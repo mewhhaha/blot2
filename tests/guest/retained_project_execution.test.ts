@@ -174,9 +174,9 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
   const base = "const flag: Bool = true\nconst a: U32 = 7\nconst b: U32 = 13\n";
   const main = 'import * as v from "./values"\n' +
     "entry func answer (n: U32): U32 => return do:\n" +
-    "  let rows: List U32 = []\n" +
+    "  let rows: Array U32 = #[]\n" +
     "  for i in 0..n:\n" +
-    "    rows := @list.append self (v.a + 3)\n" +
+    "    rows := @array.append self (v.a + 3)\n" +
     "  return rows.length + (if (#run v.flag) then v.a else v.b)\n" +
     "entry func selected (): U32 => return (#run (if v.flag then v.a else v.b))\n" +
     "entry func scale (): F32 => return 0.25\n";
@@ -241,14 +241,14 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
   }
 });
 
-Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixity", async () => {
+Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits", async () => {
   const dir = await Deno.makeTempDir();
   const entry = dir + "/main.blot";
   const prelude = dir + "/prelude.blot";
   const first = dir + "/first.blot";
   const last = dir + "/last.blot";
   const operator =
-    "infixl 60 (-) = sub\nfunc sub a -> b => return @u32.sub a b\n";
+    "func combine a -> b => return @u32.sub a b\n";
   const original =
     "func left () => return do:\n  let first = 10\n  return first\n";
   const stamp = new Date("2024-01-02T03:04:05Z");
@@ -256,7 +256,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
   await Deno.writeTextFile(
     entry,
     'import { left } from "./first"\nimport { right } from "./last"\n' +
-      "entry func answer (): U32 => return left () - right () - 1\n",
+      "entry func answer (): U32 => return combine (left () - right ()) 1\n",
   );
   await Deno.writeTextFile(first, original);
   await Deno.writeTextFile(
@@ -302,7 +302,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
     // The edited local preserves the symbol count but changes a spelling.
     await Deno.writeTextFile(first, original.replaceAll("first", "other"));
     await expect(6, 3);
-    await Deno.writeTextFile(prelude, operator.replace("infixl", "infixr"));
+    await Deno.writeTextFile(prelude, operator.replace("@u32.sub", "@u32.add"));
     await expect(8, 0);
     if (Deno.build.os !== "windows") {
       await Deno.rename(last, dir + "/three.blot");

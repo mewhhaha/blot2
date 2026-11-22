@@ -108,8 +108,6 @@ entry const answer = func (value: U32) => return do first:
 Deno.test("named binary callbacks preserve deferred and required effect rows", async () => {
   await compileAndRun(
     `
-infixl 20 (<&>) = choose
-infixl 60 (%%) = combine
 effect Read: Unit -> U32
 effect Touch: U32 -> Unit
 const choose = func (left: Bool) => return func right => return if left then right () else false
@@ -117,29 +115,29 @@ const combine = func (left: U32) => return func (right: U32) => return do:
   use Touch left
   break @u32.add left right
 const receive = func (flag: Bool) => return do:
-  let go = flag <&> (func () => return false)
+  let go = choose flag (func () => return false)
   if go:
     break ()
   use Touch 7
   break ()
-const selected = func (flag: Bool) => return flag <&> (func () => return do:
+const selected = func (flag: Bool) => return choose flag (func () => return do:
   use value <- Read ()
   break @u32.eq value 42)
-const merge = func () => return 20 %% 22
+const merge = func () => return combine 20 22
 const reader = @effect.provider Read (func () => return 42)
 const touch = @effect.provider Touch (func value => return ())
 entry const answer = do touch:
   use receive true
-  break 20 %% 22
+  break combine 20 22
 entry const loaded = do reader:
   break selected true
-entry const unforced = false <&> (func () => return @panic "unused callback")
+entry const unforced = choose false (func () => return @panic "unused callback")
 type Holder a is data = $Holder a
 const callbacks = $Holder receive
 entry const run = func (flag: Bool) : U32 => return do touch:
   let $Holder action = callbacks
   use action flag
-  break 20 %% 22
+  break combine 20 22
 `,
     (guest) => {
       equal(guest.read("answer"), 42);

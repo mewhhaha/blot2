@@ -8,11 +8,10 @@ const explicit = func (alias: GrowArray U32) -> (value: U32): U32 => return do:
   alias[0] = @u32.add self value
   pool[0] = @u32.add pool[0] 1
   return @u32.add alias[0] pool[0]
-lent const owned = func (): GrowArray U32 => return pool
 entry const mutate = func (value: U32): Array U32 => return do:
   let before = @storage.length pool
   let after = nested value
-  let alias = owned ()
+  let alias = pool
   let compared = explicit alias value
   alias[0] = @u32.add self 2
   return #[before, after, compared, pool[0], alias[0], @storage.length alias]

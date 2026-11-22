@@ -18,8 +18,8 @@ const update = func (index: U32) : Array U32 => return do:
   let before = bucket
   bucket.points[index].y[0] = @u32.add self seed
   break #[before.points[index].y[0], bucket.points[index].y[0]]
-lent const replace = func values => return func index => return func value => return do:
-  values[index] = value
+const replace = func (own values) => return func index => return func value => return do:
+  values[index] := value
   break values
 entry const run = func (index: U32) : Array U32 => return update index
 entry const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value

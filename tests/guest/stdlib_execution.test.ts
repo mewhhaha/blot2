@@ -74,76 +74,11 @@ entry const snapshots = func () => return do:
   );
 });
 
-Deno.test("list folds sequence effects and list predicates stop at the first deciding element", async () => {
-  await compileAndRun(
-    `
-import * as list from "../../std/list"
-entry const fold = func (host: U32 -> U32 ! {Foreign}) => return
-  list.fold_left (func total => return func value => return do:
-    use amount <- host value
-    break total + amount) 0 [1, 2, 3]
-entry const any = func (host: U32 -> Bool ! {Foreign}) => return list.any host [1, 2, 3]
-entry const all = func (host: U32 -> Bool ! {Foreign}) => return list.all host [1, 2, 3]
-entry const empty_any = func (host: U32 -> Bool ! {Foreign}) => return list.any host []
-entry const empty_all = func (host: U32 -> Bool ! {Foreign}) => return list.all host []
-entry const filter = func (host: U32 -> Bool ! {Foreign}) => return Array.from_list (list.filter host [1, 2, 3])
-`,
-    (guest) => {
-      const calls: number[] = [];
-      const reducer = guest.capability({
-        parameter: "U32",
-        result: "U32",
-        call(value) {
-          calls.push(value as number);
-          return (value as number) * 10;
-        },
-      });
-      equal(guest.call("fold", reducer), 60);
-      assert.deepEqual(calls, [1, 2, 3]);
-      for (
-        const [entry, accept, result] of [
-          ["any", true, true],
-          ["all", false, false],
-          ["empty_any", true, false],
-          ["empty_all", false, true],
-        ] as const
-      ) {
-        calls.length = 0;
-        const predicate = guest.capability({
-          parameter: "U32",
-          result: "Bool",
-          call(value) {
-            calls.push(value as number);
-            return value === 2 ? accept : !accept;
-          },
-        });
-        equal(guest.call(entry, predicate), result);
-        assert.deepEqual(calls, entry.startsWith("empty") ? [] : [1, 2]);
-      }
-      calls.length = 0;
-      const predicate = guest.capability({
-        parameter: "U32",
-        result: "Bool",
-        call(value) {
-          calls.push(value as number);
-          return value !== 2;
-        },
-      });
-      assert.deepEqual(
-        guest.call("filter", predicate),
-        new Uint32Array([1, 3]),
-      );
-      assert.deepEqual(calls, [1, 2, 3]);
-    },
-  );
-});
-
 Deno.test("array filtering and collection mapping keep their pure callback contract", async () => {
   for (
     const [module, member, values] of [
       ["array", "filter", "#[1, 2]"],
       ["array", "map", "#[1, 2]"],
-      ["list", "map", "[1, 2]"],
     ] as const
   ) {
     await compileExpectedFailure(
@@ -157,21 +92,21 @@ entry const run = func (host: U32 -> Bool ! {Foreign}) => return
   }
 });
 
-Deno.test("pattern branches preserve aliased list versions while appending", async () => {
+Deno.test("pattern branches preserve aliased array versions while appending", async () => {
   await compileAndRun(
     `
 entry const run = func (count: U32) => return do:
-  let values: List U32 = []
-  let prior: List U32 = []
+  let values: Array U32 = #[]
+  let prior: Array U32 = #[]
   for i in 0..count:
     let before = values
     let candidate = if i % 2 == 0 then $Some i else $Nothing
     if let $Some value = candidate:
-      values := [...self, value]
+      values := #[...self, value]
     else:
-      values := [i, ...self]
+      values := #[i, ...self]
     prior := before
-  break Array.from_list prior
+  break prior
 `,
     (guest) => {
       let current: number[] = [], previous: number[] = [];
@@ -187,18 +122,18 @@ entry const run = func (count: U32) => return do:
 Deno.test("collection wrapper elimination preserves argument effects and shared captured versions", async () => {
   await compileAndRun(
     `
-import * as list from "../../std/list"
-entry const order = func (host: U32 -> U32 ! {Foreign}) => return Array.from_list (list.append (host 1) (do:
+const append = func item => return func items => return @array.append items item
+entry const order = func (host: U32 -> U32 ! {Foreign}) => return append (host 1) (do:
   use initial <- host 2
-  break [initial]))
+  break #[initial])
 entry const shared = func () => return do:
-  let original = [1, 2]
-  let appended = list.append 3 original
-  break #[original.length, appended.length, (Array.from_list original)[1]]
+  let original = #[1, 2]
+  let appended = append 3 original
+  break #[original.length, appended.length, original[1]]
 entry const captured = func (count: U32) => return do:
-  let callbacks: List (Unit -> U32) = []
+  let callbacks: Array (Unit -> U32) = #[]
   for index in 0..count:
-    callbacks := list.append (func () => return callbacks.length) callbacks
+    callbacks := append (func () => return callbacks.length) callbacks
   break #[callback () | callback <- callbacks]
 `,
     (guest) => {
@@ -232,12 +167,12 @@ Deno.test("retained collection wrapper bodies invalidate after append becomes pr
   };
   const compiler = await createCompiler(options);
   const declarations =
-    `const append = func item => return func items => return @list.append items item
+    `const append = func item => return func items => return @array.append items item
 const build = func (count: U32) => return do:
-  let values: List U32 = []
+  let values: Array U32 = #[]
   for index in 0..count:
     values := append index values
-  break Array.from_list values
+  break values
 `;
   try {
     for (
@@ -245,7 +180,7 @@ const build = func (count: U32) => return do:
         [declarations, 0, false],
         [declarations, 1, false],
         [declarations, 2, false],
-        [declarations.replace("@list.append", "@list.prepend"), 0, true],
+        [declarations.replace("@array.append", "@array.prepend"), 0, true],
         [declarations, 0, false],
       ] as const
     ) {

@@ -17,25 +17,27 @@ ends without a compilation record (a crash) fails.
 
 The programs named g are about the rules every function has: its result is
 the caller's alone, and a call only borrows its arguments. The programs
-named h are about what stays while `=` exists: `lent` functions, what a
-store may keep, function values, and a closure that gives back what it
-captured after the call it was written for. The programs named i are
-about `own` in function types: lambdas and function values that take a
-parameter over. The programs named j take a value apart into parts of
-its own, and bind names that borrow a value and give it back. The
-programs named k are about a borrowed value without a name (an argument,
-what a plain value is read out of, what a loop walks), which is given
-back when the expression or the loop around it is done, and about two
-names that borrow from one local. The programs named l give a field of
-a local to an `own` parameter and put something back in it. The programs
-named m are about values whose type is not known yet: a parameter without
-a type is given only when it was taken over, and a function held in a
-field of a record that is not known yet is called like any function value.
-The programs named n are about a view, which borrows the field it is made
-of, about fields of a function's own local that leave in its result, and
-about an arm of a `case` or an `if` that names a local at its last read,
-which moves it, and about a `lent` function, whose result borrows its
-arguments and which may not keep them.
+named h are about what stays while `=` exists: what a store may keep,
+function values, and a closure that gives back what it captured after the
+call it was written for. The programs named i are about `own` in function
+types: lambdas and function values that take a parameter over. The programs
+named j take a value apart into parts of its own, and bind names that borrow
+a value and give it back. The programs named k are about a borrowed value
+without a name (an argument, what a plain value is read out of, what a loop
+walks), which is given back when the expression or the loop around it is
+done, and about two names that borrow from one local. The programs named l
+give a field of a local to an `own` parameter and put something back in it.
+The programs named m are about values whose type is not known yet: a
+parameter without a type is given only when it was taken over, and a
+function held in a field of a record that is not known yet is called like
+any function value. The programs named n are about a view, which borrows
+the field it is made of, about fields of a function's own local that leave
+in its result, and about an arm of a `case` or an `if` that names a local at
+its last read, which moves it.
+
+Batch 1C (22 November 2026) retired `lent` functions and `BLOT_REPORT_STORES`,
+removing the 10 `lent`-only programs (h01..h06, n09..n12) and leaving 202
+programs with unchanged diagnostics.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

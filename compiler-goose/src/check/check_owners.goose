@@ -15,9 +15,6 @@ struct CheckedOwnerState {generation:u64=0,live:bool=false,
 function_exit_lambdas:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
 iterator_bodies:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
 computations:Computation[:]=default<Computation[:]>(),
-request_loops:RequestLoop[:]=default<RequestLoop[:]>(),
-request_arms:RequestArm[:]=default<RequestArm[:]>(),
-request_controls:RequestControl[:]=default<RequestControl[:]>(),
 reflections:Reflection[:]=default<Reflection[:]>(),
 tag_origins:TagOrigin[:]=default<TagOrigin[:]>(),
 effect_runners:EffectRunner[:]=default<EffectRunner[:]>(),
@@ -60,15 +57,6 @@ access_types:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
 projection_resolved:u32[:]=default<u32[:]>(),
 projection_catalog:Projection[:]=default<Projection[:]>(),
 rebindings:Rebinding[:]=default<Rebinding[:]>(),
-resolver_blocks:ResolverBlock[:]=default<ResolverBlock[:]>(),
-resolver_ops:ResolverOp[:]=default<ResolverOp[:]>(),
-resolver_joins:ResolverJoin[:]=default<ResolverJoin[:]>(),
-resolver_completions:ResolverCompletion[:]=default<ResolverCompletion[:]>(),
-resolver_loops:ResolverLoop[:]=default<ResolverLoop[:]>(),
-resolver_block_ids:u32[:]=default<u32[:]>(),
-resolver_op_ids:u32[:]=default<u32[:]>(),
-resolver_join_ids:u32[:]=default<u32[:]>(),
-resolver_loop_ids:u32[:]=default<u32[:]>(),
 loop_carries:LoopCarry[:]=default<LoopCarry[:]>(),
 loop_ranges:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
 loop_exits:LoopExit[:]=default<LoopExit[:]>(),
@@ -80,9 +68,6 @@ reusable var checked_owners:CheckedOwnerState[>..]=[];
 reusable[] var checked_function_exit_lambdas:blot_parse_ast::Id[>..];
 reusable[] var checked_iterator_bodies:blot_parse_ast::Id[>..];
 reusable[] var checked_computations:Computation[>..];
-reusable[] var checked_request_loops:RequestLoop[>..];
-reusable[] var checked_request_arms:RequestArm[>..];
-reusable[] var checked_request_controls:RequestControl[>..];
 reusable[] var checked_reflections:Reflection[>..];
 reusable[] var checked_tag_origins:TagOrigin[>..];
 reusable[] var checked_effect_runners:EffectRunner[>..];
@@ -125,15 +110,6 @@ reusable[] var checked_access_types:blot_check_types::List[>..];
 reusable[] var checked_projection_resolved:u32[>..];
 reusable[] var checked_projection_catalog:Projection[>..];
 reusable[] var checked_rebindings:Rebinding[>..];
-reusable[] var checked_resolver_blocks:ResolverBlock[>..];
-reusable[] var checked_resolver_ops:ResolverOp[>..];
-reusable[] var checked_resolver_joins:ResolverJoin[>..];
-reusable[] var checked_resolver_completions:ResolverCompletion[>..];
-reusable[] var checked_resolver_loops:ResolverLoop[>..];
-reusable[] var checked_resolver_block_ids:u32[>..];
-reusable[] var checked_resolver_op_ids:u32[>..];
-reusable[] var checked_resolver_join_ids:u32[>..];
-reusable[] var checked_resolver_loop_ids:u32[>..];
 reusable[] var checked_loop_carries:LoopCarry[>..];
 reusable[] var checked_loop_ranges:blot_check_types::List[>..];
 reusable[] var checked_loop_exits:LoopExit[>..];
@@ -146,9 +122,6 @@ fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xf
 fn ownChecked_function_exit_lambdas(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.function_exit_lambdas.len==0);let result=checked_function_exit_lambdas.alloc_slice(values.len);for value,index in values {result[index]=value;}state.function_exit_lambdas=result;return result;}
 fn ownChecked_iterator_bodies(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.iterator_bodies.len==0);let result=checked_iterator_bodies.alloc_slice(values.len);for value,index in values {result[index]=value;}state.iterator_bodies=result;return result;}
 fn ownChecked_computations(owner:CheckedOwner,values:const Computation[:])->Computation[:] {let state .= checkedOwnerState(owner);assert(state.computations.len==0);let result=checked_computations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.computations=result;return result;}
-fn ownChecked_request_loops(owner:CheckedOwner,values:const RequestLoop[:])->RequestLoop[:] {let state .= checkedOwnerState(owner);assert(state.request_loops.len==0);let result=checked_request_loops.alloc_slice(values.len);for value,index in values {result[index]=value;}state.request_loops=result;return result;}
-fn ownChecked_request_arms(owner:CheckedOwner,values:const RequestArm[:])->RequestArm[:] {let state .= checkedOwnerState(owner);assert(state.request_arms.len==0);let result=checked_request_arms.alloc_slice(values.len);for value,index in values {result[index]=value;}state.request_arms=result;return result;}
-fn ownChecked_request_controls(owner:CheckedOwner,values:const RequestControl[:])->RequestControl[:] {let state .= checkedOwnerState(owner);assert(state.request_controls.len==0);let result=checked_request_controls.alloc_slice(values.len);for value,index in values {result[index]=value;}state.request_controls=result;return result;}
 fn ownChecked_reflections(owner:CheckedOwner,values:const Reflection[:])->Reflection[:] {let state .= checkedOwnerState(owner);assert(state.reflections.len==0);let result=checked_reflections.alloc_slice(values.len);for value,index in values {result[index]=value;}state.reflections=result;return result;}
 fn ownChecked_tag_origins(owner:CheckedOwner,values:const TagOrigin[:])->TagOrigin[:] {let state .= checkedOwnerState(owner);assert(state.tag_origins.len==0);let result=checked_tag_origins.alloc_slice(values.len);for value,index in values {result[index]=value;}state.tag_origins=result;return result;}
 fn ownChecked_effect_runners(owner:CheckedOwner,values:const EffectRunner[:])->EffectRunner[:] {let state .= checkedOwnerState(owner);assert(state.effect_runners.len==0);let result=checked_effect_runners.alloc_slice(values.len);for value,index in values {result[index]=value;}state.effect_runners=result;return result;}
@@ -204,15 +177,6 @@ fn ownChecked_access_types(owner:CheckedOwner,values:const blot_check_types::Lis
 fn ownChecked_projection_resolved(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.projection_resolved.len==0);let result=checked_projection_resolved.alloc_slice(values.len);for value,index in values {result[index]=value;}state.projection_resolved=result;return result;}
 fn ownChecked_projection_catalog(owner:CheckedOwner,values:const Projection[:])->Projection[:] {let state .= checkedOwnerState(owner);assert(state.projection_catalog.len==0);let result=checked_projection_catalog.alloc_slice(values.len);for value,index in values {result[index]=value;}state.projection_catalog=result;return result;}
 fn ownChecked_rebindings(owner:CheckedOwner,values:const Rebinding[:])->Rebinding[:] {let state .= checkedOwnerState(owner);assert(state.rebindings.len==0);let result=checked_rebindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.rebindings=result;return result;}
-fn ownChecked_resolver_blocks(owner:CheckedOwner,values:const ResolverBlock[:])->ResolverBlock[:] {let state .= checkedOwnerState(owner);assert(state.resolver_blocks.len==0);let result=checked_resolver_blocks.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_blocks=result;return result;}
-fn ownChecked_resolver_ops(owner:CheckedOwner,values:const ResolverOp[:])->ResolverOp[:] {let state .= checkedOwnerState(owner);assert(state.resolver_ops.len==0);let result=checked_resolver_ops.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_ops=result;return result;}
-fn ownChecked_resolver_joins(owner:CheckedOwner,values:const ResolverJoin[:])->ResolverJoin[:] {let state .= checkedOwnerState(owner);assert(state.resolver_joins.len==0);let result=checked_resolver_joins.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_joins=result;return result;}
-fn ownChecked_resolver_completions(owner:CheckedOwner,values:const ResolverCompletion[:])->ResolverCompletion[:] {let state .= checkedOwnerState(owner);assert(state.resolver_completions.len==0);let result=checked_resolver_completions.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_completions=result;return result;}
-fn ownChecked_resolver_loops(owner:CheckedOwner,values:const ResolverLoop[:])->ResolverLoop[:] {let state .= checkedOwnerState(owner);assert(state.resolver_loops.len==0);let result=checked_resolver_loops.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_loops=result;return result;}
-fn ownChecked_resolver_block_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.resolver_block_ids.len==0);let result=checked_resolver_block_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_block_ids=result;return result;}
-fn ownChecked_resolver_op_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.resolver_op_ids.len==0);let result=checked_resolver_op_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_op_ids=result;return result;}
-fn ownChecked_resolver_join_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.resolver_join_ids.len==0);let result=checked_resolver_join_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_join_ids=result;return result;}
-fn ownChecked_resolver_loop_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.resolver_loop_ids.len==0);let result=checked_resolver_loop_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.resolver_loop_ids=result;return result;}
 fn ownChecked_loop_carries(owner:CheckedOwner,values:const LoopCarry[:])->LoopCarry[:] {let state .= checkedOwnerState(owner);assert(state.loop_carries.len==0);let result=checked_loop_carries.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_carries=result;return result;}
 fn ownChecked_loop_ranges(owner:CheckedOwner,values:const blot_check_types::List[:])->blot_check_types::List[:] {let state .= checkedOwnerState(owner);assert(state.loop_ranges.len==0);let result=checked_loop_ranges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_ranges=result;return result;}
 fn ownChecked_loop_exits(owner:CheckedOwner,values:const LoopExit[:])->LoopExit[:] {let state .= checkedOwnerState(owner);assert(state.loop_exits.len==0);let result=checked_loop_exits.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_exits=result;return result;}
@@ -269,9 +233,6 @@ fn releaseCheckedBodies(owner:CheckedOwner) {let state .= checkedOwnerState(owne
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
 if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
 if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
-if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
-if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=default<RequestArm[:]>();}
-if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
 if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
 if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
 if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
@@ -296,15 +257,6 @@ if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types
 if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=default<u32[:]>();}
 if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=default<Projection[:]>();}
 if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=default<Rebinding[:]>();}
-if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=default<ResolverBlock[:]>();}
-if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=default<ResolverOp[:]>();}
-if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=default<ResolverJoin[:]>();}
-if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=default<ResolverCompletion[:]>();}
-if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=default<ResolverLoop[:]>();}
-if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=default<u32[:]>();}
-if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=default<u32[:]>();}
-if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=default<u32[:]>();}
-if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=default<u32[:]>();}
 if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=default<LoopCarry[:]>();}
 if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=default<blot_check_types::List[:]>();}
 if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}
@@ -315,9 +267,6 @@ fn deinit(self_:CheckedOwner&) {if self_.lease==0 {return;}assert(self_.valid())
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
 if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
 if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
-if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
-if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=default<RequestArm[:]>();}
-if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
 if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
 if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
 if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
@@ -360,15 +309,6 @@ if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types
 if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=default<u32[:]>();}
 if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=default<Projection[:]>();}
 if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=default<Rebinding[:]>();}
-if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=default<ResolverBlock[:]>();}
-if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=default<ResolverOp[:]>();}
-if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=default<ResolverJoin[:]>();}
-if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=default<ResolverCompletion[:]>();}
-if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=default<ResolverLoop[:]>();}
-if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=default<u32[:]>();}
-if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=default<u32[:]>();}
-if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=default<u32[:]>();}
-if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=default<u32[:]>();}
 if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=default<LoopCarry[:]>();}
 if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=default<blot_check_types::List[:]>();}
 if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}

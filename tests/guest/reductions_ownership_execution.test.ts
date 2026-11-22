@@ -6,8 +6,24 @@ async function run(counts: number[]) {
     `
 import * as rolling from "std/rolling"
 import * as summary from "std/summary"
-import * as iter from "std/iter"
 type Node is data = $End | $Next (Unit -> Node)
+type Range is data = $Range { current: U32, end: U32 }
+func Range.iter (r: Range) => r
+func Range.next ($Range { current, end }) => if current < end then $Some (current, $Range { current: @u32.add current 1, end }) else $Nothing
+type Mapped [i, f] is data = $Mapped { cursor: i, transform: f }
+func Mapped.iter (m: Mapped [i, f]) => m
+func Mapped.next ($Mapped { cursor, transform }) => case cursor.next of
+  $Nothing => $Nothing
+  $Some (value, rest) => $Some (transform value, $Mapped { cursor: rest, transform })
+func fold_left step -> initial -> values =>
+  let acc = initial
+  let cursor = values.iter
+  for ever:
+    let $Some (value, rest) = cursor.next else:
+      break
+    acc := step acc value
+    cursor := rest
+  return acc
 const retained_node = func () => return do:
   let saved = $End
   break $Next (func () => return saved)
@@ -21,18 +37,18 @@ const validate = func (node: Node) => return case node of
     $Next _ => @panic "summary changed its captured node"
 entry const monoid = func (count: U32) => return do:
   let node = retained_node ()
-  let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
-  let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
+  let values = $Mapped { cursor: $Range { current: 0, end: count }, transform: func index => return {sum: index, node} }
+  let total = fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
   break @u32.add total (validate node)
 entry const group = func (count: U32) => return do:
   let node = retained_node ()
-  let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
-  let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
+  let values = $Mapped { cursor: $Range { current: 0, end: count }, transform: func index => return {sum: index, node} }
+  let total = fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
   break @u32.add total (validate node)
 entry const update = func (count: U32) => return do:
   let node = retained_node ()
   let initial = {sum: 0, node}
-  let original = summary.build combine initial (iter.map (func index => return {sum: index, node}) (iter.range 0 31))
+  let original = summary.build combine initial ($Mapped { cursor: $Range { current: 0, end: 31 }, transform: func index => return {sum: index, node} })
   let tree = original
   for index in 0..count:
     tree := summary.set combine (@u32.rem index 31) {sum: 1, node} self

@@ -501,8 +501,6 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
         ref => { return NominalIdentity { 0xffffffff, blot_check_storage_types::ref }, true; },
         view => { return NominalIdentity { 0xffffffff, blot_check_storage_types::view }, true; },
         link => { return NominalIdentity { 0xffffffff, blot_check_storage_types::link }, true; },
-        list => { return NominalIdentity { 0, 0xfffffffe }, true; },
-        cursor => { return NominalIdentity { 0, 0xfffffffd }, true; },
         _ => { return NominalIdentity { 0, 0 }, false; },
     }
 }
@@ -633,7 +631,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, list, cursor, grow, resize, ref, view, link, cell => { result = true; },
+        function, provider, array, grow, resize, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -685,7 +683,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, list, cursor, grow, resize, ref, view, link, cell => { result = true; },
+        function, provider, array, grow, resize, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -876,7 +874,7 @@ recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth
     let n = m.types.node(ty);
     match n.tag {
         variable, bound => { if !inScratch(g, from, g.s.scratch.len, ty) { g.s.scratch.push(ty); } },
-        usage, forall, array, list, cursor => { mentions(g, m, n.a, from, depth + 1); },
+        usage, forall, array => { mentions(g, m, n.a, from, depth + 1); },
         function => {
             mentions(g, m, n.a, from, depth + 1);
             mentions(g, m, n.b, from, depth + 1);
@@ -1277,7 +1275,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let n = g.types.node(receiver);
             if goal.kind == blot_check_types::ObligationKind.collection {
                 match n.tag {
-                    array, list, cursor, grow, resize, view => { g.types.match_(m, goal.result, n.a, env); },
+                    array, grow, resize, view => { g.types.match_(m, goal.result, n.a, env); },
                     _ => {},
                 }
                 continue;

@@ -57,7 +57,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     match shape.tag {
         unit, boolean, u32_, f32_ => { return true; },
         function, provider, state_provider, cell, never => { return false; },
-        array, list, cursor, grow, resize, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
+        array, grow, resize, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
             for child in g.types.words[shape.a..shape.a + shape.b] {
                 if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
@@ -493,7 +493,7 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     if ref.unit != 0 && ref.unit != m.unit { return neverVal(), false, blot_direct_types::Error.none; }
     let list, present = bindGet(g, f, ref.binding);
     if !present { return neverVal(), false, blot_direct_types::Error.none; }
-    if tagOf(g, list.ty) != blot_direct_types::Tag.list && tagOf(g, list.ty) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
+    if tagOf(g, list.ty) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
     if uses(g, f, ref.binding) != 1 { return neverVal(), false, blot_direct_types::Error.none; }
     let value, error = expr(g, f, children[1]);
     if error != blot_direct_types::Error.none { return value, false, error; }
@@ -646,7 +646,7 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
             for carry in m.loop_carries[loop_.carries.start..loop_.carries.start + loop_.carries.len] {
                 let slot = (base as i64) + (carry.iteration as i64);
                 let count = g.s.use_count_vals[slot];
-                if count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.list { continue; }
+                if count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.array { continue; }
                 if terminalAppends(m, loop_.body, carry.iteration, carry.backedge, 0) == count {
                     g.s.use_count_vals[slot] = 1;
                 }

@@ -15,7 +15,7 @@ fn canonicalCheckedEditor(state:const CheckedOwnerState&,packet:blot_project_pac
 fn canonicalOwnedChecked(value:Checked)->Checked {
  let state:const CheckedOwnerState& =checkedOwnerState(value.owner);let packet=checkedPacket(value.owner);
  var editor=blot_support::none<EditorCapture>();if value.editor.present {editor=blot_support::Option<EditorCapture>{true,canonicalCheckedEditor(state,packet,value.editor.value)};}
- return Checked{owner:value.owner,function_exit_lambdas:checkedRun_function_exit_lambdas(packet,value.function_exit_lambdas,state.function_exit_lambdas),editor:editor,iterator_bodies:checkedRun_iterator_bodies(packet,value.iterator_bodies,state.iterator_bodies),initializer_rejected:value.initializer_rejected,computations:checkedRun_computations(packet,value.computations,state.computations),request_loops:checkedRun_request_loops(packet,value.request_loops,state.request_loops),request_arms:checkedRun_request_arms(packet,value.request_arms,state.request_arms),request_controls:checkedRun_request_controls(packet,value.request_controls,state.request_controls),reflections:checkedRun_reflections(packet,value.reflections,state.reflections),tag_origins:checkedRun_tag_origins(packet,value.tag_origins,state.tag_origins),effect_runners:checkedRun_effect_runners(packet,value.effect_runners,state.effect_runners),effect_runner_ids:checkedRun_effect_runner_ids(packet,value.effect_runner_ids,state.effect_runner_ids),provider_blocks:checkedRun_provider_blocks(packet,value.provider_blocks,state.provider_blocks),provider_block_ids:checkedRun_provider_block_ids(packet,value.provider_block_ids,state.provider_block_ids),body_closed_rows:checkedRun_body_closed_rows(packet,value.body_closed_rows,state.body_closed_rows),lambda_closed_rows:checkedRun_lambda_closed_rows(packet,value.lambda_closed_rows,state.lambda_closed_rows),dispatch_signatures:checkedRun_dispatch_signatures(packet,value.dispatch_signatures,state.dispatch_signatures),covered_requirements:checkedRun_covered_requirements(packet,value.covered_requirements,state.covered_requirements),effect_families:checkedRun_effect_families(packet,value.effect_families,state.effect_families),effect_templates:checkedRun_effect_templates(packet,value.effect_templates,state.effect_templates),operation_uses:checkedRun_operation_uses(packet,value.operation_uses,state.operation_uses),operation_refs:checkedRun_operation_refs(packet,value.operation_refs,state.operation_refs),types:blot_check_types::checkedView(value.types),parameter_patterns:blot_check_parameter_patterns::checkedView(value.parameter_patterns),expr_types:checkedRun_expr_types(packet,value.expr_types,state.expr_types),resolved:checkedRun_resolved(packet,value.resolved,state.resolved),bindings:checkedRun_bindings(packet,value.bindings,state.bindings),merges:checkedRun_merges(packet,value.merges,state.merges),obligations:checkedRun_obligations(packet,value.obligations,state.obligations),diagnostics:checkedRun_diagnostics(packet,value.diagnostics,state.diagnostics),body_elaborations:value.body_elaborations,imported_schemes:value.imported_schemes,counters:value.counters,unit:value.unit,associated:checkedRun_associated(packet,value.associated,state.associated),nominals:checkedRun_nominals(packet,value.nominals,state.nominals),contracts:checkedRun_contracts(packet,value.contracts,state.contracts),contract_predicates:checkedRun_contract_predicates(packet,value.contract_predicates,state.contract_predicates),contract_members:checkedRun_contract_members(packet,value.contract_members,state.contract_members),implementations:checkedRun_implementations(packet,value.implementations,state.implementations),implementation_predicates:checkedRun_implementation_predicates(packet,value.implementation_predicates,state.implementation_predicates),implementation_members:checkedRun_implementation_members(packet,value.implementation_members,state.implementation_members),member_templates:checkedRun_member_templates(packet,value.member_templates,state.member_templates),selected_proofs:checkedRun_selected_proofs(packet,value.selected_proofs,state.selected_proofs),selected_members:checkedRun_selected_members(packet,value.selected_members,state.selected_members),selected_edges:checkedRun_selected_edges(packet,value.selected_edges,state.selected_edges),selected_uses:checkedRun_selected_uses(packet,value.selected_uses,state.selected_uses),constructors:checkedRun_constructors(packet,value.constructors,state.constructors),constructor_resolved:checkedRun_constructor_resolved(packet,value.constructor_resolved,state.constructor_resolved),projections:checkedRun_projections(packet,value.projections,state.projections),access_paths:checkedRun_access_paths(packet,value.access_paths,state.access_paths),access_nodes:checkedRun_access_nodes(packet,value.access_nodes,state.access_nodes),access_types:checkedRun_access_types(packet,value.access_types,state.access_types),projection_resolved:checkedRun_projection_resolved(packet,value.projection_resolved,state.projection_resolved),projection_catalog:checkedRun_projection_catalog(packet,value.projection_catalog,state.projection_catalog),rebindings:checkedRun_rebindings(packet,value.rebindings,state.rebindings),resolver_blocks:checkedRun_resolver_blocks(packet,value.resolver_blocks,state.resolver_blocks),resolver_ops:checkedRun_resolver_ops(packet,value.resolver_ops,state.resolver_ops),resolver_joins:checkedRun_resolver_joins(packet,value.resolver_joins,state.resolver_joins),resolver_completions:checkedRun_resolver_completions(packet,value.resolver_completions,state.resolver_completions),resolver_loops:checkedRun_resolver_loops(packet,value.resolver_loops,state.resolver_loops),resolver_block_ids:checkedRun_resolver_block_ids(packet,value.resolver_block_ids,state.resolver_block_ids),resolver_op_ids:checkedRun_resolver_op_ids(packet,value.resolver_op_ids,state.resolver_op_ids),resolver_join_ids:checkedRun_resolver_join_ids(packet,value.resolver_join_ids,state.resolver_join_ids),resolver_loop_ids:checkedRun_resolver_loop_ids(packet,value.resolver_loop_ids,state.resolver_loop_ids),loop_carries:checkedRun_loop_carries(packet,value.loop_carries,state.loop_carries),loop_ranges:checkedRun_loop_ranges(packet,value.loop_ranges,state.loop_ranges),loop_exits:checkedRun_loop_exits(packet,value.loop_exits,state.loop_exits),statement_arms:checkedRun_statement_arms(packet,value.statement_arms,state.statement_arms)};
+ return Checked{owner:value.owner,function_exit_lambdas:checkedRun_function_exit_lambdas(packet,value.function_exit_lambdas,state.function_exit_lambdas),editor:editor,iterator_bodies:checkedRun_iterator_bodies(packet,value.iterator_bodies,state.iterator_bodies),initializer_rejected:value.initializer_rejected,computations:checkedRun_computations(packet,value.computations,state.computations),reflections:checkedRun_reflections(packet,value.reflections,state.reflections),tag_origins:checkedRun_tag_origins(packet,value.tag_origins,state.tag_origins),effect_runners:checkedRun_effect_runners(packet,value.effect_runners,state.effect_runners),effect_runner_ids:checkedRun_effect_runner_ids(packet,value.effect_runner_ids,state.effect_runner_ids),provider_blocks:checkedRun_provider_blocks(packet,value.provider_blocks,state.provider_blocks),provider_block_ids:checkedRun_provider_block_ids(packet,value.provider_block_ids,state.provider_block_ids),body_closed_rows:checkedRun_body_closed_rows(packet,value.body_closed_rows,state.body_closed_rows),lambda_closed_rows:checkedRun_lambda_closed_rows(packet,value.lambda_closed_rows,state.lambda_closed_rows),dispatch_signatures:checkedRun_dispatch_signatures(packet,value.dispatch_signatures,state.dispatch_signatures),covered_requirements:checkedRun_covered_requirements(packet,value.covered_requirements,state.covered_requirements),effect_families:checkedRun_effect_families(packet,value.effect_families,state.effect_families),effect_templates:checkedRun_effect_templates(packet,value.effect_templates,state.effect_templates),operation_uses:checkedRun_operation_uses(packet,value.operation_uses,state.operation_uses),operation_refs:checkedRun_operation_refs(packet,value.operation_refs,state.operation_refs),types:blot_check_types::checkedView(value.types),parameter_patterns:blot_check_parameter_patterns::checkedView(value.parameter_patterns),expr_types:checkedRun_expr_types(packet,value.expr_types,state.expr_types),resolved:checkedRun_resolved(packet,value.resolved,state.resolved),bindings:checkedRun_bindings(packet,value.bindings,state.bindings),merges:checkedRun_merges(packet,value.merges,state.merges),obligations:checkedRun_obligations(packet,value.obligations,state.obligations),diagnostics:checkedRun_diagnostics(packet,value.diagnostics,state.diagnostics),body_elaborations:value.body_elaborations,imported_schemes:value.imported_schemes,counters:value.counters,unit:value.unit,associated:checkedRun_associated(packet,value.associated,state.associated),nominals:checkedRun_nominals(packet,value.nominals,state.nominals),contracts:checkedRun_contracts(packet,value.contracts,state.contracts),contract_predicates:checkedRun_contract_predicates(packet,value.contract_predicates,state.contract_predicates),contract_members:checkedRun_contract_members(packet,value.contract_members,state.contract_members),implementations:checkedRun_implementations(packet,value.implementations,state.implementations),implementation_predicates:checkedRun_implementation_predicates(packet,value.implementation_predicates,state.implementation_predicates),implementation_members:checkedRun_implementation_members(packet,value.implementation_members,state.implementation_members),member_templates:checkedRun_member_templates(packet,value.member_templates,state.member_templates),selected_proofs:checkedRun_selected_proofs(packet,value.selected_proofs,state.selected_proofs),selected_members:checkedRun_selected_members(packet,value.selected_members,state.selected_members),selected_edges:checkedRun_selected_edges(packet,value.selected_edges,state.selected_edges),selected_uses:checkedRun_selected_uses(packet,value.selected_uses,state.selected_uses),constructors:checkedRun_constructors(packet,value.constructors,state.constructors),constructor_resolved:checkedRun_constructor_resolved(packet,value.constructor_resolved,state.constructor_resolved),projections:checkedRun_projections(packet,value.projections,state.projections),access_paths:checkedRun_access_paths(packet,value.access_paths,state.access_paths),access_nodes:checkedRun_access_nodes(packet,value.access_nodes,state.access_nodes),access_types:checkedRun_access_types(packet,value.access_types,state.access_types),projection_resolved:checkedRun_projection_resolved(packet,value.projection_resolved,state.projection_resolved),projection_catalog:checkedRun_projection_catalog(packet,value.projection_catalog,state.projection_catalog),rebindings:checkedRun_rebindings(packet,value.rebindings,state.rebindings),loop_carries:checkedRun_loop_carries(packet,value.loop_carries,state.loop_carries),loop_ranges:checkedRun_loop_ranges(packet,value.loop_ranges,state.loop_ranges),loop_exits:checkedRun_loop_exits(packet,value.loop_exits,state.loop_exits),statement_arms:checkedRun_statement_arms(packet,value.statement_arms,state.statement_arms)};
 }
 fn checkedRun_editor_names(packet:blot_project_packet::Owner,value:EditorName[:],registered:EditorName[:])->EditorName[:] {
  if packet.slot!=0 {return blot_project_packet::view(packet,value);}
@@ -44,27 +44,6 @@ fn checkedRun_computations(packet:blot_project_packet::Owner,value:Computation[:
  if value.len==0 {return default<Computation[:]>();}
  let owned=checked_computations.realloc_slice(registered,registered.len);let start=checked_computations.index_of(owned[0]);
  return checked_computations[start..start+owned.len];
-}
-fn checkedRun_request_loops(packet:blot_project_packet::Owner,value:RequestLoop[:],registered:RequestLoop[:])->RequestLoop[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<RequestLoop[:]>();}
- let owned=checked_request_loops.realloc_slice(registered,registered.len);let start=checked_request_loops.index_of(owned[0]);
- return checked_request_loops[start..start+owned.len];
-}
-fn checkedRun_request_arms(packet:blot_project_packet::Owner,value:RequestArm[:],registered:RequestArm[:])->RequestArm[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<RequestArm[:]>();}
- let owned=checked_request_arms.realloc_slice(registered,registered.len);let start=checked_request_arms.index_of(owned[0]);
- return checked_request_arms[start..start+owned.len];
-}
-fn checkedRun_request_controls(packet:blot_project_packet::Owner,value:RequestControl[:],registered:RequestControl[:])->RequestControl[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<RequestControl[:]>();}
- let owned=checked_request_controls.realloc_slice(registered,registered.len);let start=checked_request_controls.index_of(owned[0]);
- return checked_request_controls[start..start+owned.len];
 }
 fn checkedRun_reflections(packet:blot_project_packet::Owner,value:Reflection[:],registered:Reflection[:])->Reflection[:] {
  if packet.slot!=0 {return blot_project_packet::view(packet,value);}
@@ -358,69 +337,6 @@ fn checkedRun_rebindings(packet:blot_project_packet::Owner,value:Rebinding[:],re
  if value.len==0 {return default<Rebinding[:]>();}
  let owned=checked_rebindings.realloc_slice(registered,registered.len);let start=checked_rebindings.index_of(owned[0]);
  return checked_rebindings[start..start+owned.len];
-}
-fn checkedRun_resolver_blocks(packet:blot_project_packet::Owner,value:ResolverBlock[:],registered:ResolverBlock[:])->ResolverBlock[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<ResolverBlock[:]>();}
- let owned=checked_resolver_blocks.realloc_slice(registered,registered.len);let start=checked_resolver_blocks.index_of(owned[0]);
- return checked_resolver_blocks[start..start+owned.len];
-}
-fn checkedRun_resolver_ops(packet:blot_project_packet::Owner,value:ResolverOp[:],registered:ResolverOp[:])->ResolverOp[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<ResolverOp[:]>();}
- let owned=checked_resolver_ops.realloc_slice(registered,registered.len);let start=checked_resolver_ops.index_of(owned[0]);
- return checked_resolver_ops[start..start+owned.len];
-}
-fn checkedRun_resolver_joins(packet:blot_project_packet::Owner,value:ResolverJoin[:],registered:ResolverJoin[:])->ResolverJoin[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<ResolverJoin[:]>();}
- let owned=checked_resolver_joins.realloc_slice(registered,registered.len);let start=checked_resolver_joins.index_of(owned[0]);
- return checked_resolver_joins[start..start+owned.len];
-}
-fn checkedRun_resolver_completions(packet:blot_project_packet::Owner,value:ResolverCompletion[:],registered:ResolverCompletion[:])->ResolverCompletion[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<ResolverCompletion[:]>();}
- let owned=checked_resolver_completions.realloc_slice(registered,registered.len);let start=checked_resolver_completions.index_of(owned[0]);
- return checked_resolver_completions[start..start+owned.len];
-}
-fn checkedRun_resolver_loops(packet:blot_project_packet::Owner,value:ResolverLoop[:],registered:ResolverLoop[:])->ResolverLoop[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<ResolverLoop[:]>();}
- let owned=checked_resolver_loops.realloc_slice(registered,registered.len);let start=checked_resolver_loops.index_of(owned[0]);
- return checked_resolver_loops[start..start+owned.len];
-}
-fn checkedRun_resolver_block_ids(packet:blot_project_packet::Owner,value:u32[:],registered:u32[:])->u32[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<u32[:]>();}
- let owned=checked_resolver_block_ids.realloc_slice(registered,registered.len);let start=checked_resolver_block_ids.index_of(owned[0]);
- return checked_resolver_block_ids[start..start+owned.len];
-}
-fn checkedRun_resolver_op_ids(packet:blot_project_packet::Owner,value:u32[:],registered:u32[:])->u32[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<u32[:]>();}
- let owned=checked_resolver_op_ids.realloc_slice(registered,registered.len);let start=checked_resolver_op_ids.index_of(owned[0]);
- return checked_resolver_op_ids[start..start+owned.len];
-}
-fn checkedRun_resolver_join_ids(packet:blot_project_packet::Owner,value:u32[:],registered:u32[:])->u32[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<u32[:]>();}
- let owned=checked_resolver_join_ids.realloc_slice(registered,registered.len);let start=checked_resolver_join_ids.index_of(owned[0]);
- return checked_resolver_join_ids[start..start+owned.len];
-}
-fn checkedRun_resolver_loop_ids(packet:blot_project_packet::Owner,value:u32[:],registered:u32[:])->u32[:] {
- if packet.slot!=0 {return blot_project_packet::view(packet,value);}
- assert(blot_support::same_slice_identity(value,registered));
- if value.len==0 {return default<u32[:]>();}
- let owned=checked_resolver_loop_ids.realloc_slice(registered,registered.len);let start=checked_resolver_loop_ids.index_of(owned[0]);
- return checked_resolver_loop_ids[start..start+owned.len];
 }
 fn checkedRun_loop_carries(packet:blot_project_packet::Owner,value:LoopCarry[:],registered:LoopCarry[:])->LoopCarry[:] {
  if packet.slot!=0 {return blot_project_packet::view(packet,value);}

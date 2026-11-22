@@ -73,4 +73,4 @@ entry const ordered = func (index: U32): U32 => return do:
   return write rows events index
 entry const event_count = func (): U32 => return @storage.length events
 entry const filtered = func (cutoff: U32): Array U32 => return
-  @array.from_list [value | value <- @array.generate 513 (func index => return index), @u32.lt cutoff value]
+  #[value | value <- @array.generate 513 (func index => return index), @u32.lt cutoff value]

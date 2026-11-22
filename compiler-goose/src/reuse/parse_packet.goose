@@ -30,7 +30,7 @@ fn write_tree(tree: const Tree&, packet: u8[>..<]&) {
     to_bytes(tree.type_conversion_origins.items,packet);
 }
 
-fn encodeWithScratch(source: const u8[:], seed: const Pool&, fixities: const blot_parse_parser::InheritedFixity[:], tokens: blot_parse_token::Token[>..<]&, comments: blot_parse_token::Token[>..<]&, diagnostics: blot_parse_lexer::Diagnostic[>..<]&, local: Pool&, packet: u8[>..<]&) -> bool {
+fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: blot_parse_token::Token[>..<]&, comments: blot_parse_token::Token[>..<]&, diagnostics: blot_parse_lexer::Diagnostic[>..<]&, local: Pool&, packet: u8[>..<]&) -> bool {
     packet.clear();
     tokens.clear();
     comments.clear();
@@ -52,7 +52,7 @@ fn encodeWithScratch(source: const u8[:], seed: const Pool&, fixities: const blo
     if local.bytes.failure!=ok || local.entries.failure!=ok || local.buckets.failure!=ok {return false;}
     var tree,tree_error=blot_parse_ast::initPooled();
     if tree_error!=ok {return false;}
-    let parsed=blot_parse_parser::parse_with_fixities(source,tokens,local,tree,fixities);
+    let parsed=blot_parse_parser::parse(source,tokens,local,tree);
     if parsed!=ok || tree.diagnostics.len!=0 {tree.deinit();return false;}
 
     let writer=Writer{packet};
@@ -70,13 +70,13 @@ fn encodeWithScratch(source: const u8[:], seed: const Pool&, fixities: const blo
     return true;
 }
 
-fn encode(source: const u8[:], seed: const Pool&, fixities: const blot_parse_parser::InheritedFixity[:], packet: u8[>..<]&) -> bool {
+fn encode(source: const u8[:], seed: const Pool&, packet: u8[>..<]&) -> bool {
     var tokens: blot_parse_token::Token[>..<]=[];
     var comments: blot_parse_token::Token[>..<]=[];
     var diagnostics: blot_parse_lexer::Diagnostic[>..<]=[];
     var local,error=blot_parse_symbols::initPooled();
     if error!=ok {return false;}
-    let result=encodeWithScratch(source,seed,fixities,tokens,comments,diagnostics,local,packet);
+    let result=encodeWithScratch(source,seed,tokens,comments,diagnostics,local,packet);
     local.deinit();
     return result;
 }

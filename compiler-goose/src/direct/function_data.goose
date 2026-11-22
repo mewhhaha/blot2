@@ -26,58 +26,6 @@ recursive fn resultAssociated(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return callTarget(g, f, target, arguments, callee, result, id);
 }
 
-// All fields of the left record, with same-named right fields replacing them.
-recursive fn recordMerge(g: Generator&, f: Fn&, id: u32) -> Val, Error {
-    let m .= g.units[f.unit - 1];
-    let n = m.node(id);
-    let left, error = expr(g, f, n.a);
-    if error != blot_direct_types::Error.none { return left, error; }
-    let right, error = expr(g, f, n.b);
-    if error != blot_direct_types::Error.none { return right, error; }
-    let ty, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    if tagOf(g, ty) != blot_direct_types::Tag.record { return neverVal(), g.fail(m, id, "record merge of a non-record type"); }
-    let boxed, error = isBoxed(g, f, ty, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    var memory_block: u32 = 0;
-    if boxed {
-        let made, error = newBlock(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        memory_block = made;
-    }
-    // The merged words are collected on the scratch stack: field reads may
-    // allocate words of their own in the pool.
-    let s .= g.s;
-    let mark = s.scratch.len;
-    for index in 0..(g.types.node(ty).b as i64) {
-        let name = g.types.recordField(ty, index).name;
-        var source = right;
-        var position: i64 = -1;
-        if tagOf(g, right.ty) == blot_direct_types::Tag.record { position = g.types.findField(right.ty, name); }
-        if position < 0 {
-            source = left;
-            if tagOf(g, left.ty) == blot_direct_types::Tag.record { position = g.types.findField(left.ty, name); }
-        }
-        if position < 0 { s.scratch.resize(mark); return neverVal(), g.fail(m, id, "merged field missing from both records"); }
-        let field, error = recordField(g, f, source, position, id);
-        if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
-        if boxed {
-            let offset, error = fieldOffset(g, f, ty, index, id);
-            if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
-            let written = writeFlat(g, f, memory_block, offset, field, id);
-            if written != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), written; }
-        } else {
-            for at in 0..(field.len as i64) { s.scratch.push(g.s.words[field.start + at]); }
-        }
-    }
-    if boxed { s.scratch.resize(mark); return valOf1(g, ty, memory_block), blot_direct_types::Error.none; }
-    let start = g.s.words.len as u32;
-    let count = (s.scratch.len - mark) as u32;
-    for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
-    s.scratch.resize(mark);
-    return Val { ty, start, count }, blot_direct_types::Error.none;
-}
-
 // `root` with the field path of an update replaced by its new value.
 recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
@@ -140,7 +88,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
                 inner = loaded;
             }
             match tagOf(g, ty) {
-                array, list, grow, resize, view => {},
+                array, grow, resize, view => {},
                 _ => {
                     g.failOpen(m, id);
                     g.put("indexed update of a ");

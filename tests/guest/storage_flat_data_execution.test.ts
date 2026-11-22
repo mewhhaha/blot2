@@ -145,24 +145,6 @@ entry const match_rebind = func () => return do:
   });
 });
 
-Deno.test("flat List copies and cursor snapshots survive writes and concatenation", async () => {
-  await compileAndRun(`
-entry const snapshots = func () => return do:
-  let source: Array U32 = #[40, 2]
-  let saved: List U32 = @list.from_array source
-  let cursor = @list.cursor saved
-  let advanced = @cursor.advance cursor
-  source[0] = 7
-  let extended = @list.concat saved [9]
-  let joined = @list.concat extended [1]
-  let copied: Array U32 = @array.from_list joined
-  let total = 0
-  for value in saved:
-    total := self + value
-  return @cursor.value cursor + @cursor.value advanced + copied[2] + copied[3] + total + source[0]
-`, guest => equal(guest.call("snapshots", null), 101));
-});
-
 Deno.test("scope and loop frames recover scratch allocated before a transferred result", async () => {
   await compileAndRun(`
 const create = func (n: U32) => return do:

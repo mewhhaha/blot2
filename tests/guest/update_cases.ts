@@ -69,8 +69,8 @@ entry const run = func () : U32 => return do:
     name: "generic_update_u32_f32",
     expected: { integer: 42, floating: 4.5 },
     source: `
-lent const replace = func values => return func index => return func value => return do:
-  values[index] = value
+const replace = func (own values) => return func index => return func value => return do:
+  values[index] := value
   break values
 entry const integer = func () : U32 => return (replace #[1, 2] 1 42)[1]
 entry const floating = func () : F32 => return (replace #[1.0, 2.0] 0 4.5)[0]

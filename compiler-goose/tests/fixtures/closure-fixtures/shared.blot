@@ -1,4 +1,3 @@
-infixl 60 (+) = combine
 const combine = func left => return func right => return @u32.add left right
 const U32.add = func left => return func right => return @u32.add left right
 const F32.add = func left => return func right => return @f32.add left right

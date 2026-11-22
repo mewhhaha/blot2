@@ -114,38 +114,3 @@ entry const looped = func (flag: Bool) : U32 => return do:
     },
   );
 });
-
-Deno.test("return across a monadic continuation has a source diagnostic", async () => {
-  const source = `const choose = func (flag: Bool) : Maybe U32 => return do:
-  let wrapped = do (monad Maybe):
-    if flag:
-      return $Some 42
-    break 7
-  break wrapped
-entry const answer = func (flag: Bool) : U32 => return Maybe.unwrap_or 0 (choose flag)
-`;
-  const start = source.indexOf("return $Some 42");
-  await compileExpectedFailure(source, "return_across_continuation", undefined, {
-    span: [start, start + "return $Some 42".length],
-  });
-});
-
-Deno.test("return through a nested request callback has a source diagnostic", async () => {
-  const source = `type Tick is effect = { read: Unit -> U32 }
-const handled = func computation => return do:
-  let inner = do:
-    for request in @requests computation:
-      case request of
-        effect Tick.read () =>
-          return 42
-        complete value =>
-          break value
-    break 0
-  break inner
-entry const answer = func () => return handled (@computation (func () => return Tick.read ()))
-`;
-  const start = source.indexOf("return 42");
-  await compileExpectedFailure(source, "return_across_continuation", undefined, {
-    span: [start, start + "return 42".length],
-  });
-});

@@ -82,11 +82,7 @@ entry const answer = func () : U32 => return do:
 
 Deno.test("runtime generic associated operators preserve independent operand and result types", async () => {
   await compileAndRun(`
-infixl 60 (+) = associated_add
-infix 50 (==) = associated_eq
 type Point is data = $Point { x: U32 }
-const associated_add = func left => return func right => return @type.call "add" left right
-const associated_eq = func left => return func right => return @type.call "eq" left right
 const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
 const Point.eq = func (left: Point) => return func (right: Point) => return @u32.eq left.x right.x
 const combine = func left => return func right => return left + right

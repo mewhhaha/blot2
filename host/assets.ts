@@ -107,7 +107,7 @@ const encoder = new TextEncoder();
 const limit = 16 * 1024 * 1024;
 const totalLimit = 64 * 1024 * 1024;
 const keywords = new Set(
-  "const let type data effect is func do use return yield break for ever continue in case of if then else as import infix infixl infixr self where and or true false"
+  "const let type data effect is func do use return break for ever continue in case of if then else as import self where and or true false"
     .split(" "),
 );
 function identifier(name: string, upper: boolean): string {
@@ -115,7 +115,7 @@ function identifier(name: string, upper: boolean): string {
     typeof name !== "string" ||
     !(upper ? /^[A-Z][A-Za-z0-9_]*$/ : /^[a-z_][A-Za-z0-9_]*$/).test(name) ||
     keywords.has(name) || name === "_" ||
-    (upper && ["Unit", "Bool", "U32", "F32", "Array", "List"].includes(name))
+    (upper && ["Unit", "Bool", "U32", "F32", "Array"].includes(name))
   ) {
     throw new TypeError(
       `Invalid Blot ${upper ? "type" : "value/field"} name: ${name}`,

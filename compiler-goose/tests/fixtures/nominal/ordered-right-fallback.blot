@@ -1,4 +1,3 @@
-infixl 60 (+) = add
 const add = func left => return func right => return @type.call "add" left right
 const U32.add = func left => return func right => return @u32.add left right
 type Left is data = $Left U32

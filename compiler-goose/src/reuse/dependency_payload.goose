@@ -3209,21 +3209,6 @@ return blot_backend_collection_ops::Op.prepend,blot_error::Error.none;},
 identity=>{
 return blot_backend_collection_ops::Op.identity,blot_error::Error.none;},
 
-convert=>{
-return blot_backend_collection_ops::Op.convert,blot_error::Error.none;},
-
-cursor=>{
-return blot_backend_collection_ops::Op.cursor,blot_error::Error.none;},
-
-cursor_has=>{
-return blot_backend_collection_ops::Op.cursor_has,blot_error::Error.none;},
-
-cursor_value=>{
-return blot_backend_collection_ops::Op.cursor_value,blot_error::Error.none;},
-
-cursor_advance=>{
-return blot_backend_collection_ops::Op.cursor_advance,blot_error::Error.none;},
-
 concat=>{
 return blot_backend_collection_ops::Op.concat,blot_error::Error.none;},
 
@@ -6449,21 +6434,6 @@ prepend=>{
 },
 
 identity=>{
-},
-
-convert=>{
-},
-
-cursor=>{
-},
-
-cursor_has=>{
-},
-
-cursor_value=>{
-},
-
-cursor_advance=>{
 },
 
 concat=>{

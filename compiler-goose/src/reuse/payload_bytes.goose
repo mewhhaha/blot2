@@ -152,7 +152,7 @@ fn bytes(value:blot_reuse_principal_interface::SelectedProofKind)->i64 {match va
 fn bytes(value:const blot_check_core::SelectedUse&)->i64 {return bytes(value.node)+bytes(value.proof);}
 fn bytes(value:const blot_check_core::Primitive&)->i64 {return bytes(value.kind)+bytes(value.op)+bytes(value.array_op)+bytes(value.arity);}
 fn bytes(value:blot_check_core::PrimitiveKind)->i64 {match value {scalar=>{return 0;},array=>{return 0;}}}
-fn bytes(value:blot_backend_collection_ops::Op)->i64 {match value {length=>{return 0;},get=>{return 0;},set=>{return 0;},fill=>{return 0;},generate=>{return 0;},append=>{return 0;},prepend=>{return 0;},identity=>{return 0;},convert=>{return 0;},cursor=>{return 0;},cursor_has=>{return 0;},cursor_value=>{return 0;},cursor_advance=>{return 0;},concat=>{return 0;},slice=>{return 0;},simd_load=>{return 0;},simd_store=>{return 0;},flatten=>{return 0;}}}
+fn bytes(value:blot_backend_collection_ops::Op)->i64 {match value {length=>{return 0;},get=>{return 0;},set=>{return 0;},fill=>{return 0;},generate=>{return 0;},append=>{return 0;},prepend=>{return 0;},identity=>{return 0;},concat=>{return 0;},slice=>{return 0;},simd_load=>{return 0;},simd_store=>{return 0;},flatten=>{return 0;}}}
 fn bytes(value:const blot_check_core::LoopInfo&)->i64 {return bytes(value.kind)+bytes(value.first)+bytes(value.end)+bytes(value.pattern)+bytes(value.body)+bytes(value.carries)+bytes(value.can_exit);}
 fn bytes(value:blot_check_core::LoopKind)->i64 {match value {forever=>{return 0;},range=>{return 0;},array=>{return 0;}}}
 fn bytes(value:const blot_check_core::LoopCarry&)->i64 {return bytes(value.incoming)+bytes(value.iteration)+bytes(value.backedge)+bytes(value.outgoing);}

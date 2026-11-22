@@ -195,7 +195,7 @@ fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u3
 }
 fn elementOf(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Ty, Error {
     match tagOf(g, ty) {
-        array, list, grow, resize, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
+        array, grow, resize, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
         _ => {
             g.failOpen(g.units[f.unit - 1], id);
             g.put("storage operation on a ");
@@ -610,11 +610,10 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             return readElement(g, f, container, index, id, m.typeOf(children[0]));
         },
-        identity, convert => {
+        identity => {
             let value, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return value, error; }
-            if operation == blot_backend_collection_ops::Op.identity { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
-            return copyContainer(g, f, value, ty, id);
+            return Val { ty, value.start, value.len }, blot_direct_types::Error.none;
         },
         set => {
             // A new array with one element replaced; the input is unchanged.
@@ -702,83 +701,6 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let copied = copyElements(g, f, container, start, handle, zero, count, id);
             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
             return handle, blot_direct_types::Error.none;
-        },
-        cursor => {
-            // (slot, generation, position, end) over the container's live range.
-            let container, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return container, error; }
-            let result, error = fresh(g, f, ty, id);
-            if error != blot_direct_types::Error.none { return result, error; }
-            let u32_ty = blot_direct_types::u32_;
-            let copied = copy(g, f, Val { u32_ty, container.start, 1 }, Val { u32_ty, result.start, 1 }, id);
-            if copied != blot_direct_types::Error.none { return neverVal(), copied; }
-            let copied = copy(g, f, Val { u32_ty, container.start + 1, 1 }, Val { u32_ty, result.start + 1, 1 }, id);
-            if copied != blot_direct_types::Error.none { return neverVal(), copied; }
-            let length, error = lengthOf(g, f, container, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            if tagOf(g, container.ty) == blot_direct_types::Tag.view {
-                lget(g, w(g, container, 2));
-                lset(g, w(g, result, 2));
-                lget(g, w(g, container, 2));
-                lget(g, length);
-                op(g, OP_i32_add);
-            } else {
-                i32Const(g, 0);
-                lset(g, w(g, result, 2));
-                lget(g, length);
-            }
-            lset(g, w(g, result, 3));
-            return result, blot_direct_types::Error.none;
-        },
-        cursor_has => {
-            let cursor, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return cursor, error; }
-            let result, error = fresh(g, f, blot_direct_types::boolean, id);
-            if error != blot_direct_types::Error.none { return result, error; }
-            lget(g, w(g, cursor, 2));
-            lget(g, w(g, cursor, 3));
-            op(g, OP_i32_lt_u);
-            lset(g, w(g, result, 0));
-            return result, blot_direct_types::Error.none;
-        },
-        cursor_value, cursor_advance => {
-            let cursor, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return cursor, error; }
-            lget(g, w(g, cursor, 2));
-            lget(g, w(g, cursor, 3));
-            op(g, OP_i32_ge_u);
-            trap(g, f);
-            if operation == blot_backend_collection_ops::Op.cursor_advance {
-                let result, error = fresh(g, f, cursor.ty, id);
-                if error != blot_direct_types::Error.none { return result, error; }
-                for index in 0..(cursor.len as i64) {
-                    lget(g, w(g, cursor, index));
-                    if index == 2 {
-                        i32Const(g, 1);
-                        op(g, OP_i32_add);
-                    }
-                    lset(g, w(g, result, index));
-                }
-                return result, blot_direct_types::Error.none;
-            }
-            let address_function = g.runtime_().address;
-            // A cursor's type argument is its collection.
-            let collection = g.types.node(cursor.ty).a;
-            var element = collection;
-            match tagOf(g, collection) {
-                array, list, grow, resize, view => { element = g.types.node(collection).a; },
-                _ => {},
-            }
-            let address = local32(g, f);
-            lget(g, w(g, cursor, 0));
-            lget(g, w(g, cursor, 1));
-            lget(g, w(g, cursor, 2));
-            let step, error = stride(g, f, element, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            i32Const(g, step);
-            callf(g, address_function);
-            lset(g, address);
-            return loadElement(g, f, address, 0, element, id);
         },
         simd_load, simd_store => {
             // Four consecutive elements, all in bounds.

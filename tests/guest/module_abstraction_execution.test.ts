@@ -57,12 +57,12 @@ type Wrapped a is opaque = Array a
 const make = func value => return $Box { value: value }
 const read = func ($Box value) => return value.value
 const field = func value => return value.value
-lent const wrap = func value => return $Wrapped value
+const wrap = func (own value) => return $Wrapped value
 const unwrap = func ($Wrapped value) => return @storage.copy value
 entry const answer = func (value: U32) => return @u32.add (read (make value)) (field (make 2))
 entry const shared = func (value: U32) => return do:
   let original = #[value, 2]
-  let copied = unwrap (wrap original)
+  let copied = unwrap (wrap (@storage.copy original))
   break @u32.add (@array.get original 0) (@array.get copied 1)
 `,
     (guest) => {

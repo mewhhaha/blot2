@@ -70,8 +70,6 @@ entry const answer = func (input: U32) => return do:
 Deno.test("owned source operators honor associated declarations without changing explicit primitives", async () => {
   await compileAndRun(
     `
-infixl 60 (+) = add
-const add = func left -> right => return @type.call "add" left right
 type Number is data = $Number U32
 const Number.add = func (left: Number) -> (right: U32) => return do:
   let $Number value = left
@@ -569,34 +567,6 @@ entry const answer = func (input: U32): U32 => return do:
 });
 
 Deno.test("returned reader aliases remap owners variants and captured view bounds", async () => {
-  await compileAndRun(
-    `
-type Pick is data = $First | $Second
-type Buffer is data = $Buffer {rows: ResizeArray U32, label: U32}
-type Pair is data = $Pair {first: Buffer, second: Buffer}
-lent const choose = func (pair: Pair) -> (pick: Pick): Buffer => return case pick of
-  $First => pair.first
-  $Second => pair.second
-const window = func (rows: &[U32]) -> (start: U32) -> (end: U32) => return &rows[start..end]
-entry const answer = func (input: U32): U32 => return do:
-  let first: ResizeArray U32 = #[input, 2]
-  let second: ResizeArray U32 = #[3, 4]
-  let third: ResizeArray U32 = #[5, 6]
-  let pair = $Pair {first: $Buffer {rows: first, label: 11}, second: $Buffer {rows: second, label: 22}}
-  let a = choose pair $First
-  let b = choose pair $Second
-  let c = choose ($Pair {first: $Buffer {rows: third, label: 33}, second: $Buffer {rows: first, label: 44}}) $First
-  let saved = a.rows[0]
-  a.rows[0] = 7
-  let view = window (&a.rows[0..2]) 1 2
-  a.rows[1] = 9
-  return saved + a.rows[0] + b.rows[0] + c.rows[0] + view[0] + a.label + b.label + c.label
-`,
-    (guest) => {
-      assert.equal(guest.call("answer", 2), 92);
-      assert.equal(guest.call("answer", 10), 100);
-    },
-  );
   await compileAndRun(
     `
 const window = func (rows: &[U32]) -> (end: U32) => return &rows[1..end]

@@ -187,11 +187,11 @@ entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (
 Deno.test("staged indexed construction freezes once and writes through input aliases and repeated indices", async () => {
   await compileAndRun(
     `
-lent const build = func values => return do:
+const build = func values => return do:
   let saved = func () => return values[0]
   for i in 0..4096:
     values[i] = i + 1
-  break (values, saved ())
+  break saved ()
 const source = @array.fill 4096 7
 const constructed = build source
 const repeated = do:
@@ -200,8 +200,8 @@ const repeated = do:
     values[i % 2] := self + 1
   break values
 entry const answer = func () => return do:
-  let (values, old) = constructed
-  break #[source[0], old, values[0], values[4095], repeated[0], repeated[1]]
+  let old = constructed
+  break #[source[0], old, source[0], source[4095], repeated[0], repeated[1]]
 `,
     (guest) => {
       // `build` writes through its parameter into `source`, and `saved`

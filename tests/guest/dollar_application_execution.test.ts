@@ -22,11 +22,3 @@ entry const associated = func (value: U32) => return @u32.add 1 $ @u32.mul 2 $ @
     equal(guest.call("associated", 20), 43);
   }, { prelude: "none" });
 });
-
-Deno.test("explicit dollar fixity overrides grouping even with the standard prelude", async () => {
-  await compileAndRun(`
-infixl 60 ($) = subtract
-const subtract = func (a: U32) -> (b: U32) => return @u32.sub a b
-entry const answer = func () => return 50 $ 5 $ 3
-`, guest => equal(guest.call("answer", null), 42));
-});

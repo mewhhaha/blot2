@@ -200,23 +200,6 @@ const pair = func values => return (values, 1)
 const first = func values => return values[0]
 const reader = func values => return func index => return values[index]
 const left = func a => return func b => return a[0] + b[0]
-lent const merged = func (flag: Bool) => return func (values: Array U32) => return do:
-  if flag:
-    values := #[7]
-  break values
-lent const carried = func (count: U32) => return func (values: Array U32) => return do:
-  for index in 0..count:
-    values := #[index]
-  break values
-entry const reassigned = func (n: U32) => return do:
-  let values = @array.fill n 1
-  let sum = 0
-  for i in 0..n:
-    let before = merged (i == n) values
-    let after = carried 0 values
-    values[i] = 9
-    sum := sum + before[i] + after[i]
-  break sum
 entry const returned = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
@@ -279,7 +262,6 @@ entry const indexed = func (n: U32) => return do:
           equal(guest.call(name, n), 9 * n);
         }
         equal(guest.call("kept", n), 10 * n);
-        equal(guest.call("reassigned", n), 18 * n);
         equal(guest.call("nested", n), 9 * n);
         equal(guest.call("ordered", n), 10);
         equal(guest.call("indexed", n), 1);

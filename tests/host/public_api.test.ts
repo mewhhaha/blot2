@@ -25,7 +25,7 @@ for (const packaged of [false, true]) {
     });
     try {
       const original =
-        "entry const answer = func () => return (Array.from_list [40, 2])[0] + 2\n";
+        "entry const answer = func () => return (#[40, 2])[0] + 2\n";
       const first = await compiler.build({ sources: { [entry]: original } });
       ok(first.success, JSON.stringify(first));
       const guest = await instantiateGuest(first.bytes);

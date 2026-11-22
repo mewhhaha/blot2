@@ -81,14 +81,13 @@ entry const nested_edit_${id} = func (seed: F32) => return do:
   values[0].${nested ? "a.x" : "ax"} = seed
   return shape.read_${id} values[0] + shape.read_${id} old[0]
 entry const list_${id} = func (count: U32) => return do:
-  let values = @list.from_array (@array.generate count (func index => return shape.make_${id} (@u32.to_f32 index)))
+  let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
   let old = values
-  values := @list.concat [shape.make_${id} 1000.0] (@list.slice self 1 (count - 1))
-  let copied = @array.from_list values
+  values := @array.concat #[shape.make_${id} 1000.0] (@array.slice self 1 (count - 1))
   let total = 0.0
-  for value in copied:
+  for value in values:
     total := self + shape.read_${id} value
-  return total + shape.read_${id} (@cursor.value (@list.cursor old))
+  return total + shape.read_${id} old[0]
 `;
   }
   return { main, shapes };

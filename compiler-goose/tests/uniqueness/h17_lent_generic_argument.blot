@@ -1,9 +1,0 @@
-type Box is data = $Box (Array U32)
-type World is data = $World { counts: Array U32, other: Array U32 }
-const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
-lent const both = func left -> right => return { a: left, b: right }
-const apply_two = func f -> left -> right => return f left right
-const run = func (n: U32) => return do:
-  let rows = #[n, 2]
-  let pair = apply_two both rows rows
-  break @u32.add pair.a[0] pair.b[1]

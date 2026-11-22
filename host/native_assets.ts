@@ -71,10 +71,10 @@ function identifier(value: unknown, upper: boolean): string {
     const name = value as string;
     if (upper) {
       valid = /^[A-Z][A-Za-z0-9_]*$/.test(name) &&
-        !["Unit", "Bool", "U32", "F32", "Array", "List"].includes(name);
+        !["Unit", "Bool", "U32", "F32", "Array"].includes(name);
     } else {
       valid = /^[a-z_][A-Za-z0-9_]*$/.test(name) && name !== "_" &&
-        !"const let type data effect is func do use return yield break continue for ever in case of if then else as import infix infixl infixr self where"
+        !"const let type data effect is func do use return break continue for ever in case of if then else as import self where"
           .split(" ").includes(name);
     }
   }

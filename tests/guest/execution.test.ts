@@ -141,24 +141,6 @@ entry const disjunction = func (left: Bool) : Bool => return
   );
 });
 
-Deno.test("native source fixity targets are ordinary functions", async () => {
-  await withCompilation(
-    `
-infixl 60 (+) = subtract
-const subtract = func left => return func right => return @u32.sub left right
-entry const custom = func () : U32 => return 20 + 22
-`,
-    async (bytes) => {
-      const guest = await instantiateGuest(bytes);
-      try {
-        equal(guest.call("custom", null), 0xFFFF_FFFE);
-      } finally {
-        guest.dispose();
-      }
-    },
-  );
-});
-
 Deno.test("native branch rebinding preserves immutable aliases", async () => {
   await withCompilation(
     `

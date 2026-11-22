@@ -204,12 +204,6 @@ root struct Analyzer {
     inner: bool[>..] = [],
     // References to a `lent` function given as an argument.
     lent_arguments: bool[>..] = [],
-    // Whether this module is free of the store `place = value`. Its
-    // functions and closures then return values nothing else holds, and it
-    // may not write storage it does not own. A module that still has a
-    // store is in the old style: only its `own` functions are held to
-    // that. This distinction goes when `=` does.
-    report_stores: bool = false,
     // Migration aid: with BLOT_EXPLAIN_SHARING set, a result that is not
     // its function's own is reported where the local came to be shared.
     explain: bool = false,
@@ -263,11 +257,6 @@ root struct Analyzer {
 fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     var analyzer = Analyzer { .. };
     {
-        // Migration aid (tasks/MEMORY_MODEL.md, phase 3): with BLOT_REPORT_STORES set,
-        // each store whose place is provably unique is reported as `unchecked`,
-        // so a script can turn it into `:=`. It goes with `=`.
-        let name = "BLOT_REPORT_STORES\0";
-        analyzer.report_stores = blot_native::environment_size(name[0]) >= 0;
         let explaining = "BLOT_EXPLAIN_SHARING\0";
         analyzer.explain = blot_native::environment_size(explaining[0]) >= 0;
     }
@@ -833,7 +822,7 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
     if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
     // Inside a generic body a type variable is plain data.
     if (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.function { return true; }
+    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.function { return true; }
     if n.tag == blot_check_types::Tag.product {
         for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
             if holdsInMemo(self_, m, item, variables, arguments, depth + 1, memo) { return true; }
@@ -952,12 +941,9 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
     if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.function { return want != 0; }
-    if n.tag == blot_check_types::Tag.cursor { return want == 1; }
     if n.tag == blot_check_types::Tag.usage { return partsInMemo(self_, m, n.a, want, variables, arguments, depth + 1, memo); }
-    // A list is never written in place, so it owns only what its
-    // elements do.
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list {
-        if want_owned && n.tag == blot_check_types::Tag.array { return true; }
+    if n.tag == blot_check_types::Tag.array {
+        if want_owned { return true; }
         return partsInMemo(self_, m, n.a, want, variables, arguments, depth + 1, memo);
     }
     if n.tag == blot_check_types::Tag.product {
@@ -1033,8 +1019,6 @@ fn nominalIndex(self_: Analyzer&, m: const Module&, unit: u32, decl: u32) -> u32
 }
 fn element(self_: const Analyzer&, m: const Module&, ty: u32) -> blot_support::Option<u32> {
     if ty == 0 || ty >= m.types.nodes.len { return blot_support::none<u32>(); }
-    let n = m.types.node(ty);
-    if n.tag == blot_check_types::Tag.list { return blot_support::some<u32>(n.a); }
     return blot_check_storage_types::readableElement(m.types, ty);
 }
 fn elementHolds(self_: Analyzer&, m: const Module&, container: u32) -> bool {
@@ -1827,19 +1811,31 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { fact: fact, exits: exits, .. };
         }
     }
-    if tag == blot_check_core::Tag.request_loop {
-        // A handler loop carries locals the way a loop does, but through
-        // its callbacks: each version it names is read by it and shared.
-        for carry in m.requestLoopCarries(id) { read(self_, carry.incoming, id); kill(self_, carry.incoming); }
-        let exits = visitChildren(self_, m, id);
-        for carry in m.requestLoopCarries(id) {
-            read(self_, carry.iteration, id);
-            read(self_, carry.backedge, id);
-            read(self_, carry.outgoing, id);
-            kill(self_, carry.backedge);
+    if tag == blot_check_core::Tag.scalar || tag == blot_check_core::Tag.logical {
+        let holder = lends(self_, m, n.ty);
+        let base = self_.captured.len;
+        let ends = self_.briefs.len;
+        let held_base = self_.arguments_held.len;
+        let place_base = self_.argument_places.len;
+        var exits = false;
+        if n.a != 0 {
+            let value = lend(self_, m, n.a, holder, lends_to, brief);
+            exits = exits || value.exits;
         }
-        for binding in m.requestCompletionBindings(id) { read(self_, binding, id); }
-        return Value { exits: exits, .. };
+        if n.b != 0 {
+            let value = lend(self_, m, n.b, holder, lends_to, brief);
+            exits = exits || value.exits;
+        }
+        self_.arguments_held.resize(held_base);
+        self_.argument_places.resize(place_base);
+        giveBack(self_, base);
+        if !holder {
+            endBriefs(self_, ends);
+            if !self_.dry && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
+        }
+        var fact: Fact = none;
+        if owns(self_, m, n.ty) || openType(m, n.ty, 0) { fact = deep; }
+        return Value { fact: fact, exits: exits, .. };
     }
     let exits = visitChildren(self_, m, id);
     return Value { exits: exits, .. };
@@ -2082,7 +2078,7 @@ recursive fn occursNode(m: const Module&, variable: u32, ty: u32, data: bool, de
     }
     // `own T` in a function type's parameter, and the other usage wrappers.
     if n.tag == blot_check_types::Tag.usage { return occursMemo(m, variable, n.a, data, depth + 1, memo); }
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursMemo(m, variable, n.a, data, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.array { return occursMemo(m, variable, n.a, data, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
         for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursMemo(m, variable, item, data, depth + 1, memo) { return true; } }
         return false;
@@ -2119,7 +2115,7 @@ recursive fn openTypeNode(m: const Module&, ty: u32, depth: i64, memo: WalkMemo&
     if depth > 64 { return true; }
     let n = m.types.node(ty);
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return true; }
-    if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return openTypeMemo(m, n.a, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array { return openTypeMemo(m, n.a, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
         for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if openTypeMemo(m, item, depth + 1, memo) { return true; } }
         return false;
@@ -2157,7 +2153,7 @@ recursive fn occursInSinkNode(m: const Module&, variable: u32, ty: u32, inside: 
     let n = m.types.node(ty);
     if n.tag == blot_check_types::Tag.function { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo) || occursInSinkMemo(m, variable, n.b, inside, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.usage { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo); }
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.array { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
         for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursInSinkMemo(m, variable, item, inside, depth + 1, memo) { return true; } }
         return false;
@@ -2249,7 +2245,7 @@ recursive fn instanceOwnsNode(self_: Analyzer&, m: const Module&, pattern: u32, 
     if p.tag != a.tag { return true; }
     if p.tag == blot_check_types::Tag.function { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences) || instanceOwnsMemo(self_, m, p.b, a.b, variable, depth + 1, memo, occurrences); }
     if p.tag == blot_check_types::Tag.usage { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences); }
-    if p.tag == blot_check_types::Tag.array || p.tag == blot_check_types::Tag.list || p.tag == blot_check_types::Tag.cursor { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences); }
+    if p.tag == blot_check_types::Tag.array { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences); }
     if p.tag == blot_check_types::Tag.product {
         if p.b != a.b { return true; }
         let left = m.types.list(blot_check_types::List { start: p.a, len: p.b });
@@ -2820,7 +2816,6 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     if selectors.len != 0 { leaf = selectors[selectors.len - 1].result_type; }
     let shared = holds(self_, m, leaf) && replacement != deep;
     if info.store {
-        if self_.report_stores && through_storage && local(self_, root.origin) && accepts(self_, m, self_.facts[root.origin], selectors) { reject(self_, m, id, blot_check_core::Code.unchecked); }
         // A store through what the function was lent keeps the value there,
         // so the arrays the value owns must be nobody else's.
         if shared && !keeping(self_) && !(local(self_, root.origin) && accepts(self_, m, self_.facts[root.origin], selectors)) && (!ownedAs(self_, m, replacement, m.typeOf(info.value), 0) || lentHolder(self_, m, info.value)) { reject(self_, m, id, blot_check_core::Code.kept_value); }
@@ -2936,7 +2931,7 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
         escape(self_, grown);
         return Value { exits: exits, .. };
     }
-    if operation == blot_backend_collection_ops::Op.set || operation == blot_backend_collection_ops::Op.concat || operation == blot_backend_collection_ops::Op.slice || operation == blot_backend_collection_ops::Op.flatten || operation == blot_backend_collection_ops::Op.convert || operation == blot_backend_collection_ops::Op.prepend || operation == blot_backend_collection_ops::Op.append {
+    if operation == blot_backend_collection_ops::Op.set || operation == blot_backend_collection_ops::Op.concat || operation == blot_backend_collection_ops::Op.slice || operation == blot_backend_collection_ops::Op.flatten || operation == blot_backend_collection_ops::Op.prepend || operation == blot_backend_collection_ops::Op.append {
         // A new container whose elements are copies of the inputs'.
         let shares = elementHolds(self_, m, n.ty);
         var exits = false;
@@ -2977,7 +2972,6 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
         let fact = freshContainer(self_, m, n.ty, false);
         return Value { fact: fact, exits: exits, .. };
     }
-    // cursor, cursor_has, cursor_value, cursor_advance
     let exits = visitChildren(self_, m, id);
     return Value { exits: exits, .. };
 }
@@ -3551,7 +3545,7 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
     if n.tag == blot_check_core::Tag.array_op {
         let op = m.arrayOperation(id);
         let children = m.children(id);
-        if op == blot_backend_collection_ops::Op.slice || op == blot_backend_collection_ops::Op.concat || op == blot_backend_collection_ops::Op.set || op == blot_backend_collection_ops::Op.convert || op == blot_backend_collection_ops::Op.prepend || op == blot_backend_collection_ops::Op.append || op == blot_backend_collection_ops::Op.flatten {
+        if op == blot_backend_collection_ops::Op.slice || op == blot_backend_collection_ops::Op.concat || op == blot_backend_collection_ops::Op.set || op == blot_backend_collection_ops::Op.prepend || op == blot_backend_collection_ops::Op.append || op == blot_backend_collection_ops::Op.flatten {
             if !elementHolds(self_, m, n.ty) { return 0; }
         }
         var best: u32 = 0;
@@ -3563,7 +3557,7 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
         for child in m.call(id).arguments { best = maxU32(best, nodeTaint(self_, m, child, depth + 1)); }
         return best;
     }
-    if n.tag == blot_check_core::Tag.apply || n.tag == blot_check_core::Tag.record_merge {
+    if n.tag == blot_check_core::Tag.apply {
         return maxU32(nodeTaint(self_, m, n.a, depth + 1), nodeTaint(self_, m, n.b, depth + 1));
     }
     if n.tag == blot_check_core::Tag.construct { return nodeTaint(self_, m, n.b, depth + 1); }

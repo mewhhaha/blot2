@@ -564,13 +564,13 @@ entry const answer = func () => return @u32.add (lists.read 40) ${offset}
     await Deno.writeTextFile(
       directory + "/lists.blot",
       `
-const frozen = @list.generate 513 (func index => return index)
-const first = func values => return (@array.from_list values)[0]
+const frozen = @array.generate 513 (func index => return index)
+const first = func values => return values[0]
 const read = func (seed: U32) => return do:
-  let values = @array.from_list [seed, ...[2, 3], 4]
-  values[1] := (@array.from_list frozen)[512]
-  let array = @array.from_list [value | value <- values, @u32.lt 0 value]
-  break first (@list.from_array array)
+  let values = #[seed, ...#[2, 3], 4]
+  values[1] := frozen[512]
+  let array = #[value | value <- values, @u32.lt 0 value]
+  break first array
 `,
     );
     await Deno.writeTextFile(entry, source(2));
@@ -599,7 +599,7 @@ const read = func (seed: U32) => return do:
         await answer(result, 40 + offset);
         await fresh(directory, entry, result, `${label}-${result.revision}`);
       }
-      await Deno.writeTextFile(entry, "entry const broken: Array U32 = [1]\n");
+      await Deno.writeTextFile(entry, "entry const broken: Array U32 = 1\n");
       ok(!(await compiler.build()).success);
       await Deno.writeTextFile(entry, source(2));
       await answer(await compiler.build(), 42);

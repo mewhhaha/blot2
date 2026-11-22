@@ -247,17 +247,6 @@ fn encodePersistentInterface(prelude:u32,tree:const blot_parse_ast::Tree&,module
     var frozen,error=blot_reuse_dependency_snapshot::freezePersistent(tree,module.checked,summaries);
     if error!=blot_error::Error.none {return error;}
     var fixities:PersistentFixity[>..<]=[];
-    if unit==prelude {
-        for root in tree.roots.items {
-            if tree.node(root).tag!=blot_parse_ast::tag_fixity_decl {continue;}
-            let fixity=tree.fixity(root);
-            let binding=module.checked.resolved[root];
-            let declaration=module.checked.bindings[binding];
-            var target=ExternalTarget{unit,binding};
-            if declaration.external.present {target=declaration.external.value;}
-            fixities.push(PersistentFixity{operator:fixity.operator,target:fixity.target,named:fixity.named,producer:target, ..});
-        }
-    }
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,frozen.value);
     blot_project_packet::put(writer,module.exports);

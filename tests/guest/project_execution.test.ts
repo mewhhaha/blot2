@@ -153,14 +153,13 @@ const answer = 42
   }, { prelude: new URL("../../std/prelude.blot", import.meta.url).pathname });
 });
 
-Deno.test("project aliases and imported custom fixity preserve producer identities", async () => {
+Deno.test("project aliases preserve producer identities", async () => {
   await project({
     main: `import * as arithmetic from "./arithmetic"
 import { identity } from "./arithmetic"
-infixl 60 (+) = arithmetic.subtract
 const alias = arithmetic.identity
 entry const identity_entry = alias
-entry const subtract_entry = func (arithmetic: U32) : U32 => return 20 + arithmetic
+entry const subtract_entry = func (value: U32) : U32 => return arithmetic.subtract 20 value
 entry const grouped = func (value: U32) : U32 => return (arithmetic).identity value
 `,
     arithmetic: `const identity = func (value: U32) : U32 => return value

@@ -5,34 +5,32 @@ import {
   equal,
 } from "./compile_helpers.ts";
 
-Deno.test("exact nested builders preserve arrays, lists, empty extents and element order", async () => {
+Deno.test("exact nested builders preserve arrays, empty extents and element order", async () => {
   await compileAndRun(
     `
 entry const rectangle = func count => return do:
-  let result: List U32 = []
+  let result: Array U32 = #[]
   for x in 0..count:
     for y in 2..5:
-      result := [...self, x * 10 + y]
-  break @array.from_list result
+      result := #[...self, x * 10 + y]
+  break result
 entry const product = func (values: Array U32) => return #[x * 10 + y | x <- values, y <- values]
-const lists = func (values: Array U32) => return [x * 10 + y | x <- values, y <- values]
-entry const list_result = func values => return Array.from_list (lists values)
 entry const reversed = func count => return do:
-  let result: List U32 = []
+  let result: Array U32 = #[]
   for x in count..2:
-    result := [...self, x]
-  break @array.from_list result
+    result := #[...self, x]
+  break result
 entry const ragged = func count => return do:
-  let result: List U32 = []
+  let result: Array U32 = #[]
   for x in 0..count:
     for y in 0..x:
-      result := [...self, x * 10 + y]
-  break @array.from_list result
+      result := #[...self, x * 10 + y]
+  break result
 entry const observed = func count => return do:
-  let result: List U32 = []
+  let result: Array U32 = #[]
   for x in 0..count:
-    result := [...self, result.length]
-  break @array.from_list result
+    result := #[...self, result.length]
+  break result
 `,
     (guest) => {
       for (const count of [0, 1, 83, 249]) {
@@ -52,10 +50,6 @@ entry const observed = func count => return do:
           guest.call("product", Uint32Array.from(values)),
           expected,
         );
-        deepStrictEqual(
-          guest.call("list_result", Uint32Array.from(values)),
-          expected,
-        );
       }
       deepStrictEqual(guest.call("reversed", 3), new Uint32Array());
       deepStrictEqual(guest.call("reversed", 0), Uint32Array.of(0, 1));
@@ -72,12 +66,12 @@ Deno.test("effectful builders retain the ordinary path and nested-loop order", a
   await compileAndRun(
     `
 entry const run = func (send: U32 -> U32 ! {Foreign}) => return do:
-  let result: List U32 = []
+  let result: Array U32 = #[]
   for x in 0..2:
     for y in 1..3:
       use value <- send (x * 10 + y)
-      result := [...self, value]
-  break @array.from_list result
+      result := #[...self, value]
+  break result
 `,
     (guest) => {
       const seen: number[] = [];
@@ -131,18 +125,18 @@ Deno.test("branch appends preserve a saved prefix, independent branches and the 
   await compileAndRun(
     `
 entry func build (send: U32 -> U32): Array U32 => return do:
-  let prefix: List U32 = [11]
-  let rows = @list.slice prefix 0 1
+  let prefix: Array U32 = #[11]
+  let rows = @array.slice prefix 0 1
   for i in 0..9:
     if (i & 1) == 0:
       use word <- send i
-      rows := @list.append self word
+      rows := @array.append self word
     else:
       use word <- send (100 + i)
-      rows := @list.append self word
-  let left = @list.concat rows [71]
-  let right = @list.concat rows [72]
-  return @array.from_list (@list.concat prefix (@list.concat rows (@list.concat left right)))
+      rows := @array.append self word
+  let left = @array.concat rows #[71]
+  let right = @array.concat rows #[72]
+  return @array.concat prefix (@array.concat rows (@array.concat left right))
 `,
     (guest) => {
       const calls: number[] = [];
@@ -165,18 +159,18 @@ entry func build (send: U32 -> U32): Array U32 => return do:
   );
 });
 
-Deno.test("a branch cannot grow a list observed by a live alias", async () => {
+Deno.test("a branch cannot grow an array observed by a live alias", async () => {
   await compileExpectedFailure(
     `
 entry func build (count: U32): U32 => return do:
-  let rows: List U32 = [11]
+  let rows: Array U32 = #[11]
   let snapshot = rows
   for i in 0..count:
     case i % 3 of
       0 => do:
-        rows := @list.append self i
+        rows := @array.append self i
       1 => do:
-        rows := @list.append self (i + 1)
+        rows := @array.append self (i + 1)
       _ => ()
   return snapshot.length + rows.length
 `,

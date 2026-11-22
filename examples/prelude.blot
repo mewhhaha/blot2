@@ -24,9 +24,8 @@ entry func generic_identity () =>
     return same (identity 42)
   return 0
 
-// Backticks call source functions; application binds more tightly.
 func plus left -> right => left + right
-entry func named_operator () => 20 `plus` 22
+entry func named_operator () => plus 20 22
 
 entry func inspect (enabled: Bool) =>
   let candidate = $Some (if enabled then $Some 42 else $Nothing)

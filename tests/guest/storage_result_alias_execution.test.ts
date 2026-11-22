@@ -10,7 +10,7 @@ for (const width of [8, 600]) {
     (_, index) => `f${index}: @u32.add input ${index},`,
   ).join("");
   let returned =
-    `if @u32.eq flag 0 then row else @record.merge row {${last}: @u32.add row.f0 1000}`;
+    `if @u32.eq flag 0 then row else {${Array.from({ length: width - 1 }, (_, i) => `f${i}: row.f${i}`).join(", ")}, ${last}: @u32.add row.f0 1000}`;
   if (width === 600) {
     returned = "row";
     first = "g0.f0";

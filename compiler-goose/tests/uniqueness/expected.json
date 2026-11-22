@@ -811,23 +811,6 @@
   ]
  ],
  "g16_result_of_call": [],
- "h01_lent_returns_parameter": [],
- "h02_lent_result_not_unique": [
-  [
-   "aliased_update",
-   349,
-   362,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
- "h03_lent_argument_shared": [
-  [
-   "aliased_update",
-   349,
-   361,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
  "h04_store_keeps_parameter": [
   [
    "kept_value",
@@ -856,22 +839,6 @@
    "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
   ]
  ],
- "h11_lent_function_value": [
-  [
-   "lent_result_value",
-   315,
-   319,
-   "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
-  ]
- ],
- "h12_lent_function_argument": [
-  [
-   "aliased_update",
-   407,
-   419,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
  "h13_closure_gives_back": [],
  "h14_closure_kept_by_result": [
   [
@@ -890,7 +857,6 @@
   ]
  ],
  "h16_member_call_lends": [],
- "h17_lent_generic_argument": [],
  "h18_return_in_loop_moves": [],
  "i01_lambda_own_parameter": [],
  "i02_own_function_as_value": [],
@@ -1160,30 +1126,6 @@
    "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
   ]
  ],
- "n10_lent_function_result_borrows_its_argument": [],
- "n11_lent_function_result_still_read": [
-  [
-   "aliased_update",
-   351,
-   371,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ],
-  [
-   "own_argument",
-   392,
-   397,
-   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
-  ]
- ],
- "n12_lent_function_keeps_what_it_was_lent": [
-  [
-   "kept_value",
-   90,
-   113,
-   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
-  ]
- ],
- "n13_field_of_a_borrowing_name_beside_the_value_given": [],
  "n14_view_held_by_an_outer_call_while_the_value_is_given": [
   [
    "own_argument",

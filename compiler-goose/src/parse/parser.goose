@@ -16,15 +16,13 @@ type Span=blot_parse_ast::Span;
 type List=blot_parse_ast::List;
 type Token=blot_parse_token::Token;
 type Symbol=blot_parse_symbols::Symbol;
-struct Fixity { symbol: Symbol, precedence: u32, association: u32, named: bool, inherited: bool=false }
-struct InheritedFixity { operator: Symbol, precedence: u32, association: u32, named: bool }
-struct Operator { symbol: Symbol, precedence: u32, association: u32, span: Span, known: bool, named: bool, application: bool=false }
+struct Operator { symbol: Symbol, precedence: u32, association: u32, span: Span, known: bool, application: bool=false }
 struct Where { predicates: List=List {}, node: Id=0 }
 struct LambdaParameter { node: Id, pattern: Id, name: Symbol, start: u32 }
 struct Qualifier { kind: u32, name: Symbol=0, value: Id, start: u32 }
 struct Parser {
  pool: blot_parse_symbols::Pool&, tree: Tree&, recorded:ScratchIdBuffer?=null,
- fixities: ScratchFixityBuffer&, index: i64=0, expression_end: i64=0x7fffffffffffffff,
+ index: i64=0, expression_end: i64=0x7fffffffffffffff,
  depth: i64=0, declaration_origin: Span=Span {}, collection_names: u32=0,
  failure: Error=blot_error::Error.none
 }
@@ -151,7 +149,7 @@ recursive fn declaration(p: Parser&,source: const u8[:],tokens: const Token[:],d
  if word(p,source,tokens,"private") { private=true; advance(p,source,tokens); if word(p,source,tokens,"private") { let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end}; return fail(p,source,tokens,c_unexpected_token); } }
  if word(p,source,tokens,"export")&&peek(p,tokens,1)==t_l_brace { if private { return fail(p,source,tokens,c_unexpected_token); } return import_decl(p,source,tokens,true); }
  let id=declaration_body(p,source,tokens,declarations_seen,body_declarations_seen,is_opaque); if p.failure!=blot_error::Error.none { return 0; }
- if private||is_opaque { let tag=p.tree.node(id).tag; if tag==a_import_decl||tag==a_fixity_decl { return fail(p,source,tokens,c_unexpected_token); } p.tree.declaration_traits.push(blot_parse_ast::DeclarationTraits {id,private,is_opaque}); }
+ if private||is_opaque { let tag=p.tree.node(id).tag; if tag==a_import_decl { return fail(p,source,tokens,c_unexpected_token); } p.tree.declaration_traits.push(blot_parse_ast::DeclarationTraits {id,private,is_opaque}); }
  return id;
 }
 recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token[:],declarations_seen: bool,body_declarations_seen: bool,is_opaque: bool&) -> Id {
@@ -160,7 +158,6 @@ recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token
  var attributes=ScratchIdBuffer {};
  while p.failure==blot_error::Error.none&&at(p,source,tokens,t_at) { let point=current(p,source,tokens).start; eat(p,source,tokens,t_at); expect(p,source,tokens,t_l_bracket); let body=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); attributes.push(add(p,source,tokens,a_attribute,body,0,0,point)); newlines(p,source,tokens); }
  let attrs=list(p,source,tokens,attributes.items); if p.failure!=blot_error::Error.none { let __cleanup_result_4_0: Id = 0; attributes.deinit(); return __cleanup_result_4_0; }
- if at(p,source,tokens,t_kw_infixl)||at(p,source,tokens,t_kw_infixr)||at(p,source,tokens,t_kw_infix) { let __cleanup_result_5_0: Id = fixity_decl(p,source,tokens,attrs,start); attributes.deinit(); return __cleanup_result_5_0; }
  if word(p,source,tokens,"impl") { if attrs.len!=0 { let __cleanup_result_6_0: Id = fail(p,source,tokens,c_unexpected_token); attributes.deinit(); return __cleanup_result_6_0; } let __cleanup_result_7_0: Id = implementation_declaration(p,source,tokens,start); attributes.deinit(); return __cleanup_result_7_0; }
  if at(p,source,tokens,t_kw_type)||at(p,source,tokens,t_kw_data) { let __cleanup_result_8_0: Id = type_declaration(p,source,tokens,attrs,start,is_opaque); attributes.deinit(); return __cleanup_result_8_0; }
  if eat(p,source,tokens,t_kw_effect) { let name=qualified(p,source,tokens); expect(p,source,tokens,t_colon); let signature=type_expression(p,source,tokens); let __cleanup_result_9_0: Id = add(p,source,tokens,a_effect_decl,name,signature,extra(p,source,tokens,[attrs.start,attrs.len]),start); attributes.deinit(); return __cleanup_result_9_0; }
@@ -188,23 +185,6 @@ fn import_decl(p: Parser&,source: const u8[:],tokens: const Token[:],forwarding:
  let path_token=current(p,source,tokens); let path=string_symbol(p,source,tokens); let range=list(p,source,tokens,bindings.items); var tag=a_import_decl; if forwarding { tag=a_export_decl; }
  let __cleanup_result_15_0: Id = add(p,source,tokens,tag,path,range.start,extra(p,source,tokens,[range.len,name_space,path_token.start,path_token.end,namespace_span.start,namespace_span.end]),start); bindings.deinit(); return __cleanup_result_15_0;
  bindings.deinit(); }
-fn fixity_decl(p: Parser&,source: const u8[:],tokens: const Token[:],attrs: List,start: u32) -> Id {
- let head=advance(p,source,tokens).tag; var association: u32=2; if head==t_kw_infixl { association=0; } else if head==t_kw_infixr { association=1; }
- let literal=expect(p,source,tokens,t_integer); if p.failure!=blot_error::Error.none { return 0; }
- var literal_error: Id=0; let raw_precedence,err=blot_parse_lexer::integer_value(text(p,source,literal)); var precedence=raw_precedence;
- if err==blot_error::Error.integer_range { literal_error=numeric_failure(p,source,tokens,literal,blot_parse_ast::numericcode_integer_range); precedence=0; }
- else if err!=blot_error::Error.none { return fail(p,source,tokens,c_invalid_literal); }
- var symbol: Symbol=0; var target: Symbol=0; var target_span=Span {}; var named=false;
- if eat(p,source,tokens,t_backtick) { named=true; let t=current(p,source,tokens); target_span=Span {t.start,t.end}; symbol=qualified(p,source,tokens); target=symbol; expect(p,source,tokens,t_backtick); }
- else { expect(p,source,tokens,t_l_paren); let op=advance(p,source,tokens); if !operator_tag(op.tag)||op.tag==t_kw_and||op.tag==t_kw_or { return fail(p,source,tokens,c_expected_token); } symbol=intern(p,source,tokens,text(p,source,op)); expect(p,source,tokens,t_r_paren); expect(p,source,tokens,t_equal); let t=current(p,source,tokens); target_span=Span {t.start,t.end}; target=qualified(p,source,tokens); }
- if p.failure!=blot_error::Error.none { return 0; }
- var power=precedence; if power>255 { power=255; } var replaced=false;
- for i in 0..p.fixities.items.len { if p.fixities.items[i].symbol==symbol&&p.fixities.items[i].named==named { p.fixities.items[i]=Fixity {symbol,power,association,named,false}; replaced=true; break; } }
- if !replaced { p.fixities.push(Fixity {symbol,power,association,named,false}); }
- var flags: u32=0; if named { flags|=1; } if attrs.len!=0 { flags|=2; } if literal_error!=0 { flags|=4; }
- let metadata=extra(p,source,tokens,[precedence,association,flags,attrs.start,attrs.len]); if literal_error!=0 { extra(p,source,tokens,[literal_error]); }
- let id=add(p,source,tokens,a_fixity_decl,symbol,target,metadata,start); if p.failure==blot_error::Error.none { p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:id,span:target_span}); } return id;
-}
 
 let t_eof=blot_parse_token::eof;
 let t_identifier=blot_parse_token::identifier;
@@ -758,30 +738,33 @@ recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],star
  parameters.deinit(); }
 recursive fn do_block(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=expect(p,source,tokens,t_kw_do).start; var resolver: Id=0; if !at(p,source,tokens,t_colon) { resolver=application(p,source,tokens,false); } expect(p,source,tokens,t_colon); let block_=suite(p,source,tokens); if p.failure!=blot_error::Error.none { return 0; } p.tree.nodes.items[block_].c=resolver; p.tree.spans.items[block_].start=start; return block_; }
 recursive fn if_expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=expect(p,source,tokens,t_kw_if).start; let condition=infix(p,source,tokens); expect(p,source,tokens,t_kw_then); let consequence=expression(p,source,tokens); expect(p,source,tokens,t_kw_else); let fallback=expression(p,source,tokens); return add(p,source,tokens,a_if_expr,condition,consequence,fallback,start); }
-fn lookup_fixity(p: Parser&,symbol: Symbol,named: bool) -> Fixity,bool {
- let spelling=p.pool.get(symbol);
- if spelling=="and"||spelling=="or" { var precedence: u32=20; if spelling=="and" { precedence=25; } return Fixity {symbol,precedence,1,false,false},true; }
- for f in p.fixities.items { if f.symbol==symbol&&f.named==named { return f,true; } }
- if named { return Fixity {symbol,80,0,true,false},true; }
- return Fixity {symbol,0,0,false,false},false;
+fn builtin_fixity(spelling: const u8[:]) -> u32, u32, bool {
+ if spelling=="|>" { return 5,0,true; }
+ if spelling=="or" { return 20,1,true; }
+ if spelling=="and" { return 25,1,true; }
+ if spelling=="=="||spelling=="!="||spelling=="<"||spelling=="<="||spelling==">"||spelling==">=" { return 30,2,true; }
+ if spelling=="|" { return 40,0,true; }
+ if spelling=="^" { return 45,0,true; }
+ if spelling=="&" { return 50,0,true; }
+ if spelling=="<<"||spelling==">>" { return 55,0,true; }
+ if spelling=="+"||spelling=="-" { return 60,0,true; }
+ if spelling=="*"||spelling=="/"||spelling=="%" { return 70,0,true; }
+ return 0,0,false;
 }
 fn read_operator(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Operator {
- let t=advance(p,source,tokens); var named=false; var span=Span {t.start,t.end}; var symbol: Symbol=0;
- if t.tag==t_backtick { named=true; span.start=current(p,source,tokens).start; symbol=qualified(p,source,tokens); span.end=current(p,source,tokens).start; expect(p,source,tokens,t_backtick); }
- else { symbol=intern(p,source,tokens,text(p,source,t)); }
- let found,known=lookup_fixity(p,symbol,named);
- if !known&&!named&&p.pool.get(symbol)=="$" { return Operator {symbol,0,1,span,true,false,true}; }
- var precedence: u32=0; var association: u32=0; if known { precedence=found.precedence; association=found.association; }
- return Operator {symbol,precedence,association,span,known,named,false};
+ let t=advance(p,source,tokens); let span=Span {t.start,t.end}; let spelling=text(p,source,t);
+ let symbol=intern(p,source,tokens,spelling);
+ if spelling=="$" { return Operator {symbol,0,1,span,true,true}; }
+ let precedence,association,known=builtin_fixity(spelling);
+ return Operator {symbol,precedence,association,span,known,false};
 }
 fn stop_infix_for_not(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
  let tag=current(p,source,tokens).tag;
  if tag==t_kw_and||tag==t_kw_or||tag==t_dollar { return true; }
  if tag==t_symbol {
   let spelling=text(p,source,current(p,source,tokens));
-  let sym,present=p.pool.lookup(spelling);
-  if present { let f,known=lookup_fixity(p,sym,false); if known&&f.precedence<27 { return true; } }
-  if spelling=="|>" { return true; }
+  let prec,_,known=builtin_fixity(spelling);
+  if known&&prec<27 { return true; }
  }
  return false;
 }
@@ -795,7 +778,7 @@ recursive fn infix_work(p: Parser&,source: const u8[:],tokens: const Token[:],st
  let start=current(p,source,tokens).start; var head: Id=0;
  if at(p,source,tokens,t_kw_not) { head=not_operand(p,source,tokens); } else { head=prefix(p,source,tokens); }
  var operands=ScratchIdBuffer {};  var operators=ScratchOperatorBuffer {};  var unknown=false;
- while p.failure==blot_error::Error.none&&(operator_tag(current(p,source,tokens).tag)||at(p,source,tokens,t_backtick)) {
+ while p.failure==blot_error::Error.none&&operator_tag(current(p,source,tokens).tag) {
   if stop_below_not&&stop_infix_for_not(p,source,tokens) { break; }
   let op=read_operator(p,source,tokens); unknown=unknown||!op.known; operators.push(op); var rhs: Id=0;
   if at(p,source,tokens,t_kw_func)||at(p,source,tokens,t_kw_do)||at(p,source,tokens,t_kw_if)||at(p,source,tokens,t_kw_case) { rhs=expression(p,source,tokens); }
@@ -819,7 +802,7 @@ recursive fn infix_work(p: Parser&,source: const u8[:],tokens: const Token[:],st
 fn infix_chain(p: Parser&,source: const u8[:],tokens: const Token[:],head: Id,operators: const Operator[:],operands: const Id[:],start: u32) -> Id {
  var tails=ScratchIdBuffer {};
  for op,index in operators {
-  var flags=(op.association<<2)|(op.precedence<<4); if op.named { flags|=1; } if op.known { flags|=2; }
+  var flags=(op.association<<2)|(op.precedence<<4); if op.known { flags|=2; }
   let rhs=operands[index]; let tail=add(p,source,tokens,a_operator_tail,op.symbol,rhs,flags,op.span.start); if p.failure!=blot_error::Error.none { let __cleanup_result_50_0: Id = 0; tails.deinit(); return __cleanup_result_50_0; }
   p.tree.spans.items[tail].end=p.tree.span(rhs).end; p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:tail,span:op.span}); tails.push(tail);
  }
@@ -951,10 +934,18 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
   advance(p,source,tokens);
   if text(p,source,t)=="#"&&word(p,source,tokens,"run")&&peek(p,tokens,1)!=t_dot { advance(p,source,tokens); p.tree.has_typed_staging=true; let value=expression(p,source,tokens); let __cleanup_result_51_0: Id = collection_intrinsic(p,source,tokens,"@code.evaluate",[value],start); { p.depth--; } return __cleanup_result_51_0; }
   if text(p,source,t)=="#"&&at(p,source,tokens,t_kw_do) { p.tree.has_typed_staging=true; let value=do_block(p,source,tokens); let __cleanup_result_52_0: Id = collection_intrinsic(p,source,tokens,"@code.evaluate",[value],start); { p.depth--; } return __cleanup_result_52_0; }
-  if at(p,source,tokens,t_l_bracket) { let __cleanup_result_53_0: Id = collection(p,source,tokens,false,start); { p.depth--; } return __cleanup_result_53_0; } if at(p,source,tokens,t_l_brace) { let __cleanup_result_54_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_54_0; }
+  if at(p,source,tokens,t_l_bracket) { let __cleanup_result_53_0: Id = collection(p,source,tokens,start); { p.depth--; } return __cleanup_result_53_0; } if at(p,source,tokens,t_l_brace) { let __cleanup_result_54_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_54_0; }
   let name=qualified(p,source,tokens); if at(p,source,tokens,t_l_brace) { let __cleanup_result_55_0: Id = record(p,source,tokens,name,start); { p.depth--; } return __cleanup_result_55_0; } let __cleanup_result_56_0: Id = add(p,source,tokens,a_constructor_ref,name,0,0,start); { p.depth--; } return __cleanup_result_56_0;
  }
- if t.tag==t_l_brace { let __cleanup_result_57_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_57_0; } if t.tag==t_l_bracket { let __cleanup_result_58_0: Id = collection(p,source,tokens,true,start); { p.depth--; } return __cleanup_result_58_0; }
+ if t.tag==t_l_brace { let __cleanup_result_57_0: Id = record(p,source,tokens,0,start); { p.depth--; } return __cleanup_result_57_0; }
+ if t.tag==t_l_bracket {
+  advance(p,source,tokens); var values=ScratchIdBuffer {};
+  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_bracket) { values.push(expression(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } }
+  expect(p,source,tokens,t_r_bracket);
+  let range=list(p,source,tokens,values.items);
+  let id=add(p,source,tokens,a_array,range.start,range.len,1,start);
+  values.deinit(); { p.depth--; } return id;
+ }
  if t.tag==t_l_paren {
   advance(p,source,tokens); var values=ScratchIdBuffer {};  var tuple=false;
   while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_paren) { values.push(expression(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } tuple=true; }
@@ -973,7 +964,7 @@ recursive fn collection_element(p: Parser&,source: const u8[:],tokens: const Tok
  }
  let value=expression(p,source,tokens); p.expression_end=previous; return value;
 }
-fn collection_literal(p: Parser&,source: const u8[:],tokens: const Token[:],is_list: bool,values: const Id[:],start: u32) -> Id { let range=list(p,source,tokens,values); var kind: u32=0; if is_list { kind=1; } return add(p,source,tokens,a_array,range.start,range.len,kind,start); }
+fn collection_literal(p: Parser&,source: const u8[:],tokens: const Token[:],values: const Id[:],start: u32) -> Id { let range=list(p,source,tokens,values); return add(p,source,tokens,a_array,range.start,range.len,0,start); }
 fn collection_intrinsic(p: Parser&,source: const u8[:],tokens: const Token[:],name: const u8[:],args: const Id[:],start: u32) -> Id { var result=add(p,source,tokens,a_intrinsic,intern(p,source,tokens,name),0,0,start); for arg in args { result=add(p,source,tokens,a_apply,result,arg,0,start); } return result; }
 fn collection_name(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Symbol { let spelling=str("$collection.",p.collection_names); p.collection_names++; return intern(p,source,tokens,spelling); }
 fn collection_binding(p: Parser&,source: const u8[:],tokens: const Token[:],name: Symbol,value: Id,start: u32) -> Id { let pat=add(p,source,tokens,a_pattern_name,name,0,0,start); return add(p,source,tokens,a_let_stmt,pat,value,extra(p,source,tokens,[0 as u32,0,0,0,0]),start); }
@@ -994,24 +985,22 @@ fn collection_loop(p: Parser&,source: const u8[:],tokens: const Token[:],pat: Id
   statements.deinit(); }
  var explicit_flag: u32=0; if explicit { explicit_flag=1; } return add(p,source,tokens,a_for_stmt,pat,value,extra(p,source,tokens,[end,body,explicit_flag,expansion]),start);
 }
-recursive fn collection(p: Parser&,source: const u8[:],tokens: const Token[:],is_list: bool,start: u32) -> Id {
+recursive fn collection(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
  expect(p,source,tokens,t_l_bracket); var values=ScratchIdBuffer {};  var spread: i64=-1;
  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_bracket) {
   if eat(p,source,tokens,t_ellipsis) { if spread>=0 { let __cleanup_result_56_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_56_0; } spread=values.len; }
   values.push(collection_element(p,source,tokens));
-  if eat(p,source,tokens,t_pipe) { if spread>=0 { let __cleanup_result_57_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_57_0; } if values.len==1&&at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_left_arrow { let __cleanup_result_58_0: Id = comprehension(p,source,tokens,is_list,values.items[0],start); values.deinit(); return __cleanup_result_58_0; } spread=values.len; values.push(expression(p,source,tokens)); break; }
+  if eat(p,source,tokens,t_pipe) { if spread>=0 { let __cleanup_result_57_0: Id = fail(p,source,tokens,c_unexpected_token); values.deinit(); return __cleanup_result_57_0; } if values.len==1&&at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_left_arrow { let __cleanup_result_58_0: Id = comprehension(p,source,tokens,values.items[0],start); values.deinit(); return __cleanup_result_58_0; } spread=values.len; values.push(expression(p,source,tokens)); break; }
   if !eat(p,source,tokens,t_comma) { break; }
  }
  expect(p,source,tokens,t_r_bracket); if p.failure!=blot_error::Error.none { let __cleanup_result_59_0: Id = 0; values.deinit(); return __cleanup_result_59_0; }
- if spread<0 { let __cleanup_result_60_0: Id = collection_literal(p,source,tokens,is_list,values.items,start); values.deinit(); return __cleanup_result_60_0; }
+ if spread<0 { let __cleanup_result_60_0: Id = collection_literal(p,source,tokens,values.items,start); values.deinit(); return __cleanup_result_60_0; }
  var statements=ScratchIdBuffer {};  var refs=ScratchIdBuffer {};
  for value in values.items { let name=collection_name(p,source,tokens,start); statements.push(add(p,source,tokens,a_iterator_bind,name,value,0,start)); refs.push(add(p,source,tokens,a_name,name,0,0,start)); }
  var result=refs.items[spread]; var index=spread;
- var prepend: const u8[:]="@array.prepend"; var append: const u8[:]="@array.append"; var identity: const u8[:]="@array.identity";
- if is_list { prepend="@list.prepend"; append="@list.append"; identity="@list.identity"; }
- while index!=0 { index--; result=collection_intrinsic(p,source,tokens,prepend,[result,refs.items[index]],start); }
- for value in refs.items[spread+1..] { result=collection_intrinsic(p,source,tokens,append,[result,value],start); }
- if values.len==1 { result=collection_intrinsic(p,source,tokens,identity,[result],start); } statements.push(add(p,source,tokens,a_return_stmt,result,0,0,start)); let __cleanup_result_61_0: Id = list_node(p,source,tokens,a_block,statements.items,start); refs.deinit(); statements.deinit(); values.deinit(); return __cleanup_result_61_0;
+ while index!=0 { index--; result=collection_intrinsic(p,source,tokens,"@array.prepend",[result,refs.items[index]],start); }
+ for value in refs.items[spread+1..] { result=collection_intrinsic(p,source,tokens,"@array.append",[result,value],start); }
+ if values.len==1 { result=collection_intrinsic(p,source,tokens,"@array.identity",[result],start); } statements.push(add(p,source,tokens,a_return_stmt,result,0,0,start)); let __cleanup_result_61_0: Id = list_node(p,source,tokens,a_block,statements.items,start); refs.deinit(); statements.deinit(); values.deinit(); return __cleanup_result_61_0;
  refs.deinit(); statements.deinit(); values.deinit(); }
 // A spark admits one fixed-work numeric result per array index. Only total
 // primitives are eligible here; source operators can have user implementations.
@@ -1107,7 +1096,7 @@ recursive fn spawn_expression(p: Parser&,source: const u8[:],tokens: const Token
  let evaluated=add(p,source,tokens,a_use_stmt,config_name,config,word_type,start);
  var packet=ScratchIdBuffer {}; packet.push(add(p,source,tokens,a_name,config_name,0,0,start));
  for byte in spelling { packet.push(add(p,source,tokens,a_integer,byte as u32,0,0,start)); }
- let request=collection_literal(p,source,tokens,false,packet.items,start); packet.deinit();
+ let request=collection_literal(p,source,tokens,packet.items,start); packet.deinit();
  let packet_name=collection_name(p,source,tokens,start);
  let bound=collection_binding(p,source,tokens,packet_name,request,start);
  p.tree.extra.items[p.tree.node(bound).c]=words;
@@ -1116,7 +1105,7 @@ recursive fn spawn_expression(p: Parser&,source: const u8[:],tokens: const Token
  let returned=add(p,source,tokens,a_return_stmt,call,0,0,start);
  return list_node(p,source,tokens,a_block,[init,step,evaluated,bound,returned],start);
 }
-recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:],is_list: bool,result: Id,start: u32) -> Id {
+recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:],result: Id,start: u32) -> Id {
  var qualifiers=ScratchQualifierBuffer {};
  while p.failure==blot_error::Error.none {
   let point=current(p,source,tokens).start; var kind: u32=1; var name: Symbol=0;
@@ -1125,8 +1114,8 @@ recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:]
   let value=expression(p,source,tokens); qualifiers.push(Qualifier {kind,name,value,point});
   if !eat(p,source,tokens,t_comma) { break; } if at(p,source,tokens,t_r_bracket) { let __cleanup_result_62_0: Id = fail(p,source,tokens,c_expected_expression); qualifiers.deinit(); return __cleanup_result_62_0; }
  }
- expect(p,source,tokens,t_r_bracket); let accumulator=collection_name(p,source,tokens,start); let empty=collection_literal(p,source,tokens,true,[],start); let initial=collection_binding(p,source,tokens,accumulator,empty,start);
- let target=add(p,source,tokens,a_name,accumulator,0,0,start); let receiver=add(p,source,tokens,a_name,accumulator,0,0,start); let appended=collection_intrinsic(p,source,tokens,"@list.append",[receiver,result],start);
+ expect(p,source,tokens,t_r_bracket); let accumulator=collection_name(p,source,tokens,start); let empty=collection_literal(p,source,tokens,[],start); let initial=collection_binding(p,source,tokens,accumulator,empty,start);
+ let target=add(p,source,tokens,a_name,accumulator,0,0,start); let receiver=add(p,source,tokens,a_name,accumulator,0,0,start); let appended=collection_intrinsic(p,source,tokens,"@array.append",[receiver,result],start);
  let rebind=add(p,source,tokens,a_rebind_stmt,target,appended,0,start); var body=list_node(p,source,tokens,a_block,[rebind],start); var index=qualifiers.len;
  while index!=0&&p.failure==blot_error::Error.none {
   index--; let q=qualifiers.items[index]; var statement: Id=0;
@@ -1135,7 +1124,7 @@ recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:]
   else { let binding=collection_binding(p,source,tokens,q.name,q.value,q.start); var joined=ScratchIdBuffer {};  joined.append([binding]); for child in p.tree.children(body) { joined.push(child); } body=list_node(p,source,tokens,a_block,joined.items,q.start); joined.deinit(); continue;  joined.deinit(); }
   body=list_node(p,source,tokens,a_block,[statement],q.start);
  }
- var final=add(p,source,tokens,a_name,accumulator,0,0,start); if !is_list { final=collection_intrinsic(p,source,tokens,"@array.from_list",[final],start); }
+ let final=add(p,source,tokens,a_name,accumulator,0,0,start);
  let returned=add(p,source,tokens,a_return_stmt,final,0,0,start); if p.failure!=blot_error::Error.none { let __cleanup_result_64_0: Id = 0; qualifiers.deinit(); return __cleanup_result_64_0; }
  var statements=ScratchIdBuffer {};  statements.append([initial]); for child in p.tree.children(body) { statements.push(child); } statements.push(returned); let __cleanup_result_65_0: Id = list_node(p,source,tokens,a_block,statements.items,start); statements.deinit(); qualifiers.deinit(); return __cleanup_result_65_0;
  statements.deinit(); qualifiers.deinit(); }
@@ -1176,7 +1165,6 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   if eat(p,source,tokens,t_kw_else) { expect(p,source,tokens,t_colon); fallback=suite(p,source,tokens); } return add(p,source,tokens,a_let_stmt,pat,value,extra(p,source,tokens,[annotation,constraints.predicates.start,constraints.predicates.len,fallback,constraints.node]),start);
  }
  if eat(p,source,tokens,t_kw_return) { let value=expression(p,source,tokens); return add(p,source,tokens,a_function_return_stmt,value,0,0,start); }
- if eat(p,source,tokens,t_kw_yield) { let value=expression(p,source,tokens); return add(p,source,tokens,a_yield_stmt,value,0,0,start); }
  if eat(p,source,tokens,t_kw_break) {
   if at(p,source,tokens,t_newline)||at(p,source,tokens,t_dedent)||at(p,source,tokens,t_eof) { return add(p,source,tokens,a_break_stmt,0,0,0,start); }
   var forwarding: u32=0; if eat(p,source,tokens,t_dollar) { forwarding=1; } let value=expression(p,source,tokens); return add(p,source,tokens,a_return_stmt,value,forwarding,0,start);
@@ -1337,30 +1325,24 @@ recursive fn pattern(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
  { p.depth--; } }
 fn pattern_row(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=current(p,source,tokens).start; var values=ScratchIdBuffer {};  values.push(pattern(p,source,tokens)); while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_comma) { values.push(pattern(p,source,tokens)); } let __cleanup_result_73_0: Id = list_node(p,source,tokens,a_pattern_row,values.items,start); values.deinit(); return __cleanup_result_73_0;  values.deinit(); }
 recursive fn case_expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=expect(p,source,tokens,t_kw_case).start; let request_name=at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_kw_of; var values=ScratchIdBuffer {};
+ let start=expect(p,source,tokens,t_kw_case).start; var values=ScratchIdBuffer {};
  values.push(expression(p,source,tokens)); while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_comma) { values.push(expression(p,source,tokens)); }
- expect(p,source,tokens,t_kw_of); expect(p,source,tokens,t_newline); expect(p,source,tokens,t_indent); newlines(p,source,tokens); var arms=ScratchIdBuffer {};  let requests=at(p,source,tokens,t_kw_effect)||at(p,source,tokens,t_kw_complete);
- if requests&&!request_name { let __cleanup_result_74_0: Id = identifier_syntax(p,source,tokens); arms.deinit(); values.deinit(); return __cleanup_result_74_0; }
+ expect(p,source,tokens,t_kw_of); expect(p,source,tokens,t_newline); expect(p,source,tokens,t_indent); newlines(p,source,tokens); var arms=ScratchIdBuffer {};
  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_dedent)&&!at(p,source,tokens,t_eof) {
   let point=current(p,source,tokens).start;
-  if requests {
-   let complete=eat(p,source,tokens,t_kw_complete); var operation: Id=0;
-   if !complete { expect(p,source,tokens,t_kw_effect); let operation_token=current(p,source,tokens).tag; if operation_token!=t_identifier&&operation_token!=t_type_identifier&&operation_token!=t_l_paren { let __cleanup_result_75_0: Id = identifier_syntax(p,source,tokens); arms.deinit(); values.deinit(); return __cleanup_result_75_0; } let operation_start=current(p,source,tokens).start; if operation_token==t_l_paren { operation=atom(p,source,tokens); } else { operation=add(p,source,tokens,a_name,qualified(p,source,tokens),0,0,operation_start); } }
-   let pat=pattern(p,source,tokens); expect(p,source,tokens,t_fat_arrow); let body=suite(p,source,tokens); arms.push(add(p,source,tokens,a_request_arm,operation,pat,body,point));
+  var rows=ScratchIdBuffer {};  rows.push(pattern_row(p,source,tokens)); while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_pipe) { rows.push(pattern_row(p,source,tokens)); } var guard_: Id=0; if eat(p,source,tokens,t_kw_if) { guard_=expression(p,source,tokens); }
+  expect(p,source,tokens,t_fat_arrow); var body: Id=0;
+  if at(p,source,tokens,t_newline)&&peek(p,tokens,1)==t_indent {
+   let parsed_arm,ignored=suite_body(p,source,tokens,true,false);
+   body=parsed_arm;
   } else {
-   var rows=ScratchIdBuffer {};  rows.push(pattern_row(p,source,tokens)); while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_pipe) { rows.push(pattern_row(p,source,tokens)); } var guard_: Id=0; if eat(p,source,tokens,t_kw_if) { guard_=expression(p,source,tokens); }
-   expect(p,source,tokens,t_fat_arrow); var body: Id=0;
-   if at(p,source,tokens,t_newline)&&peek(p,tokens,1)==t_indent {
-    let parsed_arm,ignored=suite_body(p,source,tokens,true,false);
-    body=parsed_arm;
-   } else {
-    body=expression(p,source,tokens);
-   }
-   let range=list(p,source,tokens,rows.items); arms.push(add(p,source,tokens,a_case_arm,range.start,range.len,extra(p,source,tokens,[guard_,body]),point));
-   rows.deinit(); }
+   body=expression(p,source,tokens);
+  }
+  let range=list(p,source,tokens,rows.items); arms.push(add(p,source,tokens,a_case_arm,range.start,range.len,extra(p,source,tokens,[guard_,body]),point));
+  rows.deinit();
   if p.failure!=blot_error::Error.none { let __cleanup_result_76_0: Id = 0; arms.deinit(); values.deinit(); return __cleanup_result_76_0; } if !at(p,source,tokens,t_newline)&&!at(p,source,tokens,t_dedent) { let __cleanup_result_77_0: Id = fail(p,source,tokens,c_expected_token); arms.deinit(); values.deinit(); return __cleanup_result_77_0; } newlines(p,source,tokens);
  }
- expect(p,source,tokens,t_dedent); let inputs=list(p,source,tokens,values.items); let cases=list(p,source,tokens,arms.items); var tag=a_case_expr; if requests { tag=a_request_case; } let __cleanup_result_78_0: Id = add(p,source,tokens,tag,extra(p,source,tokens,[inputs.start,inputs.len]),cases.start,cases.len,start); arms.deinit(); values.deinit(); return __cleanup_result_78_0;
+ expect(p,source,tokens,t_dedent); let inputs=list(p,source,tokens,values.items); let cases=list(p,source,tokens,arms.items); let __cleanup_result_78_0: Id = add(p,source,tokens,a_case_expr,extra(p,source,tokens,[inputs.start,inputs.len]),cases.start,cases.len,start); arms.deinit(); values.deinit(); return __cleanup_result_78_0;
  arms.deinit(); values.deinit(); }
 fn operator_tag(tag: Tag) -> bool { return tag==t_symbol||tag==t_dollar||tag==t_star||tag==t_caret||tag==t_pipe||tag==t_kw_and||tag==t_kw_or; }
 fn atom_tag(tag: Tag) -> bool { return tag==t_integer||tag==t_float||tag==t_string||tag==t_intrinsic||tag==t_identifier||tag==t_type_identifier||tag==t_selector||tag==t_hash||tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace||tag==t_colon||tag==t_kw_true||tag==t_kw_false; }
@@ -1373,32 +1355,29 @@ fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i6
  return false;
 }
 fn is_statement_tag(tag: blot_parse_ast::Tag) -> bool {
- return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_store_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_yield_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
+ return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_store_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
 }
 fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
-fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&,fixities: ScratchFixityBuffer&) -> Parser {
- return Parser {pool:pool,tree:tree,fixities:fixities};
+fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&) -> Parser {
+ return Parser {pool:pool,tree:tree};
 }
-fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:],fixities: ScratchFixityBuffer&,recorded:ScratchIdBuffer?) -> Error {
- var p=parser_context(pool,tree,fixities);p.recorded .= recorded;
- for f in inherited { fixities.push(Fixity {f.operator,f.precedence,f.association,f.named,true}); }
+fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,recorded:ScratchIdBuffer?) -> Error {
+ var p=parser_context(pool,tree);p.recorded .= recorded;
  var declarations_seen=false; var body_declarations_seen=false;
  while !at(p,source,tokens,t_eof) {
   newlines(p,source,tokens); if at(p,source,tokens,t_eof) { break; } let before=p.index; let first_node=tree.nodes.len as Id;
   let root=declaration(p,source,tokens,declarations_seen,body_declarations_seen);
   if p.failure==blot_error::Error.syntax { recover(p,source,tokens,before); continue; } if p.failure!=blot_error::Error.none { return p.failure; }
   tree.roots.push(root); tree.declaration_nodes.push(blot_parse_ast::DeclarationNodes {root,first_node,tree.nodes.len as Id});
-  let tag=tree.node(root).tag; if tag!=a_import_decl&&tag!=a_export_decl { declarations_seen=true; } if tag!=a_import_decl&&tag!=a_export_decl&&tag!=a_fixity_decl { body_declarations_seen=true; }
+  let tag=tree.node(root).tag; if tag!=a_import_decl&&tag!=a_export_decl { declarations_seen=true; body_declarations_seen=true; }
   if !at(p,source,tokens,t_newline)&&!at(p,source,tokens,t_eof) { report(p,source,tokens,c_unexpected_token); recover(p,source,tokens,before); } newlines(p,source,tokens);
  }
  return tree.failure();
 }
-fn parse_with_fixities(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:],recorded:ScratchIdBuffer?=null) -> Error {
- var fixities=ScratchFixityBuffer {};
- let error=parse_work(source,tokens,pool,tree,inherited,fixities,recorded);
- fixities.deinit(); return error;
+fn parse_with_recorded(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,recorded:ScratchIdBuffer?=null) -> Error {
+ return parse_work(source,tokens,pool,tree,recorded);
 }
-fn parse(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&) -> Error { return parse_with_fixities(source,tokens,pool,tree,[]); }
+fn parse(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&) -> Error { return parse_work(source,tokens,pool,tree,null); }
 
 struct ScratchIdBuffer { storage: Id[:]=default<Id[:]>(),items: Id[:]=default<Id[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_ScratchIdBuffer: Id[>..]=[];
@@ -1445,8 +1424,3 @@ fn resize(self_: Scratchu8Buffer&,length: i64) { blot_support_pooled_buffer::res
 fn resize(self_: Scratchu8Buffer&,length: i64,value: u8) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: Scratchu8Buffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: Scratchu8Buffer&) { blot_support_pooled_buffer::deinit(self_,pool_Scratchu8Buffer); self_.len=0; self_.failure=blot_error::Error.none; }
-
-struct ScratchFixityBuffer { storage: Fixity[:]=default<Fixity[:]>(),items: Fixity[:]=default<Fixity[:]>(),failure: Error=blot_error::Error.none }
-reusable[] var pool_ScratchFixityBuffer: Fixity[>..]=[];
-fn push(self_: ScratchFixityBuffer&,value: Fixity) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchFixityBuffer); }
-fn deinit(self_: ScratchFixityBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchFixityBuffer); self_.failure=blot_error::Error.none; }

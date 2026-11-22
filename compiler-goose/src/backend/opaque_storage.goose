@@ -84,7 +84,7 @@ recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals:
         }
         return Storage {..};
     }
-    if node.tag == blot_check_types::Tag.array || node.tag == blot_check_types::Tag.list || node.tag == blot_check_types::Tag.cursor || node.tag == blot_check_types::Tag.record || node.tag == blot_check_types::Tag.product || node.tag == blot_check_types::Tag.function || node.tag == blot_check_types::Tag.provider || node.tag == blot_check_types::Tag.state_provider { return Storage { kind: Kind.reference , ..}; }
+    if node.tag == blot_check_types::Tag.array || node.tag == blot_check_types::Tag.record || node.tag == blot_check_types::Tag.product || node.tag == blot_check_types::Tag.function || node.tag == blot_check_types::Tag.provider || node.tag == blot_check_types::Tag.state_provider { return Storage { kind: Kind.reference , ..}; }
     if node.tag == blot_check_types::Tag.usage {
         if node.b == blot_parse_ast::usagekind_unique || node.b == blot_parse_ast::usagekind_shared { return Storage { kind: Kind.reference , ..}; }
         return expression(source, nominals, constructors, node.a, frames,current, depth + 1, remaining, authoritative, local_unit, resolver);

@@ -158,7 +158,7 @@ fn detailWrite(writer:Writer&,value:blot_parse_ast::NumericFault)->Error {writer
 fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContextKind)->Error {return writer.enumValue(value);}
 fn detailWrite(writer:Writer&,value:blot_reuse_dispatch_explanation::Explanation)->Error {return value.jsonStringify(writer);}
 fn detailWrite(writer:Writer&,value:blot_reuse_hole_diagnostics::Snapshot)->Error {return value.jsonStringify(writer);}
-fn terminatorName(value:blot_parse_source_operators::Terminator)->const u8[:] {if value==blot_parse_source_operators::terminator_return {return "return_";}if value==blot_parse_source_operators::terminator_break {return "break_";}if value==blot_parse_source_operators::terminator_yield {return "yield_";}return "none";}
+fn terminatorName(value:blot_parse_source_operators::Terminator)->const u8[:] {if value==blot_parse_source_operators::terminator_return {return "return_";}if value==blot_parse_source_operators::terminator_break {return "break_";}return "none";}
 // A checker diagnostic as the oracle's std.json renders it: every field in declaration order.
 fn detailWrite(writer:Writer&,value:blot_check_check::Diagnostic)->Error {
  writer.beginObject();detailField(writer,"origin_unit",value.origin_unit);writer.key("code");writer.enumValue(value.code);detailField(writer,"span",value.span);detailField(writer,"node",value.node);

@@ -32,7 +32,6 @@ const cases: Record<string, Call[]> = {
   "nested_updates.blot": [["run", 5, 609]],
   "inferred_types.blot": [["run", 5, 7], ["loopuse", 4, 9]],
   "dispatch.blot": [["ids", 3, 1], ["ids", 4, 0], ["vec", 1, 79]],
-  "iterators.blot": [["chained", 1, 31], ["taken", 2, 26]],
   "open_codec.blot": [["run", 5, 12], ["written", 1, 3]],
   "policy_record.blot": [["run", 5, 17]],
   "boxed_records.blot": [

@@ -1,23 +1,6 @@
 // The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
 // Arithmetic operators use ordinary functions with compile-time associated dispatch.
 // Boolean and/or are reserved short-circuit operators.
-infixl 5 (|>) = pipe
-infix 30 (==) = eq
-infix 30 (!=) = ne
-infix 30 (<) = lt
-infix 30 (<=) = le
-infix 30 (>) = gt
-infix 30 (>=) = ge
-infixl 40 (|) = bit_or
-infixl 45 (^) = bit_xor
-infixl 50 (&) = bit_and
-infixl 55 (<<) = shl
-infixl 55 (>>) = shr
-infixl 60 (+) = add
-infixl 60 (-) = sub
-infixl 70 (*) = mul
-infixl 70 (/) = div
-infixl 70 (%) = rem
 
 func add left -> right => @type.call "add" left right
 func sub left -> right => @type.call "sub" left right
@@ -47,8 +30,6 @@ type Text = #[U32]
 // The expected result selects its type's ordinary `from` member.
 func from value => @type.result "from" value
 
-// A resolver sequences through the selected type's ordinary pure/bind members.
-func monad constructor => @do.monad constructor
 func F32.from value => value.to_f32
 func U32.from value => value.to_u32
 func F32.to_f32 (value: F32) => value
@@ -273,10 +254,6 @@ func Array.at (values: #[a]) -> (index: U32) => @array.get values index
 func GrowArray.at (values: #[+a]) -> (index: U32) => @storage.read values index
 func ResizeArray.at (values: #[~a]) -> (index: U32) => @storage.read values index
 func View.at (values: &[a]) -> (index: U32) => @storage.read values index
-func Array.from_list (values: List a): #[a] => @array.from_list values
-func List.from_array (values: #[a]): List a => @list.from_array values
-func List.length (values: List a): U32 => @list.length values
-func List.is_empty (values: List a): Bool => List.length values == 0
 func Array.is_empty (values: #[a]): Bool => Array.length values == 0
 func Array.get (values: #[a]) -> (index: U32): Maybe a =>
   if index < Array.length values:
@@ -287,19 +264,14 @@ func Array.set (values: #[a]) -> (index: U32) -> (value: a): Maybe #[a] =>
     return $Some (@array.set values index value)
   return $Nothing
 
-// Iteration is ordinary associated dispatch. A step returns an item and the
-// next immutable cursor; retaining either cursor preserves its own position.
-func List.iter values => @list.cursor values
-func Array.iter values => @array.cursor values
-func Cursor.iter (cursor: Cursor collection) => cursor
-func Cursor.next cursor => if @cursor.has cursor then $Some (@cursor.value cursor, @cursor.advance cursor) else $Nothing
-
 // Pool iteration borrows a captured range. Growth preserves its addresses and
 // initial length; shortening the owner while traversal is live is rejected.
 type PoolCursor a is data = $PoolCursor { values: &[a], index: U32 }
+func Array.iter (values: #[a]) => $PoolCursor {values: &values[0..values.length], index: 0}
 func GrowArray.iter (values: #[+a]) => $PoolCursor {values: &values[0..values.length], index: 0}
 func ResizeArray.iter (values: #[~a]) => $PoolCursor {values: &values[0..values.length], index: 0}
 func View.iter (values: &[a]) => $PoolCursor {values, index: 0}
+func PoolCursor.iter (cursor: PoolCursor a) => cursor
 func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.length then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1}) else $Nothing
 
 // Mutation dispatch keeps the owner mode explicit in each selected signature.

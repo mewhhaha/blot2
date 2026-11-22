@@ -44,7 +44,7 @@ Deno.test("source buffers compile virtual entry dependencies prelude and aliases
         [root + "/main.blot"]:
           'import {value} from "./dep"\nimport {extra} from "pkg/extra"\nentry const answer: U32 = @u32.add value extra\n',
         [root + "/dep.blot"]:
-          "const values = [1, 2]\nconst value: U32 = (@array.from_list values)[1]\n",
+          "const values = #[1, 2]\nconst value: U32 = values[1]\n",
         [root + "/prelude.blot"]:
           "const increment = func (x: U32) : U32 => return @u32.add x 1\n",
         [root + "/packages/extra.blot"]: "const extra: U32 = increment 39\n",

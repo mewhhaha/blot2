@@ -6,16 +6,16 @@ Deno.test("summary trees preserve range folds, updates and concatenation", async
   await compileAndRun(
     `
 import * as summary from "std/summary"
-import * as iter from "std/iter"
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+const range = func (start: U32) -> (end: U32) => return @array.generate (@u32.sub end start) (func i => return @u32.add start i)
 entry const queries = func (count: U32) => return do:
-  let tree = summary.build add 0 (iter.range 0 count)
-  break #[summary.query add 0 start length tree | start <- iter.range 0 (@u32.add count 1), length <- iter.range 0 (@u32.add (@u32.sub count start) 1)]
+  let tree = summary.build add 0 (range 0 count)
+  break #[summary.query add 0 start length tree | start <- range 0 (@u32.add count 1), length <- range 0 (@u32.add (@u32.sub count start) 1)]
 entry const values = func (count: U32) => return do:
-  let tree = summary.build add 0 (iter.range 0 count)
-  break #[summary.get index tree | index <- iter.range 0 count]
+  let tree = summary.build add 0 (range 0 count)
+  break #[summary.get index tree | index <- range 0 count]
 entry const updates = func (count: U32) => return do:
-  let original = summary.build add 0 (iter.range 0 count)
+  let original = summary.build add 0 (range 0 count)
   let changed = original
   for index in 0..count:
     changed := summary.set add index (@u32.add index 1000) self
@@ -27,9 +27,9 @@ entry const concatenate = func (count: U32) => return do:
     let leaf = summary.build add 0 #[index]
     tree := summary.concat add self leaf
   break #[summary.query add 0 0 count tree, summary.length tree]
-entry const bounds = func (input: Array U32) => return summary.query add 0 input[0] input[1] (summary.build add 0 (iter.range 0 3))
-entry const get = func (index: U32) => return summary.get index (summary.build add 0 (iter.range 0 3))
-entry const set = func (index: U32) => return summary.length (summary.set add index 99 (summary.build add 0 (iter.range 0 3)))
+entry const bounds = func (input: Array U32) => return summary.query add 0 input[0] input[1] (summary.build add 0 (range 0 3))
+entry const get = func (index: U32) => return summary.get index (summary.build add 0 (range 0 3))
+entry const set = func (index: U32) => return summary.length (summary.set add index 99 (summary.build add 0 (range 0 3)))
 `,
     (guest) => {
       for (const count of [0, 1, 2, 3, 31, 63, 257]) {
@@ -86,21 +86,20 @@ Deno.test("summary intervals preserve noncommutative order and reference snapsho
   await compileAndRun(
     `
 import * as summary from "std/summary"
-import * as iter from "std/iter"
 const combine = func (left: {mul: U32, add: U32}) => return func (right: {mul: U32, add: U32}) => return {mul: @u32.mul left.mul right.mul, add: @u32.add (@u32.mul left.mul right.add) left.add}
 const identity = {mul: 1, add: 0}
 const measure = func (index: U32) => return {mul: @u32.add index 1, add: index}
 entry const query = func (input: Array U32) => return do:
   let size = input[2]
   let split = input[3]
-  let left = summary.build combine identity (iter.map measure (iter.range 0 split))
-  let right = summary.build combine identity (iter.map measure (iter.range split size))
+  let left = summary.build combine identity (@array.generate split measure)
+  let right = summary.build combine identity (@array.generate (@u32.sub size split) (func i => return measure (@u32.add split i)))
   let tree = summary.concat combine left right
   let value = summary.query combine identity input[0] input[1] tree
   break #[value.mul, value.add]
 entry const references = func (count: U32) => return do:
   let combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
-  let original = summary.build combine #[] (iter.map (func index => return #[index]) (iter.range 0 count))
+  let original = summary.build combine #[] (@array.generate count (func index => return #[index]))
   if @u32.eq count 0:
     break summary.query combine #[] 0 0 original
   let changed = summary.set combine (@u32.div count 2) #[99] original
@@ -268,11 +267,10 @@ Deno.test("summary static versions and rolling copies survive entry resets", asy
     `
 import * as summary from "std/summary"
 import * as rolling from "std/rolling"
-import * as iter from "std/iter"
 const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
-const original = summary.build combine #[] (iter.map (func index => return #[index]) (iter.range 0 32))
+const original = summary.build combine #[] (@array.generate 32 (func index => return #[index]))
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
-const cursor = rolling.monoid add 0 3 (iter.range 0 32)
+const cursor = rolling.monoid add 0 3 (@array.generate 32 (func index => return index))
 entry const old = func () => return summary.query combine #[] 0 32 original
 entry const updated = func (index: U32) => return summary.query combine #[] 0 32 (summary.set combine index #[99] original)
 entry const first = func () => return do:

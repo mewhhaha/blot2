@@ -154,11 +154,5 @@ let indexed_write: u32 = 2;   // Built-in Bool type ID.
 
 fn collectionElement(store, id: blot_check_types::Id, mode: u32) -> blot_support::Option<blot_check_types::Id> {
     if mode == indexed_write { return arrayElement(store, id); }
-    if mode == iteration {
-        let node = store.node(id);
-        if node.tag == blot_check_types::Tag.list {
-            return blot_support::Option<blot_check_types::Id> {true, node.a, ..};
-        }
-    }
     return readableElement(store, id);
 }

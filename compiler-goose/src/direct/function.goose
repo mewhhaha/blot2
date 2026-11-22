@@ -568,7 +568,6 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         array => { return arrayLiteral(g, f, id); },
         array_op => { return arrayOp(g, f, id); },
         storage => { return storageOp(g, f, id); },
-        record_merge => { return recordMerge(g, f, id); },
         result_associated => { return resultAssociated(g, f, id); },
         contract_method => { return staticContractMethod(g, f, id); },
         operation_value => { return operationValue(g, f, id); },
@@ -700,7 +699,7 @@ fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: T
     if error != blot_direct_types::Error.none || !boxed { return false; }
     let n = m.node(id);
     match n.tag {
-        construct, record, record_merge, update => { return true; },
+        construct, record, update => { return true; },
         reference => {
             let local_id = localRef(m, id);
             return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
@@ -721,7 +720,7 @@ recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
     if id == 0 || depth > 16 { return false; }
     let n = m.node(id);
     match n.tag {
-        construct, record, record_merge, update => { return true; },
+        construct, record, update => { return true; },
         suite => {
             let items = m.children(id);
             if items.len == 0 { return false; }
@@ -931,7 +930,7 @@ recursive fn holesUnused(g: Generator&, f: const Fn&, ty: TId, depth: i64) -> bo
             let bound_to, present = g.types.envGet(f.env, m.unit, ty);
             return present;
         },
-        usage, forall, array, list, cursor => { return holesUnused(g, f, n.a, depth + 1); },
+        usage, forall, array => { return holesUnused(g, f, n.a, depth + 1); },
         function => { return holesUnused(g, f, n.a, depth + 1) && holesUnused(g, f, n.b, depth + 1); },
         product => {
             for at in 0..(n.b as i64) { if !holesUnused(g, f, m.types.extra[n.a + at], depth + 1) { return false; } }
@@ -956,7 +955,7 @@ recursive fn defaultUnused(g: Generator&, f: Fn&, ty: TId, depth: i64) {
     let n = m.types.node(ty);
     match n.tag {
         variable => { g.types.envBind(f.env, m.unit, ty, blot_direct_types::unit); },
-        usage, forall, array, list, cursor => { defaultUnused(g, f, n.a, depth + 1); },
+        usage, forall, array => { defaultUnused(g, f, n.a, depth + 1); },
         function => {
             defaultUnused(g, f, n.a, depth + 1);
             defaultUnused(g, f, n.b, depth + 1);
@@ -978,7 +977,7 @@ recursive fn layoutFree(g: Generator&, ty: Ty, depth: i64) -> bool {
     let n = g.types.node(ty);
     match n.tag {
         never => { return false; },
-        function, array, list, cursor, grow, resize, ref, view, link, cell => { return true; },
+        function, array, grow, resize, ref, view, link, cell => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if !layoutFree(g, g.types.words[n.a + at], depth + 1) { return false; } }
             return true;

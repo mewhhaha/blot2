@@ -28,13 +28,13 @@ type U64Map = blot_direct_map::U64Map;
 // failure is not an error value here.
 enum Error { none, unsupported, diverged }
 
-enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link, provider, state_provider, cell }
+enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, grow, resize, ref, view, link, provider, state_provider, cell }
 fn tagCode(tag: Tag) -> u32 {
     match tag {
         unit => { return 0; }, boolean => { return 1; }, u32_ => { return 2; }, f32_ => { return 3; }, never => { return 4; },
         tuple => { return 5; }, record => { return 6; }, nominal => { return 7; }, function => { return 8; }, array => { return 9; },
-        list => { return 10; }, cursor => { return 11; }, grow => { return 12; }, resize => { return 13; }, ref => { return 14; },
-        view => { return 15; }, link => { return 16; }, provider => { return 17; }, state_provider => { return 18; }, cell => { return 19; },
+        grow => { return 10; }, resize => { return 11; }, ref => { return 12; },
+        view => { return 13; }, link => { return 14; }, provider => { return 15; }, state_provider => { return 16; }, cell => { return 17; },
     }
 }
 // The Zig spelling of each tag, for diagnostics.
@@ -42,7 +42,7 @@ fn tagName(tag: Tag) -> Text {
     match tag {
         unit => { return "unit"; }, boolean => { return "boolean"; }, u32_ => { return "u32"; }, f32_ => { return "f32"; }, never => { return "never"; },
         tuple => { return "tuple"; }, record => { return "record"; }, nominal => { return "nominal"; }, function => { return "function"; }, array => { return "array"; },
-        list => { return "list"; }, cursor => { return "cursor"; }, grow => { return "grow"; }, resize => { return "resize"; }, ref => { return "ref"; },
+        grow => { return "grow"; }, resize => { return "resize"; }, ref => { return "ref"; },
         view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, cell => { return "cell"; },
     }
 }
@@ -51,10 +51,11 @@ fn coreTypeTagName(tag: TTag) -> Text {
     match tag {
         absent => { return "absent"; }, unit => { return "unit"; }, boolean => { return "boolean"; }, unsigned32 => { return "u32"; }, floating32 => { return "f32"; },
         never => { return "never"; }, variable => { return "variable"; }, function => { return "function"; }, product => { return "product"; }, record => { return "record"; },
-        nominal => { return "nominal"; }, array => { return "array"; }, list => { return "list"; }, cursor => { return "cursor"; }, type_constructor => { return "type_constructor"; },
-        resolver => { return "resolver"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, projection => { return "projection"; },
+        nominal => { return "nominal"; }, array => { return "array"; }, type_constructor => { return "type_constructor"; },
+        provider => { return "provider"; }, state_provider => { return "state_provider"; }, projection => { return "projection"; },
         scoped => { return "scoped"; }, instance_selection => { return "instance_selection"; }, erased_proof => { return "erased_proof"; }, forall => { return "forall"; },
         existential => { return "existential"; }, bound => { return "bound"; }, rigid => { return "rigid"; }, usage => { return "usage"; }, instance_version => { return "instance_version"; },
+        _ => { return "retired"; },
     }
 }
 
@@ -302,7 +303,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var arity: i64 = -1;
     match tag {
         function => { arity = 2; },
-        array, list, cursor, grow, resize, ref, view, link, provider, cell => { arity = 1; },
+        array, grow, resize, ref, view, link, provider, cell => { arity = 1; },
         state_provider => { arity = 3; },
         _ => {},
     }
@@ -325,7 +326,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         record => { value = Node { tag, start, (payload.len / 2) as u32 }; },
         nominal => { value = Node { tag, start, (payload.len - 2) as u32 }; },
         function => { value = Node { tag, first, payload[payload.len - 1] }; },
-        array, list, cursor, grow, resize, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
+        array, grow, resize, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
     }
     let id = self_.nodes.len as Ty;
     let span = Span { self_.encodings.len as u32, (payload.len + 1) as u32 };
@@ -588,12 +589,10 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
             if error != Error.none { return 0, error; }
             result = made;
         },
-        array, list, cursor => {
+        array => {
             let element, error = lowerInner(self_, m, n.a, env, child_open, depth + 1);
             if error != Error.none { return 0, error; }
-            var tag = Tag.cursor;
-            if n.tag == blot_check_types::Tag.array { tag = Tag.array; } else if n.tag == blot_check_types::Tag.list { tag = Tag.list; }
-            let made, error = intern(self_, tag, [element]);
+            let made, error = intern(self_, Tag.array, [element]);
             if error != Error.none { return 0, error; }
             result = made;
         },
@@ -756,7 +755,7 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
                 for argument, at in arguments { matchInner(self_, m, argument, self_.words[have.a + 2 + at], env, depth + 1); }
             }
         },
-        array, list, cursor => { if isContainer(have.tag) { matchInner(self_, m, n.a, have.a, env, depth + 1); } },
+        array => { if isContainer(have.tag) { matchInner(self_, m, n.a, have.a, env, depth + 1); } },
         provider => { if have.tag == Tag.provider { matchInner(self_, m, n.a, have.a, env, depth + 1); } },
         state_provider => {
             if have.tag == Tag.state_provider {
@@ -779,7 +778,7 @@ recursive fn concrete(self_: const Types&, ty: Ty, depth: i64) -> bool {
         never => { return false; },
         unit, boolean, u32_, f32_ => { return true; },
         function => { return concrete(self_, n.a, depth + 1) && concrete(self_, n.b, depth + 1); },
-        array, list, cursor, grow, resize, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
+        array, grow, resize, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
         tuple, state_provider => {
             for at in 0..(n.b as i64) { if !concrete(self_, self_.words[n.a + at], depth + 1) { return false; } }
             return true;
@@ -1015,8 +1014,8 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
         },
         // Owner handles: (slot, generation); views add (start, length),
         // element references and links add an index.
-        array, list, grow, resize => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
-        view, cursor => { for at in 0..4 { self_.pushScratchLayout(i32w); } },
+        array, grow, resize => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
+        view => { for at in 0..4 { self_.pushScratchLayout(i32w); } },
         ref, link => { for at in 0..3 { self_.pushScratchLayout(i32w); } },
         cell => { self_.pushScratchLayout(i32w); },
     }
@@ -1028,7 +1027,7 @@ fn pushSlot(self_: Types&, slot: Slot) {
 
 fn isContainer(tag: Tag) -> bool {
     match tag {
-        array, list, cursor, grow, resize, ref, view, link => { return true; },
+        array, grow, resize, ref, view, link => { return true; },
         _ => { return false; },
     }
 }

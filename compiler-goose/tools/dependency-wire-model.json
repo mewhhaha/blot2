@@ -3772,53 +3772,28 @@
           "identity"
         ],
         [
-          "convert",
-          8,
-          "convert"
-        ],
-        [
-          "cursor",
-          9,
-          "cursor"
-        ],
-        [
-          "cursor_has",
-          10,
-          "cursor_has"
-        ],
-        [
-          "cursor_value",
-          11,
-          "cursor_value"
-        ],
-        [
-          "cursor_advance",
-          12,
-          "cursor_advance"
-        ],
-        [
           "concat",
-          13,
+          8,
           "concat"
         ],
         [
           "slice",
-          14,
+          9,
           "slice"
         ],
         [
           "simd_load",
-          15,
+          10,
           "simd_load"
         ],
         [
           "simd_store",
-          16,
+          11,
           "simd_store"
         ],
         [
           "flatten",
-          17,
+          12,
           "flatten"
         ]
       ]

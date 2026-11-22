@@ -2,9 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const prelude = `infix 30 (==) = eq
-const eq = func left -> right => return @type.call "eq" left right
-const U32.eq = func (left: U32) -> (right: U32) => return @u32.eq left right
+const prelude = `const U32.eq = func (left: U32) -> (right: U32) => return @u32.eq left right
 const F32.eq = func (left: F32) -> (right: F32) => return @f32.eq left right
 `;
 const helper = `const any = func predicate -> (values: Array item) => return do:

@@ -174,7 +174,7 @@ Deno.test("this checkout exports the standard prelude as an explicit package cho
     );
     await Deno.writeTextFile(
       entry,
-      "entry const answer = func () => return (Array.from_list [40, 2])[0] + 2\n",
+      "entry const answer = func () => return (Array.get #[40, 2] 0 |> func m => case m of\n  $Some v => v\n  $Nothing => 0) + 2\n",
     );
     equal(await runCli(executable, ["build", entry, output]), 0);
     const guest = await instantiateGuest(await Deno.readFile(output));

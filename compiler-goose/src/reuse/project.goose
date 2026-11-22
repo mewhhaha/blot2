@@ -180,14 +180,12 @@ struct Frame {unit:UnitId,next:u32=0}
 type LoaderFiles=blot_support_pooled_map::Map<Symbol,UnitId>;
 type LoaderVisits=blot_support_pooled_buffer::Buffer<Visit>;
 type LoaderStack=blot_support_pooled_buffer::Buffer<Frame>;
-type LoaderFixities=blot_support_pooled_buffer::Buffer<blot_parse_parser::InheritedFixity>;
 reusable[] var loader_file_slots:dictionary_slot<Symbol,UnitId>[>..]=[];
 reusable[] var loader_visit_runs:Visit[>..]=[];
 reusable[] var loader_frame_runs:Frame[>..]=[];
-reusable[] var loader_fixity_runs:blot_parse_parser::InheritedFixity[>..]=[];
 struct Loader<P> {
     previous:const Project?=null, verified_symbols:i64=0, stable_prefix:bool=true, parser_seed:i64=0, remap:WordBuffer=WordBuffer{}, reading_entry:bool=false,
-    parse_batch:ParseBatch=ParseBatch{},options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,inherited_fixities:LoaderFixities,prelude_ready:bool=false,
+    parse_batch:ParseBatch=ParseBatch{},options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,prelude_ready:bool=false,
 }
 fn starts(text: const u8[:], prefix: const u8[:]) -> bool {return prefix.len<=text.len&&text[..prefix.len]==prefix;}
 fn ends(text: const u8[:], suffix: const u8[:]) -> bool {return suffix.len<=text.len&&text[text.len-suffix.len..]==suffix;}
@@ -265,7 +263,7 @@ fn probeSource(self_:FileInputs&,path:const u8[:],maximum:i64,name:u8[>..<]&,byt
 fn recordProbedCanonical(self_:FileInputs&,path:const u8[:],canonical:const u8[:])->Error {self_.last_cause=default<const u8[:]>();return blot_error::Error.none;}
 fn recordProbedRead(self_:FileInputs&,canonical:const u8[:],bytes:const u8[:],limit:i64)->Error {self_.last_cause=default<const u8[:]>();if bytes.len>limit {self_.last_cause="StreamTooLong";return blot_error::Error.stream_too_long;}return blot_error::Error.none;}
 fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=default<const u8[:]>();return resolveImportPath(source_filename,raw,options,output);}
-fn deinitScratch<P>(self_:Loader<P>&) {self_.remap.deinit();self_.parse_batch.deinit();self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);blot_support_pooled_buffer::deinit(self_.inherited_fixities,loader_fixity_runs);}
+fn deinitScratch<P>(self_:Loader<P>&) {self_.remap.deinit();self_.parse_batch.deinit();self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);}
 fn report<P>(self_:Loader<P>&,origin:Origin,code:Code,target:const u8[:],cause:blot_support::Option<const u8[:]>)->Error {
     var name:Symbol=0;let interned,error=self_.project.symbols.intern(target);
     if error==blot_error::Error.out_of_memory {return error;}if error==blot_error::Error.none {name=interned;}
@@ -377,7 +375,7 @@ fn readEntryPacket<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:
         }
     }
     var packet:u8[>..<]=[];
-    if !blot_reuse_parse_packet::encode(source,symbols,loader.inherited_fixities.items,packet) ||
+    if !blot_reuse_parse_packet::encode(source,symbols,packet) ||
        !blot_reuse_parse_packet::decode(packet,symbols,tree) {return false;}
     projects[loader.project.lease-1].entry_packet=copySource(packet);
     return true;
@@ -451,7 +449,7 @@ fn readSource<P>(self_:Loader<P>&,filename:Symbol,reserved:blot_support::Option<
         }
         if diagnostics.len==0 {
             let parse_scope=blot_phase_profile::enter(blot_phase_profile::Phase.parse);
-            let parse_error=blot_parse_parser::parse_with_fixities(source,tokens,self_.project.symbols,tree,self_.inherited_fixities.items,recorded);
+            let parse_error=blot_parse_parser::parse_with_recorded(source,tokens,self_.project.symbols,tree,recorded);
             parse_scope.exit();if parse_error!=blot_error::Error.none {recorded.deinit();tree.deinit();return no,parse_error;}
         }
     }
@@ -521,7 +519,7 @@ fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_
 fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let scope=blot_phase_profile::enter(blot_phase_profile::Phase.load);
     let initialized,error=init();if error!=blot_error::Error.none {scope.exit();return error;}
-    var loader=Loader<P> {previous:context.previous,options:options,project:initialized,inputs:inputs,files:LoaderFiles{},visits:LoaderVisits{},stack:LoaderStack{},inherited_fixities:LoaderFixities{}, ..};loader.project.input_mode=options.input_mode;
+    var loader=Loader<P> {previous:context.previous,options:options,project:initialized,inputs:inputs,files:LoaderFiles{},visits:LoaderVisits{},stack:LoaderStack{}, ..};loader.project.input_mode=options.input_mode;
     let failure=F(context,loader);scope.exit();
     loader.deinitScratch();
     if failure!=blot_error::Error.none {loader.project.deinit();return failure;}
@@ -552,12 +550,6 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
         let prelude,failure=loader.read(loader.options.prelude_path.value,Origin {..});if failure!=blot_error::Error.none {return failure;}if !prelude.present {return blot_error::Error.none;}
         loader.project.prelude_unit=prelude.value;let walked=loader.walk(prelude.value);if walked!=blot_error::Error.none {return walked;}
         if loader.options.input_mode==InputMode.source&&loader.project.diagnostics.len!=0 {return blot_error::Error.none;}
-        let tree=blot_parse_ast::canonical(loader.project.units.items[prelude.value-1].tree);
-        let root_count=tree.roots.items.len;for root_index in 0..root_count {let root=tree.roots.items[root_index];
-            if tree.node(root).tag!=blot_parse_ast::tag_fixity_decl {continue;}let fixity=tree.fixity(root);
-            let error=blot_support_pooled_buffer::push(loader.inherited_fixities,blot_parse_parser::InheritedFixity {fixity.operator,fixity.precedence,fixity.association,fixity.named, ..},loader_fixity_runs);if error!=blot_error::Error.none {return error;}
-        }
-        // The prelude root supplies every inherited fixity to the next parses.
         let previous .= loader.previous;
         if previous && (!loader.stable_prefix || previous.prelude_unit!=prelude.value ||
             previous.unit(prelude.value).source!=loader.project.unit(prelude.value).source ||
@@ -819,7 +811,6 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
                 if canonical!=module.identity.normalized_path {return blot_error::Error.stale_artifact;}
             } else if expected!=module.identity.normalized_path {return blot_error::Error.stale_artifact;}
             loader.project.prelude_unit=id;
-            for fixity in module.fixities {let error=blot_support_pooled_buffer::push(loader.inherited_fixities,blot_parse_parser::InheritedFixity {fixity.operator,fixity.precedence,fixity.association,fixity.named, ..},loader_fixity_runs);if error!=blot_error::Error.none {return error;}}
         }
     }
     if (loader.project.prelude_unit!=0)!=options.prelude_path.present {return blot_error::Error.stale_artifact;}

@@ -133,7 +133,7 @@ fn runParseLane<P>(loader:Loader<P>&)->bool {
         let job=blot_native::persist_claim(batch.shared);
         if job==0 {local.deinit();return true;}
         if job<0 {local.deinit();return false;}
-        let ok=blot_reuse_parse_packet::encodeWithScratch(batch.inputs.items[job-1].source,loader.project.symbols,loader.inherited_fixities.items,tokens,comments,diagnostics,local,bytes);
+        let ok=blot_reuse_parse_packet::encodeWithScratch(batch.inputs.items[job-1].source,loader.project.symbols,tokens,comments,diagnostics,local,bytes);
         if !ok || bytes.len==0 {bytes.clear();bytes.push(0);}
         let id=job as u32;
         if !blot_native::persist_publish(batch.shared,id,1,marker,1) || !blot_native::persist_publish(batch.shared,id,2,bytes[0],bytes.len as u64) {local.deinit();return false;}

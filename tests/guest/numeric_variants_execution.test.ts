@@ -14,12 +14,6 @@ entry const mixed = func (count: U32) => return do:
   for value in values:
     sum := self + read value
   break sum
-entry const list = func (index: U32) => return do:
-  let values = @list.generate 513 make
-  let cursor = @list.cursor values
-  for step in 0..index:
-    cursor := @cursor.advance cursor
-  break read (@cursor.value cursor)
 entry const saved = func (index: U32) => return do:
   let values = @array.generate 513 make
   let old = values
@@ -31,9 +25,7 @@ entry const static_values = func (index: U32) => return do:
 entry const conversions = func (index: U32) => return do:
   let values = @array.generate 700 make
   let middle = @array.slice values 17 600
-  let tree = @list.from_array middle
-  let selected = @list.slice tree 63 513
-  let copied = @array.from_list selected
+  let copied = @array.slice middle 63 513
   break read copied[index]
 entry const callback = func (index: U32) => return do:
   let values = @array.generate 513 make
@@ -101,7 +93,6 @@ Deno.test(`numeric variants preserve active arms lists static values and snapsho
         );
       }
       for (const i of [0, 1, 2, 80, 81, 82, 243, 244, 245, 512]) {
-        assert.equal(guest.call("list", i), read(i));
         // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
         assert.equal(guest.call("saved", i), 600);
         assert.equal(guest.call("conversions", i), read(i + 80));

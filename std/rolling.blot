@@ -1,10 +1,42 @@
-import * as iter from "./iter"
 import * as tree from "./_summary_tree"
 
+type Fold [i, a, s, f] is opaque = {
+  width: U32,
+  cursor: i,
+  step: f,
+  initial: s,
+  window: Maybe #[a],
+}
+private func fold_window step -> initial -> (values: #[a]) =>
+  let acc = initial
+  for index in 0..values.length:
+    use next <- step acc values[index]
+    acc := next
+  return acc
 func fold step -> initial -> (width: U32) -> values =>
   if @u32.eq width 0:
     return panic "rolling requires a positive width"
-  return iter.map (iter.fold_left step initial) (iter.windows width values)
+  return $Fold { width, cursor: values.iter, step, initial, window: $Nothing }
+func Fold.iter (state: Fold [i, a, s, f]) => state
+func Fold.next (state: Fold [i, a, s, f]) => case state.window of
+  $Nothing => do:
+    let cursor = state.cursor
+    let buf: #[a] = #[]
+    for _ in 0..state.width:
+      use step <- cursor.next
+      let $Some (value, rest) = step else:
+        return $Nothing
+      buf := @array.append self value
+      cursor := rest
+    use total <- fold_window state.step state.initial buf
+    break $Some (total, $Fold { width: state.width, cursor, step: state.step, initial: state.initial, window: $Some buf })
+  $Some previous => do:
+    use step <- state.cursor.next
+    let $Some (value, rest) = step else:
+      break $Nothing
+    let next_buf = @array.append (@array.slice previous 1 (@u32.sub state.width 1)) value
+    use total <- fold_window state.step state.initial next_buf
+    break $Some (total, $Fold { width: state.width, cursor: rest, step: state.step, initial: state.initial, window: $Some next_buf })
 
 type Monoid [i, s, f] is opaque = {
   width: U32,

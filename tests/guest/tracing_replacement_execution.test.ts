@@ -170,13 +170,13 @@ entry const run = func (mode: U32) => return do:
       break #[0]
   break #[original.child[0], changed.child[0], captured (), original.value, changed.value]
 entry const packed = func (value: U32) => return do:
-  let rows = [{x: value, y: value + 1}]
+  let rows = #[{x: value, y: value + 1}]
   let original = rows
-  rows := [{x: value + 40, y: value + 1}, ...self]
-  let items = @array.from_list rows
+  rows := #[{x: value + 40, y: value + 1}, ...self]
+  let items = @storage.copy rows
   let before = items
   items[0] = {x: self.x + 1, y: self.y + 2}
-  break #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
+  break #[original[0].x, rows[0].x, before[0].x, items[0].x, items[0].y]
 entry const floating = func (value: F32) => return do:
   let original = $Large {alpha: value, child: #[40], value: 7, tail: 3}
   let changed = replace original

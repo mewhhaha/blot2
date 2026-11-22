@@ -280,7 +280,7 @@ Deno.test("spark rejects unknown work and spawn checks its start operation and c
     "spark_generator",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: List U32) => return @spark #[x | x <- xs]\n",
+    "entry func nope (xs: U32) => return @spark #[x | x <- xs]\n",
     "type_mismatch",
   );
   await compileExpectedFailure(

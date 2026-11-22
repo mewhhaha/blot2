@@ -1,9 +1,6 @@
 // Executable syntax showcase for Blot vNext.
 // See docs/language/spec.md for the vNext specification.
 
-infixl 60 `add`
-infixl 70 (><) = dot
-
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
 type Mode is data = $Running | $Paused
 type Event is data = $Tick U32 | $SetMode Mode | $Reset
@@ -52,7 +49,7 @@ func react event -> ticks => case event of
   $SetMode $Paused => ticks
   $Reset => 0
 
-entry const operator_example = 1 `add` 2 * 3
+entry const operator_example = 1 + 2 * 3
 entry func recursive_example (value: U32) => factorial value
 entry func matching_example () => choose $Nothing false ($Some (double_or_zero ($Some 21)))
 entry func event_example () => react ($Tick 2) 40
@@ -60,7 +57,7 @@ entry func event_example () => react ($Tick 2) 40
 entry func vector_example () =>
   let position = $Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
-  return position >< scaled
+  return dot position scaled
 
 entry func array_snapshot () =>
   let original = #[1, 2, 3]

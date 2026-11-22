@@ -10,17 +10,17 @@ const mark = func number => return do:
   let $Trace before = previous
   use @state.set ($Trace (before * 10 + number))
   break number
-const first = func (values: List U32) => return do:
+const first = func (values: Array U32) => return do:
   for value in values:
     break value
   break 0
 entry const ordered = func () => return do:
-  let ($Trace trace, answer) = @state.run ($Trace 0) (func () => return first [mark 1, mark 2, mark 3])
+  let ($Trace trace, answer) = @state.run ($Trace 0) (func () => return first #[mark 1, mark 2, mark 3])
   break trace * 10 + answer
-entry const trapped = func denominator => return first [7, @u32.div 1 denominator]
+entry const trapped = func denominator => return first #[7, @u32.div 1 denominator]
 entry const empty = func (seed: U32) => return do:
   let result = seed
-  let values: List U32 = []
+  let values: Array U32 = #[]
   for value in values:
     result := self + value
   break result

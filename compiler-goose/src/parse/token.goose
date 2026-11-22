@@ -96,7 +96,6 @@ fn keyword(value: const u8[:]) -> Tag {
             if value == "const" { return kw_const; }
             if value == "case" { return kw_case; }
             if value == "continue" { return kw_continue; }
-            if value == "complete" { return kw_complete; }
         },
         'd' => {
             if value == "do" { return kw_do; }
@@ -117,9 +116,6 @@ fn keyword(value: const u8[:]) -> Tag {
             if value == "if" { return kw_if; }
             if value == "is" { return kw_is; }
             if value == "import" { return kw_import; }
-            if value == "infixl" { return kw_infixl; }
-            if value == "infixr" { return kw_infixr; }
-            if value == "infix" { return kw_infix; }
         },
         'l' => { if value == "let" { return kw_let; } },
         'n' => { if value == "not" { return kw_not; } },
@@ -135,7 +131,6 @@ fn keyword(value: const u8[:]) -> Tag {
         },
         'u' => { if value == "use" { return kw_use; } },
         'w' => { if value == "with" { return kw_with; } },
-        'y' => { if value == "yield" { return kw_yield; } },
         _ => {},
     }
     return identifier;

@@ -48,6 +48,14 @@ starts at 1 Wasm page (64 KiB) with `memory.grow` up to the planned budget,
 `rewind_stack` fast path and guarded `releaseTo`, and lazy transport/undo
 buffers. All exit codes, diagnostics, and frontend counters are unchanged.
 
+Batch 1C (22 November 2026) retired `List` / `@cursor` / `std/list` /
+`std/iter`, `@requests` / `yield` / `complete`, `do (monad ...)`,
+`@record.merge`, custom fixity declarations / backtick operators (replaced by
+the fixed 19-operator built-in table with direct dispatch), and `lent`. The 80
+fixtures exercising retired features were removed (109 fixtures remain) and
+expected.json was re-recorded against the slimmer `std/prelude.blot` and direct
+operator lowering.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

@@ -7,13 +7,13 @@ import parse.symbols;
 import support.error;
 type Tree=blot_parse_ast::Tree;
 type Pool=blot_parse_symbols::Pool;
-fn parse_source(source:const u8[:],names:Pool&,tree:Tree&,inherited:const blot_parse_parser::InheritedFixity[:]=[]) {
+fn parse_source(source:const u8[:],names:Pool&,tree:Tree&) {
  var tokens:blot_parse_token::Token[>..<]=[];
  var comments:blot_parse_token::Token[>..<]=[];
  var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
  var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
  assert(blot_parse_lexer::lex(source,lexed)==blot_error::Error.none && diagnostics.len==0);
- assert(blot_parse_parser::parse_with_fixities(source,tokens[..],names,tree,inherited)==blot_error::Error.none);
+ assert(blot_parse_parser::parse(source,tokens[..],names,tree)==blot_error::Error.none);
 }
 fn values() {
  var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
@@ -34,18 +34,18 @@ fn values() {
 }
 fn fixities() {
  var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
- let plus,error=names.intern("+");assert(error==blot_error::Error.none);
- let times,error=names.intern("*");assert(error==blot_error::Error.none);
  var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
- let inherited=[blot_parse_parser::InheritedFixity {plus,20,1,false},blot_parse_parser::InheritedFixity {times,60,0,false}];
- parse_source("infixl 50 (+) = add\nconst value = 1 + 2 * 3 + 4\n",names,tree,inherited);
+ parse_source("const value = 1 + 2 * 3 + 4\nconst piped = 1 + 2 |> f\n",names,tree);
  assert(tree.diagnostics.len==0 && tree.roots.len==2);
- let body=tree.node(tree.node(tree.roots.items[1]).b);
+ let body=tree.node(tree.node(tree.roots.items[0]).b);
  assert(body.tag==blot_parse_ast::tag_binary && names.get(body.a)=="+" && tree.node(body.c).a==4);
  let left=tree.node(body.b);
  assert(left.tag==blot_parse_ast::tag_binary && names.get(left.a)=="+" && tree.node(left.b).a==1);
  let product=tree.node(left.c);
  assert(product.tag==blot_parse_ast::tag_binary && names.get(product.a)=="*" && tree.node(product.b).a==2 && tree.node(product.c).a==3);
+ let piped=tree.node(tree.node(tree.roots.items[1]).b);
+ assert(piped.tag==blot_parse_ast::tag_binary && names.get(piped.a)=="|>");
+ assert(tree.node(piped.b).tag==blot_parse_ast::tag_binary && names.get(tree.node(piped.b).a)=="+");
  tree.deinit();names.deinit();
 }
 fn recovery() {
@@ -64,8 +64,8 @@ fn recovery() {
 fn staging() {
  var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
  var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
- parse_source("const value = @code.quote 1\nconst proof: @proof.U32Eq 1 1 = @proof.eq 1 1\n",names,tree);
- assert(tree.diagnostics.len==0 && tree.roots.len==2 && tree.has_typed_staging && tree.has_numeric_proofs);
+ parse_source("const value = @code.quote 1\n",names,tree);
+ assert(tree.diagnostics.len==0 && tree.roots.len==1 && tree.has_typed_staging);
  tree.deinit();names.deinit();
 }
 fn depth_limit() {

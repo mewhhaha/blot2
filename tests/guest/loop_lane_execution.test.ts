@@ -31,7 +31,7 @@ entry const swaps = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 3:
-    row := @record.merge self {first: self.second, second: self.first}
+    row := {first: self.second, second: self.first, steady: self.steady}
     if @u32.eq index 1:
       continue
   return #[row.first, row.second, row.steady, marker[0]]

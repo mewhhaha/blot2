@@ -10,6 +10,9 @@ fn opName(value: Op) -> Chars {
 fn isScalarTag(tag: blot_direct_types::Tag) -> bool {
     return tag == blot_direct_types::Tag.u32_ || tag == blot_direct_types::Tag.f32_ || tag == blot_direct_types::Tag.boolean;
 }
+fn isComparisonOp(op_: Op) -> bool {
+    return op_ == blot_check_core::Op.equal || op_ == blot_check_core::Op.not_equal || op_ == blot_check_core::Op.less || op_ == blot_check_core::Op.less_equal || op_ == blot_check_core::Op.greater || op_ == blot_check_core::Op.greater_equal;
+}
 recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -53,8 +56,14 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if has_right { push(g, operand_right); }
         let emitted = scalarOp(g, f, n.op, operand_left.ty, id);
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
-        let result, error = typeOf(g, f, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        var result: Ty = 0;
+        if n.c == 1 {
+            if isComparisonOp(n.op) { result = blot_direct_types::boolean; } else { result = left.ty; }
+        } else {
+            let lowered, error = typeOf(g, f, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            result = lowered;
+        }
         return pop(g, f, result, id);
     }
     if n.c == 1 && !isScalarTag(tag) && tag != blot_direct_types::Tag.tuple {
@@ -90,8 +99,14 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         return callTarget(g, f, target, arguments, callee, rest, id);
     }
-    let result, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    var result: Ty = 0;
+    if n.c == 1 && isScalarTag(tag) {
+        if isComparisonOp(n.op) { result = blot_direct_types::boolean; } else { result = left.ty; }
+    } else {
+        let lowered, error = typeOf(g, f, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        result = lowered;
+    }
     if tag == blot_direct_types::Tag.tuple { return lanes(g, f, n.op, left, has_right, right, result, id); }
     // Machine operations take operands of one type; the checker should reject
     // a mix, so never emit one.
@@ -140,6 +155,7 @@ fn scalarMember(g: Generator&, f: const Fn&, catalog: const Module&, receiver: T
     }
     let target, has_target = g.dispatchTarget(catalog, identity, member, operator);
     if !has_target {
+        if member == 0 { return standard, blot_direct_types::Error.none; }
         g.failOpenCode(g.units[f.unit - 1], id, blot_check_diagnostic_code::Code.missing_associated);
         g.put(blot_direct_types::tagName(tagOf(g, receiver)));
         g.put(" has no `");

@@ -97,19 +97,21 @@ async function inspectBuild(
         const source = `type Token${record ? " a" : ""}${
           opaque ? " is opaque" : ""
         } = ${record ? "{value: a}" : "Array U32"}
-lent const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
+const make: ${record ? "own a -> Token a" : "own (Array U32) -> Token"} = func (own value) => return ${
           opaque ? "$Token " : ""
         }${record ? "{value}" : "value"}
-lent const read: ${record ? "Token a -> a" : "Token -> Array U32"} = func ${
-          opaque ? "($Token value)" : "value"
-        } => return ${record ? "value.value" : "value"}
+const read: ${record ? "own (Token a) -> a" : "own Token -> Array U32"} = func (own wrapped) => return ${
+          opaque
+            ? `do:\n  let $Token value = wrapped\n  break ${record ? "value.value" : "value"}`
+            : (record ? "wrapped.value" : "wrapped")
+        }
 const capture = func value => return do:
-  let saved = make value
-  break func () => return (read saved)[0]
+  let saved = ${opaque ? "$Token " : ""}${record ? "{value}" : "value"}
+  break func () => return (${opaque ? "case saved of\n    $Token inner => " : ""}${record ? (opaque ? "inner.value" : "saved.value") : (opaque ? "inner" : "saved")})[0]
 entry const run = func (value: U32) => return do:
   let original = #[value, 7]
   let alias = read (make original)
-  original[0] = 0
+  alias[0] := 0
   break @u32.add alias[0] 2
 entry const captured = func (value: U32) => return do:
   let original = #[value, 7]

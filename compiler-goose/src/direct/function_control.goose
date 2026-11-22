@@ -385,7 +385,7 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
         return_, project, result_associated, computation, effect_scope, fork_, resource_release, usage_share, usage_read => {
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
         },
-        scalar, logical, apply, associated, record_merge, type_same, effect_provider, handle, proof_guard, resource_acquire, usage_borrow, staging => {
+        scalar, logical, apply, associated, type_same, effect_provider, handle, proof_guard, resource_acquire, usage_borrow, staging => {
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
             collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
         },
@@ -2351,7 +2351,7 @@ recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
     if boxed { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, list, grow, resize, view, ref, link, cursor => {
+        array, grow, resize, view, ref, link => {
             let element_holds, error = g.contentsHoldMemory(n.a);
             if error != blot_direct_types::Error.none { return false, error; }
             if element_holds { return false, blot_direct_types::Error.none; }

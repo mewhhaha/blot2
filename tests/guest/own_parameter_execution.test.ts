@@ -304,42 +304,6 @@ entry func arms (n: U32) : U32 => return do:
   });
 });
 
-// A `lent` function returns what it was lent and keeps nothing, so a name
-// bound to its result borrows the argument and gives it back at its last read.
-Deno.test("a lent reader's result gives the world back at its last read", async () => {
-  await compileAndRun(`${declarations}
-lent func counts_of (world: World): Array U32 => return world.counts
-entry func read_then_step (n: U32) : U32 => return do:
-  let world = $World { counts: #[n, 2], size: 2 }
-  let counts = counts_of world
-  let seen = counts[0] + counts[1]
-  world := damage world 1
-  world.counts[0] := seen
-  break world.counts[0] * 10 + world.counts[1]
-`, (guest) => {
-    equal(guest.call("read_then_step", 4), 63);
-  });
-  const kept = `${declarations}
-lent func counts_of (world: World): Array U32 => return world.counts
-entry func run (n: U32) : U32 => return do:
-  let world = $World { counts: #[n, 2], size: 2 }
-  let counts = counts_of world
-  let after = damage world 1
-  break counts[0] + after.counts[1]
-`;
-  await compileExpectedFailure(kept, "own_argument", argument, { span: [kept.indexOf("damage world 1") + 7, kept.indexOf("damage world 1") + 12] });
-  const keeps = `${declarations}
-lent func remember (rows: Array U32) -> (into: GrowArray (Array U32)): Array U32 => return do:
-  @storage.push into rows
-  break rows
-entry func run (n: U32) : U32 => return do:
-  let into: GrowArray (Array U32) = #[]
-  let rows = remember #[n] into
-  break rows[0]
-`;
-  await compileExpectedFailure(keeps, "kept_value", undefined, { span: [keeps.indexOf("@storage.push"), keeps.indexOf("@storage.push") + "@storage.push into rows".length] });
-});
-
 // A record too wide for registers is a block of memory. Handing it round a
 // loop, updating through it and returning it beside another value must not
 // use a new block each time: 300,000 rounds of 288 bytes would not fit the
@@ -600,13 +564,13 @@ entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
   } finally {
     guest.dispose();
   }
-  const list = `entry func run (n: U32) : U32 => return do:
-  let items: List U32 = [n, 2]
+  const nonArray = `entry func run (n: U32) : U32 => return do:
+  let items: U32 = n
   break first { items }
 `;
-  await compileExpectedFailure(`${systems}${list}`, "type_mismatch");
-  const across = await project({ main: `import { first } from "./systems"\n${list}`, systems });
-  if (across.success) throw new Error("a list was indexed through another module's function");
+  await compileExpectedFailure(`${systems}${nonArray}`, "type_mismatch");
+  const across = await project({ main: `import { first } from "./systems"\n${nonArray}`, systems });
+  if (across.success) throw new Error("a scalar was indexed through another module's function");
 });
 
 Deno.test("a call into another module gives its argument away", async () => {
