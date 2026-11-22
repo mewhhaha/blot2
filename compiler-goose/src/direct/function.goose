@@ -1050,12 +1050,23 @@ fn markInto(g: Generator&, out: u8[>..<]&, owner_mark: u32, stack_mark: u32) {
 }
 // Releases every owner and stack byte allocated since the marks.
 fn releaseTo(g: Generator&, owner_mark: u32, stack_mark: u32) {
-    let release = g.runtime_().release;
-    let stack_pointer = g.runtime_().stack_pointer;
+    let rt = g.runtime_();
+    opIndex(g, OP_global_get, rt.owner_top);
     opIndex(g, OP_local_get, owner_mark);
-    opIndex(g, OP_call, release);
+    op(g, OP_i32_ne);
+    op(g, OP_if_);
+    op(g, 0x40);
+    opIndex(g, OP_local_get, owner_mark);
+    opIndex(g, OP_call, rt.release);
+    op(g, OP_end);
+    opIndex(g, OP_global_get, rt.stack_pointer);
     opIndex(g, OP_local_get, stack_mark);
-    opIndex(g, OP_global_set, stack_pointer);
+    op(g, OP_i32_ne);
+    op(g, OP_if_);
+    op(g, 0x40);
+    opIndex(g, OP_local_get, stack_mark);
+    opIndex(g, OP_call, rt.rewind_stack);
+    op(g, OP_end);
 }
 fn storeOp(g: const Generator&, f: const Fn&, local_id: u32) -> u8 {
     if localType(g, f, local_id) == VT_f32 { return OP_f32_store; }

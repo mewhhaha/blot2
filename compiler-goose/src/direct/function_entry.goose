@@ -31,7 +31,9 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
         lset(g, base);
         let bytes = emitScaledBytes(g, f, length, 4);
         lget(g, bytes);
-        i32Const(g, rt.layout.transport_end);
+        gget(g, rt.transport_base);
+        gget(g, rt.transport_cap);
+        op(g, OP_i32_add);
         lget(g, base);
         op(g, OP_i32_sub);
         op(g, OP_i32_gt_u);
@@ -71,23 +73,75 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     op(g, OP_i32_gt_u);
     trap(g, f);
     let bytes = emitScaledBytes(g, f, length, 4);
-    let packet = constLocal(g, f, rt.layout.transport_base);
-    i32Const(g, rt.layout.transport_base + 4);
+    let total = local32(g, f);
     lget(g, bytes);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lset(g, total);
+    let packet = local32(g, f);
+    lget(g, total);
+    gget(g, rt.transport_cap);
+    op(g, OP_i32_le_u);
+    let fast = open(g, f, OP_if_);
+    gget(g, rt.transport_base);
+    ltee(g, packet);
+    lget(g, total);
     op(g, OP_i32_add);
     gset(g, rt.transport_top);
-    let opened = open(g, f, OP_block);
+    let non_empty = open(g, f, OP_block);
     lget(g, length);
     op(g, OP_i32_eqz);
     opIndex(g, OP_br_if, 0);
     let base = baseOf(g, f, value);
-    i32Const(g, rt.layout.transport_base + 4);
+    lget(g, packet);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
     lget(g, base);
     lget(g, bytes);
     op(g, OP_prefix_fc);
     uleb(g, 10);
     op(g, 0);
     op(g, 0);
+    close(g, f);
+    popCheckedArraysAt(f, fast);
+    op(g, OP_else_);
+    let new_base = local32(g, f);
+    let new_cap = local32(g, f);
+    lget(g, total);
+    callf(g, rt.heap_alloc);
+    lset(g, new_cap);
+    lset(g, new_base);
+    let non_empty2 = open(g, f, OP_block);
+    lget(g, length);
+    op(g, OP_i32_eqz);
+    opIndex(g, OP_br_if, 0);
+    let base2 = baseOf(g, f, value);
+    lget(g, new_base);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lget(g, base2);
+    lget(g, bytes);
+    op(g, OP_prefix_fc);
+    uleb(g, 10);
+    op(g, 0);
+    op(g, 0);
+    close(g, f);
+    gget(g, rt.transport_cap);
+    let had_old = open(g, f, OP_if_);
+    gget(g, rt.transport_base);
+    gget(g, rt.transport_cap);
+    callf(g, rt.heap_free);
+    close(g, f);
+    lget(g, new_base);
+    gset(g, rt.transport_base);
+    lget(g, new_cap);
+    gset(g, rt.transport_cap);
+    lget(g, new_base);
+    lget(g, total);
+    op(g, OP_i32_add);
+    gset(g, rt.transport_top);
+    lget(g, new_base);
+    lset(g, packet);
     close(g, f);
     lget(g, packet);
     lget(g, length);
@@ -447,27 +501,25 @@ fn hostImport(g: Generator&, first: Abi, second: Abi) -> u32 {
 // Recovers temporaries and providers a trapped earlier call left behind.
 fn resetEntry(g: Generator&) {
     let rt = g.runtime_();
-    let release = rt.release;
-    let stack_base = rt.layout.stack_base;
-    let stack_pointer = rt.stack_pointer;
-    let effect_context = rt.effect_context;
     i32Const(g, 1);
-    callf(g, release);
-    i32Const(g, stack_base);
-    gset(g, stack_pointer);
+    callf(g, rt.release);
     i32Const(g, 0);
-    gset(g, effect_context);
+    callf(g, rt.rewind_stack);
+    i32Const(g, 0);
+    gset(g, rt.effect_context);
     if rt.has_fork {
         i32Const(g, 0);
         gset(g, rt.fork_owner_mark);
-        i32Const(g, rt.layout.undo_base);
+        gget(g, rt.undo_base);
         gset(g, rt.undo_sp);
     }
 }
 fn releaseEntry(g: Generator&) {
-    let release = g.runtime_().release;
+    let rt = g.runtime_();
     i32Const(g, 1);
-    callf(g, release);
+    callf(g, rt.release);
+    i32Const(g, 0);
+    callf(g, rt.rewind_stack);
 }
 
 // Called by the host after the final result has been copied, or after a trap.

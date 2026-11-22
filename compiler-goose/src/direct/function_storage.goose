@@ -346,13 +346,21 @@ fn create(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, Error {
     if error != blot_direct_types::Error.none { return handle, error; }
     if tagOf(g, ty) == blot_direct_types::Tag.grow || tagOf(g, ty) == blot_direct_types::Tag.resize {
         let entry = local32(g, f);
-        lget(g, w(g, handle, 0));
+        let slot_loc = w(g, handle, 0);
+        lget(g, slot_loc);
+        i32Const(g, 8);
+        op(g, OP_i32_shr_u);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, g.runtime_().layout.owner_table);
+        lget(g, slot_loc);
+        i32Const(g, 255);
+        op(g, OP_i32_and);
         i32Const(g, 4);
         op(g, OP_i32_shl);
-        i32Const(g, g.runtime_().layout.owner_table);
         op(g, OP_i32_add);
         lset(g, entry);
-        recordCheckedGrow(f, w(g, handle, 0), w(g, handle, 1), entry);
+        recordCheckedGrow(f, slot_loc, w(g, handle, 1), entry);
     }
     return handle, blot_direct_types::Error.none;
 }

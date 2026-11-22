@@ -46,8 +46,10 @@ entry const floats = func (input: Array F32): Array F32 => return do:
         ),
       );
       const exports = new WebAssembly.Instance(module).exports;
+      const memory = exports["blot:memory"] as WebAssembly.Memory;
+      assert.equal(memory.buffer.byteLength, 65536);
       assert.throws(
-        () => (exports["blot:memory"] as WebAssembly.Memory).grow(1),
+        () => memory.grow(1024),
         RangeError,
       );
       assert.throws(

@@ -1,9 +1,10 @@
-// Storage runtime of the direct backend (compiler/src/direct/runtime.zig): an
-// owner table of (base, length, capacity, generation) entries addressed by
-// (slot, generation) handles. Fixed arrays and closure environments live on a
-// bump stack, growable storage in a power-of-two heap, application pools in a
-// persistent region. A scope releases the owners it opened by bumping their
-// generations, so a stale handle traps instead of reading reused storage.
+// Storage runtime of the direct backend: a 2-level paged owner table of
+// (base, length, capacity, generation) entries addressed by (slot, generation)
+// handles, a chunk-list contiguous bump stack for fixed arrays and closure
+// environments, a power-of-two free-list heap for growable storage, and
+// on-demand transport/persistent/undo regions. Modules commit 1 Wasm page
+// (64 KiB) initially and grow on demand via `memory.grow` up to the planned
+// budget ceiling, reusing all chunks and free lists across invocations.
 namespace blot_direct_runtime;
 import std;
 import direct.writer;
@@ -17,14 +18,22 @@ let entry_generation: u32 = 12;
 let frozen_flag: u32 = 0x80000000;
 let heap_flag: u32 = 0x40000000;
 let capacity_mask: u32 = 0x3fffffff;
-// Speculative fork undo journal budget (2 MiB, allocated only when a module uses `fork`).
+// Speculative fork undo journal budget (2 MiB, allocated lazily only when a module executes `fork`).
 let undo_bytes: u32 = 2097152;
+// Fixed page-0 layout: [0..512) zero guard, [512..640) free lists,
+// [1024..2048) 256-entry owner block directory, [2048..65536) initial arena.
+let owner_block_bytes: u32 = 4096;
+let arena_start: u32 = 2048;
+let initial_page_bytes: u32 = 65536;
+// Chunked stack sizing: starts at 16 KiB, doubles up to 256 KiB automatic chunks.
+let stack_chunk_min: u32 = 16384;
+let stack_chunk_max_auto: u32 = 262144;
 
-// Defaults: 65536 owners, 4 MiB persistent, 8 MiB stack, 32 MiB heap, 2 MiB transport.
+// Defaults: 65536 owners, 4 MiB persistent, 16 MiB stack, 32 MiB heap, 2 MiB transport.
 struct Budgets {
     owners: u32 = 65536,
     persistent: u32 = 4194304,
-    stack: u32 = 8388608,
+    stack: u32 = 16777216,
     heap: u32 = 33554432,
     transport: u32 = 2097152
 }
@@ -32,6 +41,7 @@ struct Layout {
     free_lists: u32 = 512,
     owner_table: u32 = 1024,
     owner_capacity: u32 = 0,
+    persistent_split: u32 = 0,
     persistent_base: u32 = 0,
     persistent_end: u32 = 0,
     stack_base: u32 = 0,
@@ -44,19 +54,26 @@ struct Layout {
     undo_end: u32 = 0,
     total: u32 = 0
 }
-// `Layout.init` in the Zig source.
 fn init(budgets: Budgets) -> Layout { return initWithFork(budgets, false); }
 fn initWithFork(budgets: Budgets, has_fork: bool) -> Layout {
     let owner_table: u32 = 1024;
-    let persistent_base = owner_table + budgets.owners * entry_bytes;
+    let owner_bytes = budgets.owners * entry_bytes;
+    var split = ((budgets.owners * 3) / 4) & 0xffffff00;
+    if split == 0 { split = budgets.owners / 2; }
+    if split >= budgets.owners { split = budgets.owners - 1; }
+    let persistent_base = arena_start + owner_bytes;
     let stack_base = persistent_base + budgets.persistent;
     let heap_base = stack_base + budgets.stack;
     let transport_base = heap_base + budgets.heap;
     let transport_end = transport_base + budgets.transport;
     var undo_end = transport_end;
     if has_fork { undo_end = transport_end + undo_bytes; }
+    // Allow small overhead for chunk headers and alignment rounding.
+    var total = undo_end + 262144;
+    if total < initial_page_bytes { total = initial_page_bytes; }
     return Layout {
         owner_capacity: budgets.owners,
+        persistent_split: split,
         persistent_base: persistent_base,
         persistent_end: stack_base,
         stack_base: stack_base,
@@ -67,7 +84,7 @@ fn initWithFork(budgets: Budgets, has_fork: bool) -> Layout {
         transport_end: transport_end,
         undo_base: transport_end,
         undo_end: undo_end,
-        total: undo_end,
+        total: total,
         ..
     };
 }
@@ -77,9 +94,17 @@ struct Runtime {
     has_fork: bool = false,
     owner_top: u32 = 0,
     persistent_bottom: u32 = 0,
+    arena_top: u32 = 0,
+    page_top: u32 = 0,
+    stack_head: u32 = 0,
+    stack_chunk: u32 = 0,
     stack_pointer: u32 = 0,
+    stack_limit: u32 = 0,
+    stack_total: u32 = 0,
     heap_top: u32 = 0,
     persistent_top: u32 = 0,
+    transport_base: u32 = 0,
+    transport_cap: u32 = 0,
     transport_top: u32 = 0,
     // The installed providers: the newest frame of
     // {operation id, closure slot, closure environment, previous frame}.
@@ -88,12 +113,18 @@ struct Runtime {
     // the active `fork` and journal writes onto `undo_sp`. Zero outside `fork`.
     fork_owner_mark: u32 = 0,
     fork_depth: u32 = 0,
+    undo_base: u32 = 0,
+    undo_end: u32 = 0,
     undo_sp: u32 = 0,
+    alloc_raw: u32 = 0,
     open: u32 = 0,
     open_persistent: u32 = 0,
     release: u32 = 0,
     check: u32 = 0,
     stack: u32 = 0,
+    stack_slow: u32 = 0,
+    rewind_stack: u32 = 0,
+    rewind_stack_slow: u32 = 0,
     heap_alloc: u32 = 0,
     heap_free: u32 = 0,
     address: u32 = 0,
@@ -171,6 +202,10 @@ fn memoryFill(h: H&) {
     blot_direct_writer::uleb(h.code, 11);
     blot_direct_writer::byte(h.code, 0);
 }
+fn memoryGrow(h: H&) {
+    op(h, blot_direct_writer::OP_memory_grow);
+    blot_direct_writer::byte(h.code, 0);
+}
 fn finish(h: H&, module: blot_direct_writer::Module&, function: u32) {
     op(h, blot_direct_writer::OP_end);
     var out: u8[>..<] = [];
@@ -193,37 +228,74 @@ fn helper(module: blot_direct_writer::Module&, params: i64, results: i64) -> u32
     return blot_direct_writer::addFunction(module, sig(module, params, results));
 }
 
+// Emits `owner_dir[slot >> 8]` address onto the stack.
+fn emitOwnerDirAddr(h: H&, slot_local: u32, owner_dir: u32) {
+    get(h, slot_local);
+    k(h, 8);
+    op(h, blot_direct_writer::OP_i32_shr_u);
+    k(h, 2);
+    op(h, blot_direct_writer::OP_i32_shl);
+    k(h, owner_dir);
+    op(h, blot_direct_writer::OP_i32_add);
+}
+// Emits `block + ((slot & 255) << 4)` onto the stack.
+fn emitOwnerEntryFromBlock(h: H&, block_local: u32, slot_local: u32) {
+    get(h, block_local);
+    get(h, slot_local);
+    k(h, 255);
+    op(h, blot_direct_writer::OP_i32_and);
+    k(h, 4);
+    op(h, blot_direct_writer::OP_i32_shl);
+    op(h, blot_direct_writer::OP_i32_add);
+}
+
 // open(base, length, capacity) -> (slot, generation)
 fn emitOpen(module: blot_direct_writer::Module&, r: const Runtime&, function: u32, persistent: bool) {
     var h = H { parameters: 3, locals: 3, .. };
     let slot = temp(h);
+    let dir = temp(h);
+    let blk = temp(h);
     let entry = temp(h);
     if persistent {
         gget(h, r.persistent_bottom);
-        k(h, 1);
-        op(h, blot_direct_writer::OP_i32_sub);
         tee(h, slot);
-        gset(h, r.persistent_bottom);
-        get(h, slot);
-        gget(h, r.owner_top);
-        op(h, blot_direct_writer::OP_i32_lt_u);
+        k(h, r.layout.owner_capacity);
+        op(h, blot_direct_writer::OP_i32_ge_u);
         trapIf(h);
     } else {
         gget(h, r.owner_top);
         tee(h, slot);
-        gget(h, r.persistent_bottom);
+        k(h, r.layout.persistent_split);
         op(h, blot_direct_writer::OP_i32_ge_u);
         trapIf(h);
+    }
+    emitOwnerDirAddr(h, slot, r.layout.owner_table);
+    tee(h, dir);
+    load(h, 0);
+    tee(h, blk);
+    op(h, blot_direct_writer::OP_i32_eqz);
+    open(h, blot_direct_writer::OP_if_);
+    k(h, owner_block_bytes);
+    call(h, r.alloc_raw);
+    tee(h, blk);
+    get(h, dir);
+    get(h, blk);
+    store(h, 0);
+    op(h, blot_direct_writer::OP_drop);
+    op(h, blot_direct_writer::OP_end);
+    // Advance slot pointer only after the backing block is committed (trap-safe).
+    if persistent {
+        get(h, slot);
+        k(h, 1);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.persistent_bottom);
+    } else {
         get(h, slot);
         k(h, 1);
         op(h, blot_direct_writer::OP_i32_add);
         gset(h, r.owner_top);
     }
-    get(h, slot);
-    k(h, entry_bytes);
-    op(h, blot_direct_writer::OP_i32_mul);
-    k(h, r.layout.owner_table);
-    op(h, blot_direct_writer::OP_i32_add);
+    emitOwnerEntryFromBlock(h, blk, slot);
     set(h, entry);
     get(h, entry);
     get(h, 0);
@@ -250,22 +322,36 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
     let i32t = blot_direct_writer::VT_i32;
     var r = Runtime { layout: layout, has_fork: has_fork, .. };
     r.owner_top = blot_direct_writer::addGlobal(module, i32t, true, 1);
-    r.persistent_bottom = blot_direct_writer::addGlobal(module, i32t, true, layout.owner_capacity);
-    r.stack_pointer = blot_direct_writer::addGlobal(module, i32t, true, layout.stack_base);
-    r.heap_top = blot_direct_writer::addGlobal(module, i32t, true, layout.heap_base);
-    r.persistent_top = blot_direct_writer::addGlobal(module, i32t, true, layout.persistent_base);
-    r.transport_top = blot_direct_writer::addGlobal(module, i32t, true, layout.transport_base);
+    r.persistent_bottom = blot_direct_writer::addGlobal(module, i32t, true, layout.persistent_split);
+    r.arena_top = blot_direct_writer::addGlobal(module, i32t, true, arena_start);
+    r.page_top = blot_direct_writer::addGlobal(module, i32t, true, initial_page_bytes);
+    r.stack_head = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.stack_chunk = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.stack_pointer = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.stack_limit = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.stack_total = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.heap_top = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.persistent_top = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.transport_base = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.transport_cap = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    r.transport_top = blot_direct_writer::addGlobal(module, i32t, true, 0);
     r.effect_context = blot_direct_writer::addGlobal(module, i32t, true, 0);
     if has_fork {
         r.fork_owner_mark = blot_direct_writer::addGlobal(module, i32t, true, 0);
         r.fork_depth = blot_direct_writer::addGlobal(module, i32t, true, 0);
-        r.undo_sp = blot_direct_writer::addGlobal(module, i32t, true, layout.undo_base);
+        r.undo_base = blot_direct_writer::addGlobal(module, i32t, true, 0);
+        r.undo_end = blot_direct_writer::addGlobal(module, i32t, true, 0);
+        r.undo_sp = blot_direct_writer::addGlobal(module, i32t, true, 0);
     }
+    r.alloc_raw = helper(module, 1, 1);
     r.open = helper(module, 3, 2);
     r.open_persistent = helper(module, 3, 2);
     r.release = helper(module, 1, 0);
     r.check = helper(module, 2, 1);
     r.stack = helper(module, 1, 1);
+    r.stack_slow = helper(module, 1, 1);
+    r.rewind_stack = helper(module, 1, 0);
+    r.rewind_stack_slow = helper(module, 1, 0);
     r.heap_alloc = helper(module, 1, 2);
     r.heap_free = helper(module, 2, 0);
     r.address = helper(module, 4, 1);
@@ -285,8 +371,67 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         r.undo_rewind = helper(module, 1, 0);
     }
     let ot = layout.owner_table;
+    let stack_budget = layout.stack_end - layout.stack_base;
+    let heap_budget = layout.heap_end - layout.heap_base;
+    let persistent_budget = layout.persistent_end - layout.persistent_base;
+    let transport_budget = layout.transport_end - layout.transport_base;
+
+    // alloc_raw(bytes) -> 16-byte aligned address, growing Wasm pages on demand.
+    {
+        var h = H { parameters: 1, locals: 1, .. };
+        let address = temp(h);
+        let next = temp(h);
+        let need_pages = temp(h);
+        let old_pages = temp(h);
+        gget(h, r.arena_top);
+        k(h, 15);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, 0xfffffff0);
+        op(h, blot_direct_writer::OP_i32_and);
+        tee(h, address);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, next);
+        get(h, address);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        get(h, next);
+        k(h, layout.total);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        trapIf(h);
+        get(h, next);
+        gget(h, r.page_top);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, next);
+        gget(h, r.page_top);
+        op(h, blot_direct_writer::OP_i32_sub);
+        k(h, 65535);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_shr_u);
+        tee(h, need_pages);
+        memoryGrow(h);
+        tee(h, old_pages);
+        k(h, 0xffffffff);
+        op(h, blot_direct_writer::OP_i32_eq);
+        trapIf(h);
+        get(h, old_pages);
+        get(h, need_pages);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_shl);
+        gset(h, r.page_top);
+        op(h, blot_direct_writer::OP_end);
+        get(h, next);
+        gset(h, r.arena_top);
+        get(h, address);
+        finish(h, module, r.alloc_raw);
+    }
+
     emitOpen(module, r, r.open, false);
     emitOpen(module, r, r.open_persistent, true);
+
     // heap_free(address, size): push onto the size class's free list.
     {
         var h = H { parameters: 2, locals: 2, .. };
@@ -312,6 +457,8 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
     // release(mark): every owner opened above mark is invalidated.
     {
         var h = H { parameters: 1, locals: 1, .. };
+        let slot = temp(h);
+        let blk = temp(h);
         let entry = temp(h);
         let capacity = temp(h);
         open(h, blot_direct_writer::OP_block);
@@ -323,12 +470,12 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         gget(h, r.owner_top);
         k(h, 1);
         op(h, blot_direct_writer::OP_i32_sub);
+        tee(h, slot);
         gset(h, r.owner_top);
-        gget(h, r.owner_top);
-        k(h, entry_bytes);
-        op(h, blot_direct_writer::OP_i32_mul);
-        k(h, ot);
-        op(h, blot_direct_writer::OP_i32_add);
+        emitOwnerDirAddr(h, slot, ot);
+        load(h, 0);
+        set(h, blk);
+        emitOwnerEntryFromBlock(h, blk, slot);
         tee(h, entry);
         get(h, entry);
         load(h, entry_generation);
@@ -353,22 +500,27 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         op(h, blot_direct_writer::OP_end);
         finish(h, module, r.release);
     }
-    // check(slot, generation) -> entry; slot zero is never an owner.
+    // check(slot, generation) -> entry; slot zero or unallocated block traps.
     {
         var h = H { parameters: 2, locals: 2, .. };
+        let blk = temp(h);
         let entry = temp(h);
         get(h, 0);
-        k(h, layout.owner_capacity);
+        k(h, 1);
+        op(h, blot_direct_writer::OP_i32_sub);
+        k(h, layout.owner_capacity - 1);
         op(h, blot_direct_writer::OP_i32_ge_u);
-        get(h, 0);
-        op(h, blot_direct_writer::OP_i32_eqz);
-        op(h, blot_direct_writer::OP_i32_or);
         trapIf(h);
         get(h, 0);
-        k(h, entry_bytes);
-        op(h, blot_direct_writer::OP_i32_mul);
-        k(h, ot);
-        op(h, blot_direct_writer::OP_i32_add);
+        k(h, 8);
+        op(h, blot_direct_writer::OP_i32_shr_u);
+        k(h, 2);
+        op(h, blot_direct_writer::OP_i32_shl);
+        load(h, ot);
+        tee(h, blk);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        trapIf(h);
+        emitOwnerEntryFromBlock(h, blk, 0);
         tee(h, entry);
         load(h, entry_generation);
         get(h, 1);
@@ -377,25 +529,285 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         get(h, entry);
         finish(h, module, r.check);
     }
-    // stack(bytes) -> address, 16-byte aligned.
+    // stack_slow(need) -> address: reuse a chained chunk or allocate a new one.
     {
         var h = H { parameters: 1, locals: 1, .. };
+        let cur = temp(h);
+        let tail = temp(h);
+        let result = temp(h);
+        let prev_cap = temp(h);
+        let grow = temp(h);
+        let cap = temp(h);
+        let chunk_bytes = temp(h);
+        let chunk = temp(h);
+        let limit = temp(h);
+        gget(h, r.stack_chunk);
+        tee(h, tail);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, tail);
+        load(h, 4);
+        set(h, cur);
+        op(h, blot_direct_writer::OP_else_);
+        gget(h, r.stack_head);
+        set(h, cur);
+        op(h, blot_direct_writer::OP_end);
+        open(h, blot_direct_writer::OP_block); // $found
+        open(h, blot_direct_writer::OP_block); // $miss
+        open(h, blot_direct_writer::OP_loop);  // $scan
+        get(h, cur);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        idx(h, blot_direct_writer::OP_br_if, 1); // -> $miss
+        get(h, cur);
+        load(h, 12);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_ge_u);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, cur);
+        gset(h, r.stack_chunk);
+        get(h, cur);
+        load(h, 8);
+        gset(h, r.stack_limit);
+        get(h, cur);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, result);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.stack_pointer);
+        idx(h, blot_direct_writer::OP_br, 3); // -> $found
+        op(h, blot_direct_writer::OP_end);
+        get(h, cur);
+        set(h, tail);
+        get(h, cur);
+        load(h, 4);
+        set(h, cur);
+        idx(h, blot_direct_writer::OP_br, 0);
+        op(h, blot_direct_writer::OP_end); // end $scan
+        op(h, blot_direct_writer::OP_end); // end $miss
+        // No existing chunk fits: compute cap = max(need, min(prev_cap * 2, 256 KiB)).
+        get(h, tail);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, tail);
+        load(h, 12);
+        set(h, prev_cap);
+        op(h, blot_direct_writer::OP_else_);
+        k(h, stack_chunk_min / 2);
+        set(h, prev_cap);
+        op(h, blot_direct_writer::OP_end);
+        get(h, prev_cap);
+        k(h, 1);
+        op(h, blot_direct_writer::OP_i32_shl);
+        tee(h, grow);
+        k(h, stack_chunk_max_auto);
+        get(h, grow);
+        k(h, stack_chunk_max_auto);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        op(h, blot_direct_writer::OP_select);
+        set(h, grow);
+        get(h, 0);
+        get(h, grow);
+        get(h, 0);
+        get(h, grow);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_select);
+        tee(h, cap);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, chunk_bytes);
+        get(h, cap);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        gget(h, r.stack_total);
+        get(h, chunk_bytes);
+        op(h, blot_direct_writer::OP_i32_add);
+        gget(h, r.stack_total);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        gget(h, r.stack_total);
+        get(h, chunk_bytes);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, stack_budget);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        trapIf(h);
+        get(h, chunk_bytes);
+        call(h, r.alloc_raw);
+        set(h, chunk);
+        gget(h, r.stack_total);
+        get(h, chunk_bytes);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.stack_total);
+        get(h, chunk);
+        get(h, tail);
+        store(h, 0);
+        get(h, chunk);
+        k(h, 0);
+        store(h, 4);
+        get(h, chunk);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, result);
+        get(h, cap);
+        op(h, blot_direct_writer::OP_i32_add);
+        set(h, limit);
+        get(h, chunk);
+        get(h, limit);
+        store(h, 8);
+        get(h, chunk);
+        get(h, cap);
+        store(h, 12);
+        get(h, tail);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, tail);
+        get(h, chunk);
+        store(h, 4);
+        op(h, blot_direct_writer::OP_else_);
+        get(h, chunk);
+        gset(h, r.stack_head);
+        op(h, blot_direct_writer::OP_end);
+        get(h, chunk);
+        gset(h, r.stack_chunk);
+        get(h, limit);
+        gset(h, r.stack_limit);
+        get(h, result);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.stack_pointer);
+        op(h, blot_direct_writer::OP_end); // end $found
+        get(h, result);
+        finish(h, module, r.stack_slow);
+    }
+    // stack(bytes) -> address, 16-byte aligned; contiguous fast path in active chunk.
+    {
+        var h = H { parameters: 1, locals: 1, .. };
+        let need = temp(h);
         let address = temp(h);
-        gget(h, r.stack_pointer);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        open(h, blot_direct_writer::OP_if_);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        get(h, 0);
         k(h, 15);
         op(h, blot_direct_writer::OP_i32_add);
         k(h, 0xfffffff0);
         op(h, blot_direct_writer::OP_i32_and);
-        tee(h, address);
+        tee(h, need);
         get(h, 0);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        trapIf(h);
+        get(h, need);
+        gget(h, r.stack_limit);
+        gget(h, r.stack_pointer);
+        op(h, blot_direct_writer::OP_i32_sub);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, need);
+        call(h, r.stack_slow);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        gget(h, r.stack_pointer);
+        tee(h, address);
+        get(h, need);
         op(h, blot_direct_writer::OP_i32_add);
         gset(h, r.stack_pointer);
-        gget(h, r.stack_pointer);
-        k(h, layout.stack_end);
-        op(h, blot_direct_writer::OP_i32_gt_u);
-        trapIf(h);
         get(h, address);
         finish(h, module, r.stack);
+    }
+    // rewind_stack(mark): loop-free fast path in current chunk; slow path crosses chunks or resets to head.
+    {
+        var h = H { parameters: 1, locals: 1, .. };
+        get(h, 0);
+        gget(h, r.stack_chunk);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        op(h, blot_direct_writer::OP_i32_ge_u);
+        get(h, 0);
+        gget(h, r.stack_limit);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        op(h, blot_direct_writer::OP_i32_and);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, 0);
+        gset(h, r.stack_pointer);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        get(h, 0);
+        call(h, r.rewind_stack_slow);
+        finish(h, module, r.rewind_stack);
+    }
+    // rewind_stack_slow(mark): walks back across chunks or resets to stack_head on mark == 0.
+    {
+        var h = H { parameters: 1, locals: 1, .. };
+        let cur = temp(h);
+        let lim = temp(h);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        open(h, blot_direct_writer::OP_if_);
+        gget(h, r.stack_head);
+        tee(h, cur);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, cur);
+        gset(h, r.stack_chunk);
+        get(h, cur);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.stack_pointer);
+        get(h, cur);
+        load(h, 8);
+        gset(h, r.stack_limit);
+        op(h, blot_direct_writer::OP_else_);
+        k(h, 0);
+        gset(h, r.stack_chunk);
+        k(h, 0);
+        gset(h, r.stack_pointer);
+        k(h, 0);
+        gset(h, r.stack_limit);
+        op(h, blot_direct_writer::OP_end);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        gget(h, r.stack_chunk);
+        set(h, cur);
+        open(h, blot_direct_writer::OP_block);
+        open(h, blot_direct_writer::OP_loop);
+        get(h, cur);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        open(h, blot_direct_writer::OP_if_);
+        k(h, 0);
+        gset(h, r.stack_chunk);
+        k(h, 0);
+        gset(h, r.stack_pointer);
+        k(h, 0);
+        gset(h, r.stack_limit);
+        idx(h, blot_direct_writer::OP_br, 2);
+        op(h, blot_direct_writer::OP_end);
+        get(h, cur);
+        load(h, 8);
+        set(h, lim);
+        get(h, 0);
+        get(h, cur);
+        k(h, 16);
+        op(h, blot_direct_writer::OP_i32_add);
+        op(h, blot_direct_writer::OP_i32_ge_u);
+        get(h, 0);
+        get(h, lim);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        op(h, blot_direct_writer::OP_i32_and);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, cur);
+        gset(h, r.stack_chunk);
+        get(h, lim);
+        gset(h, r.stack_limit);
+        get(h, 0);
+        gset(h, r.stack_pointer);
+        idx(h, blot_direct_writer::OP_br, 2);
+        op(h, blot_direct_writer::OP_end);
+        get(h, cur);
+        load(h, 0);
+        set(h, cur);
+        idx(h, blot_direct_writer::OP_br, 0);
+        op(h, blot_direct_writer::OP_end);
+        op(h, blot_direct_writer::OP_end);
+        finish(h, module, r.rewind_stack_slow);
     }
     // heap_alloc(bytes) -> (address, size): power-of-two classes from 16 bytes.
     {
@@ -403,6 +815,11 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         let class = temp(h);
         let head = temp(h);
         let address = temp(h);
+        let size = temp(h);
+        get(h, 0);
+        k(h, heap_budget);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        trapIf(h);
         k(h, 32);
         get(h, 0);
         k(h, 16);
@@ -415,6 +832,10 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         op(h, blot_direct_writer::OP_i32_clz);
         op(h, blot_direct_writer::OP_i32_sub);
         set(h, class);
+        k(h, 1);
+        get(h, class);
+        op(h, blot_direct_writer::OP_i32_shl);
+        set(h, size);
         get(h, class);
         k(h, 4);
         op(h, blot_direct_writer::OP_i32_mul);
@@ -430,22 +851,27 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         store(h, 0);
         op(h, blot_direct_writer::OP_else_);
         gget(h, r.heap_top);
+        get(h, size);
+        op(h, blot_direct_writer::OP_i32_add);
+        gget(h, r.heap_top);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        gget(h, r.heap_top);
+        get(h, size);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, heap_budget);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        trapIf(h);
+        get(h, size);
+        call(h, r.alloc_raw);
         set(h, address);
         gget(h, r.heap_top);
-        k(h, 1);
-        get(h, class);
-        op(h, blot_direct_writer::OP_i32_shl);
+        get(h, size);
         op(h, blot_direct_writer::OP_i32_add);
         gset(h, r.heap_top);
-        gget(h, r.heap_top);
-        k(h, layout.heap_end);
-        op(h, blot_direct_writer::OP_i32_gt_u);
-        trapIf(h);
         op(h, blot_direct_writer::OP_end);
         get(h, address);
-        k(h, 1);
-        get(h, class);
-        op(h, blot_direct_writer::OP_i32_shl);
+        get(h, size);
         finish(h, module, r.heap_alloc);
     }
     // address(slot, generation, index, stride) -> element address
@@ -693,6 +1119,10 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         let address = temp(h);
         let size = temp(h);
         get(h, 0);
+        k(h, 0x04000000);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        trapIf(h);
+        get(h, 0);
         get(h, 1);
         op(h, blot_direct_writer::OP_i32_mul);
         set(h, bytes);
@@ -761,6 +1191,7 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         let bytes = temp(h);
         let address = temp(h);
         let size = temp(h);
+        let aligned = temp(h);
         get(h, 0);
         get(h, 1);
         call(h, r.check);
@@ -780,19 +1211,34 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         op(h, blot_direct_writer::OP_i32_or);
         set(h, size);
         op(h, blot_direct_writer::OP_else_);
-        gget(h, r.persistent_top);
+        get(h, bytes);
         k(h, 15);
         op(h, blot_direct_writer::OP_i32_add);
         k(h, 0xfffffff0);
         op(h, blot_direct_writer::OP_i32_and);
-        tee(h, address);
+        tee(h, aligned);
         get(h, bytes);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        gget(h, r.persistent_top);
+        get(h, aligned);
+        op(h, blot_direct_writer::OP_i32_add);
+        gget(h, r.persistent_top);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        gget(h, r.persistent_top);
+        get(h, aligned);
+        op(h, blot_direct_writer::OP_i32_add);
+        k(h, persistent_budget);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_i32_or);
+        trapIf(h);
+        get(h, aligned);
+        call(h, r.alloc_raw);
+        set(h, address);
+        gget(h, r.persistent_top);
+        get(h, aligned);
         op(h, blot_direct_writer::OP_i32_add);
         gset(h, r.persistent_top);
-        gget(h, r.persistent_top);
-        k(h, layout.persistent_end);
-        op(h, blot_direct_writer::OP_i32_gt_u);
-        trapIf(h);
         get(h, bytes);
         set(h, size);
         op(h, blot_direct_writer::OP_end);
@@ -808,10 +1254,15 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         call(h, r.open_persistent);
         finish(h, module, r.persist);
     }
-    // Host transport: allocate(bytes) -> zeroed packet address; reset.
+    // Host transport: allocate(bytes) -> zeroed packet address; grows lazily via heap_alloc.
     {
         var h = H { parameters: 1, locals: 1, .. };
         let address = temp(h);
+        let used = temp(h);
+        let need = temp(h);
+        let new_base = temp(h);
+        let new_cap = temp(h);
+        let want = temp(h);
         get(h, 0);
         op(h, blot_direct_writer::OP_i32_eqz);
         get(h, 0);
@@ -819,12 +1270,51 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         op(h, blot_direct_writer::OP_i32_and);
         op(h, blot_direct_writer::OP_i32_or);
         trapIf(h);
-        get(h, 0);
-        k(h, layout.transport_end);
         gget(h, r.transport_top);
+        gget(h, r.transport_base);
+        op(h, blot_direct_writer::OP_i32_sub);
+        set(h, used);
+        get(h, 0);
+        k(h, transport_budget);
+        get(h, used);
         op(h, blot_direct_writer::OP_i32_sub);
         op(h, blot_direct_writer::OP_i32_gt_u);
         trapIf(h);
+        get(h, used);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, need);
+        gget(h, r.transport_cap);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        open(h, blot_direct_writer::OP_if_);
+        var default_init: u32 = 4096;
+        if default_init > transport_budget { default_init = transport_budget; }
+        get(h, need);
+        k(h, default_init);
+        get(h, need);
+        k(h, default_init);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_select);
+        set(h, want);
+        get(h, want);
+        call(h, r.heap_alloc);
+        set(h, new_cap);
+        set(h, new_base);
+        gget(h, r.transport_cap);
+        open(h, blot_direct_writer::OP_if_);
+        gget(h, r.transport_base);
+        gget(h, r.transport_cap);
+        call(h, r.heap_free);
+        op(h, blot_direct_writer::OP_end);
+        get(h, new_base);
+        gset(h, r.transport_base);
+        get(h, new_cap);
+        gset(h, r.transport_cap);
+        get(h, new_base);
+        get(h, used);
+        op(h, blot_direct_writer::OP_i32_add);
+        gset(h, r.transport_top);
+        op(h, blot_direct_writer::OP_end);
         gget(h, r.transport_top);
         tee(h, address);
         k(h, 0);
@@ -837,9 +1327,10 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         get(h, address);
         finish(h, module, r.allocate);
     }
+    // reset(ignored) -> 0
     {
         var h = H { parameters: 1, locals: 1, .. };
-        k(h, layout.transport_base);
+        gget(h, r.transport_base);
         gset(h, r.transport_top);
         k(h, 0);
         finish(h, module, r.reset);
@@ -847,35 +1338,66 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
     // packet_length(address): the checked word count of a host packet.
     {
         var h = H { parameters: 1, locals: 1, .. };
+        let end = temp(h);
         let length = temp(h);
+        gget(h, r.transport_cap);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        trapIf(h);
+        gget(h, r.transport_base);
+        gget(h, r.transport_cap);
+        op(h, blot_direct_writer::OP_i32_add);
+        set(h, end);
         get(h, 0);
-        k(h, layout.transport_base);
+        gget(h, r.transport_base);
         op(h, blot_direct_writer::OP_i32_lt_u);
         get(h, 0);
         k(h, 3);
         op(h, blot_direct_writer::OP_i32_and);
         op(h, blot_direct_writer::OP_i32_or);
         get(h, 0);
-        k(h, layout.transport_end - 4);
+        get(h, end);
+        k(h, 4);
+        op(h, blot_direct_writer::OP_i32_sub);
         op(h, blot_direct_writer::OP_i32_gt_u);
         op(h, blot_direct_writer::OP_i32_or);
         trapIf(h);
         get(h, 0);
         load(h, 0);
         tee(h, length);
-        k(h, (layout.transport_end - layout.transport_base) / 4);
+        get(h, end);
+        get(h, 0);
+        op(h, blot_direct_writer::OP_i32_sub);
+        k(h, 4);
+        op(h, blot_direct_writer::OP_i32_sub);
+        k(h, 2);
+        op(h, blot_direct_writer::OP_i32_shr_u);
         op(h, blot_direct_writer::OP_i32_gt_u);
         trapIf(h);
         get(h, length);
         finish(h, module, r.packet_length);
     }
     if has_fork {
-        // undo_record(addr, bytes): save [addr..addr+bytes] onto the undo journal.
+        // undo_record(addr, bytes): lazily allocate undo journal and save slice.
         {
             var h = H { parameters: 2, locals: 2, .. };
             let aligned = temp(h);
             let sp = temp(h);
             let next = temp(h);
+            let base = temp(h);
+            gget(h, r.undo_base);
+            op(h, blot_direct_writer::OP_i32_eqz);
+            open(h, blot_direct_writer::OP_if_);
+            k(h, undo_bytes);
+            call(h, r.alloc_raw);
+            tee(h, base);
+            gset(h, r.undo_base);
+            get(h, base);
+            k(h, undo_bytes);
+            op(h, blot_direct_writer::OP_i32_add);
+            gset(h, r.undo_end);
+            get(h, base);
+            gset(h, r.undo_sp);
+            op(h, blot_direct_writer::OP_end);
             get(h, 1);
             k(h, 3);
             op(h, blot_direct_writer::OP_i32_add);
@@ -889,7 +1411,7 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
             k(h, 8);
             op(h, blot_direct_writer::OP_i32_add);
             tee(h, next);
-            k(h, layout.undo_end);
+            gget(h, r.undo_end);
             op(h, blot_direct_writer::OP_i32_gt_u);
             get(h, next);
             get(h, sp);
@@ -917,15 +1439,26 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         // undo_rewind(saved_sp): LIFO restore every journaled slice down to saved_sp.
         {
             var h = H { parameters: 1, locals: 1, .. };
+            let target = temp(h);
             let sp = temp(h);
             let bytes = temp(h);
             let addr = temp(h);
             let src = temp(h);
+            gget(h, r.undo_base);
+            op(h, blot_direct_writer::OP_i32_eqz);
+            open(h, blot_direct_writer::OP_if_);
+            op(h, blot_direct_writer::OP_return_);
+            op(h, blot_direct_writer::OP_end);
+            get(h, 0);
+            gget(h, r.undo_base);
+            get(h, 0);
+            op(h, blot_direct_writer::OP_select);
+            set(h, target);
             open(h, blot_direct_writer::OP_block);
             open(h, blot_direct_writer::OP_loop);
             gget(h, r.undo_sp);
             tee(h, sp);
-            get(h, 0);
+            get(h, target);
             op(h, blot_direct_writer::OP_i32_le_u);
             idx(h, blot_direct_writer::OP_br_if, 1);
             get(h, sp);
@@ -961,13 +1494,18 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
         }
     }
     module.has_memory = true;
-    module.memory_pages = (layout.total + 0xffff) / 0x10000;
+    module.memory_pages = 1;
+    module.memory_max_pages = (layout.total + 0xffff) / 0x10000;
     // Helper names for traces, in the order of the struct's fields.
+    blot_direct_writer::setName(module, r.alloc_raw, "runtime.alloc_raw");
     blot_direct_writer::setName(module, r.open, "runtime.open");
     blot_direct_writer::setName(module, r.open_persistent, "runtime.open_persistent");
     blot_direct_writer::setName(module, r.release, "runtime.release");
     blot_direct_writer::setName(module, r.check, "runtime.check");
     blot_direct_writer::setName(module, r.stack, "runtime.stack");
+    blot_direct_writer::setName(module, r.stack_slow, "runtime.stack_slow");
+    blot_direct_writer::setName(module, r.rewind_stack, "runtime.rewind_stack");
+    blot_direct_writer::setName(module, r.rewind_stack_slow, "runtime.rewind_stack_slow");
     blot_direct_writer::setName(module, r.heap_alloc, "runtime.heap_alloc");
     blot_direct_writer::setName(module, r.heap_free, "runtime.heap_free");
     blot_direct_writer::setName(module, r.address, "runtime.address");

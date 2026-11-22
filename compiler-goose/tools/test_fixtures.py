@@ -41,6 +41,13 @@ pruning, direct inline emission of non-exported scalar and nullary-constructor
 constants, and the `noStorageResize` `Tag.construct` traversal fix. All exit
 codes, diagnostics, and frontend counters are unchanged.
 
+On-demand linear memory Checkpoint A (22 November 2026) re-recorded the Wasm
+bytes and emitted function counts of 98 direct-backend fixtures: initial memory
+starts at 1 Wasm page (64 KiB) with `memory.grow` up to the planned budget,
+2-level paged owner directory, chunk-list scratch stack with loop-free
+`rewind_stack` fast path and guarded `releaseTo`, and lazy transport/undo
+buffers. All exit codes, diagnostics, and frontend counters are unchanged.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

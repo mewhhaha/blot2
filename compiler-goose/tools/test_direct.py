@@ -2,9 +2,11 @@
 """Check the direct backend's laws against the recorded bytes.
 
 Each law in compiler-goose/tests/direct is NAME.goose, which prints bytes as
-hex, beside NAME.expected, the bytes the Zig source of the direct backend
-produced for the same input on 15 November 2026, the day it was removed. The
-output must equal the record, and Goose must not warn.
+hex, beside NAME.expected. `writer.expected` preserves the exact bytes the Zig
+direct backend produced on 15 November 2026; `runtime.expected` was updated on
+22 November 2026 for the on-demand 64 KiB linear memory allocator (paged owner
+directory, chunk-list scratch stack, lazy transport/undo buffers). The output
+must equal the record, and Goose must not warn.
 
 Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]
 """

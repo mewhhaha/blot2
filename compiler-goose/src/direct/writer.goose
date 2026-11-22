@@ -46,6 +46,7 @@ let OP_i32_store: Op = 0x36;
 let OP_f32_store: Op = 0x38;
 let OP_i32_store8: Op = 0x3a;
 let OP_memory_size: Op = 0x3f;
+let OP_memory_grow: Op = 0x40;
 let OP_i32_const: Op = 0x41;
 let OP_f32_const: Op = 0x43;
 let OP_i32_eqz: Op = 0x45;
@@ -165,6 +166,7 @@ root struct Module {
     host_slots: u32 = 0,
     has_memory: bool = false,
     memory_pages: u32 = 0,
+    memory_max_pages: u32 = 0,
     // The start function (exported constants are computed there).
     has_start: bool = false,
     start: u32 = 0,
@@ -306,12 +308,14 @@ fn assemble(module: const Module&, out: u8[>..<]&) {
         uleb(payload, module.host_slots);
         section(out, 4, payload);
     }
-    // 5: memory (fixed size)
+    // 5: memory (min = memory_pages, max = memory_max_pages or memory_pages)
     if module.has_memory {
         uleb(payload, 1);
         byte(payload, 1);
         uleb(payload, module.memory_pages);
-        uleb(payload, module.memory_pages);
+        var max_pages = module.memory_max_pages;
+        if max_pages == 0 { max_pages = module.memory_pages; }
+        uleb(payload, max_pages);
         section(out, 5, payload);
     }
     // 6: globals
