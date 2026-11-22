@@ -508,7 +508,7 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     i32Const(g, step);
     callf(g, push_function);
     lset(g, address);
-    let noted = noteStore(g, f, value);
+    let noted = noteStoreToSlot(g, f, w(g, list, 0), value);
     if noted != blot_direct_types::Error.none { return neverVal(), false, noted; }
     if g.runtime_().has_fork {
         let bytes, berr = flatBytes(g, f, value.ty, id);

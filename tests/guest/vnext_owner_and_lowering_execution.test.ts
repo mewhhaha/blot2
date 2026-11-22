@@ -310,3 +310,56 @@ entry func main (): #[U32] =>
     { stdRoot },
   );
 });
+
+Deno.test("Item 4: runtime-guarded noteStoreToSlot releases loop-local slice builders and preserves escaping stores", async () => {
+  await compileAndRun(
+    `
+type SliceHolder = { span: &[U32], tag: U32 }
+entry func main (): #[U32] =>
+  let base: #[U32] = #[10, 20, 30, 40]
+  let total = 0
+  for round in 0 .. 4000:
+    let local: #[~SliceHolder] = #[]
+    for i in 0 .. 16:
+      @storage.push local { span: &base[0..4], tag: (round + i) % 4 }
+    let items = #[{ span: &base[0..4], tag: (round + j) % 4 } | j <- base]
+    total := self + local[round % 16].span[local[0].tag] + items[0].span[items[1].tag]
+  return #[total]
+`,
+    (guest, bytes) => {
+      const result = Array.from(guest.call("main", null) as Uint32Array);
+      assert.equal(result.length, 1);
+      assert.ok(result[0] > 0);
+      const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes));
+      const exports = instance.exports;
+      (exports.main as CallableFunction)();
+      const memory = exports["blot:memory"] as WebAssembly.Memory;
+      assert.ok(memory instanceof WebAssembly.Memory);
+      assert.ok(
+        memory.buffer.byteLength <= 131072,
+        `expected loop-local slice builders to stay bounded, got ${memory.buffer.byteLength} bytes`,
+      );
+    },
+    { stdRoot },
+  );
+  await compileAndRun(
+    `
+func append_rows (dst: #[~#[U32]]) -> (n: U32): Unit =>
+  for i in 0 .. n:
+    let row = #[i + 1, i + 10]
+    @storage.push dst row
+  return ()
+entry func main (): #[U32] =>
+  let rows: #[~#[U32]] = #[]
+  append_rows rows 4
+  return #[rows[0][0], rows[1][1], rows[2][0], rows[3][1]]
+`,
+    (guest) => {
+      assert.deepEqual(
+        Array.from(guest.call("main", null) as Uint32Array),
+        [1, 11, 3, 13],
+      );
+    },
+    { stdRoot },
+  );
+});

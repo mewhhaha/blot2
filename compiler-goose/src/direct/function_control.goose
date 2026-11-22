@@ -2277,6 +2277,45 @@ fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
     if holds { f.memory_stores += 1; }
     return blot_direct_types::Error.none;
 }
+// Records a store into the owner at `dst_slot`, disabling scope release only
+// if `dst_slot` predates the scope's owner mark at run time.
+fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
+    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    let holds, error = g.contentsHoldMemory(value.ty);
+    if error != blot_direct_types::Error.none { return error; }
+    if !holds { return blot_direct_types::Error.none; }
+    let s .= g.s;
+    for idx in f.labels_base..s.labels.len {
+        if s.labels[idx].kind == blot_direct_emit::LabelKind.loop_ && s.labels[idx].has_release {
+            s.labels[idx].used = true;
+            let mark_local = s.labels[idx].release_owner;
+            let allow_local = s.labels[idx].allow;
+            lget(g, dst_slot);
+            lget(g, mark_local);
+            op(g, OP_i32_lt_u);
+            let opened = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, allow_local);
+            close(g, f);
+        }
+    }
+    if f.entry_owner_mark != 0xffffffff {
+        if f.entry_allow == 0xffffffff {
+            f.entry_allow = local32(g, f);
+        }
+        f.scoped_stores += 1;
+        lget(g, dst_slot);
+        lget(g, f.entry_owner_mark);
+        op(g, OP_i32_lt_u);
+        let opened = open(g, f, OP_if_);
+        i32Const(g, 0);
+        lset(g, f.entry_allow);
+        close(g, f);
+    } else {
+        f.memory_stores += 1;
+    }
+    return blot_direct_types::Error.none;
+}
 // Releases an iteration's allocations when its loop allows it and every
 // carried owner predates the iteration.
 fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label) {

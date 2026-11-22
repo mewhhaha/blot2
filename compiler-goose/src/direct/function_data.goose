@@ -193,7 +193,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     let replacement, error = stmt(g, f, info.value);
     if error != blot_direct_types::Error.none { return replacement, error; }
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
-    let noted = noteStore(g, f, replacement);
+    let noted = noteStoreToSlot(g, f, w(g, container, 0), replacement);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
     // A fixed array never moves or shrinks; only growable/resizable owners
     // can reallocate during `info.value` and need a fresh address lookup.

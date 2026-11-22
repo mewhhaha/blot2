@@ -1062,7 +1062,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
         callf(g, g.runtime_().push);
         lset(g, address);
     }
-    let noted = noteStore(g, f, value);
+    let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
     if g.runtime_().has_fork {
         let bytes, berr = flatBytes(g, f, value.ty, id);

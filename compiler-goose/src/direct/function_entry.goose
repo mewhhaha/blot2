@@ -273,6 +273,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     f.parameter_words = localCount(g, f);
     let owner_mark = local(g, f, VT_i32);
     let stack_mark = local(g, f, VT_i32);
+    f.entry_owner_mark = owner_mark;
     var captures = Vals {};
     if closure {
         let loaded, error = loadCaptures(g, f, g.s.instances[id].captures, 0);
@@ -375,7 +376,16 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         if error != blot_direct_types::Error.none { return error; }
         release = !holds && f.memory_stores == 0;
     }
-    if release { releaseTo(g, owner_mark, stack_mark); }
+    if release {
+        if f.scoped_stores != 0 && f.entry_allow != 0xffffffff {
+            lget(g, f.entry_allow);
+            let opened = open(g, f, OP_if_);
+            releaseTo(g, owner_mark, stack_mark);
+            close(g, f);
+        } else {
+            releaseTo(g, owner_mark, stack_mark);
+        }
+    }
     if result.ty == blot_direct_types::never { op(g, OP_unreachable_); } else { push(g, result); }
     op(g, OP_end);
     finishWith(g, g.s.instances[id].function, f, release, owner_mark, stack_mark);
@@ -418,7 +428,15 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
         finish_body_scratch.push(g.s.locals[first + at]);
         at = end;
     }
-    if release { markInto(g, finish_body_scratch, owner_mark, stack_mark); }
+    if release {
+        markInto(g, finish_body_scratch, owner_mark, stack_mark);
+        if f.scoped_stores != 0 && f.entry_allow != 0xffffffff {
+            finish_body_scratch.push(OP_i32_const);
+            blot_direct_writer::sleb(finish_body_scratch, 1);
+            finish_body_scratch.push(OP_local_set);
+            blot_direct_writer::uleb(finish_body_scratch, f.entry_allow);
+        }
+    }
     blot_direct_relocations::finishBody(f.sites_base,(finish_body_scratch.len-mark)-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
     blot_direct_writer::raw(finish_body_scratch, g.s.code[f.code_base..g.s.code.len]);
     blot_direct_writer::setBody(g.module, function, finish_body_scratch[mark..]);

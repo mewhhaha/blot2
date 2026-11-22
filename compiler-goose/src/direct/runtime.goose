@@ -29,12 +29,12 @@ let initial_page_bytes: u32 = 65536;
 let stack_chunk_min: u32 = 16384;
 let stack_chunk_max_auto: u32 = 262144;
 
-// Defaults: 65536 owners, 4 MiB persistent, 16 MiB stack, 32 MiB heap, 2 MiB transport.
+// Defaults: 65536 owners, 4 MiB persistent, 128 MiB stack, 128 MiB heap, 2 MiB transport.
 struct Budgets {
     owners: u32 = 65536,
     persistent: u32 = 4194304,
-    stack: u32 = 16777216,
-    heap: u32 = 33554432,
+    stack: u32 = 134217728,
+    heap: u32 = 134217728,
     transport: u32 = 2097152
 }
 struct Layout {

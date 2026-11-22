@@ -49,7 +49,7 @@ entry const floats = func (input: Array F32): Array F32 => return do:
       const memory = exports["blot:memory"] as WebAssembly.Memory;
       assert.equal(memory.buffer.byteLength, 65536);
       assert.throws(
-        () => memory.grow(1024),
+        () => memory.grow(8192),
         RangeError,
       );
       assert.throws(
