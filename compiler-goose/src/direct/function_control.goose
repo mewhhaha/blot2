@@ -574,9 +574,9 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if n.c == 1 {
         let fidx = findComptimeFrame(f, n.a);
         if fidx < 0 { return neverVal(), g.fail(m, id, "comptime .name outside #for"); }
-        let text = g.types.spelling(f.comptime_frames[fidx].name_id);
         let arr_ty, terr = typeOf(g, f, id);
         if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+        let text = g.types.spelling(f.comptime_frames[fidx].name_id);
         var cp_count: i64 = 0;
         var p: i64 = 0;
         while p < text.len { let _, next = utf8Next(text, p); cp_count += 1; p = next; }
@@ -657,8 +657,57 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;
     }
-    let result = g.newSlot();
     let merges = m.branchMerges(id);
+    if inputs.len == 1 && merges.len == 0 {
+        let input_val = g.s.vals[values.start];
+        if input_val.len == 1 && tagOf(g, input_val.ty) == blot_direct_types::Tag.nominal {
+            let known_tag, has_known = findConstTag(f, w(g, input_val, 0));
+            if has_known {
+                let boxed, berr = isBoxed(g, f, input_val.ty, id);
+                let cases, cerr = g.types.variants(input_val.ty);
+                if berr == blot_direct_types::Error.none && !boxed && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                    let arms = m.matchArms(id);
+                    var matched_arm: i64 = -1;
+                    var matched_bind: u32 = 0;
+                    var can_fold = true;
+                    for arm, arm_index in arms {
+                        if arm.guard_ != 0 { can_fold = false; break; }
+                        let rows = m.armRows(arm);
+                        var row_hit = false;
+                        for row in rows {
+                            let patterns = m.rowPatterns(row);
+                            if patterns.len != 1 { can_fold = false; break; }
+                            let pat = m.pattern(patterns[0]);
+                            match pat.tag {
+                                wildcard => { row_hit = true; break; },
+                                bind => { row_hit = true; matched_bind = pat.a; break; },
+                                constructor => {
+                                    if pat.b != 0 { can_fold = false; break; }
+                                    if m.constructor(pat.a).tag == known_tag { row_hit = true; break; }
+                                },
+                                _ => { can_fold = false; break; },
+                            }
+                        }
+                        if !can_fold { break; }
+                        if row_hit { matched_arm = arm_index; break; }
+                    }
+                    if can_fold && matched_arm >= 0 {
+                        if matched_bind != 0 {
+                            refine(g, f, m.binding(matched_bind).ty, input_val.ty);
+                            bindPut(g, f, matched_bind, input_val);
+                        }
+                        let arm_body = arms[matched_arm].body;
+                        let body_val, berr2 = stmt(g, f, arm_body);
+                        if berr2 != blot_direct_types::Error.none { return body_val, berr2; }
+                        if body_val.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+                        if info.statement { return unitVal(), blot_direct_types::Error.none; }
+                        return body_val, blot_direct_types::Error.none;
+                    }
+                }
+            }
+        }
+    }
+    let result = g.newSlot();
     let merged = newSlots(g, merges.len);
     var falls = false;
     let done = open(g, f, OP_block);
@@ -1221,12 +1270,13 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
     left -= 1;
     let n = m.node(id);
     match n.tag {
-        suite, block_, product, record, construct, array => {
+        suite, block_, product, record, array => {
             for child in m.children(id) {
                 if !noStorageResize(g, m, child, left) { return false; }
             }
             return true;
         },
+        construct => { return noStorageResize(g, m, n.b, left); },
         bind => { return noStorageResize(g, m, n.b, left); },
         return_ => { return noStorageResize(g, m, n.a, left); },
         break_ => {
@@ -1484,60 +1534,497 @@ recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id:
         _ => { return false; },
     }
 }
-recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
-    let m .= g.units[f.unit - 1];
-    let info = m.loopInfo(id);
-    let carries = m.loopCarries(id);
-    let incoming = g.reserveVals(carries.len);
-    for carry, at in carries {
-        let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
-        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
-        if !present { return neverVal(), g.fail(m, id, "loop carry without an incoming value"); }
-        g.s.vals[incoming.start + at] = value;
+fn unwrapSingleBody(m: const Module&, id: u32) -> u32 {
+    var cur = id;
+    for step in 0..8 {
+        if cur == 0 { return 0; }
+        let n = m.node(cur);
+        if (n.tag == blot_check_core::Tag.suite || n.tag == blot_check_core::Tag.block_) && n.b == 1 {
+            cur = m.children(cur)[0];
+        } else { break; }
     }
-    let iteration = g.reserveVals(carries.len);
-    let outgoing = g.reserveVals(carries.len);
-    // A boxed carry lives in a slot reserved before the loop, so each
-    // iteration can release what it allocated.
-    let slots = Words { g.s.words.len as u32, carries.len as u32 };
-    for carry in carries { g.s.words.push(0); }
-    for at in 0..carries.len {
-        let value = g.s.vals[incoming.start + at];
-        let held, error = copiedBox(g, f, value.ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        let ctag = tagOf(g, value.ty);
-        var in_place = false;
-        if !held && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
-            var cbudget: i64 = 256;
-            in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
-        }
-        if in_place {
-            g.s.vals[iteration.start + at] = value;
-            g.s.vals[outgoing.start + at] = value;
-            continue;
-        }
-        if held {
-            g.s.words[slots.start + at] = 1;
-            let reserved, error = newBlock(g, f, value.ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            g.s.vals[iteration.start + at] = valOf1(g, value.ty, reserved);
+    return cur;
+}
+
+fn isTwoParamPushForwarder(tm: const Module&, body: const blot_check_core::Body&) -> bool {
+    if !body.is_function { return false; }
+    let params = tm.bodyParameters(body);
+    if params.len != 2 { return false; }
+    let inner = scratchReturned(tm, unwrapSingleBody(tm, body.root));
+    if inner == 0 { return false; }
+    let n = tm.node(inner);
+    if n.tag != blot_check_core::Tag.storage { return false; }
+    let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+    if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push { return false; }
+    let ch = tm.children(inner);
+    return ch.len == 2 && localRef(tm, ch[0]) == params[0].binding && localRef(tm, ch[1]) == params[1].binding;
+}
+
+// Recognize `for item in src: dest.push item` (or `@storage.push dest item`)
+// with no loop carries and plain non-boxed elements, emitting a single ensure
+// + `memory.copy`.
+recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> bool, Error {
+    if g.runtime_().has_fork { return false, blot_direct_types::Error.none; }
+    if info.kind != blot_check_core::LoopKind.array || info.carries.len != 0 || info.pattern == 0 {
+        return false, blot_direct_types::Error.none;
+    }
+    var dest = neverVal();
+    var method_target = BindingRef { 0, 0 };
+    var step: u32 = 0;
+    var stag = blot_direct_types::Tag.unit;
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return false, blot_direct_types::Error.none; }
+        let item_binding = pat.a;
+        let body_node = unwrapSingleBody(m, info.body);
+        if body_node == 0 { return false, blot_direct_types::Error.none; }
+        let bn = m.node(body_node);
+        var dest_binding: u32 = 0;
+        if bn.tag == blot_check_core::Tag.storage {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(bn.c);
+            if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push {
+                return false, blot_direct_types::Error.none;
+            }
+            let ch = m.children(body_node);
+            if ch.len != 2 || localRef(m, ch[1]) != item_binding { return false, blot_direct_types::Error.none; }
+            dest_binding = localRef(m, ch[0]);
+        } else if bn.tag == blot_check_core::Tag.apply {
+            if localRef(m, bn.b) != item_binding || m.node(bn.a).tag != blot_check_core::Tag.project {
+                return false, blot_direct_types::Error.none;
+            }
+            let proj = m.node(bn.a);
+            dest_binding = localRef(m, proj.a);
+            if dest_binding == 0 { return false, blot_direct_types::Error.none; }
+            let dest_check, has_dest = bindGet(g, f, dest_binding);
+            if !has_dest || (tagOf(g, dest_check.ty) != blot_direct_types::Tag.grow && tagOf(g, dest_check.ty) != blot_direct_types::Tag.resize) {
+                return false, blot_direct_types::Error.none;
+            }
+            let identity, has_id = g.receiverIdentity(dest_check.ty);
+            if !has_id { return false, blot_direct_types::Error.none; }
+            let target, has_target = g.dispatchTarget(m, identity, m.projection(proj.b).field, blot_check_types::Operator.none);
+            if !has_target || !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+            let tm .= g.units[target.unit - 1];
+            let tbody .= tm.body(target.binding);
+            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, blot_direct_types::Error.none; }
+            method_target = target;
+        } else if bn.tag == blot_check_core::Tag.call {
+            let cinfo = m.call(body_node);
+            if cinfo.arguments.len != 2 || localRef(m, cinfo.arguments[1]) != item_binding {
+                return false, blot_direct_types::Error.none;
+            }
+            let target = g.resolve(m, cinfo.target);
+            if !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+            let tm .= g.units[target.unit - 1];
+            let tbody .= tm.body(target.binding);
+            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, blot_direct_types::Error.none; }
+            dest_binding = localRef(m, cinfo.arguments[0]);
+            method_target = target;
         } else {
-            let current, error = fresh(g, f, value.ty, id);
+            return false, blot_direct_types::Error.none;
+        }
+        if dest_binding == 0 || dest_binding == item_binding { return false, blot_direct_types::Error.none; }
+        let found_dest, has_dest = bindGet(g, f, dest_binding);
+        if !has_dest { return false, blot_direct_types::Error.none; }
+        dest = found_dest;
+        let dtag = tagOf(g, dest.ty);
+        if dtag != blot_direct_types::Tag.grow && dtag != blot_direct_types::Tag.resize {
+            return false, blot_direct_types::Error.none;
+        }
+        let elem, elem_err = elementOf(g, f, dest.ty, id);
+        if elem_err != blot_direct_types::Error.none { return false, blot_direct_types::Error.none; }
+        let holds, herr = g.contentsHoldMemory(elem);
+        if herr != blot_direct_types::Error.none || holds { return false, blot_direct_types::Error.none; }
+        let boxed, berr = isBoxed(g, f, elem, id);
+        if berr != blot_direct_types::Error.none || boxed { return false, blot_direct_types::Error.none; }
+        let got_step, serr = stride(g, f, elem, id);
+        if serr != blot_direct_types::Error.none || got_step == 0 || got_step > 65536 { return false, blot_direct_types::Error.none; }
+        step = got_step;
+
+        // Verify source Core type lowers to a contiguous container of the exact same element type.
+        let src_ty, sty_err = g.types.lower(m, m.typeOf(info.first), f.env);
+        if sty_err != blot_direct_types::Error.none { return false, blot_direct_types::Error.none; }
+        stag = tagOf(g, src_ty);
+        if stag != blot_direct_types::Tag.array && stag != blot_direct_types::Tag.view && stag != blot_direct_types::Tag.grow && stag != blot_direct_types::Tag.resize {
+            return false, blot_direct_types::Error.none;
+        }
+        if g.types.node(src_ty).a != elem { return false, blot_direct_types::Error.none; }
+    }
+
+    if method_target.unit != 0 { g.recordInlined(method_target.unit, method_target.binding); }
+    let source, eval_err = expr(g, f, info.first);
+    if eval_err != blot_direct_types::Error.none { return false, eval_err; }
+    let count, lerr = lengthOf(g, f, source, id);
+    if lerr != blot_direct_types::Error.none { return false, lerr; }
+
+    let rt = g.runtime_();
+    lget(g, count);
+    let non_empty = open(g, f, OP_if_);
+    let entry = ensureCheckedGrow(g, f, dest);
+    let cap = local32(g, f);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    ltee(g, cap);
+    i32Const(g, blot_direct_runtime::frozen_flag);
+    op(g, OP_i32_and);
+    trap(g, f);
+    let old_len = local32(g, f);
+    let new_len = local32(g, f);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    ltee(g, old_len);
+    lget(g, count);
+    op(g, OP_i32_add);
+    ltee(g, new_len);
+    lget(g, old_len);
+    op(g, OP_i32_lt_u);
+    let max_count = (rt.layout.heap_end - rt.layout.heap_base) / step;
+    lget(g, new_len);
+    i32Const(g, max_count);
+    op(g, OP_i32_gt_u);
+    op(g, OP_i32_or);
+    trap(g, f);
+    let need = emitScaledBytes(g, f, new_len, step);
+    let cap_bytes = local32(g, f);
+    lget(g, cap);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    lset(g, cap_bytes);
+    lget(g, need);
+    lget(g, cap_bytes);
+    op(g, OP_i32_gt_u);
+    let grow_if = open(g, f, OP_if_);
+    let doubled = local32(g, f);
+    lget(g, cap_bytes);
+    i32Const(g, 1);
+    op(g, OP_i32_shl);
+    lset(g, doubled);
+    lget(g, need);
+    lget(g, doubled);
+    lget(g, need);
+    lget(g, doubled);
+    op(g, OP_i32_gt_u);
+    op(g, OP_select);
+    callf(g, rt.heap_alloc);
+    let fresh_size = local32(g, f);
+    let fresh_base = local32(g, f);
+    lset(g, fresh_size);
+    lset(g, fresh_base);
+    let old_base = local32(g, f);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, old_base);
+    let old_bytes = emitScaledBytes(g, f, old_len, step);
+    lget(g, fresh_base);
+    lget(g, old_base);
+    lget(g, old_bytes);
+    memoryCopyOp(g);
+    lget(g, cap);
+    i32Const(g, blot_direct_runtime::heap_flag);
+    op(g, OP_i32_and);
+    let free_if = open(g, f, OP_if_);
+    lget(g, old_base);
+    lget(g, cap_bytes);
+    callf(g, rt.heap_free);
+    close(g, f);
+    lget(g, entry);
+    lget(g, fresh_base);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lget(g, entry);
+    lget(g, fresh_size);
+    i32Const(g, blot_direct_runtime::heap_flag);
+    op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    close(g, f);
+
+    // Resolve source base address after any growth of `dest`.
+    var src_base: u32 = 0;
+    if stag == blot_direct_types::Tag.array {
+        let base, _ = ensureCheckedArray(g, f, source);
+        src_base = base;
+    } else if stag == blot_direct_types::Tag.view {
+        let vslot = w(g, source, 0);
+        let vgen = w(g, source, 1);
+        let vstart = w(g, source, 2);
+        let vlen = w(g, source, 3);
+        let cv = findCheckedView(f, vslot, vgen, vstart, vlen);
+        if cv >= 0 {
+            src_base = f.checked_views[cv].base;
+        } else {
+            let src_entry = local32(g, f);
+            lget(g, vslot);
+            lget(g, vgen);
+            callf(g, rt.check);
+            lset(g, src_entry);
+            let vend = local32(g, f);
+            lget(g, vstart);
+            lget(g, vlen);
+            op(g, OP_i32_add);
+            ltee(g, vend);
+            lget(g, vstart);
+            op(g, OP_i32_lt_u);
+            lget(g, vend);
+            lget(g, src_entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+            op(g, OP_i32_gt_u);
+            op(g, OP_i32_or);
+            trap(g, f);
+            let raw_base = local32(g, f);
+            lget(g, src_entry);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+            lset(g, raw_base);
+            src_base = emitOffsetAddress(g, f, raw_base, vstart, step);
+        }
+    } else {
+        let src_entry = ensureCheckedGrow(g, f, source);
+        src_base = local32(g, f);
+        lget(g, src_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        lset(g, src_base);
+    }
+
+    let dst_base = local32(g, f);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, dst_base);
+    let dst_addr = emitOffsetAddress(g, f, dst_base, old_len, step);
+    let copy_bytes = emitScaledBytes(g, f, count, step);
+    lget(g, dst_addr);
+    lget(g, src_base);
+    lget(g, copy_bytes);
+    memoryCopyOp(g);
+    lget(g, entry);
+    lget(g, new_len);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    close(g, f);
+    return true, blot_direct_types::Error.none;
+}
+
+recursive fn countBodyNodes(m: const Module&, id: u32, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_, product, record, array, array_op, storage => {
+            for c in m.children(id) { if !countBodyNodes(m, c, budget) { return false; } }
+            return true;
+        },
+        call, break_ => {
+            for c in m.children(id) { if !countBodyNodes(m, c, budget) { return false; } }
+            return true;
+        },
+        bind, construct => { return countBodyNodes(m, n.b, budget); },
+        pattern_bind => { return countBodyNodes(m, n.b, budget) && countBodyNodes(m, n.c, budget); },
+        return_, project, result_associated => { return countBodyNodes(m, n.a, budget); },
+        scalar, logical, associated, apply => { return countBodyNodes(m, n.a, budget) && countBodyNodes(m, n.b, budget); },
+        if_value, if_stmt => { return countBodyNodes(m, n.a, budget) && countBodyNodes(m, n.b, budget) && countBodyNodes(m, n.c, budget); },
+        update => {
+            let u = m.updateInfo(id);
+            if !countBodyNodes(m, u.root, budget) || !countBodyNodes(m, u.value, budget) { return false; }
+            for s in m.updateSelectors(id) { if s.kind == blot_check_core::UpdateKind.index && !countBodyNodes(m, s.index, budget) { return false; } }
+            return true;
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { if !countBodyNodes(m, inp, budget) { return false; } }
+            for arm in m.matchArms(id) { if !countBodyNodes(m, arm.guard_, budget) || !countBodyNodes(m, arm.body, budget) { return false; } }
+            return true;
+        },
+        constant, reference, panic => { return true; },
+        _ => { return false; },
+    }
+}
+
+// Unroll `for x in const_array:` over small (1..4) compile-time scalar/enum
+// constant arrays so `pool()` + `rt.check()` disappear and Cranelift can
+// constant-fold match dispatch on the iteration element.
+recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, iteration: Vals, outgoing: Vals, slots: Words) -> bool, Error {
+    if g.runtime_().has_fork { return false, blot_direct_types::Error.none; }
+    if info.kind != blot_check_core::LoopKind.array { return false, blot_direct_types::Error.none; }
+    var target = BindingRef { 0, 0 };
+    var elem_count: i64 = 0;
+    var elem_is_const: bool[4] = [false; 4];
+    var elem_nodes: u32[4] = [0; 4];
+    var elem_vals: u32[4] = [0; 4];
+    var elem_ty: Ty = 0;
+    {
+        let m .= g.units[f.unit - 1];
+        if m.node(info.first).tag != blot_check_core::Tag.reference { return false, blot_direct_types::Error.none; }
+        target = g.resolve(m, m.reference(info.first));
+        if !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+        let tm .= g.units[target.unit - 1];
+        let cbody .= tm.body(target.binding);
+        if !cbody || cbody.is_function || tm.node(cbody.root).tag != blot_check_core::Tag.array {
+            return false, blot_direct_types::Error.none;
+        }
+        let elems = tm.children(cbody.root);
+        if elems.len == 0 || elems.len > 4 { return false, blot_direct_types::Error.none; }
+        for el, ei in elems {
+            let en = tm.node(el);
+            if en.tag == blot_check_core::Tag.constant {
+                elem_is_const[ei] = true;
+                elem_nodes[ei] = el;
+                elem_vals[ei] = en.a;
+            } else if en.tag == blot_check_core::Tag.construct && en.b == 0 {
+                elem_is_const[ei] = false;
+                elem_nodes[ei] = el;
+                elem_vals[ei] = tm.constructor(en.a).tag;
+            } else {
+                return false, blot_direct_types::Error.none;
+            }
+        }
+        elem_count = elems.len;
+        let arr_ty, ty_err = g.types.lower(m, m.typeOf(info.first), f.env);
+        if ty_err != blot_direct_types::Error.none || tagOf(g, arr_ty) != blot_direct_types::Tag.array {
+            return false, blot_direct_types::Error.none;
+        }
+        elem_ty = g.types.node(arr_ty).a;
+        let boxed, berr = isBoxed(g, f, elem_ty, id);
+        if berr != blot_direct_types::Error.none || boxed { return false, blot_direct_types::Error.none; }
+        let width, werr = layoutLen(g, f, elem_ty, id);
+        if werr != blot_direct_types::Error.none || width != 1 { return false, blot_direct_types::Error.none; }
+        let carries = m.loopCarries(id);
+        for at in 0..carries.len {
+            if g.s.words[slots.start + at] != 0 { return false, blot_direct_types::Error.none; }
+        }
+        var budget: i64 = 64;
+        if !countBodyNodes(m, info.body, budget) { return false, blot_direct_types::Error.none; }
+    }
+
+    g.recordInlined(target.unit, target.binding);
+    let exit = open(g, f, OP_block);
+    let unused = g.newSlot();
+    for ei in 0..elem_count {
+        let iter_done = open(g, f, OP_block);
+        var item = neverVal();
+        if elem_is_const[ei] {
+            let loc = local(g, f, localKindForScalar(g, elem_ty));
+            if tagOf(g, elem_ty) == blot_direct_types::Tag.f32_ {
+                blot_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
+                f32Const(g, elem_vals[ei]);
+            } else {
+                blot_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
+                i32Const(g, elem_vals[ei]);
+            }
+            lset(g, loc);
+            item = valOf1(g, elem_ty, loc);
+        } else {
+            let loc = constLocal(g, f, elem_vals[ei]);
+            recordConstTag(f, loc, elem_vals[ei]);
+            item = valOf1(g, elem_ty, loc);
+        }
+        if info.pattern != 0 {
+            let tested = test_(g, f, info.pattern, item, false, 0, id);
+            if tested != blot_direct_types::Error.none { return false, tested; }
+        }
+        let s .= g.s;
+        let labels_mark = s.labels.len;
+        s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: iter_done, iteration: iteration, outgoing: outgoing, unchanged: 0xffffffff, has_release: false, release_owner: 0, release_stack: 0, allocations: f.allocations, slots: slots, allow: 0, guards: Words {} });
+        let body_val, body_err = stmt(g, f, info.body);
+        s.labels.resize(labels_mark);
+        if body_err != blot_direct_types::Error.none { return false, body_err; }
+        if body_val.ty != blot_direct_types::never {
+            let carry_len = g.units[f.unit - 1].loopCarries(id).len;
+            let backedge = g.reserveVals(carry_len);
+            for at in 0..carry_len {
+                let carry_be = g.units[f.unit - 1].loopCarries(id)[at].backedge;
+                let value, present, rerr = readBindingVal(g, f, carry_be, id);
+                if rerr != blot_direct_types::Error.none { return false, rerr; }
+                if !present { return false, g.fail(g.units[f.unit - 1], id, "loop carry without a backedge value"); }
+                g.s.vals[backedge.start + at] = value;
+            }
+            let assigned = assignCarries(g, f, backedge, iteration, slots, 0xffffffff, 0, 0, id);
+            if assigned != blot_direct_types::Error.none { return false, assigned; }
+        }
+        close(g, f);
+    }
+    let final_assign = assign(g, f, iteration, outgoing, id);
+    if final_assign != blot_direct_types::Error.none { return false, final_assign; }
+    close(g, f);
+    let carry_len = g.units[f.unit - 1].loopCarries(id).len;
+    for at in 0..carry_len {
+        let carry_out = g.units[f.unit - 1].loopCarries(id)[at].outgoing;
+        bindPut(g, f, carry_out, g.s.vals[outgoing.start + at]);
+    }
+    return true, blot_direct_types::Error.none;
+}
+
+fn localKindForScalar(g: const Generator&, ty: Ty) -> ValType {
+    if tagOf(g, ty) == blot_direct_types::Tag.f32_ { return VT_f32; }
+    return VT_i32;
+}
+
+recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let info = g.units[f.unit - 1].loopInfo(id);
+    if info.kind == blot_check_core::LoopKind.array && info.carries.len == 0 {
+        let bulk_done, bulk_err = tryBulkPushLoop(g, f, id, info);
+        if bulk_err != blot_direct_types::Error.none { return neverVal(), bulk_err; }
+        if bulk_done { return unitVal(), blot_direct_types::Error.none; }
+    }
+    var iteration = Vals {};
+    var outgoing = Vals {};
+    var slots = Words {};
+    {
+        let m .= g.units[f.unit - 1];
+        let carries = m.loopCarries(id);
+        let incoming = g.reserveVals(carries.len);
+        for carry, at in carries {
+            let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
+            if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+            if !present { return neverVal(), g.fail(m, id, "loop carry without an incoming value"); }
+            g.s.vals[incoming.start + at] = value;
+        }
+        iteration = g.reserveVals(carries.len);
+        outgoing = g.reserveVals(carries.len);
+        // A boxed carry lives in a slot reserved before the loop, so each
+        // iteration can release what it allocated.
+        slots = Words { g.s.words.len as u32, carries.len as u32 };
+        for carry in carries { g.s.words.push(0); }
+        for at in 0..carries.len {
+            let value = g.s.vals[incoming.start + at];
+            let held, error = copiedBox(g, f, value.ty, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            g.s.vals[iteration.start + at] = current;
+            let ctag = tagOf(g, value.ty);
+            var in_place = false;
+            if !held && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
+                var cbudget: i64 = 256;
+                in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
+            }
+            if in_place {
+                g.s.vals[iteration.start + at] = value;
+                g.s.vals[outgoing.start + at] = value;
+                continue;
+            }
+            if held {
+                g.s.words[slots.start + at] = 1;
+                let reserved, error = newBlock(g, f, value.ty, id);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                g.s.vals[iteration.start + at] = valOf1(g, value.ty, reserved);
+            } else {
+                let current, error = fresh(g, f, value.ty, id);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                g.s.vals[iteration.start + at] = current;
+            }
+            let after, error = fresh(g, f, value.ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            g.s.vals[outgoing.start + at] = after;
         }
-        let after, error = fresh(g, f, value.ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        g.s.vals[outgoing.start + at] = after;
-    }
-    let assigned = assignCarries(g, f, incoming, iteration, slots, 0xffffffff, 0, 0, id);
-    if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
-    for carry, at in carries {
-        bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
-        if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
+        let assigned = assignCarries(g, f, incoming, iteration, slots, 0xffffffff, 0, 0, id);
+        if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
+        for carry, at in carries {
+            bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
+            if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming) {
+                blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
+            }
         }
     }
+    if info.kind == blot_check_core::LoopKind.array {
+        let unrolled, uerr = tryUnrollConstArrayLoop(g, f, id, info, iteration, outgoing, slots);
+        if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
+        if unrolled { return unitVal(), blot_direct_types::Error.none; }
+    }
+    let m .= g.units[f.unit - 1];
+    let carries = m.loopCarries(id);
     var has_index = false;
     var index: u32 = 0;
     var end = neverVal();

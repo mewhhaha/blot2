@@ -161,16 +161,16 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     let handles_mark = s.handles.len;
     let handle_cells_mark = s.handle_cells_len;
     let prev_active = s.active_instance;
-    let prev_dep_mark = blot_direct_emit::dep_frame_mark;
-    let dep_mark = blot_direct_emit::dep_scratch.len;
+    let prev_dep_mark = s.dep_frame_mark;
+    let dep_mark = s.dep_scratch.len;
     s.active_instance = id;
-    blot_direct_emit::dep_frame_mark = dep_mark;
+    s.dep_frame_mark = dep_mark;
     let error = emitInstanceBody(g, id);
     if error == blot_direct_types::Error.none && s.track_deps {
-        let count = blot_direct_emit::dep_scratch.len - dep_mark;
+        let count = s.dep_scratch.len - dep_mark;
         if !s.replaying {
             let start = s.dep_list.len as u32;
-            for di in 0..count { s.dep_list.push(blot_direct_emit::dep_scratch[dep_mark + di].id); }
+            for di in 0..count { s.dep_list.push(s.dep_scratch[dep_mark + di].id); }
             s.instances[id].deps_start = start;
             s.instances[id].deps_len = count as u32;
         } else {
@@ -179,7 +179,7 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
                 s.dep_match = false;
             } else {
                 for di in 0..count {
-                    if s.dep_list[(inst.deps_start as i64) + di] != blot_direct_emit::dep_scratch[dep_mark + di].id {
+                    if s.dep_list[(inst.deps_start as i64) + di] != s.dep_scratch[dep_mark + di].id {
                         s.dep_match = false;
                         break;
                     }
@@ -187,8 +187,8 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
             }
         }
     }
-    blot_direct_emit::dep_scratch.resize(dep_mark);
-    blot_direct_emit::dep_frame_mark = prev_dep_mark;
+    s.dep_scratch.resize(dep_mark);
+    s.dep_frame_mark = prev_dep_mark;
     s.active_instance = prev_active;
     blot_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);

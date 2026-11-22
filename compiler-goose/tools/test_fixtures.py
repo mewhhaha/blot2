@@ -32,6 +32,15 @@ method-call `apply(project(...))` unwinding, single-op array/storage forwarding,
 path, zero-allocation `continue` release skipping, and zero-copy pure entry
 packet input. All exit codes, diagnostics, and frontend counters are unchanged.
 
+Runtime performance Checkpoint R2 (22 November 2026) re-recorded the Wasm bytes
+and emitted function counts of 36 direct-backend fixtures: small pure leaf
+function inlining (preserving caller CheckedArray/CheckedView descriptors),
+bulk contiguous slice/array-to-GrowArray push loops (`memory.copy`), small
+constant-array `for` loop unrolling, compile-time constant-tag `match` arm
+pruning, direct inline emission of non-exported scalar and nullary-constructor
+constants, and the `noStorageResize` `Tag.construct` traversal fix. All exit
+codes, diagnostics, and frontend counters are unchanged.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

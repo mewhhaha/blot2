@@ -70,6 +70,7 @@ struct CheckedView {
     base: u32 = 0,
     depth: u32 = 0
 }
+struct ConstTag { local: u32 = 0, tag: u32 = 0, depth: u32 = 0 }
 struct CheckedRange {
     slot: u32 = 0xffffffff,
     generation: u32 = 0,
@@ -123,8 +124,11 @@ struct Fn {
     current_call: u32 = 0,
     // Set while evaluating a direct field value of a record literal.
     field_value: bool = false,
-    // Nested forwarding resolutions in progress (bounded against cycles).
+    // Nested forwarding / inlining resolutions in progress (bounded against cycles).
     forward_depth: u32 = 0,
+    inline_depth: u32 = 0,
+    const_tags: ConstTag[8] = [ConstTag {}; 8],
+    const_tags_len: i64 = 0,
     // Stores of memory-holding values: a loop body that makes one cannot
     // release per iteration, since older storage may now refer to it.
     memory_stores: u32 = 0,
@@ -192,6 +196,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth > max_depth {
         f.checked_views_len -= 1;
     }
+    while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth > max_depth {
+        f.const_tags_len -= 1;
+    }
 }
 fn popCheckedArraysAt(f: Fn&, depth: u32) {
     while f.checked_arrays_len > 0 && f.checked_arrays[f.checked_arrays_len - 1].depth >= depth {
@@ -203,6 +210,23 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth >= depth {
         f.checked_views_len -= 1;
     }
+    while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth >= depth {
+        f.const_tags_len -= 1;
+    }
+}
+fn findConstTag(f: const Fn&, local_id: u32) -> u32, bool {
+    var i = f.const_tags_len;
+    while i > 0 {
+        i -= 1;
+        if f.const_tags[i].local == local_id { return f.const_tags[i].tag, true; }
+    }
+    return 0, false;
+}
+fn recordConstTag(f: Fn&, local_id: u32, tag: u32) {
+    let _, exists = findConstTag(f, local_id);
+    if exists || f.const_tags_len >= 8 { return; }
+    f.const_tags[f.const_tags_len] = ConstTag { local: local_id, tag: tag, depth: f.depth };
+    f.const_tags_len += 1;
 }
 fn findCheckedArray(f: const Fn&, slot: u32, generation: u32) -> i64 {
     var i = f.checked_arrays_len;
@@ -307,6 +331,24 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             }
         }
         f.checked_views_len = out;
+    }
+    if f.const_tags_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.const_tags_len {
+            let entry = f.const_tags[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                if g.s.words[value.start + at] == entry.local {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.const_tags[out] = entry;
+                out += 1;
+            }
+        }
+        f.const_tags_len = out;
     }
 }
 fn br(g: Generator&, f: const Fn&, value: u8, depth: u32) { opIndex(g, value, f.depth - depth); }
@@ -829,6 +871,31 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
         match tagOf(g, ty) {
             array, grow, resize => { return pool(g, f, target, ty, id); },
             _ => {},
+        }
+        // Inline non-exported scalar or nullary-constructor constants directly
+        // instead of emitting a getter call on every read.
+        if !body.exported && evidenceContext(g, f, target, id) == 0 && g.types.concrete(ty, 0) {
+            let root = body.root;
+            let rn = tm.node(root);
+            if rn.tag == blot_check_core::Tag.constant {
+                let ctag = tagOf(g, ty);
+                if ctag == blot_direct_types::Tag.u32_ || ctag == blot_direct_types::Tag.boolean || ctag == blot_direct_types::Tag.f32_ {
+                    g.recordInlined(target.unit, target.binding);
+                    blot_direct_relocations::operand(target.unit, root, g.s.code.len);
+                    if ctag == blot_direct_types::Tag.f32_ { f32Const(g, rn.a); } else { i32Const(g, rn.a); }
+                    return pop(g, f, ty, id);
+                }
+            } else if rn.tag == blot_check_core::Tag.construct && rn.b == 0 {
+                let boxed, berr = isBoxed(g, f, ty, id);
+                let width, werr = layoutLen(g, f, ty, id);
+                if berr == blot_direct_types::Error.none && !boxed && werr == blot_direct_types::Error.none && width == 1 {
+                    g.recordInlined(target.unit, target.binding);
+                    let ctor_tag = tm.constructor(rn.a).tag;
+                    let loc = constLocal(g, f, ctor_tag);
+                    recordConstTag(f, loc, ctor_tag);
+                    return valOf1(g, ty, loc), blot_direct_types::Error.none;
+                }
+            }
         }
         // A constant: its instance computes the value.
         let instance, error = g.namedWith(target, ty, unused, m, id, evidenceContext(g, f, target, id));

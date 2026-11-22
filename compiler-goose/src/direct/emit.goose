@@ -161,6 +161,7 @@ struct HandleCell { cell: u32, outer: Val, ty: Ty, outer_is_cell: bool = false }
 // it, and the block depth it was installed at.
 struct Handle { saved: u32, depth: u32, cells_start: u32 = 0, cells_len: u32 = 0 }
 
+struct DepEntry { id: u32 }
 root struct State {
     instances: Instance[>..] = [],
     // Hash of a key to its newest index node (id + 1).
@@ -233,24 +234,22 @@ root struct State {
     replaying: bool = false,
     active_instance: u32 = 0xffffffff,
     dep_list: u32[>..] = [],
+    dep_scratch: DepEntry[>..<] = [],
+    dep_frame_mark: i64 = 0,
     dep_match: bool = true,
     inlined_callees: U64Map = U64Map {},
 }
 
-struct DepEntry { id: u32 }
-var dep_scratch: DepEntry[>..<] = [];
-
 fn recordDep(g: Generator&, id: u32) {
     if !g.s.track_deps || g.s.active_instance == 0xffffffff { return; }
-    for at in dep_frame_mark..dep_scratch.len {
-        if dep_scratch[at].id == id { return; }
+    for at in g.s.dep_frame_mark..g.s.dep_scratch.len {
+        if g.s.dep_scratch[at].id == id { return; }
     }
-    dep_scratch.push(DepEntry { id });
+    g.s.dep_scratch.push(DepEntry { id });
 }
 fn recordInlined(g: Generator&, unit: u32, binding: u32) {
     if g.s.track_deps { g.s.inlined_callees.put(key64(unit, binding), 1); }
 }
-var dep_frame_mark: i64 = 0;
 
 fn resetUnitCaches(s: State&, unit_id: u32) {
     let idx = (unit_id - 1) as i64;
