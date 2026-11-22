@@ -1,5 +1,6 @@
 // Concrete data domains for the same-executable copied worker protocol.
 namespace blot_project_packet;
+import binary;
 import backend.collection_ops;
 import backend.opaque_storage;
 import check.capability_flow;
@@ -29,22 +30,22 @@ import support.error;
 import support.option;
 import work_counters;
 import .project_packet;
-fn put<PacketWriter>(receiver:PacketWriter&,value:u8) {if !receiver.room(1) {return;}let bits=value as! u8;for index in 1 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:u8&) {if !receiver.available(1) {return;}var bits:u8=0;for index in 1 {bits|=(receiver.bytes[receiver.at+index] as u8)<<(index*8);}receiver.at+=1;value=bits as! u8;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:u16) {if !receiver.room(2) {return;}let bits=value as! u16;for index in 2 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:u16&) {if !receiver.available(2) {return;}var bits:u16=0;for index in 2 {bits|=(receiver.bytes[receiver.at+index] as u16)<<(index*8);}receiver.at+=2;value=bits as! u16;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:u32) {if !receiver.room(4) {return;}let bits=value as! u32;for index in 4 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:u32&) {if !receiver.available(4) {return;}var bits:u32=0;for index in 4 {bits|=(receiver.bytes[receiver.at+index] as u32)<<(index*8);}receiver.at+=4;value=bits as! u32;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:u64) {if !receiver.room(8) {return;}let bits=value as! u64;for index in 8 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:u64&) {if !receiver.available(8) {return;}var bits:u64=0;for index in 8 {bits|=(receiver.bytes[receiver.at+index] as u64)<<(index*8);}receiver.at+=8;value=bits as! u64;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:i8) {if !receiver.room(1) {return;}let bits=value as! u8;for index in 1 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:i8&) {if !receiver.available(1) {return;}var bits:u8=0;for index in 1 {bits|=(receiver.bytes[receiver.at+index] as u8)<<(index*8);}receiver.at+=1;value=bits as! i8;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:i16) {if !receiver.room(2) {return;}let bits=value as! u16;for index in 2 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:i16&) {if !receiver.available(2) {return;}var bits:u16=0;for index in 2 {bits|=(receiver.bytes[receiver.at+index] as u16)<<(index*8);}receiver.at+=2;value=bits as! i16;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:i32) {if !receiver.room(4) {return;}let bits=value as! u32;for index in 4 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:i32&) {if !receiver.available(4) {return;}var bits:u32=0;for index in 4 {bits|=(receiver.bytes[receiver.at+index] as u32)<<(index*8);}receiver.at+=4;value=bits as! i32;}
-fn put<PacketWriter>(receiver:PacketWriter&,value:i64) {if !receiver.room(8) {return;}let bits=value as! u64;for index in 8 {receiver.output.push((bits>>(index*8)) as! u8);}}
-fn get<PacketReader>(receiver:PacketReader&,value:i64&) {if !receiver.available(8) {return;}var bits:u64=0;for index in 8 {bits|=(receiver.bytes[receiver.at+index] as u64)<<(index*8);}receiver.at+=8;value=bits as! i64;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:u8) {if !receiver.room(1) {return;}receiver.output.push(value as! u8);}
+fn get<PacketReader>(receiver:PacketReader&,value:u8&) {if !receiver.available(1) {return;}value=receiver.bytes[receiver.at] as! u8;receiver.at+=1;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:i8) {if !receiver.room(1) {return;}receiver.output.push(value as! u8);}
+fn get<PacketReader>(receiver:PacketReader&,value:i8&) {if !receiver.available(1) {return;}value=receiver.bytes[receiver.at] as! i8;receiver.at+=1;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:u16) {if !receiver.room(2) {return;}let bits=value as! u16;var buf:u8[2]=[bits as! u8,(bits>>8) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:u16&) {if !receiver.available(2) {return;}value=binary::u16le(receiver.bytes,receiver.at) as! u16;receiver.at+=2;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:i16) {if !receiver.room(2) {return;}let bits=value as! u16;var buf:u8[2]=[bits as! u8,(bits>>8) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:i16&) {if !receiver.available(2) {return;}value=binary::u16le(receiver.bytes,receiver.at) as! i16;receiver.at+=2;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:u32) {if !receiver.room(4) {return;}let bits=value as! u32;var buf:u8[4]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:u32&) {if !receiver.available(4) {return;}value=binary::u32le(receiver.bytes,receiver.at) as! u32;receiver.at+=4;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:i32) {if !receiver.room(4) {return;}let bits=value as! u32;var buf:u8[4]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:i32&) {if !receiver.available(4) {return;}value=binary::u32le(receiver.bytes,receiver.at) as! i32;receiver.at+=4;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:u64) {if !receiver.room(8) {return;}let bits=value as! u64;var buf:u8[8]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8,(bits>>32) as! u8,(bits>>40) as! u8,(bits>>48) as! u8,(bits>>56) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:u64&) {if !receiver.available(8) {return;}value=binary::u64le(receiver.bytes,receiver.at) as! u64;receiver.at+=8;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:i64) {if !receiver.room(8) {return;}let bits=value as! u64;var buf:u8[8]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8,(bits>>32) as! u8,(bits>>40) as! u8,(bits>>48) as! u8,(bits>>56) as! u8];receiver.output.append(buf);}
+fn get<PacketReader>(receiver:PacketReader&,value:i64&) {if !receiver.available(8) {return;}value=binary::u64le(receiver.bytes,receiver.at) as! i64;receiver.at+=8;}
 fn put<PacketWriter>(receiver:PacketWriter&,value:f32) {put(receiver,blot_native::f32_bits(value));}
 fn get<PacketReader>(receiver:PacketReader&,value:f32&) {var bits:u32=0;get(receiver,bits);value=blot_native::f32_from_bits(bits);}
 fn put<PacketWriter>(receiver:PacketWriter&,value:f64) {put(receiver,blot_native::f64_bits(value));}
@@ -469,41 +470,115 @@ fn put(receiver:Writer&,value:const blot_check_core::Body[:]) {putFlat(receiver,
 fn get(receiver:Reader&,value:blot_check_core::Body[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::CallInfo[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::CallInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::ClosureInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::ClosureInfo[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Constructor[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Constructor[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::Contract[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::Contract[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::DeclarationDependencies[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::DeclarationDependencies[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::DependencyMember[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::DependencyMember[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::Diagnostic[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::Diagnostic[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::ErasedDeclarationReference[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::ErasedDeclarationReference[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::FieldName[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::FieldName[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::HandleEffects[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::HandleEffects[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::List[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::List[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::LoopCarry[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::LoopCarry[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::LoopInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::LoopInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::MatchArm[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::MatchArm[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::MatchInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::MatchInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::Merge[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::Merge[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Node[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Node[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Nominal[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Nominal[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Obligation[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Obligation[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::OperationName[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::OperationName[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::OperationValue[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::OperationValue[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Parameter[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Parameter[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::Pattern[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::Pattern[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::PatternRow[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::PatternRow[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::Primitive[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::Primitive[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_core::Projection[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_core::Projection[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::ProjectionVariant[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::ProjectionVariant[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::RequestArm[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::RequestArm[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::RequestLoopInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::RequestLoopInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::ResolverInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::ResolverInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::RuntimeName[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::RuntimeName[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::SelectedUse[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::SelectedUse[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::TypeTag[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::TypeTag[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::UpdateInfo[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::UpdateInfo[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_core::UpdateStep[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_core::UpdateStep[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_parameter_patterns::Node[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_parameter_patterns::Node[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_types::List[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_types::List[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_types::Node[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_types::Node[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_check_types::Obligation[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_check_types::Obligation[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_types::Operation[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_types::Operation[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_parse_ast::Span[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_parse_ast::Span[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_frozen_dependency::Export[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_frozen_dependency::Export[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_frozen_dependency::Fixity[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_frozen_dependency::Fixity[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Associated[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Associated[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Binding[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Binding[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Constructor[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Constructor[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Contract[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::Contract[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::ContractMember[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::ContractMember[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::EffectFamily[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::EffectFamily[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::EffectTemplate[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::EffectTemplate[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Implementation[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::Implementation[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::ImplementationMember[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::ImplementationMember[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::MemberTemplate[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::MemberTemplate[:]& ) {getFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Nominal[:]) {putFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Nominal[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const u32[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:u32[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const u8[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:u8[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::SelectedProof[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::SelectedProof[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::SelectedUse[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::SelectedUse[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_project_check::Export[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_project_check::Export[:]& ) {getFlat(receiver,value);}

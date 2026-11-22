@@ -2,6 +2,7 @@
 // in parser order, then relocate only symbol fields in the packed syntax.
 namespace blot_reuse_parse_packet;
 import std;
+import binary;
 import parse.ast;
 import parse.lexer;
 import parse.parser;
@@ -9,6 +10,7 @@ import parse.symbols;
 import parse.token;
 import support.bytes;
 import support.error;
+import support.native;
 
 type Tree = blot_parse_ast::Tree;
 type Pool = blot_parse_symbols::Pool;
@@ -28,25 +30,30 @@ fn write_tree(tree: const Tree&, packet: u8[>..<]&) {
     to_bytes(tree.type_conversion_origins.items,packet);
 }
 
-fn encode(source: const u8[:], seed: const Pool&, fixities: const blot_parse_parser::InheritedFixity[:], packet: u8[>..<]&) -> bool {
+fn encodeWithScratch(source: const u8[:], seed: const Pool&, fixities: const blot_parse_parser::InheritedFixity[:], tokens: blot_parse_token::Token[>..<]&, comments: blot_parse_token::Token[>..<]&, diagnostics: blot_parse_lexer::Diagnostic[>..<]&, local: Pool&, packet: u8[>..<]&) -> bool {
     packet.clear();
-    var tokens: blot_parse_token::Token[>..<]=[];
-    var comments: blot_parse_token::Token[>..<]=[];
-    var diagnostics: blot_parse_lexer::Diagnostic[>..<]=[];
+    tokens.clear();
+    comments.clear();
+    diagnostics.clear();
     var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
     if blot_parse_lexer::lex(source,lexed)!=ok || diagnostics.len!=0 {return false;}
 
-    var local,error=blot_parse_symbols::initPooled();
-    if error!=ok {return false;}
-    // Each job starts at exactly the same prefix, even in a reused worker.
+    // Reset worker symbol pool to exactly the seed prefix without re-allocating.
+    local.bytes.resize(0);
+    local.entries.resize(0);
     local.bytes.append(seed.bytes.items);
     local.entries.append(seed.entries.items);
-    local.buckets.append(seed.buckets.items);
-    if local.bytes.failure!=ok || local.entries.failure!=ok || local.buckets.failure!=ok {local.deinit();return false;}
+    if local.buckets.len==seed.buckets.len && seed.buckets.len!=0 {
+        local.buckets.items.move_from(seed.buckets.items);
+    } else {
+        local.buckets.resize(0);
+        local.buckets.append(seed.buckets.items);
+    }
+    if local.bytes.failure!=ok || local.entries.failure!=ok || local.buckets.failure!=ok {return false;}
     var tree,tree_error=blot_parse_ast::initPooled();
-    if tree_error!=ok {local.deinit();return false;}
+    if tree_error!=ok {return false;}
     let parsed=blot_parse_parser::parse_with_fixities(source,tokens,local,tree,fixities);
-    if parsed!=ok || tree.diagnostics.len!=0 {tree.deinit();local.deinit();return false;}
+    if parsed!=ok || tree.diagnostics.len!=0 {tree.deinit();return false;}
 
     let writer=Writer{packet};
     writer.write_u32(seed.entries.len as u32);
@@ -60,8 +67,18 @@ fn encode(source: const u8[:], seed: const Pool&, fixities: const blot_parse_par
         writer.write(local.bytes.items[entry.offset..entry.offset+entry.len]);
     }
     tree.deinit();
-    local.deinit();
     return true;
+}
+
+fn encode(source: const u8[:], seed: const Pool&, fixities: const blot_parse_parser::InheritedFixity[:], packet: u8[>..<]&) -> bool {
+    var tokens: blot_parse_token::Token[>..<]=[];
+    var comments: blot_parse_token::Token[>..<]=[];
+    var diagnostics: blot_parse_lexer::Diagnostic[>..<]=[];
+    var local,error=blot_parse_symbols::initPooled();
+    if error!=ok {return false;}
+    let result=encodeWithScratch(source,seed,fixities,tokens,comments,diagnostics,local,packet);
+    local.deinit();
+    return result;
 }
 
 // Goose's flat image starts with the byte length as ULEB. Verify the image
@@ -88,11 +105,31 @@ fn read_table<T,B>(packet: const u8[:], at:i64&, table: B&, witness: T) -> bool 
     return true;
 }
 
+fn read_table_u32<B>(packet: const u8[:], at:i64&, table: B&) -> bool {
+    var length:u64=0;
+    var shift:u64=0;
+    while true {
+        if at>=packet.len || shift>=63 {return false;}
+        let byte=packet[at]; at++;
+        length|=((byte & 127) as u64)<<shift;
+        if byte<128 {break;}
+        shift+=7;
+    }
+    if length>(packet.len-at) as u64 || (length & 3)!=0 {return false;}
+    let count=(length>>2) as i64;
+    if table.ensure(count)!=ok {return false;}
+    let target=table.storage[..count];
+    if count!=0 { blot_native::copy_u32(target[0],packet[at],count as u64); at+=length as i64; }
+    table.items=target;
+    table.len=count;
+    return true;
+}
+
 fn read_tree(packet: const u8[:], at:i64&, tree: Tree&) -> bool {
     return read_table(packet,at,tree.nodes,default<blot_parse_ast::Node>()) &&
         read_table(packet,at,tree.spans,default<blot_parse_ast::Span>()) &&
-        read_table(packet,at,tree.extra,0 as u32) &&
-        read_table(packet,at,tree.roots,0 as u32) &&
+        read_table_u32(packet,at,tree.extra) &&
+        read_table_u32(packet,at,tree.roots) &&
         read_table(packet,at,tree.runtime_names,default<blot_parse_ast::RuntimeName>()) &&
         read_table(packet,at,tree.constant_names,default<blot_parse_ast::RuntimeName>()) &&
         read_table(packet,at,tree.declaration_traits,default<blot_parse_ast::DeclarationTraits>()) &&

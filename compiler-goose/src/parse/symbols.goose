@@ -79,11 +79,22 @@ fn intern_hashed(pool: Pool&,text: const u8[:],hash: u64) -> Symbol,Error {
  assert(valid(pool)); let existing,found=find(pool,text,hash); if found { return existing,blot_error::Error.none; }
  if pool.read_only { pool.missing_name=true; return absent,blot_error::Error.symbol_limit; }
  if pool.entries.len>=0xffffffff||text.len>0xffffffff||pool.bytes.len>0xffffffff-text.len { return absent,blot_error::Error.symbol_limit; }
- // A typed temporary preserves self-substring inputs across capacity growth.
- let stable=intern_bytes.alloc_slice(text.len); for byte,index in text { stable[index]=byte; }
- let entries_error=pool.entries.ensure(pool.entries.len+1); if entries_error!=blot_error::Error.none { intern_bytes.free_slice(stable); return absent,entries_error; }
- let bytes_error=pool.bytes.ensure(pool.bytes.len+stable.len); if bytes_error!=blot_error::Error.none { intern_bytes.free_slice(stable); return absent,bytes_error; }
- let buckets_error=reserve_buckets(pool,pool.entries.len+1); if buckets_error!=blot_error::Error.none { intern_bytes.free_slice(stable); return absent,buckets_error; }
- let offset=pool.bytes.len as u32; pool.bytes.append(stable); pool.entries.push(Entry {offset,stable.len as u32,hash}); intern_bytes.free_slice(stable);
+ let entries_error=pool.entries.ensure(pool.entries.len+1); if entries_error!=blot_error::Error.none { return absent,entries_error; }
+ let buckets_error=reserve_buckets(pool,pool.entries.len+1); if buckets_error!=blot_error::Error.none { return absent,buckets_error; }
+ let offset=pool.bytes.len as u32;
+ if pool.bytes.len+text.len<=pool.bytes.storage.len {
+  pool.bytes.append(text);
+ } else if text.len<=256 {
+  var stack_buf:u8[256]=[0;256];
+  if text.len!=0 { stack_buf[..text.len].move_from(text); }
+  let bytes_error=pool.bytes.ensure(pool.bytes.len+text.len); if bytes_error!=blot_error::Error.none { return absent,bytes_error; }
+  pool.bytes.append(stack_buf[..text.len]);
+ } else {
+  // A typed temporary preserves self-substring inputs across capacity growth.
+  let stable=intern_bytes.alloc_slice(text.len); stable.move_from(text);
+  let bytes_error=pool.bytes.ensure(pool.bytes.len+stable.len); if bytes_error!=blot_error::Error.none { intern_bytes.free_slice(stable); return absent,bytes_error; }
+  pool.bytes.append(stable); intern_bytes.free_slice(stable);
+ }
+ pool.entries.push(Entry {offset,text.len as u32,hash});
  let symbol=pool.entries.len as Symbol; var slot=(hash&((pool.buckets.len-1) as u64)) as i64; while pool.buckets.items[slot]!=absent { slot=(slot+1)&(pool.buckets.len-1); } pool.buckets.items[slot]=symbol; return symbol,blot_error::Error.none;
 }

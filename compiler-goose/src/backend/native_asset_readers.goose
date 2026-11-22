@@ -15,7 +15,7 @@ enum Kind {json,catalog,text,tunables}
 struct Issue {start: u32 = 0,end: u32 = 0,code: const u8[:],message: const u8[:]}
 enum Result {source {bytes: u8[:]},issue {value: Issue}}
 reusable[] var output_bytes: u8[>..] = [];
-fn copyOutput(bytes: const u8[:]) -> u8[:] {if bytes.len == 0 {return default<u8[:]>();}let result = output_bytes.alloc_slice(bytes.len);for index in 0..bytes.len {result[index] = bytes[index];}return result;}
+fn copyOutput(bytes: const u8[:]) -> u8[:] {if bytes.len == 0 {return default<u8[:]>();}let result = output_bytes.alloc_slice(bytes.len);result.move_from(bytes);return result;}
 fn rootedText(text:const u8[:])->const u8[:] {if text.len==0 {return default<const u8[:]>();}return text_pool.realloc_slice(text,text.len);}
 fn freeOutput(bytes: const u8[:]) {if bytes.len != 0 {output_bytes.free_slice(bytes);}}
 fn deinit(result: Result&) {match result {source value=>{freeOutput(value.bytes);},issue value=>{freeOutput(value.value.code);freeOutput(value.value.message);},}result = Result.source {bytes: default<u8[:]>()};}
@@ -43,13 +43,20 @@ fn push(self_: Shapes&,shape: Shape) -> Error {return blot_support_pooled_buffer
 fn push(self_: Members&,member: Member) -> Error {return blot_support_pooled_buffer::push(self_,Member{name:rootedText(member.name),value:member.value},member_pool);}
 fn deinit(self_: Members&) {blot_support_pooled_buffer::deinit(self_,member_pool);}
 struct Reader {input: const u8[:],at: i64 = 0,nodes: Nodes = Nodes {..},shapes: Shapes = Shapes {..},interned: dictionary<const u8[:],u32>&,texts: TextRuns = TextRuns {..},serial: i64 = 0,visits: i64 = 0,header: Text = Text {..},body: Text = Text {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>(),string_wellformed: bool = true}
-fn own(self_: Reader&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let result = text_pool.alloc_slice(bytes.len);for index in 0..bytes.len {result[index] = bytes[index];}let error = blot_support_pooled_buffer::push(self_.texts,TextRun {bytes: result},text_runs_pool);if error != blot_error::Error.none {text_pool.free_slice(result);return default<const u8[:]>(),error;}return result,blot_error::Error.none;}
+fn own(self_: Reader&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let result = text_pool.alloc_slice(bytes.len);result.move_from(bytes);let error = blot_support_pooled_buffer::push(self_.texts,TextRun {bytes: result},text_runs_pool);if error != blot_error::Error.none {text_pool.free_slice(result);return default<const u8[:]>(),error;}return result,blot_error::Error.none;}
 fn deinit(self_: Reader&) {for node in self_.nodes.items {if node.members.len != 0 {member_pool.free_slice(node.members);}}for shape in self_.shapes.items {if shape.fields.len != 0 {field_pool.free_slice(shape.fields);}if shape.elements.len != 0 {element_pool.free_slice(shape.elements);}}for text in self_.texts.items {text_pool.free_slice(text.bytes);}blot_support_pooled_buffer::deinit(self_.texts,text_runs_pool);blot_support_pooled_buffer::deinit(self_.nodes,node_pool);blot_support_pooled_buffer::deinit(self_.shapes,shape_pool);self_.header.deinit();self_.body.deinit();self_.interned.clear();}
 fn fail(self_: Reader&,start: i64,end: i64,code: const u8[:],message: const u8[:]) -> Error {self_.issue = blot_support::some(Issue {start: min(start,self_.input.len) as u32,end: min(max(start,end),self_.input.len) as u32,code: code,message: message});return blot_error::Error.invalid_asset;}
 fn problem(self_: Reader&,id: u32,code: const u8[:],message: const u8[:]) -> Error {let node = self_.nodes.items[id];return self_.fail(node.start,node.end,code,message);}
 fn budget(self_: Reader&,depth: i64) -> Error {self_.visits++;if depth > 128 || self_.visits > 1000000 {return self_.fail(self_.at,self_.at,"asset_limit","Asset exceeds the structural budget");}return blot_error::Error.none;}
 fn put(self_: Reader&,out: Text&,text: const u8[:]) -> Error {if text.len > limit || out.len > limit - text.len {return self_.fail(0,self_.input.len,"asset_limit","Generated asset module exceeds 16 MiB");}return out.append(text);}
-fn integer<T>(self_: Reader&,out: Text&,value: T) -> Error {var text: u8[>..] = [];format(text,value);return self_.put(out,text);}
+fn integer<T>(self_: Reader&,out: Text&,value: T) -> Error {
+    var v: u64 = value as u64;
+    var buf: u8[24] = [0; 24];
+    var pos: i64 = 24;
+    if v == 0 { pos--; buf[pos] = '0'; }
+    else { while v != 0 { pos--; buf[pos] = ('0' + (v % 10) as u8); v /= 10; } }
+    return self_.put(out, buf[pos..24]);
+}
 fn float32(self_: Reader&,out: Text&,value: f64) -> Error {var text: u8[>..<] = [];blot_backend_native_asset_numbers::float32(text,value);return self_.put(out,text);}
 fn skip(self_: Reader&) {while self_.at < self_.input.len {let byte = self_.input[self_.at];if byte != ' ' && byte != '\t' && byte != '\r' && byte != '\n' {break;}self_.at++;}}
 fn take(self_: Reader&,byte: u8) -> bool {self_.skip();if self_.at == self_.input.len || self_.input[self_.at] != byte {return false;}self_.at++;return true;}
@@ -189,8 +196,24 @@ fn catalog(self_: Reader&,root: u32) -> Error {
 fn inFont(point: u32) -> bool {if point >= 32 && point <= 126 {return true;}let extras = "åäöÅÄÖéüÉ‹›•…×–—";var at: i64 = 0;while at < extras.len {let extra,length,valid = decodePoint(extras,at);assert(valid);if extra == point {return true;}at += length;}return false;}
 fn points(self_: Reader&,out: Text&,id: u32,name: const u8[:],shown: bool) -> Error {
     let node = self_.nodes.items[id];if node.tag != Tag.string {return self_.problem(id,"asset_text","Text must be a string or a list of strings");}
-    if !shown {var missing = Text {..};var seen: dictionary<u32,bool> = dictionary<u32,bool> {};var at: i64 = 0;while at < node.text.len {let point,length,valid = decodePoint(node.text,at);assert(valid);if !inFont(point) && missing.len < 512 && !seen.get(point) {seen.insert(point,true);let appended = missing.append(node.text[at..at + length]);if appended != blot_error::Error.none {missing.deinit();return appended;}}at += length;}if missing.len > 0 {let message,error = self_.text(["text ",boundedUtf8Prefix(name,256),": the font has no ",missing.items]);missing.deinit();if error != blot_error::Error.none {return error;}return self_.problem(id,"asset_font",message);}missing.deinit();}
-    let opened = self_.put(out,"#[");if opened != blot_error::Error.none {return opened;}var at: i64 = 0;var index: i64 = 0;while at < node.text.len {let point,length,valid = decodePoint(node.text,at);assert(valid);at += length;let bounded = self_.budget(1);if bounded != blot_error::Error.none {return bounded;}var value = point;if shown && !inFont(point) {value = 63;}if index > 0 {let separator = self_.put(out,", ");if separator != blot_error::Error.none {return separator;}}let emitted = self_.integer(out,value);if emitted != blot_error::Error.none {return emitted;}index++;}return self_.put(out,"]");
+    if !shown {
+        var has_missing = false;
+        var scan: i64 = 0;
+        while scan < node.text.len {
+            let b = node.text[scan];
+            if b >= 32 && b <= 126 { scan++; continue; }
+            let point,length,valid = decodePoint(node.text,scan);assert(valid);
+            if !inFont(point) { has_missing = true; break; }
+            scan += length;
+        }
+        if has_missing {
+            var missing = Text {..};var seen: dictionary<u32,bool> = dictionary<u32,bool> {};var at: i64 = 0;
+            while at < node.text.len {let point,length,valid = decodePoint(node.text,at);assert(valid);if !inFont(point) && missing.len < 512 && !seen.get(point) {seen.insert(point,true);let appended = missing.append(node.text[at..at + length]);if appended != blot_error::Error.none {missing.deinit();return appended;}}at += length;}
+            if missing.len > 0 {let message,error = self_.text(["text ",boundedUtf8Prefix(name,256),": the font has no ",missing.items]);missing.deinit();if error != blot_error::Error.none {return error;}return self_.problem(id,"asset_font",message);}
+            missing.deinit();
+        }
+    }
+    let opened = self_.put(out,"#[");if opened != blot_error::Error.none {return opened;}var at: i64 = 0;var index: i64 = 0;while at < node.text.len {let b = node.text[at];var point: u32 = b as u32;if b < 128 { at++; } else { let p,length,valid = decodePoint(node.text,at);assert(valid);point = p;at += length; } let bounded = self_.budget(1);if bounded != blot_error::Error.none {return bounded;}var value = point;if shown && !inFont(point) {value = 63;}if index > 0 {let separator = self_.put(out,", ");if separator != blot_error::Error.none {return separator;}}let emitted = self_.integer(out,value);if emitted != blot_error::Error.none {return emitted;}index++;}return self_.put(out,"]");
 }
 fn textModule(self_: Reader&,root: u32) -> Error {
     let object = self_.object(root);if object != blot_error::Error.none {return object;}let opened = self_.recordStart("Text","text");if opened != blot_error::Error.none {return opened;}
@@ -225,11 +248,11 @@ fn tunables(self_: Reader&,root: u32) -> Error {
     let error = build();text.deinit();declarations.deinit();return error;
 }
 fn run(self_: Reader&,kind: Kind) -> Error {
-    if self_.input.len > limit {return self_.fail(0,self_.input.len,"asset_limit","Asset input exceeds 16 MiB");}var at: i64 = 0;while at < self_.input.len {let point,length,valid = decodePoint(self_.input,at);if !valid {return self_.fail(at,at + 1,"asset_unicode","Asset input must be UTF-8");}at += length;}if self_.input.len >= 3 && self_.input[0] == 239 && self_.input[1] == 187 && self_.input[2] == 191 {self_.at = 3;}
+    if self_.input.len > limit {return self_.fail(0,self_.input.len,"asset_limit","Asset input exceeds 16 MiB");}var at: i64 = 0;while at < self_.input.len {if self_.input[at] < 128 {at++;continue;}let point,length,valid = decodePoint(self_.input,at);if !valid {return self_.fail(at,at + 1,"asset_unicode","Asset input must be UTF-8");}at += length;}if self_.input.len >= 3 && self_.input[0] == 239 && self_.input[1] == 187 && self_.input[2] == 191 {self_.at = 3;}
     let root,error = self_.parse(0);if error != blot_error::Error.none {return error;}self_.skip();if self_.at != self_.input.len {return self_.syntax();}self_.visits = 0;var generated = blot_error::Error.none;match kind {json=>{generated = self_.json(root);},catalog=>{generated = self_.catalog(root);},text=>{generated = self_.textModule(root);},tunables=>{generated = self_.tunables(root);},}if generated != blot_error::Error.none {return generated;}if self_.header.len > limit - self_.body.len {return self_.problem(root,"asset_limit","Generated asset module exceeds 16 MiB");}return blot_error::Error.none;
 }
 fn generate(kind: Kind,bytes: const u8[:]) -> Result,Error {
     var interned: dictionary<const u8[:],u32> = dictionary<const u8[:],u32> {};var reader = Reader {input: bytes,interned: interned,..};let error = reader.run(kind);
     if error != blot_error::Error.none {if error == blot_error::Error.out_of_memory {reader.deinit();return Result.source {bytes: default<u8[:]>()},error;}assert(error == blot_error::Error.invalid_asset && reader.issue.present);let observed=reader.issue.value;let issue=Issue{start:observed.start,end:observed.end,code:copyOutput(observed.code),message:copyOutput(observed.message)};reader.deinit();return Result.issue {value: issue},blot_error::Error.none;}
-    let length = reader.header.len + reader.body.len;var source: u8[:] = default<u8[:]>();if length != 0 {source = output_bytes.alloc_slice(length);for index in 0..reader.header.len {source[index] = reader.header.items[index];}for index in 0..reader.body.len {source[reader.header.len + index] = reader.body.items[index];}}reader.deinit();return Result.source {bytes: source},blot_error::Error.none;
+    let length = reader.header.len + reader.body.len;var source: u8[:] = default<u8[:]>();if length != 0 {source = output_bytes.alloc_slice(length);source[..reader.header.len].move_from(reader.header.items);source[reader.header.len..].move_from(reader.body.items);}reader.deinit();return Result.source {bytes: source},blot_error::Error.none;
 }

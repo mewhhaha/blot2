@@ -98,6 +98,44 @@ fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
     receiver.at=end;
 }
 
+// Direct byte and u32 slice codecs avoid temporary from_bytes allocations.
+fn put(receiver:Writer&,values:const u8[:]) {
+    count(receiver,values.len);
+    if values.len==0 || !receiver.room(values.len) {return;}
+    receiver.output.append(values);
+}
+fn get(receiver:Reader&,value:u8[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<u8[:]>();return;}
+    if !receiver.available(length) {return;}
+    let run,error=allocate(receiver.owner,length,0 as u8);
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    run.move_from(receiver.bytes[receiver.at..receiver.at+length]);
+    receiver.at+=length;
+    value=run;
+}
+fn put(receiver:Writer&,values:const u32[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:u32[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<u32[:]>();return;}
+    if length>limit/4 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*4;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,0 as u32);
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    blot_native::copy_u32(run[0],receiver.bytes[receiver.at],length as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+
 // Only the Wasm preparation path sends this image. The parent resolves a
 // constructor's signature in its defining module. Each importing module still
 // needs its own catalog index, tag and payload type to interpret its Core.
@@ -107,12 +145,17 @@ fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
     put(writer,header);
     count(writer,module.constructors.len);
     for c in module.constructors {
-        put(writer,c.identity.unit);
-        put(writer,c.identity.decl);
-        put(writer,c.nominal);
-        put(writer,c.tag);
-        put(writer,c.payload);
-        if c.identity.unit==module.unit {put(writer,c.scheme);}
+        if !writer.room(20) {return;}
+        let u=c.identity.unit;let d=c.identity.decl;let n=c.nominal;let t=c.tag;let p=c.payload;
+        var buf:u8[20]=[
+            u as! u8,(u>>8) as! u8,(u>>16) as! u8,(u>>24) as! u8,
+            d as! u8,(d>>8) as! u8,(d>>16) as! u8,(d>>24) as! u8,
+            n as! u8,(n>>8) as! u8,(n>>16) as! u8,(n>>24) as! u8,
+            t as! u8,(t>>8) as! u8,(t>>16) as! u8,(t>>24) as! u8,
+            p as! u8,(p>>8) as! u8,(p>>16) as! u8,(p>>24) as! u8,
+        ];
+        writer.output.append(buf);
+        if u==module.unit {put(writer,c.scheme);}
     }
 }
 
@@ -126,13 +169,18 @@ fn getExecutionCore(reader:Reader&,module:blot_check_core::Module&) {
     if error!=blot_error::Error.none {reader.failure=error;return;}
     for &c in constructors {
         c=default<blot_check_core::Constructor>();
-        get(reader,c.identity.unit);
-        get(reader,c.identity.decl);
-        get(reader,c.nominal);
-        get(reader,c.tag);
-        get(reader,c.payload);
-        if c.identity.unit==module.unit {get(reader,c.scheme);}
-        if reader.failure!=blot_error::Error.none {return;}
+        if !reader.available(20) {return;}
+        let at=reader.at;
+        c.identity.unit=binary::u32le(reader.bytes,at);
+        c.identity.decl=binary::u32le(reader.bytes,at+4);
+        c.nominal=binary::u32le(reader.bytes,at+8);
+        c.tag=binary::u32le(reader.bytes,at+12);
+        c.payload=binary::u32le(reader.bytes,at+16);
+        reader.at=at+20;
+        if c.identity.unit==module.unit {
+            get(reader,c.scheme);
+            if reader.failure!=blot_error::Error.none {return;}
+        }
     }
     module.constructors=constructors;
 }

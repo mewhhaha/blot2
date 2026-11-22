@@ -469,7 +469,7 @@ fn head(self_: const Store&, root: Id, at: Cursor) -> Id {
         let variable = node(self_, id); position = max(position, variable.b); let write = replacement(self_, variable.a, position);
         if !write.present { break; } id = write.value.replacement; position = write.value.position + 1;
     }
-    block { let equation = self_.associated_equations.get(id); if equation { id = equation; } }
+    if self_.associated_equations.count != 0 { let equation = self_.associated_equations.get(id); if equation { id = equation; } }
     let value = node(self_, id);
     if value.tag == Tag.variable {
         if position == 0 { return self_.variables.items[value.a].principal; }
@@ -667,11 +667,12 @@ recursive fn compositeWindow(self_: Store&, root: Id, at: Cursor) -> Id, Error {
 }
 fn compositeResult(self_: Store&, root: Id, at: Cursor) -> blot_support::Option<Id> {
     self_.normalization.composite_probes += 1;
-    if self_.composites.entries.len == 0 || !self_.composites.activate(self_.closed_generation, self_.effects.physical_epoch) { return blot_support::Option<Id> { false, 0 , ..}; }
-    let certificate = self_.composites.get(root, at);
-    if !certificate.present { if self_.composites.occupied(root, at) { self_.normalization.composite_collisions += 1; } return blot_support::Option<Id> { false, 0 , ..}; }
-    if !validResolution(self_, certificate.value) { return blot_support::Option<Id> { false, 0 , ..}; }
-    self_.normalization.composite_hits += 1; return blot_support::Option<Id> { true, certificate.value.result , ..};
+    var collision = false;
+    let hit = self_.composites.probeHit(self_.closed_generation, self_.effects.physical_epoch, root, at, collision);
+    if hit < 0 { if collision { self_.normalization.composite_collisions += 1; } return blot_support::Option<Id> { false, 0 , ..}; }
+    let certificate = self_.composites.entries.items[hit].record;
+    if !validResolution(self_, certificate) { return blot_support::Option<Id> { false, 0 , ..}; }
+    self_.normalization.composite_hits += 1; return blot_support::Option<Id> { true, certificate.result , ..};
 }
 fn saveComposite(self_: Store&, root: Id, at: Cursor, result: Id) -> Error {
     let certificate = resolutionDependencies(self_, result);
@@ -785,7 +786,8 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
     if (self_.has_projections || self_.use_closed_graphs) && self_.use_resolution_cache && depth != 0 && root > never {
         if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth, height); }
         if self_.projection_resolution_types != self_.mutation_epoch || self_.projection_resolution_rows != self_.effects.mutation_epoch || self_.projection_resolution_limit != self_.resolution_depth_limit {
-            self_.projection_resolutions.clear(); self_.projection_resolution_types = self_.mutation_epoch; self_.projection_resolution_rows = self_.effects.mutation_epoch; self_.projection_resolution_limit = self_.resolution_depth_limit;
+            if self_.projection_resolutions.count != 0 { self_.projection_resolutions.clear(); }
+            self_.projection_resolution_types = self_.mutation_epoch; self_.projection_resolution_rows = self_.effects.mutation_epoch; self_.projection_resolution_limit = self_.resolution_depth_limit;
         }
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
         let key = ProjectionResolution { root, at, depth as u32 , ..};
@@ -797,7 +799,7 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
     return resolveNode(self_, root, at, depth, height);
 }
 recursive fn resolveNode(self_: Store&, root: Id, at: Cursor, depth: i64, height: u8) -> Id, Error {
-    block { let equation = self_.associated_equations.get(root); if equation { return resolveDepth(self_, equation, at, depth + 1); } }
+    if self_.associated_equations.count != 0 { let equation = self_.associated_equations.get(root); if equation { return resolveDepth(self_, equation, at, depth + 1); } }
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
     if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
     if height != 0 { if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; } return root, blot_error::Error.none; }
@@ -930,6 +932,13 @@ recursive fn resolveNominalArguments(self_:Store&,id:Id,value:Node,position:Curs
 }
 fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
     let resolved_root, error = resolve(self_, root, 0); if error != blot_error::Error.none { return false, error; }
+    return occursResolved(self_, variable, resolved_root);
+}
+fn occursUnify(self_: Store&, variable: u32, resolved_root: Id) -> bool, Error {
+    if self_.has_projections { return occurs(self_, variable, resolved_root); }
+    return occursResolved(self_, variable, resolved_root);
+}
+fn occursResolved(self_: Store&, variable: u32, resolved_root: Id) -> bool, Error {
     if closedHeight(self_, resolved_root) != 0 || resolved_root <= never { self_.occurs_steps += 1; return false, blot_error::Error.none; }
     if self_.occurs_seen.len < self_.nodes.len { self_.occurs_seen.resize(self_.nodes.len, 0);if self_.occurs_seen.failure!=blot_error::Error.none {return false,self_.occurs_seen.failure;} }
     self_.occurs_generation += 1;
@@ -1322,13 +1331,13 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
         if an.tag == Tag.variable {
             if bn.tag == Tag.forall { return mismatch(self_, reporter, a, b); }
             if !self_.variables.items[an.a].region { let free, error = freeBound(self_, b); if error != blot_error::Error.none { return error; } if free { return mismatch(self_, reporter, a, b); } }
-            let infinite, error = occurs(self_, an.a, b); if error != blot_error::Error.none { return error; } if infinite { return blot_error::Error.infinite_type; }
+            let infinite, error = occursUnify(self_, an.a, b); if error != blot_error::Error.none { return error; } if infinite { return blot_error::Error.infinite_type; }
             let error = appendVersion(self_, a, b); if error != blot_error::Error.none { return error; } continue;
         }
         if bn.tag == Tag.variable {
             if an.tag == Tag.forall { return mismatch(self_, reporter, a, b); }
             if !self_.variables.items[bn.a].region { let free, error = freeBound(self_, a); if error != blot_error::Error.none { return error; } if free { return mismatch(self_, reporter, a, b); } }
-            let infinite, error = occurs(self_, bn.a, a); if error != blot_error::Error.none { return error; } if infinite { return blot_error::Error.infinite_type; }
+            let infinite, error = occursUnify(self_, bn.a, a); if error != blot_error::Error.none { return error; } if infinite { return blot_error::Error.infinite_type; }
             let error = appendVersion(self_, b, a); if error != blot_error::Error.none { return error; } continue;
         }
         if an.tag != bn.tag { return mismatch(self_, reporter, a, b); }
@@ -1393,15 +1402,24 @@ fn appendChildren(self_: const Store&, pending: Id[>..<]&, id: Id, scoped_identi
 }
 fn freeVariables(self_: Store&, root: Id) -> Id[>..], Error { return freeVariablesMode(self_, root, true); }
 fn freeVariablesMode(self_: Store&, root: Id, bounded: bool) -> Id[>..], Error {
-    var values: Id[>..] = []; var pending: Id[>..<] = [];
+    var values: Id[>..] = [];
     let resolved, error = resolve(self_, root, 0); if error != blot_error::Error.none { return [], error; }
     if bounded && (resolved <= never || closedHeight(self_, resolved) != 0) { return [], blot_error::Error.none; }
     if bounded && node(self_, resolved).tag == Tag.variable { values.push(resolved); return values, blot_error::Error.none; }
-    self_.normalization.free_type_queries += 1; pending.push(resolved); var seen = dictionary<Id, bool> {};
+    self_.normalization.free_type_queries += 1;
+    var pending: Id[>..<] = []; pending.push(resolved);
+    var seen_few: Id[16] = [0; 16]; var seen_few_len: i64 = 0; var seen = dictionary<Id, bool> {};
     while pending.len > 0 {
         let id = pending.pop(); self_.normalization.free_type_visits += 1;
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return [], error; } }
-        if bounded && closedHeight(self_, id) != 0 { continue; } if ::contains(seen,id) { continue; } ::insert(seen,id, true);
+        if bounded && closedHeight(self_, id) != 0 { continue; }
+        if seen_few_len < 16 {
+            var dup = false; for k in 0..seen_few_len { if seen_few[k] == id { dup = true; break; } }
+            if dup { continue; } seen_few[seen_few_len] = id; seen_few_len += 1;
+        } else {
+            if seen.count == 0 { for prior in seen_few { ::insert(seen, prior, true); } }
+            if ::contains(seen,id) { continue; } ::insert(seen,id, true);
+        }
         let value = node(self_, id);
         if value.tag == Tag.function || value.tag == Tag.provider { for label in rowLabels(self_, value.c) { pending.append(operationArguments(self_, label)); let instance = operation(self_, label).instance; if instance.unit == 0 && instance.decl != 0 { pending.push(instance.decl); } } }
         if value.tag == Tag.variable { values.push(id); } else { appendChildren(self_, pending, id, true); }
@@ -1433,9 +1451,14 @@ fn freeRowVariables(self_: Store&, root: Id) -> u32[>..], Error { return freeRow
 fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {
     if bounded && (root <= never || closedHeight(self_, root) != 0) { return [], blot_error::Error.none; }
     if bounded { let selected = head(self_, root, 0); if selected <= never || node(self_, selected).tag == Tag.variable || node(self_, selected).tag == Tag.type_constructor { return [], blot_error::Error.none; } }
-    self_.normalization.free_row_queries += 1; var result: u32[>..] = []; var pending: RowWork[>..<] = []; var seen = dictionary<u64, bool> {}; pending.push(RowWork { root, 0 , ..});
-    while pending.len > 0 {
-        let work = pending.pop(); self_.normalization.free_row_visits += 1;
+    self_.normalization.free_row_queries += 1; var result: u32[>..] = [];
+    var stack: RowWork[64] = [default<RowWork>(); 64]; var stack_len: i64 = 1; stack[0] = RowWork { root, 0 , ..};
+    var overflow: RowWork[>..<] = [];
+    var seen_few: u64[16] = [0; 16]; var seen_few_len: i64 = 0; var seen = dictionary<u64, bool> {};
+    while stack_len > 0 || overflow.len > 0 {
+        var work = default<RowWork>();
+        if overflow.len > 0 { work = overflow.pop(); } else { stack_len -= 1; work = stack[stack_len]; }
+        self_.normalization.free_row_visits += 1;
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return [], error; } }
         if work.depth >= 1024 { return [], blot_error::Error.type_limit; } var id = work.id; var at = work.at;
         while node(self_, id).tag == Tag.variable { let variable = node(self_, id); at = max(at, variable.b); let write = replacement(self_, variable.a, at); if !write.present { break; } id = write.value.replacement; at = write.value.position + 1; }
@@ -1443,19 +1466,67 @@ fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Err
             if id <= never || node(self_, id).tag == Tag.variable || node(self_, id).tag == Tag.type_constructor { continue; }
             let height = closedHeight(self_, id); if height != 0 { if work.depth + height > 1024 { return [], blot_error::Error.type_limit; } continue; }
         }
-        let key = ((id as u64) << 32) | at; if ::contains(seen,key) { continue; } ::insert(seen,key, true); let value = node(self_, id);
+        let key = ((id as u64) << 32) | at;
+        if seen_few_len < 16 {
+            var dup = false; for k in 0..seen_few_len { if seen_few[k] == key { dup = true; break; } }
+            if dup { continue; } seen_few[seen_few_len] = key; seen_few_len += 1;
+        } else {
+            if seen.count == 0 { for prior in seen_few { ::insert(seen, prior, true); } }
+            if ::contains(seen,key) { continue; } ::insert(seen,key, true);
+        }
+        let value = node(self_, id);
+        let next_depth = work.depth + 1;
         if value.tag == Tag.function || value.tag == Tag.provider {
             var row_ = self_.effects.node(value.c); var row_at = max(at, row_.cursor);
             loop {
-                for label in self_.effects.list(row_.labels) { for argument in operationArguments(self_, label) { pending.push(RowWork { argument, at, work.depth + 1 , ..}); } }
+                for label in self_.effects.list(row_.labels) {
+                    for argument in operationArguments(self_, label) {
+                        if stack_len < 64 { stack[stack_len] = RowWork { argument, at, next_depth , ..}; stack_len += 1; }
+                        else { overflow.push(RowWork { argument, at, next_depth , ..}); }
+                    }
+                }
                 var variable = none; match row_.tail { variable v => { variable = v.value; }, _ => { break; }, }
                 row_at = max(row_at, row_.cursor); let write, found = self_.effects.replacementAt(variable, row_at); if !found { break; }
                 row_ = self_.effects.node(write.replacement); row_at = write.position + 1;
             }
             match row_.tail { variable v => { if !has(result, v.value) { result.push(v.value); } }, _ => {}, }
         }
-        var children: Id[>..<] = []; appendChildren(self_, children, id, false);
-        for child in children { pending.push(RowWork { child, at, work.depth + 1 , ..}); }
+        match value.tag {
+            function => {
+                if stack_len < 64 { stack[stack_len] = RowWork { value.a, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { value.a, at, next_depth , ..}); }
+                if stack_len < 64 { stack[stack_len] = RowWork { value.b, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { value.b, at, next_depth , ..}); }
+            },
+            product => {
+                for child in list(self_, List { value.a, value.b , ..}) {
+                    if stack_len < 64 { stack[stack_len] = RowWork { child, at, next_depth , ..}; stack_len += 1; }
+                    else { overflow.push(RowWork { child, at, next_depth , ..}); }
+                }
+            },
+            usage => {
+                if stack_len < 64 { stack[stack_len] = RowWork { value.a, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { value.a, at, next_depth , ..}); }
+                if value.c != 0 { if stack_len < 64 { stack[stack_len] = RowWork { value.c, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { value.c, at, next_depth , ..}); } }
+            },
+            scoped, forall, existential, array, list, cursor, resolver, provider => {
+                if stack_len < 64 { stack[stack_len] = RowWork { value.a, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { value.a, at, next_depth , ..}); }
+            },
+            state_provider => {
+                for child in [value.a, value.b, value.c] {
+                    if stack_len < 64 { stack[stack_len] = RowWork { child, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { child, at, next_depth , ..}); }
+                }
+            },
+            record => {
+                for i in value.b {
+                    let child = recordField(self_, value, i).ty;
+                    if stack_len < 64 { stack[stack_len] = RowWork { child, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { child, at, next_depth , ..}); }
+                }
+            },
+            nominal, projection, instance_selection => {
+                for child in nominalArguments(self_, value) {
+                    if stack_len < 64 { stack[stack_len] = RowWork { child, at, next_depth , ..}; stack_len += 1; } else { overflow.push(RowWork { child, at, next_depth , ..}); }
+                }
+            },
+            _ => {},
+        }
     }
     return result, blot_error::Error.none;
 }

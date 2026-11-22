@@ -26,7 +26,7 @@ struct Operator {text:const u8[:] = default<const u8[:]>(),precedence:u8=0,count
 reusable[] var output_pool:u8[>..]=[];
 reusable[] var element_pool:Value[>..]=[];
 reusable[] var lane_argument_runs:Value[>..]=[];
-fn copyOutput(bytes:const u8[:])->u8[:] {let result=output_pool.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn copyOutput(bytes:const u8[:])->u8[:] {let result=output_pool.alloc_slice(bytes.len);result.move_from(bytes);return result;}
 fn freeOutput(bytes:const u8[:]) {if bytes.len!=0 {output_pool.free_slice(bytes);}}
 fn deinit(result:Result&) {match result {source value=>{freeOutput(value.bytes);},issue value=>{freeOutput(value.value.message);},}result=Result.source{bytes:default<u8[:]>()};}
 // Token spellings all belong to one immutable shader, including names kept
@@ -101,10 +101,74 @@ fn identifierContinue(byte:u8)->bool {return identifierStart(byte) || digit(byte
 fn contains(text:const u8[:],byte:u8)->bool {for item in text {if item==byte {return true;}}return false;}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len && text[..prefix.len]==prefix;}
 fn ends(text:const u8[:],suffix:const u8[:])->bool {return text.len>=suffix.len && text[text.len-suffix.len..]==suffix;}
-fn lex(self_:Reader&) {if self_.input.len>limit {self_.fail(Token{text:default<const u8[:]>(),start:0,end:0,..},"asset_limit","WGSL asset exceeds 16 MiB");return;}let source=shader_bytes.alloc_slice(self_.input.len);
-    for byte,index in self_.input {source[index]=byte;}
+fn lex(self_:Reader&) {
+    if self_.input.len>limit {self_.fail(Token{text:default<const u8[:]>(),start:0,end:0,..},"asset_limit","WGSL asset exceeds 16 MiB");return;}
+    let source=shader_bytes.alloc_slice(self_.input.len);
+    source.move_from(self_.input);
     self_.tokens.source=source;
-    var unicode:i64=0;while unicode<self_.input.len {let point,length,valid=blot_backend_native_asset_readers::decodePoint(self_.input,unicode);if !valid {self_.fail(Token{text:default<const u8[:]>(),start:0,end:self_.input.len as u32,..},"asset_unicode","WGSL asset must be valid UTF-8");return;}unicode+=length;}var pos:i64=0;while pos<self_.input.len && self_.failure==blot_error::Error.none {let byte=self_.input[pos];if contains(" \t\r\n",byte) {pos+=1;continue;}if starts(self_.input[pos..],"//") {while pos<self_.input.len && self_.input[pos]!='\n' {pos+=1;}continue;}if starts(self_.input[pos..],"/*") {let start=pos;pos+=2;var nesting:i64=1;while pos<self_.input.len && nesting!=0 {if starts(self_.input[pos..],"/*") {nesting+=1;if nesting>128 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(pos+2) as u32,..},"asset_limit","WGSL comment nesting exceeds 128");return;}pos+=2;}else if starts(self_.input[pos..],"*/") {nesting-=1;pos+=2;}else {pos+=1;}}if nesting!=0 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_wgsl","Unterminated WGSL block comment");return;}continue;}let start=pos;var number=false;if identifierStart(byte) {pos+=1;while pos<self_.input.len && identifierContinue(self_.input[pos]) {pos+=1;}}else if digit(byte) || (byte=='.' && pos+1<self_.input.len && digit(self_.input[pos+1])) {number=true;pos+=1;while pos<self_.input.len {let c=self_.input[pos];if identifierContinue(c) || c=='.' {pos+=1;}else if (c=='+' || c=='-') && pos>start && contains("eEpP",self_.input[pos-1]) {pos+=1;}else {break;}}}else {if !contains("@{}()[]<>,:;.=+-*/%!~&|^",byte) {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(start+1) as u32,..},"asset_wgsl","Invalid WGSL token");return;}pos+=1;if pos<self_.input.len && byte!='<' && byte!='>' {let pair=self_.input[start..pos+1];for op in ["->","==","!=","&&","||","+=","-=","*=","/=","%=","&=","|=","^=","++","--"] {if pair==op {pos+=1;break;}}}}if self_.tokens.len==1000000 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_limit","WGSL token count exceeds 1000000");return;}self_.record(self_.tokens.push(TokenSpan{start:start as u32,end:pos as u32,number:number}));}if self_.failure==blot_error::Error.none {self_.record(self_.tokens.push(TokenSpan{start:pos as u32,end:pos as u32,..}));}}
+    let n=self_.input.len;
+    var unicode:i64=0;
+    while unicode<n {
+        if self_.input[unicode]<128 {unicode+=1;continue;}
+        let point,length,valid=blot_backend_native_asset_readers::decodePoint(self_.input,unicode);
+        if !valid {self_.fail(Token{text:default<const u8[:]>(),start:0,end:n as u32,..},"asset_unicode","WGSL asset must be valid UTF-8");return;}
+        unicode+=length;
+    }
+    var pos:i64=0;
+    while pos<n && self_.failure==blot_error::Error.none {
+        let byte=self_.input[pos];
+        if byte==' ' || byte=='\t' || byte=='\r' || byte=='\n' {pos+=1;continue;}
+        if byte=='/' && pos+1<n {
+            let next=self_.input[pos+1];
+            if next=='/' {pos+=2;while pos<n && self_.input[pos]!='\n' {pos+=1;}continue;}
+            if next=='*' {
+                let start=pos;pos+=2;var nesting:i64=1;
+                while pos<n && nesting!=0 {
+                    let c=self_.input[pos];
+                    if c=='/' && pos+1<n && self_.input[pos+1]=='*' {
+                        nesting+=1;
+                        if nesting>128 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(pos+2) as u32,..},"asset_limit","WGSL comment nesting exceeds 128");return;}
+                        pos+=2;
+                    } else if c=='*' && pos+1<n && self_.input[pos+1]=='/' {nesting-=1;pos+=2;}
+                    else {pos+=1;}
+                }
+                if nesting!=0 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_wgsl","Unterminated WGSL block comment");return;}
+                continue;
+            }
+        }
+        let start=pos;var number=false;
+        if identifierStart(byte) {
+            pos+=1;while pos<n && identifierContinue(self_.input[pos]) {pos+=1;}
+        } else if digit(byte) || (byte=='.' && pos+1<n && digit(self_.input[pos+1])) {
+            number=true;pos+=1;
+            while pos<n {
+                let c=self_.input[pos];
+                if identifierContinue(c) || c=='.' {pos+=1;}
+                else if (c=='+' || c=='-') && pos>start {let p=self_.input[pos-1];if p=='e' || p=='E' || p=='p' || p=='P' {pos+=1;} else {break;}}
+                else {break;}
+            }
+        } else {
+            var valid_punct=false;
+            match byte {
+                '@','{','}','(',')','[',']','<','>',',',':',';','.','=','+','-','*','/','%','!','~','&','|','^'=>{valid_punct=true;},
+                _=>{},
+            }
+            if !valid_punct {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(start+1) as u32,..},"asset_wgsl","Invalid WGSL token");return;}
+            pos+=1;
+            if pos<n && byte!='<' && byte!='>' {
+                let next=self_.input[pos];
+                if next=='=' {
+                    match byte {'=','!','+','-','*','/','%','&','|','^'=>{pos+=1;},_=>{},}
+                } else if (byte=='-' && (next=='>' || next=='-')) || (byte=='+' && next=='+') || (byte=='&' && next=='&') || (byte=='|' && next=='|') {
+                    pos+=1;
+                }
+            }
+        }
+        if self_.tokens.len==1000000 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_limit","WGSL token count exceeds 1000000");return;}
+        self_.record(self_.tokens.push(TokenSpan{start:start as u32,end:pos as u32,number:number}));
+    }
+    if self_.failure==blot_error::Error.none {self_.record(self_.tokens.push(TokenSpan{start:pos as u32,end:pos as u32,..}));}
+}
 
 fn attributes(self_:Reader&) {while self_.take("@") {self_.name();if self_.take("(") && !self_.take(")") {while self_.failure==blot_error::Error.none {self_.expression(0,0);if self_.take(")") {break;}self_.expect(",");if self_.take(")") {break;}}}}}
 recursive fn typeName(self_:Reader&,depth:i64)->const u8[:] {if !self_.budget(depth) {return default<const u8[:]>();}let token=self_.name();if self_.take("<") {var parameter:i64=0;while self_.failure==blot_error::Error.none {if self_.peek().number || (token.text=="array" && parameter==1) {self_.expression(8,depth+1);}else {self_.typeName(depth+1);}if self_.take(">") {break;}self_.expect(",");parameter+=1;}return default<const u8[:]>();}return token.text;}
@@ -112,8 +176,44 @@ fn structure(self_:Reader&) {let token=self_.name();let selected=token.text=="Pa
 fn variable(self_:Reader&,is_const:bool,retain:bool) {if self_.take("<") {self_.name();if self_.take(",") {self_.name();}self_.expect(">");}let token=self_.name();if self_.take(":") {self_.typeName(0);}var value=Value{..};if self_.take("=") {let saved=self_.constant_mode;self_.constant_mode=retain;value=self_.expression(0,0);self_.constant_mode=saved;}else if is_const {self_.syntax();return;}self_.expect(";");if retain && self_.failure==blot_error::Error.none {let prior .= self_.binding_index.get(token.text);if prior {self_.bindings.items[prior].value=rootedValue(value);}else {let id=self_.bindings.len as u32;self_.binding_index.insert(token.text,id);self_.record(self_.bindings.push(Binding{name:token.text,value:value}));}}}
 fn function(self_:Reader&) {self_.name();self_.expect("(");if !self_.take(")") {while self_.failure==blot_error::Error.none {self_.attributes();self_.name();self_.expect(":");self_.typeName(0);if self_.take(")") {break;}self_.expect(",");if self_.take(")") {break;}}}if self_.take("->") {self_.attributes();self_.typeName(0);}self_.block_(0);}
 recursive fn block_(self_:Reader&,depth:i64) {if !self_.budget(depth) {return;}self_.expect("{");while self_.failure==blot_error::Error.none && !self_.take("}") {self_.statement(depth+1);}}
-recursive fn statement(self_:Reader&,depth:i64) {if !self_.budget(depth) {return;}self_.attributes();if self_.is("{") {self_.block_(depth+1);return;}if self_.take(";") {return;}if self_.take("var") || self_.take("let") || self_.take("const") {self_.variable(false,false);return;}if self_.take("if") {self_.expression(0,0);self_.block_(depth+1);if self_.take("else") {if self_.is("if") {self_.statement(depth+1);return;}self_.block_(depth+1);}return;}if self_.take("for") {self_.expect("(");if !self_.take(";") {if self_.take("var") || self_.take("let") {self_.variable(false,false);}else {self_.simpleStatement(";");}}if !self_.take(";") {self_.expression(0,0);self_.expect(";");}if !self_.take(")") {self_.simpleStatement(")");}self_.block_(depth+1);return;}if self_.take("while") {self_.expression(0,0);self_.block_(depth+1);return;}if self_.take("loop") || self_.take("continuing") {self_.block_(depth+1);return;}if self_.take("switch") {self_.expression(0,0);self_.expect("{");while self_.failure==blot_error::Error.none && !self_.take("}") {if self_.take("case") {while self_.failure==blot_error::Error.none {if !self_.take("default") {self_.expression(0,0);}if !self_.take(",") {break;}}}else {self_.expect("default");}self_.take(":");self_.block_(depth+1);}return;}if self_.take("return") {if !self_.take(";") {self_.expression(0,0);self_.expect(";");}return;}if self_.take("break") {if self_.take("if") {self_.expression(0,0);}self_.expect(";");return;}if self_.take("continue") || self_.take("discard") {self_.expect(";");return;}if self_.take("const_assert") {self_.expression(0,0);self_.expect(";");return;}self_.simpleStatement(";");}
-fn simpleStatement(self_:Reader&,closing:const u8[:]) {self_.expression(0,0);if !self_.take("++") && !self_.take("--") {for op in ["=","+=","-=","*=","/=","%=","&=","|=","^="] {if self_.take(op) {self_.expression(0,0);break;}}}self_.expect(closing);}
+recursive fn statement(self_:Reader&,depth:i64) {
+    if !self_.budget(depth) {return;}
+    self_.attributes();
+    let text=self_.peek().text;
+    if text.len==0 {self_.simpleStatement(";");return;}
+    match text[0] {
+        '{'=>{self_.block_(depth+1);return;},
+        ';'=>{self_.at+=1;return;},
+        'v'=>{if text=="var" {self_.at+=1;self_.variable(false,false);return;}},
+        'l'=>{if text=="let" {self_.at+=1;self_.variable(false,false);return;} if text=="loop" {self_.at+=1;self_.block_(depth+1);return;}},
+        'c'=>{
+            if text=="const" {self_.at+=1;self_.variable(false,false);return;}
+            if text=="continue" {self_.at+=1;self_.expect(";");return;}
+            if text=="continuing" {self_.at+=1;self_.block_(depth+1);return;}
+            if text=="const_assert" {self_.at+=1;self_.expression(0,0);self_.expect(";");return;}
+        },
+        'i'=>{if text=="if" {self_.at+=1;self_.expression(0,0);self_.block_(depth+1);if self_.take("else") {if self_.is("if") {self_.statement(depth+1);return;}self_.block_(depth+1);}return;}},
+        'f'=>{if text=="for" {self_.at+=1;self_.expect("(");if !self_.take(";") {if self_.take("var") || self_.take("let") {self_.variable(false,false);}else {self_.simpleStatement(";");}}if !self_.take(";") {self_.expression(0,0);self_.expect(";");}if !self_.take(")") {self_.simpleStatement(")");}self_.block_(depth+1);return;}},
+        'w'=>{if text=="while" {self_.at+=1;self_.expression(0,0);self_.block_(depth+1);return;}},
+        's'=>{if text=="switch" {self_.at+=1;self_.expression(0,0);self_.expect("{");while self_.failure==blot_error::Error.none && !self_.take("}") {if self_.take("case") {while self_.failure==blot_error::Error.none {if !self_.take("default") {self_.expression(0,0);}if !self_.take(",") {break;}}}else {self_.expect("default");}self_.take(":");self_.block_(depth+1);}return;}},
+        'r'=>{if text=="return" {self_.at+=1;if !self_.take(";") {self_.expression(0,0);self_.expect(";");}return;}},
+        'b'=>{if text=="break" {self_.at+=1;if self_.take("if") {self_.expression(0,0);}self_.expect(";");return;}},
+        'd'=>{if text=="discard" {self_.at+=1;self_.expect(";");return;}},
+        _=>{},
+    }
+    self_.simpleStatement(";");
+}
+fn simpleStatement(self_:Reader&,closing:const u8[:]) {
+    self_.expression(0,0);
+    let text=self_.peek().text;
+    if text.len==1 && text[0]=='=' {self_.at+=1;self_.expression(0,0);}
+    else if text.len==2 {
+        let a=text[0];let b=text[1];
+        if (a=='+' && b=='+') || (a=='-' && b=='-') {self_.at+=1;}
+        else if b=='=' {match a {'+','-','*','/','%','&','|','^'=>{self_.at+=1;self_.expression(0,0);},_=>{},}}
+    }
+    self_.expect(closing);
+}
 fn resolve(self_:const Reader&,original:const u8[:])->const u8[:] {var text=original;for depth in 0..128 {let target .= self_.aliases.get(text);if target {text=target;}else {return text;}}return default<const u8[:]>();}
 fn blotName(text:const u8[:])->bool {if text.len==0 || text=="_" || !((text[0]>='a' && text[0]<='z') || text[0]=='_') {return false;}for word in ["const","let","type","data","effect","is","func","do","use","return","yield","break","for","ever","continue","in","case","of","if","then","else","as","import","infix","infixl","infixr","self","where","and","or","true","false"] {if text==word {return false;}}for byte in text {if !identifierContinue(byte) {return false;}}return true;}
 fn run(self_:Reader&) {self_.lex();while self_.failure==blot_error::Error.none && !self_.is("") {if !self_.budget(0) {return;}self_.attributes();if self_.take(";") {continue;}if self_.take("struct") {self_.structure();}else if self_.take("alias") || self_.take("type") {let token=self_.name();self_.expect("=");let target=self_.typeName(0);self_.expect(";");if self_.failure==blot_error::Error.none {self_.aliases.insert(token.text,target);}}else if self_.take("const") {self_.variable(true,true);}else if self_.take("var") || self_.take("override") {self_.variable(false,false);}else if self_.take("fn") {self_.function();}else if self_.take("enable") || self_.take("requires") {self_.name();while self_.take(",") {self_.name();}self_.expect(";");}else if self_.take("diagnostic") {self_.expect("(");self_.name();self_.expect(",");self_.name();if self_.take(".") {self_.name();}self_.expect(")");self_.expect(";");}else if self_.take("const_assert") {self_.expression(0,0);self_.expect(";");}else {self_.syntax();}}if self_.failure!=blot_error::Error.none {return;}if self_.parameters {if self_.fields.len>4 {self_.fail(self_.fields.items[4].token,"asset_wgsl_parameters","Parameters must contain at most four f32 fields");return;}self_.put(self_.header,"type Parameters is data = $Parameters { ");for field,index in self_.fields.items {if self_.resolve(field.type_name)!="f32" {self_.fail(field.token,"asset_wgsl_parameters","Parameters fields must resolve to f32");return;}if !blotName(field.name) {self_.fail(field.token,"asset_identifier","WGSL field is not a Blot identifier");return;}if index!=0 {self_.put(self_.header,", ");}self_.put(self_.header,field.name);self_.put(self_.header,": F32");}self_.put(self_.header," }\n");}emitBindings(self_);if self_.header.len>limit-self_.body.len {self_.fail(self_.peek(),"asset_limit","Generated asset module exceeds 16 MiB");}}
@@ -122,105 +222,160 @@ fn emitBindings(self_:Reader&) {for binding in self_.bindings.items {if self_.fa
 fn emitInteger(self_:Reader&,value:u32) {var bytes:u8[>..<]=[];format(bytes,value);self_.put(self_.body,bytes);}
 fn emitFloat(self_:Reader&,value:f64) {var bytes:u8[>..<]=[];blot_backend_native_asset_numbers::float32(bytes,value);self_.put(self_.body,bytes);}
 fn constructor(text:const u8[:])->bool {return text=="array" || text=="bitcast" || starts(text,"vec") || starts(text,"mat");}
-fn operator(self_:const Reader&)->Operator {let text=self_.peek().text;if (self_.is("<") || self_.is(">")) && self_.at+1<self_.tokens.len {let next=self_.tokens.tokenAt(self_.at+1);if next.text==text && next.start==self_.peek().end {if self_.is("<") {return Operator{text:"<<",precedence:8,count:2};}return Operator{text:">>",precedence:8,count:2};}if next.text=="=" {if self_.is("<") {return Operator{text:"<=",precedence:7,count:2};}return Operator{text:">=",precedence:7,count:2};}}let precedences:u8[14]=[1,2,3,4,5,6,6,7,7,9,9,10,10,10];for candidate,index in ["||","&&","|","^","&","==","!=","<",">","+","-","*","/","%"] {if text==candidate {return Operator{text:text,precedence:precedences[index],..};}}return Operator{..};}
-recursive fn expression(self_:Reader&,minimum:u8,depth:i64)->Value {if !self_.budget(depth) {return Value{..};}var left=self_.prefix(depth+1);while self_.failure==blot_error::Error.none {let op=self_.operator();if op.precedence==0 || op.precedence<minimum {break;}self_.at+=op.count;let right=self_.expression(op.precedence+1,depth+1);left=self_.binaryValue(op.text,left,right,depth+1);}return left;}
+fn operator(self_:const Reader&)->Operator {
+    let token=self_.peek();
+    let text=token.text;
+    if text.len==1 {
+        let ch=text[0];
+        if ch=='<' || ch=='>' {
+            if self_.at+1<self_.tokens.len {
+                let next=self_.tokens.tokenAt(self_.at+1);
+                if next.text.len==1 {
+                    let nch=next.text[0];
+                    if nch==ch && next.start==token.end {
+                        if ch=='<' {return Operator{text:"<<",precedence:8,count:2};}
+                        return Operator{text:">>",precedence:8,count:2};
+                    }
+                    if nch=='=' {
+                        if ch=='<' {return Operator{text:"<=",precedence:7,count:2};}
+                        return Operator{text:">=",precedence:7,count:2};
+                    }
+                }
+            }
+            return Operator{text:text,precedence:7,..};
+        }
+        match ch {
+            '|'=>{return Operator{text:text,precedence:3,..};},
+            '^'=>{return Operator{text:text,precedence:4,..};},
+            '&'=>{return Operator{text:text,precedence:5,..};},
+            '+','-'=>{return Operator{text:text,precedence:9,..};},
+            '*','/','%'=>{return Operator{text:text,precedence:10,..};},
+            _=>{return Operator{..};},
+        }
+    }
+    if text.len==2 {
+        let a=text[0];let b=text[1];
+        if a=='|' && b=='|' {return Operator{text:text,precedence:1,..};}
+        if a=='&' && b=='&' {return Operator{text:text,precedence:2,..};}
+        if b=='=' && (a=='=' || a=='!') {return Operator{text:text,precedence:6,..};}
+    }
+    return Operator{..};
+}
+recursive fn expression(self_:Reader&,minimum:u8,depth:i64)->Value {
+    if !self_.budget(depth) {return Value{..};}
+    var left=self_.prefix(depth+1);
+    while self_.failure==blot_error::Error.none {
+        let op=self_.operator();
+        if op.precedence==0 || op.precedence<minimum {break;}
+        self_.at+=op.count;
+        let right=self_.expression(op.precedence+1,depth+1);
+        if self_.constant_mode {left=self_.binaryValue(op.text,left,right,depth+1);}
+    }
+    return left;
+}
+fn validateLiteral(self_:Reader&,token:Token) {
+    if self_.failure!=blot_error::Error.none {return;}
+    var text=token.text;
+    if text.len==0 {self_.syntax();return;}
+    let last=text[text.len-1];
+    if text.len>=2 && text[0]=='0' && (text[1]=='x' || text[1]=='X') {let ignored=self_.literal(token);return;}
+    if last=='u' || last=='i' || last=='f' || last=='h' {text=text[..text.len-1];}
+    if text.len==0 {self_.fail(token,"asset_wgsl","Invalid WGSL number");return;}
+    var at:i64=0;var has_digits=false;
+    while at<text.len && digit(text[at]) {at+=1;has_digits=true;}
+    if at<text.len && text[at]=='.' {at+=1;while at<text.len && digit(text[at]) {at+=1;has_digits=true;}}
+    if at<text.len && (text[at]=='e' || text[at]=='E') {
+        at+=1;
+        if at<text.len && (text[at]=='+' || text[at]=='-') {at+=1;}
+        var exp_digits=false;
+        while at<text.len && digit(text[at]) {at+=1;exp_digits=true;}
+        if !exp_digits {let ignored=self_.literal(token);return;}
+    }
+    if at==text.len && has_digits {return;}
+    let ignored=self_.literal(token);
+}
 recursive fn prefix(self_:Reader&,depth:i64)->Value {
-if !self_.budget(depth) {
-return Value{
-..}
-;
-}
-let token=self_.peek();
-var value=Value{
-..}
-;
-if self_.take("-") || self_.take("+") || self_.take("!") || self_.take("~") || self_.take("&") || self_.take("*") {
-let operand=self_.prefix(depth+1);
-value=self_.unaryValue(token.text,operand,depth+1);
-}
-else if self_.take("(") {
-value=self_.expression(0,depth+1);
-self_.expect(")");
-}
-else if token.number {
-self_.at+=1;
-value=self_.literal(token);
-}
-else {
-let name=self_.name();
-let spelling=name.text;
-if spelling=="true" {
-value=Value{
-kind:Kind.boolean,n:1.0,..}
-;
-}
-else if spelling=="false" {
-value=Value{
-kind:Kind.boolean,..}
-;
-}
-else {
-let index .= self_.binding_index.get(spelling);
-if index {
-value=self_.bindings.items[index].value;
-}
-}
-let element_type=if constructor(spelling) && self_.take("<") {
-let parsed_type=self_.typeName(depth+1);
-while self_.take(",") {
-self_.expression(8,depth+1);
-}
-self_.expect(">");
-parsed_type}
-else {
-self_.input[0..0]}
-;
-if self_.take("(") {
-var args=Values{
-..}
-;
-if !self_.take(")") {
-while self_.failure==blot_error::Error.none {
-let argument=self_.expression(0,depth+1);
-self_.record(args.push(argument));
-if self_.take(")") {
-break;
-}
-self_.expect(",");
-if self_.take(")") {
-break;
-}
-}
-}
-let resolved_spelling=self_.resolve(spelling);
-if self_.failure==blot_error::Error.none {
-value=self_.call(resolved_spelling,element_type,args.items);
-}
-args.deinit();
-}
-}
-while self_.failure==blot_error::Error.none {
-if self_.take("[") {
-let index=self_.expression(0,depth+1);
-self_.expect("]");
-if blot_backend_native_asset_numbers::finite(index.n) && index.n>=0.0 && index.n<value.elements.len as f64 && blot_backend_native_asset_numbers::integral(index.n) {
-value=rootedValue(value.elements[index.n as i64]);
-}
-else {
-value=Value{
-..}
-;
-}
-}
-else if self_.take(".") {
-let field=self_.name();
-value=self_.swizzle(value,field.text);
-}
-else {
-break;
-}
-}
-return value;
+    if !self_.budget(depth) {return Value{..};}
+    let token=self_.peek();
+    var value=Value{..};
+    var is_unary=false;
+    if token.text.len==1 {
+        match token.text[0] {
+            '-','+','!','~','&','*'=>{is_unary=true;},
+            _=>{},
+        }
+    }
+    if is_unary {
+        self_.at+=1;
+        let operand=self_.prefix(depth+1);
+        if self_.constant_mode {value=self_.unaryValue(token.text,operand,depth+1);}
+    } else if token.text.len==1 && token.text[0]=='(' {
+        self_.at+=1;
+        value=self_.expression(0,depth+1);
+        self_.expect(")");
+    } else if token.number {
+        self_.at+=1;
+        if self_.constant_mode {value=self_.literal(token);}
+        else {self_.validateLiteral(token);}
+    } else {
+        let name=self_.name();
+        let spelling=name.text;
+        if self_.constant_mode {
+            if spelling=="true" {value=Value{kind:Kind.boolean,n:1.0,..};}
+            else if spelling=="false" {value=Value{kind:Kind.boolean,..};}
+            else {let index .= self_.binding_index.get(spelling);if index {value=self_.bindings.items[index].value;}}
+        }
+        let element_type=if constructor(spelling) && self_.take("<") {
+            let parsed_type=self_.typeName(depth+1);
+            while self_.take(",") {self_.expression(8,depth+1);}
+            self_.expect(">");
+            parsed_type
+        } else {self_.input[0..0]};
+        if self_.take("(") {
+            if self_.constant_mode {
+                var args=Values{..};
+                if !self_.take(")") {
+                    while self_.failure==blot_error::Error.none {
+                        let argument=self_.expression(0,depth+1);
+                        self_.record(args.push(argument));
+                        if self_.take(")") {break;}
+                        self_.expect(",");
+                        if self_.take(")") {break;}
+                    }
+                }
+                let resolved_spelling=self_.resolve(spelling);
+                if self_.failure==blot_error::Error.none {value=self_.call(resolved_spelling,element_type,args.items);}
+                args.deinit();
+            } else {
+                if !self_.take(")") {
+                    while self_.failure==blot_error::Error.none {
+                        self_.expression(0,depth+1);
+                        if self_.take(")") {break;}
+                        self_.expect(",");
+                        if self_.take(")") {break;}
+                    }
+                }
+            }
+        }
+    }
+    while self_.failure==blot_error::Error.none {
+        let p=self_.peek().text;
+        if p.len==1 && p[0]=='[' {
+            self_.at+=1;
+            let index=self_.expression(0,depth+1);
+            self_.expect("]");
+            if self_.constant_mode {
+                if blot_backend_native_asset_numbers::finite(index.n) && index.n>=0.0 && index.n<value.elements.len as f64 && blot_backend_native_asset_numbers::integral(index.n) {
+                    value=rootedValue(value.elements[index.n as i64]);
+                } else {value=Value{..};}
+            }
+        } else if p.len==1 && p[0]=='.' {
+            self_.at+=1;
+            let field=self_.name();
+            if self_.constant_mode {value=self_.swizzle(value,field.text);}
+        } else {break;}
+    }
+    return value;
 }
 
 
@@ -326,7 +481,7 @@ fn builtin(name:const u8[:],args:const Value[:])->Value {let x=args[0].n;var y:f
  else if name=="reverseBits" && args.len==1 {n=reverse(bits(x)) as f64;}
  else {return Value{..};}return scalar(output_kind,n);
 }
-fn generate(bytes:const u8[:])->Result,Error {var reader=Reader{input:bytes,..};reader.run();if reader.failure!=blot_error::Error.none {let error=reader.failure;if error!=blot_error::Error.invalid_asset {reader.deinit();return Result.source{bytes:default<u8[:]>()},error;}assert(reader.issue.present);var issue=reader.issue.value;issue.message=copyOutput(issue.message);reader.deinit();return Result.issue{value:issue},blot_error::Error.none;}if reader.header.len>0x7fffffffffffffff-reader.body.len {reader.deinit();return Result.source{bytes:default<u8[:]>()},blot_error::Error.out_of_memory;}let source=output_pool.alloc_slice(reader.header.len+reader.body.len);for byte,index in reader.header.items {source[index]=byte;}for byte,index in reader.body.items {source[reader.header.len+index]=byte;}reader.deinit();return Result.source{bytes:source},blot_error::Error.none;}
+fn generate(bytes:const u8[:])->Result,Error {var reader=Reader{input:bytes,..};reader.run();if reader.failure!=blot_error::Error.none {let error=reader.failure;if error!=blot_error::Error.invalid_asset {reader.deinit();return Result.source{bytes:default<u8[:]>()},error;}assert(reader.issue.present);var issue=reader.issue.value;issue.message=copyOutput(issue.message);reader.deinit();return Result.issue{value:issue},blot_error::Error.none;}if reader.header.len>0x7fffffffffffffff-reader.body.len {reader.deinit();return Result.source{bytes:default<u8[:]>()},blot_error::Error.out_of_memory;}let source=output_pool.alloc_slice(reader.header.len+reader.body.len);source[..reader.header.len].move_from(reader.header.items);source[reader.header.len..].move_from(reader.body.items);reader.deinit();return Result.source{bytes:source},blot_error::Error.none;}
 
 // Zig's floating @min/@max select the numerical operand when one is NaN.
 fn floatMin(a:f64,b:f64)->f64 {if a!=a {return b;}if b!=b {return a;}if a==0.0 && b==0.0 {return blot_native::f64_from_bits(blot_native::f64_bits(a)|blot_native::f64_bits(b));}if b<a {return b;}return a;}

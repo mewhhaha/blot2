@@ -200,6 +200,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgs
 fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::ValueRun,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgsl::Values)->bool {return equalFields(left,right);}
 fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::Values,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::AssetItem)->bool {return equalFields(left,right);}
+fn blot_backend_native_assets::blotStructuralHash<StructuralSink>(value:blot_backend_native_assets::AssetItem,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::Candidate)->bool {return equalFields(left,right);}
 fn blot_backend_native_assets::blotStructuralHash<StructuralSink>(value:blot_backend_native_assets::Candidate,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::Definition)->bool {return equalFields(left,right);}
@@ -1002,8 +1004,14 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Vals)->bool
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::Vals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Words)->bool {return equalFields(left,right);}
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::Words,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedArray)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::CheckedArray,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedGrow)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::CheckedGrow,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedRange)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::CheckedRange,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedView)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::CheckedView,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::ComptimeFrame)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::ComptimeFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Fn)->bool {return equalFields(left,right);}

@@ -32,7 +32,7 @@ reusable[] var resolution_pool:Resolution[>..]=[];
 reusable[] var index_pool:dictionary_slot<const u8[:],u32>[>..]=[];
 reusable[] var digest_pool:dictionary_slot<u32,Digest>[>..]=[];
 reusable[] var mask_pool:bool[>..]=[];
-fn own(bytes:const u8[:])->const u8[:] {let result=bytes_pool.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn own(bytes:const u8[:])->const u8[:] {if bytes.len==0 {return default<const u8[:]>();}let result=bytes_pool.alloc_slice(bytes.len);result.move_from(bytes);return result;}
 fn ownedText(bytes:const u8[:])->const u8[:] {if bytes.len==0 {return default<const u8[:]>();}let canonical=bytes_pool.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(canonical,bytes));let start=bytes_pool.index_of(canonical[0]);return bytes_pool[start..start+bytes.len];}
 fn canonicalOutcome(value:Outcome)->Outcome {match value {bytes payload=>{return Outcome.bytes{ownedText(payload.value)};},failure payload=>{return Outcome.failure{payload.error,ownedText(payload.cause)};},inactive=>{return Outcome.inactive;}}}
 fn pushEntry(buffer:blot_support_pooled_buffer::Buffer<Entry>&,value:Entry)->Error {
@@ -140,6 +140,30 @@ fn probeSource(self_:Provider&,path:const u8[:],maximum:i64,name:u8[>..<]&,bytes
     }
     var disk=blot_reuse_project::FileInputs{};
     return disk.probeSource(path,maximum,name,bytes);
+}
+fn recordProbedCanonical(self_:Provider&,path:const u8[:],canonical:const u8[:])->Error {
+    if !self_.snapshot.valid() {return blot_error::Error.invalid_artifact;}
+    let old=lookup(self_.snapshot.state().paths.items,self_.snapshot.state().path_index,path);
+    if old.present {return blot_error::Error.none;}
+    self_.snapshot.state().counts.canonical_reads++;
+    let result=Outcome.bytes{own(canonical)};
+    let ignored,error=self_.snapshot.publish(self_.snapshot.state().paths,self_.snapshot.state().path_index,path,result);
+    if error!=blot_error::Error.none {return error;}
+    self_.snapshot.clearCause();
+    return blot_error::Error.none;
+}
+fn recordProbedRead(self_:Provider&,canonical:const u8[:],bytes:const u8[:],limit:i64)->Error {
+    if !self_.snapshot.valid() {return blot_error::Error.invalid_artifact;}
+    let old=lookup(self_.snapshot.state().files.items,self_.snapshot.state().file_index,canonical);
+    if !old.present {
+        self_.snapshot.state().counts.source_reads++;
+        let result=Outcome.bytes{own(bytes)};
+        let ignored,error=self_.snapshot.publish(self_.snapshot.state().files,self_.snapshot.state().file_index,canonical,result);
+        if error!=blot_error::Error.none {return error;}
+        self_.snapshot.clearCause();
+    }
+    if bytes.len>limit {self_.snapshot.setCause("StreamTooLong");return blot_error::Error.stream_too_long;}
+    return blot_error::Error.none;
 }
 fn cause(self_:const Provider&,error:Error)->const u8[:] {if self_.snapshot.state().last_cause.len!=0 {return self_.snapshot.state().last_cause;}return blot_error::error_name(error);}
 fn optionalTextEqual(left:Text,right:Text)->bool {if left.present!=right.present {return false;}if !left.present {return true;}return left.value==right.value;}

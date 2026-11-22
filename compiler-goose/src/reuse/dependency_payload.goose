@@ -395,7 +395,7 @@ fn adopt(self_:Owner&,source:Owner&)->Error {
  leases[at].live=false;source=Owner {..};leases.free(at);return blot_error::Error.none;
 }
 fn alloc<T>(self_:Owner&,length:i64)->T[:],Error {return allocate(self_,default<T>(),length);}
-fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}for value,index in values {result[index]=copyElement(self_,value);}return result,blot_error::Error.none;}
+fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}if values.len!=0 {result.move_from(values);}return result,blot_error::Error.none;}
 
 fn allocate(self_:Owner&,sample:u32,length:i64)->u32[:],Error {
  assert(unique(self_));if length<0 {return default<u32[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<u32[:]>(),blot_error::Error.none;}

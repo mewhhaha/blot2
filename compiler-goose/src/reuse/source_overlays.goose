@@ -21,7 +21,7 @@ struct SetState {live:bool=false,generation:u64=0,files:Files=Files{}}
 reusable var sets:SetState[>..]=[];
 fn valid(self_:const Set&)->bool {return self_.slot!=0 && self_.slot-1<sets.len && sets[self_.slot-1].live && sets[self_.slot-1].generation==self_.generation;}
 fn files(self_:Set)->Files& {assert(self_.valid());return sets[self_.slot-1].files;}
-fn copyBytes(bytes:const u8[:])->const u8[:] {let result=owned_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn copyBytes(bytes:const u8[:])->const u8[:] {if bytes.len==0 {return default<const u8[:]>();}let result=owned_bytes.alloc_slice(bytes.len);result.move_from(bytes);return result;}
 fn ownedText(bytes:const u8[:])->const u8[:] {if bytes.len==0 {return default<const u8[:]>();}let owned=owned_bytes.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(owned,bytes));let start=owned_bytes.index_of(owned[0]);return owned_bytes[start..start+bytes.len];}
 fn allocateFiles(self_:Files&,count:i64) {
  if count==0 {return;}var capacity:i64=8;while count*3>capacity*2 {capacity*=2;}

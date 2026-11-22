@@ -121,11 +121,19 @@ for t in list(SLICES):visit(t)
 # Concrete code below is emitted after the contexts file has defined all roots.
 def ident(t):return re.sub(r'[^A-Za-z0-9_]','_',t)
 imports='\n'.join('import '+x+';' for x in sorted(IMPORTS))
-code=['// Concrete data domains for the same-executable copied worker protocol.','namespace blot_project_packet;',imports,'import .project_packet;']
-for typ in ['u8','u16','u32','u64','i8','i16','i32','i64']:
- width=int(typ[1:])//8;u='u'+typ[1:]
- code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room({width}) {{return;}}let bits=value as! {u};for index in {width} {{self.output.push((bits>>(index*8)) as! u8);}}}}')
- code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available({width}) {{return;}}var bits:{u}=0;for index in {width} {{bits|=(self.bytes[self.at+index] as {u})<<(index*8);}}self.at+={width};value=bits as! {typ};}}')
+code=['// Concrete data domains for the same-executable copied worker protocol.','namespace blot_project_packet;','import binary;',imports,'import .project_packet;']
+for typ in ['u8','i8']:
+ code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(1) {{return;}}self.output.push(value as! u8);}}')
+ code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(1) {{return;}}value=self.bytes[self.at] as! {typ};self.at+=1;}}')
+for typ in ['u16','i16']:
+ code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(2) {{return;}}let bits=value as! u16;var buf:u8[2]=[bits as! u8,(bits>>8) as! u8];self.output.append(buf);}}')
+ code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(2) {{return;}}value=binary::u16le(self.bytes,self.at) as! {typ};self.at+=2;}}')
+for typ in ['u32','i32']:
+ code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(4) {{return;}}let bits=value as! u32;var buf:u8[4]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8];self.output.append(buf);}}')
+ code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(4) {{return;}}value=binary::u32le(self.bytes,self.at) as! {typ};self.at+=4;}}')
+for typ in ['u64','i64']:
+ code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(8) {{return;}}let bits=value as! u64;var buf:u8[8]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8,(bits>>32) as! u8,(bits>>40) as! u8,(bits>>48) as! u8,(bits>>56) as! u8];self.output.append(buf);}}')
+ code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(8) {{return;}}value=binary::u64le(self.bytes,self.at) as! {typ};self.at+=8;}}')
 for typ,bits in [('f32','u32'),('f64','u64')]:
  code.append(f'fn put(self:Writer&,value:{typ}) {{put(self,blot_native::{typ}_bits(value));}}')
  code.append(f'fn get(self:Reader&,value:{typ}&) {{var bits:{bits}=0;get(self,bits);value=blot_native::{typ}_from_bits(bits);}}')
@@ -187,25 +195,62 @@ FLAT_SLICES = (
     'blot_check_core::BindingRef',
     'blot_check_core::Body',
     'blot_check_core::CallInfo',
+    'blot_check_core::ClosureInfo',
     'blot_check_core::Constructor',
+    'blot_check_core::Contract',
     'blot_check_core::DeclarationDependencies',
+    'blot_check_core::DependencyMember',
+    'blot_check_core::Diagnostic',
+    'blot_check_core::ErasedDeclarationReference',
     'blot_check_core::FieldName',
+    'blot_check_core::HandleEffects',
     'blot_check_core::List',
+    'blot_check_core::LoopCarry',
+    'blot_check_core::LoopInfo',
+    'blot_check_core::MatchArm',
+    'blot_check_core::MatchInfo',
+    'blot_check_core::Merge',
     'blot_check_core::Node',
     'blot_check_core::Nominal',
     'blot_check_core::Obligation',
+    'blot_check_core::OperationName',
+    'blot_check_core::OperationValue',
     'blot_check_core::Parameter',
+    'blot_check_core::Pattern',
+    'blot_check_core::PatternRow',
+    'blot_check_core::Primitive',
     'blot_check_core::Projection',
+    'blot_check_core::ProjectionVariant',
+    'blot_check_core::RequestArm',
+    'blot_check_core::RequestLoopInfo',
+    'blot_check_core::ResolverInfo',
+    'blot_check_core::RuntimeName',
+    'blot_check_core::SelectedUse',
+    'blot_check_core::TypeTag',
+    'blot_check_core::UpdateInfo',
+    'blot_check_core::UpdateStep',
     'blot_check_parameter_patterns::Node',
+    'blot_check_types::List',
     'blot_check_types::Node',
     'blot_check_types::Obligation',
+    'blot_check_types::Operation',
     'blot_parse_ast::Span',
+    'blot_reuse_frozen_dependency::Export',
+    'blot_reuse_frozen_dependency::Fixity',
     'blot_reuse_principal_interface::Associated',
     'blot_reuse_principal_interface::Binding',
     'blot_reuse_principal_interface::Constructor',
+    'blot_reuse_principal_interface::Contract',
+    'blot_reuse_principal_interface::ContractMember',
+    'blot_reuse_principal_interface::EffectFamily',
+    'blot_reuse_principal_interface::EffectTemplate',
+    'blot_reuse_principal_interface::Implementation',
+    'blot_reuse_principal_interface::ImplementationMember',
+    'blot_reuse_principal_interface::MemberTemplate',
     'blot_reuse_principal_interface::Nominal',
-    'u32',
-    'u8',
+    'blot_reuse_principal_interface::SelectedProof',
+    'blot_reuse_principal_interface::SelectedUse',
+    'blot_reuse_project_check::Export',
 )
 def has_tagged_union(t, ns='blot_project_packet'):
  t = resolve(t, ns)

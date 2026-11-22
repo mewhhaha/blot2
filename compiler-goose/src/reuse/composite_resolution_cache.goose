@@ -68,6 +68,19 @@ fn occupied(cache: const Cache&, root: u32, at: u32) -> bool {
     let state:const State& =states[cache.lease-1];
     state.entries.len != 0 && state.entries.items[slot(root, at)].root != 0
 }
+fn probeHit(cache: Cache&, physical: u16, effects_physical: u64, root: u32, at: u32, collision: bool&) -> i64 {
+    if cache.entries.len == 0 || physical == 65535 || effects_physical == 18446744073709551615 { return -1; }
+    if cache.physical != physical || cache.effects_physical != effects_physical {
+        for &entry in cache.entries.items { entry.root = 0; }
+        cache.physical = physical; cache.effects_physical = effects_physical;
+        return -1;
+    }
+    let idx = slot(root, at);
+    let entry .= cache.entries.items[idx];
+    if entry.root == root && entry.at == at { return idx; }
+    if entry.root != 0 { collision = true; }
+    return -1;
+}
 fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
     assert(valid(cache));
     let state:State& =states[cache.lease-1];

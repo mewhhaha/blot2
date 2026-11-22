@@ -44,6 +44,9 @@ uint32_t blot_f32_bits(float value) { uint32_t bits; memcpy(&bits, &value, 4); r
 float blot_f32_from_bits(uint32_t bits) { float value; memcpy(&value, &bits, 4); return value; }
 uint64_t blot_f64_bits(double value) { uint64_t bits; memcpy(&bits, &value, 8); return bits; }
 double blot_f64_from_bits(uint64_t bits) { double value; memcpy(&value, &bits, 8); return value; }
+void blot_copy_u32(uint32_t *dst, const uint8_t *src, uint64_t count) {
+    if (count) memcpy(dst, src, (size_t)(count * 4));
+}
 
 int64_t blot_read(int32_t fd, uint8_t *out, uint64_t count) {
     if (count > SSIZE_MAX) return -EINVAL;

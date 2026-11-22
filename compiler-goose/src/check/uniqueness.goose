@@ -170,7 +170,7 @@ root struct Analyzer {
     captured: Captured[>..<] = [],
     records: Record[>..] = [],
     entries: Entry[>..] = [],
-    holds_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
+    holds_cache: u8[>..] = [],
     nominal_index: dictionary<u64, u32> = dictionary<u64, u32> {},
     expanding: Expansion[>..<] = [],
     loops: LoopFrame[>..<] = [],
@@ -199,10 +199,10 @@ root struct Analyzer {
     chained: u32[>..<] = [],
     chained_base: i64[>..<] = [],
     // Nodes in callee position, and applications that are another's callee.
-    heads: dictionary<u32, bool> = dictionary<u32, bool> {},
-    inner: dictionary<u32, bool> = dictionary<u32, bool> {},
+    heads: bool[>..] = [],
+    inner: bool[>..] = [],
     // References to a `lent` function given as an argument.
-    lent_arguments: dictionary<u32, bool> = dictionary<u32, bool> {},
+    lent_arguments: bool[>..] = [],
     // Whether this module is free of the store `place = value`. Its
     // functions and closures then return values nothing else holds, and it
     // may not write storage it does not own. A module that still has a
@@ -214,7 +214,7 @@ root struct Analyzer {
     explain: bool = false,
     at: u32 = 0,
     killer: u32[>..] = [],
-    owns_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
+    owns_cache: u8[>..] = [],
     // Each binding by unit and number; whether it is a
     // generic function that returns what it was lent (0 unknown, 1 no,
     // 2 yes) and how many arguments its type takes; and each member of a
@@ -233,8 +233,8 @@ root struct Analyzer {
     block_taint: dictionary<u32, u32> = dictionary<u32, u32> {},
     non_freezable: bool[>..] = [],
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
-    lends_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
-    calls_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
+    lends_cache: u8[>..] = [],
+    calls_cache: u8[>..] = [],
     // The root of the function being checked when its result must be owned,
     // and of a contract's member, whose result is its implementation's.
     owned_result: u32 = 0,
@@ -268,10 +268,11 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.explain = blot_native::environment_size(explaining[0]) >= 0;
     }
     {
+        let binding_count = module.bindings.len;
+        analyzer.reader_state.resize(binding_count, 0);
+        analyzer.reader_arity.resize(binding_count, 0);
+        analyzer.member_kind.resize(binding_count, 0);
         for binding, index in module.bindings {
-            analyzer.reader_state.push(0);
-            analyzer.reader_arity.push(0);
-            analyzer.member_kind.push(0);
             if index != 0 { analyzer.binding_index.insert(((binding.target.unit as u64) << 32) | binding.target.binding, index as! u32); }
         }
         for method in module.associated {
@@ -291,8 +292,32 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         if member.target.unit != 0 && member.target.unit != module.unit { continue; }
         if member.target.binding != 0 && member.target.binding < analyzer.member_kind.len { analyzer.member_kind[member.target.binding] = 2; }
     }
-    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.killer.push(0); analyzer.loan_holds.push(0); analyzer.loan_ended.push(false); analyzer.ever_read.push(false); analyzer.kills.push(0); analyzer.blame.push(0); analyzer.flows.push(false); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); analyzer.fork_taint.push(0); analyzer.non_freezable.push(false); }
-    for at in 0..module.nodes.len { analyzer.last_read.push(false); }
+    let binding_count = module.bindings.len;
+    let node_count = module.nodes.len;
+    let type_count = module.types.nodes.len;
+    analyzer.facts.resize(binding_count, none);
+    analyzer.touch.resize(binding_count, 0);
+    analyzer.killer.resize(binding_count, 0);
+    analyzer.loan_holds.resize(binding_count, 0);
+    analyzer.loan_ended.resize(binding_count, false);
+    analyzer.ever_read.resize(binding_count, false);
+    analyzer.kills.resize(binding_count, 0);
+    analyzer.blame.resize(binding_count, 0);
+    analyzer.flows.resize(binding_count, false);
+    analyzer.born.resize(binding_count, 0);
+    analyzer.home.resize(binding_count, 0);
+    analyzer.stamp.resize(binding_count, 0);
+    analyzer.changed_slot.resize(binding_count, -1);
+    analyzer.fork_taint.resize(binding_count, 0);
+    analyzer.non_freezable.resize(binding_count, false);
+    analyzer.last_read.resize(node_count, false);
+    analyzer.heads.resize(node_count, false);
+    analyzer.inner.resize(node_count, false);
+    analyzer.lent_arguments.resize(node_count, false);
+    analyzer.holds_cache.resize(type_count, 0);
+    analyzer.owns_cache.resize(type_count, 0);
+    analyzer.lends_cache.resize(type_count, 0);
+    analyzer.calls_cache.resize(type_count, 0);
     for merge in module.merges {
         if merge.then_binding < analyzer.flows.len { analyzer.flows[merge.then_binding] = true; }
         if merge.else_binding < analyzer.flows.len { analyzer.flows[merge.else_binding] = true; }
@@ -740,16 +765,18 @@ fn holds(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
     let known, cached = holdsKnown(self_, ty);
     if cached { return known; }
     let result = holdsIn(self_, m, ty, [], [], 0);
-    var bit: u8 = 0;
-    if result { bit = 1; }
-    self_.holds_cache.insert(ty, bit);
+    if ty < self_.holds_cache.len {
+        var bit: u8 = 1;
+        if result { bit = 2; }
+        self_.holds_cache[ty] = bit;
+    }
     return result;
 }
 fn holdsKnown(self_: Analyzer&, ty: u32) -> bool, bool {
-    let known .= self_.holds_cache.get(ty);
-    if !known { return false, false; }
-    let bit: u8 = known;
-    return bit != 0, true;
+    if ty >= self_.holds_cache.len { return false, false; }
+    let bit = self_.holds_cache[ty];
+    if bit == 0 { return false, false; }
+    return bit == 2, true;
 }
 fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64) -> bool {
     var memo = WalkMemo {};
@@ -832,31 +859,43 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
 // type, an effect type) counts as borrowing: its results are not checked
 // and not promised. So does growable storage, until `=` is gone.
 fn owns(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
-    let known .= self_.owns_cache.get(ty);
-    if known { let bit: u8 = known; return bit != 0; }
+    if ty < self_.owns_cache.len {
+        let bit = self_.owns_cache[ty];
+        if bit != 0 { return bit == 2; }
+    }
     let result = partsIn(self_, m, ty, 0, [], [], 0);
-    var bit: u8 = 0;
-    if result { bit = 1; }
-    self_.owns_cache.insert(ty, bit);
+    if ty < self_.owns_cache.len {
+        var bit: u8 = 1;
+        if result { bit = 2; }
+        self_.owns_cache[ty] = bit;
+    }
     return result;
 }
 fn lends(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
-    let known .= self_.lends_cache.get(ty);
-    if known { let bit: u8 = known; return bit != 0; }
+    if ty < self_.lends_cache.len {
+        let bit = self_.lends_cache[ty];
+        if bit != 0 { return bit == 2; }
+    }
     let result = partsIn(self_, m, ty, 1, [], [], 0);
-    var bit: u8 = 0;
-    if result { bit = 1; }
-    self_.lends_cache.insert(ty, bit);
+    if ty < self_.lends_cache.len {
+        var bit: u8 = 1;
+        if result { bit = 2; }
+        self_.lends_cache[ty] = bit;
+    }
     return result;
 }
 // Whether a value of type `ty` can hold a function.
 fn calls(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
-    let known .= self_.calls_cache.get(ty);
-    if known { let bit: u8 = known; return bit != 0; }
+    if ty < self_.calls_cache.len {
+        let bit = self_.calls_cache[ty];
+        if bit != 0 { return bit == 2; }
+    }
     let result = partsIn(self_, m, ty, 2, [], [], 0);
-    var bit: u8 = 0;
-    if result { bit = 1; }
-    self_.calls_cache.insert(ty, bit);
+    if ty < self_.calls_cache.len {
+        var bit: u8 = 1;
+        if result { bit = 2; }
+        self_.calls_cache[ty] = bit;
+    }
     return result;
 }
 // Whether `ty` has a part that owns an array (`want` 0), a part that
@@ -1109,11 +1148,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let error = blot_eval_body_recipe::appendChildren(list, m, id, false);
             assert(error == blot_error::Error.none);
         }
-        for child in self_.children[start..] { if m.node(child).tag == blot_check_core::Tag.operation_value { self_.heads.insert(child, true); } }
+        for child in self_.children[start..] { if m.node(child).tag == blot_check_core::Tag.operation_value { self_.heads[child] = true; } }
         self_.children.resize(start);
     }
     if tag == blot_check_core::Tag.constructor_function || tag == blot_check_core::Tag.primitive_function || tag == blot_check_core::Tag.operation_value {
-        if !self_.heads.contains(id) { keeperValue(self_, m, id, n.ty); }
+        if !self_.heads[id] { keeperValue(self_, m, id, n.ty); }
         return Value { .. };
     }
     if tag == blot_check_core::Tag.constant || tag == blot_check_core::Tag.type_constructor || tag == blot_check_core::Tag.invalid { return Value { .. }; }
@@ -1122,13 +1161,13 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let target = m.reference(id);
         // A function that takes over a parameter is only ever called in
         // full, which `apply` and `call` see before this.
-        if !self_.lent_arguments.contains(id) && !self_.lent_constant {
+        if !self_.lent_arguments[id] && !self_.lent_constant {
             lentValue(self_, m, id);
             {
                 // An entry function may return what it shares, so it cannot
                 // stand for a function whose result is the caller's alone.
                 let named = calleeBinding(self_, m, id);
-                if named != 0 && !self_.heads.contains(id) && m.bindings[named].kind != blot_reuse_principal_interface::Kind.local && m.bindings[named].kind != blot_reuse_principal_interface::Kind.parameter && !trusted(self_, m, named) {
+                if named != 0 && !self_.heads[id] && m.bindings[named].kind != blot_reuse_principal_interface::Kind.local && m.bindings[named].kind != blot_reuse_principal_interface::Kind.parameter && !trusted(self_, m, named) {
                     if finalOwns(self_, m, n.ty) { reject(self_, m, id, blot_check_core::Code.lent_result_value); }
                 }
             }
@@ -1176,7 +1215,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         for child in kids {
             let cn = m.node(child);
             if cn.tag == blot_check_core::Tag.effect_provider {
-                if m.node(cn.a).tag == blot_check_core::Tag.operation_value { self_.heads.insert(cn.a, true); }
+                if m.node(cn.a).tag == blot_check_core::Tag.operation_value { self_.heads[cn.a] = true; }
                 let _ = visit(self_, m, child);
                 for ci in 0..cell_count {
                     let ob = outers[ci];
@@ -1548,7 +1587,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             var exits = false;
             if !member {
-                self_.heads.insert(callee, true);
+                self_.heads[callee] = true;
                 let held = visit(self_, m, callee);
                 exits = held.exits;
             }
@@ -1558,7 +1597,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         // Given a parameter it takes over but not all its arguments, the
         // function would hold the argument for any number of calls.
-        if mask != 0 && count < (taking >> 32) as i64 && count < 32 && mask & (((1 as u32) << (count as! u32)) - 1) != 0 && !self_.inner.contains(id) {
+        if mask != 0 && count < (taking >> 32) as i64 && count < 32 && mask & (((1 as u32) << (count as! u32)) - 1) != 0 && !self_.inner[id] {
             reject(self_, m, id, blot_check_core::Code.own_function_value);
         }
     }
@@ -1569,16 +1608,16 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // shared from here on.
         var head = id;
         var count: i64 = 0;
-        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; count += 1; if m.node(head).tag == blot_check_core::Tag.apply { self_.inner.insert(head, true); } }
-        if tag == blot_check_core::Tag.apply { self_.heads.insert(head, true); }
-        if tag == blot_check_core::Tag.apply && self_.inner.contains(id) {
+        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; count += 1; if m.node(head).tag == blot_check_core::Tag.apply { self_.inner[head] = true; } }
+        if tag == blot_check_core::Tag.apply { self_.heads[head] = true; }
+        if tag == blot_check_core::Tag.apply && self_.inner[id] {
             // Part of a longer application whose callee is not known: the
             // arguments are shared, as phase 1 had it.
             let exits = visitChildren(self_, m, id);
             return Value { exits: exits, .. };
         }
         let keeper = m.node(head).tag == blot_check_core::Tag.constructor_function || m.node(head).tag == blot_check_core::Tag.primitive_function || m.node(head).tag == blot_check_core::Tag.operation_value;
-        if tag == blot_check_core::Tag.apply && keeper && !self_.inner.contains(id) {
+        if tag == blot_check_core::Tag.apply && keeper && !self_.inner[id] {
             // A constructor or an effect operation given only some of its
             // arguments is a function that keeps the others.
             if m.types.node(n.ty).tag == blot_check_types::Tag.function { keeperValue(self_, m, head, m.typeOf(head)); }
@@ -1653,7 +1692,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         // A `lent` or entry function given only some of its arguments is
         // a function value too.
-        if !known && !lent_given && tag == blot_check_core::Tag.apply && head_tag == blot_check_core::Tag.reference && binding != 0 && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.local && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.parameter && !self_.inner.contains(id) && finalOwns(self_, m, n.ty) {
+        if !known && !lent_given && tag == blot_check_core::Tag.apply && head_tag == blot_check_core::Tag.reference && binding != 0 && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.local && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.parameter && !self_.inner[id] && finalOwns(self_, m, n.ty) {
             reject(self_, m, id, blot_check_core::Code.lent_result_value);
         }
         if !known && !lent_given && tag == blot_check_core::Tag.apply {
@@ -2196,14 +2235,14 @@ fn lentHolder(self_: Analyzer&, m: const Module&, node: u32) -> bool {
 fn lentArgument(self_: Analyzer&, m: const Module&, id: u32) -> bool {
     var found = false;
     if m.node(id).tag == blot_check_core::Tag.call {
-        for child in m.call(id).arguments { if lentFunction(self_, m, child) { self_.lent_arguments.insert(child, true); found = true; } }
+        for child in m.call(id).arguments { if lentFunction(self_, m, child) { self_.lent_arguments[child] = true; found = true; } }
         return found;
     }
     var cursor = id;
     var steps: i64 = 0;
     while steps < 64 && m.node(cursor).tag == blot_check_core::Tag.apply {
         let child = m.node(cursor).b;
-        if lentFunction(self_, m, child) { self_.lent_arguments.insert(child, true); found = true; }
+        if lentFunction(self_, m, child) { self_.lent_arguments[child] = true; found = true; }
         cursor = m.node(cursor).a;
         steps += 1;
     }

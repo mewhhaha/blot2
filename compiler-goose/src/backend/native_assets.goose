@@ -11,7 +11,7 @@ struct Stats {parsed: i64 = 0,reused: i64 = 0,inputBytes: i64 = 0,generatedBytes
 struct Dependency {path: const u8[:],sha256: blot_support::Option<u8[64]>}
 struct Resource {id: u32,path: const u8[:],mediaType: const u8[:],sha256: u8[64],bytes: const u8[:],key: const u8[:]}
 struct Issue {filename: const u8[:],start: u32 = 0,end: u32 = 0,code: const u8[:],message: const u8[:]}
-struct Module {module: const u8[:],definition: Definition,canonical: const u8[:],bytes: const u8[:],source: const u8[:],overlaid:bool=false,hidden:bool=false,read:bool=false}
+struct Module {module: const u8[:],definition: Definition,canonical: const u8[:],bytes: const u8[:],source: const u8[:],sha256: u8[64] = [0;64],overlaid:bool=false,hidden:bool=false,read:bool=false}
 struct Modules {storage: Module[:] = default<Module[:]>(),items: Module[:] = default<Module[:]>()}
 struct Sources {storage: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>(),items: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>()}
 struct Dependencies {storage: Dependency[:] = default<Dependency[:]>(),items: Dependency[:] = default<Dependency[:]>()}
@@ -46,7 +46,7 @@ reusable[] var definition_runs: Definition[>..] = [];
 reusable[] var definition_order_runs: u32[>..] = [];
 reusable[] var discovered_definition_runs: Definition[>..] = [];
 reusable[] var root_runs: const u8[:][>..] = [];
-fn own<C>(self_: C&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let copied = text_bytes.alloc_slice(bytes.len);for index in 0..bytes.len {copied[index] = bytes[index];}let text:const u8[:] =copied;let error = blot_support_pooled_buffer::push(self_.texts,text,text_runs);if error != blot_error::Error.none {text_bytes.free_slice(copied);return default<const u8[:]>(),error;}return copied,blot_error::Error.none;}
+fn own<C>(self_: C&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let copied = text_bytes.alloc_slice(bytes.len);copied.move_from(bytes);let text:const u8[:] =copied;let error = blot_support_pooled_buffer::push(self_.texts,text,text_runs);if error != blot_error::Error.none {text_bytes.free_slice(copied);return default<const u8[:]>(),error;}return copied,blot_error::Error.none;}
 fn freeTexts(self_: Texts&) {for bytes in self_.items {if bytes.len == 0 {continue;}text_bytes.free_slice(bytes);}blot_support_pooled_buffer::deinit(self_,text_runs);}
 // Publication reuses only exact text runs already registered to this owner.
 fn registeredText(texts:Texts,text:const u8[:])->const u8[:] {
@@ -60,7 +60,7 @@ fn registeredDefinition(texts:Texts,value:Definition)->Definition {
  var media=blot_support::none<const u8[:]>();if value.mediaType.present {media=blot_support::some<const u8[:]>(registeredText(texts,value.mediaType.value));}
  return Definition{module:registeredText(texts,value.module),path:registeredText(texts,value.path),kind:value.kind,ty:ty,export_name:export_name,mediaType:media};
 }
-fn push(self_:Modules&,value:Module,texts:Texts)->Error {let canonical=Module{module:registeredText(texts,value.module),definition:registeredDefinition(texts,value.definition),canonical:registeredText(texts,value.canonical),bytes:registeredText(texts,value.bytes),source:registeredText(texts,value.source),overlaid:value.overlaid,hidden:value.hidden,read:value.read};return blot_support_pooled_buffer::push(self_,canonical,module_runs);}
+fn push(self_:Modules&,value:Module,texts:Texts)->Error {let canonical=Module{module:registeredText(texts,value.module),definition:registeredDefinition(texts,value.definition),canonical:registeredText(texts,value.canonical),bytes:registeredText(texts,value.bytes),source:registeredText(texts,value.source),sha256:value.sha256,overlaid:value.overlaid,hidden:value.hidden,read:value.read};return blot_support_pooled_buffer::push(self_,canonical,module_runs);}
 fn push(self_:Sources&,value:Source,texts:Texts)->Error {var contents=blot_support::none<const u8[:]>();if value.contents.present {contents=blot_support::some<const u8[:]>(registeredText(texts,value.contents.value));}let canonical=Source{path:registeredText(texts,value.path),contents:contents};return blot_support_pooled_buffer::push(self_,canonical,source_runs);}
 fn push(self_:Dependencies&,value:Dependency,texts:Texts)->Error {let canonical=Dependency{path:registeredText(texts,value.path),sha256:value.sha256};return blot_support_pooled_buffer::push(self_,canonical,dependency_runs);}
 fn push(self_:Resources&,value:Resource,texts:Texts)->Error {let canonical=Resource{id:value.id,path:registeredText(texts,value.path),mediaType:registeredText(texts,value.mediaType),sha256:value.sha256,bytes:registeredText(texts,value.bytes),key:registeredText(texts,value.key)};return blot_support_pooled_buffer::push(self_,canonical,resource_runs);}
@@ -84,7 +84,20 @@ fn init(options: Options) -> Session,Error {
 fn deinit(self_: Session&) {let last .=self_.last;if last {last.deinit();self_.last .= null;}self_.options = Options {..};if self_.owned_definitions.len != 0 {definition_runs.free_slice(self_.owned_definitions);}if self_.owned_roots.len != 0 {root_runs.free_slice(self_.owned_roots);}self_.owned_definitions = default<Definition[:]>();self_.owned_roots = default<const u8[:][:]>();self_.texts.freeTexts();}
 fn commit(self_: Session&,candidate: Candidate&) {assert(candidate.owner_id != 0 && !candidate.issue.present);let last .=self_.last;if last {last.deinit();}self_.last .= candidate;}
 fn reusable_(self_: const Session&,module: const u8[:],input: const u8[:],kind: Kind,bytes: const u8[:]) -> blot_support::Option<Module> {let last .=self_.last;if !last {return blot_support::none<Module>();}for old in last.modules.items {if old.definition.kind == kind && old.module == module && old.canonical == input && old.bytes == bytes {return blot_support::some<Module>(old);}}return blot_support::none<Module>();}
-fn utf16Less(left: const u8[:],right: const u8[:]) -> bool {var l: i64 = 0;var r: i64 = 0;loop {if l == left.len {return r != right.len;}if r == right.len {return false;}let lp,ll,lv = blot_backend_native_asset_readers::decodePoint(left,l);let rp,rl,rv = blot_backend_native_asset_readers::decodePoint(right,r);assert(lv && rv);l += ll;r += rl;var lu = lp;var ru = rp;if lp > 65535 {lu = 55296 + ((lp - 65536) >> 10);}if rp > 65535 {ru = 55296 + ((rp - 65536) >> 10);}if lu != ru {return lu < ru;}if lp != rp {return lp < rp;}}}
+fn utf16Less(left: const u8[:],right: const u8[:]) -> bool {
+    var l: i64 = 0;var r: i64 = 0;
+    while l < left.len && r < right.len {
+        let lb = left[l];let rb = right[r];
+        if lb < 128 && rb < 128 {
+            if lb != rb {return lb < rb;}
+            l++;r++;continue;
+        }
+        let lp,ll,lv = blot_backend_native_asset_readers::decodePoint(left,l);let rp,rl,rv = blot_backend_native_asset_readers::decodePoint(right,r);assert(lv && rv);l += ll;r += rl;
+        var lu = lp;var ru = rp;if lp > 65535 {lu = 55296 + ((lp - 65536) >> 10);}if rp > 65535 {ru = 55296 + ((rp - 65536) >> 10);}
+        if lu != ru {return lu < ru;}if lp != rp {return lp < rp;}
+    }
+    return l == left.len && r != right.len;
+}
 fn definitionLess(left: Definition,right: Definition) -> bool {return utf16Less(left.module,right.module);}
 fn dependencyLess(left: Dependency,right: Dependency) -> bool {return utf16Less(left.path,right.path);}
 fn resourceLess(left: Resource,right: Resource) -> bool {return utf16Less(left.key,right.key);}
@@ -143,7 +156,7 @@ fn readBuildInput(candidate_id:i64,key:u32)->const u8[:],bool {
     if key==0 || key>candidate.modules.items.len {return empty,false;}
     let module=candidate.modules.items[key-1];
     if module.definition.kind!=Kind.input || module.hidden {return empty,false;}
-    if module.read {return module.bytes,true;}
+    if module.read {return candidate.modules.items[key-1].bytes,true;}
     var bytes=module.bytes;
     if !module.overlaid {
         let captured,present,error=readInput(candidate,module.definition.path,module.canonical);
@@ -215,6 +228,89 @@ fn keepStagedWasm(c:Candidate&,wasm:const u8[:],functions:i64)->Error {
 
 fn digest(bytes: const u8[:]) -> u8[64] {var state = blot_support_sha256::init();blot_support_sha256::update(state,bytes);let hash = blot_support_sha256::final(state);let alphabet = "0123456789abcdef";var result: u8[64] = [0;64];for byte,index in hash {result[index * 2] = alphabet[byte >> 4];result[index * 2 + 1] = alphabet[byte & 15];}return result;}
 fn resourceKey(candidate: Candidate&,path: const u8[:],media: const u8[:],digest: const u8[:]) -> const u8[:],Error {var bytes: u8[>..] = [];var writer = blot_json::Writer {out: bytes,options: blot_json::Options {..},..};writer.beginArray();writer.element(path);writer.element(media);writer.element(digest);writer.endArray();if writer.failure != blot_error::Error.none {return default<const u8[:]>(),writer.failure;}return candidate.own(bytes);}
+struct AssetItem {
+    module_path: const u8[:],
+    input_path: const u8[:],
+    definition: Definition,
+    input: const u8[:],
+    source: const u8[:] = default<const u8[:]>(),
+    sha256: u8[64] = [0;64],
+    overlaid: bool = false,
+    hidden: bool = false,
+    reused: bool = false,
+    job_id: u32 = 0,
+}
+fn putU32Le(out: u8[>..<]&, value: u32) {
+    var b: u8[4] = [value as! u8, (value >> 8) as! u8, (value >> 16) as! u8, (value >> 24) as! u8];
+    out.append(b);
+}
+fn getU32Le(bytes: const u8[:], at: i64) -> u32 {
+    return (bytes[at] as u32) | ((bytes[at + 1] as u32) << 8) | ((bytes[at + 2] as u32) << 16) | ((bytes[at + 3] as u32) << 24);
+}
+fn runAssetLane(shared: u64, items: const AssetItem[:], jobs: const u32[:]) -> bool {
+    var meta: u8[>..<] = [];
+    var generated: u8[>..<] = [];
+    loop {
+        let job = blot_native::persist_claim(shared);
+        if job == 0 { return true; }
+        if job < 0 { return false; }
+        let item = items[jobs[job - 1]];
+        let hash = digest(item.input);
+        meta.clear();
+        generated.clear();
+        meta.push(0);
+        meta.append(hash[..]);
+        generated.push(0);
+        if item.definition.kind == Kind.wgsl {
+            let produced, error = blot_backend_native_asset_wgsl::generate(item.input);
+            if error != blot_error::Error.none { return false; }
+            var g = produced;
+            match g {
+                source value => { generated.append(value.bytes); },
+                issue value => {
+                    let iss = value.value;
+                    meta[0] = 1;
+                    putU32Le(meta, iss.start);
+                    putU32Le(meta, iss.end);
+                    putU32Le(meta, iss.code.len as u32);
+                    putU32Le(meta, iss.message.len as u32);
+                    meta.append(iss.code);
+                    meta.append(iss.message);
+                },
+            }
+            g.deinit();
+        } else if item.definition.kind != Kind.reference {
+            var kind = blot_backend_native_asset_readers::Kind.json;
+            match item.definition.kind {
+                json => { kind = blot_backend_native_asset_readers::Kind.json; },
+                catalog => { kind = blot_backend_native_asset_readers::Kind.catalog; },
+                text => { kind = blot_backend_native_asset_readers::Kind.text; },
+                tunables => { kind = blot_backend_native_asset_readers::Kind.tunables; },
+                _ => { abort("invalid native reader kind"); },
+            }
+            let produced, error = blot_backend_native_asset_readers::generate(kind, item.input);
+            if error != blot_error::Error.none { return false; }
+            var g = produced;
+            match g {
+                source value => { generated.append(value.bytes); },
+                issue value => {
+                    let iss = value.value;
+                    meta[0] = 1;
+                    putU32Le(meta, iss.start);
+                    putU32Le(meta, iss.end);
+                    putU32Le(meta, iss.code.len as u32);
+                    putU32Le(meta, iss.message.len as u32);
+                    meta.append(iss.code);
+                    meta.append(iss.message);
+                },
+            }
+            g.deinit();
+        }
+        let id = job as u32;
+        if !blot_native::persist_publish(shared, id, 1, meta[0], meta.len as u64) ||
+           !blot_native::persist_publish(shared, id, 2, generated[0], generated.len as u64) { return false; }
+    }
+}
 fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sources: const Source[:]) -> Candidate?,Error {
     if candidates.len >= 4294967295 {return null,blot_error::Error.out_of_memory;}let candidate_index=candidates.alloc_index(Candidate {owner_id: blot_native::fresh_owner_id(),..});let candidate:Candidate& =candidates[candidate_index];candidate.allocation_index=candidate_index;let overlay,overlay_error = blot_reuse_source_overlays::init(asset_sources,blot_reuse_project::Options {..});if overlay_error != blot_error::Error.none {candidate.deinit();return null,overlay_error;}var overrides = overlay;var order = DefinitionOrder {..};var discovered = DiscoveredDefinitions {..};
     fn capture() -> Error {
@@ -223,12 +319,15 @@ fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sou
         for position in 0..order.items.len {let definition=definitions.definitionAt(order.items[position]);if !validPath(definition.module) || !validPath(definition.path) {return blot_error::Error.invalid_native_assets;}}
         for index in 1..order.items.len {let item=order.items[index];var at=index;while at>0 && definitionLess(definitions.definitionAt(item),definitions.definitionAt(order.items[at-1])) {order.items[at]=order.items[at-1];at--;}order.items[at]=item;}
         let canonical_entry,entry_error = candidate.canonical(entry);if entry_error != blot_error::Error.none {return entry_error;}var source_names: dictionary<const u8[:],bool> = dictionary<const u8[:],bool> {};for source in sources {let name,error = candidate.canonical(source.path);if error != blot_error::Error.none {return error;}if source_names.get(name) {return blot_error::Error.duplicate_source_path;}source_names.insert(name,true);}var module_names: dictionary<const u8[:],bool> = dictionary<const u8[:],bool> {};var loads: dictionary<const u8[:],const u8[:]> = dictionary<const u8[:],const u8[:]> {};
+        var items: AssetItem[>..<] = [];
+        var jobs: u32[>..<] = [];
+        var pending_read_issue: blot_support::Option<Issue> = blot_support::none<Issue>();
         for position in 0..order.items.len {
             let borrowed_definition=definitions.definitionAt(order.items[position]);
             let owned,definition_error = candidate.copyDefinition(borrowed_definition);if definition_error != blot_error::Error.none {return definition_error;}let definition = owned;let module_path,module_error = candidate.canonical(definition.module);if module_error != blot_error::Error.none {return module_error;}if !validPath(module_path) {return blot_error::Error.invalid_native_assets;}if module_names.get(module_path) || source_names.get(module_path) || module_path == canonical_entry {return blot_error::Error.duplicate_asset_module;}module_names.insert(module_path,true);
             let input_path,input_error = candidate.canonical(definition.path);if input_error != blot_error::Error.none {return input_error;}if !validPath(input_path) {return blot_error::Error.invalid_native_assets;}if definition.kind == Kind.input {
                 candidate.tracks_inputs=true;
-                var text:u8[>..]=[];format(text,"const file: U32 = ",candidate.modules.items.len+1,"\n");
+                var text:u8[>..]=[];format(text,"const file: U32 = ",items.len+1,"\n");
                 let source,error=candidate.own(text);if error!=blot_error::Error.none {return error;}
                 let override .= overrides.files().get(input_path);
                 var bytes:const u8[:]=default<const u8[:]>();var hidden=false;var overlaid=false;
@@ -236,52 +335,188 @@ fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sou
                     overlaid=true;hidden=!override.present;
                     if !hidden {let copied,error=candidate.own(override.value);if error!=blot_error::Error.none {return error;}bytes=copied;}
                 }
-                let added=candidate.modules.push(Module{module:module_path,canonical:input_path,definition:definition,source:source,bytes:bytes,overlaid:overlaid,hidden:hidden,..},candidate.texts);
-                if added!=blot_error::Error.none {return added;}continue;
+                items.push(AssetItem{module_path:module_path,input_path:input_path,definition:definition,input:bytes,source:source,overlaid:overlaid,hidden:hidden,..});
+                continue;
             }
-            let input:const u8[:] = {
+            var read_failed = false;
+            let loaded_bytes: const u8[:] = {
                 let old .= loads.get(input_path);
-                if old {let cached:const u8[:]=old;cached}
+                if old { let cached: const u8[:] = old; registeredText(candidate.texts, cached) }
                 else {
-                    let bytes:const u8[:] = {
+                    let bytes: const u8[:] = {
                         let overridden .= overrides.files().get(input_path);
                         if overridden {
-                            if !overridden.present {candidate.fail(definition.path,"asset_missing","Asset hidden by overlay");return blot_error::Error.none;}
-                            let copied,error=candidate.own(overridden.value);if error!=blot_error::Error.none {return error;}copied
+                            if !overridden.present { candidate.fail(definition.path,"asset_missing","Asset hidden by overlay"); read_failed = true; default<const u8[:]>() }
+                            else { let copied,error = candidate.own(overridden.value); if error != blot_error::Error.none { return error; } copied }
                         } else {
-                            let copied,present,error=readInput(candidate,definition.path,input_path);if error!=blot_error::Error.none {return error;}if !present {return blot_error::Error.none;}copied
+                            let copied,present,error = readInput(candidate,definition.path,input_path);
+                            if error != blot_error::Error.none { return error; }
+                            if !present { read_failed = true; default<const u8[:]>()} else { copied }
                         }
                     };
-                    if bytes.len>maximum_file {candidate.fail(definition.path,"asset_limit","Asset input exceeds 16 MiB");return blot_error::Error.none;}
-                    if bytes.len>max(maximum_total-candidate.stats.inputBytes,0) {candidate.fail(definition.path,"asset_limit","Asset inputs exceed 64 MiB");return blot_error::Error.none;}
-                    candidate.stats.inputBytes+=bytes.len;loads.insert(input_path,bytes);bytes
+                    if !read_failed {
+                        if bytes.len > maximum_file { candidate.fail(definition.path,"asset_limit","Asset input exceeds 16 MiB"); read_failed = true; }
+                        else if bytes.len > max(maximum_total - candidate.stats.inputBytes, 0) { candidate.fail(definition.path,"asset_limit","Asset inputs exceed 64 MiB"); read_failed = true; }
+                        else { candidate.stats.inputBytes += bytes.len; loads.insert(input_path, bytes); }
+                    }
+                    bytes
                 }
             };
-            let hash = digest(input);var dependency_exists = false;for dependency in candidate.dependencies.items {if dependency.path == definition.path {dependency_exists = true;break;}}if !dependency_exists {let appended = candidate.dependencies.push(Dependency {path: definition.path,sha256: blot_support::some(hash)},candidate.texts);if appended != blot_error::Error.none {return appended;}}
-            var source: const u8[:] = default<const u8[:]>();
-            if definition.kind == Kind.reference {
-                var found = false;assert(definition.mediaType.present);for resource in candidate.resources.items {if resource.path == input_path && resource.mediaType == definition.mediaType.value && resource.sha256 == hash {found = true;break;}}
-                if !found {let key,key_error = resourceKey(candidate,input_path,definition.mediaType.value,hash);if key_error != blot_error::Error.none {return key_error;}let appended = candidate.resources.push(Resource {id: 0,path: input_path,mediaType: definition.mediaType.value,sha256: hash,bytes: input,key: key},candidate.texts);if appended != blot_error::Error.none {return appended;}}
-                if self_.reusable_(module_path,input_path,Kind.reference,input).present {candidate.stats.reused++;}else {candidate.stats.parsed++;}
-            }else {
-                let old = self_.reusable_(module_path,input_path,definition.kind,input);
-                if old.present {let copied,error = candidate.own(old.value.source);if error != blot_error::Error.none {return error;}source = copied;candidate.stats.reused++;}
-                else {
-                    if definition.kind == Kind.wgsl {
-                        let produced,error = blot_backend_native_asset_wgsl::generate(input);if error != blot_error::Error.none {return error;}var generated = produced;var generated_error = blot_error::Error.none;
-                        match generated {source value=>{let copied,error = candidate.own(value.bytes);source = copied;generated_error = error;},issue value=>{let issue = value.value;let message,error = candidate.own(issue.message);generated_error = error;if error == blot_error::Error.none {let code,code_error=candidate.own(issue.code);generated_error=code_error;if code_error==blot_error::Error.none {candidate.issue = blot_support::some(Issue {filename: registeredText(candidate.texts,definition.path),start: issue.start,end: issue.end,code: registeredText(candidate.texts,code),message: registeredText(candidate.texts,message)});}}},}
-                        generated.deinit();if generated_error != blot_error::Error.none {return generated_error;}if candidate.issue.present {return blot_error::Error.none;}
-                    }else {
-                        var kind = blot_backend_native_asset_readers::Kind.json;match definition.kind {json=>{kind = blot_backend_native_asset_readers::Kind.json;},catalog=>{kind = blot_backend_native_asset_readers::Kind.catalog;},text=>{kind = blot_backend_native_asset_readers::Kind.text;},tunables=>{kind = blot_backend_native_asset_readers::Kind.tunables;},_=>{abort("invalid native reader kind");},}
-                        let produced,error = blot_backend_native_asset_readers::generate(kind,input);if error != blot_error::Error.none {return error;}var generated = produced;var generated_error = blot_error::Error.none;
-                        match generated {source value=>{let copied,error = candidate.own(value.bytes);source = copied;generated_error = error;},issue value=>{let issue = value.value;let message,error = candidate.own(issue.message);generated_error = error;if error == blot_error::Error.none {let code,code_error=candidate.own(issue.code);generated_error=code_error;if code_error==blot_error::Error.none {candidate.issue = blot_support::some(Issue {filename: registeredText(candidate.texts,definition.path),start: issue.start,end: issue.end,code: registeredText(candidate.texts,code),message: registeredText(candidate.texts,message)});}}},}
-                        generated.deinit();if generated_error != blot_error::Error.none {return generated_error;}if candidate.issue.present {return blot_error::Error.none;}
+            if read_failed {
+                pending_read_issue = candidate.issue;
+                candidate.issue = blot_support::none<Issue>();
+                break;
+            }
+            let old = self_.reusable_(module_path, input_path, definition.kind, loaded_bytes);
+            if old.present {
+                var reused_source: const u8[:] = default<const u8[:]>();
+                if definition.kind != Kind.reference {
+                    let copied, error = candidate.own(old.value.source);
+                    if error != blot_error::Error.none { return error; }
+                    reused_source = copied;
+                }
+                items.push(AssetItem{module_path:module_path,input_path:input_path,definition:definition,input:loaded_bytes,source:reused_source,sha256:old.value.sha256,reused:true,..});
+            } else {
+                let job_id = (jobs.len + 1) as u32;
+                jobs.push(items.len as u32);
+                items.push(AssetItem{module_path:module_path,input_path:input_path,definition:definition,input:loaded_bytes,job_id:job_id,..});
+            }
+        }
+        var shared: u64 = 0;
+        let width: i64 = min(8, min(jobs.len, blot_native::available_workers() as i64));
+        if jobs.len >= 8 && width > 1 && blot_native::platform_is_linux() != 0 {
+            let opened = blot_native::persist_open(jobs.len as u32);
+            if opened != 0 {
+                var registered = true;
+                for job_idx, pos in jobs {
+                    if !blot_native::persist_node(opened, (pos + 1) as u32, items[job_idx].input.len as u32) { registered = false; break; }
+                }
+                if registered {
+                    var pids: i64[8] = [0; 8];
+                    for lane in 1..width {
+                        let pid = blot_native::fork_process();
+                        if pid == 0 {
+                            if !runAssetLane(opened, items[..], jobs[..]) { blot_native::persist_fail(opened); blot_native::job_exit(1); }
+                            blot_native::job_exit(0);
+                        }
+                        if pid > 0 { pids[lane] = pid; }
+                    }
+                    var all_ok = runAssetLane(opened, items[..], jobs[..]);
+                    for lane in 1..width {
+                        if pids[lane] > 0 && !blot_native::wait_success(pids[lane] as u32) { all_ok = false; }
+                    }
+                    if all_ok { shared = opened; } else { blot_native::persist_close(opened); }
+                } else {
+                    blot_native::persist_close(opened);
+                }
+            }
+        }
+        var meta_buf: u8[>..<] = [];
+        var gen_buf: u8[>..<] = [];
+        for item in items {
+            if item.definition.kind == Kind.input {
+                let added = candidate.modules.push(Module{module:item.module_path,canonical:item.input_path,definition:item.definition,source:item.source,bytes:item.input,overlaid:item.overlaid,hidden:item.hidden,..},candidate.texts);
+                if added != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return added; }
+                continue;
+            }
+            var hash: u8[64] = item.sha256;
+            var source: const u8[:] = registeredText(candidate.texts, item.source);
+            var got_parallel = false;
+            if !item.reused && shared != 0 && item.job_id != 0 {
+                let meta_size = blot_native::persist_size(shared, item.job_id, 1);
+                if meta_size >= 65 {
+                    meta_buf.resize(meta_size, 0);
+                    if blot_native::persist_read(shared, item.job_id, 1, meta_buf[0], meta_size as u64) {
+                        for k in 0..64 { hash[k] = meta_buf[1 + k]; }
+                        got_parallel = true;
+                        var dependency_exists = false;
+                        for dependency in candidate.dependencies.items { if dependency.path == item.definition.path { dependency_exists = true; break; } }
+                        if !dependency_exists {
+                            let appended = candidate.dependencies.push(Dependency{path:item.definition.path,sha256:blot_support::some(hash)},candidate.texts);
+                            if appended != blot_error::Error.none { blot_native::persist_close(shared); return appended; }
+                        }
+                        if meta_buf[0] == 1 {
+                            let start = getU32Le(meta_buf[..], 65);
+                            let end = getU32Le(meta_buf[..], 69);
+                            let code_len = getU32Le(meta_buf[..], 73) as i64;
+                            let msg_len = getU32Le(meta_buf[..], 77) as i64;
+                            let code_bytes = meta_buf[81..81 + code_len];
+                            let msg_bytes = meta_buf[81 + code_len..81 + code_len + msg_len];
+                            let message, merr = candidate.own(msg_bytes);
+                            if merr != blot_error::Error.none { blot_native::persist_close(shared); return merr; }
+                            let code, cerr = candidate.own(code_bytes);
+                            if cerr != blot_error::Error.none { blot_native::persist_close(shared); return cerr; }
+                            candidate.issue = blot_support::some(Issue{filename:registeredText(candidate.texts,item.definition.path),start:start,end:end,code:registeredText(candidate.texts,code),message:registeredText(candidate.texts,message)});
+                            blot_native::persist_close(shared);
+                            return blot_error::Error.none;
+                        }
+                        if item.definition.kind == Kind.reference {
+                            var found = false; assert(item.definition.mediaType.present);
+                            for resource in candidate.resources.items { if resource.path == item.input_path && resource.mediaType == item.definition.mediaType.value && resource.sha256 == hash { found = true; break; } }
+                            if !found {
+                                let key, key_error = resourceKey(candidate, item.input_path, item.definition.mediaType.value, hash);
+                                if key_error != blot_error::Error.none { blot_native::persist_close(shared); return key_error; }
+                                let appended = candidate.resources.push(Resource{id:0,path:item.input_path,mediaType:item.definition.mediaType.value,sha256:hash,bytes:item.input,key:key},candidate.texts);
+                                if appended != blot_error::Error.none { blot_native::persist_close(shared); return appended; }
+                            }
+                            candidate.stats.parsed++;
+                        } else {
+                            let gen_size = blot_native::persist_size(shared, item.job_id, 2);
+                            if gen_size >= 1 {
+                                gen_buf.resize(gen_size, 0);
+                                if !blot_native::persist_read(shared, item.job_id, 2, gen_buf[0], gen_size as u64) { blot_native::persist_close(shared); return blot_error::Error.io; }
+                                let copied, cerr = candidate.own(gen_buf[1..gen_size]);
+                                if cerr != blot_error::Error.none { blot_native::persist_close(shared); return cerr; }
+                                source = copied;
+                                candidate.stats.parsed++;
+                            } else {
+                                got_parallel = false;
+                            }
+                        }
+                    }
+                }
+            }
+            if !got_parallel {
+                if !item.reused { hash = digest(item.input); }
+                var dependency_exists = false;
+                for dependency in candidate.dependencies.items { if dependency.path == item.definition.path { dependency_exists = true; break; } }
+                if !dependency_exists {
+                    let appended = candidate.dependencies.push(Dependency{path:item.definition.path,sha256:blot_support::some(hash)},candidate.texts);
+                    if appended != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return appended; }
+                }
+                if item.definition.kind == Kind.reference {
+                    var found = false; assert(item.definition.mediaType.present);
+                    for resource in candidate.resources.items { if resource.path == item.input_path && resource.mediaType == item.definition.mediaType.value && resource.sha256 == hash { found = true; break; } }
+                    if !found {
+                        let key, key_error = resourceKey(candidate, item.input_path, item.definition.mediaType.value, hash);
+                        if key_error != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return key_error; }
+                        let appended = candidate.resources.push(Resource{id:0,path:item.input_path,mediaType:item.definition.mediaType.value,sha256:hash,bytes:item.input,key:key},candidate.texts);
+                        if appended != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return appended; }
+                    }
+                    if item.reused { candidate.stats.reused++; } else { candidate.stats.parsed++; }
+                } else if item.reused {
+                    candidate.stats.reused++;
+                } else {
+                    if item.definition.kind == Kind.wgsl {
+                        let produced, error = blot_backend_native_asset_wgsl::generate(item.input); if error != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return error; }
+                        var generated = produced; var generated_error = blot_error::Error.none;
+                        match generated { source value => { let copied, error = candidate.own(value.bytes); source = copied; generated_error = error; }, issue value => { let issue = value.value; let message, error = candidate.own(issue.message); generated_error = error; if error == blot_error::Error.none { let code, code_error = candidate.own(issue.code); generated_error = code_error; if code_error == blot_error::Error.none { candidate.issue = blot_support::some(Issue{filename:registeredText(candidate.texts,item.definition.path),start:issue.start,end:issue.end,code:registeredText(candidate.texts,code),message:registeredText(candidate.texts,message)}); } } }, }
+                        generated.deinit(); if generated_error != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return generated_error; } if candidate.issue.present { if shared != 0 { blot_native::persist_close(shared); } return blot_error::Error.none; }
+                    } else {
+                        var kind = blot_backend_native_asset_readers::Kind.json; match item.definition.kind { json => { kind = blot_backend_native_asset_readers::Kind.json; }, catalog => { kind = blot_backend_native_asset_readers::Kind.catalog; }, text => { kind = blot_backend_native_asset_readers::Kind.text; }, tunables => { kind = blot_backend_native_asset_readers::Kind.tunables; }, _ => { abort("invalid native reader kind"); }, }
+                        let produced, error = blot_backend_native_asset_readers::generate(kind, item.input); if error != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return error; }
+                        var generated = produced; var generated_error = blot_error::Error.none;
+                        match generated { source value => { let copied, error = candidate.own(value.bytes); source = copied; generated_error = error; }, issue value => { let issue = value.value; let message, error = candidate.own(issue.message); generated_error = error; if error == blot_error::Error.none { let code, code_error = candidate.own(issue.code); generated_error = code_error; if code_error == blot_error::Error.none { candidate.issue = blot_support::some(Issue{filename:registeredText(candidate.texts,item.definition.path),start:issue.start,end:issue.end,code:registeredText(candidate.texts,code),message:registeredText(candidate.texts,message)}); } } }, }
+                        generated.deinit(); if generated_error != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return generated_error; } if candidate.issue.present { if shared != 0 { blot_native::persist_close(shared); } return blot_error::Error.none; }
                     }
                     candidate.stats.parsed++;
                 }
             }
-            let appended = candidate.modules.push(Module {module: module_path,definition: definition,canonical: input_path,bytes: input,source: source,..},candidate.texts);if appended != blot_error::Error.none {return appended;}
+            let appended = candidate.modules.push(Module{module:item.module_path,definition:item.definition,canonical:item.input_path,bytes:item.input,source:source,sha256:hash,..},candidate.texts);
+            if appended != blot_error::Error.none { if shared != 0 { blot_native::persist_close(shared); } return appended; }
         }
+        if shared != 0 { blot_native::persist_close(shared); }
+        if pending_read_issue.present { candidate.issue = pending_read_issue; return blot_error::Error.none; }
         for index in 1..candidate.resources.items.len {let item = candidate.resources.items[index];var at = index;while at > 0 && resourceLess(item,candidate.resources.items[at - 1]) {candidate.resources.items[at] = candidate.resources.items[at - 1];at--;}candidate.resources.items[at] = item;}for index in 0..candidate.resources.items.len {candidate.resources.items[index].id = (index + 1) as u32;}
         for index in 0..candidate.modules.items.len {
             let module = candidate.modules.items[index];

@@ -36,6 +36,7 @@ struct Copier {
     associated: bool = false, mapping: WordMap&, row_variables: WordMap&, rows: WordMap&, labels: WordMap&,
 }
 fn init(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, tables: Tables) -> Copier { return Copier { private_scopes: tables.private_scopes, source: source, destination: destination, mapping: tables.mapping, row_variables: tables.row_variables, rows: tables.rows, labels: tables.labels , ..}; }
+fn reset(self_: Copier&) { self_.private_scopes.clear(); self_.mapping.clear(); self_.row_variables.clear(); self_.rows.clear(); self_.labels.clear(); }
 fn deinit(self_: Copier&) { self_.private_scopes.deinit(); self_.mapping.deinit(); self_.row_variables.deinit(); self_.rows.deinit(); self_.labels.deinit(); }
 fn copyPhysical(self_: Copier&, identity: Identity) -> Identity, Error {
     if self_.private_namespace == 0 || identity.unit != self_.private_namespace || identity.decl == 0 || identity.decl > self_.private_nodes.len { return Identity {..}, blot_error::Error.type_limit; }
@@ -179,7 +180,7 @@ fn withCopier<C,F>(source: blot_check_frozen_types::Source, destination: blot_ch
     var copier = init(source, destination, Tables { scopes, mapping, row_variables, rows, labels , ..}); let error = F(context, copier); deinit(copier); return error;
 }
 
-struct WordMap { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<u32,u32>[:] = default<dictionary_slot<u32,u32>[:]>() }
+struct WordMap { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<u32,u32>[:] = default<dictionary_slot<u32,u32>[:]>(), touched: i64[128] = [0; 128] }
 fn probe(map: const WordMap&,key: u32) -> i64 {
     if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
@@ -189,26 +190,35 @@ fn contains(map: const WordMap&,key: u32) -> bool { return probe(map,key) >= 0; 
 fn release(slots: dictionary_slot<u32,u32>[:]) { if slots.len != 0 { pool_WordMap.free_slice(slots); } }
 fn grow(map: WordMap&,capacity: i64) {
     let replacement = pool_WordMap.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<u32,u32> { default<u32>(),default<u32>(),0 }; }
-    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    var moved: i64 = 0;
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; if map.count <= map.touched.len { map.touched[moved] = index; moved += 1; } } }
     release(map.slots); map.slots = replacement;
 }
 fn insert(map: WordMap&,key: u32,value: u32) -> bool {
     if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<u32,u32> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<u32,u32> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<u32,u32> { key,value,tag }; if map.count < map.touched.len { map.touched[map.count] = index; } map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<u32,u32> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
 }
 fn remove(map: WordMap&,key: u32) -> bool {
     var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
     loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
-    map.slots[hole] = dictionary_slot<u32,u32> { default<u32>(),default<u32>(),0 }; map.count--; return true;
+    map.slots[hole] = dictionary_slot<u32,u32> { default<u32>(),default<u32>(),0 }; map.count--;
+    var live: i64 = 0;
+    if map.count <= map.touched.len { for slot,at in map.slots { if slot.tag != 0 && live < map.touched.len { map.touched[live] = at; live += 1; } } }
+    return true;
 }
-fn clear(map: WordMap&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn clear(map: WordMap&) {
+    if map.count == 0 { return; }
+    if map.count <= map.touched.len { for index in map.touched[..map.count] { map.slots[index].tag = 0; } }
+    else { for &slot in map.slots { slot.tag = 0; } }
+    map.count = 0;
+}
 fn deinit(map: WordMap&) { release(map.slots); map.slots=default<dictionary_slot<u32,u32>[:]>(); map.count = 0;map.failure=blot_error::Error.none; }
-fn clone(map: const WordMap&) -> WordMap { var copy = WordMap {..}; if map.slots.len != 0 { let slots = pool_WordMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn clone(map: const WordMap&) -> WordMap { var copy = WordMap {..}; if map.slots.len != 0 { let slots = pool_WordMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; copy.touched = map.touched; } return copy; }
 fn each<F>(map: WordMap&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_WordMap:dictionary_slot<u32,u32>[>..];
-fn restore(map:WordMap&,slots:const dictionary_slot<u32,u32>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_WordMap.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return blot_error::Error.none;}
+fn restore(map:WordMap&,slots:const dictionary_slot<u32,u32>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_WordMap.alloc_slice(slots.len);var live:i64=0;for slot,index in slots {run[index]=slot;if slot.tag!=0 && live<map.touched.len {map.touched[live]=index;live+=1;}}map.slots=run;map.count=count;return blot_error::Error.none;}
 struct IdentityMap { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<Identity,Identity>[:] = default<dictionary_slot<Identity,Identity>[:]>() }
 fn probe(map: const IdentityMap&,key: Identity) -> i64 {
     if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;

@@ -13,12 +13,36 @@ let constants:u32[64]=[
 struct State {words:u32[8]=initial,block_:u8[64]=[0;64],used:i64=0,bytes:u64=0}
 fn init()->State {return State{..};}
 fn rotate(value:u32,bits:u32)->u32 {return (value>>bits)|(value<<(32-bits));}
-fn compress(receiver:State&) {
-    var schedule:u32[64]=[0;64];for index in 16 {let at=index*4;schedule[index]=(receiver.block_[at] as u32<<24)|(receiver.block_[at+1] as u32<<16)|(receiver.block_[at+2] as u32<<8)|receiver.block_[at+3];}
+fn compressAt(receiver:State&,data:const u8[:],offset:i64) {
+    var schedule:u32[64]=[0;64];
+    for index in 16 {
+        let at=offset+index*4;
+        schedule[index]=(data[at] as u32<<24)|(data[at+1] as u32<<16)|(data[at+2] as u32<<8)|data[at+3];
+    }
     for index in 16..64 {let x=schedule[index-15];let y=schedule[index-2];let a=rotate(x,7)^rotate(x,18)^(x>>3);let b=rotate(y,17)^rotate(y,19)^(y>>10);schedule[index]=schedule[index-16]+a+schedule[index-7]+b;}
     var a=receiver.words[0];var b=receiver.words[1];var c=receiver.words[2];var d=receiver.words[3];var e=receiver.words[4];var f=receiver.words[5];var g=receiver.words[6];var h=receiver.words[7];
     for index in 64 {let choice=(e&f)^((e^0xffffffff)&g);let first=h+(rotate(e,6)^rotate(e,11)^rotate(e,25))+choice+constants[index]+schedule[index];let majority=(a&b)^(a&c)^(b&c);let second=(rotate(a,2)^rotate(a,13)^rotate(a,22))+majority;h=g;g=f;f=e;e=d+first;d=c;c=b;b=a;a=first+second;}
     receiver.words[0]+=a;receiver.words[1]+=b;receiver.words[2]+=c;receiver.words[3]+=d;receiver.words[4]+=e;receiver.words[5]+=f;receiver.words[6]+=g;receiver.words[7]+=h;
 }
-fn update(receiver:State&,bytes:const u8[:]) {receiver.bytes+=bytes.len as u64;for byte in bytes {receiver.block_[receiver.used]=byte;receiver.used++;if receiver.used==64 {receiver.compress();receiver.used=0;}}}
+fn compress(receiver:State&) { compressAt(receiver, receiver.block_[..], 0); }
+fn update(receiver:State&,bytes:const u8[:]) {
+    receiver.bytes+=bytes.len as u64;
+    var at:i64=0;
+    if receiver.used!=0 {
+        let take=min(64-receiver.used,bytes.len);
+        receiver.block_[receiver.used..receiver.used+take].move_from(bytes[..take]);
+        receiver.used+=take;
+        at+=take;
+        if receiver.used==64 {receiver.compress();receiver.used=0;}
+    }
+    while at+64<=bytes.len {
+        compressAt(receiver,bytes,at);
+        at+=64;
+    }
+    if at<bytes.len {
+        let rem=bytes.len-at;
+        receiver.block_[..rem].move_from(bytes[at..]);
+        receiver.used=rem;
+    }
+}
 fn final(source:State)->u8[32] {var receiver=source;let bits=receiver.bytes*8;receiver.block_[receiver.used]=0x80;receiver.used++;if receiver.used>56 {for index in receiver.used..64 {receiver.block_[index]=0;}receiver.compress();receiver.used=0;}for index in receiver.used..56 {receiver.block_[index]=0;}for index in 8 {receiver.block_[56+index]=(bits>>((7-index)*8)) as! u8;}receiver.compress();var result:u8[32]=[0;32];for word,index in receiver.words {for byte in 4 {result[index*4+byte]=(word>>((3-byte)*8)) as! u8;}}return result;}
