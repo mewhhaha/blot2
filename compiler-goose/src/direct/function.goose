@@ -15,6 +15,7 @@ import check.types;
 import check.storage_ops;
 import check.storage_types;
 import check.diagnostic_code;
+import check.wire_schema;
 import reuse.principal_interface;
 import direct.writer;
 import direct.types;
@@ -579,6 +580,8 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_unreachable_);
             return neverVal(), blot_direct_types::Error.none;
         },
+        spark => { return sparkNode(g, f, id); },
+        flat_op => { return flatOpNode(g, f, id); },
         _ => {
             g.failOpen(m, id);
             g.put(blot_direct_emit::nodeTagName(n.tag));
@@ -1191,7 +1194,7 @@ recursive fn adapterBody(g: Generator&, f: Fn&, instance_id: u32, captures: Vals
             let constructor = tm.constructor(key.id);
             // A record-bodied constructor used as a function takes its fields
             // as a tuple in declared order.
-            if tagOf(g, argument.ty) == blot_direct_types::Tag.tuple && constructor.payload != 0 && tm.types.node(constructor.payload).tag == blot_check_types::Tag.record {
+            if tagOf(g, argument.ty) == blot_direct_types::Tag.tuple && constructor.payload != 0 && tm.types.node(constructor.payload).tag == blot_check_types::Tag.record && tm.types.node(constructor.payload).b > 1 {
                 let cases, error = g.types.variants(result);
                 if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(tm, 0); }
                 let position, error = variantPosition(g, f, cases, constructor.tag, 0);

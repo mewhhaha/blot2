@@ -594,7 +594,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
         },
         comptime_meta => { return evalComptimeMetaStage(g, f, s, m, id, frame, depth); },
         panic => { return stopStage(s, "#run trapped"); },
-        fork_, with_handle, comptime_for => { return stopStage(s, "#run does not support this construct"); },
+        fork_, with_handle, comptime_for, spark, flat_op => { return stopStage(s, "#run does not support this construct"); },
         _ => { return stopStage(s, "#run requires a supported closed expression"); },
     }
 }

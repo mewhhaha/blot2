@@ -448,6 +448,21 @@
           "type_tags"
         ],
         [
+          "sparks",
+          "[]check.core.SparkInfo",
+          "sparks"
+        ],
+        [
+          "kernels",
+          "[]check.core.KernelDecl",
+          "kernels"
+        ],
+        [
+          "processes",
+          "[]check.core.ProcessDecl",
+          "processes"
+        ],
+        [
           "diagnostics",
           "[]check.core.Diagnostic",
           "diagnostics"
@@ -1564,6 +1579,16 @@
           "comptime_meta",
           44,
           "comptime_meta"
+        ],
+        [
+          "spark",
+          45,
+          "spark"
+        ],
+        [
+          "flat_op",
+          46,
+          "flat_op"
         ]
       ]
     },
@@ -2073,9 +2098,187 @@
           "is_function",
           "bool",
           "is_function"
+        ],
+        [
+          "is_kernel",
+          "bool",
+          "is_kernel"
         ]
       ],
       "unwired": []
+    },
+    {
+      "name": "check.core.SparkInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::SparkInfo",
+      "fields": [
+        [
+          "is_range",
+          "bool",
+          "is_range"
+        ],
+        [
+          "source",
+          "u32",
+          "source"
+        ],
+        [
+          "end",
+          "u32",
+          "end"
+        ],
+        [
+          "pattern",
+          "u32",
+          "pattern"
+        ],
+        [
+          "body",
+          "u32",
+          "body"
+        ],
+        [
+          "captures",
+          "check.core.List",
+          "captures"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.SparkInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::SparkInfo[:]",
+      "children": [
+        "check.core.SparkInfo"
+      ]
+    },
+    {
+      "name": "check.core.KernelDecl",
+      "kind": "struct",
+      "goose": "blot_check_core::KernelDecl",
+      "fields": [
+        [
+          "name",
+          "check.core.Name",
+          "name"
+        ],
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "has_context",
+          "bool",
+          "has_context"
+        ],
+        [
+          "prepare_target",
+          "check.core.BindingRef",
+          "prepare_target"
+        ],
+        [
+          "run_target",
+          "check.core.BindingRef",
+          "run_target"
+        ],
+        [
+          "ctx_type",
+          "u32",
+          "ctx_type"
+        ],
+        [
+          "prepared_type",
+          "u32",
+          "prepared_type"
+        ],
+        [
+          "item_type",
+          "u32",
+          "item_type"
+        ],
+        [
+          "out_type",
+          "u32",
+          "out_type"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.KernelDecl",
+      "kind": "slice",
+      "goose": "blot_check_core::KernelDecl[:]",
+      "children": [
+        "check.core.KernelDecl"
+      ]
+    },
+    {
+      "name": "check.core.ProcessDecl",
+      "kind": "struct",
+      "goose": "blot_check_core::ProcessDecl",
+      "fields": [
+        [
+          "name",
+          "check.core.Name",
+          "name"
+        ],
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "init_target",
+          "check.core.BindingRef",
+          "init_target"
+        ],
+        [
+          "step_target",
+          "check.core.BindingRef",
+          "step_target"
+        ],
+        [
+          "config_type",
+          "u32",
+          "config_type"
+        ],
+        [
+          "state_type",
+          "u32",
+          "state_type"
+        ],
+        [
+          "cmd_type",
+          "u32",
+          "cmd_type"
+        ],
+        [
+          "reply_type",
+          "u32",
+          "reply_type"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.ProcessDecl",
+      "kind": "slice",
+      "goose": "blot_check_core::ProcessDecl[:]",
+      "children": [
+        "check.core.ProcessDecl"
+      ]
     },
     {
       "name": "[]check.core.Body",

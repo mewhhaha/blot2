@@ -24,6 +24,9 @@ type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
 type Iteration [state, result] is data = $Continue state | $Done result
 type Type witness is data = $Type witness
+// Represented opaque handles for compiler-verified multi-core batch kernels and isolated processes.
+type Kernel [ctx, item, out] is opaque = (U32, (U32, U32), (U32, U32), (U32, U32))
+type Process [cfg, cmd, reply] is opaque = U32
 // Text stores Unicode scalar values; std/text validates external scalar arrays.
 type Text = #[U32]
 

@@ -2,9 +2,23 @@
 (export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
 (entry_modifier) @variable
+(kernel_modifier) @variable
+(process_modifier) @variable
 ((entry_binding (entry_modifier) @keyword.storage.modifier) @_entry
   (#match? @_entry "^entry[ \t]+(const|let)"))
 (entry_binding (binding_keyword) @keyword.storage.type)
+((entry_kernel_function_header
+    (entry_modifier) @keyword.storage.modifier
+    (kernel_modifier) @keyword.storage.modifier) @_entry_kernel_fn
+  (#match? @_entry_kernel_fn "^entry[ \t]+kernel[ \t]+func"))
+((entry_kernel_binding
+    (entry_modifier) @keyword.storage.modifier
+    (kernel_modifier) @keyword.storage.modifier) @_entry_kernel
+  (#match? @_entry_kernel "^entry[ \t]+kernel[ \t]+"))
+((entry_process_binding
+    (entry_modifier) @keyword.storage.modifier
+    (process_modifier) @keyword.storage.modifier) @_entry_process
+  (#match? @_entry_process "^entry[ \t]+process[ \t]+"))
 (private_modifier) @variable
 ((named_function_header
     (private_modifier)? @keyword.storage.modifier
@@ -29,7 +43,7 @@
 (ever_loop "ever" @keyword.control.repeat)
 ["return" "break" "yield" "panic"] @keyword.control.return
 (request_complete_header "complete" @keyword.control)
-["do" "fork" "with" "freeze" "seal" "copy" "test"] @keyword.control
+["do" "fork" "with" "freeze" "seal" "copy" "spark" "test"] @keyword.control
 
 (self) @variable.builtin
 (intrinsic) @function.builtin
@@ -50,6 +64,9 @@
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 
 (function_binding name: (identifier) @function)
+(entry_kernel_function_header name: (identifier) @function)
+(entry_kernel_function_header parameter: (identifier) @variable.parameter)
+(entry_kernel_function_header parameter: (parenthesized . (identifier) @variable.parameter))
 (named_function_header name: (identifier) @function)
 (named_function_header parameter: (identifier) @variable.parameter)
 (named_function_header parameter: (parenthesized . (identifier) @variable.parameter))

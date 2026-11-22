@@ -65,6 +65,13 @@ recognize primitive intrinsic aliases (`const F32.add = @f32.add`, etc.). All
 `std/prelude.blot` Core nodes and eliminating closure allocations / indirect
 calls in scalar comparison and prelude math helpers.
 
+Concurrency vNext Phase 1 (22 November 2026) added represented opaque `Kernel`
+and `Process` handle types to `std/prelude.blot` (+231 source bytes, +26 syntax
+nodes, +17 type nodes), reserved the `spark` keyword, added `entry kernel` /
+`entry process`, wire-schema / relational read-only purity analysis, and fixed
+`k == 1` record-payload constructor/pattern lowering. All 109 fixtures kept
+100% identical exit codes, diagnostics, and emitted Wasm bytes.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

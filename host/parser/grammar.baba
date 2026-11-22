@@ -22,7 +22,13 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | entry_concurrency_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+entry_concurrency_declaration = ("entrY" (entry_kernel_declaration | entry_process_declaration)) ;
+entry_kernel_declaration = ("kernel" (value:named_function | name:source_identifier ":" annotation:type_expression "=" body:kernel_body)) ;
+kernel_body = ("{" LAYOUT_NEWLINE? ("prepare" ":" prepare:callable_path "," LAYOUT_NEWLINE? "run" ":" run:callable_path | "run" ":" run:callable_path "," LAYOUT_NEWLINE? "prepare" ":" prepare:callable_path) ","? LAYOUT_NEWLINE? "}") ;
+entry_process_declaration = ("process" name:source_identifier ":" annotation:type_expression "=" body:process_body) ;
+process_body = ("{" LAYOUT_NEWLINE? ("init" ":" init:callable_path "," LAYOUT_NEWLINE? "step" ":" step:callable_path | "step" ":" step:callable_path "," LAYOUT_NEWLINE? "init" ":" init:callable_path) ","? LAYOUT_NEWLINE? "}") ;
+callable_path = (root:source_identifier ("." (TYPE_IDENT ".")* name:source_identifier)? | types:(TYPE_IDENT ".")+ name:source_identifier) ;
 // The source adapter marks `opaque` only directly after `is`.
 opaque_type = ("type" name:TYPE_IDENT parameters:type_atom* ("=>" "type" parameters:type_atom)* "is" "opaquE" "=" value:type_expression) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom* ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
@@ -95,7 +101,8 @@ named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | comptime_access | member_access | slice_access)*) ;
 comptime_access = ("." "(" name:source_identifier ")") ;
 member_access = ("." name:(source_identifier | TYPE_IDENT)) ;
-atom = (boolean | FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+atom = (boolean | FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | spark_expression | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+spark_expression = ("spark" "#" "[" body:collection_expression "|" pattern:pattern "<-" source:expression (".." end:expression)? "]") ;
 static_run = ("#" "run" value:expression) ;
 static_do = ("#" value:do_block) ;
 receive = ("|" value:(qualified_name | group) "|") ;
@@ -174,10 +181,10 @@ collection_if = ("if" condition:collection_infix "then" consequence:collection_e
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
 collection_infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
-source_identifier = (IDENT | "own" | "run" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
+source_identifier = (IDENT | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 
 quantified_type = (kind:("forall" | "exists") "[" binders:quantified_binder ("," binders:quantified_binder)* "]" where:quantified_where? "=>" body:type_expression) ;
-quantified_binder = (sort:("row" | "region")? name:(IDENT | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
+quantified_binder = (sort:("row" | "region")? name:(IDENT | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
 quantified_where = (("where" | "wherE") body:constraint_body) ;
 package_pack = ("pack" "[" witnesses:type_expression ("," witnesses:type_expression)* "]" value:expression "as" annotation:type_expression) ;
 package_unpack = ("unpack" package:expression "as" "[" binders:quantified_binder ("," binders:quantified_binder)* "]" name:source_identifier "in" body:expression) ;

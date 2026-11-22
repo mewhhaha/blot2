@@ -75,16 +75,36 @@ Deno.test("formatter preserves spark and receive boundaries", async () => {
   equal(await formatSource(formatted), formatted);
 });
 
-Deno.test("formatter keeps ordered sparks and scoped spawn operands", async () => {
-  const source = `effect Start: Array U32->U32
-entry func planner (seed:U32):U32=> return seed
-entry func planner_step(pair:Array U32):U32=> return @u32.add pair[0] pair[1]
-func request(config:U32):U32 ! {Start}=> return @spawn Start planner config
-entry func double(xs:Array U32):Array U32=> return @spark #[@u32.add x x | x<-xs]
+Deno.test("formatter keeps sparks and entry kernel and process declarations", async () => {
+  const source = `func prep (w:Array F32):Array F32=> return w
+func step_item (ctx:Array F32)->(x:U32):U32=> return x
+func init_p (seed:U32):U32=> return seed
+func step_p (st:own U32)->(cmd:U32):(U32,U32)=> return (st,cmd)
+entry kernel func mix (x:U32):U32=> return x
+entry kernel plan:Kernel [Array F32,U32,U32]={prepare:prep,run:step_item}
+entry process planner:Process [U32,U32,U32]={init:init_p,step:step_p}
+entry func double(xs:Array U32):Array U32=> return spark #[@u32.add x x | x<-xs]
+entry func indexed(n:U32):Array U32=> return spark #[x | x<-0..n]
 `;
   const formatted = await formatSource(source);
-  equal(formatted.includes("@spawn Start planner config"), true);
-  equal(formatted.includes("@spark #[@u32.add x x | x <- xs]"), true);
+  equal(
+    formatted.includes("entry kernel func mix (x: U32): U32 => return x"),
+    true,
+  );
+  equal(
+    formatted.includes(
+      "entry kernel plan: Kernel [Array F32, U32, U32] = { prepare: prep, run: step_item }",
+    ),
+    true,
+  );
+  equal(
+    formatted.includes(
+      "entry process planner: Process [U32, U32, U32] = { init: init_p, step: step_p }",
+    ),
+    true,
+  );
+  equal(formatted.includes("spark #[@u32.add x x | x <- xs]"), true);
+  equal(formatted.includes("spark #[x | x <- 0 .. n]"), true);
   equal(await formatSource(formatted), formatted);
 });
 

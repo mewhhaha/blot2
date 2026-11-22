@@ -525,7 +525,7 @@ recursive fn construct(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if constructor.payload != 0 && m.types.node(constructor.payload).tag == blot_check_types::Tag.record { declared = constructor.payload; }
     var payload = unitVal();
     if n.b != 0 {
-        if declared != 0 && m.node(n.b).tag == blot_check_core::Tag.product {
+        if declared != 0 && m.types.node(declared).b > 1 && m.node(n.b).tag == blot_check_core::Tag.product {
             let value, error = positionalRecord(g, f, n.b, declared);
             if error != blot_direct_types::Error.none { return value, error; }
             payload = value;
@@ -533,6 +533,20 @@ recursive fn construct(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let value, error = expr(g, f, n.b);
             if error != blot_direct_types::Error.none { return value, error; }
             payload = value;
+            if declared != 0 && m.types.node(declared).b == 1 {
+                let field_sym = m.types.recordField(m.types.node(declared), 0).name;
+                let spelling = m.fieldSpelling(field_sym);
+                if spelling.present {
+                    let fname = g.types.fieldName(spelling.value);
+                    let already_wrapped = tagOf(g, payload.ty) == blot_direct_types::Tag.record && g.types.node(payload.ty).b == 1 && g.types.findField(payload.ty, fname) == 0;
+                    if !already_wrapped {
+                        var one_field: blot_direct_types::Field[1] = [blot_direct_types::Field { fname, payload.ty }];
+                        let rec_ty, rerr = g.types.record(one_field[..]);
+                        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                        payload = Val { rec_ty, payload.start, payload.len };
+                    }
+                }
+            }
         }
     }
     // The node's type, or the one the payload's value gives the nominal.

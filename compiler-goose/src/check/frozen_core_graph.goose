@@ -10,17 +10,17 @@ import support.option;
 
 import .frozen_core_validation;
 import .frozen_core_bounds;
-enum Kind { type_,row,operation,node,pattern,closure,match_,arm,pattern_row,update,update_step,loop_,operation_value,scheme,obligation }
-let kind_count: i64=15;
-fn kindCode(kind: Kind) -> i64 { match kind { type_=>0,row=>1,operation=>2,node=>3,pattern=>4,closure=>5,match_=>6,arm=>7,pattern_row=>8,update=>9,update_step=>10,loop_=>11,operation_value=>12,scheme=>13,obligation=>14 } }
-let kinds=[Kind.type_,Kind.row,Kind.operation,Kind.node,Kind.pattern,Kind.closure,Kind.match_,Kind.arm,Kind.pattern_row,Kind.update,Kind.update_step,Kind.loop_,Kind.operation_value,Kind.scheme,Kind.obligation];
+enum Kind { type_,row,operation,node,pattern,closure,match_,arm,pattern_row,update,update_step,loop_,spark,operation_value,scheme,obligation }
+let kind_count: i64=16;
+fn kindCode(kind: Kind) -> i64 { match kind { type_=>0,row=>1,operation=>2,node=>3,pattern=>4,closure=>5,match_=>6,arm=>7,pattern_row=>8,update=>9,update_step=>10,loop_=>11,spark=>12,operation_value=>13,scheme=>14,obligation=>15 } }
+let kinds=[Kind.type_,Kind.row,Kind.operation,Kind.node,Kind.pattern,Kind.closure,Kind.match_,Kind.arm,Kind.pattern_row,Kind.update,Kind.update_step,Kind.loop_,Kind.spark,Kind.operation_value,Kind.scheme,Kind.obligation];
 struct Frame { vertex: i64, edge: i64=0 }
 struct Scratch { colors: u8[:], path: Frame[:] }
 struct Requirements { colors: i64, path: i64 }
 struct Item { kind: Kind, id: i64 }
-struct Graph { m: const Module&, starts: i64[16] }
+struct Graph { m: const Module&, starts: i64[17] }
 fn initGraph(m: const Module&) -> Graph,Error {
-    var graph=Graph{m,[0;16], ..}; let counts=[m.types.nodes.len,m.types.effects.rows.len,m.types.operations.len,m.nodes.len,m.patterns.len,m.closures.len,m.matches.len,m.match_arms.len,m.pattern_rows.len,m.updates.len,m.update_steps.len,m.loops.len,m.operation_values.len,m.bindings.len,m.obligations.len];
+    var graph=Graph{m,[0;17], ..}; let counts=[m.types.nodes.len,m.types.effects.rows.len,m.types.operations.len,m.nodes.len,m.patterns.len,m.closures.len,m.matches.len,m.match_arms.len,m.pattern_rows.len,m.updates.len,m.update_steps.len,m.loops.len,m.sparks.len,m.operation_values.len,m.bindings.len,m.obligations.len];
     for size,i in counts { let value,error=sum(graph.starts[i],size); if error != blot_error::Error.none { return graph,error; } graph.starts[i+1]=value; } return graph,blot_error::Error.none;
 }
 fn vertex(self_: Graph,kind: Kind,id: i64) -> i64 { return self_.starts[kindCode(kind)]+id; }
@@ -54,6 +54,8 @@ fn edge(self_: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> 
             with_handle => { if slot == 0 { return self_.to(Kind.node,v.a); } if slot - 1 < v.c { return self_.to(Kind.node,m.extra[v.b + slot - 1]); } },
             comptime_for => { if slot == 0 { return self_.to(Kind.node,v.b); } },
             comptime_meta => { if v.c == 0 && slot == 0 { return self_.to(Kind.node,v.a); } if (v.c == 8 || v.c == 9) && slot == 0 { return self_.to(Kind.node,v.b); } },
+            spark => { if slot == 0 { return self_.to(Kind.spark,v.a); } },
+            flat_op => { if v.c <= blot_check_core::flat_op_kernel_io_hash && slot == 0 { return self_.to(Kind.node,v.a); } },
             block_,suite,product,record,array,array_op,storage => { if slot < v.b { return self_.to(Kind.node,m.extra[v.a+slot]); } },
             call,contract_method,break_ => { if slot < v.c { return self_.to(Kind.node,m.extra[v.b+slot]); } },
             bind,construct => { if slot == 0 { return self_.to(Kind.node,v.b); } },
@@ -72,6 +74,7 @@ fn edge(self_: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> 
         update => { let v=m.updates[id]; if slot == 0 { return self_.to(Kind.node,v.root); } if slot == 1 { return self_.to(Kind.node,v.value); } let step=slot-2; if step < v.selectors.len { return self_.to(Kind.update_step,v.selectors.start+step); } },
         update_step => { if slot == 0 && m.update_steps[id].kind == blot_check_core::UpdateKind.index { return self_.to(Kind.node,m.update_steps[id].index); } },
         loop_ => { let v=m.loops[id]; if slot == 0 { return self_.to(Kind.node,v.first); } if slot == 1 { return self_.to(Kind.node,v.end); } if slot == 2 { return self_.to(Kind.node,v.body); } if slot == 3 && v.pattern != 0 { return self_.to(Kind.pattern,v.pattern); } },
+        spark => { let v=m.sparks[id]; if slot == 0 { return self_.to(Kind.node,v.source); } if slot == 1 { return self_.to(Kind.node,v.end); } if slot == 2 { return self_.to(Kind.node,v.body); } if slot == 3 && v.pattern != 0 { return self_.to(Kind.pattern,v.pattern); } },
         operation_value => { if slot == 0 { return self_.to(Kind.node,m.operation_values[id].witness); } if slot == 1 { return self_.to(Kind.node,m.operation_values[id].capability); } },
         scheme => { let list=m.bindings[id].scheme.obligations; if slot < list.len { return self_.to(Kind.obligation,list.start+slot); } },
         obligation => { let value=m.obligations[id]; if slot == 0 && value.kind == blot_check_types::ObligationKind.callee_use { return self_.to(Kind.scheme,value.identity.decl); } },
@@ -112,7 +115,7 @@ fn listRoles(m: const Module&,type_roles: u8[:],core_roles: u8[:]) -> Error {
     for t in m.member_templates { { let propagated_error = mark(type_roles,t.arguments.start,t.arguments.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     for n in m.nominals { { let propagated_error = mark(type_roles,n.parameters.start,n.parameters.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(type_roles,n.variables.start,n.variables.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(core_roles,n.constructors.start,n.constructors.len,role_constructor); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     for o in m.operation_names { { let propagated_error = mark(type_roles,o.variables.start,o.variables.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(type_roles,o.parameters.start,o.parameters.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } }
-    for c in m.closures { { let propagated_error = mark(type_roles,c.closed_rows.start,c.closed_rows.len,role_row_variable); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(core_roles,c.captures.start,c.captures.len,role_binding); if propagated_error != blot_error::Error.none { return propagated_error; } } } for o in m.operation_values { { let propagated_error = mark(type_roles,o.arguments.start,o.arguments.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } }
+    for c in m.closures { { let propagated_error = mark(type_roles,c.closed_rows.start,c.closed_rows.len,role_row_variable); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(core_roles,c.captures.start,c.captures.len,role_binding); if propagated_error != blot_error::Error.none { return propagated_error; } } } for s in m.sparks { { let propagated_error = mark(core_roles,s.captures.start,s.captures.len,role_binding); if propagated_error != blot_error::Error.none { return propagated_error; } } } for o in m.operation_values { { let propagated_error = mark(type_roles,o.arguments.start,o.arguments.len,role_type); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     for n in m.nodes { match n.tag {
         block_,suite,product,array,array_op,storage=>{{ let propagated_error = mark(core_roles,n.a,n.b,role_node); if propagated_error != blot_error::Error.none { return propagated_error; } }},
         record=>{{ let propagated_error = mark(core_roles,n.a,n.b,role_node); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(core_roles,n.c,n.b,role_destination); if propagated_error != blot_error::Error.none { return propagated_error; } }}, call,break_,with_handle=>{{ let propagated_error = mark(core_roles,n.b,n.c,role_node); if propagated_error != blot_error::Error.none { return propagated_error; } }},

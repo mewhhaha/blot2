@@ -78,6 +78,7 @@ let kw_not: Tag = 72;
 let kw_with: Tag = 73;
 let kw_fork: Tag = 74;
 let semicolon: Tag = 75;
+let kw_spark: Tag = 76;
 
 struct Token { tag: Tag, start: u32, end: u32 }
 fn text(value: Token, source: const u8[:]) -> const u8[:] { return source[value.start..value.end]; }
@@ -124,6 +125,7 @@ fn keyword(value: const u8[:]) -> Tag {
             if value == "of" { return kw_of; }
         },
         'r' => { if value == "return" { return kw_return; } },
+        's' => { if value == "spark" { return kw_spark; } },
         't' => {
             if value == "true" { return kw_true; }
             if value == "then" { return kw_then; }

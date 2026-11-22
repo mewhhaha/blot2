@@ -68,8 +68,10 @@ not a method on an implicit receiver.
 
 Scalars: `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`),
 and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32 arithmetic wraps
-at 32 bits; F32 rounds to binary32 and can yield infinity or NaN. Prefix `-`
-negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
+at 32 bits; F32 rounds to binary32 and can yield infinity or canonical positive
+quiet NaN (`0x7fc00000`) on arithmetic and rounding producers (`+`, `-`, `*`,
+`/`, `sqrt`, `floor`, `ceil`, `trunc`). Prefix `-` negates F32 bitwise;
+parenthesize negative arguments: `F32.abs (-2.0)`.
 
 Functions take one argument at a time. Calls associate left: `f a b` means
 `(f a) b`. Application binds tighter than infix operators. `f(x)` also calls a
@@ -1335,8 +1337,9 @@ func scaled lanes => return simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
 ```
 
 Every operation with a scalar counterpart gives the bits of that scalar kernel
-in each lane, including NaN, signed zero and wrapping. Collection arguments and
-lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
+in each lane, including canonical positive quiet NaN (`0x7fc00000`) on F32
+arithmetic/rounding producers, signed zero and wrapping. Collection arguments
+and lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
 
 - Arithmetic: U32 add/subtract/multiply and bitwise and/or/xor; F32 arithmetic,
   abs/negate, sqrt and rounding; saturating F32-to-U32 and U32-to-F32
@@ -2120,86 +2123,51 @@ alternatives, and removes parentheses that do not affect expression grouping.
 `--check` checks without writing. The formatter verifies that the parsed
 structure is unchanged before writing.
 
-## Sparks, processes and host workers
+## Sparks, kernels and isolated processes
 
-Use a spark when the caller needs an ordered array in this invocation. Use
-a process when private state needs to survive the caller.
+Blot provides three orthogonal, compiler-verified concurrency primitives:
 
-```blot
-entry func double (xs: Array U32): Array U32 => return @spark #[@u32.mul x 2 | x <- xs]
-```
-
-The compiler evaluates the generator input once, allocates the result array at its final
-length and writes one result at each input index. Empty inputs produce an
-empty array. The direct Wasm path works on single-threaded hosts. This first
-profile accepts one unguarded array generator, numeric literals, the bound
-item, and nested calls to these bounded scalar operations:
-
-| Input | Operations |
-| --- | --- |
-| U32 | `@u32.add`, `sub`, `mul`, `bit_and`, `bit_or`, `bit_xor`, `to_f32` |
-| F32 | `@f32.add`, `sub`, `mul`, `div`, `abs`, `neg` |
-
-A bare identity preserves U32 or F32 elements. User functions, overloaded operators, captures,
-guards and additional generators are outside this profile. Unmarked
-comprehensions keep their existing semantics.
-
-A Deno host can opt into parallel execution for an independently verified
-batch entry with `SparkPool.open(module, { entry, width, workers })` from
-`@mewhhaha/blot/sparks`. `pool.run(queries)` gives prepared workers disjoint
-contiguous rows. The input is a private U32 array. Each query must return
-exactly `width` lanes of the declared U32 or F32 result type, in input order.
-An optional copied U32 prefix supplies the same immutable configuration to
-each batch. The pool installs it once per prepared worker.
-The host registering a kernel is responsible for its purity, termination
-and row independence. On worker failure the pool retires its workers and
-recomputes the complete saved input directly. `pool.direct(queries)` runs
-the same entry in one guest call. Await `pool.close()` to observe retirement.
-Worker selection is explicit.
-
-An explicit Deno driver can share a `SparkCopyBudget` across prepared pools.
-Call `beginFrame()` once per frame. Preparation and each dispatch reserve
-their worst-case array payload copies, including both host transfers, the
-guest's packet unpacking and packing, and direct recovery. The returned
-packet is bounded by the fixed ABI 8 transport bank before the host checks
-its expected shape. A rejected worker reservation can still run directly if there is
-enough allowance for one guest call. If that also exceeds the allowance, the
-host reports a range error before copying. An unfinished attempt keeps its
-whole reservation across frame changes until its worker threads stop. Pools
-that share a budget also share its worker slots and worker linear-memory cap.
-Retiring threads occupy their slots and cap until exit. The payload budget
-excludes allocation, Wasm memory
-growth, and the kernel's own writes. The source form `@spark.within` is
-unavailable until its direct path can prove zero charged copies.
+1. **`spark #[expr | pat <- source]`** — synchronous, pure (`! {}`), ordered
+   data-parallel map over a single unguarded irrefutable array or `U32` range
+   generator. The compiler verifies read-only purity over outer captures, the
+   generator source, and module globals, auto-vectorizing eligible scalar
+   kernels to 4-wide Wasm SIMD (`v128`) and compiling non-numeric pure maps to
+   a preallocated direct loop.
+2. **`entry kernel`** — pure, compiler-verified multi-core batch kernels
+   (stateless `entry kernel func name (x: Item): Out => ...` or prepared-context
+   `entry kernel name : Kernel [WireCtx, Item, Out] = { prepare, run }`),
+   binding an opaque entry-module `Kernel [Ctx, Item, Out]` handle and emitting
+   schema-validated `blot:kernels` metadata for warm host `KernelPool`s.
+3. **`entry process`** — isolated stateful sequential actors
+   (`entry process name : Process [Config, Cmd, Reply] = { init, step }` where
+   `step` takes `own State`), emitting `blot:processes` metadata for
+   deterministic host schedulers (`Processes`).
 
 ```blot
-effect Start: Array U32 -> U32
-entry func planner (seed: U32): U32 => return seed
-entry func planner_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
-func request (config: U32): U32 ! {Start} => return @spawn Start planner config
+// Pure data-parallel map (vectorizes to 4-wide Wasm SIMD):
+entry func double (xs: #[U32]): #[U32] =>
+  spark #[x * 2 | x <- xs]
+
+// Stateless multi-core batch kernel:
+entry kernel func mix_u32 (x: U32): U32 =>
+  (x * 1664525) ^ 1013904223
+
+// Isolated stateful process:
+type PlannerState is data = $PlannerState { total: U32 }
+func planner_init (seed: U32): PlannerState => $PlannerState { total: seed }
+func planner_step (own s: PlannerState) -> (delta: U32): (PlannerState, U32) =>
+  let next = s.total + delta
+  return ($PlannerState { total: next }, next)
+
+entry process planner : Process [U32, U32, U32] = {
+  init: planner_init,
+  step: planner_step,
+}
 ```
 
-A scoped provider for `Start` decides admission synchronously. The packet
-contains the U32 configuration followed by the ASCII bytes of the local
-program name. The compiler checks the start operation and the two entry
-signatures. A live provider forwards the packet to `ProcessHost.admit`
-from `@mewhhaha/blot/processes`. Zero means refused. An admitted child starts
-in a later `advance(budget)` in its own Wasm instance. The host registers
-an initialization and step work charge for each trusted bounded program.
-A step consumes `#[previous_state, command]` and its U32 result becomes
-both the next state and the reply.
-
-`send` accepts a command when the child is ready and its mailbox has room.
-Accepted tickets reserve space for a final reply. `poll` consumes one
-completed, cancelled or failed ticket. `close` cancels queued tickets,
-`release` reclaims a drained terminal child, and `restore` invalidates all
-endpoints and returns their remaining terminal events to the previous owner. Turn budgets bound registered work units. Each Wasm call runs to
-completion on the host thread. The caller should check world revisions before
-applying a result produced across frames.
-
-Host workers exchange copied numeric packets under ABI 8 and session
-protocol 2. Guest closures, owners, borrowed views and provider capabilities
-stay in their originating instance.
+Host workers exchange canonical flat-numeric or numeric-array packets under
+ABI 8 and Session Protocol 2. Guest closures, owners, borrowed views, opaque
+handles, and provider capabilities stay inside their originating instance.
 
 Host callbacks suspend the current invocation through the guest adapter. Keep
 borrowed views within that invocation; retain later state by copying it into a

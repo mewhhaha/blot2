@@ -45,3 +45,26 @@ func eq (left: a) -> (right: a): Bool where {Eq a} => return Eq.eq left right
 func namespace.member value => return value
 //   ^^^^^^^^^ namespace
 //             ^^^^^^ function
+
+entry kernel func mix (x: U32): U32 => return x
+// <- keyword.storage.modifier
+//    ^^^^^^ keyword.storage.modifier
+//           ^^^^ keyword.function
+//                ^^^ function
+
+entry kernel plan: Kernel [#[F32], U32, U32] = { prepare: p, run: r }
+// <- keyword.storage.modifier
+//    ^^^^^^ keyword.storage.modifier
+
+entry process planner: Process [U32, U32, U32] = { init: i, step: s }
+// <- keyword.storage.modifier
+//    ^^^^^^^ keyword.storage.modifier
+
+const kernel = 1
+//    ^^^^^^ variable
+
+const process = 2
+//    ^^^^^^^ variable
+
+func map_xs xs => return spark #[x | x <- xs]
+//                       ^^^^^ keyword.control

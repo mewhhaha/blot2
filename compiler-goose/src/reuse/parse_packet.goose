@@ -171,8 +171,9 @@ fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
             blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind, blot_parse_ast::tag_pattern_name,
             blot_parse_ast::tag_pattern_constructor, blot_parse_ast::tag_pattern_field, blot_parse_ast::tag_pattern_value,
             blot_parse_ast::tag_type_name, blot_parse_ast::tag_type_field, blot_parse_ast::tag_type_binder,
-            blot_parse_ast::tag_quantified_binder, blot_parse_ast::tag_comptime_for => {if !relocate(prefix,names,node.a) {return false;}},
-            _ => {if node.tag>blot_parse_ast::tag_comptime_project {return false;}},
+            blot_parse_ast::tag_quantified_binder, blot_parse_ast::tag_comptime_for,
+            blot_parse_ast::tag_entry_kernel_decl, blot_parse_ast::tag_entry_process_decl => {if !relocate(prefix,names,node.a) {return false;}},
+            _ => {if node.tag>blot_parse_ast::tag_entry_process_decl {return false;}},
         }
     }
     for &origin in tree.operator_origins.items {if !relocate(prefix,names,origin.member) {return false;}}

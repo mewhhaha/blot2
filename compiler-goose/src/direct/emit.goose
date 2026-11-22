@@ -15,6 +15,7 @@ import check.core;
 import check.types;
 import check.diagnostic_code;
 import check.storage_types;
+import check.wire_schema;
 import direct.writer;
 import direct.types;
 import direct.runtime;
@@ -238,6 +239,9 @@ root struct State {
     dep_frame_mark: i64 = 0,
     dep_match: bool = true,
     inlined_callees: U64Map = U64Map {},
+    kernels: blot_check_wire_schema::KernelInfo[>..] = [],
+    processes: blot_check_wire_schema::ProcessInfo[>..] = [],
+    wire_word_tags: u8[>..] = [],
 }
 
 fn recordDep(g: Generator&, id: u32) {
@@ -379,6 +383,15 @@ fn failCode(g: Generator&, m: const Module&, id: u32, code: Code, text: Chars) -
     failOpenCode(g, m, id, code);
     put(g, text);
     return failClose(g);
+}
+fn failSpanCode(g: Generator&, unit: u32, span: Span, code: Code, text: Chars) -> Error {
+    if !g.s.has_failure {
+        let start = g.s.text.len as u32;
+        g.s.text.append(text);
+        g.s.failure = Failure { unit: unit, span: span, message: Text { start, (g.s.text.len as u32) - start }, code: code };
+        g.s.has_failure = true;
+    }
+    return blot_direct_types::Error.unsupported;
 }
 // The Zig spelling of a Core node tag.
 fn nodeTagName(tag: blot_check_core::Tag) -> Chars {

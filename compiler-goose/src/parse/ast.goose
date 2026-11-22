@@ -112,6 +112,9 @@ let tag_with_entry: Tag = 96;
 let tag_comptime_for: Tag = 97;
 let tag_comptime_if: Tag = 98;
 let tag_comptime_project: Tag = 99;
+let tag_spark_expr: Tag = 100;
+let tag_entry_kernel_decl: Tag = 101;
+let tag_entry_process_decl: Tag = 102;
 type BinderSort = u32;
 let bindersort_type_: BinderSort = 0;
 let bindersort_row: BinderSort = 1;
@@ -137,8 +140,6 @@ let code_expected_expression: Code = 1;
 let code_expected_type: Code = 2;
 let code_expected_pattern: Code = 3;
 let code_unexpected_token: Code = 4;
-let code_task_spark_scope: Code = 5;
-let code_task_spark_call: Code = 6;
 let code_task_receive_tuple: Code = 7;
 let code_invalid_literal: Code = 8;
 let code_operator_associativity: Code = 9;
@@ -151,11 +152,6 @@ let code_private_marker: Code = 15;
 let code_GPU_FRONTEND_SYNTAX_ERROR: Code = 16;
 let code_function_return_required: Code = 17;
 let code_spark_generator: Code = 18;
-let code_spark_kernel: Code = 19;
-let code_spawn_program: Code = 20;
-// Extra constraints on the generated application (ordinary applications use 0).
-let apply_process_start: u32 = 1;
-let apply_spark_identity: u32 = 2;
 
 struct Node { tag: Tag = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
 struct NumericFault { node: Id, code: NumericCode, span: Span, actual_token: blot_parse_token::Tag }
@@ -169,16 +165,12 @@ struct Diagnostic {
 fn message(value: Diagnostic) -> const u8[:] {
  if value.code == code_GPU_FRONTEND_SYNTAX_ERROR { return "This syntax is not allowed in this position"; }
  if value.code == code_expected_token { return "Expected a syntax token"; }
- if value.code == code_spark_generator { return "A spark requires one unguarded array generator: @spark #[result | item <- array]"; }
- if value.code == code_spark_kernel { return "The spark kernel must use its input, numeric literals and bounded numeric primitives"; }
- if value.code == code_spawn_program { return "Spawn requires a start operation and a local entry func with a matching _step entry"; }
+ if value.code == code_spark_generator { return "A spark requires one unguarded generator: spark #[result | pattern <- source]"; }
  if value.code == code_expected_expression { return "Expected an expression"; }
  if value.code == code_function_return_required { return "A function body requires return or a do block with explicit returns"; }
  if value.code == code_expected_type { return "Expected a type"; }
  if value.code == code_expected_pattern { return "Expected a pattern"; }
  if value.code == code_unexpected_token { return "Unexpected syntax token"; }
- if value.code == code_task_spark_scope { return "A sparked call needs an enclosing task group"; }
- if value.code == code_task_spark_call { return "Spark needs a parenthesized function call"; }
  if value.code == code_task_receive_tuple { return "Tuple receive is not available yet; join each handle explicitly"; }
  if value.code == code_invalid_literal { return "Invalid literal"; }
  if value.code == code_operator_associativity { return "Equal-precedence operators need compatible associativity or parentheses"; }
@@ -192,6 +184,8 @@ fn message(value: Diagnostic) -> const u8[:] {
 }
 
 struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, modifier: blot_parse_symbols::Symbol, runtime: bool, exported: bool, function_declaration: bool=false, where: List, where_node: Id, attributes: List }
+struct EntryKernelDecl { name: blot_parse_symbols::Symbol, annotation: Id, stateless: bool, first: Id, second: Id, attributes: List, name_point: u32, where: List }
+struct EntryProcessDecl { name: blot_parse_symbols::Symbol, annotation: Id, init: Id, step: Id, attributes: List, name_point: u32 }
 struct ImplementationDecl { name: blot_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
 // `own`: the function takes the argument over (spec section 10.3).
 struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id, own: bool = false }
@@ -465,6 +459,16 @@ fn value_decl(tree: const Tree&, id: Id) -> ValueDecl {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+9];
  return ValueDecl {n.a,n.b,x[0],x[1],x[2]==1,(x[7]&1)!=0,(x[7]&2)!=0,List {x[3],x[4], ..},x[8],List {x[5],x[6], ..}, ..};
 }
+fn entry_kernel_decl(tree: const Tree&, id: Id) -> EntryKernelDecl {
+ let n=node(tree,id); let x=tree.extra.items[n.c..n.c+8];
+ return EntryKernelDecl {n.a,n.b,x[0]==0,x[1],x[2],List {x[3],x[4], ..},x[5],List {x[6],x[7], ..}, ..};
+}
+fn entry_process_decl(tree: const Tree&, id: Id) -> EntryProcessDecl {
+ let n=node(tree,id); let x=tree.extra.items[n.c..n.c+5];
+ return EntryProcessDecl {n.a,n.b,x[0],x[1],List {x[2],x[3], ..},x[4], ..};
+}
+fn spark_source(tree: const Tree&, id: Id) -> Id { return tree.extra.items[node(tree,id).c]; }
+fn spark_end(tree: const Tree&, id: Id) -> Id { return tree.extra.items[node(tree,id).c+1]; }
 fn implementation(tree: const Tree&, id: Id) -> ImplementationDecl {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+6]; let members=node(tree,n.b);
  return ImplementationDecl {n.a,List {x[0],x[1], ..},x[2],List {members.a,members.b, ..},List {x[3],x[4], ..},x[5], ..};
@@ -492,14 +496,10 @@ fn fixity(tree: const Tree&, id: Id) -> Fixity {
 fn code_name(code: Code) -> const u8[:] {
  if code==code_expected_token { return "expected_token"; }
  if code==code_spark_generator { return "spark_generator"; }
- if code==code_spark_kernel { return "spark_kernel"; }
- if code==code_spawn_program { return "spawn_program"; }
  if code==code_expected_expression { return "expected_expression"; }
  if code==code_expected_type { return "expected_type"; }
  if code==code_expected_pattern { return "expected_pattern"; }
  if code==code_unexpected_token { return "unexpected_token"; }
- if code==code_task_spark_scope { return "task_spark_scope"; }
- if code==code_task_spark_call { return "task_spark_call"; }
  if code==code_task_receive_tuple { return "task_receive_tuple"; }
  if code==code_invalid_literal { return "invalid_literal"; }
  if code==code_operator_associativity { return "operator_associativity"; }

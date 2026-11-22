@@ -97,6 +97,14 @@ fn processNode<C>(self_:Walker<C>&,id:Id)->Error {
   },
   blot_parse_ast::tag_comptime_if=>{{ let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.b); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
   blot_parse_ast::tag_comptime_project=>{{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+  blot_parse_ast::tag_spark_expr=>{
+   { let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.push(Event.pattern_bind {n.b, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.push(Event.pattern_read {n.b, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(self_.tree.spark_end(id)); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(self_.tree.spark_source(id)); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  },
   _=>{},
  }
  return blot_error::Error.none;
@@ -112,6 +120,16 @@ fn walk<C>(walker:Walker<C>&,declaration:Id)->Error {
  if walker.tree.node(declaration).tag==blot_parse_ast::tag_field {
   let field=walker.tree.node(declaration);
   if field.b!=0 { let propagated_error = walker.visit(field.b); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ } else if walker.tree.node(declaration).tag==blot_parse_ast::tag_entry_kernel_decl {
+  let decl=walker.tree.entry_kernel_decl(declaration);
+  { let propagated_error = walker.visit(decl.first); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  if !decl.stateless { let propagated_error = walker.visit(decl.second); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  { let propagated_error = walker.list(decl.attributes); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ } else if walker.tree.node(declaration).tag==blot_parse_ast::tag_entry_process_decl {
+  let decl=walker.tree.entry_process_decl(declaration);
+  { let propagated_error = walker.visit(decl.init); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  { let propagated_error = walker.visit(decl.step); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  { let propagated_error = walker.list(decl.attributes); if propagated_error != blot_error::Error.none { return propagated_error; } }
  } else {
   let value=walker.tree.value_decl(declaration);{ let propagated_error = walker.visit(value.body); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = walker.list(value.attributes); if propagated_error != blot_error::Error.none { return propagated_error; } }
  }

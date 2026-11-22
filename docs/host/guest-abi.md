@@ -98,6 +98,14 @@ results, algebraic values and bundles are not host ABI values.
 | Array F32     | copied `Float32Array`                | `i32` array pointer           |
 | Host callback | opaque capability token              | `externref`                   |
 
+**Scalar `F32` JS host-boundary NaN contract:** Array packets copy raw 32-bit
+IEEE-754 bits verbatim across Rust and JS/V8. Per the WebAssembly JS API
+(`ToWebAssemblyValue`), JS↔Wasm scalar `f32` conversion preserves all finite
+values, signed zeros, and infinities, while arbitrary implementation-defined
+NaN bit patterns are not preserved across the JS scalar `f32` boundary (use
+`U32` bit-words or array packets for portable bit-exact NaN transport across
+JS).
+
 Arguments and callback results are validated, not JS-coerced. U32 values
 returned by Wasm are converted from signed i32 representation back to unsigned
 numbers. Unit callbacks return `null`, not `undefined`. `guest.read(name)` reads
@@ -139,9 +147,17 @@ returned packet and supply it to a replacement guest after reload. Its schema
 and compatibility are application responsibilities.
 
 Only modules with array arguments/results (including callback signatures) export
-`blot:memory`, `blot:allocate` and `blot:reset` for the adapter. Allocation
-takes an i32 byte count and returns an aligned i32 pointer. Reset takes an
-ignored i32 and returns the first dynamic arena byte. Arrays use a little-endian
+`blot:memory`, `blot:allocate` and `blot:reset` for the adapter (`packets == true`).
+Scalar-only `entry process` modules still define internal linear memory without
+exporting `blot:memory`/`blot:allocate`/`blot:reset` so existing ABI 8 strict
+export checks continue to accept them. Allocation takes an i32 byte count and
+returns an aligned i32 pointer from the module's transport bank (for host-to-guest
+packets and callback replies without resetting the arena between callbacks).
+Reset takes an ignored i32 and releases the transport bank. For modules with
+`blot:kernels` or `blot:processes`, `numericPacketCapacity()` reports the exact
+declared `transport_budget`; for ABI 8 modules without those optional sections,
+it reports the compiler's nominal 2 MiB default (bounded at runtime by actual
+memory growth and host limits). Arrays use a little-endian
 U32 length followed by contiguous 32-bit words, with F32 values stored as
 IEEE-754 bits. Modules with an arena also export `blot:allocation`, the raw
 `(i32 bytes) -> i32 pointer` allocator used internally, for development tools to

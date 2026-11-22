@@ -131,13 +131,21 @@ export type LiteralKind =
   | ","
   | "}"
   | "privatE"
+  | "entrY"
+  | "kernel"
+  | ":"
+  | "="
+  | "prepare"
+  | "run"
+  | "process"
+  | "init"
+  | "step"
+  | "."
   | "type"
   | "=>"
   | "is"
   | "opaquE"
-  | "="
   | "impL"
-  | ":"
   | "const"
   | "@"
   | "["
@@ -146,7 +154,6 @@ export type LiteralKind =
   | "func"
   | "->"
   | "return"
-  | "."
   | "effect"
   | "data"
   | "|"
@@ -179,7 +186,9 @@ export type LiteralKind =
   | "borrow_mut"
   | "and"
   | "or"
-  | "run"
+  | "spark"
+  | "<-"
+  | ".."
   | "true"
   | "false"
   | "·"
@@ -187,7 +196,6 @@ export type LiteralKind =
   | "then"
   | "else"
   | "..."
-  | "<-"
   | "do"
   | "case"
   | "of"
@@ -198,7 +206,6 @@ export type LiteralKind =
   | "fields"
   | "variants"
   | ":="
-  | ".."
   | "ever"
   | "use"
   | "break"
@@ -276,6 +283,12 @@ export type RuleName =
   | "named_import"
   | "import_binding"
   | "declaration"
+  | "entry_concurrency_declaration"
+  | "entry_kernel_declaration"
+  | "kernel_body"
+  | "entry_process_declaration"
+  | "process_body"
+  | "callable_path"
   | "opaque_type"
   | "type_alias"
   | "contract_type"
@@ -341,6 +354,7 @@ export type RuleName =
   | "comptime_access"
   | "member_access"
   | "atom"
+  | "spark_expression"
   | "static_run"
   | "static_do"
   | "receive"
@@ -494,8 +508,50 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | EntryConcurrencyDeclarationCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EntryConcurrencyDeclarationCursor extends RuleCursorBase<"entry_concurrency_declaration"> {
+}
+
+export interface EntryKernelDeclarationCursor extends RuleCursorBase<"entry_kernel_declaration"> {
+  field(name: "annotation"): TypeExpressionCursor | null;
+  field(name: "body"): KernelBodyCursor | null;
+  field(name: "name"): SourceIdentifierCursor | null;
+  field(name: "value"): NamedFunctionCursor | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface KernelBodyCursor extends RuleCursorBase<"kernel_body"> {
+  field(name: "prepare"): CallablePathCursor;
+  field(name: "run"): CallablePathCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EntryProcessDeclarationCursor extends RuleCursorBase<"entry_process_declaration"> {
+  field(name: "annotation"): TypeExpressionCursor;
+  field(name: "body"): ProcessBodyCursor;
+  field(name: "name"): SourceIdentifierCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ProcessBodyCursor extends RuleCursorBase<"process_body"> {
+  field(name: "init"): CallablePathCursor;
+  field(name: "step"): CallablePathCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CallablePathCursor extends RuleCursorBase<"callable_path"> {
+  field(name: "name"): SourceIdentifierCursor | null;
+  field(name: "root"): SourceIdentifierCursor | null;
+  field(name: "types"): ReadonlyArray<readonly [TokenCursor<"named", "TYPE_IDENT">, TokenCursor<"literal", ".">]> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -970,6 +1026,15 @@ export interface MemberAccessCursor extends RuleCursorBase<"member_access"> {
 }
 
 export interface AtomCursor extends RuleCursorBase<"atom"> {
+}
+
+export interface SparkExpressionCursor extends RuleCursorBase<"spark_expression"> {
+  field(name: "body"): CollectionExpressionCursor;
+  field(name: "end"): ExpressionCursor | null;
+  field(name: "pattern"): PatternCursor;
+  field(name: "source"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface StaticRunCursor extends RuleCursorBase<"static_run"> {
@@ -1467,7 +1532,7 @@ export interface QuantifiedTypeCursor extends RuleCursorBase<"quantified_type"> 
 }
 
 export interface QuantifiedBinderCursor extends RuleCursorBase<"quantified_binder"> {
-  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
+  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "init"> | TokenCursor<"literal", "kernel"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "prepare"> | TokenCursor<"literal", "process"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "step"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
   field(name: "sort"): TokenCursor<"literal", "region"> | TokenCursor<"literal", "row"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1506,6 +1571,12 @@ export type AnyRuleCursor =
   | NamedImportCursor
   | ImportBindingCursor
   | DeclarationCursor
+  | EntryConcurrencyDeclarationCursor
+  | EntryKernelDeclarationCursor
+  | KernelBodyCursor
+  | EntryProcessDeclarationCursor
+  | ProcessBodyCursor
+  | CallablePathCursor
   | OpaqueTypeCursor
   | TypeAliasCursor
   | ContractTypeCursor
@@ -1571,6 +1642,7 @@ export type AnyRuleCursor =
   | ComptimeAccessCursor
   | MemberAccessCursor
   | AtomCursor
+  | SparkExpressionCursor
   | StaticRunCursor
   | StaticDoCursor
   | ReceiveCursor

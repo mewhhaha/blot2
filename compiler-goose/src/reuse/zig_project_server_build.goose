@@ -67,6 +67,32 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
         ready payload=>{
             let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);
+            // Validate wire schemas and concurrency purity before ANY retained/cached fast path.
+            {
+                var pinfo=blot_check_wire_schema::ProgramInfo{};
+                blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
+                if pinfo.issue.failed {
+                    timing.exit();
+                    if reused { if replay.used { replay.valid=false; replay.needs_reset=true; } retry=true; return false,blot_error::Error.none; }
+                    var code:const u8[:]=default<const u8[:]>();
+                    match pinfo.issue.code { const for <N,V> in variants<blot_check_diagnostic_code::Code> { V=>{code=N;}, } }
+                    if pinfo.issue.unit!=0 && pinfo.issue.unit<=payload.value.paths.len {
+                        return false,reject(writer,id,opened.revisions,Diagnostic{filename:payload.value.paths[pinfo.issue.unit-1],stage:"emit",code:code,start:pinfo.issue.span.start,end:pinfo.issue.span.end,message:pinfo.issue.message,..});
+                    }
+                    return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pinfo.issue.span.start,end:pinfo.issue.span.end,message:pinfo.issue.message,..});
+                }
+                let pres=blot_check_purity::analyze(payload.value.units,payload.value.entry);
+                if pres.issue.failed {
+                    timing.exit();
+                    if reused { if replay.used { replay.valid=false; replay.needs_reset=true; } retry=true; return false,blot_error::Error.none; }
+                    var code:const u8[:]=default<const u8[:]>();
+                    match pres.issue.code { const for <N,V> in variants<blot_check_diagnostic_code::Code> { V=>{code=N;}, } }
+                    if pres.issue.unit!=0 && pres.issue.unit<=payload.value.paths.len {
+                        return false,reject(writer,id,opened.revisions,Diagnostic{filename:payload.value.paths[pres.issue.unit-1],stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
+                    }
+                    return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
+                }
+            }
             var inputs:i64=-1;
             if assets {
                 inputs=assets.allocation_index;

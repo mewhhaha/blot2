@@ -467,3 +467,40 @@ const read=func item=> return unpack item as [a] value in Render.show value
     frontend.dispose();
   }
 });
+
+Deno.test("spark, entry kernel, entry process, and callable paths enforce reserved and contextual boundaries", async () => {
+  const frontend = await createFrontend();
+  const source = `const kernel = 1
+const process = 2
+const prepare = 3
+const init = 4
+const step = 5
+private entry func keep () => return 1
+entry kernel func mix (x: U32): U32 => return x
+entry kernel plan: Kernel [#[F32], U32, U32] = { prepare: routes.Planner.prep, run: Planner.step }
+entry process planner: Process [U32, U32, U32] = { init: routes.init_p, step: step_p }
+entry func mapped (xs: #[U32]): #[U32] => return spark #[x | x <- xs]
+entry func ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    ok(rows.some((row) => row.kind === "entry_kernel_declaration"));
+    ok(rows.some((row) => row.kind === "entry_process_declaration"));
+    ok(rows.some((row) => row.kind === "callable_path"));
+    equal(rows.filter((row) => row.kind === "spark_expression").length, 2);
+    for (
+      const invalid of [
+        "const spark = 1\n",
+        "private entry kernel func bad (x: U32): U32 => return x\n",
+        "private entry process bad: Process [U32, U32, U32] = { init: i, step: s }\n",
+        "entry kernel bad: Kernel [U32, U32, U32] = { prepare: BadCtor, run: r }\n",
+        "entry kernel bad: Kernel [U32, U32, U32] = { prepare: a.b.c, run: r }\n",
+        "entrY kernel func bad (x: U32): U32 => return x\n",
+      ]
+    ) {
+      throws(() => frontend.parse(invalid), SourceError, invalid);
+    }
+  } finally {
+    frontend.dispose();
+  }
+});

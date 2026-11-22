@@ -13,10 +13,10 @@ const program = await Deno.readTextFile(
 Deno.test("spark source maps and worker recovery preserve bits, cardinality and order", async () => {
   await compileAndRun(
     program + `
-entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return @spark #[@u32.add x x | x <- read 7]
-entry func keep_float (xs: Array F32): Array F32 => return @spark #[x | x <- xs]
-entry func negative (xs: Array U32): Array F32 => return @spark #[@f32.neg (@u32.to_f32 x) | x <- xs]
-entry func reciprocal (xs: Array U32): Array F32 => return @spark #[@f32.div 1.0 (@u32.to_f32 x) | x <- xs]
+entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
+entry func keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
+entry func negative (xs: Array U32): Array F32 => return spark #[@f32.neg (@u32.to_f32 x) | x <- xs]
+entry func reciprocal (xs: Array U32): Array F32 => return spark #[@f32.div 1.0 (@u32.to_f32 x) | x <- xs]
 `,
     async (guest, bytes) => {
       const floating = Float32Array.of(-0, Infinity, -Infinity, 1.25);
@@ -262,53 +262,49 @@ entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
   );
 });
 
-Deno.test("spark rejects unknown work and spawn checks its start operation and child entries", async () => {
-  for (
-    const body of ["@u32.div x 0", '@panic "fault"', "hidden x", "captured"]
-  ) {
-    await compileExpectedFailure(
-      `func hidden x => return x\nconst captured = 5\nentry func nope (xs: Array U32) => return @spark #[${body} | x <- xs]\n`,
-      "spark_kernel",
-    );
-  }
+Deno.test("spark accepts pure helpers and captures while rejecting invalid generators, effects, and legacy intrinsics", async () => {
+  await compileAndRun(
+    `func hidden (x: U32): U32 => return @u32.add x 1
+const captured: U32 = 5
+entry func pure_spark (xs: Array U32): Array U32 => return spark #[@u32.add (hidden x) captured | x <- xs]
+entry func range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <- 0..n]
+`,
+    (guest) => {
+      equal(String(guest.call("pure_spark", Uint32Array.of(1, 2, 3))), "7,8,9");
+      equal(String(guest.call("range_spark", 4)), "10,11,12,13");
+    },
+  );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return @spark #[x | x <- xs, x <- xs]\n",
+    "entry func nope (xs: Array U32) => return spark #[x | x <- xs, x <- xs]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return @spark #[x | x <- xs, x < 8]\n",
+    "entry func nope (xs: Array U32) => return spark #[x | x <- xs, x < 8]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: U32) => return @spark #[x | x <- xs]\n",
+    "entry func nope (xs: U32) => return spark #[x | x <- xs]\n",
     "type_mismatch",
+  );
+  await compileExpectedFailure(
+    "entry func nope (xs: Array U32) => return @spark #[x | x <- xs]\n",
+    "unknown_intrinsic",
   );
   await compileExpectedFailure(
     "entry func nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
     "unknown_intrinsic",
   );
   await compileExpectedFailure(
-    program.replace("entry func planner_step", "func planner_step"),
-    "spawn_program",
+    `effect Ping: Unit -> U32
+entry func nope (xs: Array U32): Array U32 ! { Ping } => return spark #[Ping () | x <- xs]
+`,
+    "spark_effectful",
   );
-  const impostor = `func admit (packet: Array U32): U32 => return 0
-entry func planner (seed: U32): U32 => return seed
-entry func planner_step (pair: Array U32): U32 => return pair[0]
-entry func invalid (x: U32) => return @spawn admit planner x
-`;
-  await compileExpectedFailure(impostor, "operation_target");
   await compileExpectedFailure(
-    "entry func nope (xs: Array (Array U32)) => return @spark #[x | x <- xs]\n",
-    "type_mismatch",
+    `func bad_step (st: U32) -> (cmd: U32): (U32, U32) => return (st, cmd)
+func init_p (seed: U32): U32 => return seed
+entry process p: Process [U32, U32, U32] = { init: init_p, step: bad_step }
+`,
+    "kernel_callable",
   );
-  const wrongConfig = program.replace(
-    "@spawn Start planner config",
-    "@spawn Start planner 1.5",
-  );
-  await compileExpectedFailure(wrongConfig, "type_mismatch");
-  const wrongStep = program.replace(
-    "planner_step (pair: Array U32): U32",
-    "planner_step (pair: Array F32): F32",
-  ).replace("@u32.add pair[0] pair[1]", "@f32.add pair[0] pair[1]");
-  await compileExpectedFailure(wrongStep, "type_mismatch");
 });

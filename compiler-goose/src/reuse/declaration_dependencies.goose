@@ -87,6 +87,8 @@ fn scanNode(self_: Capture&, id: u32) {
         comptime_for => { self_.node(n.b); },
         comptime_if => { self_.node(n.c); self_.node(n.b); self_.node(n.a); },
         comptime_meta => { if n.c == 0 { self_.node(n.a); } else if n.c == 8 || n.c == 9 { self_.node(n.b); } },
+        spark => { let metadata = m.sparkInfo(id); self_.node(metadata.body); self_.pattern(metadata.pattern); self_.node(metadata.end); self_.node(metadata.source); },
+        flat_op => { if n.c <= blot_check_core::flat_op_kernel_io_hash { self_.node(n.a); } else if n.c == blot_check_core::flat_op_kernel_handle && n.a < m.kernels.len { let k = m.kernels[n.a]; if k.has_context { self_.reference(k.prepare_target, id); } self_.reference(k.run_target, id); } else if n.c == blot_check_core::flat_op_process_handle && n.a < m.processes.len { let p = m.processes[n.a]; self_.reference(p.init_target, id); self_.reference(p.step_target, id); } },
         contract_method => {
             self_.nodes(m.children(id)); let template = m.member_templates[n.a];
             for implementation in m.implementations {

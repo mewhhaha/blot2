@@ -290,6 +290,9 @@ let a_with_entry=blot_parse_ast::tag_with_entry;
 let a_comptime_for=blot_parse_ast::tag_comptime_for;
 let a_comptime_if=blot_parse_ast::tag_comptime_if;
 let a_comptime_project=blot_parse_ast::tag_comptime_project;
+let a_spark_expr=blot_parse_ast::tag_spark_expr;
+let a_entry_kernel_decl=blot_parse_ast::tag_entry_kernel_decl;
+let a_entry_process_decl=blot_parse_ast::tag_entry_process_decl;
 recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
  if id!=0 { let tag=tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&context.source_editor_probe(id) { return; } }
  if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
@@ -391,6 +394,12 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
  } else if n.tag==a_comptime_project {
   walk(self_,tree,pool,context,locals,n.a,depth+1);
   if !local(self_,tree,pool,context,locals,n.b) { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start,n.b); }
+ } else if n.tag==a_spark_expr {
+  walk(self_,tree,pool,context,locals,tree.spark_source(id),depth+1);
+  walk(self_,tree,pool,context,locals,tree.spark_end(id),depth+1);
+  let saved_loops=self_.loops; self_.loops=0;
+  scope(self_,tree,pool,context,locals,n.b,n.a,depth+1);
+  self_.loops=saved_loops;
  } else if n.tag==a_let_stmt {
   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
 
@@ -459,6 +468,40 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
    context.source_implementation_end(scope); locals.resize(saved);
    if validator.has_issue { let __cleanup_result_89_0: Issue = validator.issue; let __cleanup_result_89_1: bool = true; let __cleanup_result_89_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_89_0, __cleanup_result_89_1, __cleanup_result_89_2; }
    if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_90_0: Issue = Issue {}; let __cleanup_result_90_1: bool = false; let __cleanup_result_90_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_90_0, __cleanup_result_90_1, __cleanup_result_90_2; } continue;
+  }
+  if tree.node(id).tag==a_entry_kernel_decl {
+   let decl=tree.entry_kernel_decl(id);
+   if pool.get(decl.name)=="own" { let __own_k_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_k_1: bool = true; let __own_k_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_k_0, __own_k_1, __own_k_2; }
+   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __k_err_0: Issue = Issue {}; let __k_err_1: bool = false; let __k_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __k_err_0, __k_err_1, __k_err_2; }
+   validator.failure=context.source_binding_annotation(id);
+   if !annotations_stopped(validator,tree,pool,context,locals) {
+    walk(validator,tree,pool,context,locals,decl.first,0);
+    if !decl.stateless { walk(validator,tree,pool,context,locals,decl.second,0); }
+    var attribute_index=decl.attributes.len;
+    while attribute_index!=0 { attribute_index--; walk(validator,tree,pool,context,locals,tree.node(tree.list(decl.attributes)[attribute_index]).a,0); }
+    if !validator.has_issue&&!annotations_stopped(validator,tree,pool,context,locals) { validator.failure=context.source_binding_finish(id); }
+   }
+   context.source_binding_end(scope);
+   if validator.has_issue { let __k_iss_0: Issue = validator.issue; let __k_iss_1: bool = true; let __k_iss_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __k_iss_0, __k_iss_1, __k_iss_2; }
+   if annotations_stopped(validator,tree,pool,context,locals) { let __k_ann_0: Issue = Issue {}; let __k_ann_1: bool = false; let __k_ann_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __k_ann_0, __k_ann_1, __k_ann_2; }
+   continue;
+  }
+  if tree.node(id).tag==a_entry_process_decl {
+   let decl=tree.entry_process_decl(id);
+   if pool.get(decl.name)=="own" { let __own_p_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_p_1: bool = true; let __own_p_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_p_0, __own_p_1, __own_p_2; }
+   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __p_err_0: Issue = Issue {}; let __p_err_1: bool = false; let __p_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __p_err_0, __p_err_1, __p_err_2; }
+   validator.failure=context.source_binding_annotation(id);
+   if !annotations_stopped(validator,tree,pool,context,locals) {
+    walk(validator,tree,pool,context,locals,decl.init,0);
+    walk(validator,tree,pool,context,locals,decl.step,0);
+    var attribute_index=decl.attributes.len;
+    while attribute_index!=0 { attribute_index--; walk(validator,tree,pool,context,locals,tree.node(tree.list(decl.attributes)[attribute_index]).a,0); }
+    if !validator.has_issue&&!annotations_stopped(validator,tree,pool,context,locals) { validator.failure=context.source_binding_finish(id); }
+   }
+   context.source_binding_end(scope);
+   if validator.has_issue { let __p_iss_0: Issue = validator.issue; let __p_iss_1: bool = true; let __p_iss_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __p_iss_0, __p_iss_1, __p_iss_2; }
+   if annotations_stopped(validator,tree,pool,context,locals) { let __p_ann_0: Issue = Issue {}; let __p_ann_1: bool = false; let __p_ann_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __p_ann_0, __p_ann_1, __p_ann_2; }
+   continue;
   }
   if tree.node(id).tag!=a_value_decl { continue; } let value=tree.value_decl(id);
   if pool.get(value.name)=="own" { let __own_name_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_name_1: bool = true; let __own_name_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_name_0, __own_name_1, __own_name_2; }

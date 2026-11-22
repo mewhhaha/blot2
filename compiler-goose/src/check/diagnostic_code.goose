@@ -4,7 +4,7 @@ import support.error;
 import support.structural_adapters;
 
 import support.structural;
-enum Code { cycle, constant_fuel, constant_recursion, integer_divide_by_zero, array_bounds, backend_limit, const_panic, const_effect, const_runtime_dependency, invalid_annotation, ambiguous_state, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, missing_implementation, incompatible_implementation, recursive_evidence, recursive_associated_type, associated_limit, missing_field, ambiguous_qualified, type_mismatch, effect_mismatch, infinite_effect, type_constructor_required, invalid_provider, initialization_cycle, backend_const_only, unsupported, no_entry, entry_type, entry_let_type, unresolved_type, constant_expression, complexity, invalid_numeric_proof, ownership_unproved, collector_free_unproved, simd_lane_literal, stage_unavailable, code_shape_mismatch, cross_stage_authority, staging_budget, storage_unsupported, storage_borrow_conflict, storage_escape }
+enum Code { cycle, constant_fuel, constant_recursion, integer_divide_by_zero, array_bounds, backend_limit, const_panic, const_effect, const_runtime_dependency, invalid_annotation, ambiguous_state, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, missing_implementation, incompatible_implementation, recursive_evidence, recursive_associated_type, associated_limit, missing_field, ambiguous_qualified, type_mismatch, effect_mismatch, infinite_effect, type_constructor_required, invalid_provider, initialization_cycle, backend_const_only, unsupported, no_entry, entry_type, entry_let_type, unresolved_type, constant_expression, complexity, invalid_numeric_proof, ownership_unproved, collector_free_unproved, simd_lane_literal, stage_unavailable, code_shape_mismatch, cross_stage_authority, staging_budget, storage_unsupported, storage_borrow_conflict, storage_escape, spark_mutates_capture, kernel_mutates_context, process_mutates_global, kernel_type, kernel_effectful, purity_limit }
 fn message(self_: Code, detail: const u8[:]) -> const u8[:] {
     match self_ {
         storage_unsupported => { if detail.len != 0 { return detail; } return "This program exceeds the current scoped-storage profile"; },
@@ -58,6 +58,12 @@ fn message(self_: Code, detail: const u8[:]) -> const u8[:] {
         code_shape_mismatch => { return "The generated code does not have its checked shape"; },
         cross_stage_authority => { return "The value cannot cross this stage boundary"; },
         staging_budget => { return "Typed staging exceeds the evaluation budget"; },
+        spark_mutates_capture => { if detail.len != 0 { return detail; } return "A spark body cannot mutate captured bindings, input storage, or module globals"; },
+        kernel_mutates_context => { if detail.len != 0 { return detail; } return "A kernel function cannot mutate its context, input item, or module globals"; },
+        process_mutates_global => { if detail.len != 0 { return detail; } return "An isolated process cannot read mutable globals or mutate module globals through its state"; },
+        kernel_type => { if detail.len != 0 { return detail; } return "Kernel or process wire type does not satisfy FlatNumeric, PersistentSafe, or stride requirements"; },
+        kernel_effectful => { if detail.len != 0 { return detail; } return "Kernel and process entry functions must be pure (! {})"; },
+        purity_limit => { if detail.len != 0 { return detail; } return "Read-only purity analysis exceeded its specialization or context bound"; },
     }
 }
 
@@ -111,6 +117,12 @@ fn codeCode(value: Code) -> u32 {
         storage_unsupported => { return 45; },
         storage_borrow_conflict => { return 46; },
         storage_escape => { return 47; },
+        spark_mutates_capture => { return 48; },
+        kernel_mutates_context => { return 49; },
+        process_mutates_global => { return 50; },
+        kernel_type => { return 51; },
+        kernel_effectful => { return 52; },
+        purity_limit => { return 53; },
     }
 }
 fn codeFromCode(code: u32) -> Code, blot_error::Error {
@@ -163,6 +175,12 @@ fn codeFromCode(code: u32) -> Code, blot_error::Error {
         45 => { return Code.storage_unsupported, blot_error::Error.none; },
         46 => { return Code.storage_borrow_conflict, blot_error::Error.none; },
         47 => { return Code.storage_escape, blot_error::Error.none; },
+        48 => { return Code.spark_mutates_capture, blot_error::Error.none; },
+        49 => { return Code.kernel_mutates_context, blot_error::Error.none; },
+        50 => { return Code.process_mutates_global, blot_error::Error.none; },
+        51 => { return Code.kernel_type, blot_error::Error.none; },
+        52 => { return Code.kernel_effectful, blot_error::Error.none; },
+        53 => { return Code.purity_limit, blot_error::Error.none; },
         _ => { return Code.cycle, blot_error::Error.invalid_artifact; },
     }
 }

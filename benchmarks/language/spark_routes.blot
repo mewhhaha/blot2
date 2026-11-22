@@ -21,7 +21,7 @@ entry func route_planner (seed: U32): U32 => return seed
 entry func route_planner_step (pair: Array U32): U32 => return do:
   let plans = fixture.direct_shared (@u32.add pair[0] pair[1])
   return F32.to_u32 plans[0]
-func request_planner (): U32 ! { StartRoute } => return @spawn StartRoute route_planner 11
+func request_planner (): U32 ! { StartRoute } => return StartRoute #[11, 114, 111, 117, 116, 101, 95, 112, 108, 97, 110, 110, 101, 114]
 entry func start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
   use endpoint <- request_planner ()
   return endpoint

@@ -1130,6 +1130,8 @@ fn appendChildren(out: u32[>..<]&, m: const Module&, id: u32) {
     if tag == blot_check_core::Tag.break_ { out.append(m.breakValues(id)); return; }
     if tag == blot_check_core::Tag.update { let update = m.updateInfo(id); out.append([update.root, update.value]); for selector in m.updateSelectors(id) { if selector.kind == blot_check_core::UpdateKind.index { out.push(selector.index); } } return; }
     if tag == blot_check_core::Tag.effect_reflection { if n.a == 2 || n.a == 3 || n.a == 4 { out.push(n.b); } if n.c != 0 { out.push(n.c); } return; }
+    if tag == blot_check_core::Tag.spark { let info = m.sparkInfo(id); out.push(info.source); if info.end != 0 { out.push(info.end); } out.push(info.body); return; }
+    if tag == blot_check_core::Tag.flat_op { if n.c <= blot_check_core::flat_op_kernel_io_hash { out.push(n.a); } return; }
 }
 recursive fn visitChildren(self_: Analyzer&, m: const Module&, id: u32) -> bool {
     let start = self_.children.len;
@@ -1407,6 +1409,19 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     if tag == blot_check_core::Tag.loop_ { return loop_(self_, m, id); }
     if tag == blot_check_core::Tag.break_ { return breakNode(self_, m, id); }
+    if tag == blot_check_core::Tag.spark { return sparkNode(self_, m, id); }
+    if tag == blot_check_core::Tag.flat_op {
+        var exits = false;
+        if n.c <= blot_check_core::flat_op_kernel_io_hash {
+            self_.brief_node = n.a;
+            let arg = visit(self_, m, n.a);
+            self_.brief_node = 0;
+            exits = arg.exits;
+        }
+        var fact: Fact = none;
+        if n.c == blot_check_core::flat_op_encode || n.c == blot_check_core::flat_op_decode { fact = deep; }
+        return Value { fact: fact, exits: exits, .. };
+    }
     if tag == blot_check_core::Tag.closure {
         // A spent capture is reported where the body reads it.
         let body = m.closure(id).body;
@@ -3590,6 +3605,12 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
         for captured in m.closureCaptures(id) { best = maxU32(best, getForkTaint(self_, captured)); }
         return best;
     }
+    if n.tag == blot_check_core::Tag.spark {
+        let info = m.sparkInfo(id);
+        var best = maxU32(nodeTaint(self_, m, info.source, depth + 1), nodeTaint(self_, m, info.body, depth + 1));
+        for captured in m.sparkCaptures(id) { best = maxU32(best, getForkTaint(self_, captured)); }
+        return best;
+    }
     return 0;
 }
 // Whether function expression `id` captures linear/borrowed storage or an
@@ -3720,4 +3741,55 @@ recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     var fact: Fact = none;
     if holds(self_, m, n.ty) { fact = deep; }
     return Value { fact: fact, .. };
+}
+recursive fn sparkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
+    let n = m.node(id);
+    let info = m.sparkInfo(id);
+    var exits = false;
+    let ends = self_.briefs.len;
+    var aliasing = false;
+    if info.is_range {
+        let first = visitEscaping(self_, m, info.source);
+        exits = first.exits || exits;
+        let last = visitEscaping(self_, m, info.end);
+        exits = last.exits || exits;
+    } else {
+        aliasing = elementHolds(self_, m, m.typeOf(info.source));
+        self_.brief_node = info.source;
+        let src = visit(self_, m, info.source);
+        self_.brief_node = 0;
+        exits = src.exits;
+        if aliasing {
+            if local(self_, src.origin) && self_.facts[src.origin] != spent {
+                let fact = self_.facts[src.origin];
+                set(self_, src.origin, none);
+                self_.briefs.push(Captured { binding: src.origin, fact: fact, stamp: self_.touch[src.origin] });
+            } else {
+                escape(self_, src);
+            }
+        }
+    }
+    for captured in m.sparkCaptures(id) {
+        read(self_, captured, id);
+        if local(self_, captured) && self_.facts[captured] != spent {
+            let fact = self_.facts[captured];
+            set(self_, captured, none);
+            self_.briefs.push(Captured { binding: captured, fact: fact, stamp: self_.touch[captured] });
+        }
+    }
+    if self_.in_fork != 0 && !info.is_range {
+        let taint = nodeTaint(self_, m, info.source, 0);
+        if taint != 0 { taintPattern(self_, m, info.pattern, taint, 0); }
+    }
+    let body_val = visit(self_, m, info.body);
+    let body_ty = m.typeOf(info.body);
+    let body_owned = !holds(self_, m, body_ty) || ownedAs(self_, m, taken(self_, m, info.body, body_val), body_ty, 0);
+    if !body_owned {
+        for at in ends..self_.briefs.len { kill(self_, self_.briefs[at].binding); }
+        self_.briefs.resize(ends);
+    }
+    endBriefs(self_, ends);
+    var fact: Fact = none;
+    if body_owned { fact = deep; }
+    return Value { fact: fact, exits: exits, .. };
 }

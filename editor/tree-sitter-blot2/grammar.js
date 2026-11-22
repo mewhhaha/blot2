@@ -17,6 +17,7 @@ export default grammar({
     [$.private_effect_header, $.identifier],
     [$.implementation_header, $.identifier],
     [$.entry_binding, $.identifier],
+    [$.entry_process_binding, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
 
@@ -28,6 +29,9 @@ export default grammar({
         $.import_declaration,
         $.export_declaration,
         $.function_binding,
+        $.entry_kernel_function_header,
+        $.entry_kernel_binding,
+        $.entry_process_binding,
         $.named_function_header,
         $.lambda_header,
         $.type_header,
@@ -122,6 +126,44 @@ export default grammar({
           "func",
           field("parameter", $._parameter),
           repeat(seq("->", field("parameter", $._parameter))),
+        ),
+      ),
+
+    entry_kernel_function_header: ($) =>
+      prec.dynamic(
+        4,
+        prec.right(
+          3,
+          seq(
+            alias("entry", $.entry_modifier),
+            alias("kernel", $.kernel_modifier),
+            "func",
+            field("name", choice($.identifier, $.qualified_function_name)),
+            field("parameter", $._parameter),
+            repeat(seq("->", field("parameter", $._parameter))),
+          ),
+        ),
+      ),
+
+    entry_kernel_binding: ($) =>
+      prec.dynamic(
+        2,
+        seq(
+          alias("entry", $.entry_modifier),
+          alias("kernel", $.kernel_modifier),
+          field("name", $.identifier),
+          alias(":", $.separator),
+        ),
+      ),
+
+    entry_process_binding: ($) =>
+      prec.dynamic(
+        2,
+        seq(
+          alias("entry", $.entry_modifier),
+          alias("process", $.process_modifier),
+          field("name", $.identifier),
+          alias(":", $.separator),
         ),
       ),
 
@@ -400,6 +442,8 @@ export default grammar({
         $._identifier,
         "complete",
         "entry",
+        "kernel",
+        "process",
         "private",
         "opaque",
         "export",
@@ -442,6 +486,7 @@ export default grammar({
         "in",
         "break",
         "continue",
+        "spark",
         "test",
       ),
     comment: (_) => token(/\/\/[^\r\n]*/),

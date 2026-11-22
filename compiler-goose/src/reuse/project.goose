@@ -63,7 +63,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
     }
 }
 struct Import { declaration: DeclarationId, target: UnitId=0, path: Symbol, namespace_: Symbol, bindings: blot_parse_ast::List, span: Span }
-struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0, parse_names:const u32[:]=default<const u32[:]>(), parser_tree:blot_parse_ast::Tree=blot_parse_ast::Tree{..}, visible_names:i64=0 }
+struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, is_std: bool=false, parse_start:i64=0, parse_end:i64=0, parse_names:const u32[:]=default<const u32[:]>(), parser_tree:blot_parse_ast::Tree=blot_parse_ast::Tree{..}, visible_names:i64=0 }
 reusable[] var owned_source: u8[>..]=[];
 reusable[] var owned_lexical: blot_parse_lexer::Diagnostic[>..]=[];
 fn copySource(bytes: const u8[:]) -> const u8[:] { if bytes.len==0 {return default<const u8[:]>();} let result=owned_source.alloc_slice(bytes.len); result.move_from(bytes); return result; }
@@ -85,7 +85,14 @@ fn canonicalOwnedDiagnostic(value:Diagnostic)->Diagnostic {
  return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:cause,lex_code:value.lex_code,parse_code:value.parse_code,publication:publication,parse_detail:value.parse_detail,lexical_details:lexical};
 }
 fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
-fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end,parse_names:value.parse_names,parser_tree:blot_parse_ast::canonical(value.parser_tree),visible_names:value.visible_names};}
+fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,is_std:value.is_std,parse_start:value.parse_start,parse_end:value.parse_end,parse_names:value.parse_names,parser_tree:blot_parse_ast::canonical(value.parser_tree),visible_names:value.visible_names};}
+fn isStdPath(canonical:const u8[:],options:Options)->bool {
+    if !options.std_root.present {return false;}
+    let root=options.std_root.value;
+    if root.len==0 || canonical.len<=root.len {return false;}
+    if root[root.len-1]=='/' as u8 {return starts(canonical,root);}
+    return starts(canonical,root) && canonical[root.len]=='/' as u8;
+}
 fn deinit(self_: Unit&) {self_.tree.deinit();self_.parser_tree.deinit();blot_reuse_project_check::releaseOwned(self_.parse_names);releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
@@ -455,7 +462,7 @@ fn readSource<P>(self_:Loader<P>&,filename:Symbol,reserved:blot_support::Option<
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
     if recorded.failure!=blot_error::Error.none {let error=recorded.failure;recorded.deinit();tree.deinit();return no,error;}
-    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,parse_start:parse_start,parse_end:self_.project.symbols.entries.len,parse_names:blot_reuse_project_check::copyOwned(recorded.items), ..};
+    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,is_std:(self_.options.prelude_path.present && !self_.prelude_ready) || isStdPath(canonical,self_.options),parse_start:parse_start,parse_end:self_.project.symbols.entries.len,parse_names:blot_reuse_project_check::copyOwned(recorded.items), ..};
     recorded.deinit();
     if reserved.present {self_.project.units.items[id-1]=canonicalUnit(loaded);}
     else {let appended=self_.project.units.push(loaded);if appended!=blot_error::Error.none {loaded.deinit();return no,appended;}}
@@ -794,7 +801,7 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
         let id=(index+1) as u32;let cached=loader.project.compiledModule(id)!=null;
         if cached&&(module.identity.source_bytes>options.max_source_bytes||module.identity.source_bytes>max(0,options.max_total_source_bytes-loader.project.source_bytes)) {return blot_error::Error.source_limit;}
         let filename,failure=loader.project.symbols.intern(module.identity.normalized_path);if failure!=blot_error::Error.none {return failure;}
-        { let propagated_error = loader.project.units.push(Unit {filename:filename,source:default<const u8[:]>(),tree:blot_parse_ast::Tree {..},implicit_prelude:module.implicit_prelude, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+        { let propagated_error = loader.project.units.push(Unit {filename:filename,source:default<const u8[:]>(),tree:blot_parse_ast::Tree {..},implicit_prelude:module.implicit_prelude,is_std:module.identity.prelude || isStdPath(module.identity.normalized_path,options), ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
         if cached {loader.project.source_bytes+=module.identity.source_bytes;}
         loader.files.insert(filename,id,loader_file_slots);var visit=Visit.unloaded;if cached {visit=Visit.finished;}let error=blot_support_pooled_buffer::push(loader.visits,visit,loader_visit_runs);if error!=blot_error::Error.none {return error;}
         let start=loader.project.imports.len as u32;

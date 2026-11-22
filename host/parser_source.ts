@@ -48,6 +48,7 @@ export function parserSource(
     );
   let moduleDeclaration = false;
   let declarationStart = true;
+  let sawPrivate = false;
   let delimiters = 0;
   let indentation = 0;
   for (
@@ -74,10 +75,11 @@ export function parserSource(
     // Same-width markers preserve original CST text and source offsets.
     const topLevel = delimiters === 0 && indentation === 0;
     if (topLevel && declarationStart) {
-      if (["privatE", "exporT", "impL"].includes(token.text)) {
+      if (["privatE", "exporT", "impL", "entrY"].includes(token.text)) {
         throw reservedMarker(token);
       }
       if (token.text === "private") {
+        sawPrivate = true;
         replace(token.span.end - 1, token.span.end, "E");
       } else {
         declarationStart = false;
@@ -88,6 +90,12 @@ export function parserSource(
           moduleDeclaration = true;
         } else if (token.text === "impl") {
           replace(token.span.end - 1, token.span.end, "L");
+        } else if (
+          !sawPrivate && token.text === "entry" &&
+          (prepared.tokens[index + 1]?.text === "kernel" ||
+            prepared.tokens[index + 1]?.text === "process")
+        ) {
+          replace(token.span.end - 1, token.span.end, "Y");
         } else if (token.text === "import") moduleDeclaration = true;
       }
     }
@@ -100,6 +108,7 @@ export function parserSource(
     }
     if (token.text === "\uE000" && topLevel) {
       declarationStart = true;
+      sawPrivate = false;
       moduleDeclaration = false;
     }
     if (["(", "[", "{"].includes(token.text)) delimiters++;
@@ -107,7 +116,10 @@ export function parserSource(
     if (token.text === "\uE001") indentation++;
     else if (token.text === "\uE002") {
       indentation--;
-      if (indentation === 0 && delimiters === 0) declarationStart = true;
+      if (indentation === 0 && delimiters === 0) {
+        declarationStart = true;
+        sawPrivate = false;
+      }
     }
     if (
       moduleDeclaration && token.text === "froM" &&

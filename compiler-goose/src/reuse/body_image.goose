@@ -51,6 +51,7 @@ fn encode(out:u8[>..<]&,opcode:u8,value:u32)->bool {
 
 fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&)->u8[:],i64 {
     if image.bytes.len==0 || previous.entry!=next.entry || previous.units.len!=next.units.len { return default<u8[:]>(),-1; }
+    for unit in next.units { if unit.kernels.len!=0 || unit.processes.len!=0 { return default<u8[:]>(),-1; } }
     var changed=blot_direct_map::U64Map{};
     for unit,i in next.units {
         if next.borrowed[i] { continue; }
@@ -627,7 +628,8 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
        a.implementations.len!=b.implementations.len || a.implementation_members.len!=b.implementation_members.len ||
        a.member_templates.len!=b.member_templates.len || a.associated.len!=b.associated.len ||
        a.primitives.len!=b.primitives.len || a.operation_names.len!=b.operation_names.len ||
-       a.type_tags.len!=b.type_tags.len || a.tag_calls.len!=b.tag_calls.len {
+       a.type_tags.len!=b.type_tags.len || a.tag_calls.len!=b.tag_calls.len ||
+       a.sparks.len!=b.sparks.len || a.kernels.len!=b.kernels.len || a.processes.len!=b.processes.len {
         return false;
     }
     for i in 0..a.nominals.len {
@@ -666,7 +668,7 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     for bi in 1..a.bodies.len {
         let ob=a.bodies[bi];
         let nb=b.bodies[bi];
-        if ob.binding!=nb.binding || ob.exported!=nb.exported || ob.runtime!=nb.runtime || ob.is_function!=nb.is_function { return false; }
+        if ob.binding!=nb.binding || ob.exported!=nb.exported || ob.runtime!=nb.runtime || ob.is_function!=nb.is_function || ob.is_kernel!=nb.is_kernel { return false; }
         if a.name(ob.declaration_name)!=b.name(nb.declaration_name) || a.name(ob.export_name)!=b.name(nb.export_name) { return false; }
         let pa=a.bodyParameters(ob);
         let pb=b.bodyParameters(nb);
@@ -698,6 +700,7 @@ fn hasStagedUnit(sites:const blot_direct_relocations::Site[:],unit:u32)->bool {
 fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&,out_bytes:u8[:]&,pending:blot_direct_relocations::Snapshot&)->bool {
     if !replay.valid || image.bytes.len==0 { return false; }
     if previous.entry!=next.entry || previous.units.len!=next.units.len { return false; }
+    for unit in next.units { if unit.kernels.len!=0 || unit.processes.len!=0 { return false; } }
     var differing:u32[>..<]=[];
     for unit,i in next.units {
         if next.borrowed[i] { continue; }

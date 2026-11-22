@@ -32,7 +32,16 @@ struct FieldName {
     symbol: u32,
     spelling: Name
 }
-enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, operation_value, effect_provider, state_provider, handle, effect_reflection, contract_method, staging, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta }
+enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, operation_value, effect_provider, state_provider, handle, effect_reflection, contract_method, staging, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta, spark, flat_op }
+let flat_op_encode: u32 = 0;
+let flat_op_decode: u32 = 1;
+let flat_op_schema_hash: u32 = 2;
+let flat_op_kernel_id: u32 = 3;
+let flat_op_kernel_binding_hash: u32 = 4;
+let flat_op_kernel_ctx_hash: u32 = 5;
+let flat_op_kernel_io_hash: u32 = 6;
+let flat_op_kernel_handle: u32 = 7;
+let flat_op_process_handle: u32 = 8;
 enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,
@@ -98,7 +107,8 @@ struct Body {
     export_name: Name = Name {..},
     exported: bool = false,
     runtime: bool = false,
-    is_function: bool = false
+    is_function: bool = false,
+    is_kernel: bool = false
 }
 struct CallInfo {
     target: BindingRef,
@@ -271,6 +281,37 @@ struct LoopInfo {
     carries: List = List {..},
     can_exit: bool = false
 }
+struct SparkInfo {
+    is_range: bool = false,
+    source: Id = 0,
+    end: Id = 0,
+    pattern: PatternId = 0,
+    body: Id = 0,
+    captures: List = List {..}
+}
+struct KernelDecl {
+    name: Name = Name {..},
+    binding: BindingId = 0,
+    has_context: bool = false,
+    prepare_target: BindingRef = BindingRef { binding: 0, .. },
+    run_target: BindingRef = BindingRef { binding: 0, .. },
+    ctx_type: blot_check_types::Id = 0,
+    prepared_type: blot_check_types::Id = 0,
+    item_type: blot_check_types::Id = 0,
+    out_type: blot_check_types::Id = 0,
+    span: Span = Span { start: 0, end: 0, .. }
+}
+struct ProcessDecl {
+    name: Name = Name {..},
+    binding: BindingId = 0,
+    init_target: BindingRef = BindingRef { binding: 0, .. },
+    step_target: BindingRef = BindingRef { binding: 0, .. },
+    config_type: blot_check_types::Id = 0,
+    state_type: blot_check_types::Id = 0,
+    cmd_type: blot_check_types::Id = 0,
+    reply_type: blot_check_types::Id = 0,
+    span: Span = Span { start: 0, end: 0, .. }
+}
 enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, spent_value, own_argument, own_function_value, result_not_owned, lent_result_value, kept_value }
 struct Diagnostic {
     code: Code,
@@ -351,6 +392,9 @@ struct Module {
     handle_effects: HandleEffects[:] = default<HandleEffects[:]>(),
     dispatch_signatures: blot_check_types::Id[:] = default<blot_check_types::Id[:]>(),
     type_tags: TypeTag[:] = default<TypeTag[:]>(),
+    sparks: SparkInfo[:] = default<SparkInfo[:]>(),
+    kernels: KernelDecl[:] = default<KernelDecl[:]>(),
+    processes: ProcessDecl[:] = default<ProcessDecl[:]>(),
     diagnostics: Diagnostic[:],
     body_lowerings: i64
 }
@@ -474,6 +518,8 @@ fn bodyParameters(self_: const Module&, value: const Body&) -> const Parameter[:
 fn branchMerges(self_: const Module&, id: Id) -> const Merge[:] { let range = self_.merge_ranges[id]; return self_.merges[range.start..range.start + range.len]; }
 fn loopInfo(self_: const Module&, id: Id) -> LoopInfo { let value = self_.node(id); assert(value.tag == Tag.loop_); return self_.loops[value.a]; }
 fn loopCarries(self_: const Module&, id: Id) -> const LoopCarry[:] { let range = self_.loopInfo(id).carries; return self_.loop_carries[range.start..range.start + range.len]; }
+fn sparkInfo(self_: const Module&, id: Id) -> SparkInfo { let value = self_.node(id); assert(value.tag == Tag.spark); return self_.sparks[value.a]; }
+fn sparkCaptures(self_: const Module&, id: Id) -> const BindingId[:] { let range = self_.sparkInfo(id).captures; return self_.extra[range.start..range.start + range.len]; }
 fn breakValues(self_: const Module&, id: Id) -> const Id[:] { assert(self_.node(id).tag == Tag.break_); return self_.children(id); }
 fn name(self_: const Module&, range: Name) -> const u8[:] { return self_.names[range.start..range.start + range.len]; }
 fn fieldSpelling(self_: const Module&, symbol: u32) -> blot_support::Option<const u8[:]> {
@@ -558,6 +604,8 @@ fn tagCode(value: Tag) -> u32 {
         comptime_for => { return 42; },
         comptime_if => { return 43; },
         comptime_meta => { return 44; },
+        spark => { return 45; },
+        flat_op => { return 46; },
     }
 }
 fn tagFromCode(code: u32) -> Tag, blot_error::Error {
@@ -607,6 +655,8 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
         42 => { return Tag.comptime_for, blot_error::Error.none; },
         43 => { return Tag.comptime_if, blot_error::Error.none; },
         44 => { return Tag.comptime_meta, blot_error::Error.none; },
+        45 => { return Tag.spark, blot_error::Error.none; },
+        46 => { return Tag.flat_op, blot_error::Error.none; },
         _ => { return Tag.invalid, blot_error::Error.core_limit; },
     }
 }
@@ -862,6 +912,10 @@ fn deinit(self_: Module&) {
     self_.operation_values = default<blot_check_core::OperationValue[:]>();
     self_.handle_effects = default<blot_check_core::HandleEffects[:]>();
     self_.dispatch_signatures = default<blot_check_types::Id[:]>();
+    self_.type_tags = default<blot_check_core::TypeTag[:]>();
+    self_.sparks = default<blot_check_core::SparkInfo[:]>();
+    self_.kernels = default<blot_check_core::KernelDecl[:]>();
+    self_.processes = default<blot_check_core::ProcessDecl[:]>();
     self_.diagnostics = default<blot_check_core::Diagnostic[:]>();
     self_.types.nodes = default<const blot_check_types::Node[:]>(); self_.types.extra = default<const blot_check_types::Id[:]>(); self_.types.effects.rows = default<const blot_check_effects::Row[:]>(); self_.types.effects.labels = default<const blot_check_effects::Label[:]>();
     self_.types.operations = default<const blot_check_types::Operation[:]>();
@@ -948,11 +1002,14 @@ struct StampView {
     handle_effects: const HandleEffects[:] = default<const HandleEffects[:]>(),
     dispatch_signatures: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),
     type_tags: const TypeTag[:] = default<const TypeTag[:]>(),
+    sparks: const SparkInfo[:] = default<const SparkInfo[:]>(),
+    kernels: const KernelDecl[:] = default<const KernelDecl[:]>(),
+    processes: const ProcessDecl[:] = default<const ProcessDecl[:]>(),
     diagnostics: const Diagnostic[:],
     body_lowerings: i64
 }
 fn stampView(self_: const Module&) -> StampView {
-    return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.primitives, self_.loops, self_.loop_carries, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
+    return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.primitives, self_.loops, self_.loop_carries, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.sparks, self_.kernels, self_.processes, self_.diagnostics, self_.body_lowerings , ..};
 }
 
 type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;

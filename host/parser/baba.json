@@ -818,6 +818,52 @@
         "boundary": {
           "kind": "root"
         }
+      },
+      {
+        "rule": "entry_concurrency_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "entry_kernel_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "kernel_body",
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
+      },
+      {
+        "rule": "entry_process_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "process_body",
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
+      },
+      {
+        "rule": "callable_path",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "spark_expression",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {

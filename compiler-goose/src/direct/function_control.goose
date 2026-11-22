@@ -943,7 +943,11 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
                 if error != blot_direct_types::Error.none { return error; }
                 return test_(g, f, pattern.b, declared, has_fail, fail, id);
             }
-            // A one-field record's child is that field's own pattern.
+            // A one-field record's child is always that field's own pattern
+            // (even when that pattern is a tuple product pattern).
+            if storage.tag == blot_check_types::Tag.record && storage.b == 1 {
+                return recordPattern(g, f, pattern.b, true, storage, value, has_fail, fail, id);
+            }
             if m.pattern(pattern.b).tag == blot_check_core::PatternTag.product { return recordPattern(g, f, pattern.b, false, storage, value, has_fail, fail, id); }
             return recordPattern(g, f, pattern.b, true, storage, value, has_fail, fail, id);
         },
@@ -2447,4 +2451,236 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     op(g, OP_unreachable_);
     close(g, f);
     return unitVal(), blot_direct_types::Error.none;
+}
+
+// Synchronous ordered data-parallel array map `spark #[body | pat <- source]`.
+// Phase 1 emits an escape-safe preallocated direct loop; Phase 2 adds 4-wide
+// Wasm SIMD (`v128`) vectorization ahead of this scalar fallback.
+recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let info = m.sparkInfo(id);
+    let out_ty, ty_err = typeOf(g, f, id);
+    if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+    let elem_ty, elem_err = elementOf(g, f, out_ty, id);
+    if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+    let step, step_err = stride(g, f, elem_ty, id);
+    if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+    let elem_holds, hold_err = g.contentsHoldMemory(elem_ty);
+    if hold_err != blot_direct_types::Error.none { return neverVal(), hold_err; }
+
+    var start_local: u32 = 0;
+    var count: u32 = 0;
+    var source_val = neverVal();
+    if info.is_range {
+        let s_val, s_err = expr(g, f, info.source);
+        if s_err != blot_direct_types::Error.none { return s_val, s_err; }
+        let s_loc, sl_err = scalarLocal(g, f, s_val, id);
+        if sl_err != blot_direct_types::Error.none { return neverVal(), sl_err; }
+        start_local = s_loc;
+        let e_val, e_err = expr(g, f, info.end);
+        if e_err != blot_direct_types::Error.none { return e_val, e_err; }
+        let e_loc, el_err = scalarLocal(g, f, e_val, id);
+        if el_err != blot_direct_types::Error.none { return neverVal(), el_err; }
+        count = local32(g, f);
+        lget(g, e_loc);
+        lget(g, start_local);
+        op(g, OP_i32_gt_u);
+        let cmp_if = open(g, f, OP_if_);
+        lget(g, e_loc);
+        lget(g, start_local);
+        op(g, OP_i32_sub);
+        lset(g, count);
+        popCheckedArraysAt(f, cmp_if);
+        op(g, OP_else_);
+        i32Const(g, 0);
+        lset(g, count);
+        close(g, f);
+    } else {
+        let c_val, c_err = expr(g, f, info.source);
+        if c_err != blot_direct_types::Error.none { return c_val, c_err; }
+        source_val = c_val;
+        let len_loc, len_err = lengthOf(g, f, source_val, id);
+        if len_err != blot_direct_types::Error.none { return neverVal(), len_err; }
+        count = len_loc;
+    }
+
+    let handle, base, alloc_err = createUninit(g, f, out_ty, count, id);
+    if alloc_err != blot_direct_types::Error.none { return handle, alloc_err; }
+
+    let index = constLocal(g, f, 0);
+    let exit = open(g, f, OP_block);
+    let top = open(g, f, OP_loop);
+    lget(g, index);
+    lget(g, count);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, exit);
+
+    let owner_mark = local32(g, f);
+    let stack_mark = local32(g, f);
+    let mark_at = g.s.code.len;
+    let allocs_before = f.allocations;
+    let stores_before = f.memory_stores;
+    let scoped_before = f.scoped_stores;
+
+    var item = neverVal();
+    if info.is_range {
+        let cur = local32(g, f);
+        lget(g, start_local);
+        lget(g, index);
+        op(g, OP_i32_add);
+        lset(g, cur);
+        item = valOf1(g, blot_direct_types::u32_, cur);
+    } else {
+        let loaded, lerr = readElement(g, f, source_val, index, id, g.units[f.unit - 1].typeOf(info.source));
+        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+        item = loaded;
+    }
+
+    let saved_bindings = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
+    let tested = test_(g, f, info.pattern, item, false, 0, id);
+    if tested != blot_direct_types::Error.none {
+        f.bindings = saved_bindings;
+        return neverVal(), tested;
+    }
+    let val, verr = stmt(g, f, info.body);
+    f.bindings = saved_bindings;
+    if verr != blot_direct_types::Error.none { return val, verr; }
+
+    if val.ty != blot_direct_types::never {
+        let dst_addr = emitOffsetAddress(g, f, base, index, step);
+        let written = writeFlat(g, f, dst_addr, 0, val, id);
+        if written != blot_direct_types::Error.none { return neverVal(), written; }
+        // Escape-safe per-iteration scratch release: only release when output
+        // elements cannot hold scope memory and the body made no escaping store.
+        let release_ok = !elem_holds && f.memory_stores == stores_before && f.scoped_stores == scoped_before && f.allocations != allocs_before;
+        if release_ok {
+            releaseTo(g, owner_mark, stack_mark);
+            var prefix: u8[>..<] = [];
+            markInto(g, prefix, owner_mark, stack_mark);
+            blot_direct_relocations::insert(f.sites_base, mark_at, prefix.len);
+            let old_len = g.s.code.len;
+            for byte in prefix { g.s.code.push(byte); }
+            var at = old_len;
+            while at > mark_at {
+                at -= 1;
+                g.s.code[at + prefix.len] = g.s.code[at];
+            }
+            for byte, offset in prefix { g.s.code[mark_at + offset] = byte; }
+        }
+        lget(g, index);
+        i32Const(g, 1);
+        op(g, OP_i32_add);
+        lset(g, index);
+        br(g, f, OP_br, top);
+    }
+    close(g, f);
+    close(g, f);
+    return handle, blot_direct_types::Error.none;
+}
+
+recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    if n.c == blot_check_core::flat_op_kernel_handle {
+        let kidx = n.a;
+        if (kidx as i64) >= g.s.kernels.len {
+            return neverVal(), g.fail(m, id, "unknown kernel declaration index");
+        }
+        let kinfo = g.s.kernels[kidx];
+        let ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        let w0 = constLocal(g, f, kidx);
+        let w1 = constLocal(g, f, (kinfo.binding_hash & 0xffffffff) as u32);
+        let w2 = constLocal(g, f, (kinfo.binding_hash >> 32) as u32);
+        let w3 = constLocal(g, f, (kinfo.ctx_schema.schema_hash & 0xffffffff) as u32);
+        let w4 = constLocal(g, f, (kinfo.ctx_schema.schema_hash >> 32) as u32);
+        let w5 = constLocal(g, f, (kinfo.io_schema_hash & 0xffffffff) as u32);
+        let w6 = constLocal(g, f, (kinfo.io_schema_hash >> 32) as u32);
+        let boxed, berr = isBoxed(g, f, ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if boxed {
+            let blk, merr = newBlock(g, f, ty, id);
+            if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+            let vals: u32[7] = [w0, w1, w2, w3, w4, w5, w6];
+            for wi in 0..7 {
+                lget(g, blk);
+                lget(g, vals[wi]);
+                op(g, OP_i32_store);
+                uleb(g, 2);
+                uleb(g, (wi * 4) as u32);
+            }
+            return valOf1(g, ty, blk), blot_direct_types::Error.none;
+        }
+        let words = g.saveWords([w0, w1, w2, w3, w4, w5, w6]);
+        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+    }
+    if n.c == blot_check_core::flat_op_process_handle {
+        let ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        let loc = constLocal(g, f, n.a);
+        return valOf1(g, ty, loc), blot_direct_types::Error.none;
+    }
+    if n.c == blot_check_core::flat_op_kernel_id {
+        let kval, kerr = expr(g, f, n.a);
+        if kerr != blot_direct_types::Error.none { return kval, kerr; }
+        let boxed, berr = isBoxed(g, f, kval.ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if boxed {
+            let res = local32(g, f);
+            lget(g, w(g, kval, 0));
+            op(g, OP_i32_load);
+            uleb(g, 2);
+            uleb(g, 0);
+            lset(g, res);
+            return valOf1(g, blot_direct_types::u32_, res), blot_direct_types::Error.none;
+        }
+        return valOf1(g, blot_direct_types::u32_, w(g, kval, 0)), blot_direct_types::Error.none;
+    }
+    if n.c == blot_check_core::flat_op_kernel_binding_hash || n.c == blot_check_core::flat_op_kernel_ctx_hash || n.c == blot_check_core::flat_op_kernel_io_hash {
+        let kval, kerr = expr(g, f, n.a);
+        if kerr != blot_direct_types::Error.none { return kval, kerr; }
+        let ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        var word_base: i64 = 1;
+        if n.c == blot_check_core::flat_op_kernel_ctx_hash { word_base = 3; }
+        else if n.c == blot_check_core::flat_op_kernel_io_hash { word_base = 5; }
+        let boxed, berr = isBoxed(g, f, kval.ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        var lo: u32 = 0;
+        var hi: u32 = 0;
+        if boxed {
+            lo = local32(g, f);
+            lget(g, w(g, kval, 0));
+            op(g, OP_i32_load);
+            uleb(g, 2);
+            uleb(g, (word_base * 4) as u32);
+            lset(g, lo);
+            hi = local32(g, f);
+            lget(g, w(g, kval, 0));
+            op(g, OP_i32_load);
+            uleb(g, 2);
+            uleb(g, ((word_base + 1) * 4) as u32);
+            lset(g, hi);
+        } else {
+            lo = w(g, kval, word_base);
+            hi = w(g, kval, word_base + 1);
+        }
+        let words = g.saveWords([lo, hi]);
+        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+    }
+    if n.c == blot_check_core::flat_op_schema_hash {
+        let ignored, aerr = expr(g, f, n.a);
+        if aerr != blot_direct_types::Error.none { return ignored, aerr; }
+        let ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        let h, ok = blot_check_wire_schema::computeSchemaHash(g.units, f.unit, n.b);
+        if !ok {
+            return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
+        }
+        let lo = constLocal(g, f, (h & 0xffffffff) as u32);
+        let hi = constLocal(g, f, (h >> 32) as u32);
+        let words = g.saveWords([lo, hi]);
+        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+    }
+    return neverVal(), g.fail(m, id, "@flat.encode/@flat.decode lowering is implemented in Phase 3");
 }

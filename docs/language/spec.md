@@ -35,7 +35,10 @@ WebAssembly. Every design rule below is an invariant:
    and typed reflection (`#for` / `#if`) run inside bodies only and never
    synthesize module-level names or types.
 6. **One meaning per program.** Every build tier preserves identical wrapping
-   integers, IEEE 754 floats, trap behavior, and effect order.
+   integers, IEEE 754 floats (with canonical positive quiet NaN `0x7fc00000`
+   produced by all `F32` arithmetic and rounding operations `+`, `-`, `*`, `/`,
+   `sqrt`, `floor`, `ceil`, and `trunc` across scalar Wasm, `spark` SIMD,
+   `std/simd`, and `#run`), trap behavior, and effect order.
 7. **Effects are visible.** Effectful calls appear only in `use` statements
    (or `return use`). Everything between `use` lines is pure and freely
    reorderable, shareable, or skippable when traps are preserved.
@@ -100,13 +103,14 @@ UpperName = [A-Z] [A-Za-z0-9_]*
 Reserved everywhere:
 ```
 and  as  break  case  const  continue  data  effect  else  ever  false  for
-fork  func  if  import  in  is  let  not  of  or  return  then  true  type
-use  with
+fork  func  if  import  in  is  let  not  of  or  return  spark  then  true
+type  use  with
 ```
 
 Contextual keywords (ordinary names elsewhere): `opaque`, `trait` (after `is`);
-`private`, `entry`, `export` (start of module item); `from` (imports); `where`
-(after signature); `self` (RHS of `:=`); `own` (before parameter type).
+`private`, `entry`, `export` (start of module item); `kernel`, `process`
+(immediately after `entry`); `from` (imports); `where` (after signature);
+`self` (RHS of `:=`); `own` (before parameter type).
 
 ### 3.4 Literals
 
@@ -173,16 +177,29 @@ Import      = "import" "*" "as" LowerName "from" String
             | "import" "{" ImportName,+ "}" "from" String
 ImportName  = Name ("as" Name)?
 Name        = LowerName | UpperName
-Item        = Reexport | Tag* "private"? "entry"? Declaration
+Item        = Reexport
+            | Tag* "private"? "entry"? Declaration
+            | EntryKernelDecl
+            | EntryProcessDecl
 Reexport    = "export" "{" ImportName,+ "}" "from" String
 Declaration = FuncDecl | ConstDecl | LetDecl | TypeDecl
+CallablePath     = (LowerName ".")? (UpperName ".")* LowerName
+EntryKernelDecl  = "entry" "kernel" FuncDecl
+                 | "entry" "kernel" LowerName ":" Type "=" "{" "prepare" ":" CallablePath "," "run" ":" CallablePath ","? "}"
+EntryProcessDecl = "entry" "process" LowerName ":" Type "=" "{" "init" ":" CallablePath "," "step" ":" CallablePath ","? "}"
 ```
 
 - Imports precede all declarations. Import cycles are errors.
 - Declarations are public by default; `private` restricts to the defining module.
 - A public signature cannot expose a private type or effect.
 - `entry` marks host Wasm exports on the entry module only (at least one entry
-  required). Only the entry module may declare entries.
+  required). Only the entry module may declare entries. `private entry func` is
+  allowed; `private entry kernel` and `private entry process` are errors.
+- `entry kernel` declares a pure, compiler-verified multi-core batch kernel
+  (stateless or prepared-context) and binds its entry-module `Kernel [ctx, item, out]`
+  handle. `entry process` declares an isolated stateful actor (`init` + `step`
+  with `own State`) and binds its entry-module `Process [cfg, cmd, reply]` handle.
+  Each `CallablePath` must resolve to a named function of the exact required arity.
 - Module-level names are declared once (no ad-hoc overloads).
 
 ---
@@ -487,7 +504,9 @@ Primary     = Integer | Float | String | "true" | "false" | "()"
             | "{" Field,* "}"
             | "#[" Expression,* "]"
             | "#[" Expression "|" Qualifier,+ "]"
+            | SparkExpr
             | "#fields" TypeAtom | "#variants" TypeAtom
+SparkExpr   = "spark" "#[" CollectionExpr "|" Pattern "<-" (Range | Expression) "]"
 Field       = LowerName (":" Expression)?
 Qualifier   = Pattern "<-" (Range | Expression) | "let" Pattern "=" Expression
             | Expression
@@ -499,6 +518,11 @@ Range       = Expression ".." Expression
   (defaulting to `#[T]`). Empty `#[]` requires an expected type.
 - Comprehensions accept arrays, ranges (`#[i * 2 | i <- 0..n]`), and any
   `Collection` trait implementation.
+- `spark #[body | pat <- source]` is a synchronous, pure (`! {}`), ordered
+  data-parallel map over a single unguarded irrefutable array or `U32` range
+  generator. Its body cannot mutate any storage reachable from outer captures,
+  the generator source, or module globals. Eligible scalar kernels vectorize to
+  4-wide Wasm SIMD (`v128`).
 - `_` in expression position is a typed hole (compile error reporting expected
   type and locals in scope).
 

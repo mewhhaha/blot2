@@ -11,6 +11,8 @@ import std;
 import check.core;
 import check.types;
 import check.diagnostic_code;
+import check.wire_schema;
+import check.purity;
 import direct.writer;
 import direct.types;
 import direct.emit;
@@ -67,6 +69,22 @@ fn poolBefore(g: const Generator&, left: u32, right: u32) -> bool {
 
 fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     if !g.hasUnit(entry) { return blot_direct_types::Error.unsupported; }
+    var pinfo = blot_check_wire_schema::ProgramInfo {};
+    blot_check_wire_schema::analyze(g.units, entry, pinfo);
+    if pinfo.issue.failed {
+        var err_unit = pinfo.issue.unit;
+        if !g.hasUnit(err_unit) { err_unit = entry; }
+        return g.failSpanCode(err_unit, pinfo.issue.span, pinfo.issue.code, pinfo.issue.message);
+    }
+    g.s.kernels.append(pinfo.kernels[..]);
+    g.s.processes.append(pinfo.processes[..]);
+    g.s.wire_word_tags.append(pinfo.word_tags[..]);
+    let pres = blot_check_purity::analyze(g.units, entry);
+    if pres.issue.failed {
+        var err_unit = pres.issue.unit;
+        if !g.hasUnit(err_unit) { err_unit = entry; }
+        return g.failSpanCode(err_unit, pres.issue.span, pres.issue.code, pres.issue.message);
+    }
     let m .= g.units[entry - 1];
     var entries: u8[>..<] = [];
     var constants: u8[>..<] = [];
@@ -99,7 +117,7 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
         if error != blot_direct_types::Error.none { return error; }
         inits.push(init_function);
     }
-    if count == 0 && inits.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
+    if count == 0 && inits.len == 0 && m.kernels.len == 0 && m.processes.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
     let emitted = g.emitAll();
     if emitted != blot_direct_types::Error.none { return emitted; }
     var starts: u32[>..<] = [];
