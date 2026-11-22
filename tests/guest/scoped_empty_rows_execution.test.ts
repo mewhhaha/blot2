@@ -52,9 +52,8 @@ entry const mixed = func (choose: U32): U32 => return do:
 entry const alias_write = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65]
   let rows: ResizeArray Row = #[]
-  let alias = rows
   for index in 0 .. count:
-    append alias (&labels[0..1])
+    append rows (&labels[0..1])
   let total = 0
   for row in rows:
     for code in row.text:

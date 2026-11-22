@@ -8,11 +8,13 @@ const variant = func (choice: Choice) -> (live: Array U32): U32 => return do:
   return @u32.add (@u32.mul value 10) live[0]
 const windows = func (first: &[U32]) -> (second: &[U32]): U32 => return
   @u32.add (@u32.add (@u32.mul (@storage.length first) 1000) (@u32.mul (@storage.length second) 100)) (@u32.add (@u32.mul first[0] 10) second[0])
-const append = func (first: GrowArray U32) -> (second: GrowArray U32) -> (view: &[U32]): {before: U32, after: U32, extent: U32, last: U32, observed: U32} => return do:
-  let before = @storage.length second
+const append = func (first: own GrowArray U32): {rows: GrowArray U32, before: U32, after: U32, last: U32} => return do:
+  let before = @storage.length first
   @storage.push first 99
-  first[0] = @u32.add self 3
-  return {before, after: @storage.length second, extent: @storage.length view, last: second[before], observed: view[0]}
+  first[0] := @u32.add self 3
+  let after = @storage.length first
+  let last = first[before]
+  return {rows: first, before, after, last}
 entry const answer = func (input: U32): Array U32 => return do:
   let left: Array U32 = #[input, @u32.add input 1, @u32.add input 2, @u32.add input 3]
   let right: Array U32 = #[@u32.add input 20]
@@ -32,10 +34,10 @@ entry const answer = func (input: U32): Array U32 => return do:
   let different_lengths = windows middle longer
   let same_windows = windows middle middle
   let growing: GrowArray U32 = #[input, @u32.add input 1]
-  let view = &growing[0..1]
-  let first = append growing growing view
-  let second = append growing growing view
+  let first = append growing
+  let second = append first.rows
+  let view = &second.rows[0..1]
   return #[mixed, inactive, identical, different_offsets, different_lengths, same_windows,
-    first.before, first.after, first.extent, first.last, first.observed,
-    second.before, second.after, second.extent, second.last, second.observed,
-    @storage.length growing, @storage.length view]
+    first.before, first.after, first.last,
+    second.before, second.after, second.last,
+    @storage.length second.rows, @storage.length view, view[0]]

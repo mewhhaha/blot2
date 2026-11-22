@@ -66,15 +66,15 @@ entry const bounds = func (index: U32): U32 => return do:
   let rows: ResizeArray U32 = #[41, 42]
   return rows[index]
 
-const append_rhs = func (rows: ResizeArray U32) -> (value: U32): U32 => return do:
+const append_rhs = func (rows: own ResizeArray U32) -> (value: U32): ResizeArray U32 => return do:
   @storage.push rows (@u32.add value 1)
-  return @u32.add value 10
+  rows[0] := @u32.add value 10
+  return rows
 
 entry const grow_rhs = func (value: U32): Array U32 => return do:
   let rows: ResizeArray U32 = #[value]
   @storage.reserve rows 2
-  let alias = rows
-  rows[0] = append_rhs alias value
+  rows := append_rhs self value
   return @storage.freeze rows
 
 const mutate_sibling = func (rows: Array {left: U32, right: U32}) -> (value: U32): U32 => return do:

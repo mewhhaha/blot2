@@ -97,11 +97,11 @@ const make = func (): GrowArray U32 => return #[40]
 const peek = func (item: &U32) => return @storage.load item
 entry const answer = func () => return do:
   let items: GrowArray U32 = make ()
+  let grown = @storage.push items 7
+  items[0] := 42
   let first: &U32 = &items[0]
   let link: ^U32 = ^items[0]
   let view: &[U32] = &items[0..1]
-  let grown = @storage.push items 7
-  items[0] = 42
   let saved = peek first
   let copied = @storage.copy items
   let copy_ref = &copied[0]
@@ -191,22 +191,28 @@ entry const bad = func () => return do:
 `,
     "type_mismatch",
   );
-  await trapsAtRun(`
+  await compileExpectedFailure(
+    `
 entry const bad = func () => return do:
   let items: ResizeArray U32 = #[42]
   let first = &items[0]
   let alias = items
   let shrunk = @storage.truncate alias 0
   break @storage.load first
-`);
-  await trapsAtRun(`
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `
 entry const bad = func () => return do:
   let items: GrowArray U32 = #[42]
   let alias = items
   let fixed = @storage.freeze items
   let grown = @storage.push alias 1
   break fixed[0]
-`);
+`,
+    "aliased_update",
+  );
 });
 
 Deno.test("data stacks reclaim lexical owners and admit shrinking after the final borrow use", async () => {
@@ -219,10 +225,10 @@ const choose = func (flag: Bool): GrowArray U32 => return
   if flag then #[40] else #[41]
 entry const grow = func () => return do:
   let items: GrowArray U32 = #[42]
-  let reference = &items[0]
   for i in 0..5000:
     let pushed = @storage.push items i
     let used = temporary i
+  let reference = &items[0]
   break @u32.add (@storage.load reference) (@storage.length items)
 entry const shrink = func () => return do:
   let items: ResizeArray U32 = #[42, 7]
@@ -295,22 +301,25 @@ const apply = func transform -> value => return transform value
 const add = func (left: U32) -> (right: U32) => return @u32.add left right
 entry const answer = func () => return do:
   let items: GrowArray U32 = #[40]
+  let grown = @storage.push items 99
   let reference = &items[0]
   let read = func (offset: U32) => return @u32.add (@storage.load reference) offset
   let plus_one = add 1
-  let grown = @storage.push items 99
   break apply read (plus_one 1)
 `,
     (guest) => equal(guest.call("answer", null), 42),
   );
-  await trapsAtRun(`
+  await compileExpectedFailure(
+    `
 entry const bad = func () => return do:
   let items: ResizeArray U32 = #[42]
   let reference = &items[0]
   let read = func () => return @storage.load reference
   let shrunk = @storage.truncate items 0
   break read ()
-`);
+`,
+    "aliased_update",
+  );
 });
 
 Deno.test("joined aliases and caller temporaries retain every possible borrow root", async () => {
@@ -319,11 +328,9 @@ Deno.test("joined aliases and caller temporaries retain every possible borrow ro
 entry const answer = func (flag: Bool) => return do:
   let left: GrowArray U32 = #[40]
   let right: GrowArray U32 = #[42]
-  let selected = left
-  if flag:
-    selected := right
-  let reference = &selected[0]
+  let selected = if flag then right else left
   let pushed = @storage.push selected 1
+  let reference = &selected[0]
   break @storage.load reference
 `,
     (guest) => {
@@ -331,22 +338,26 @@ entry const answer = func (flag: Bool) => return do:
       equal(guest.call("answer", false), 40);
     },
   );
-  const joined = `
+  await compileExpectedFailure(
+    `
 entry const bad = func (flag: Bool) => return do:
   let left: ResizeArray U32 = #[40]
   let right: ResizeArray U32 = #[42]
   let reference = if flag then &left[0] else &right[0]
   let shrunk = @storage.truncate right 0
   break @storage.load reference
-`;
-  await compileAndRun(joined, (guest) => equal(guest.call("bad", true), 40));
-  await trapsAtRun(joined, false);
-  await trapsAtRun(`
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `
 const consume = func (reference: &U32) -> (removed: U32) => return @storage.load reference
 entry const bad = func () => return do:
   let items: ResizeArray U32 = #[42]
   break consume (&items[0]) (@storage.pop items)
-`);
+`,
+    "aliased_update",
+  );
 });
 
 Deno.test("conditional owned returns release earlier loop iterations and transfer only the selected owner", async () => {

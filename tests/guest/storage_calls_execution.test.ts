@@ -657,7 +657,7 @@ entry const answer = func (input: U32): U32 => return do:
 });
 
 Deno.test("Unit writers preserve callback aliases growth views and ordered updates", async () => {
-  await compileAndRun(
+  await compileExpectedFailure(
     `
 const execute = func callback -> (rows: ResizeArray U32) -> (amount: U32): Unit => return do:
   callback amount
@@ -674,10 +674,7 @@ entry const answer = func (input: U32): U32 => return do:
   execute grow rows 1
   return rows[0] + other[0] + rows.length + view[0]
 `,
-    (guest) => {
-      assert.equal(guest.call("answer", 5), 41);
-      assert.equal(guest.call("answer", 0), 31);
-    },
+    "aliased_update",
   );
   await compileAndRun(
     `
@@ -700,8 +697,8 @@ entry const answer = func (input: U32): U32 => return do:
       assert.equal(guest.call("answer", 0), 3);
     },
   );
-  // Ownership is checked at run time: reading a view of truncated storage traps.
-  await compileAndRun(
+  // Ownership is checked at compile time: shrinking storage while a view borrows it is rejected.
+  await compileExpectedFailure(
     `
 const shrink = func (rows: ResizeArray U32): Unit => return @storage.truncate rows 0
 entry const answer = func (input: U32): U32 => return do:
@@ -710,7 +707,7 @@ entry const answer = func (input: U32): U32 => return do:
   shrink rows
   return view[0]
 `,
-    (guest) => assert.throws(() => guest.call("answer", 1), WebAssembly.RuntimeError),
+    "aliased_update",
   );
 });
 

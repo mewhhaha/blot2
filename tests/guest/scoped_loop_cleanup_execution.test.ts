@@ -84,8 +84,7 @@ const entry =
           guest.dispose();
         }
       }
-      // Ownership is checked at run time: storing into an element that the
-      // right-hand side truncated away traps.
+      // Ownership is checked at compile time: truncating through an alias is rejected.
       const truncated = await compiler.build({
         sources: {
           [entry]: await Deno.readTextFile(entry) + `
@@ -100,13 +99,11 @@ entry const invalid = func (): U32 => return do:
 `,
         },
       });
-      assert(truncated.success, JSON.stringify(truncated));
-      const guest = await instantiateGuest(truncated.bytes);
-      try {
-        assert.throws(() => guest.call("invalid", null), WebAssembly.RuntimeError);
-      } finally {
-        guest.dispose();
-      }
+      assert(!truncated.success, JSON.stringify(truncated));
+      assert(
+        truncated.diagnostics.some((d) => d.code === "aliased_update"),
+        JSON.stringify(truncated),
+      );
     } finally {
       await compiler.close();
     }

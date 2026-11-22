@@ -24,8 +24,8 @@ const sum_pool = func values => return do:
 entry const lengths = func () => return do:
   let growing: GrowArray U32 = #[10, 20]
   let changing: ResizeArray U32 = #[30]
-  let borrowed = &growing[0..2]
   let pushed = @storage.push growing 40
+  let borrowed = &growing[0..2]
   let total = 0
   for value in borrowed:
     total := self + value

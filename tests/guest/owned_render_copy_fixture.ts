@@ -58,7 +58,6 @@ import * as math from "ink/math"
 ${packing}
 entry const stream = func (input: U32) => return do:
   let vectors: ResizeArray math.Vec4 = #[math.vec4 (-1.0) (-0.0) 10.0 11.0, math.vec4 (-2.0) 12.0 13.0 14.0]
-  let prefix = &vectors[0..2]
   let draws: ResizeArray render.Draw = #[]
 ${frame}`;
   for (let at = 0; at < callers; at++) {
@@ -82,24 +81,23 @@ ${frame}`;
   ${call}
 `;
   }
-  source += `  return pack vectors draws prefix
+  source += `  let prefix = &vectors[0..2]
+  return pack vectors draws prefix
 entry const overlap = func (input: U32) => return do:
   let vectors: ResizeArray math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0, math.vec4 7.0 8.0 9.0 10.0]
-  let prefix = &vectors[0..3]
   let left = $render.Draw {mesh: 1, material: 2, matrix: math.Mat4.identity, parameters: $Some (math.vec4 (-0.0) 0.0 2.0 3.0), extra: &vectors[0..2]}
   let right = $render.Draw {mesh: 3, material: 4, matrix: math.Mat4.identity, parameters: $Nothing, extra: &vectors[1..3]}
   let first = render.store_draw left vectors
   let second = render.store_draw right vectors
-  let copied = @array.generate first.extra.length (func index => return first.extra[index])
-  @storage.push vectors copied[0]
+  let prefix = &vectors[0..3]
   let draws: ResizeArray render.Draw = #[first, second]
   return pack vectors draws prefix
 entry const self_rows = func (input: U32) => return do:
   let vectors: ResizeArray math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0]
-  let prefix = &vectors[0..2]
-  let draws: ResizeArray render.Draw = #[$render.Draw {mesh: 5, material: 6, matrix: math.Mat4.identity, parameters: $Nothing, extra: prefix}]
+  let draws: ResizeArray render.Draw = #[$render.Draw {mesh: 5, material: 6, matrix: math.Mat4.identity, parameters: $Nothing, extra: &vectors[0..2]}]
 ${frame}  render.emit_owned (&draws[0..1]) vectors access
   render.emit_owned (&draws[0..2]) vectors access
+  let prefix = &vectors[0..2]
   return pack vectors draws prefix
 entry const empty_after_freeze = func (input: U32) => return do:
   let vectors: ResizeArray math.Vec4 = #[]
@@ -171,7 +169,7 @@ export function expectedRenderStream(
   const b = [3, 4, 5, 6];
   if (entry === "overlap") {
     const c = [7, 8, 9, 10];
-    return pack([a, b, c, a, b, b, c, a], [
+    return pack([a, b, c, a, b, b, c], [
       { mesh: 1, material: 2, parameters: [-0, 0, 2, 3], extra: [a, b] },
       { mesh: 3, material: 4, extra: [b, c] },
     ], [a, b, c]);

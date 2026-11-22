@@ -31,33 +31,6 @@ fn evidenceContext(g: Generator&, f: const Fn&, target: BindingRef, id: u32) -> 
     return f.evidence_context;
 }
 
-// Effectful dictionary applications that return closures on an intermediate
-// effectful arrow need closure sequencing through binding, partial application
-// and return. Pure arrows and final-arrow closed effects use this path safely.
-fn pureContractMethod(m: const Module&, index: u32) -> bool {
-    var ty = m.binding(m.member_templates[index].binding).ty;
-    while true {
-        let shape = m.types.node(ty);
-        match shape.tag {
-            forall, usage => { ty = shape.a; },
-            function => {
-                let row = m.types.row(shape.c);
-                if row.tail != blot_check_effects::Tail.closed { return false; }
-                if row.labels.len != 0 {
-                    var next = shape.b;
-                    while m.types.node(next).tag == blot_check_types::Tag.forall || m.types.node(next).tag == blot_check_types::Tag.usage {
-                        next = m.types.node(next).a;
-                    }
-                    if m.types.node(next).tag == blot_check_types::Tag.function { return false; }
-                }
-                ty = shape.b;
-            },
-            _ => { return true; },
-        }
-    }
-    return false;
-}
-
 // Contract member symbols are local to each Core module. The members in
 // both copies of the declaration follow the original declaration order.
 fn memberName(origin: const Module&, context: const Module&, template: blot_reuse_principal_interface::MemberTemplate) -> u32 {
@@ -487,7 +460,7 @@ fn fromFieldConstraints(g: Generator&, f: Fn&, tm: const Module&, goals_span: bl
     var params_env = Env {};
     for at in 0..(goals_span.len as i64) {
         let goal = tm.obligations[goals_span.start + at];
-        if goal.kind != blot_check_types::ObligationKind.field || goal.ty != formal || goal.result == 0 { continue; }
+        if (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field) || goal.ty != formal || goal.result == 0 { continue; }
         let spelling = tm.fieldSpelling(goal.name);
         if !spelling.present { continue; }
         let wanted, error = g.types.lowerHoles(tm, goal.result, env);

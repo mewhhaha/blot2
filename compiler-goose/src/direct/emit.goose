@@ -749,6 +749,86 @@ fn operationId(g: Generator&, operation: Ty) -> u32 {
     g.s.operation_ids.put(operation, id);
     return id;
 }
+recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: const blot_check_types::List[:], mark: i64, depth: i64) {
+    let s .= g.s;
+    var grew = true;
+    while grew {
+        grew = false;
+        for span in obligations {
+            for at in 0..(span.len as i64) {
+                let goal = m.obligations[span.start + at];
+                // Exactly what solveObligations can derive: a field,
+                // element, update, type equality, or shared callee use of a
+                // reachable receiver.
+                if goal.kind == blot_check_types::ObligationKind.type_eq {
+                    let has_l = within(g, m, goal.ty, mark);
+                    let has_r = within(g, m, goal.other, mark);
+                    if !has_l && !has_r { continue; }
+                    let before = s.scratch.len;
+                    if has_l { mentions(g, m, goal.other, mark, 0); }
+                    if has_r { mentions(g, m, goal.ty, mark, 0); }
+                    if s.scratch.len != before { grew = true; }
+                    continue;
+                }
+                if goal.kind == blot_check_types::ObligationKind.callee_use {
+                    if depth >= 16 { continue; }
+                    let decl = goal.identity.decl;
+                    if decl == 0 || decl >= m.bindings.len { continue; }
+                    let pn = m.types.node(goal.ty);
+                    if pn.tag != blot_check_types::Tag.product { continue; }
+                    let cb = m.binding(decl);
+                    var arg_ids: u32[64] = [0; 64];
+                    var pvar_ids: u32[64] = [0; 64];
+                    var count_p: i64 = 0;
+                    {
+                        let args = m.types.list(blot_check_types::List { pn.a, pn.b });
+                        let pvars = m.types.list(cb.public_variables);
+                        count_p = args.len;
+                        if pvars.len < count_p { count_p = pvars.len; }
+                        if count_p > 64 { count_p = 64; }
+                        for pi in 0..count_p {
+                            arg_ids[pi] = args[pi];
+                            pvar_ids[pi] = pvars[pi];
+                        }
+                    }
+                    if count_p == 0 { continue; }
+                    var known: bool[64] = [false; 64];
+                    var any_known = false;
+                    for pi in 0..count_p {
+                        let k = within(g, m, arg_ids[pi], mark);
+                        known[pi] = k;
+                        if k { any_known = true; }
+                    }
+                    if !any_known { continue; }
+                    let cmark = s.scratch.len;
+                    for pi in 0..count_p {
+                        if known[pi] { mentions(g, m, pvar_ids[pi], cmark, 0); }
+                    }
+                    var cobs: blot_check_types::List[2] = [cb.scheme.obligations, blot_check_types::List {}];
+                    let cbody .= m.body(decl);
+                    if cbody { cobs[1] = cbody.scheme.obligations; }
+                    propagateObligations(g, m, cobs[..], cmark, depth + 1);
+                    var reached: bool[64] = [false; 64];
+                    for pi in 0..count_p { reached[pi] = within(g, m, pvar_ids[pi], cmark); }
+                    s.scratch.resize(cmark);
+                    let before = s.scratch.len;
+                    for pi in 0..count_p {
+                        if reached[pi] { mentions(g, m, arg_ids[pi], mark, 0); }
+                    }
+                    if s.scratch.len != before { grew = true; }
+                    continue;
+                }
+                if goal.result == 0 || (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection && goal.kind != blot_check_types::ObligationKind.update) { continue; }
+                if !within(g, m, goal.ty, mark) { continue; }
+                let before = s.scratch.len;
+                mentions(g, m, goal.result, mark, 0);
+                mentions(g, m, goal.other, mark, 0);
+                mentions(g, m, goal.signature, mark, 0);
+                if s.scratch.len != before { grew = true; }
+            }
+        }
+    }
+}
 // Whether a scheme of `m` quantifies variable `ty`. A variable none
 // quantifies is one the checker left ambiguous: no use fixes it.
 // Only variables an instance key can reach count: ones the binding's type
@@ -772,24 +852,7 @@ fn isQuantified(g: Generator&, m: const Module&, ty: TId) -> bool {
             var obligations: blot_check_types::List[2] = [binding.scheme.obligations, blot_check_types::List {}];
             if body { obligations[1] = body.scheme.obligations; }
             // Obligations on reachable receivers reach their results.
-            var grew = true;
-            while grew {
-                grew = false;
-                for span in obligations {
-                    for at in 0..(span.len as i64) {
-                        let goal = m.obligations[span.start + at];
-                        // Exactly what solveObligations can derive: a field or
-                        // element of a receiver whose variables are all reachable.
-                        if goal.result == 0 || (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.collection) { continue; }
-                        if !within(g, m, goal.ty, mark) { continue; }
-                        let before = s.scratch.len;
-                        mentions(g, m, goal.result, mark, 0);
-                        mentions(g, m, goal.other, mark, 0);
-                        mentions(g, m, goal.signature, mark, 0);
-                        if s.scratch.len != before { grew = true; }
-                    }
-                }
-            }
+            propagateObligations(g, m, obligations[..], mark, 0);
             var schemes: blot_check_types::List[2] = [binding.scheme.variables, blot_check_types::List {}];
             if body { schemes[1] = body.scheme.variables; }
             for span in schemes {
@@ -1066,8 +1129,149 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
         let before = env.count;
         for at in 0..count {
             let goal = m.obligations[goals_span.start + at];
+            if goal.kind == blot_check_types::ObligationKind.type_eq {
+                let left, lerr = g.types.lower(m, goal.ty, env);
+                if lerr == blot_direct_types::Error.none {
+                    g.types.match_(m, goal.other, left, env);
+                } else {
+                    let right, rerr = g.types.lower(m, goal.other, env);
+                    if rerr == blot_direct_types::Error.none { g.types.match_(m, goal.ty, right, env); }
+                }
+                continue;
+            }
+            if goal.kind == blot_check_types::ObligationKind.callee_use {
+                if g.s.solve_depth >= 32 { continue; }
+                let decl = goal.identity.decl;
+                if decl == 0 || decl >= m.bindings.len { continue; }
+                let pn = m.types.node(goal.ty);
+                if pn.tag != blot_check_types::Tag.product { continue; }
+                let cb = m.binding(decl);
+                var arg_ids: u32[64] = [0; 64];
+                var pvar_ids: u32[64] = [0; 64];
+                var count_p: i64 = 0;
+                {
+                    let args = m.types.list(blot_check_types::List { pn.a, pn.b });
+                    let pvars = m.types.list(cb.public_variables);
+                    count_p = args.len;
+                    if pvars.len < count_p { count_p = pvars.len; }
+                    if count_p > 64 { count_p = 64; }
+                    for pi in 0..count_p {
+                        arg_ids[pi] = args[pi];
+                        pvar_ids[pi] = pvars[pi];
+                    }
+                }
+                if count_p == 0 { continue; }
+                var cenv = Env {};
+                var any_known = false;
+                for pi in 0..count_p {
+                    let cty, cerr = g.types.lower(m, arg_ids[pi], env);
+                    if cerr == blot_direct_types::Error.none {
+                        g.types.match_(m, pvar_ids[pi], cty, cenv);
+                        any_known = true;
+                    }
+                }
+                if !any_known { continue; }
+                g.s.solve_depth += 1;
+                let cerr1 = solveObligations(g, m, cb.scheme.obligations, cenv);
+                if cerr1 != blot_direct_types::Error.none { g.s.solve_depth -= 1; return cerr1; }
+                let cbody .= m.body(decl);
+                if cbody && (cbody.scheme.obligations.start != cb.scheme.obligations.start || cbody.scheme.obligations.len != cb.scheme.obligations.len) {
+                    let cerr2 = solveObligations(g, m, cbody.scheme.obligations, cenv);
+                    if cerr2 != blot_direct_types::Error.none { g.s.solve_depth -= 1; return cerr2; }
+                }
+                g.s.solve_depth -= 1;
+                for pi in 0..count_p {
+                    let derived, derr = g.types.lower(m, pvar_ids[pi], cenv);
+                    if derr == blot_direct_types::Error.none {
+                        g.types.match_(m, arg_ids[pi], derived, env);
+                    }
+                }
+                continue;
+            }
             if goal.result == 0 { continue; }
-            if goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.collection { continue; }
+            if goal.kind == blot_check_types::ObligationKind.update {
+                let receiver, error = g.types.lower(m, goal.ty, env);
+                if error != blot_direct_types::Error.none { continue; }
+                let n = g.types.node(receiver);
+                let name, has_name = g.types.fieldNameOf(m, goal.name, true);
+                if !has_name { continue; }
+                if n.tag == blot_direct_types::Tag.nominal {
+                    var record = receiver;
+                    let cases, verr = g.types.variants(receiver);
+                    if verr == blot_direct_types::Error.none && cases.len == 1 { record = g.types.variant_payloads[cases.payloads]; }
+                    let position = g.types.findField(record, name);
+                    if position >= 0 {
+                        let old_ty = g.types.recordField(record, position).ty;
+                        let assigned, aerr = g.types.lower(m, goal.other, env);
+                        if n.b == 0 {
+                            g.types.match_(m, goal.other, old_ty, env);
+                            g.types.match_(m, goal.result, receiver, env);
+                        } else if aerr == blot_direct_types::Error.none {
+                            if assigned == old_ty {
+                                g.types.match_(m, goal.result, receiver, env);
+                            } else {
+                                let owner_unit = g.types.words[n.a];
+                                if g.hasUnit(owner_unit) {
+                                    let owner .= g.units[owner_unit - 1];
+                                    let identity = blot_check_types::NominalIdentity { owner_unit, g.types.words[n.a + 1] };
+                                    let ordinal, oerr = g.types.nominalOrdinal(owner, identity);
+                                    if oerr == blot_direct_types::Error.none {
+                                        let ctors = owner.nominalConstructors(ordinal);
+                                        if ctors.len == 1 {
+                                            let ctor = owner.constructor(ctors[0]);
+                                            let payload = owner.types.node(ctor.payload);
+                                            if payload.tag == blot_check_types::Tag.record {
+                                                var penv = Env {};
+                                                for fi in 0..(payload.b as i64) {
+                                                    let pf = owner.types.recordField(payload, fi);
+                                                    let fn_id, fn_ok = g.types.fieldNameOf(owner, pf.name, true);
+                                                    if !fn_ok { continue; }
+                                                    if fn_id == name {
+                                                        g.types.match_(owner, pf.ty, assigned, penv);
+                                                    } else {
+                                                        let pos = g.types.findField(record, fn_id);
+                                                        if pos >= 0 { g.types.match_(owner, pf.ty, g.types.recordField(record, pos).ty, penv); }
+                                                    }
+                                                }
+                                                let sig = owner.types.node(ctor.scheme.root);
+                                                var ret = ctor.scheme.root;
+                                                if sig.tag == blot_check_types::Tag.function { ret = sig.b; }
+                                                let updated, uerr = g.types.lower(owner, ret, penv);
+                                                if uerr == blot_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+                if n.tag == blot_direct_types::Tag.record {
+                    let position = g.types.findField(receiver, name);
+                    if position >= 0 {
+                        let old_ty = g.types.recordField(receiver, position).ty;
+                        let assigned, aerr = g.types.lower(m, goal.other, env);
+                        if aerr == blot_direct_types::Error.none {
+                            if assigned == old_ty {
+                                g.types.match_(m, goal.result, receiver, env);
+                            } else {
+                                var fields: blot_direct_types::Field[>..<] = [];
+                                for fi in 0..(n.b as i64) {
+                                    var fld = g.types.recordField(receiver, fi);
+                                    if fi == position { fld.ty = assigned; }
+                                    fields.push(fld);
+                                }
+                                let updated, uerr = g.types.record(fields[..]);
+                                if uerr == blot_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
+                            }
+                        }
+                    }
+                    continue;
+                }
+                continue;
+            }
+            if goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection { continue; }
             let receiver, error = g.types.lower(m, goal.ty, env);
             if error != blot_direct_types::Error.none { continue; }
             let n = g.types.node(receiver);

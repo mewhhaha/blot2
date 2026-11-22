@@ -2053,11 +2053,11 @@
     {
      "body_elaborations": 164,
      "body_lowerings": 164,
-     "check_occurs_steps": 1699,
+     "check_occurs_steps": 1698,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3089,
-      "instantiations": 238,
+      "inference_steps": 3082,
+      "instantiations": 237,
       "memo_declined": 0,
       "memo_hits": 7,
       "memo_misses": 13,
@@ -2067,25 +2067,25 @@
       "shared_uses": 26,
       "use_expansions": 23
      },
-     "core_nodes": 1000,
-     "effect_rows": 2761,
+     "core_nodes": 997,
+     "effect_rows": 2760,
      "emitted_functions": 34,
      "filename": "direct/miscompiles.blot",
      "files": 2,
      "imported_schemes": 30,
      "kind": "compilation",
-     "row_versions": 485,
-     "source_bytes": 14519,
+     "row_versions": 484,
+     "source_bytes": 14482,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2186,
-     "type_nodes": 5368,
-     "type_versions": 830,
-     "wasm_bytes": 3637
+     "syntax_nodes": 2181,
+     "type_nodes": 5367,
+     "type_versions": 829,
+     "wasm_bytes": 3628
     }
    ],
-   "wasm_bytes": 3637,
-   "wasm_sha256": "5a8d772573e9154a69b849340d71e9e47749fa2efc819e3576efaed1db387bbc"
+   "wasm_bytes": 3628,
+   "wasm_sha256": "2eb89a536ae29880709642cc23e51b972f80280f4034b8134ea248f5ba51e62d"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
@@ -3848,11 +3848,11 @@
     {
      "body_elaborations": 164,
      "body_lowerings": 164,
-     "check_occurs_steps": 1762,
+     "check_occurs_steps": 1740,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3335,
-      "instantiations": 269,
+      "inference_steps": 3320,
+      "instantiations": 267,
       "memo_declined": 0,
       "memo_hits": 5,
       "memo_misses": 8,
@@ -3862,25 +3862,25 @@
       "shared_uses": 19,
       "use_expansions": 16
      },
-     "core_nodes": 1129,
-     "effect_rows": 2918,
+     "core_nodes": 1124,
+     "effect_rows": 2894,
      "emitted_functions": 27,
      "filename": "input_alias_descriptors.blot",
      "files": 2,
      "imported_schemes": 21,
      "kind": "compilation",
-     "row_versions": 526,
-     "source_bytes": 15854,
+     "row_versions": 524,
+     "source_bytes": 15725,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2439,
-     "type_nodes": 5574,
-     "type_versions": 851,
-     "wasm_bytes": 4913
+     "syntax_nodes": 2419,
+     "type_nodes": 5524,
+     "type_versions": 845,
+     "wasm_bytes": 4859
     }
    ],
-   "wasm_bytes": 4913,
-   "wasm_sha256": "1832d3a805b1211daec20bb5963d303e1b49dddf1f5cffa6a70b13cff6fac75a"
+   "wasm_bytes": 4859,
+   "wasm_sha256": "ad44dd1d43051a32cb1d74e6d99bc5fe654f90eefdd56079e8cc65b19d0d96d5"
   },
   "input_alias_partition.blot": {
    "exit": 0,
@@ -4240,8 +4240,17 @@
    "wasm_sha256": "fd7b6e9be78b0be41d3a34bd59b8ac28d11fc5de513000a4dc12da983cb52112"
   },
   "mutating_owner_return_truncate.blot": {
-   "exit": 0,
+   "exit": 1,
    "records": [
+    {
+     "code": "aliased_update",
+     "end": 278,
+     "filename": "mutating_owner_return_truncate.blot",
+     "kind": "diagnostic",
+     "message": "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value",
+     "stage": "lower",
+     "start": 254
+    },
     {
      "body_elaborations": 161,
      "body_lowerings": 161,
@@ -4261,7 +4270,7 @@
      },
      "core_nodes": 957,
      "effect_rows": 2623,
-     "emitted_functions": 27,
+     "emitted_functions": 0,
      "filename": "mutating_owner_return_truncate.blot",
      "files": 2,
      "imported_schemes": 21,
@@ -4269,15 +4278,13 @@
      "row_versions": 455,
      "source_bytes": 14056,
      "stage": "build-project",
-     "success": true,
+     "success": false,
      "syntax_nodes": 2102,
      "type_nodes": 5126,
      "type_versions": 776,
-     "wasm_bytes": 3007
+     "wasm_bytes": 0
     }
-   ],
-   "wasm_bytes": 3007,
-   "wasm_sha256": "f1d58d43fd9203ade85546905a5ecaefc3d8a13a227e504965aafee75bf5f7f9"
+   ]
   },
   "named-closure-parameter-fixtures/applied-provider-capture.blot": {
    "exit": 0,
@@ -8035,10 +8042,10 @@
     {
      "body_elaborations": 177,
      "body_lowerings": 177,
-     "check_occurs_steps": 1822,
+     "check_occurs_steps": 1824,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3557,
+      "inference_steps": 3558,
       "instantiations": 268,
       "memo_declined": 0,
       "memo_hits": 5,
@@ -8049,25 +8056,25 @@
       "shared_uses": 19,
       "use_expansions": 16
      },
-     "core_nodes": 1260,
-     "effect_rows": 3025,
+     "core_nodes": 1261,
+     "effect_rows": 3022,
      "emitted_functions": 56,
      "filename": "scoped-loop-cleanup.blot",
      "files": 2,
      "imported_schemes": 21,
      "kind": "compilation",
      "row_versions": 555,
-     "source_bytes": 16845,
+     "source_bytes": 16857,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2604,
-     "type_nodes": 5756,
+     "syntax_nodes": 2607,
+     "type_nodes": 5761,
      "type_versions": 907,
-     "wasm_bytes": 7875
+     "wasm_bytes": 7886
     }
    ],
-   "wasm_bytes": 7875,
-   "wasm_sha256": "b12d17ab3787673863dbac9b7eb79c3e286fead9afcf5785ce09d5c09ec0c256"
+   "wasm_bytes": 7886,
+   "wasm_sha256": "60e06206d4f8361714a95b5f419e41040aedc2d6c6ca44afcc067796fd7141d9"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,

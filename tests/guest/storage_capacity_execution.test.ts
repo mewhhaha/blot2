@@ -7,9 +7,7 @@ Deno.test("owner reservations preserve lengths and borrows of neighboring pools"
 entry const answer = func (overflow: Bool): Array U32 => return do:
   let large: GrowArray U32 = #[41]
   let small: ResizeArray U32 = #[1, 2, 3]
-  let alias = large
-  let first = &large[0..1]
-  @storage.reserve alias 300001
+  @storage.reserve large 300001
   @storage.reserve large 1
   @storage.reserve small 0
   for index in 0 .. 300000:
@@ -17,6 +15,7 @@ entry const answer = func (overflow: Bool): Array U32 => return do:
   if overflow:
     @storage.push small 4
     @storage.push small 5
+  let first = &large[0..1]
   return #[large.length + first[0] + small.length]
 `,
     (guest) => {

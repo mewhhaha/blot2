@@ -68,15 +68,15 @@ type Shifted is data = $Shifted {rows: ResizeArray U32}
 const Shifted.length = func (value: Shifted) => return @u32.add (@storage.length value.rows) 100
 const Shifted.at = func (value: Shifted) -> (index: U32) => return @u32.add value.rows[index] 200
 const add_three = func first -> second -> third => return first + second + third
-const write_three = func (rows: ResizeArray U32) -> (first: U32) -> (second: U32) => return do:
+const write_three = func (first: U32) -> (second: U32) -> (rows: ResizeArray U32) => return do:
   rows.push (@u32.add first second)
   return rows.length
 entry const staged_effect = func (input: U32) => return do:
   let rows: ResizeArray U32 = #[]
-  let first = write_three rows
-  let second = first input
+  let first = write_three input
+  let second = first 1
   let before = rows.length
-  let result = second 1
+  let result = second rows
   return #[before, result, rows[0]]
 entry const partial_integer = func (input: U32) => return do:
   let first = add_three input
@@ -89,9 +89,9 @@ entry const partial_floating = func (input: F32) => return do:
 entry const getters = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input]
   let second: ResizeArray U32 = #[10]
-  let read = first.at
   first[0] = @u32.add input 2
   first.push 99
+  let read = first.at
   let shifted = $Shifted {rows: second}
   return #[first.length, read 0, shifted.length, shifted.at 0]
 const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:

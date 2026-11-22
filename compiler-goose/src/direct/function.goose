@@ -565,12 +565,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         storage => { return storageOp(g, f, id); },
         record_merge => { return recordMerge(g, f, id); },
         result_associated => { return resultAssociated(g, f, id); },
-        contract_method => {
-            if !pureContractMethod(m, n.a) {
-                return neverVal(), g.fail(m, id, "contract_method expressions are not supported yet");
-            }
-            return staticContractMethod(g, f, id);
-        },
+        contract_method => { return staticContractMethod(g, f, id); },
         operation_value => { return operationValue(g, f, id); },
         effect_provider => { return effectProvider(g, f, id); },
         state_provider => { return stateProvider(g, f, id); },

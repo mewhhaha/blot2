@@ -145,6 +145,7 @@ root struct Analyzer {
     // name among them does not give back what it borrowed until its call
     // is done, even when that was its last read.
     arguments_held: u32[>..<] = [],
+    argument_places: Place[>..<] = [],
     // The node that is read only for a field of it or to update a field of
     // it, not as a whole.
     base_node: u32 = 0,
@@ -232,6 +233,9 @@ root struct Analyzer {
     fork_taint: u32[>..] = [],
     block_taint: dictionary<u32, u32> = dictionary<u32, u32> {},
     non_freezable: bool[>..] = [],
+    ever_owned: bool[>..] = [],
+    borrows_owned: bool[>..] = [],
+    length_mut_params: u32[>..] = [],
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
     lends_cache: u8[>..] = [],
     calls_cache: u8[>..] = [],
@@ -272,6 +276,9 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.reader_state.resize(binding_count, 0);
         analyzer.reader_arity.resize(binding_count, 0);
         analyzer.member_kind.resize(binding_count, 0);
+        analyzer.ever_owned.resize(binding_count, false);
+        analyzer.borrows_owned.resize(binding_count, false);
+        analyzer.length_mut_params.resize(binding_count, 0);
         for binding, index in module.bindings {
             if index != 0 { analyzer.binding_index.insert(((binding.target.unit as u64) << 32) | binding.target.binding, index as! u32); }
         }
@@ -285,6 +292,23 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
             let known .= analyzer.identity_ids.get(key);
             if known { let existing: u32 = known; identity_id = existing; } else { analyzer.identity_ids.insert(key, identity_id); }
             analyzer.members.insert(((identity_id as u64) << 32) | method.member, index);
+            let st_kind = blot_check_storage_types::identity(method.identity.unit, method.identity.decl);
+            if st_kind.present && blot_check_storage_types::isGrowable(st_kind.value) {
+                let sp = module.fieldSpelling(method.member);
+                if sp.present && (sp.value == "push" || sp.value == "truncate" || sp.value == "pop") {
+                    analyzer.length_mut_params[index] |= 1;
+                }
+            }
+        }
+        // Detect same-module functions whose body directly mutates a parameter's storage length.
+        for body, bi in module.bodies {
+            if bi == 0 || body.root == 0 || !body.is_function { continue; }
+            let params = module.bodyParameters(body);
+            if params.len == 0 { continue; }
+            let mask = scanLengthMutParams(analyzer, module, body.root, params, 0);
+            if mask != 0 && body.binding < analyzer.length_mut_params.len {
+                analyzer.length_mut_params[body.binding] |= mask;
+            }
         }
     }
     for template in module.member_templates { if template.binding < analyzer.member_kind.len { analyzer.member_kind[template.binding] = 1; } }
@@ -335,7 +359,9 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         for parameter, position in module.bodyParameters(body) {
             if !local(analyzer, parameter.binding) { continue; }
             analyzer.home[parameter.binding] = body.root;
-            if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 { set(analyzer, parameter.binding, deep); }
+            if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 {
+                set(analyzer, parameter.binding, deep);
+            }
         }
         analyzer.owned_result = 0;
         let kind = analyzer.member_kind[body.binding];
@@ -388,6 +414,7 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.trail.push(Change { binding: binding, old: self_.facts[binding] });
     self_.facts[binding] = fact;
     self_.touch[binding] += 1;
+    if !self_.dry && fact != none && fact != spent && fact != top { self_.ever_owned[binding] = true; }
 }
 // A spent version stays spent: nothing gives its storage back.
 fn kill(self_: Analyzer&, binding: u32) {
@@ -410,6 +437,9 @@ fn kill(self_: Analyzer&, binding: u32) {
 // field `symbol`. The local, or that field, is shared while the name is in
 // use and gets its fact back afterwards.
 fn borrow(self_: Analyzer&, holder: u32, source: u32, symbol: u32) {
+    if !self_.dry && local(self_, holder) && local(self_, source) && (self_.ever_owned[source] || self_.borrows_owned[source]) {
+        self_.borrows_owned[holder] = true;
+    }
     if !local(self_, holder) || !local(self_, source) || self_.facts[source] == spent || self_.loan_holds[source] != 0 { kill(self_, source); return; }
     var saved = self_.facts[source];
     let whole = wholeLoan(self_, source);
@@ -1054,7 +1084,7 @@ fn source(self_: const Analyzer&, m: const Module&, id: u32) -> Place, bool {
             if operation != blot_backend_collection_ops::Op.get && operation != blot_backend_collection_ops::Op.identity { return Place { .. }, false; }
         } else if n.tag == blot_check_core::Tag.storage {
             let operation, unknown = blot_check_storage_ops::opFromCode(n.c);
-            if unknown != blot_error::Error.none || (operation != blot_check_storage_ops::Op.view && operation != blot_check_storage_ops::Op.read) { return Place { .. }, false; }
+            if unknown != blot_error::Error.none || (operation != blot_check_storage_ops::Op.view && operation != blot_check_storage_ops::Op.read && operation != blot_check_storage_ops::Op.ref && operation != blot_check_storage_ops::Op.at) { return Place { .. }, false; }
         } else {
             return Place { .. }, false;
         }
@@ -1269,6 +1299,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { exits: result.exits, .. };
         }
         let fact = taken(self_, m, n.b, result);
+        if !self_.dry && local(self_, n.a) && fact == none && result.origin != 0 && local(self_, result.origin) && (self_.ever_owned[result.origin] || self_.borrows_owned[result.origin]) {
+            self_.borrows_owned[n.a] = true;
+        }
         if n.c >= 2 {
             let outer_b = n.c - 2;
             if local(self_, outer_b) {
@@ -1727,8 +1760,14 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let base = self_.captured.len;
             let ends = self_.briefs.len;
             let held_base = self_.arguments_held.len;
+            let place_base = self_.argument_places.len;
             if tag == blot_check_core::Tag.call {
-                for child in m.call(id).arguments {
+                var lmut: u32 = 0;
+                if binding != 0 && binding < self_.length_mut_params.len { lmut = self_.length_mut_params[binding]; }
+                for child, pos in m.call(id).arguments {
+                    if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
+                        checkLengthMutation(self_, m, child, id);
+                    }
                     let value = lend(self_, m, child, holder, lends_to, brief);
                     exits = exits || value.exits;
                 }
@@ -1746,19 +1785,35 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     self_.captured.resize(base);
                     self_.briefs.resize(ends);
                     self_.arguments_held.resize(held_base);
+                    self_.argument_places.resize(place_base);
                     let all = visitChildren(self_, m, id);
                     return Value { exits: all, .. };
                 }
+                var lmut: u32 = 0;
+                if binding != 0 && binding < self_.length_mut_params.len { lmut = self_.length_mut_params[binding]; }
                 // The value of `value.member` is the first argument.
                 var callee = Value { .. };
-                if head_tag == blot_check_core::Tag.project { callee = lend(self_, m, m.node(head).a, holder, lends_to, brief); } else { callee = lend(self_, m, head, holder, lends_to, brief); }
+                if head_tag == blot_check_core::Tag.project {
+                    if (lmut & 1) != 0 { checkLengthMutation(self_, m, m.node(head).a, id); }
+                    callee = lend(self_, m, m.node(head).a, holder, lends_to, brief);
+                } else {
+                    callee = lend(self_, m, head, holder, lends_to, brief);
+                }
                 exits = callee.exits;
+                var arg_offset: i64 = 0;
+                if head_tag == blot_check_core::Tag.project { arg_offset = 1; }
                 for back in 0..given {
-                    let value = lend(self_, m, arguments[given - 1 - back], holder, lends_to, brief);
+                    let arg_node = arguments[given - 1 - back];
+                    let pos = arg_offset + back;
+                    if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
+                        checkLengthMutation(self_, m, arg_node, id);
+                    }
+                    let value = lend(self_, m, arg_node, holder, lends_to, brief);
                     exits = exits || value.exits;
                 }
             }
             self_.arguments_held.resize(held_base);
+            self_.argument_places.resize(place_base);
             giveBack(self_, base);
             if !holder {
                 endBriefs(self_, ends);
@@ -1821,6 +1876,139 @@ fn storageOwned(self_: const Analyzer&, m: const Module&, node: u32) -> bool {
     if fact == spent { return false; }
     for at in 0..target.len { fact = field(self_, fact, target.fields[at]); }
     return unique(fact);
+}
+fn paramIndexOfNode(m: const Module&, node: u32, params: const blot_check_core::Parameter[:]) -> i64 {
+    var cur = node;
+    var steps: i64 = 0;
+    while steps < 16 && cur != 0 && cur < m.nodes.len {
+        let n = m.node(cur);
+        if n.tag == blot_check_core::Tag.project { cur = n.a; steps += 1; continue; }
+        if n.tag == blot_check_core::Tag.reference {
+            let ref = m.reference(cur);
+            if ref.unit != 0 && ref.unit != m.unit { return -1; }
+            for p, idx in params {
+                if p.binding == ref.binding { return idx; }
+            }
+        }
+        return -1;
+    }
+    return -1;
+}
+recursive fn scanLengthMutParams(self_: const Analyzer&, m: const Module&, id: u32, params: const blot_check_core::Parameter[:], depth: i64) -> u32 {
+    if id == 0 || id >= m.nodes.len || depth > 64 { return 0; }
+    let n = m.node(id);
+    var mask: u32 = 0;
+    if n.tag == blot_check_core::Tag.storage {
+        let op, err = blot_check_storage_ops::opFromCode(n.c);
+        if err == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || op == blot_check_storage_ops::Op.truncate || op == blot_check_storage_ops::Op.pop) {
+            let children = m.children(id);
+            if children.len != 0 {
+                let idx = paramIndexOfNode(m, children[0], params);
+                if idx >= 0 && idx < 32 { mask |= (1 as u32) << (idx as! u32); }
+            }
+        }
+    } else if n.tag == blot_check_core::Tag.apply {
+        var head = id;
+        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; }
+        if m.node(head).tag == blot_check_core::Tag.project {
+            let binding = calleeBinding(self_, m, head);
+            if binding != 0 && binding < self_.length_mut_params.len && (self_.length_mut_params[binding] & 1) != 0 {
+                let idx = paramIndexOfNode(m, m.node(head).a, params);
+                if idx >= 0 && idx < 32 { mask |= (1 as u32) << (idx as! u32); }
+            }
+        }
+    }
+    match n.tag {
+        suite, block_, array, array_op, storage, product, record, construct, call, break_, contract_method, with_handle => {
+            for child in m.children(id) { mask |= scanLengthMutParams(self_, m, child, params, depth + 1); }
+        },
+        bind, return_ => {
+            if n.tag == blot_check_core::Tag.bind { mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1); }
+            else { mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1); }
+        },
+        if_value, if_stmt => {
+            mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1);
+            mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1);
+            mask |= scanLengthMutParams(self_, m, n.c, params, depth + 1);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { mask |= scanLengthMutParams(self_, m, inp, params, depth + 1); }
+            for arm in m.matchArms(id) {
+                mask |= scanLengthMutParams(self_, m, arm.guard_, params, depth + 1);
+                mask |= scanLengthMutParams(self_, m, arm.body, params, depth + 1);
+            }
+        },
+        loop_ => {
+            let info = m.loopInfo(id);
+            mask |= scanLengthMutParams(self_, m, info.first, params, depth + 1);
+            mask |= scanLengthMutParams(self_, m, info.end, params, depth + 1);
+            mask |= scanLengthMutParams(self_, m, info.body, params, depth + 1);
+        },
+        apply => {
+            mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1);
+            mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1);
+        },
+        _ => {},
+    }
+    return mask;
+}
+fn placesOverlap(a: Place, b: Place) -> bool {
+    if a.binding != b.binding { return false; }
+    var shared = a.len;
+    if b.len < shared { shared = b.len; }
+    for at in 0..shared {
+        if a.fields[at] != b.fields[at] { return false; }
+    }
+    return true;
+}
+fn containerOwned(self_: Analyzer&, m: const Module&, node: u32) -> bool {
+    let target, found = place(self_, m, node);
+    if !found || !local(self_, target.binding) { return false; }
+    var fact = self_.facts[target.binding];
+    if fact == spent { return false; }
+    for at in 0..target.len { fact = field(self_, fact, target.fields[at]); }
+    if unique(fact) { return true; }
+    if fact >= first_record && fact < spent { return ownedAs(self_, m, fact, m.typeOf(node), 0); }
+    return false;
+}
+fn checkLengthMutation(self_: Analyzer&, m: const Module&, container_node: u32, site_id: u32) {
+    let target, found = place(self_, m, container_node);
+    if !found || !local(self_, target.binding) { return; }
+    let tracked = self_.ever_owned[target.binding] || self_.borrows_owned[target.binding];
+    let in_same_fn = self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1];
+    if !in_same_fn {
+        if self_.in_fork != 0 {
+            reject(self_, m, site_id, blot_check_core::Code.aliased_update);
+            return;
+        }
+        if tracked {
+            var sole_downward = false;
+            for entry in self_.captured {
+                if entry.binding != target.binding { continue; }
+                var part = entry.fact;
+                if target.len != 0 { part = partFact(self_, entry.fact, target.fields[..target.len]); }
+                if unique(part) || (part >= first_record && part < spent && ownedAs(self_, m, part, m.typeOf(container_node), 0)) {
+                    sole_downward = true;
+                    break;
+                }
+            }
+            if !sole_downward {
+                reject(self_, m, site_id, blot_check_core::Code.aliased_update);
+            }
+        }
+        return;
+    }
+    if tracked {
+        for held in self_.argument_places {
+            if placesOverlap(held, target) {
+                reject(self_, m, site_id, blot_check_core::Code.aliased_update);
+                return;
+            }
+        }
+        if !containerOwned(self_, m, container_node) {
+            reject(self_, m, site_id, blot_check_core::Code.aliased_update);
+        }
+    }
 }
 // The identity the backend's dispatch gives a receiver of type `ty`.
 fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdentity, bool {
@@ -2154,7 +2342,13 @@ recursive fn lend(self_: Analyzer&, m: const Module&, child: u32, holder: bool, 
     self_.brief_node = 0;
     self_.let_node = 0;
     for at in from..self_.captured.len { self_.captured[at].stamp = self_.touch[self_.captured[at].binding]; }
-    if value.origin != 0 && local(self_, value.origin) { self_.arguments_held.push(value.origin); }
+    if value.origin != 0 && local(self_, value.origin) {
+        self_.arguments_held.push(value.origin);
+        var held_place = Place { binding: value.origin, .. };
+        let src, found = source(self_, m, child);
+        if found && src.binding == value.origin { held_place = src; }
+        self_.argument_places.push(held_place);
+    }
     if holder { held(self_, m, child, value, lends_to, brief); }
     return value;
 }
@@ -2338,6 +2532,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
     let base = self_.captured.len;
     let ends = self_.briefs.len;
     let held_base = self_.arguments_held.len;
+    let place_base = self_.argument_places.len;
     var guarded: u32[32] = [0; 32];
     var guard_saved: u32[32] = [0; 32];
     var guard_kills: u32[32] = [0; 32];
@@ -2432,6 +2627,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
         set(self_, binding, restored);
     }
     self_.arguments_held.resize(held_base);
+    self_.argument_places.resize(place_base);
     giveBack(self_, base);
     if !holder {
         endBriefs(self_, ends);
@@ -2762,7 +2958,22 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
     }
     if operation == blot_backend_collection_ops::Op.fill || operation == blot_backend_collection_ops::Op.generate {
         var exits = false;
-        for child in children { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
+        let cap_base = self_.captured.len;
+        for child in children {
+            if operation == blot_backend_collection_ops::Op.generate && m.node(child).tag == blot_check_core::Tag.closure {
+                let from = self_.captured.len;
+                for binding in m.closureCaptures(child) {
+                    if local(self_, binding) && self_.facts[binding] != spent { self_.captured.push(Captured { binding: binding, fact: self_.facts[binding], stamp: 0 }); }
+                }
+                let value = visitEscaping(self_, m, child);
+                for at in from..self_.captured.len { self_.captured[at].stamp = self_.touch[self_.captured[at].binding]; }
+                exits = value.exits || exits;
+            } else {
+                let value = visitEscaping(self_, m, child);
+                exits = value.exits || exits;
+            }
+        }
+        self_.captured.resize(cap_base);
         let fact = freshContainer(self_, m, n.ty, false);
         return Value { fact: fact, exits: exits, .. };
     }
@@ -2778,7 +2989,9 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if unknown == blot_error::Error.none {
         if operation == blot_check_storage_ops::Op.length || operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.reserve || operation == blot_check_storage_ops::Op.pop {
             let container = visit(self_, m, children[0]);
-
+            if operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.pop {
+                checkLengthMutation(self_, m, children[0], id);
+            }
             var exits = container.exits;
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
             return Value { exits: exits, .. };
@@ -2790,9 +3003,14 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if holds(self_, m, n.ty) { return Value { origin: container.origin, exits: exits, .. }; }
             return Value { exits: exits, .. };
         }
-        if operation == blot_check_storage_ops::Op.view {
-            // A view borrows the storage it names, as a value read out of
-            // it does: it is given back where the view is last used.
+        if operation == blot_check_storage_ops::Op.load {
+            let container = visit(self_, m, children[0]);
+            if holds(self_, m, n.ty) { return Value { origin: container.origin, exits: container.exits, .. }; }
+            return Value { exits: container.exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.view || operation == blot_check_storage_ops::Op.ref || operation == blot_check_storage_ops::Op.at {
+            // A view or ref borrows the storage it names, as a value read out of
+            // it does: it is given back where the view/ref is last used.
             let container = visit(self_, m, children[0]);
             var exits = container.exits;
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
@@ -2800,6 +3018,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if operation == blot_check_storage_ops::Op.push {
             let container = visit(self_, m, children[0]);
+            checkLengthMutation(self_, m, children[0], id);
             let value = visit(self_, m, children[1]);
             let pushed = taken(self_, m, children[1], value);
             // A push into storage the function was lent is a store like
