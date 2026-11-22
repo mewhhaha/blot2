@@ -40,7 +40,6 @@ import check.core;
 import check.types;
 import check.storage_types;
 import check.storage_ops;
-import eval.body_recipe;
 import backend.collection_ops;
 import support.error;
 import support.option;
@@ -1112,13 +1111,29 @@ recursive fn visitEscaping(self_: Analyzer&, m: const Module&, id: u32) -> Value
     escape(self_, value);
     return value;
 }
+fn appendChildren(out: u32[>..<]&, m: const Module&, id: u32) {
+    let n = m.node(id);
+    let tag = n.tag;
+    if tag == blot_check_core::Tag.fork_ { out.push(n.a); return; }
+    if tag == blot_check_core::Tag.with_handle { out.append(m.children(id)); out.push(n.a); return; }
+    if tag == blot_check_core::Tag.comptime_for { out.push(n.b); return; }
+    if tag == blot_check_core::Tag.comptime_if { out.append([n.a, n.b, n.c]); return; }
+    if tag == blot_check_core::Tag.comptime_meta { if n.c == 0 { out.push(n.a); } else if n.c == 8 || n.c == 9 { out.push(n.b); } return; }
+    if tag == blot_check_core::Tag.staging || tag == blot_check_core::Tag.scalar || tag == blot_check_core::Tag.associated || tag == blot_check_core::Tag.logical || tag == blot_check_core::Tag.type_same || tag == blot_check_core::Tag.apply || tag == blot_check_core::Tag.effect_provider || tag == blot_check_core::Tag.handle { out.append([n.a, n.b]); return; }
+    if tag == blot_check_core::Tag.if_value || tag == blot_check_core::Tag.if_stmt || tag == blot_check_core::Tag.state_provider { out.append([n.a, n.b, n.c]); return; }
+    if tag == blot_check_core::Tag.block_ || tag == blot_check_core::Tag.suite || tag == blot_check_core::Tag.product || tag == blot_check_core::Tag.record || tag == blot_check_core::Tag.array || tag == blot_check_core::Tag.array_op || tag == blot_check_core::Tag.storage || tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.contract_method { out.append(m.children(id)); return; }
+    if tag == blot_check_core::Tag.bind || tag == blot_check_core::Tag.construct { out.push(n.b); return; }
+    if tag == blot_check_core::Tag.return_ || tag == blot_check_core::Tag.project || tag == blot_check_core::Tag.result_associated { out.push(n.a); return; }
+    if tag == blot_check_core::Tag.pattern_bind { out.append([n.b, n.c]); return; }
+    if tag == blot_check_core::Tag.match_ { out.append(m.matchInputs(id)); for arm in m.matchArms(id) { out.append([arm.guard_, arm.body]); } return; }
+    if tag == blot_check_core::Tag.loop_ { let iteration = m.loopInfo(id); out.append([iteration.first, iteration.end, iteration.body]); return; }
+    if tag == blot_check_core::Tag.break_ { out.append(m.breakValues(id)); return; }
+    if tag == blot_check_core::Tag.update { let update = m.updateInfo(id); out.append([update.root, update.value]); for selector in m.updateSelectors(id) { if selector.kind == blot_check_core::UpdateKind.index { out.push(selector.index); } } return; }
+    if tag == blot_check_core::Tag.effect_reflection { if n.a == 2 || n.a == 3 || n.a == 4 { out.push(n.b); } if n.c != 0 { out.push(n.c); } return; }
+}
 recursive fn visitChildren(self_: Analyzer&, m: const Module&, id: u32) -> bool {
     let start = self_.children.len;
-    {
-        var list = blot_eval_body_recipe::Pending { items: self_.children, limit: 0x7fffffffffffffff };
-        let error = blot_eval_body_recipe::appendChildren(list, m, id, false);
-        assert(error == blot_error::Error.none);
-    }
+    appendChildren(self_.children, m, id);
     var exits = false;
     var at = start;
     while at < self_.children.len {
@@ -1157,11 +1172,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // A provider names the operations it answers; that is not a use
         // of them as functions.
         let start = self_.children.len;
-        {
-            var list = blot_eval_body_recipe::Pending { items: self_.children, limit: 0x7fffffffffffffff };
-            let error = blot_eval_body_recipe::appendChildren(list, m, id, false);
-            assert(error == blot_error::Error.none);
-        }
+        appendChildren(self_.children, m, id);
         for child in self_.children[start..] { if m.node(child).tag == blot_check_core::Tag.operation_value { self_.heads[child] = true; } }
         self_.children.resize(start);
     }

@@ -158,7 +158,6 @@ recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token
  var attributes=ScratchIdBuffer {};
  while p.failure==blot_error::Error.none&&at(p,source,tokens,t_at) { let point=current(p,source,tokens).start; eat(p,source,tokens,t_at); expect(p,source,tokens,t_l_bracket); let body=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); attributes.push(add(p,source,tokens,a_attribute,body,0,0,point)); newlines(p,source,tokens); }
  let attrs=list(p,source,tokens,attributes.items); if p.failure!=blot_error::Error.none { let __cleanup_result_4_0: Id = 0; attributes.deinit(); return __cleanup_result_4_0; }
- if word(p,source,tokens,"impl") { if attrs.len!=0 { let __cleanup_result_6_0: Id = fail(p,source,tokens,c_unexpected_token); attributes.deinit(); return __cleanup_result_6_0; } let __cleanup_result_7_0: Id = implementation_declaration(p,source,tokens,start); attributes.deinit(); return __cleanup_result_7_0; }
  if at(p,source,tokens,t_kw_type)||at(p,source,tokens,t_kw_data) { let __cleanup_result_8_0: Id = type_declaration(p,source,tokens,attrs,start,is_opaque); attributes.deinit(); return __cleanup_result_8_0; }
  if eat(p,source,tokens,t_kw_effect) { let name=qualified(p,source,tokens); expect(p,source,tokens,t_colon); let signature=type_expression(p,source,tokens); let __cleanup_result_9_0: Id = add(p,source,tokens,a_effect_decl,name,signature,extra(p,source,tokens,[attrs.start,attrs.len]),start); attributes.deinit(); return __cleanup_result_9_0; }
  var modifier: Symbol=0; var flags: u32=0;
@@ -428,7 +427,6 @@ fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs:
    members.deinit(); trait_outputs.deinit(); params.deinit(); return trait_result;
   }
   if trait_outputs.len!=0 { let err_res=fail(p,source,tokens,c_expected_token); trait_outputs.deinit(); params.deinit(); return err_res; }
-  if word(p,source,tokens,"contract") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=predicate_body(p,source,tokens,current(p,source,tokens).start,true); let range=list(p,source,tokens,params.items); let __cleanup_result_19_0: Id = add(p,source,tokens,a_contract_decl,name,body.node,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); trait_outputs.deinit(); params.deinit(); return __cleanup_result_19_0; }
   // An opaque representation is data with one private constructor spelled like its type.
   if word(p,source,tokens,"opaque") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items); let constructor=add(p,source,tokens,a_constructor_ref,name,body,0,start); let constructors=list_node(p,source,tokens,a_constructors,[constructor],start); is_opaque=true; let opaque_result: Id = add(p,source,tokens,a_data_decl,name,constructors,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); trait_outputs.deinit(); params.deinit(); return opaque_result; }
   if eat(p,source,tokens,t_kw_effect) { effect=true; } else { expect(p,source,tokens,t_kw_data); }
@@ -465,35 +463,14 @@ fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs:
  let range=list(p,source,tokens,params.items); var tag=a_data_decl; if effect { tag=a_effect_type_decl; }
  let __cleanup_result_20_0: Id = add(p,source,tokens,tag,name,body,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_20_0;
  params.deinit(); }
-fn implementation_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
- advance(p,source,tokens); let name=type_identifier(p,source,tokens); var parameters=ScratchIdBuffer {};
- if type_atom_tag(current(p,source,tokens).tag) { parameters.push(type_atom(p,source,tokens)); }
- while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_fat_arrow) { expect(p,source,tokens,t_kw_type); parameters.push(type_atom(p,source,tokens)); }
- expect(p,source,tokens,t_colon); let head=contract_item(p,source,tokens,false); let prerequisites=where_clause(p,source,tokens); expect(p,source,tokens,t_equal); let body_start=expect(p,source,tokens,t_l_brace).start; newlines(p,source,tokens); var members=ScratchIdBuffer {};
- while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) {
-  let member_start=current(p,source,tokens).start;
-  if eat(p,source,tokens,t_kw_type) { let member=type_identifier(p,source,tokens); expect(p,source,tokens,t_equal); let ty=type_expression(p,source,tokens); members.push(add(p,source,tokens,a_contract_type_member,member,ty,0,member_start)); }
-  else {
-   expect(p,source,tokens,t_kw_const); let member=identifier(p,source,tokens); var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); } expect(p,source,tokens,t_equal);
-   if !at(p,source,tokens,t_kw_func) { let __cleanup_result_21_0: Id = fail(p,source,tokens,c_expected_token); members.deinit(); parameters.deinit(); return __cleanup_result_21_0; }
-   let value=expression(p,source,tokens); let method=add(p,source,tokens,a_value_decl,member,value,extra(p,source,tokens,[annotation,0,0,0,0,0,0,0,0]),member_start);
-   if p.failure!=blot_error::Error.none { let __cleanup_result_22_0: Id = 0; members.deinit(); parameters.deinit(); return __cleanup_result_22_0; } members.push(method); p.tree.constant_names.push(blot_parse_ast::RuntimeName {method,member_start});
-  }
-  if !eat(p,source,tokens,t_comma) { break; } newlines(p,source,tokens);
- }
- newlines(p,source,tokens); expect(p,source,tokens,t_r_brace); let body=list_node(p,source,tokens,a_where_clause,members.items,body_start); let params=list(p,source,tokens,parameters.items);
- let __cleanup_result_23_0: Id = add(p,source,tokens,a_implementation_decl,name,body,extra(p,source,tokens,[params.start,params.len,head,prerequisites.predicates.start,prerequisites.predicates.len,prerequisites.node]),start); members.deinit(); parameters.deinit(); return __cleanup_result_23_0;
- members.deinit(); parameters.deinit(); }
-fn where_clause(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Where { let start=current(p,source,tokens).start; if !eat(p,source,tokens,t_kw_where) { return Where {}; } return predicate_body(p,source,tokens,start,false); }
-recursive fn predicate_body(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32,members: bool) -> Where {
+fn where_clause(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Where { let start=current(p,source,tokens).start; if !eat(p,source,tokens,t_kw_where) { return Where {}; } return predicate_body(p,source,tokens,start); }
+recursive fn predicate_body(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Where {
  expect(p,source,tokens,t_l_brace); newlines(p,source,tokens); var predicates=ScratchIdBuffer {};
- while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) { predicates.push(contract_item(p,source,tokens,members)); if !eat(p,source,tokens,t_comma) { break; } newlines(p,source,tokens); }
+ while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) { predicates.push(contract_item(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } newlines(p,source,tokens); }
  newlines(p,source,tokens); expect(p,source,tokens,t_r_brace); let range=list(p,source,tokens,predicates.items); let id=add(p,source,tokens,a_where_clause,range.start,range.len,0,start); let __cleanup_result_24_0: Where = Where {range,id}; predicates.deinit(); return __cleanup_result_24_0;
  predicates.deinit(); }
-recursive fn contract_item(p: Parser&,source: const u8[:],tokens: const Token[:],members: bool) -> Id {
+recursive fn contract_item(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  let start=current(p,source,tokens).start;
- if members&&eat(p,source,tokens,t_kw_type) { let name=type_identifier(p,source,tokens); var value: Id=0; if eat(p,source,tokens,t_equal) { value=type_expression(p,source,tokens); } return add(p,source,tokens,a_contract_type_member,name,value,0,start); }
- if members&&eat(p,source,tokens,t_kw_const) { let name=identifier(p,source,tokens); expect(p,source,tokens,t_colon); let ty=type_expression(p,source,tokens); return add(p,source,tokens,a_contract_value_member,name,ty,0,start); }
  let kind=qualified(p,source,tokens); var member: Symbol=0; if at(p,source,tokens,t_string) { member=string_symbol(p,source,tokens); }
  var args=ScratchIdBuffer {};
  while p.failure==blot_error::Error.none&&type_atom_at(p,source,tokens,0) {

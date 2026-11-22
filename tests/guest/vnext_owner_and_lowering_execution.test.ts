@@ -178,8 +178,8 @@ Deno.test("Item 3a: effectful contract_method preserves callback evaluation orde
   await compileAndRun(
     `
 type Box is data = $Box U32
-type Make a is contract = {
-  const make: a -> ((U32 -> U32 ! {Foreign}) -> (U32 -> U32 ! {Foreign}) ! {Foreign})
+type Make a is trait = {
+  make: a -> ((U32 -> U32 ! {Foreign}) -> (U32 -> U32 ! {Foreign}) ! {Foreign})
 }
 func make_box (b: Box) -> (log: U32 -> U32 ! {Foreign}): (U32 -> U32 ! {Foreign}) ! {Foreign} =>
   let $Box v = b
@@ -187,8 +187,8 @@ func make_box (b: Box) -> (log: U32 -> U32 ! {Foreign}): (U32 -> U32 ! {Foreign}
   return func (y: U32) => return do:
     use _ <- log 3
     return v + y
-impl BoxMake : Make Box = {
-  const make = func (b: Box) -> (log: U32 -> U32 ! {Foreign}) => return make_box b log,
+const Box.Make: Make Box = {
+  make: func (b: Box) -> (log: U32 -> U32 ! {Foreign}) => return make_box b log,
 }
 const run: a -> (U32 -> U32 ! {Foreign}) -> (U32 -> U32 ! {Foreign}) where { Make a } = func x -> log -> y => return do:
   use f <- Make.make x log
@@ -216,8 +216,8 @@ entry func main (log: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => run ($Box 100)
     `
 effect Tick: U32 -> U32
 type Box is data = $Box U32
-type MakeEffect a is contract = {
-  const make: a -> (U32 -> U32 ! {Tick}) ! {Tick}
+type MakeEffect a is trait = {
+  make: a -> (U32 -> U32 ! {Tick}) ! {Tick}
 }
 func make_box_effect (b: Box): (U32 -> U32 ! {Tick}) ! {Tick} =>
   let $Box v = b
@@ -225,8 +225,8 @@ func make_box_effect (b: Box): (U32 -> U32 ! {Tick}) ! {Tick} =>
   return func (y: U32) => return do:
     use _ <- Tick 30
     return v + y
-impl BoxMakeEffect : MakeEffect Box = {
-  const make = func (b: Box) => return make_box_effect b,
+const Box.MakeEffect: MakeEffect Box = {
+  make: func (b: Box) => return make_box_effect b,
 }
 const run: a -> (U32 -> U32 ! {Tick}) where { MakeEffect a } = func x -> y => return do:
   use f <- MakeEffect.make x

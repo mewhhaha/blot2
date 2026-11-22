@@ -9,10 +9,7 @@ ROOT = Path(__file__).resolve().parents[1] / 'src'
 TARGET = ROOT / 'support/structural_adapters.goose'
 # Concrete equality covers only explicitly selected private domains. Tagged
 # enums compare their active payload fields, never owner addresses or padding.
-ENUM_EQUALITY = {
-    'blot_eval_type_evidence::Tag': ('eval/type_evidence_schema.goose', 'Tag'),
-    'blot_eval_implementation_evidence::ProofKind': ('eval/implementation_evidence.goose', 'ProofKind'),
-}
+ENUM_EQUALITY = {}
 def enum_equalities():
     result={}
     for qualified,(path,name) in ENUM_EQUALITY.items():

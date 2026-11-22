@@ -108,12 +108,11 @@ Deno.test("abstract operation contracts preserve symbolic aliases through source
 type Number = U32
 type Identity a = a
 type Signal a is effect = { get: Unit -> a }
-type Read a is contract = { operation Signal.get a, type_rep a, effect_rep ! {} }
-const read: Unit -> a ! {| e} where { Read a } = func () => return Signal.get a ()
+const read: Unit -> a ! {Signal.get a} = func () => return Signal.get a ()
 const number: Unit -> Number ! {Signal.get Number} = func () => return Signal.get Number ()
 `;
   const main = `
-import {Number, Identity, Signal, Read, read, number} from "./read"
+import {Number, Identity, Signal, read, number} from "./read"
 entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
   break @u32.add (read ()) (number ())
 entry const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):

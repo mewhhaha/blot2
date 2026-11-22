@@ -44,10 +44,6 @@ implementations:Implementation[:]=default<Implementation[:]>(),
 implementation_predicates:blot_check_types::Obligation[:]=default<blot_check_types::Obligation[:]>(),
 implementation_members:ImplementationMember[:]=default<ImplementationMember[:]>(),
 member_templates:blot_reuse_principal_interface::MemberTemplate[:]=default<blot_reuse_principal_interface::MemberTemplate[:]>(),
-selected_proofs:blot_reuse_principal_interface::SelectedProof[:]=default<blot_reuse_principal_interface::SelectedProof[:]>(),
-selected_members:ImplementationMember[:]=default<ImplementationMember[:]>(),
-selected_edges:u32[:]=default<u32[:]>(),
-selected_uses:blot_reuse_principal_interface::SelectedUse[:]=default<blot_reuse_principal_interface::SelectedUse[:]>(),
 constructors:Constructor[:]=default<Constructor[:]>(),
 constructor_resolved:u32[:]=default<u32[:]>(),
 projections:u32[:]=default<u32[:]>(),
@@ -97,10 +93,6 @@ reusable[] var checked_implementations:Implementation[>..];
 reusable[] var checked_implementation_predicates:blot_check_types::Obligation[>..];
 reusable[] var checked_implementation_members:ImplementationMember[>..];
 reusable[] var checked_member_templates:blot_reuse_principal_interface::MemberTemplate[>..];
-reusable[] var checked_selected_proofs:blot_reuse_principal_interface::SelectedProof[>..];
-reusable[] var checked_selected_members:ImplementationMember[>..];
-reusable[] var checked_selected_edges:u32[>..];
-reusable[] var checked_selected_uses:blot_reuse_principal_interface::SelectedUse[>..];
 reusable[] var checked_constructors:Constructor[>..];
 reusable[] var checked_constructor_resolved:u32[>..];
 reusable[] var checked_projections:u32[>..];
@@ -164,10 +156,6 @@ fn ownChecked_implementations(owner:CheckedOwner,values:const Implementation[:])
 fn ownChecked_implementation_predicates(owner:CheckedOwner,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {let state .= checkedOwnerState(owner);assert(state.implementation_predicates.len==0);let result=checked_implementation_predicates.alloc_slice(values.len);for value,index in values {result[index]=value;}state.implementation_predicates=result;return result;}
 fn ownChecked_implementation_members(owner:CheckedOwner,values:const ImplementationMember[:])->ImplementationMember[:] {let state .= checkedOwnerState(owner);assert(state.implementation_members.len==0);let result=checked_implementation_members.alloc_slice(values.len);for value,index in values {result[index]=value;}state.implementation_members=result;return result;}
 fn ownChecked_member_templates(owner:CheckedOwner,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:] {let state .= checkedOwnerState(owner);assert(state.member_templates.len==0);let result=checked_member_templates.alloc_slice(values.len);for value,index in values {result[index]=value;}state.member_templates=result;return result;}
-fn ownChecked_selected_proofs(owner:CheckedOwner,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:] {let state .= checkedOwnerState(owner);assert(state.selected_proofs.len==0);let result=checked_selected_proofs.alloc_slice(values.len);for value,index in values {result[index]=value;}state.selected_proofs=result;return result;}
-fn ownChecked_selected_members(owner:CheckedOwner,values:const ImplementationMember[:])->ImplementationMember[:] {let state .= checkedOwnerState(owner);assert(state.selected_members.len==0);let result=checked_selected_members.alloc_slice(values.len);for value,index in values {result[index]=value;}state.selected_members=result;return result;}
-fn ownChecked_selected_edges(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.selected_edges.len==0);let result=checked_selected_edges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.selected_edges=result;return result;}
-fn ownChecked_selected_uses(owner:CheckedOwner,values:const blot_reuse_principal_interface::SelectedUse[:])->blot_reuse_principal_interface::SelectedUse[:] {let state .= checkedOwnerState(owner);assert(state.selected_uses.len==0);let result=checked_selected_uses.alloc_slice(values.len);for value,index in values {result[index]=value;}state.selected_uses=result;return result;}
 fn ownChecked_constructors(owner:CheckedOwner,values:const Constructor[:])->Constructor[:] {let state .= checkedOwnerState(owner);assert(state.constructors.len==0);let result=checked_constructors.alloc_slice(values.len);for value,index in values {result[index]=value;}state.constructors=result;return result;}
 fn ownChecked_constructor_resolved(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.constructor_resolved.len==0);let result=checked_constructor_resolved.alloc_slice(values.len);for value,index in values {result[index]=value;}state.constructor_resolved=result;return result;}
 fn ownChecked_projections(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.projections.len==0);let result=checked_projections.alloc_slice(values.len);for value,index in values {result[index]=value;}state.projections=result;return result;}
@@ -198,10 +186,6 @@ fn ownedSourceValidation(checked:const Checked&,declarations:const SourceDeclara
  assert(blot_support::same_slice_identity(state.implementation_predicates,checked.implementation_predicates));
  assert(blot_support::same_slice_identity(state.implementation_members,checked.implementation_members));
  assert(blot_support::same_slice_identity(state.member_templates,checked.member_templates));
- assert(blot_support::same_slice_identity(state.selected_proofs,checked.selected_proofs));
- assert(blot_support::same_slice_identity(state.selected_members,checked.selected_members));
- assert(blot_support::same_slice_identity(state.selected_edges,checked.selected_edges));
- assert(blot_support::same_slice_identity(state.selected_uses,checked.selected_uses));
  assert(blot_support::same_slice_identity(state.constructors,checked.constructors));
  assert(blot_support::same_slice_identity(state.effect_families,checked.effect_families));
  assert(blot_support::same_slice_identity(state.effect_templates,checked.effect_templates));
@@ -218,10 +202,6 @@ fn ownedSourceValidation(checked:const Checked&,declarations:const SourceDeclara
  implementation_predicates:checked_implementation_predicates.realloc_slice(state.implementation_predicates,state.implementation_predicates.len),
  implementation_members:checked_implementation_members.realloc_slice(state.implementation_members,state.implementation_members.len),
  member_templates:checked_member_templates.realloc_slice(state.member_templates,state.member_templates.len),
- selected_proofs:checked_selected_proofs.realloc_slice(state.selected_proofs,state.selected_proofs.len),
- selected_members:checked_selected_members.realloc_slice(state.selected_members,state.selected_members.len),
- selected_edges:checked_selected_edges.realloc_slice(state.selected_edges,state.selected_edges.len),
- selected_uses:checked_selected_uses.realloc_slice(state.selected_uses,state.selected_uses.len),
  constructors:checked_constructors.realloc_slice(state.constructors,state.constructors.len),
  effect_families:checked_effect_families.realloc_slice(state.effect_families,state.effect_families.len),
  effect_templates:checked_effect_templates.realloc_slice(state.effect_templates,state.effect_templates.len),
@@ -296,10 +276,6 @@ if state.implementations.len!=0 {checked_implementations.free_slice(state.implem
 if state.implementation_predicates.len!=0 {checked_implementation_predicates.free_slice(state.implementation_predicates);state.implementation_predicates=default<blot_check_types::Obligation[:]>();}
 if state.implementation_members.len!=0 {checked_implementation_members.free_slice(state.implementation_members);state.implementation_members=default<ImplementationMember[:]>();}
 if state.member_templates.len!=0 {checked_member_templates.free_slice(state.member_templates);state.member_templates=default<blot_reuse_principal_interface::MemberTemplate[:]>();}
-if state.selected_proofs.len!=0 {checked_selected_proofs.free_slice(state.selected_proofs);state.selected_proofs=default<blot_reuse_principal_interface::SelectedProof[:]>();}
-if state.selected_members.len!=0 {checked_selected_members.free_slice(state.selected_members);state.selected_members=default<ImplementationMember[:]>();}
-if state.selected_edges.len!=0 {checked_selected_edges.free_slice(state.selected_edges);state.selected_edges=default<u32[:]>();}
-if state.selected_uses.len!=0 {checked_selected_uses.free_slice(state.selected_uses);state.selected_uses=default<blot_reuse_principal_interface::SelectedUse[:]>();}
 if state.constructors.len!=0 {checked_constructors.free_slice(state.constructors);state.constructors=default<Constructor[:]>();}
 if state.constructor_resolved.len!=0 {checked_constructor_resolved.free_slice(state.constructor_resolved);state.constructor_resolved=default<u32[:]>();}
 if state.projections.len!=0 {checked_projections.free_slice(state.projections);state.projections=default<u32[:]>();}

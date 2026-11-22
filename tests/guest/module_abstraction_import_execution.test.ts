@@ -323,7 +323,8 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
       dir + "/types.blot",
       [
         "type Point is data = $Point { other: U32, x: U32 }",
-        "type Identity a is contract = { type Item = a }",
+        "type Identity a { item } is trait = { id: a -> item }",
+        "const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }",
         "func make (n: U32): Point => return $Point { other: 90, x: n }",
       ].join("\n") + "\n",
     );
@@ -339,11 +340,11 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
       dir,
       [
         'import * as bridge from "./bridge"',
-        "type Marker = bridge.Identity.Item U32",
+        "type Marker = bridge.Identity.item U32",
         "func read (n: U32): U32 => return (bridge.carry n).x",
       ].join("\n") + "\n",
     );
-    for (const inferenceBudget of [2902, 2903]) {
+    for (const inferenceBudget of [4074, 4075]) {
       const outputs = [];
       for (const frontendWorkers of [1, 8]) {
         const client = await createZigProjectCompiler({
@@ -355,7 +356,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
         });
         try {
           const result = await client.build();
-          assert.equal(result.success, inferenceBudget === 2903);
+          assert.equal(result.success, inferenceBudget === 4075);
           if (result.success) {
             const guest = await instantiateGuest(result.bytes);
             try {

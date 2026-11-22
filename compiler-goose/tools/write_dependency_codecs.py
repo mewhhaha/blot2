@@ -115,7 +115,7 @@ for d in ORDER:
  for namespace in re.findall(r'\b(blot_\w+)::',actual(d)):
   if namespace in GF:imports.add(GF[namespace])
 # The port's spelling: qualified errors, varint_, unqualified match patterns.
-SYNTAX_TYPES={'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
+SYNTAX_TYPES={'T','bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
 for path in GOOSE.rglob('*.goose'):SYNTAX_TYPES.update(re.findall(r'\b(?:struct|enum|type)\s+(\w+)',path.read_text()))
 def port_syntax(text):return finish_syntax(normalize(text,SYNTAX_TYPES))
 lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n',OWNER_DISPATCH]

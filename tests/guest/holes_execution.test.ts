@@ -62,8 +62,7 @@ Deno.test("typed holes expose shared generic requirements and repeated structure
   try {
     const built = await compiler.build({
       sources: {
-        [entry]: `type Add a is contract = { associated "add" a a a }
-const incomplete: a -> a where { Add a } = func value => return @hole
+        [entry]: `const incomplete: a -> a where { associated "add" a a a } = func value => return @hole
 entry const answer = 42
 `,
       },

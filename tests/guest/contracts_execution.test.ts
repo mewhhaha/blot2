@@ -1,20 +1,19 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
-import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
-Deno.test("contract methods select caller evidence and preserve a defining module's private implementation", async () => {
+Deno.test("trait methods select caller evidence and preserve a defining module's private implementation", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   try {
     await Deno.writeTextFile(`${directory}/convert.blot`, `
-type Read a is contract = { const read: a -> U32 }
-private impl Inside : Read U32 = {
-  const read = func (value: U32) => return value + 1,
+type Read a is trait = { read: a -> U32 }
+private const U32.Read: Read U32 = {
+  read: func (value: U32) => return value + 1,
 }
 func generic (value: a): U32 where { Read a } => return Read.read value
 func closed (value: U32): U32 => return Read.read value
@@ -24,8 +23,8 @@ import * as convert from "./convert"
 type Wrapped is data = $Wrapped U32
 func doubled (value: Wrapped): U32 => return case value of
   $Wrapped number => number * 2
-impl Outside : convert.Read Wrapped = {
-  const read = func value => return doubled value,
+const Wrapped.Read: convert.Read Wrapped = {
+  read: func value => return doubled value,
 }
 func invoke (callback: Wrapped -> U32) -> (value: Wrapped): U32 => return callback value
 entry func run (value: U32): U32 => return convert.generic ($Wrapped value) + convert.closed value
@@ -61,53 +60,24 @@ entry func as_value (value: U32): U32 => return invoke convert.Read.read ($Wrapp
   }
 });
 
-// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
-Deno.test.ignore("named contracts compose ordinary operations and shaped field requirements without sharing instances", async () => {
-  await compileAndRun(
-    `
-type Add a is contract = { associated "add" a a a }
-type Arithmetic a is contract = { Add a, associated "mul" a a a }
-type Project [owner, value] is contract = { field "value" owner value }
-type Box a is data = $Box { value: a }
-const contract = 1
-const twice: a -> a where { Arithmetic a } = func value => return value + value
-const read: a -> b where { Project [a, b] } = func box => return box.value
-entry const answer = func () => return twice (read ($Box { value: 21 }))
-entry const fraction = func () => return twice (read ($Box { value: 1.5 }))
-`,
-    (guest) => {
-      equal(guest.call("answer", null), 42);
-      equal(guest.call("fraction", null), 3);
-    },
-  );
-  await compileExpectedFailure(
-    `
-type Project [a, b] is contract = { field "value" a b }
-const bad: a -> U32 where { Project [a, U32] } = func value => return value.missing
-entry const answer = 42
-`,
-    "missing_predicate",
-  );
-});
-
-Deno.test("imported and qualified contracts survive retained edits, errors and serialized dependencies", async () => {
+Deno.test("imported and qualified traits survive retained edits, errors and serialized dependencies", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`,
     library = `${directory}/contracts.blot`;
   const bundle = `${directory}/dependencies.blotdep`;
   const librarySource = `
-type Project [owner, value] is contract = { field "value" owner value }
-type Read a is contract = { Project [a, U32] }
+type Read a is trait = { read: a -> U32 }
 type Action a = Unit -> a ! {| e}
-const read: a -> U32 where { Read a } = func box => return box.value
+const read: a -> U32 where { Read a } = func box => return Read.read box
 const invoke = func (action: Action a) => return action ()
 `;
   const source = `
 import { Read, Action, invoke } from "./contracts"
 import * as contracts from "./contracts"
 type Box is data = $Box { value: U32 }
-const local: a -> U32 where { Read a } = func box => return box.value
-const qualified: a -> U32 where { contracts.Project [a, U32] } = func box => return box.value
+const Box.Read: Read Box = { read: func box => return box.value }
+const local: a -> U32 where { Read a } = func box => return Read.read box
+const qualified: a -> U32 where { contracts.Read a } = func box => return contracts.Read.read box
 const call = func (action: Action U32) => return invoke action
 entry const answer = func () => return call (func () => return qualified ($Box { value: local ($Box { value: 42 }) }))
 entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func () => return send 41)
@@ -121,8 +91,8 @@ entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func
     const fail = await compiler.build({
       sources: {
         [library]: librarySource.replace(
-          '"value" owner value',
-          '"missing" owner value',
+          "read: a -> U32",
+          "missing: a -> U32",
         ),
       },
     });
@@ -170,32 +140,4 @@ entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func
     await compiler.dispose();
     await Deno.remove(directory, { recursive: true });
   }
-});
-
-// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
-Deno.test.ignore("a contract's invocation effects remain distinct at each use", async () => {
-  await compileAndRun(
-    `
-type Run [owner, result] is contract = { receiver "run" owner Unit (Unit -> result ! {| e}) }
-type Pure is data = $Pure U32
-type Sending is data = $Sending (U32 -> U32 ! {Foreign})
-const Pure.run = func value => return func () => return case value of
-  $Pure number => number
-const Sending.run = func value => return func () => return case value of
-  $Sending send => send 41
-const run: a -> b ! {| e} where { Run [a, b] } = func value => return value.run ()
-entry const answer = func () => return run ($Pure 42)
-entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return run ($Sending send)
-`,
-    (guest) => {
-      equal(guest.call("answer", null), 42);
-      const send = guest.capability({
-        parameter: "U32",
-        result: "U32",
-        call: (value) => value + 1,
-      });
-      equal(guest.call("effectful", send), 42);
-    },
-    { prelude },
-  );
 });

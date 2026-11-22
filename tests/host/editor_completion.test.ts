@@ -129,12 +129,12 @@ Deno.test("completion has no entry or build dependency and never publishes its r
       equal(context.nodes[context.scope[index].type].kind, "u32");
     }
     const generic = await query(
-      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a where { Add a } = tw<cursor>',
+      "type Add a is trait = { add: a -> a -> a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a where { Add a } = tw<cursor>",
     );
     ok(generic.success, JSON.stringify(generic));
     equal(generic.items[0].match, "compatible");
     const conflicting = await query(
-      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a = tw<cursor>',
+      "type Add a is trait = { add: a -> a -> a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a = tw<cursor>",
     );
     ok(conflicting.success, JSON.stringify(conflicting));
     equal(conflicting.items[0].match, "unknown");

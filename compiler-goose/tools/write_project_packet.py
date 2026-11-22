@@ -249,7 +249,6 @@ FLAT_SLICES = (
     'blot_reuse_principal_interface::MemberTemplate',
     'blot_reuse_principal_interface::Nominal',
     'blot_reuse_principal_interface::SelectedProof',
-    'blot_reuse_principal_interface::SelectedUse',
     'blot_reuse_project_check::Export',
 )
 def has_tagged_union(t, ns='blot_project_packet'):

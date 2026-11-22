@@ -156,8 +156,7 @@ Deno.test("aliases retain underlying effect identities in written rows and opera
 type Number = U32
 type Identity a = a
 type Signal a is effect = { get: Unit -> a }
-type Read a is contract = { operation Signal.get a, type_rep a, effect_rep ! {} }
-const read: Unit -> a ! {| e} where { Read a } = func () => return Signal.get a ()
+const read: Unit -> a ! {Signal.get a} = func () => return Signal.get a ()
 const number: Unit -> Number ! {Signal.get Number} = func () => return Signal.get Number ()
 entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
   break @u32.add (read ()) (number ())

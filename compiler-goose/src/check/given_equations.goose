@@ -1,4 +1,4 @@
-namespace blot_eval_given_equations;
+namespace blot_check_given_equations;
 import check.types;
 import support.error;
 import support.pooled_buffer;
@@ -34,17 +34,13 @@ recursive fn tyValue(self_: Rewrite&,root: u32,memo: Memo&,depth: i64,equations:
 recursive fn node(self_:Rewrite&,id:u32,memo:Memo&,depth:i64)->u32 {var old=Words{};var parts=Words{};var fields=Fields{};let result=nodeValue(self_,id,memo,depth,old,parts,fields);fields.deinit();parts.deinit();old.deinit();return result;}
 recursive fn nodeValue(self_: Rewrite&,id: u32,memo: Memo&,depth: i64,old:Words&,parts:Words&,fields:Fields&) -> u32 {
  if self_.failure!=blot_error::Error.none { return 0; } let n=self_.store.node(id); let tag=n.tag;
- if tag==blot_check_types::Tag.scoped {
-  let descriptor=ty(self_,n.a,memo,depth+1); var identity=n.c; if n.b==0 { identity=ty(self_,n.c,memo,depth+1); } if self_.failure!=blot_error::Error.none { return 0; } if descriptor==n.a&&identity==n.c { return id; }
-  let value,error=self_.store.scoped(descriptor,blot_check_types::NominalIdentity {n.b,identity}); return take(self_,value,error);
- }
  if tag==blot_check_types::Tag.function {
   let a=ty(self_,n.a,memo,depth+1); let b=ty(self_,n.b,memo,depth+1); let row=effectRow(self_,n.c,memo,depth+1); if self_.failure!=blot_error::Error.none { return 0; } if a==n.a&&b==n.b&&row==n.c { return id; }
   let value,error=self_.store.functionWithEffects(a,b,row); return take(self_,value,error);
  }
- if tag==blot_check_types::Tag.array||tag==blot_check_types::Tag.list||tag==blot_check_types::Tag.cursor||tag==blot_check_types::Tag.resolver||tag==blot_check_types::Tag.provider {
+ if tag==blot_check_types::Tag.array||tag==blot_check_types::Tag.provider {
   let a=ty(self_,n.a,memo,depth+1); var row=n.c; if tag==blot_check_types::Tag.provider { row=effectRow(self_,n.c,memo,depth+1); } if self_.failure!=blot_error::Error.none { return 0; } if a==n.a&&row==n.c { return id; }
-  if tag==blot_check_types::Tag.resolver { let value,error=self_.store.resolver(a); return take(self_,value,error); } if tag==blot_check_types::Tag.provider { let value,error=self_.store.provider(a,row); return take(self_,value,error); } let value,error=self_.store.sequence(tag,a); return take(self_,value,error);
+  if tag==blot_check_types::Tag.provider { let value,error=self_.store.provider(a,row); return take(self_,value,error); } let value,error=self_.store.sequence(tag,a); return take(self_,value,error);
  }
  if tag==blot_check_types::Tag.product||tag==blot_check_types::Tag.nominal||tag==blot_check_types::Tag.projection {
   if tag==blot_check_types::Tag.nominal||tag==blot_check_types::Tag.projection { old.append(self_.store.nominalArguments(n)); } else { old.append(self_.store.list(blot_check_types::List {n.a,n.b})); } if scratchFailed(self_,old.failure) {return 0;}

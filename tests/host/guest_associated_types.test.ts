@@ -1,18 +1,17 @@
-import { deepStrictEqual as equal, ok, rejects } from "node:assert/strict";
+import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { instantiateGuest } from "../../host/guest.ts";
 import { compile } from "./test_compile.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
-Deno.test("defined associated outputs execute nested records arrays and exact callback rows", async () => {
+Deno.test("trait output types execute nested records arrays and exact callback rows", async () => {
   const artifact = await compile(`
-type Identity a is contract = { type Item = a }
-type Record a is contract = { type Item = {value: Identity.Item a, items: Array (Identity.Item a)} }
-type Callable f is contract = { type Run = f }
-type Alias a = Record.Item a
-const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
-const relay: f -> (Callable.Run f) = func value => return value
-entry const count: U32 -> U32 = func value => return do:
-  let record: Alias U32 = {value: keep value, items: #[value]}
+type Identity a { item } is trait = { id: a -> item }
+const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }
+type RecordBox a = { value: Identity.item a, items: #[Identity.item a] }
+const keep: a -> a.item where { Identity a } = func value => return Identity.id value
+const relay: (Unit -> a ! {Foreign}) -> (Unit -> a ! {Foreign}) = func value => return value
+entry const count: U32 -> U32 = func (value: U32) => return do:
+  let record: RecordBox U32 = { value: keep value, items: #[value] }
   break @u32.add record.value (@array.length record.items)
 entry const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
   let selected = relay callback
@@ -38,50 +37,18 @@ entry const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
   }
 });
 
-// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
-Deno.test.ignore(
-  "defined associated equations retain equality prerequisites at executable uses",
-  async () => {
-    const header =
-      `type Required a is contract = { type Item = a, type_eq a U32 }
-const keep: a -> (Required.Item a) where { Required a } = func value => return value
-const chain: a -> U32 where { type_eq a b, type_eq b U32 } = func value => return value
-`;
-    const artifact = await compile(
-      header + "entry const answer = func () => return chain (keep 42)\n",
-    );
-    const guest = await instantiateGuest(artifact.bytes);
-    try {
-      equal(guest.call("answer", null), 42);
-    } finally {
-      guest.dispose();
-    }
-    await rejects(
-      () =>
-        compile(header + "entry const answer = func () => return keep 42.0\n"),
-      /type_mismatch/,
-    );
-    await rejects(
-      () =>
-        compile(`type Source s is contract = { type Item }
-entry const answer: U32 -> U32 where { Source U32 } = func value => return value
-`),
-      /missing_implementation/,
-    );
-  },
-);
-
-Deno.test("associated equation edits preserve the last good revision", async () => {
+Deno.test("trait output type edits preserve the last good revision", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-associated-revisions-",
   });
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
-  const source = `import {Identity, make} from "./library"
-entry const answer: Unit -> (Identity.Item U32) = func () => return make 42
+  const source = `import { Identity, make } from "./library"
+entry const answer: Unit -> (Identity.item U32) = func () => return make 42
 `;
-  const producer = `type Identity a is contract = { type Item = a }
-const make: a -> (Identity.Item a) = func value => return value
+  const producer = `type Identity a { item } is trait = { id: a -> item }
+const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }
+const make: a -> a.item where { Identity a } = func value => return Identity.id value
 `;
   await Deno.writeTextFile(entry, source);
   await Deno.writeTextFile(library, producer);
@@ -98,8 +65,8 @@ const make: a -> (Identity.Item a) = func value => return value
     const broken = await compiler.build({
       sources: {
         [library]: producer.replace(
-          "type Item = a",
-          "type Item = Identity.Item a",
+          "{ item: U32 }",
+          "{ item: Identity.item U32 }",
         ),
       },
     });
@@ -107,8 +74,10 @@ const make: a -> (Identity.Item a) = func value => return value
     equal(broken.revision, first.revision);
     ok(
       broken.diagnostics.some((issue) =>
-        issue.code === "recursive_associated_type"
+        issue.code === "recursive_associated_type" ||
+        issue.code === "invalid_constraint"
       ),
+      JSON.stringify(broken.diagnostics),
     );
     const restored = await compiler.build();
     ok(restored.success, JSON.stringify(restored));

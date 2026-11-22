@@ -7,8 +7,6 @@ import check.types;
 import check.effects;
 import check.frozen_types;
 import check.parameter_patterns;
-import check.associated_admission;
-import eval.implementation_admission;
 import backend.opaque_storage;
 import support.error;
 import support.option;
@@ -223,8 +221,6 @@ fn child(self_:GraphEdges,key:i64,index:i64)->blot_support::Option<i64> {
 struct Frame {key:i64=0,next:i64=0}
 fn validateGraph(owner:const Interface&)->Error {var remaining:i64=1000000;return validateGraphWithBudget(owner,remaining);}
 fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
- { let propagated_error = blot_check_associated_admission::interfaceWithBudget(owner,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }let source=blot_check_associated_admission::typesView(owner.graph);
- { let propagated_error = blot_eval_implementation_admission::scopes(source,owner,owner.implementation_predicates,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }
  var symbol_limit:i64=0;
  for n in owner.graph.nodes {if n.tag==blot_check_types::Tag.record {for index in 0..n.b {symbol_limit=max(symbol_limit,(owner.graph.extra[n.a+index*2] as i64)+1);}}}
  var stamps:u32[>..<]=[];stamps.resize(symbol_limit,0);var generation:u32=0;

@@ -12,9 +12,8 @@ Deno.test("written result interfaces select the destination through aliases cont
     `
 type Box a is data = $Box a
 const Box.from = func value => return $Box value
-type Convert (a, b) is contract = { result "from" a b }
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-const alias: a -> b where { Convert (a, b) } = convert
+const alias: a -> b where { result "from" a b } = convert
 entry const answer = func () => return do:
   let local: a -> b where { result "from" a b ! {} } = alias
   let $Box first: Box U32 = local 40

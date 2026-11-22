@@ -630,21 +630,23 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     }
                 }
                 if want_name == 0 { continue; }
-                let proof_count = self_.units[unit_idx].selected_proofs.len;
-                for proof_idx in 0..proof_count {
-                    let proof = self_.units[unit_idx].selected_proofs[proof_idx];
-                    if proof.kind != blot_reuse_principal_interface::SelectedProofKind.implementation || proof.contract != contract_id { continue; }
-                    if proof.arguments.len != proj_len { continue; }
-                    var parg_ids: TId[16] = [0; 16];
-                    for pi in 0..proj_len { parg_ids[pi] = self_.units[unit_idx].types.list(proof.arguments)[pi]; }
+                let impl_count = self_.units[unit_idx].implementations.len;
+                for impl_idx in 0..impl_count {
+                    let impl_ = self_.units[unit_idx].implementations[impl_idx];
+                    if impl_.contract != contract_id { continue; }
+                    if impl_.head.len != proj_len { continue; }
+                    var harg_ids: TId[16] = [0; 16];
+                    for pi in 0..proj_len { harg_ids[pi] = self_.units[unit_idx].types.list(impl_.head)[pi]; }
+                    var match_env = Env {};
                     var matches = true;
                     for pi in 0..proj_len {
+                        matchInner(self_, self_.units[unit_idx], harg_ids[pi], proj_args[pi], match_env, 0);
                         var dummy_open = false;
-                        let resolved_parg, perr = lowerInner(self_, self_.units[unit_idx], parg_ids[pi], Env {}, dummy_open, depth + 1);
-                        if perr != Error.none { matches = false; break; }
-                        if resolved_parg != proj_args[pi] {
+                        let resolved_harg, herr = lowerInner(self_, self_.units[unit_idx], harg_ids[pi], match_env, dummy_open, depth + 1);
+                        if herr != Error.none { matches = false; break; }
+                        if resolved_harg != proj_args[pi] {
                             let pn = self_.node(proj_args[pi]);
-                            let rn = self_.node(resolved_parg);
+                            let rn = self_.node(resolved_harg);
                             let array_lift = (pn.tag == Tag.grow || pn.tag == Tag.resize) && rn.tag == Tag.array && pn.a == rn.a;
                             if !array_lift { matches = false; break; }
                         }
@@ -652,10 +654,10 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     if !matches { continue; }
                     var mem_root: TId = 0;
                     var has_mem = false;
-                    let mem_start = proof.members.start as i64;
-                    let mem_end = mem_start + (proof.members.len as i64);
+                    let mem_start = impl_.members.start as i64;
+                    let mem_end = mem_start + (impl_.members.len as i64);
                     for mi in mem_start..mem_end {
-                        let member = self_.units[unit_idx].selected_members[mi];
+                        let member = self_.units[unit_idx].implementation_members[mi];
                         if member.kind == blot_reuse_principal_interface::ImplementationMemberKind.type_ && member.name == want_name {
                             mem_root = member.root;
                             has_mem = true;
@@ -664,7 +666,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     }
                     if has_mem {
                         var mem_open = false;
-                        let lowered_mem, merr = lowerInner(self_, self_.units[unit_idx], mem_root, Env {}, mem_open, depth + 1);
+                        let lowered_mem, merr = lowerInner(self_, self_.units[unit_idx], mem_root, match_env, mem_open, depth + 1);
                         if merr != Error.none { return 0, merr; }
                         found_ty = lowered_mem;
                         found = true;

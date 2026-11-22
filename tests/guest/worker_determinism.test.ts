@@ -174,9 +174,10 @@ Deno.test("project workers preserve the exact associated type budget across impo
     await Deno.writeTextFile(
       `${directory}/shared.blot`,
       [
-        "type Identity a is contract = { type Item = a }",
-        "type Read a is contract = { const read: a -> U32 }",
-        "impl ReadU32 : Read U32 = { const read = func value => return @u32.add value 1 }",
+        "type Identity a { item } is trait = { id: a -> item }",
+        "const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }",
+        "type Read a is trait = { read: a -> U32 }",
+        "const U32.Read: Read U32 = { read: func value => return @u32.add value 1 }",
         "func generic (value: a): U32 where { Read a } => return Read.read value",
         "func unwrap value => return value.number",
       ].join("\n") + "\n",
@@ -186,7 +187,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
     for (let index = 0; index < 18; index++) {
       const body = [
         'import * as shared from "./shared"',
-        "type Marker = shared.Identity.Item U32",
+        "type Marker = shared.Identity.item U32",
       ];
       for (let f = 0; f < 4; f++) {
         body.push(
@@ -200,7 +201,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
     lines.push(`entry func run (value: U32): U32 => return ${sum}`);
     const entry = `${directory}/main.blot`;
     await Deno.writeTextFile(entry, lines.join("\n") + "\n");
-    for (const inferenceBudget of [16_646, 16_645]) {
+    for (const inferenceBudget of [18_133, 18_132]) {
       const outcomes = [];
       for (const frontendWorkers of [1, 4]) {
         const compiler = await createZigProjectCompiler({
@@ -213,7 +214,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
         });
         try {
           const result = await compiler.build();
-          assert.equal(result.success, inferenceBudget === 16_646);
+          assert.equal(result.success, inferenceBudget === 18_133);
           if (result.success) {
             if (frontendWorkers === 4 && Deno.build.os === "linux") {
               const profile = result.stats.phaseProfile as { checking: Record<string, number> };

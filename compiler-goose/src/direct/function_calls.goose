@@ -99,58 +99,34 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
         parameters.push(resolved);
     }
     var target = BindingRef { 0, 0 };
-    for proof in catalog.selected_proofs {
-        if proof.kind != blot_reuse_principal_interface::SelectedProofKind.implementation || proof.contract != template.contract || proof.context != context { continue; }
-        let actual = catalog.types.list(proof.arguments);
-        if actual.len != parameters.len { continue; }
-        var matches = true;
-        for argument, index in actual {
-            let resolved, error = g.types.lower(catalog, argument, Env {});
-            if error != blot_direct_types::Error.none { matches = false; break; }
-            if resolved != parameters[index] {
-                let pn = g.types.node(parameters[index]);
-                let rn = g.types.node(resolved);
-                let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
-                if !array_lift { matches = false; break; }
+    for unit in g.units {
+        let uname = memberName(m, unit, template);
+        if uname == 0 { continue; }
+        for impl_ in unit.implementations {
+            if impl_.contract != template.contract { continue; }
+            if impl_.private && unit.unit != context { continue; }
+            let head_list = unit.types.list(impl_.head);
+            if head_list.len != parameters.len { continue; }
+            var match_env = Env {};
+            var matches = true;
+            for head_arg, index in head_list {
+                let want = parameters[index];
+                g.types.match_(unit, head_arg, want, match_env);
+                let lowered, lerr = g.types.lower(unit, head_arg, match_env);
+                if lerr != blot_direct_types::Error.none { matches = false; break; }
+                if lowered != want {
+                    let pn = g.types.node(want);
+                    let rn = g.types.node(lowered);
+                    let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
+                    if !array_lift { matches = false; break; }
+                }
             }
-        }
-        if !matches { continue; }
-        for member in catalog.selected_members[proof.members.start..proof.members.start + proof.members.len] {
-            if member.name != name || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
-            let candidate = g.resolve(catalog, BindingRef { member.target.unit, member.target.binding });
-            if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
-            target = candidate;
-        }
-    }
-    if target.binding == 0 {
-        for unit in g.units {
-            let uname = memberName(m, unit, template);
-            if uname == 0 { continue; }
-            for impl_ in unit.implementations {
-                if impl_.contract != template.contract { continue; }
-                let head_list = unit.types.list(impl_.head);
-                if head_list.len != parameters.len { continue; }
-                var match_env = Env {};
-                var matches = true;
-                for head_arg, index in head_list {
-                    let want = parameters[index];
-                    g.types.match_(unit, head_arg, want, match_env);
-                    let lowered, lerr = g.types.lower(unit, head_arg, match_env);
-                    if lerr != blot_direct_types::Error.none { matches = false; break; }
-                    if lowered != want {
-                        let pn = g.types.node(want);
-                        let rn = g.types.node(lowered);
-                        let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
-                        if !array_lift { matches = false; break; }
-                    }
-                }
-                if !matches { continue; }
-                for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
-                    if member.name != uname || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
-                    let candidate = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
-                    if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
-                    target = candidate;
-                }
+            if !matches { continue; }
+            for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
+                if member.name != uname || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                let candidate = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
+                if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
+                target = candidate;
             }
         }
     }
