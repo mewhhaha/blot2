@@ -21,6 +21,7 @@ import parse.syntax_diagnostics;
 import phase_profile;
 import support.error;
 import support.option;
+import support.native;
 import support.project_packet;
 import .retained_project;
 import .persistent_project;
@@ -39,7 +40,7 @@ reusable[] var result_bytes:u8[>..]=[];
 // A scalar revision shares the immutable tables and owns only a new node slice.
 struct CoreOwners { tables:Owner=Owner{}, nodes:Owner=Owner{} }
 reusable[] var core_owners:CoreOwners[>..]=[];
-fn copyResultBytes(bytes:const u8[:])->u8[:] {let result=result_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn copyResultBytes(bytes:const u8[:])->u8[:] {let result=result_bytes.alloc_slice(bytes.len);if bytes.len!=0 {blot_native::copy_u8(result[0],bytes[0],bytes.len as u64);}return result;}
 fn releaseResultBytes(bytes:u8[:]) {if bytes.len!=0 {result_bytes.free_slice(bytes);}}
 struct Result {result:ConsumerResult=default<ConsumerResult>(),diagnostic_filename:blot_support::Option<u8[:]> =blot_support::none<u8[:]>(),source_bytes:i64=0,fresh_modules:i64=0,cached_modules:i64=0}
 fn deinit(self_:Result&) {self_.result.deinit();if self_.diagnostic_filename.present {releaseResultBytes(self_.diagnostic_filename.value);}self_=Result{};}

@@ -358,6 +358,13 @@ fn resolver(self_: Store&, token: Id) -> Id, Error { let error = dataKind(self_,
 fn provider(self_: Store&, operation_type: Id, implementation_effects: blot_check_effects::Id) -> Id, Error { let error = dataKind(self_, operation_type); if error != blot_error::Error.none { return 0, error; } return add(self_, Node { tag: Tag.provider, a: operation_type, c: implementation_effects , ..}); }
 fn stateProvider(self_: Store&, read: Id, write: Id, state_type: Id) -> Id, Error { let error = dataKind(self_, state_type); if error != blot_error::Error.none { return 0, error; } return add(self_, Node { tag: Tag.state_provider, a: read, b: write, c: state_type , ..}); }
 fn record(self_: Store&, fields: const Field[:]) -> Id, Error {
+    if fields.len <= 16 {
+        var small: Id[32] = [0; 32];
+        var len: i64 = 0;
+        for field in fields { let error = dataKind(self_, field.ty); if error != blot_error::Error.none { return 0, error; } small[len] = field.name; small[len + 1] = field.ty; len += 2; }
+        let span, error = saveList(self_, small[..len]); if error != blot_error::Error.none { return 0, error; }
+        return add(self_, Node { tag: Tag.record, a: span.start, b: fields.len as u32 , ..});
+    }
     var words: Id[>..] = [];
     for field in fields { let error = dataKind(self_, field.ty); if error != blot_error::Error.none { return 0, error; } words.push(field.name); words.push(field.ty); }
     let span, error = saveList(self_, words); if error != blot_error::Error.none { return 0, error; }
@@ -396,7 +403,15 @@ fn nominal(self_: Store&, identity: NominalIdentity, arguments: const Id[:]) -> 
 fn nominalLike(self_: Store&, tag: Tag, identity: NominalIdentity, arguments: const Id[:]) -> Id, Error {
     for argument in arguments { let error = dataKind(self_, argument); if error != blot_error::Error.none { return 0, error; } }
     if arguments.len >= none || self_.extra.len > none - arguments.len - 1 { return 0, blot_error::Error.type_limit; }
-    var owned: Id[>..] = []; owned.append(arguments); let start = self_.extra.len as u32;
+    let start = self_.extra.len as u32;
+    if arguments.len <= 8 {
+        var small: Id[8] = [0; 8];
+        for arg, i in arguments { small[i] = arg; }
+        self_.extra.push(arguments.len as u32);if self_.extra.failure!=blot_error::Error.none {return 0,self_.extra.failure;}
+        if arguments.len != 0 { self_.extra.append(small[..arguments.len]);if self_.extra.failure!=blot_error::Error.none {return 0,self_.extra.failure;} }
+        return add(self_, Node { tag: tag, a: identity.unit, b: identity.decl, c: start , ..});
+    }
+    var owned: Id[>..] = []; owned.append(arguments);
     self_.extra.push(owned.len as u32);if self_.extra.failure!=blot_error::Error.none {return 0,self_.extra.failure;} self_.extra.append(owned);if self_.extra.failure!=blot_error::Error.none {return 0,self_.extra.failure;}
     return add(self_, Node { tag: tag, a: identity.unit, b: identity.decl, c: start , ..});
 }
@@ -783,6 +798,25 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
         if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
         return root, blot_error::Error.none;
     }
+    if !self_.has_projections && self_.associated_equations.count == 0 && root > never {
+        var value = node(self_, root);
+        if value.tag == Tag.variable {
+            if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+            var id = root; var position = at;
+            while value.tag == Tag.variable {
+                position = max(position, value.b);
+                let write = replacement(self_, value.a, position);
+                if !write.present { return variableView(self_, value.a, position); }
+                id = write.value.replacement; position = write.value.position + 1;
+                value = node(self_, id);
+            }
+            let target_height = closedHeight(self_, id);
+            if target_height != 0 {
+                if depth + target_height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+                return id, blot_error::Error.none;
+            }
+        }
+    }
     if (self_.has_projections || self_.use_closed_graphs) && self_.use_resolution_cache && depth != 0 && root > never {
         if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth, height); }
         if self_.projection_resolution_types != self_.mutation_epoch || self_.projection_resolution_rows != self_.effects.mutation_epoch || self_.projection_resolution_limit != self_.resolution_depth_limit {
@@ -943,26 +977,42 @@ fn occursResolved(self_: Store&, variable: u32, resolved_root: Id) -> bool, Erro
     if self_.occurs_seen.len < self_.nodes.len { self_.occurs_seen.resize(self_.nodes.len, 0);if self_.occurs_seen.failure!=blot_error::Error.none {return false,self_.occurs_seen.failure;} }
     self_.occurs_generation += 1;
     if self_.occurs_generation == 0 { for &value in self_.occurs_seen.items { value = 0; } self_.occurs_generation = 1; }
-    var pending: Id[>..<] = []; pending.push(resolved_root); var budget: i64 = 1000000;
-    while pending.len > 0 {
-        let id = pending.pop(); if self_.occurs_seen.items[id] == self_.occurs_generation { continue; } self_.occurs_seen.items[id] = self_.occurs_generation;
+    var fast: Id[32] = [0; 32]; var fast_len: i64 = 1; fast[0] = resolved_root;
+    var pending: Id[>..<] = []; var budget: i64 = 1000000;
+    while fast_len > 0 || pending.len > 0 {
+        var id: Id = 0;
+        if pending.len > 0 { id = pending.pop(); } else { fast_len -= 1; id = fast[fast_len]; }
+        if self_.occurs_seen.items[id] == self_.occurs_generation { continue; } self_.occurs_seen.items[id] = self_.occurs_generation;
         if budget == 0 { return false, blot_error::Error.type_limit; } budget -= 1; self_.occurs_steps += 1; if closedHeight(self_, id) != 0 { continue; }
         let value = node(self_, id);
         if value.tag == Tag.function || value.tag == Tag.provider { for label in rowLabels(self_, value.c) {
-            pending.append(operationArguments(self_, label)); let instance = operation(self_, label).instance;
-            if instance.unit == 0 && instance.decl != 0 { pending.push(instance.decl); }
+            for arg in operationArguments(self_, label) { if pending.len == 0 && fast_len < 32 { fast[fast_len] = arg; fast_len += 1; } else { pending.push(arg); } }
+            let instance = operation(self_, label).instance;
+            if instance.unit == 0 && instance.decl != 0 { if pending.len == 0 && fast_len < 32 { fast[fast_len] = instance.decl; fast_len += 1; } else { pending.push(instance.decl); } }
         } }
         match value.tag {
             variable => { if value.a == variable { return true, blot_error::Error.none; } },
-            function => { pending.append([value.a, value.b]); },
-            product => { pending.append(list(self_, List { value.a, value.b , ..})); },
-            usage => { pending.push(value.a); if value.c != 0 { pending.push(value.c); } },
-            scoped => { pending.push(value.a); if value.b == 0 { pending.push(value.c); } },
-            forall, existential => { pending.push(value.a); },
-            array, list, cursor, resolver, provider => { pending.push(value.a); },
-            state_provider => { pending.append([value.a, value.b, value.c]); },
-            record => { for i in value.b { pending.push(recordField(self_, value, i).ty); } },
-            nominal, projection, instance_selection => { pending.append(nominalArguments(self_, value)); },
+            function => {
+                if pending.len == 0 && fast_len + 2 <= 32 { fast[fast_len] = value.a; fast[fast_len + 1] = value.b; fast_len += 2; }
+                else { pending.append([value.a, value.b]); }
+            },
+            product => { for child in list(self_, List { value.a, value.b , ..}) { if pending.len == 0 && fast_len < 32 { fast[fast_len] = child; fast_len += 1; } else { pending.push(child); } } },
+            usage => {
+                if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.a; fast_len += 1; } else { pending.push(value.a); }
+                if value.c != 0 { if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.c; fast_len += 1; } else { pending.push(value.c); } }
+            },
+            scoped => {
+                if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.a; fast_len += 1; } else { pending.push(value.a); }
+                if value.b == 0 { if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.c; fast_len += 1; } else { pending.push(value.c); } }
+            },
+            forall, existential => { if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.a; fast_len += 1; } else { pending.push(value.a); } },
+            array, list, cursor, resolver, provider => { if pending.len == 0 && fast_len < 32 { fast[fast_len] = value.a; fast_len += 1; } else { pending.push(value.a); } },
+            state_provider => {
+                if pending.len == 0 && fast_len + 3 <= 32 { fast[fast_len] = value.a; fast[fast_len + 1] = value.b; fast[fast_len + 2] = value.c; fast_len += 3; }
+                else { pending.append([value.a, value.b, value.c]); }
+            },
+            record => { for i in value.b { let fty = recordField(self_, value, i).ty; if pending.len == 0 && fast_len < 32 { fast[fast_len] = fty; fast_len += 1; } else { pending.push(fty); } } },
+            nominal, projection, instance_selection => { for arg in nominalArguments(self_, value) { if pending.len == 0 && fast_len < 32 { fast[fast_len] = arg; fast_len += 1; } else { pending.push(arg); } } },
             _ => {},
         }
     }
@@ -1290,17 +1340,31 @@ type UnificationSeen=blot_support_pooled_map::Map<Pair,bool>;
 type UnificationPending=blot_support_pooled_buffer::Buffer<Pair>;
 reusable[] var unification_seen:dictionary_slot<Pair,bool>[>..];
 reusable[] var unification_pairs:Pair[>..];
-fn pushUnification(pending:UnificationPending&,value:Pair)->Error {return blot_support_pooled_buffer::push(pending,value,unification_pairs);}
-fn appendUnification(pending:UnificationPending&,values:const Pair[:])->Error {return blot_support_pooled_buffer::append(pending,values,unification_pairs);}
-fn popUnification(pending:UnificationPending&)->Pair {let length=pending.items.len;assert(length!=0);let result=pending.items[length-1];blot_support_pooled_buffer::resize(pending,length-1);return result;}
-recursive fn unifyInner<R>(self_:Store&,left:Id,right:Id,reporter:R,associated:bool)->Error {
- var seen=UnificationSeen{..};var pending=UnificationPending{..};let error=unifyWalk(self_,left,right,reporter,associated,seen,pending);
- blot_support_pooled_buffer::deinit(pending,unification_pairs);blot_support_pooled_map::deinit(seen,unification_seen);return error;
+struct UnificationStack { fast: Pair[16] = [Pair{..}; 16], fast_len: i64 = 0, overflow: UnificationPending = UnificationPending{..} }
+fn pushUnification(pending:UnificationStack&,value:Pair)->Error {
+    if pending.overflow.items.len == 0 && pending.fast_len < 16 { pending.fast[pending.fast_len] = value; pending.fast_len += 1; return blot_error::Error.none; }
+    return blot_support_pooled_buffer::push(pending.overflow,value,unification_pairs);
 }
-recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool,seen:UnificationSeen&,pending:UnificationPending&) -> Error {
+fn appendUnification(pending:UnificationStack&,values:const Pair[:])->Error {
+    if pending.overflow.items.len == 0 && pending.fast_len + values.len <= 16 {
+        for v in values { pending.fast[pending.fast_len] = v; pending.fast_len += 1; }
+        return blot_error::Error.none;
+    }
+    return blot_support_pooled_buffer::append(pending.overflow,values,unification_pairs);
+}
+fn popUnification(pending:UnificationStack&)->Pair {
+    let length=pending.overflow.items.len;
+    if length!=0 { let result=pending.overflow.items[length-1]; blot_support_pooled_buffer::resize(pending.overflow,length-1); return result; }
+    assert(pending.fast_len!=0); pending.fast_len-=1; return pending.fast[pending.fast_len];
+}
+recursive fn unifyInner<R>(self_:Store&,left:Id,right:Id,reporter:R,associated:bool)->Error {
+ var seen=UnificationSeen{..};var pending=UnificationStack{..};let error=unifyWalk(self_,left,right,reporter,associated,seen,pending);
+ blot_support_pooled_buffer::deinit(pending.overflow,unification_pairs);blot_support_pooled_map::deinit(seen,unification_seen);return error;
+}
+recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool,seen:UnificationSeen&,pending:UnificationStack&) -> Error {
     let bounded = associated || self_.has_projections; var rank_active = false; var rank_remaining: i64 = 4096;
     var first = true;
-    while first || pending.items.len > 0 {
+    while first || pending.fast_len > 0 || pending.overflow.items.len > 0 {
         var pair = Pair { left, right, ..};
         if first { first = false; } else { pair = popUnification(pending); }
         if rank_active { if rank_remaining == 0 { return blot_error::Error.type_limit; } rank_remaining -= 1; }

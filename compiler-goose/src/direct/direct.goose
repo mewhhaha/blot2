@@ -32,6 +32,16 @@ fn compile(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..
     blot_direct_types::init(types);
     var module = blot_direct_writer::Module { .. };
     var state = blot_direct_emit::State { .. };
+    return compileWith(units, entry, types, module, state, bytes, message, build_inputs);
+}
+
+fn compileTracked(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    blot_direct_types::init(types);
+    state.track_deps = true;
+    return compileWith(units, entry, types, module, state, bytes, message, build_inputs);
+}
+
+fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
     var g = Generator { types: types, module: module, s: state, units: units, build_inputs:build_inputs };
     let error = build(g, entry, bytes);
     if error != blot_direct_types::Error.none {

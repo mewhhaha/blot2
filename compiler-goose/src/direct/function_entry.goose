@@ -160,7 +160,36 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
     let handle_cells_mark = s.handle_cells_len;
+    let prev_active = s.active_instance;
+    let prev_dep_mark = blot_direct_emit::dep_frame_mark;
+    let dep_mark = blot_direct_emit::dep_scratch.len;
+    s.active_instance = id;
+    blot_direct_emit::dep_frame_mark = dep_mark;
     let error = emitInstanceBody(g, id);
+    if error == blot_direct_types::Error.none && s.track_deps {
+        let count = blot_direct_emit::dep_scratch.len - dep_mark;
+        if !s.replaying {
+            let start = s.dep_list.len as u32;
+            for di in 0..count { s.dep_list.push(blot_direct_emit::dep_scratch[dep_mark + di].id); }
+            s.instances[id].deps_start = start;
+            s.instances[id].deps_len = count as u32;
+        } else {
+            let inst = s.instances[id];
+            if count != (inst.deps_len as i64) {
+                s.dep_match = false;
+            } else {
+                for di in 0..count {
+                    if s.dep_list[(inst.deps_start as i64) + di] != blot_direct_emit::dep_scratch[dep_mark + di].id {
+                        s.dep_match = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    blot_direct_emit::dep_scratch.resize(dep_mark);
+    blot_direct_emit::dep_frame_mark = prev_dep_mark;
+    s.active_instance = prev_active;
     blot_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);
     s.locals.resize(locals_mark);
@@ -310,10 +339,12 @@ fn finish(g: Generator&, function: u32, f: const Fn&) {
     g.s.handle_cells_len = f.handle_cells_base;
 }
 
+var finish_body_scratch: u8[>..<] = [];
+
 // Encodes the body: local declarations (in runs of one type), the marks a
 // releasing body records on entry, then code.
 fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_mark: u32, stack_mark: u32) {
-    var out: u8[>..<] = [];
+    let mark = finish_body_scratch.len;
     let first = f.locals_base + f.parameter_words;
     let count = g.s.locals.len - first;
     var runs: u64 = 0;
@@ -324,19 +355,20 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
         at = end;
         runs += 1;
     }
-    blot_direct_writer::uleb(out, runs);
+    blot_direct_writer::uleb(finish_body_scratch, runs);
     at = 0;
     while at < count {
         var end = at + 1;
         while end < count && g.s.locals[first + end] == g.s.locals[first + at] { end += 1; }
-        blot_direct_writer::uleb(out, (end - at) as! u64);
-        out.push(g.s.locals[first + at]);
+        blot_direct_writer::uleb(finish_body_scratch, (end - at) as! u64);
+        finish_body_scratch.push(g.s.locals[first + at]);
         at = end;
     }
-    if release { markInto(g, out, owner_mark, stack_mark); }
-    blot_direct_relocations::finishBody(f.sites_base,out.len-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
-    blot_direct_writer::raw(out, g.s.code[f.code_base..g.s.code.len]);
-    blot_direct_writer::setBody(g.module, function, out[..]);
+    if release { markInto(g, finish_body_scratch, owner_mark, stack_mark); }
+    blot_direct_relocations::finishBody(f.sites_base,(finish_body_scratch.len-mark)-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
+    blot_direct_writer::raw(finish_body_scratch, g.s.code[f.code_base..g.s.code.len]);
+    blot_direct_writer::setBody(g.module, function, finish_body_scratch[mark..]);
+    finish_body_scratch.resize(mark);
 }
 
 // ----- ABI ---------------------------------------------------------------

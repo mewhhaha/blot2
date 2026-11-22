@@ -667,7 +667,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var fbip_ty: Ty = 0;
     if !info.statement && inputs.len == 1 && !g.runtime_().has_fork {
         let matched_binding = localRef(m, inputs[0]);
-        if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(m, matched_binding) {
+        if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(g, f, matched_binding) {
             let input_val = g.s.vals[values.start];
             let boxed, berr = isBoxed(g, f, input_val.ty, id);
             if berr == blot_direct_types::Error.none && boxed && input_val.len == 1 {
@@ -1202,6 +1202,7 @@ fn rangeSizedLength(g: Generator&, f: Fn&, info: blot_check_core::LoopInfo) -> T
         if !body || !body.is_function { return 0; }
         let params = unit.bodyParameters(body);
         if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return 0; }
+        g.recordInlined(target.unit, target.binding);
     } else {
         if lengthReceiver(m, info.end) == 0 { return 0; }
         let args = m.children(info.end);
@@ -1328,6 +1329,7 @@ fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -
         if !body || !body.is_function { return neverVal(), false; }
         let params = unit.bodyParameters(body);
         if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return neverVal(), false; }
+        g.recordInlined(target.unit, target.binding);
     }
     if tag == blot_direct_types::Tag.view {
         var budget: i64 = 256;
@@ -1532,7 +1534,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
     for carry, at in carries {
         bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
-        if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(m, carry.incoming) {
+        if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming) {
             blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
         }
     }

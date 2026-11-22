@@ -44,7 +44,12 @@ fn contains(text: const u8[:],c: u8) -> bool { for item in text { if item==c { r
 fn starts(text: const u8[:],at: i64,value: const u8[:]) -> bool {
  if value.len>text.len-at { return false; } return text[at..at+value.len]==value;
 }
-fn symbolic(c: u8) -> bool { return contains("+*$%=!<>^&|?~-",c); }
+fn symbolic(c: u8) -> bool {
+ match c {
+  '+', '*', '$', '%', '=', '!', '<', '>', '^', '&', '|', '?', '~', '-' => { return true; },
+  _ => { return false; },
+ }
+}
 struct Number { end: i64, tag: Tag }
 fn digits(source: const u8[:],start: i64,hexadecimal: bool) -> i64 {
  var at=start;
@@ -254,7 +259,7 @@ fn broken_line(source: const u8[:],previous: Token,next: Token) -> bool { for c 
 fn close(tag: Tag) -> bool { return tag==blot_parse_token::r_paren||tag==blot_parse_token::r_bracket||tag==blot_parse_token::r_brace; }
 fn open(tag: Tag) -> bool { return tag==blot_parse_token::l_paren||tag==blot_parse_token::l_bracket||tag==blot_parse_token::l_brace; }
 fn layout(source: const u8[:],result: Result&) {
- var raw: Token[>..]=[]; for t in result.tokens { raw.push(t); } result.tokens.resize(0);
+ var raw: Token[>..]=[]; raw.append(result.tokens); result.tokens.resize(0);
  var starts: u32[>..]=[0]; for c,index in source { if c=='\r'||c=='\n' { starts.push((index+1) as u32); } }
  var frames: Frame[>..<]=[Frame {0,0}]; var depth: i32=0; var operations_depth: i32=-1;
  if raw.len!=0 { let first=raw[0]; let width=indentation(source,starts,first.start); if width.tab { diagnose(result,layout_tab,width.start,first.start); return; } if width.width!=0 { diagnose(result,layout_indent,first.start,first.start); return; } }

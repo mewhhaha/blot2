@@ -156,6 +156,7 @@ fn scalarMember(g: Generator&, f: const Fn&, catalog: const Module&, receiver: T
     let defining .= g.units[target.unit - 1];
     let alias, has_alias = primitiveAlias(defining, target.binding);
     if !has_alias { return standard, blot_direct_types::Error.none; }
+    g.recordInlined(target.unit, target.binding);
     let primitive = defining.primitive(alias);
     if primitive.kind == blot_check_core::PrimitiveKind.scalar && primitive.op != blot_check_core::Op.none { return primitive.op, blot_direct_types::Error.none; }
     return standard, blot_direct_types::Error.none;

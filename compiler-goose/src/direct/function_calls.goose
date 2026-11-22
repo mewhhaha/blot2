@@ -321,7 +321,7 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
         g.s.pool_words.push(first);
         g.s.pool_words.push(second);
         g.s.pool_words.push(third);
-        g.s.pool_globals.put(created, at);
+        g.s.instances[created].pool_offset = at;
         g.s.pool_order.push(created);
         instance = created;
     }
@@ -330,8 +330,8 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
 }
 recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
-    let at, present = g.s.pool_globals.get(f.instance_id);
-    assert(present);
+    let at = g.s.instances[f.instance_id].pool_offset;
+    assert(at != 0xffffffff);
     let slot_global = g.s.pool_words[at];
     let generation_global = g.s.pool_words[at + 1];
     let state_global = g.s.pool_words[at + 2];
@@ -647,37 +647,40 @@ recursive fn terminalAppends(m: const Module&, suite: u32, incoming: u32, outgoi
 // rebinding of it, so it does not count.
 fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
     let m .= g.units[f.unit - 1];
-    if !g.s.use_count_units.contains(m.unit) {
-        g.s.use_count_units.put(m.unit, 1);
-        var exits = blot_direct_map::U64Map {};
+    let uid = (m.unit - 1) as i64;
+    while g.s.use_count_base.len < g.units.len { g.s.use_count_base.push(0xffffffff); }
+    var base = g.s.use_count_base[uid];
+    if base == 0xffffffff {
+        base = g.s.use_count_vals.len as u32;
+        g.s.use_count_base[uid] = base;
+        for at in 0..m.bindings.len { g.s.use_count_vals.push(0); }
+        var is_exit: u8[>..<] = [];
+        for at in 0..m.nodes.len { is_exit.push(0); }
         for index in 0..m.nodes.len {
             if m.nodes[index].tag != blot_check_core::Tag.break_ { continue; }
-            for child in m.children(index as u32) { exits.put(child, 1); }
+            for child in m.children(index as u32) { is_exit[child] = 1; }
         }
         for index in 0..m.nodes.len {
             let node = m.nodes[index];
-            if node.tag != blot_check_core::Tag.reference || exits.contains(index as u64) { continue; }
+            if node.tag != blot_check_core::Tag.reference || is_exit[index] != 0 { continue; }
             let target = m.references[node.a];
             if target.unit != 0 && target.unit != m.unit { continue; }
-            let key = blot_direct_emit::key64(m.unit, target.binding);
-            let count, counted = g.s.use_counts.get(key);
-            g.s.use_counts.put(key, count + 1);
+            g.s.use_count_vals[(base as i64) + (target.binding as i64)] += 1;
         }
         // Each arm hands its successor to the same carry, so only one of
         // these receivers can run before the old version is replaced.
         for loop_ in m.loops {
             for carry in m.loop_carries[loop_.carries.start..loop_.carries.start + loop_.carries.len] {
-                let key = blot_direct_emit::key64(m.unit, carry.iteration);
-                let count, found = g.s.use_counts.get(key);
-                if !found || count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.list { continue; }
+                let slot = (base as i64) + (carry.iteration as i64);
+                let count = g.s.use_count_vals[slot];
+                if count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.list { continue; }
                 if terminalAppends(m, loop_.body, carry.iteration, carry.backedge, 0) == count {
-                    g.s.use_counts.put(key, 1);
+                    g.s.use_count_vals[slot] = 1;
                 }
             }
         }
     }
-    let count, counted = g.s.use_counts.get(blot_direct_emit::key64(m.unit, binding));
-    return count;
+    return g.s.use_count_vals[(base as i64) + (binding as i64)];
 }
 // Whether call node `id` applies a named function to fewer arguments than its
 // parameters.
@@ -741,6 +744,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id);
             f.forward_depth -= 1;
             if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if was_forwarded { g.recordInlined(target.unit, target.binding); }
             value = forwarded;
             has_value = was_forwarded;
         }
@@ -782,6 +786,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     if body && !body.is_function && tm.node(body.root).tag == blot_check_core::Tag.reference && f.forward_depth < 8 {
         let next = g.resolve(tm, tm.reference(body.root));
         if next != target {
+            g.recordInlined(target.unit, target.binding);
             f.forward_depth += 1;
             let forwarded, ferr = callTarget(g, f, next, arguments, callee, result, id);
             f.forward_depth -= 1;
@@ -789,7 +794,10 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         }
     }
     let node, has_alias = primitiveAlias(tm, target.binding);
-    if has_alias { return applyPrimitive(g, f, tm.primitive(node), arguments, callee, result, target, id); }
+    if has_alias {
+        g.recordInlined(target.unit, target.binding);
+        return applyPrimitive(g, f, tm.primitive(node), arguments, callee, result, target, id);
+    }
     // A constant holding a function value: apply it one argument at a time.
     var value, error = namedValue(g, f, target, callee, id);
     if error != blot_direct_types::Error.none { return value, error; }

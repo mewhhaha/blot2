@@ -17,28 +17,28 @@ fn jsonStringify(self_:BuildReply,writer:Writer&)->Error {writer.beginObject();w
     if inputs && inputs.tracks_inputs {writer.field("reusedStagedWasm",self_.stats.reusedStagedWasm);writer.field("stagedDefinitions",self_.stats.stagedDefinitions);}
     writer.endObject();let assets .= self_.assets;if assets {writer.field("wasmBytes",self_.wasm_bytes);writer.field("assets",self_.ranges);writer.field("assetDependencies",self_.dependencies);writer.field("assetStats",assets.stats);}writer.endObject();return writer.failure;}
 // Profiled sessions clock this build until its stats are published.
-fn build(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const Source[:],asset_sources:const Source[:])->Error {
+fn build(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_body_image::Replay&,id:u32,sources:const Source[:],asset_sources:const Source[:])->Error {
     var trace=blot_phase_profile::Trace{..};if opened.profile_trace {trace=blot_phase_profile::initTrace(id);}var trace_ref:blot_phase_profile::Trace?=null;if trace.key.slot!=0 {trace_ref .= trace;}let trace_installation=blot_phase_profile::installTrace(trace_ref);
     var profile=blot_phase_profile::Profile{..};if opened.profile_backend {profile=blot_phase_profile::initProfile();}var installation=blot_support::none<blot_phase_profile::Installation>();if profile.key.slot!=0 {installation=blot_support::some(blot_phase_profile::install(profile));}
-    let error=buildAssets(writer,opened,id,sources,asset_sources,profile);
+    let error=buildAssets(writer,opened,replay,id,sources,asset_sources,profile);
     if installation.present {installation.value.restore();}profile.deinit();if trace.key.slot!=0 {trace.flushPasses();}trace_installation.restore();trace.deinit();return error;
 }
-fn buildAssets(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const Source[:],asset_sources:const Source[:],profile:blot_phase_profile::Profile&)->Error {
+fn buildAssets(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_body_image::Replay&,id:u32,sources:const Source[:],asset_sources:const Source[:],profile:blot_phase_profile::Profile&)->Error {
     var assets:blot_backend_native_assets::Candidate?=null;
     if opened.assets.present {
         let timing=blot_phase_profile::enter(blot_phase_profile::Phase.assets);let candidate,error=opened.assets.value.prepare(opened.entry,sources,asset_sources);timing.exit();if error!=blot_error::Error.none {return operationFailure(writer,opened,id,blot_error::error_name(error),"Unable to prepare native asset inputs");}assert(candidate);assets .= candidate;
         if assets.issue.present {let found=assets.issue.value;let error=reject(writer,id,opened.revisions,Diagnostic{filename:found.filename,stage:"asset",code:found.code,start:found.start,end:found.end,message:found.message,..});assets.deinit();return error;}
     }
-    let committed,error=buildSources(writer,opened,id,sources,assets,profile);if assets {if !committed {assets.deinit();}}return error;
+    let committed,error=buildSources(writer,opened,replay,id,sources,assets,profile);if assets {if !committed {assets.deinit();}}return error;
 }
 // All successful builds commit a revision. The asset session takes its
 // candidate at that same point.
-fn buildSources(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const Source[:],assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&)->bool,Error {
+fn buildSources(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_body_image::Replay&,id:u32,sources:const Source[:],assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&)->bool,Error {
     var merged:Source[>..]=[];let complete_sources=composeSources(sources,assets,merged);
     var snapshot,error=blot_reuse_revision_inputs::initWithSources(opened.options_owner.options(),complete_sources);if error!=blot_error::Error.none {if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
-    let committed,failure=buildSnapshot(writer,opened,id,assets,profile,snapshot);snapshot.deinit();return committed,failure;
+    let committed,failure=buildSnapshot(writer,opened,replay,id,assets,profile,snapshot);snapshot.deinit();return committed,failure;
 }
-fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,snapshot:blot_reuse_revision_inputs::Snapshot&)->bool,Error {
+fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_body_image::Replay&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,snapshot:blot_reuse_revision_inputs::Snapshot&)->bool,Error {
     var allow_reuse=true;
     loop {
         var candidate=Retained{..};var reused=false;var load=SourceLoad{};
@@ -46,13 +46,14 @@ fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         load.sourceReads=snapshot.counts().source_reads;
         if error!=blot_error::Error.none {candidate.deinit();if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
         var retry=false;
-        let committed,failure=buildPrepared(writer,opened,id,assets,profile,preparation,reused,candidate.source.lease!=0,load,retry);
+        let committed,failure=buildPrepared(writer,opened,replay,id,assets,profile,preparation,reused,candidate.source.lease!=0,load,retry);
         if committed && candidate.source.lease!=0 {
             if reused {candidate.completeFrom(opened.checked);}
             match preparation {ready payload=>{
                 opened.core.deinit();opened.checked.deinit();
                 opened.checked=candidate;candidate=Retained{..};
                 opened.core=payload.value;preparation=blot_reuse_partial_dependency::Preparation.inactive;
+                if replay.valid { replay.types.units=opened.core.catalog_owner.mutable(opened.core.units); }
             },_=>{abort("committed revision requires prepared Core");}}
         }
         preparation.deinit();candidate.deinit();
@@ -60,7 +61,7 @@ fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         allow_reuse=false;
     }
 }
-fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&,reused:bool,retainable:bool,load:SourceLoad,retry:bool&)->bool,Error {
+fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_body_image::Replay&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&,reused:bool,retainable:bool,load:SourceLoad,retry:bool&)->bool,Error {
     match preparation {
         inactive=>{return false,blot_error::Error.missing_rejection_diagnostic;},
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
@@ -81,24 +82,35 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
             let track=(retainable || reused) && (!assets || !assets.tracks_inputs);
             var bytes=default<u8[:]>();
             var operands:i64=-1;
-            if track && reused {
-                bytes,operands=blot_reuse_body_image::relocate(opened.image,opened.core,payload.value);
-            }
+            var replayed=false;
             var pending=blot_direct_relocations::Snapshot{};
+            if track && reused {
+                bytes,operands=blot_reuse_body_image::relocate(opened.image,opened.core,payload.value,replay);
+                if operands<0 && replay.valid {
+                    replayed=blot_reuse_body_image::replayEdits(opened.image,opened.core,payload.value,replay,bytes,pending);
+                }
+            }
             var result=Emission{};
-            if operands>=0 {
+            if operands>=0 || replayed {
                 let compiled=blot_reuse_dependency_consumer::Compiled{bytes:bytes,emitted_functions:opened.image.functions,..};
                 let cached=payload.value.cachedCount();
                 result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:compiled,stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,fresh_modules:payload.value.units.len-cached,cached_modules:cached,..};
             } else {
                 if track { blot_direct_relocations::begin(); }
-                let emitted,error=payload.value.emit(inputs);
+                var emitted=Emission{};
+                var error=blot_error::Error.none;
+                if track && !replay.used {
+                    emitted,error=blot_reuse_body_image::emitTracked(payload.value,replay,inputs);
+                } else {
+                    if replay.used { replay.valid=false; replay.needs_reset=true; }
+                    emitted,error=payload.value.emit(inputs);
+                }
                 if track { pending=blot_direct_relocations::finish(); }
-                if error!=blot_error::Error.none { pending.deinit();timing.exit();return false,error; }
+                if error!=blot_error::Error.none { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();timing.exit();return false,error; }
                 result=emitted;
             }
             timing.exit();
-            if reused && result.result.compiled.failed { pending.deinit();result.deinit();retry=true;return false,blot_error::Error.none; }
+            if reused && result.result.compiled.failed { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();result.deinit();retry=true;return false,blot_error::Error.none; }
             let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,operands);
             if committed {
                 if operands<0 {
@@ -112,6 +124,9 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
                     result.result.compiled.bytes=default<u8[:]>();
                     opened.image.functions=result.result.compiled.emitted_functions;
                 }
+                if !replay.valid && replay.used { replay.needs_reset=true; }
+            } else {
+                if operands<0 && replay.used { replay.valid=false; replay.needs_reset=true; }
             }
             pending.deinit();result.deinit();return committed,error;
         }

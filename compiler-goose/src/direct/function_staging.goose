@@ -403,6 +403,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 return stopStage(s, "#run depends on a runtime binding");
             }
             blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+            blot_direct_relocations::stagedRead(target.unit, 0);
             let body .= owner.body(target.binding);
             var root = binding.initializer;
             if body {

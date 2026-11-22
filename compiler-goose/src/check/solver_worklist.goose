@@ -53,8 +53,8 @@ fn canonicalHeadsSlots(source: const dictionary_slot<u64,u32>[:]) -> dictionary_
  assert(start>=0 && source.len<=head_slots.len-start);
  return head_slots[start..start+source.len];
 }
-fn insert(self_: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self_.count=view.count; self_.slots=canonicalHeadsSlots(view.slots); }
-fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,head_slots); self_.count=view.count; self_.slots=canonicalHeadsSlots(view.slots); return removed; }
+fn insert(self_: Heads&,key: u64,value: u32) { let before=self_.slots.len; var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self_.count=view.count; if view.slots.len!=before { self_.slots=canonicalHeadsSlots(view.slots); } }
+fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,head_slots); self_.count=view.count; return removed; }
 fn clear(self_: Heads&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: Heads&) { if self_.slots.len!=0 { head_slots.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
 fn restore(self_: Heads&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=head_slots.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }

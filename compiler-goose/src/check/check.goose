@@ -3868,28 +3868,25 @@ recursive fn lambdaExpression(self_:Engine&,id:u32)->u32,blot_error::Error {var 
 fn usesAsCapabilityParam(tree:const blot_parse_ast::Tree&,pool:const blot_parse_symbols::Pool&,body:u32,param_name:u32)->bool {
  if param_name==0 { return false; }
  // Effect capability parameter detection via member access
- var has_with=false;
- var accesses_member=false;
  let pname=pool.get(param_name);
  let node_span=tree.span(body);
  for ni in 1..tree.nodes.len {
   let sp=tree.span(ni as u32);
   if sp.start<node_span.start || sp.end>node_span.end { continue; }
   let nd=tree.node(ni as u32);
-  if nd.tag==blot_parse_ast::tag_with_stmt { has_with=true; }
   if nd.tag==blot_parse_ast::tag_field_access {
    let base=tree.node(nd.a);
-   if base.tag==blot_parse_ast::tag_name && base.a==param_name { accesses_member=true; }
+   if base.tag==blot_parse_ast::tag_name && base.a==param_name { return true; }
   }
   if nd.tag==blot_parse_ast::tag_name {
    let txt=pool.get(nd.a);
-   if txt.len>pname.len && txt[pname.len]=='.' as u8 && starts_with(txt,pname) { accesses_member=true; }
+   if txt.len>pname.len && txt[pname.len]=='.' as u8 && starts_with(txt,pname) { return true; }
   }
  }
- return accesses_member;
+ return false;
 }
 recursive fn lambdaExpressionBody(self_:Engine&,id:u32,saved:LambdaContext&)->u32,blot_error::Error {
- let node=self_.tree.node(id);let parameter=self_.tree.parameter(node.a);if parameter.where_node!=0 {let err=self_.diagnostic(Code.higher_rank_constraint,parameter.where_node);if err!=blot_error::Error.none {return 0,err;}}var expected:u32=0;if self_.expected_lambda_source==id {expected=self_.expected_lambda_type;}var required_arrow=blot_check_types::Node{tag:blot_check_types::Tag.absent, ..};if expected!=0 {let resolved,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return 0,err;}required_arrow=self_.types.node(resolved);}let contextual=expected!=0 && required_arrow.tag==blot_check_types::Tag.function;var takes=parameter.own;if contextual {let wanted,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}let wrapper=self_.types.node(wanted);if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {takes=true;required_arrow.a=wrapper.a;}}var contextual_capability=false;if contextual {let root,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}contextual_capability=self_.types.node(root).tag==blot_check_types::Tag.scoped;}let scoped=node.a==self_.scoped_parameter;if !scoped {self_.scoped_parameter=0;}var descriptor=blot_support::none<u32>();if !scoped && usesAsCapabilityParam(self_.tree,self_.pool,node.b,parameter.name) {let family,err=self_.capabilityDescriptorAnnotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}descriptor=family;}let symbolic=descriptor.present || contextual_capability;var element_ty:u32=0;
+ let node=self_.tree.node(id);let parameter=self_.tree.parameter(node.a);if parameter.where_node!=0 {let err=self_.diagnostic(Code.higher_rank_constraint,parameter.where_node);if err!=blot_error::Error.none {return 0,err;}}var expected:u32=0;if self_.expected_lambda_source==id {expected=self_.expected_lambda_type;}var required_arrow=blot_check_types::Node{tag:blot_check_types::Tag.absent, ..};if expected!=0 {let resolved,err=self_.types.resolve(expected,0);if err!=blot_error::Error.none {return 0,err;}required_arrow=self_.types.node(resolved);}let contextual=expected!=0 && required_arrow.tag==blot_check_types::Tag.function;var takes=parameter.own;if contextual {let wanted,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}let wrapper=self_.types.node(wanted);if wrapper.tag==blot_check_types::Tag.usage && wrapper.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {takes=true;required_arrow.a=wrapper.a;}}var contextual_capability=false;if contextual {let root,err=self_.types.resolve(required_arrow.a,0);if err!=blot_error::Error.none {return 0,err;}contextual_capability=self_.types.node(root).tag==blot_check_types::Tag.scoped;}let scoped=node.a==self_.scoped_parameter;if !scoped {self_.scoped_parameter=0;}var descriptor=blot_support::none<u32>();if !scoped && parameter.annotation!=0 && self_.capabilityFamilyAnnotation(parameter.annotation).present && usesAsCapabilityParam(self_.tree,self_.pool,node.b,parameter.name) {let family,err=self_.capabilityDescriptorAnnotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}descriptor=family;}let symbolic=descriptor.present || contextual_capability;var element_ty:u32=0;
  if scoped {element_ty=self_.scoped_parameter_type;}else if contextual {element_ty=required_arrow.a;}else if descriptor.present {let ty,err=self_.types.capabilityParameter(descriptor.value);if err!=blot_error::Error.none {return 0,err;}element_ty=ty;}else if parameter.is_unit {element_ty=blot_check_types::unit;}else {let ty,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}element_ty=ty;}
  if contextual {if descriptor.present {let capability,err=self_.types.capabilityParameter(descriptor.value);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element_ty,capability,node.a);if err!=blot_error::Error.none {return 0,err;}}if parameter.is_unit {let err=self_.constrain(element_ty,blot_check_types::unit,node.a);if err!=blot_error::Error.none {return 0,err;}}}if !scoped && !symbolic && parameter.annotation!=0 {let written,err=self_.annotation(parameter.annotation);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element_ty,written,node.a);if err!=blot_error::Error.none {return 0,err;}}
  saved.has_frames=self_.storage_frames.len!=0 && !scoped;if saved.has_frames {saved.frames=lambda_storage_frames.alloc_slice(self_.storage_frames.len);for frame,index in self_.storage_frames {saved.frames[index]=frame;}self_.storage_frames.clear();}let ambient,err=self_.types.freshEffects();if err!=blot_error::Error.none {return 0,err;}self_.ambient=ambient;let latent=self_.ambient;match self_.types.row(latent).tail {variable payload=>{self_.row_sources.insert(payload.value,id);},_=>{abort("fresh effect row must have a variable tail");},}

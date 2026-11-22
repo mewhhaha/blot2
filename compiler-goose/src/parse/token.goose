@@ -82,41 +82,61 @@ let semicolon: Tag = 75;
 struct Token { tag: Tag, start: u32, end: u32 }
 fn text(value: Token, source: const u8[:]) -> const u8[:] { return source[value.start..value.end]; }
 fn keyword(value: const u8[:]) -> Tag {
-    // Every keyword is two to eight lowercase letters. The first letter
-    // rules out most identifiers before any spelling is compared.
-    if value.len < 2 || value.len > 8 || value[0] < 'a' || value[0] > 'z' { return identifier; }
-    if value == "import" { return kw_import; }
-    if value == "as" { return kw_as; }
-    if value == "const" { return kw_const; }
-    if value == "let" { return kw_let; }
-    if value == "type" { return kw_type; }
-    if value == "is" { return kw_is; }
-    if value == "data" { return kw_data; }
-    if value == "effect" { return kw_effect; }
-    if value == "infixl" { return kw_infixl; }
-    if value == "infixr" { return kw_infixr; }
-    if value == "infix" { return kw_infix; }
-    if value == "func" { return kw_func; }
-    if value == "if" { return kw_if; }
-    if value == "then" { return kw_then; }
-    if value == "else" { return kw_else; }
-    if value == "do" { return kw_do; }
-    if value == "case" { return kw_case; }
-    if value == "of" { return kw_of; }
-    if value == "for" { return kw_for; }
-    if value == "in" { return kw_in; }
-    if value == "ever" { return kw_ever; }
-    if value == "use" { return kw_use; }
-    if value == "return" { return kw_return; }
-    if value == "yield" { return kw_yield; }
-    if value == "break" { return kw_break; }
-    if value == "continue" { return kw_continue; }
-    if value == "complete" { return kw_complete; }
-    if value == "true" { return kw_true; }
-    if value == "false" { return kw_false; }
-    if value == "and" { return kw_and; }
-    if value == "or" { return kw_or; }
-    if value == "not" { return kw_not; }
-    if value == "with" { return kw_with; }
+    // Every keyword is two to eight lowercase letters. Dispatching on the
+    // first letter eliminates almost all comparisons on identifiers.
+    let len = value.len;
+    if len < 2 || len > 8 { return identifier; }
+    match value[0] {
+        'a' => {
+            if value == "as" { return kw_as; }
+            if value == "and" { return kw_and; }
+        },
+        'b' => { if value == "break" { return kw_break; } },
+        'c' => {
+            if value == "const" { return kw_const; }
+            if value == "case" { return kw_case; }
+            if value == "continue" { return kw_continue; }
+            if value == "complete" { return kw_complete; }
+        },
+        'd' => {
+            if value == "do" { return kw_do; }
+            if value == "data" { return kw_data; }
+        },
+        'e' => {
+            if value == "else" { return kw_else; }
+            if value == "ever" { return kw_ever; }
+            if value == "effect" { return kw_effect; }
+        },
+        'f' => {
+            if value == "for" { return kw_for; }
+            if value == "func" { return kw_func; }
+            if value == "false" { return kw_false; }
+        },
+        'i' => {
+            if value == "in" { return kw_in; }
+            if value == "if" { return kw_if; }
+            if value == "is" { return kw_is; }
+            if value == "import" { return kw_import; }
+            if value == "infixl" { return kw_infixl; }
+            if value == "infixr" { return kw_infixr; }
+            if value == "infix" { return kw_infix; }
+        },
+        'l' => { if value == "let" { return kw_let; } },
+        'n' => { if value == "not" { return kw_not; } },
+        'o' => {
+            if value == "or" { return kw_or; }
+            if value == "of" { return kw_of; }
+        },
+        'r' => { if value == "return" { return kw_return; } },
+        't' => {
+            if value == "true" { return kw_true; }
+            if value == "then" { return kw_then; }
+            if value == "type" { return kw_type; }
+        },
+        'u' => { if value == "use" { return kw_use; } },
+        'w' => { if value == "with" { return kw_with; } },
+        'y' => { if value == "yield" { return kw_yield; } },
+        _ => {},
+    }
     return identifier;
 }

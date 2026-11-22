@@ -31,9 +31,8 @@ fn grow<M,K,V>(map: M&,capacity: i64,pool: dictionary_slot<K,V>[>..]&) {
 }
 fn insert<M,K,V>(map: M&,key: K,value: V,pool: dictionary_slot<K,V>[>..]&) -> bool {
     if map.slots.len == 0 { grow(map,8,pool); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2,pool); }
-    let slots = pool.realloc_slice(map.slots,map.slots.len);
-    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = slots[index].tag; if present == 0 { slots[index] = dictionary_slot<K,V> { key,value,tag }; map.count++; return true; } if present == tag && slots[index].key.keyEqual(key) { slots[index] = dictionary_slot<K,V> { slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<K,V> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key.keyEqual(key) { map.slots[index].val = value; return false; } index = (index + 1) & mask; }
 }
 fn remove<M,K,V>(map:M&,key:K,pool:dictionary_slot<K,V>[>..]&)->bool {
     var hole=probe(map,key);if hole<0 {return false;}

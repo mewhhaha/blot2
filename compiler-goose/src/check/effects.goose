@@ -183,8 +183,26 @@ fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
                 return root, blot_error::Error.none;
             }
             if original.labels.len == 0 && writes.first != none {
-                let first = self_.versions.items[writes.first];
-                if first.position >= max(at, original.cursor) && first.replacement == 0 { return 0, blot_error::Error.none; }
+                var pos = max(at, original.cursor);
+                var vid = v.value;
+                var steps: i64 = 0;
+                while steps < 4 {
+                    let w = self_.variables.items[vid];
+                    if w.first == none { break; }
+                    let fw = self_.versions.items[w.first];
+                    if fw.position < pos { break; }
+                    if fw.replacement == 0 { return 0, blot_error::Error.none; }
+                    let rep = node(self_, fw.replacement);
+                    if rep.labels.len != 0 { break; }
+                    match rep.tail {
+                        variable nv => {
+                            vid = nv.value;
+                            pos = max(fw.position + 1, rep.cursor);
+                            steps += 1;
+                        },
+                        _ => { return 0, blot_error::Error.none; },
+                    }
+                }
             }
         },
         _ => { return root, blot_error::Error.none; },
@@ -529,7 +547,7 @@ fn clear(self_:Table_versions&) {self_.items=self_.storage[..0];self_.len=0;self
 fn deinit(self_:Table_versions&) {blot_support_pooled_buffer::deinit(self_,pool_Table_versions);self_.len=0;self_.failure=blot_error::Error.none;}
 fn index_of(self_:const Table_versions&,value:const Version&)->i64 {return self_.items.index_of(value);}
 fn restore(self_:Table_versions&,values:const Version[:])->Error {self_.clear();self_.append(values);return self_.failure;}
-struct Map_resolved { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<Id,Id>[:] = default<dictionary_slot<Id,Id>[:]>() }
+struct Map_resolved { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<Id,Id>[:] = default<dictionary_slot<Id,Id>[:]>(), touched: i64[32] = [0; 32] }
 fn probe(map: const Map_resolved&,key: Id) -> i64 {
     if map.count == 0 { return -1; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
@@ -541,7 +559,8 @@ fn release(slots: dictionary_slot<Id,Id>[:]) { if slots.len != 0 { pool_Map_reso
 fn grow(map: Map_resolved&,capacity: i64) {
     if map.failure != blot_error::Error.none { return; } if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = blot_error::Error.out_of_memory; return; }
     let replacement = pool_Map_resolved.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; }
-    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    var filled: i64 = 0;
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; if filled < 32 { map.touched[filled] = index; } filled += 1; } }
     release(map.slots); map.slots = replacement;
 }
 fn insert(map: Map_resolved&,key: Id,value: Id) -> bool {
@@ -549,14 +568,18 @@ fn insert(map: Map_resolved&,key: Id,value: Id) -> bool {
     if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
     if map.failure != blot_error::Error.none { return false; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Id,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Id,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Id,Id> { key,value,tag }; if map.count < 32 { map.touched[map.count] = index; } map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Id,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
 }
 fn remove(map: Map_resolved&,key: Id) -> bool {
     var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
     loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
     map.slots[hole] = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; map.count--; return true;
 }
-fn clear(map: Map_resolved&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn clear(map: Map_resolved&) {
+    if map.count == 0 { return; }
+    if map.count <= 32 { for i in 0..map.count { map.slots[map.touched[i]].tag = 0; } map.count = 0; return; }
+    for &slot in map.slots { slot.tag = 0; } map.count = 0;
+}
 fn deinit(map: Map_resolved&) { release(map.slots); map.slots=default<dictionary_slot<Id,Id>[:]>(); map.count = 0;map.failure=blot_error::Error.none; }
 fn clone(map: const Map_resolved&) -> Map_resolved { var copy = Map_resolved {..}; if map.slots.len != 0 { let slots = pool_Map_resolved.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: Map_resolved&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }

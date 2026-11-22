@@ -145,14 +145,15 @@ fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
     put(writer,header);
     count(writer,module.constructors.len);
     for c in module.constructors {
-        if !writer.room(20) {return;}
-        let u=c.identity.unit;let d=c.identity.decl;let n=c.nominal;let t=c.tag;let p=c.payload;
-        var buf:u8[20]=[
+        if !writer.room(24) {return;}
+        let u=c.identity.unit;let d=c.identity.decl;let n=c.nominal;let t=c.tag;let p=c.payload;let nm=c.name;
+        var buf:u8[24]=[
             u as! u8,(u>>8) as! u8,(u>>16) as! u8,(u>>24) as! u8,
             d as! u8,(d>>8) as! u8,(d>>16) as! u8,(d>>24) as! u8,
             n as! u8,(n>>8) as! u8,(n>>16) as! u8,(n>>24) as! u8,
             t as! u8,(t>>8) as! u8,(t>>16) as! u8,(t>>24) as! u8,
             p as! u8,(p>>8) as! u8,(p>>16) as! u8,(p>>24) as! u8,
+            nm as! u8,(nm>>8) as! u8,(nm>>16) as! u8,(nm>>24) as! u8,
         ];
         writer.output.append(buf);
         if u==module.unit {put(writer,c.scheme);}
@@ -164,19 +165,20 @@ fn getExecutionCore(reader:Reader&,module:blot_check_core::Module&) {
     if reader.failure!=blot_error::Error.none {return;}
     if module.unit==0 || module.constructors.len!=0 {reader.failure=blot_error::Error.invalid_artifact;return;}
     let length=count(reader);
-    if reader.failure!=blot_error::Error.none || !reader.available(length*20) {return;}
+    if reader.failure!=blot_error::Error.none || !reader.available(length*24) {return;}
     let constructors,error=allocate(reader.owner,length,default<blot_check_core::Constructor>());
     if error!=blot_error::Error.none {reader.failure=error;return;}
     for &c in constructors {
         c=default<blot_check_core::Constructor>();
-        if !reader.available(20) {return;}
+        if !reader.available(24) {return;}
         let at=reader.at;
         c.identity.unit=binary::u32le(reader.bytes,at);
         c.identity.decl=binary::u32le(reader.bytes,at+4);
         c.nominal=binary::u32le(reader.bytes,at+8);
         c.tag=binary::u32le(reader.bytes,at+12);
         c.payload=binary::u32le(reader.bytes,at+16);
-        reader.at=at+20;
+        c.name=binary::u32le(reader.bytes,at+20);
+        reader.at=at+24;
         if c.identity.unit==module.unit {
             get(reader,c.scheme);
             if reader.failure!=blot_error::Error.none {return;}

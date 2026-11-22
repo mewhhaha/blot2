@@ -110,6 +110,13 @@ struct Instance {
     // The unit of the module that created a compiler-owned instance (unit
     // zero: effect operations and state accessors), or 0.
     site: u32 = 0,
+    // Offset into State.pool_words for pool instances (0xffffffff otherwise).
+    pool_offset: u32 = 0xffffffff,
+    // Replay metadata: whether result was inferred from body, and first-seen
+    // instance lookup order during body emission.
+    was_inferred: bool = false,
+    deps_start: u32 = 0,
+    deps_len: u32 = 0,
 }
 struct IndexNode { key: InstanceKey, value: u32, next: u32 }
 struct DispatchNode { unit: u32, identity: NominalIdentity, member: u32, operator: Operator, found: bool, target: BindingRef, next: u32 }
@@ -172,12 +179,13 @@ root struct State {
     // `dispatchTarget` results by catalog unit, receiver and member.
     dispatch_cache: U64Map = U64Map {},
     dispatch_nodes: DispatchNode[>..] = [],
-    contents_memory: U64Map = U64Map {},
+    // 0 = unknown, 1 = false, 2 = true, indexed by Ty.
+    contents_memory: u8[>..] = [],
     // Effect operations (lowered operation types) and their frame ids.
     operation_ids: U64Map = U64Map {},
     // Type variables some scheme quantifies, per unit (built on demand).
-    quantified: U64Map = U64Map {},
-    quantified_units: U64Map = U64Map {},
+    quantified_base: u32[>..] = [],
+    quantified_vals: u8[>..] = [],
     failures: Recorded[>..] = [],
     // The storage runtime, emitted on first use.
     has_rt: bool = false,
@@ -185,13 +193,11 @@ root struct State {
     // Host callback imports by (parameter, result) ABI kinds.
     host_imports: U64Map = U64Map {},
     exported_storage: bool = false,
-    // Pool instance globals: (slot, generation, state) by instance, three
-    // words at the mapped offset of `pool_words`; `pool_order` lists the
-    // instances for direct.goose to sort.
-    pool_globals: U64Map = U64Map {},
+    // Pool instance globals: (slot, generation, state) stored in `pool_words`
+    // at Instance.pool_offset; `pool_order` lists instances for direct.goose.
     pool_words: u32[>..] = [],
     pool_order: u32[>..] = [],
-    holds_memory: U64Map = U64Map {},
+    holds_memory: u8[>..] = [],
 
     // Pools that only grow.
     text: u8[>..] = [],
@@ -212,13 +218,53 @@ root struct State {
     map_pool: u32[>..] = [],
     // Generalized local function values: (body serial, binding) to node.
     polymorphic: U64Map = U64Map {},
-    // Reference counts of local bindings by (unit, binding), per built unit.
-    use_counts: U64Map = U64Map {},
-    use_count_units: U64Map = U64Map {},
+    // Reference counts of local bindings per unit (built on demand).
+    use_count_base: u32[>..] = [],
+    use_count_vals: u32[>..] = [],
+    // Whether a local binding is captured by a closure, per unit (built on demand).
+    captured_base: u32[>..] = [],
+    captured_vals: u8[>..] = [],
     serial: u32 = 0,
     scratch: u32[>..<] = [],
     scratch_bytes: u8[>..<] = [],
     scratch_types: ValType[>..<] = [],
+    // Instance dependency tracking for structural per-body replay.
+    track_deps: bool = false,
+    replaying: bool = false,
+    active_instance: u32 = 0xffffffff,
+    dep_list: u32[>..] = [],
+    dep_match: bool = true,
+    inlined_callees: U64Map = U64Map {},
+}
+
+struct DepEntry { id: u32 }
+var dep_scratch: DepEntry[>..<] = [];
+
+fn recordDep(g: Generator&, id: u32) {
+    if !g.s.track_deps || g.s.active_instance == 0xffffffff { return; }
+    for at in dep_frame_mark..dep_scratch.len {
+        if dep_scratch[at].id == id { return; }
+    }
+    dep_scratch.push(DepEntry { id });
+}
+fn recordInlined(g: Generator&, unit: u32, binding: u32) {
+    if g.s.track_deps { g.s.inlined_callees.put(key64(unit, binding), 1); }
+}
+var dep_frame_mark: i64 = 0;
+
+fn resetUnitCaches(s: State&, unit_id: u32) {
+    let idx = (unit_id - 1) as i64;
+    if idx < s.use_count_base.len { s.use_count_base[idx] = 0xffffffff; }
+    if idx < s.quantified_base.len { s.quantified_base[idx] = 0xffffffff; }
+    if idx < s.captured_base.len { s.captured_base[idx] = 0xffffffff; }
+    s.dispatch_cache.clear();
+}
+
+fn resetAllCaches(s: State&) {
+    for i in 0..s.use_count_base.len { s.use_count_base[i] = 0xffffffff; }
+    for i in 0..s.quantified_base.len { s.quantified_base[i] = 0xffffffff; }
+    for i in 0..s.captured_base.len { s.captured_base[i] = 0xffffffff; }
+    s.dispatch_cache.clear();
 }
 
 // `units` is the caller's slice. Emitter code reads modules as
@@ -266,6 +312,18 @@ fn newSlot(g: Generator&) -> u32 {
 // --- Failures -----------------------------------------------------------
 
 fn putInt(out: u8[>..]&, value: u64) {
+    var digits: u8[20] = [0; 20];
+    var count = 0;
+    var rest = value;
+    loop {
+        digits[count] = ('0' + (rest % 10)) as! u8;
+        count += 1;
+        rest = rest / 10;
+        if rest == 0 { break; }
+    }
+    while count != 0 { count -= 1; out.push(digits[count]); }
+}
+fn putIntStack(out: u8[>..<]&, value: u64) {
     var digits: u8[20] = [0; 20];
     var count = 0;
     var rest = value;
@@ -508,17 +566,26 @@ fn closureSignature(g: Generator&, parameter: Ty, result: Ty) -> u32, Error {
     if error != blot_direct_types::Error.none { return 0, error; }
     let result_words, error = g.types.layout(result);
     if error != blot_direct_types::Error.none { return 0, error; }
+    if parameter_words.len < 32 {
+        var small: ValType[32] = [0; 32];
+        small[0] = blot_direct_writer::VT_i32;
+        for w, i in parameter_words { small[i + 1] = w; }
+        return g.module.signature(small[..parameter_words.len + 1], result_words), blot_direct_types::Error.none;
+    }
     var words: ValType[>..<] = [];
     words.push(blot_direct_writer::VT_i32);
     words.append(parameter_words);
     return g.module.signature(words[..], result_words), blot_direct_types::Error.none;
 }
-fn find(g: const Generator&, key: InstanceKey) -> u32, bool {
+fn find(g: Generator&, key: InstanceKey) -> u32, bool {
     let head, known = g.s.instance_index.get(hashKey(key));
     var at = head;
     while at != 0 {
         let entry = g.s.index_nodes[at - 1];
-        if sameKey(entry.key, key) { return entry.value, true; }
+        if sameKey(entry.key, key) {
+            recordDep(g, entry.value);
+            return entry.value, true;
+        }
         at = entry.next;
     }
     return 0, false;
@@ -554,8 +621,12 @@ fn runtime_(g: Generator&) -> const Runtime& {
 // closure, inline or nested. Boxing is ignored, since a stored or slot-held
 // value is copied flat.
 recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
-    let hit, cached = g.s.contents_memory.get(ty);
-    if cached { return hit != 0, blot_direct_types::Error.none; }
+    if (ty as i64) < g.s.contents_memory.len {
+        let hit = g.s.contents_memory[ty];
+        if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
+    } else {
+        while g.s.contents_memory.len < g.types.nodes.len { g.s.contents_memory.push(0); }
+    }
     // A recursive type's flat form is a pointer into scope memory.
     let is_recursive, recursive_error = g.types.isRecursive(ty);
     if recursive_error == blot_direct_types::Error.none && is_recursive { return true, blot_direct_types::Error.none; }
@@ -584,7 +655,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
             }
         },
         nominal => {
-            g.s.contents_memory.put(ty, 0); // recursion guard
+            g.s.contents_memory[ty] = 1; // recursion guard
             let cases, error = g.types.variants(ty);
             if error != blot_direct_types::Error.none { return false, error; }
             for at in 0..(cases.len as i64) {
@@ -594,19 +665,21 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
             }
         },
     }
-    var stored: u32 = 0;
-    if result { stored = 1; }
-    g.s.contents_memory.put(ty, stored);
+    if result { g.s.contents_memory[ty] = 2; } else { g.s.contents_memory[ty] = 1; }
     return result, blot_direct_types::Error.none;
 }
 // Whether a value of `ty` can refer to scope-allocated memory.
 recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
-    let hit, cached = g.s.holds_memory.get(ty);
-    if cached { return hit != 0, blot_direct_types::Error.none; }
+    if (ty as i64) < g.s.holds_memory.len {
+        let hit = g.s.holds_memory[ty];
+        if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
+    } else {
+        while g.s.holds_memory.len < g.types.nodes.len { g.s.holds_memory.push(0); }
+    }
     // A boxed value is a pointer into scope memory.
     let is_boxed, boxed_error = g.types.boxed(ty);
     if boxed_error == blot_direct_types::Error.none && is_boxed {
-        g.s.holds_memory.put(ty, 1);
+        g.s.holds_memory[ty] = 2;
         return true, blot_direct_types::Error.none;
     }
     let n = g.types.node(ty);
@@ -634,7 +707,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
             }
         },
         nominal => {
-            g.s.holds_memory.put(ty, 0); // recursion guard
+            g.s.holds_memory[ty] = 1; // recursion guard
             let cases, error = g.types.variants(ty);
             if error != blot_direct_types::Error.none { return false, error; }
             for at in 0..(cases.len as i64) {
@@ -644,21 +717,28 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
             }
         },
     }
-    var stored: u32 = 0;
-    if result { stored = 1; }
-    g.s.holds_memory.put(ty, stored);
+    if result { g.s.holds_memory[ty] = 2; } else { g.s.holds_memory[ty] = 1; }
     return result, blot_direct_types::Error.none;
 }
 
 fn signatureOf(g: Generator&, parameters: const Ty[:], result: Ty) -> u32, Error {
+    var small: ValType[32] = [0; 32];
+    var small_len: i64 = 0;
+    var overflow = false;
     var words: ValType[>..<] = [];
     for parameter in parameters {
         let layout, error = g.types.layout(parameter);
         if error != blot_direct_types::Error.none { return 0, error; }
-        words.append(layout);
+        if !overflow && small_len + layout.len <= 32 {
+            for w in layout { small[small_len] = w; small_len += 1; }
+        } else {
+            if !overflow { words.append(small[..small_len]); overflow = true; }
+            words.append(layout);
+        }
     }
     let result_words, error = g.types.layout(result);
     if error != blot_direct_types::Error.none { return 0, error; }
+    if !overflow { return g.module.signature(small[..small_len], result_words), blot_direct_types::Error.none; }
     return g.module.signature(words[..], result_words), blot_direct_types::Error.none;
 }
 
@@ -676,8 +756,13 @@ fn operationId(g: Generator&, operation: Ty) -> u32 {
 // mentions, or obligations on reachable variables determine. A scheme may
 // also quantify variables its body alone leaves open.
 fn isQuantified(g: Generator&, m: const Module&, ty: TId) -> bool {
-    if !g.s.quantified_units.contains(m.unit) {
-        g.s.quantified_units.put(m.unit, 1);
+    let uid = (m.unit - 1) as i64;
+    while g.s.quantified_base.len < g.units.len { g.s.quantified_base.push(0xffffffff); }
+    var base = g.s.quantified_base[uid];
+    if base == 0xffffffff {
+        base = g.s.quantified_vals.len as u32;
+        g.s.quantified_base[uid] = base;
+        for at in 0..m.types.nodes.len { g.s.quantified_vals.push(0); }
         let s .= g.s;
         let mark = s.scratch.len;
         for index in 0..m.bindings.len {
@@ -710,13 +795,13 @@ fn isQuantified(g: Generator&, m: const Module&, ty: TId) -> bool {
             if body { schemes[1] = body.scheme.variables; }
             for span in schemes {
                 for variable in m.types.list(span) {
-                    if inScratch(g, mark, s.scratch.len, variable) { g.s.quantified.put(key64(m.unit, variable), 1); }
+                    if inScratch(g, mark, s.scratch.len, variable) { g.s.quantified_vals[(base as i64) + (variable as i64)] = 1; }
                 }
             }
         }
         s.scratch.resize(mark);
     }
-    return g.s.quantified.contains(key64(m.unit, ty));
+    return g.s.quantified_vals[(base as i64) + (ty as i64)] != 0;
 }
 fn inScratch(g: const Generator&, from: i64, to: i64, value: u32) -> bool {
     for at in from..to { if g.s.scratch[at] == value { return true; } }
@@ -811,9 +896,10 @@ fn inferResult(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, site:
 recursive fn inferResultWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, unused_holes: bool, site: const Module&, site_id: u32) -> u32, Error {
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
-    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, inferring: true, emitted: true, unused_holes: unused_holes });
+    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, inferring: true, emitted: true, unused_holes: unused_holes, was_inferred: true });
     nameFunction(g, function, key);
     indexPut(g, key, id);
+    recordDep(g, id);
     let emitted = blot_direct_function::emitInstance(g, id);
     if emitted != blot_direct_types::Error.none { return 0, emitted; }
     g.s.instances[id].inferring = false;
@@ -844,34 +930,38 @@ fn addInstanceWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, r
     g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: result, closure: closure, captures: captures, slot: slot, site: site.unit });
     nameFunction(g, function, key);
     indexPut(g, key, id);
+    recordDep(g, id);
     g.s.queue.push(id);
     return id, blot_direct_types::Error.none;
 }
+
+var name_scratch: u8[>..<] = [];
 
 // Names the function after its source binding, for the name section.
 fn nameFunction(g: Generator&, function: u32, key: InstanceKey) {
     if !hasUnit(g, key.unit) { return; }
     let m .= unitModule(g, key.unit);
-    var text: u8[>..] = [];
-    text.append(kindName(key.kind));
-    text.push('.');
+    let mark = name_scratch.len;
+    name_scratch.append(kindName(key.kind));
+    name_scratch.push('.');
     match key.kind {
         named, partial, pool => {
             let body .= m.body(key.id);
-            if body { text.append(m.name(body.declaration_name)); } else { text.append("binding"); }
+            if body { name_scratch.append(m.name(body.declaration_name)); } else { name_scratch.append("binding"); }
         },
-        lambda => { text.append("lambda"); },
-        primitive => { text.append("primitive"); },
-        constructor => { text.append("constructor"); },
-        host => { text.append("host"); },
-        trap => { text.append("trap"); },
-        operation => { text.append("operation"); },
-        state_get => { text.append("state_get"); },
-        state_set => { text.append("state_set"); },
+        lambda => { name_scratch.append("lambda"); },
+        primitive => { name_scratch.append("primitive"); },
+        constructor => { name_scratch.append("constructor"); },
+        host => { name_scratch.append("host"); },
+        trap => { name_scratch.append("trap"); },
+        operation => { name_scratch.append("operation"); },
+        state_get => { name_scratch.append("state_get"); },
+        state_set => { name_scratch.append("state_set"); },
     }
-    text.push('#');
-    putInt(text, function);
-    blot_direct_writer::setName(g.module, function, text[..]);
+    name_scratch.push('#');
+    putIntStack(name_scratch, function);
+    blot_direct_writer::setName(g.module, function, name_scratch[mark..]);
+    name_scratch.resize(mark);
 }
 // The concrete type of `target` when applied to arguments of the types
 // `arguments`: its parameter types fix its variables, obligations the
@@ -955,9 +1045,10 @@ recursive fn inferClosure(g: Generator&, key: InstanceKey, env: Env, parameters:
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
     let slot = g.module.tableSlot(function);
-    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, closure: true, captures: captures, slot: slot, inferring: true, emitted: true });
+    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, closure: true, captures: captures, slot: slot, inferring: true, emitted: true, was_inferred: true });
     nameFunction(g, function, key);
     indexPut(g, key, id);
+    recordDep(g, id);
     let emitted = blot_direct_function::emitInstance(g, id);
     if emitted != blot_direct_types::Error.none { return 0, emitted; }
     g.s.instances[id].inferring = false;
@@ -988,9 +1079,8 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 }
                 continue;
             }
-            let spelling = m.fieldSpelling(goal.name);
-            if !spelling.present { continue; }
-            let name = g.types.fieldName(spelling.value);
+            let name, has_name = g.types.fieldNameOf(m, goal.name, true);
+            if !has_name { continue; }
             var record = receiver;
             if n.tag == blot_direct_types::Tag.nominal {
                 let cases, error = g.types.variants(receiver);

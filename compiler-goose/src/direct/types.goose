@@ -103,7 +103,12 @@ root struct Types {
     variant_payloads: Ty[>..] = [],
     variant_cache: VariantSlot[>..] = [],
     // Lowered closed Core types; open ones depend on an environment.
-    closed: U64Map = U64Map {},
+    closed_base: u32[>..] = [],
+    closed_len: u32[>..] = [],
+    closed_vals: u32[>..] = [],
+    field_id_base: u32[>..] = [],
+    field_id_len: u32[>..] = [],
+    field_ids: u32[>..] = [],
     nominal_positions: U64Map = U64Map {},
     in_layout: bool[>..] = [],
     // Nominal types that contain themselves: always one pointer to an
@@ -144,13 +149,59 @@ fn pushScratchLayout(self_: Types&, value: ValType) {
 
 fn key64(unit_id: u32, id: u32) -> u64 { let high: u64 = unit_id; return (high << 32) | id; }
 
-fn isClosed(self_: const Types&, unit_id: u32, ty: TId) -> bool { return self_.closed.contains(key64(unit_id, ty)); }
+fn isClosed(self_: const Types&, unit_id: u32, ty: TId) -> bool {
+    return self_.closed_vals[(self_.closed_base[unit_id - 1] as i64) + (ty as i64)] != 0xffffffff;
+}
+
+fn initUnitTables(self_: Types&) {
+    var total_types: i64 = 0;
+    var total_fields: i64 = 0;
+    for m in self_.units {
+        self_.closed_base.push(total_types as u32);
+        self_.closed_len.push(m.types.nodes.len as u32);
+        total_types += m.types.nodes.len;
+        self_.field_id_base.push(total_fields as u32);
+        self_.field_id_len.push(m.field_names.len as u32);
+        total_fields += m.field_names.len;
+    }
+    while self_.closed_vals.len < total_types { self_.closed_vals.push(0xffffffff); }
+    while self_.field_ids.len < total_fields { self_.field_ids.push(0xffffffff); }
+}
+
+fn resetClosedUnit(self_: Types&, unit_id: u32) {
+    let idx = (unit_id - 1) as i64;
+    let need = self_.units[idx].types.nodes.len;
+    if need <= (self_.closed_len[idx] as i64) {
+        let base = self_.closed_base[idx] as i64;
+        for at in base..base + need { self_.closed_vals[at] = 0xffffffff; }
+    } else {
+        let base = self_.closed_vals.len as u32;
+        self_.closed_base[idx] = base;
+        self_.closed_len[idx] = need as u32;
+        for at in 0..need { self_.closed_vals.push(0xffffffff); }
+    }
+    let fneed = self_.units[idx].field_names.len;
+    if fneed <= (self_.field_id_len[idx] as i64) {
+        let fbase = self_.field_id_base[idx] as i64;
+        for at in fbase..fbase + fneed { self_.field_ids[at] = 0xffffffff; }
+    } else {
+        let fbase = self_.field_ids.len as u32;
+        self_.field_id_base[idx] = fbase;
+        self_.field_id_len[idx] = fneed as u32;
+        for at in 0..fneed { self_.field_ids.push(0xffffffff); }
+    }
+}
+
+fn resetClosed(self_: Types&) {
+    for idx in 0..self_.units.len { resetClosedUnit(self_, (idx + 1) as u32); }
+}
 
 fn init(self_: Types&) {
     // Layout word 0 is the one pointer of a boxed or recursive value.
     self_.layout_words.push(blot_direct_writer::VT_i32);
     // Environment node 0 ends every list.
     self_.env_nodes.push(EnvNode { 0, 0, 0, 0 });
+    initUnitTables(self_);
     for tag in [Tag.unit, Tag.boolean, Tag.u32_, Tag.f32_, Tag.never] {
         let id, error = intern(self_, tag, []);
         assert(error == Error.none);
@@ -344,6 +395,31 @@ fn fieldName(self_: Types&, text: Text) -> u32 {
     self_.names.put(hashed, id + 1);
     return id;
 }
+fn fieldNameOf(self_: Types&, m: const Module&, symbol: u32, intern_missing: bool) -> u32, bool {
+    var low: i64 = 0;
+    var high = m.field_names.len;
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let value = m.field_names[middle];
+        if value.symbol < symbol { low = middle + 1; }
+        else if value.symbol > symbol { high = middle; }
+        else {
+            let slot = (self_.field_id_base[m.unit - 1] as i64) + middle;
+            let cached = self_.field_ids[slot];
+            if cached != 0xffffffff { return cached, true; }
+            let text = m.name(value.spelling);
+            if intern_missing {
+                let id = fieldName(self_, text);
+                self_.field_ids[slot] = id;
+                return id, true;
+            }
+            let id, known = findName(self_, text);
+            if known { self_.field_ids[slot] = id; return id, true; }
+            return 0, false;
+        }
+    }
+    return 0, false;
+}
 fn findField(self_: const Types&, ty: Ty, name: u32) -> i64 {
     let n = self_.node(ty);
     if n.tag != Tag.record { return -1; }
@@ -386,9 +462,9 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
     if ty == blot_check_types::f32_type { return f32_, Error.none; }
     if ty == blot_check_types::never { return never, Error.none; }
     if depth > 256 { return 0, fail(self_, m, ty, "type nesting exceeds 256"); }
-    let key = key64(m.unit, ty);
-    let hit, cached = self_.closed.get(key);
-    if cached { return hit, Error.none; }
+    let closed_idx = (self_.closed_base[m.unit - 1] as i64) + (ty as i64);
+    let hit = self_.closed_vals[closed_idx];
+    if hit != 0xffffffff { return hit, Error.none; }
     var child_open = false;
     let n = m.types.node(ty);
     var result: Ty = 0;
@@ -431,9 +507,8 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
             let mark = self_.scratch_fields_len;
             for index in 0..(n.b as i64) {
                 let source = m.types.recordField(n, index);
-                let text = m.fieldSpelling(source.name);
-                if !text.present { self_.scratch_fields_len = mark; return 0, fail(self_, m, ty, "record field without a spelling"); }
-                let name = fieldName(self_, text.value);
+                let name, ok = fieldNameOf(self_, m, source.name, true);
+                if !ok { self_.scratch_fields_len = mark; return 0, fail(self_, m, ty, "record field without a spelling"); }
                 let field_ty, error = lowerInner(self_, m, source.ty, env, child_open, depth + 1);
                 if error != Error.none { self_.scratch_fields_len = mark; return 0, error; }
                 self_.pushScratchField(Field { name, field_ty });
@@ -604,7 +679,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
         },
         _ => { return 0, fail(self_, m, ty, coreTypeTagName(n.tag)); },
     }
-    if child_open { open = true; } else { self_.closed.put(key, result); }
+    if child_open { open = true; } else { self_.closed_vals[closed_idx] = result; }
     return result, Error.none;
 }
 
@@ -655,9 +730,7 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
             if have.tag == Tag.record {
                 for index in 0..(n.b as i64) {
                     let source = m.types.recordField(n, index);
-                    let text = m.fieldSpelling(source.name);
-                    if !text.present { continue; }
-                    let name, known = findName(self_, text.value);
+                    let name, known = fieldNameOf(self_, m, source.name, false);
                     if !known { continue; }
                     let position = self_.findField(actual, name);
                     if position < 0 { continue; }

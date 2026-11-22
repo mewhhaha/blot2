@@ -26,6 +26,11 @@ fn get(map: const U64Map&, key: u64) -> u32, bool {
     if at == 0 { return 0, false; }
     return map.words[at + 2], true;
 }
+fn clear(map: U64Map&) {
+    if map.count == 0 { return; }
+    for at in 0..((map.mask as i64) + 1) { map.words[(map.base as i64) + at] = 0; }
+    map.count = 0;
+}
 fn contains(map: const U64Map&, key: u64) -> bool { return find(map, key) != 0; }
 fn grow(map: U64Map&, buckets: u32) {
     let old_base = map.base;

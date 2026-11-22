@@ -631,13 +631,22 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if value.ty == blot_direct_types::never { return value, blot_direct_types::Error.none; }
     return unitVal(), blot_direct_types::Error.none;
 }
-fn bindingCaptured(m: const Module&, binding: u32) -> bool {
-    for closure in m.closures {
-        for captured in m.extra[closure.captures.start..closure.captures.start + closure.captures.len] {
-            if captured == binding { return true; }
+fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
+    let m .= g.units[f.unit - 1];
+    let uid = (m.unit - 1) as i64;
+    while g.s.captured_base.len < g.units.len { g.s.captured_base.push(0xffffffff); }
+    var base = g.s.captured_base[uid];
+    if base == 0xffffffff {
+        base = g.s.captured_vals.len as u32;
+        g.s.captured_base[uid] = base;
+        for at in 0..m.bindings.len { g.s.captured_vals.push(0); }
+        for closure in m.closures {
+            for captured in m.extra[closure.captures.start..closure.captures.start + closure.captures.len] {
+                if (captured as i64) < m.bindings.len { g.s.captured_vals[(base as i64) + (captured as i64)] = 1; }
+            }
         }
     }
-    return false;
+    return g.s.captured_vals[(base as i64) + (binding as i64)] != 0;
 }
 fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
@@ -652,7 +661,7 @@ fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: T
         construct, record, record_merge, update => { return true; },
         reference => {
             let local_id = localRef(m, id);
-            return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(m, local_id);
+            return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
         },
         if_value => {
             return isFreshBoxedNode(m, n.b, 0) && isFreshBoxedNode(m, n.c, 0);
@@ -813,7 +822,7 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
     let tm .= g.units[target.unit - 1];
     let binding = tm.binding(target.binding);
     let alias, has_alias = primitiveAlias(tm, target.binding);
-    if has_alias { return partial(g, f, blot_direct_emit::InstanceKind.primitive, target, ty, Vals {}, id); }
+    if has_alias { g.recordInlined(target.unit, target.binding); return partial(g, f, blot_direct_emit::InstanceKind.primitive, target, ty, Vals {}, id); }
     let body .= tm.body(target.binding);
     if body {
         if body.is_function { return partial(g, f, blot_direct_emit::InstanceKind.partial, target, ty, Vals {}, id); }

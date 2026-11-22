@@ -89,7 +89,7 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let prev_reuse_ty = f.reuse_ty;
     if !info.store && !g.runtime_().has_fork {
         let root_binding = localRef(m, info.root);
-        if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && uses(g, f, root_binding) == 1 && !bindingCaptured(m, root_binding) {
+        if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && uses(g, f, root_binding) == 1 && !bindingCaptured(g, f, root_binding) {
             let boxed, berr = isBoxed(g, f, root.ty, id);
             if berr == blot_direct_types::Error.none && boxed && root.len == 1 {
                 f.reuse_node = id;

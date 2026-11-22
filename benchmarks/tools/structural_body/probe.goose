@@ -83,13 +83,9 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     let functions=w.functions.len;
     let instances=s.instances.len;
     let sections=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len];
-    g.types.closed=Map{};
+    g.types.resetClosed();
     g.types.nominal_positions=Map{};
-    s.use_counts=Map{};
-    s.use_count_units=Map{};
-    s.quantified=Map{};
-    s.quantified_units=Map{};
-    s.dispatch_cache=Map{};
+    s.resetAllCaches();
     var emitted:u32=0;
     var matched=true;
     for index in 0..instances {

@@ -26,6 +26,7 @@ import compile;
 import support.error;
 import support.option;
 import support.json;
+import support.native;
 type Error=blot_error::Error;
 type Span=blot_parse_ast::Span;
 type Core=blot_check_core::Module;
@@ -40,7 +41,7 @@ struct Publication {
 struct Details {bytes:const u8[:]}
 fn jsonStringify(self_:Details,writer:Writer&)->Error {return blot_json::write(writer,blot_json::Raw{self_.bytes});}
 reusable[] var diagnostic_bytes:u8[>..]=[];
-fn ownBytes(bytes:const u8[:])->u8[:] {let result=diagnostic_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn ownBytes(bytes:const u8[:])->u8[:] {let result=diagnostic_bytes.alloc_slice(bytes.len);if bytes.len!=0 {blot_native::copy_u8(result[0],bytes[0],bytes.len as u64);}return result;}
 fn freeBytes(bytes:u8[:]) {if bytes.len!=0 {diagnostic_bytes.free_slice(bytes);}}
 struct Diagnostic {
  stage:const u8[:]=default<const u8[:]>(),unit:u32=0,code:u8[:]=default<u8[:]>(),start:u32=0,end:u32=0,message:u8[:]=default<u8[:]>(),publication:blot_support::Option<Publication> =blot_support::none<Publication>(),

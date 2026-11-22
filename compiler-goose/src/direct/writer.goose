@@ -104,6 +104,7 @@ let OP_prefix_fd: Op = 0xfd;
 fn byte(bytes: u8[>..<]&, value: u8) { bytes.push(value); }
 fn raw(bytes: u8[>..<]&, value: const u8[:]) { bytes.append(value); }
 fn uleb(bytes: u8[>..<]&, value: u64) {
+    if value < 128 { bytes.push(value as! u8); return; }
     var rest = value;
     loop {
         let low = (rest & 127) as! u8; rest >>= 7;
@@ -112,6 +113,7 @@ fn uleb(bytes: u8[>..<]&, value: u64) {
     }
 }
 fn sleb(bytes: u8[>..<]&, value: i64) {
+    if value >= -64 && value < 64 { bytes.push(((value as! u64) & 127) as! u8); return; }
     var rest = value;
     loop {
         let low = ((rest as! u64) & 127) as! u8; rest >>= 7;
