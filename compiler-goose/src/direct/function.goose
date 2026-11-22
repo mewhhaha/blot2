@@ -32,6 +32,7 @@ import .function_storage;
 import .function_effects;
 import .function_entry;
 import .function_staging;
+import .function_spark;
 
 type Ty = u32;
 type Error = blot_direct_types::Error;
@@ -158,6 +159,9 @@ struct Fn {
     allocates: bool = false,
     // Allocation events so far, so a loop can tell whether its body allocated.
     allocations: u32 = 0,
+    // Direct child Core node eligible to elide F32 NaN canonicalization because
+    // its immediate parent is itself a canonicalizing consumer.
+    elide_f32_nan_node: u32 = 0,
 }
 
 fn op(g: Generator&, value: u8) { g.s.code.push(value); }
@@ -525,6 +529,8 @@ fn refine(g: Generator&, f: Fn&, ty: TId, actual: Ty) {
 }
 recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     // Node zero is an absent value, such as a bare `return ()`.
+    let elide_f32_nan = id != 0 && f.elide_f32_nan_node == id;
+    f.elide_f32_nan_node = 0;
     if id == 0 { return unitVal(), blot_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -532,10 +538,10 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         constant => { return constant(g, f, id, n.a, true); },
         staging => { return stagedConstant(g, f, id); },
         reference => { return reference(g, f, id); },
-        scalar => { return scalar(g, f, id); },
+        scalar => { return scalar(g, f, id, elide_f32_nan); },
         logical => { return logical(g, f, id); },
-        call => { return call(g, f, id); },
-        associated => { return associated(g, f, id); },
+        call => { return call(g, f, id, elide_f32_nan); },
+        associated => { return associated(g, f, id, elide_f32_nan); },
         if_value, if_stmt => { return ifNode(g, f, id); },
         block_ => { return block_(g, f, id); },
         fork_ => { return forkNode(g, f, id); },

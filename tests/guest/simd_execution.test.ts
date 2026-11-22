@@ -504,8 +504,9 @@ Deno.test("explicit SIMD lanes are bit-identical to their scalar kernels and to 
       }
     }
     deepStrictEqual(arithmetic, expected);
-    // Compare with the guest's own table: a NaN constant's sign is the host's.
+    // Compare with the guest's own table: F32 arithmetic NaNs canonicalize to 0x7fc00000.
     const table = words(guest.call("float_table", 0));
+    deepStrictEqual(table[4], 0x7fc00000);
     deepStrictEqual(table.slice(0, 4).concat(table.slice(5)), [0, -0, 1, -1, Infinity, -Infinity, 0.5, -0.5, 1e-45, 3, -3].map(floatBits));
     deepStrictEqual(words(guest.call("lane_bits", 0)), Array.from({ length: 48 }, (_, n) => table[(Math.floor(n / 4) + n % 4) % 12]));
     deepStrictEqual(words(guest.call("lane_floats", 0)), Array.from({ length: 48 }, (_, n) => integerTable[(Math.floor(n / 4) + n % 4) % 12] >>> 0));

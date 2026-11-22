@@ -115,11 +115,11 @@
      "syntax_nodes": 2039,
      "type_nodes": 4788,
      "type_versions": 680,
-     "wasm_bytes": 3238
+     "wasm_bytes": 3251
     }
    ],
-   "wasm_bytes": 3238,
-   "wasm_sha256": "dccb93d964875374a3c0ef8bf89224bb320f57590ff5d5ca014fb87c6090e3f7"
+   "wasm_bytes": 3251,
+   "wasm_sha256": "b69d52fd16b871e6bb5e3eddc500c6f4a9ef8b0ae56092bb2e300d5813949d41"
   },
   "callback-fixtures/parameter.blot": {
    "exit": 0,
@@ -155,11 +155,11 @@
      "syntax_nodes": 2030,
      "type_nodes": 4778,
      "type_versions": 678,
-     "wasm_bytes": 3142
+     "wasm_bytes": 3155
     }
    ],
-   "wasm_bytes": 3142,
-   "wasm_sha256": "b35169fd5bfc80aa73e834843bb1130a44b70956ea4aeb03bafae71fe7e8a123"
+   "wasm_bytes": 3155,
+   "wasm_sha256": "ba7158ebe4d456c6e5d9b13d233c1e7f2f755cdc0af96ff925a7ffaf7e8962ed"
   },
   "callback-fixtures/record.blot": {
    "exit": 0,
@@ -195,11 +195,11 @@
      "syntax_nodes": 2047,
      "type_nodes": 4787,
      "type_versions": 679,
-     "wasm_bytes": 3151
+     "wasm_bytes": 3164
     }
    ],
-   "wasm_bytes": 3151,
-   "wasm_sha256": "b4880dd2b616827bf81d29f0edc59948567294e3d4bcc12d76697e3d18ea405f"
+   "wasm_bytes": 3164,
+   "wasm_sha256": "68fde7437042396c86fd0e85072768ca2f721b952934cc6c2861880ec81786f4"
   },
   "captured-callable-fixtures/bound-cache-effects.blot": {
    "exit": 0,
@@ -997,11 +997,11 @@
      "syntax_nodes": 2219,
      "type_nodes": 5271,
      "type_versions": 757,
-     "wasm_bytes": 4633
+     "wasm_bytes": 4659
     }
    ],
-   "wasm_bytes": 4633,
-   "wasm_sha256": "229ce60130ca55fc87d3d1364fa85b0b2305a98614fc30447b34a2581c1d30af"
+   "wasm_bytes": 4659,
+   "wasm_sha256": "eb07a241720e19d33caa0d02fa3c51a9e4c93384aa3fba0783608969fd6d029d"
   },
   "direct/closures_in_data.blot": {
    "exit": 0,
@@ -1117,11 +1117,11 @@
      "syntax_nodes": 2021,
      "type_nodes": 4782,
      "type_versions": 683,
-     "wasm_bytes": 3149
+     "wasm_bytes": 3162
     }
    ],
-   "wasm_bytes": 3149,
-   "wasm_sha256": "e52eb7796bd49eaa107c5c3368df8e495c3453bff4cc7b86e43dba6dc0001f8c"
+   "wasm_bytes": 3162,
+   "wasm_sha256": "c1616558cb804dabbc0dfa9b34896f3224883e279b618a5fe6008548fc6f98ba"
   },
   "direct/data_and_control.blot": {
    "exit": 0,
@@ -1157,11 +1157,11 @@
      "syntax_nodes": 2273,
      "type_nodes": 5151,
      "type_versions": 752,
-     "wasm_bytes": 4081
+     "wasm_bytes": 4120
     }
    ],
-   "wasm_bytes": 4081,
-   "wasm_sha256": "e6aac83c33860836409a4ae7a3b0472355ddb7c1a2d29d678daedd951294c595"
+   "wasm_bytes": 4120,
+   "wasm_sha256": "c98c263d9037f75ecd5353eabe0be5ecf699a807f8e78ec1ebffbb8f6917f14f"
   },
   "direct/dispatch.blot": {
    "exit": 0,
@@ -1197,11 +1197,11 @@
      "syntax_nodes": 2497,
      "type_nodes": 6061,
      "type_versions": 830,
-     "wasm_bytes": 3372
+     "wasm_bytes": 3516
     }
    ],
-   "wasm_bytes": 3372,
-   "wasm_sha256": "e014eb22eb1b1ec09f22dc1d3ae42ae6b6960afc7a1f45b703ba9b35960a3f13"
+   "wasm_bytes": 3516,
+   "wasm_sha256": "b956b1f39733a3feb765b94fc5617f59a5b14b96899c2f8faa56be6f3a6ef59f"
   },
   "direct/empty_literals.blot": {
    "exit": 0,
@@ -1477,11 +1477,11 @@
      "syntax_nodes": 2126,
      "type_nodes": 4887,
      "type_versions": 699,
-     "wasm_bytes": 3632
+     "wasm_bytes": 3645
     }
    ],
-   "wasm_bytes": 3632,
-   "wasm_sha256": "f14a9daa5e9dd7e12a39b3be28c86083de489bddf71793f594a0d409ddedbb44"
+   "wasm_bytes": 3645,
+   "wasm_sha256": "9233b751c1163954a24a683d9c51c0907307c7a1da8c15d76a7c270016b59e3c"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
@@ -1677,11 +1677,11 @@
      "syntax_nodes": 2084,
      "type_nodes": 4835,
      "type_versions": 692,
-     "wasm_bytes": 4077
+     "wasm_bytes": 4090
     }
    ],
-   "wasm_bytes": 4077,
-   "wasm_sha256": "7e221bfaa0ad4e44158ee4d1a16f6173a261b22804ce99f6c9627052b2e8766a"
+   "wasm_bytes": 4090,
+   "wasm_sha256": "c8cd31f67c65bbab65786b71fc77da8108f81a115728fd6f61e820d19bc9520a"
   },
   "direct/providers.blot": {
    "exit": 0,
@@ -1877,11 +1877,11 @@
      "syntax_nodes": 2930,
      "type_nodes": 7587,
      "type_versions": 1094,
-     "wasm_bytes": 3105
+     "wasm_bytes": 3118
     }
    ],
-   "wasm_bytes": 3105,
-   "wasm_sha256": "c98542a15b2ec09d76aa4ae4e9a0e270038d57105d534afc4b852b2485bb10b5"
+   "wasm_bytes": 3118,
+   "wasm_sha256": "f045cb4d95f0ba84a6c5322fcfbb6ca057b041f09c2c04c0e61c0e5835f45d47"
   },
   "direct/simd_lanes.blot": {
    "exit": 0,
@@ -1917,11 +1917,11 @@
      "syntax_nodes": 3005,
      "type_nodes": 7741,
      "type_versions": 1124,
-     "wasm_bytes": 4128
+     "wasm_bytes": 4141
     }
    ],
-   "wasm_bytes": 4128,
-   "wasm_sha256": "190a53fd7c7e0f70236d78e2e878420b6c4f55e660ecc7431fb4caa56fb44e95"
+   "wasm_bytes": 4141,
+   "wasm_sha256": "4c737c56ea29ae316514874e02f6d183050a7d027c5adf1e26a372bd8adcb34a"
   },
   "direct/staged_scalar.blot": {
    "exit": 0,
@@ -4003,11 +4003,11 @@
      "syntax_nodes": 2112,
      "type_nodes": 5262,
      "type_versions": 697,
-     "wasm_bytes": 4147
+     "wasm_bytes": 4160
     }
    ],
-   "wasm_bytes": 4147,
-   "wasm_sha256": "362749d63752ade30899b793bfd4a007b7d4d37fe9ccb408a85263b4e35863e3"
+   "wasm_bytes": 4160,
+   "wasm_sha256": "783c1b65fab57b7b36396b648ada8a960d259f694abcced0f2022ca3b7233dde"
   },
   "primitive-aliases.blot": {
    "exit": 0,
@@ -4043,11 +4043,11 @@
      "syntax_nodes": 2830,
      "type_nodes": 6673,
      "type_versions": 975,
-     "wasm_bytes": 11289
+     "wasm_bytes": 11471
     }
    ],
-   "wasm_bytes": 11289,
-   "wasm_sha256": "9ff5bbf7d4118b235eeb69b05f7808269a6511f787dd70482840eddb7addee6b"
+   "wasm_bytes": 11471,
+   "wasm_sha256": "ba0f3f44cf0a5a42fd14fa78220a21e6d8bb1c8e541547360ea6628e23ed1f89"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
@@ -4243,11 +4243,11 @@
      "syntax_nodes": 2117,
      "type_nodes": 5100,
      "type_versions": 737,
-     "wasm_bytes": 3611
+     "wasm_bytes": 3650
     }
    ],
-   "wasm_bytes": 3611,
-   "wasm_sha256": "c3f69c28f04ac8e31ddd8b725ac0857a59c278f9514dd10a1f8d68f26ab23b6a"
+   "wasm_bytes": 3650,
+   "wasm_sha256": "a25612235b372ef122ac81033c023112306af6036251da2acdfd077db5abf1e3"
   },
   "scoped-loop-cleanup.blot": {
    "exit": 0,

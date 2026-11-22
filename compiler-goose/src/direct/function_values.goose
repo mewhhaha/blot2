@@ -13,15 +13,44 @@ fn isScalarTag(tag: blot_direct_types::Tag) -> bool {
 fn isComparisonOp(op_: Op) -> bool {
     return op_ == blot_check_core::Op.equal || op_ == blot_check_core::Op.not_equal || op_ == blot_check_core::Op.less || op_ == blot_check_core::Op.less_equal || op_ == blot_check_core::Op.greater || op_ == blot_check_core::Op.greater_equal;
 }
-recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+fn isCanonicalF32Op(op_: Op) -> bool {
+    return op_ == blot_check_core::Op.add || op_ == blot_check_core::Op.sub || op_ == blot_check_core::Op.mul || op_ == blot_check_core::Op.div || op_ == blot_check_core::Op.sqrt || op_ == blot_check_core::Op.floor || op_ == blot_check_core::Op.ceil || op_ == blot_check_core::Op.trunc;
+}
+fn isCanonicalF32Consumer(op_: Op) -> bool {
+    return isCanonicalF32Op(op_) || isComparisonOp(op_) || op_ == blot_check_core::Op.convert_f32_u32 || op_ == blot_check_core::Op.convert_f32_i32;
+}
+fn canonicalizeF32Stack(g: Generator&, f: const Fn&) {
+    let tmp = local(g, f, VT_f32);
+    ltee(g, tmp);
+    f32Const(g, 0x7fc00000);
+    lget(g, tmp);
+    lget(g, tmp);
+    op(g, OP_f32_eq);
+    op(g, OP_select);
+}
+fn isF32CoreExpr(g: Generator&, f: const Fn&, m: const Module&, expr_id: u32) -> bool {
+    if expr_id == 0 { return false; }
+    let ty, err = g.types.lower(m, m.typeOf(expr_id), f.env);
+    if err != blot_direct_types::Error.none { g.dropFailure(); return false; }
+    return tagOf(g, ty) == blot_direct_types::Tag.f32_;
+}
+recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
+    // Peephole-elide NaN canonicalization on direct F32 operands ONLY when this
+    // operation itself canonicalizes or ignores NaN payloads (arithmetic/rounding,
+    // float comparisons, F32.to_u32 / F32.to_i32).
+    let elide_children = isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    if elide_children { f.elide_f32_nan_node = n.a; }
     let left, error = expr(g, f, n.a);
+    f.elide_f32_nan_node = 0;
     if error != blot_direct_types::Error.none { return left, error; }
     var has_right = false;
     var right = neverVal();
     if n.b != 0 {
+        if elide_children { f.elide_f32_nan_node = n.b; }
         let value, error = expr(g, f, n.b);
+        f.elide_f32_nan_node = 0;
         if error != blot_direct_types::Error.none { return value, error; }
         has_right = true;
         right = value;
@@ -54,7 +83,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if isScalarTag(tag) && operand_left.ty != left.ty {
         push(g, operand_left);
         if has_right { push(g, operand_right); }
-        let emitted = scalarOp(g, f, n.op, operand_left.ty, id);
+        let emitted = scalarOp(g, f, n.op, operand_left.ty, id, !elide_nan);
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
         var result: Ty = 0;
         if n.c == 1 {
@@ -127,7 +156,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     push(g, left);
     if has_right { push(g, right); }
-    let emitted = scalarOp(g, f, machine, left.ty, id);
+    let emitted = scalarOp(g, f, machine, left.ty, id, !elide_nan);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     return pop(g, f, result, id);
 }
@@ -252,14 +281,14 @@ fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, has_right: bool, right: Val,
                 if op_ == blot_check_core::Op.relaxed_nmadd { lget(g, w(g, right, index + 4)); }
                 lget(g, w(g, left, index));
                 lget(g, w(g, right, index));
-                let multiplied = scalarOp(g, f, blot_check_core::Op.mul, lane, id);
+                let multiplied = scalarOp(g, f, blot_check_core::Op.mul, lane, id, false);
                 if multiplied != blot_direct_types::Error.none { return neverVal(), multiplied; }
                 if op_ == blot_check_core::Op.relaxed_madd {
                     lget(g, w(g, right, index + 4));
-                    let added = scalarOp(g, f, blot_check_core::Op.add, lane, id);
+                    let added = scalarOp(g, f, blot_check_core::Op.add, lane, id, true);
                     if added != blot_direct_types::Error.none { return neverVal(), added; }
                 } else {
-                    let subtracted = scalarOp(g, f, blot_check_core::Op.sub, lane, id);
+                    let subtracted = scalarOp(g, f, blot_check_core::Op.sub, lane, id, true);
                     if subtracted != blot_direct_types::Error.none { return neverVal(), subtracted; }
                 }
                 lset(g, w(g, result, index));
@@ -354,7 +383,10 @@ fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, has_right: bool, right: Val,
     return result, blot_direct_types::Error.none;
 }
 // Emits the machine operation for `op` on operands already on the stack.
-fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32) -> Error {
+// F32 arithmetic & rounding producers (+, -, *, /, sqrt, floor, ceil, trunc)
+// canonicalize NaN outputs to positive quiet NaN 0x7fc00000 unless `canonicalize`
+// is false (peephole-elided directly into a canonicalizing consumer).
+fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonicalize: bool = true) -> Error {
     let m .= g.units[f.unit - 1];
     let tag = g.types.node(operand).tag;
     let float = tag == blot_direct_types::Tag.f32_;
@@ -439,6 +471,7 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32) -> Error
         },
     }
     op(g, code);
+    if float && canonicalize && isCanonicalF32Op(op_) { canonicalizeF32Stack(g, f); }
     return blot_direct_types::Error.none;
 }
 

@@ -26,7 +26,9 @@ type Emission=blot_reuse_partial_dependency::Result;
 struct Image {
     layout:blot_direct_relocations::Snapshot=blot_direct_relocations::Snapshot{},
     bytes:u8[:]=default<u8[:]>(),
-    functions:i64=0
+    functions:i64=0,
+    sparks_vectorized:i64=0,
+    sparks_scalar_fallback:i64=0
 }
 fn deinit(image:Image&) {
     image.layout.deinit();
@@ -482,6 +484,20 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             return true;
         },
         panic=>{ return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1); },
+        spark=>{
+            let sa=a.sparkInfo(ia);
+            let sb=b.sparkInfo(ib);
+            if sa.is_range!=sb.is_range { return false; }
+            if !sameCoreExpr(old_units,a,sa.source,new_units,b,sb.source,locals,blocks,depth+1) { return false; }
+            if sa.is_range && !sameCoreExpr(old_units,a,sa.end,new_units,b,sb.end,locals,blocks,depth+1) { return false; }
+            let lmark=locals.items.len;
+            var ok=true;
+            if (sa.pattern==0)!=(sb.pattern==0) { ok=false; }
+            else if sa.pattern!=0 { ok=samePattern(a,sa.pattern,b,sb.pattern,locals,0); }
+            if ok { ok=sameCoreExpr(old_units,a,sa.body,new_units,b,sb.body,locals,blocks,depth+1); }
+            locals.items.resize(lmark);
+            return ok;
+        },
         constructor_function,primitive_function=>{ return na.a==nb.a; },
         result_associated=>{
             if !sameFieldSymbol(a,na.b,b,nb.b) { return false; }
@@ -692,7 +708,7 @@ fn containsU32(list:const u32[:],value:u32)->bool {
 
 fn hasStagedUnit(sites:const blot_direct_relocations::Site[:],unit:u32)->bool {
     for site in sites {
-        if site.offset<0 && site.unit==unit { return true; }
+        if site.offset==-1 && site.unit==unit { return true; }
     }
     return false;
 }
@@ -847,7 +863,9 @@ fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emissi
     } else {
         compiled=blot_reuse_dependency_consumer::Compiled{
             bytes:blot_reuse_dependency_consumer::ownBytes(bytes[..]),
-            emitted_functions:built.emitted_functions,..
+            emitted_functions:built.emitted_functions,
+            sparks_vectorized:built.sparks_vectorized,
+            sparks_scalar_fallback:built.sparks_scalar_fallback,..
         };
         replay.valid=true;
     }

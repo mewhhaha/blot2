@@ -232,6 +232,60 @@ fn stageBool(value: bool) -> StageValue {
     return StageValue {0, blot_check_types::boolean, 0};
 }
 
+recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id: u32, value: StageValue, depth: i64) -> bool {
+    if pat_id == 0 { return true; }
+    if depth >= 64 { return false; }
+    let pat = m.pattern(pat_id);
+    match pat.tag {
+        wildcard => { return true; },
+        bind => {
+            blot_support_pooled_buffer::push(s.bindings, StageBinding {pat.a, value}, binding_runs);
+            return true;
+        },
+        constant => { return value.ty != stage_aggregate && value.ty != stage_function && value.bits == pat.a; },
+        product => {
+            let children = m.patternChildren(pat_id);
+            if value.ty != stage_aggregate { return children.len == 0; }
+            let agg = s.aggregates.items[value.bits];
+            if agg.kind == blot_check_core::Tag.product {
+                if agg.len != children.len { return false; }
+                for child, at in children {
+                    if !bindStagePattern(g, s, m, child, s.parts.items[agg.start + at].value, depth + 1) { return false; }
+                }
+                return true;
+            }
+            if agg.kind == blot_check_core::Tag.record && m.types.node(pat.ty).tag == blot_check_types::Tag.record {
+                let rnode = m.types.node(pat.ty);
+                if rnode.b != children.len { return false; }
+                for child, at in children {
+                    let field = m.types.recordField(rnode, at);
+                    let sp = m.fieldSpelling(field.name);
+                    if !sp.present { return false; }
+                    let fname = g.types.fieldName(sp.value);
+                    var found = false;
+                    var fval = StageValue {};
+                    for pi in 0..(agg.len as i64) {
+                        if s.parts.items[agg.start + pi].name == fname { fval = s.parts.items[agg.start + pi].value; found = true; break; }
+                    }
+                    if !found || !bindStagePattern(g, s, m, child, fval, depth + 1) { return false; }
+                }
+                return true;
+            }
+            return false;
+        },
+        constructor => {
+            if value.ty != stage_aggregate { return false; }
+            let agg = s.aggregates.items[value.bits];
+            let ctor = m.constructor(pat.a);
+            if agg.kind != blot_check_core::Tag.construct || agg.tag != ctor.tag { return false; }
+            if pat.b == 0 { return true; }
+            if agg.len != 1 { return false; }
+            return bindStagePattern(g, s, m, pat.b, s.parts.items[agg.start].value, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+
 fn compareStage<T>(op: blot_check_core::Op, a: T, b: T) -> StageValue, bool {
     match op {
         equal => { return stageBool(a == b), true; }, not_equal => { return stageBool(a != b), true; },
@@ -262,7 +316,7 @@ fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Stag
             convert_f32_u32 => { return StageValue {blot_check_scalar_ops::truncate(x), blot_check_types::u32_type, 0}; },
             _ => { return stopStage(s, "#run does not support this floating-point operation"); },
         }
-        return StageValue {blot_native::f32_bits(result), left.ty, 0};
+        return StageValue {if result != result { 0x7fc00000 } else { blot_native::f32_bits(result) }, left.ty, 0};
     }
     let cmp, compared = compareStage(op, a, b);
     if compared { return cmp; }
@@ -315,8 +369,21 @@ recursive fn applyStage(g: Generator&, f: const Fn&, s: Stage&, fn_value: StageV
 
 recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const Module&, id: u32, frame: i64, depth: i64) -> StageValue {
     let call = m.call(id);
-    let target = g.resolve(m, call.target);
+    var target = g.resolve(m, call.target);
     if !g.hasUnit(target.unit) { return stopStage(s, "#run has no body for this call"); }
+    // Follow constant aliases like `const sqrt = F32.sqrt` while recording each definition read.
+    for step in 0..8 {
+        let cur_owner .= g.units[target.unit - 1];
+        let cur_binding = cur_owner.binding(target.binding);
+        if target.unit == m.unit && (cur_binding.kind == blot_reuse_principal_interface::Kind.local || cur_binding.kind == blot_reuse_principal_interface::Kind.parameter) { break; }
+        let cur_body .= cur_owner.body(target.binding);
+        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != blot_check_core::Tag.reference { break; }
+        blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+        blot_direct_relocations::stagedRead(target.unit, 0);
+        let next = g.resolve(cur_owner, cur_owner.reference(cur_body.root));
+        if next == target || !g.hasUnit(next.unit) { break; }
+        target = next;
+    }
     let owner .= g.units[target.unit - 1];
     let binding = owner.binding(target.binding);
     if target.unit == m.unit && (binding.kind == blot_reuse_principal_interface::Kind.local || binding.kind == blot_reuse_principal_interface::Kind.parameter) {
@@ -594,7 +661,72 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
         },
         comptime_meta => { return evalComptimeMetaStage(g, f, s, m, id, frame, depth); },
         panic => { return stopStage(s, "#run trapped"); },
-        fork_, with_handle, comptime_for, spark, flat_op => { return stopStage(s, "#run does not support this construct"); },
+        spark => {
+            let info = m.sparkInfo(id);
+            if info.is_range {
+                let start_v = evaluateStage(g, f, s, m, info.source, frame, depth + 1);
+                if s.failure.len != 0 || start_v.returning_to != 0 { return start_v; }
+                let end_v = evaluateStage(g, f, s, m, info.end, frame, depth + 1);
+                if s.failure.len != 0 || end_v.returning_to != 0 { return end_v; }
+                if start_v.ty != blot_check_types::u32_type || end_v.ty != blot_check_types::u32_type {
+                    return stopStage(s, "#run spark range requires U32 bounds");
+                }
+                var count: u32 = 0;
+                if end_v.bits > start_v.bits { count = end_v.bits - start_v.bits; }
+                if count > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+                s.remaining -= count;
+                let parts_start = s.parts.items.len as u32;
+                for at in 0..(count as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+                for at in 0..(count as i64) {
+                    let bmark = s.bindings.items.len;
+                    let item = StageValue { start_v.bits + (at as u32), blot_check_types::u32_type, 0 };
+                    if !bindStagePattern(g, s, m, info.pattern, item, 0) {
+                        blot_support_pooled_buffer::resize(s.bindings, bmark);
+                        return stopStage(s, "#run spark pattern did not match");
+                    }
+                    let out = evaluateStage(g, f, s, m, info.body, frame, depth + 1);
+                    blot_support_pooled_buffer::resize(s.bindings, bmark);
+                    if s.failure.len != 0 || out.returning_to != 0 { return out; }
+                    s.parts.items[parts_start + at].value = out;
+                }
+                let index = s.aggregates.items.len as u32;
+                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, count, 0}, aggregate_runs);
+                return StageValue {index, stage_aggregate, 0};
+            }
+            let src_v = evaluateStage(g, f, s, m, info.source, frame, depth + 1);
+            if s.failure.len != 0 || src_v.returning_to != 0 { return src_v; }
+            if src_v.ty != stage_aggregate || s.aggregates.items[src_v.bits].kind != blot_check_core::Tag.array {
+                return stopStage(s, "#run spark requires an array or range source");
+            }
+            let src_agg = s.aggregates.items[src_v.bits];
+            if src_agg.len > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+            s.remaining -= src_agg.len;
+            let parts_start = s.parts.items.len as u32;
+            for at in 0..(src_agg.len as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+            for at in 0..(src_agg.len as i64) {
+                var item = StageValue {};
+                if src_agg.tag != 0 {
+                    let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, src_agg.tag);
+                    if !found { return stopStage(s, "#run input snapshot missing"); }
+                    item = StageValue { bytes[at], blot_check_types::u32_type, 0 };
+                } else {
+                    item = s.parts.items[src_agg.start + at].value;
+                }
+                let bmark = s.bindings.items.len;
+                if !bindStagePattern(g, s, m, info.pattern, item, 0) {
+                    blot_support_pooled_buffer::resize(s.bindings, bmark);
+                    return stopStage(s, "#run spark pattern did not match");
+                }
+                let out = evaluateStage(g, f, s, m, info.body, frame, depth + 1);
+                blot_support_pooled_buffer::resize(s.bindings, bmark);
+                if s.failure.len != 0 || out.returning_to != 0 { return out; }
+                s.parts.items[parts_start + at].value = out;
+            }
+            let index = s.aggregates.items.len as u32;
+            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, src_agg.len, 0}, aggregate_runs);
+            return StageValue {index, stage_aggregate, 0};
+        },
+        fork_, with_handle, comptime_for, flat_op => { return stopStage(s, "#run does not support this construct"); },
         _ => { return stopStage(s, "#run requires a supported closed expression"); },
     }
 }

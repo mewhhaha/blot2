@@ -72,6 +72,15 @@ nodes, +17 type nodes), reserved the `spark` keyword, added `entry kernel` /
 `k == 1` record-payload constructor/pattern lowering. All 109 fixtures kept
 100% identical exit codes, diagnostics, and emitted Wasm bytes.
 
+Concurrency vNext Phase 2 (23 November 2026) added 4-wide Wasm SIMD (`v128`)
+auto-vectorization for `spark` (`direct/function_spark.goose`), body-scoped
+`offset = -2` `unpatchableOperand` relocations, `#run` `Tag.spark` staging,
+and uniform producer-site `0x7fc00000` NaN canonicalization on F32 arithmetic
+and rounding ops (`+`, `-`, `*`, `/`, `sqrt`, `floor`, `ceil`, `trunc`) with
+safe consumer peephole elision. Re-recorded the 14 fixtures containing F32
+arithmetic/rounding (+13 bytes per non-elided F32 op); all 109 fixtures kept
+identical exit codes, diagnostics, and frontend counters.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

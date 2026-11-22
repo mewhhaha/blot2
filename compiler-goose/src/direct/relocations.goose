@@ -31,7 +31,7 @@ fn beginReplay(previous:const BodySite[:],skip_fn:const u8[:],drop_unit:u32) {
     suppressed_unit=drop_unit;
     used=0; pending=[]; bodies=[]; starts=[]; sites=[]; committed_bodies=[];
     for record in previous {
-        if record.site.offset<0 {
+        if record.site.offset==-1 {
             if drop_unit!=0 && record.site.unit==drop_unit { continue; }
             staged_flag=true;
             sites.push(record.site);
@@ -56,6 +56,17 @@ fn operand(unit:u32,node:u32,offset:i64) {
     else { pending[used]=site; }
     used++;
 }
+// Records a body-scoped unpatchable constant operand (e.g. inside a SIMD
+// v128.const or shape constant) using sentinel offset -2 so `relocate` rejects
+// in-place patching and falls through to `replayEdits` without poisoning the
+// whole unit as a `#run` stagedRead (-1).
+fn unpatchableOperand(unit:u32,node:u32) {
+    if !recording || (suppressed_unit!=0 && unit==suppressed_unit) { return; }
+    let site=Site{unit,node,-2};
+    if used==pending.len { pending.push(site); }
+    else { pending[used]=site; }
+    used++;
+}
 fn stagedRead(unit:u32,node:u32) {
     if recording {
         staged_flag=true;
@@ -72,7 +83,9 @@ fn insert(first:i64,at:i64,length:i64) {
 fn finishBody(first:i64,adjust:i64,index:u32,generation:i64) {
     if !recording { return; }
     for site in pending[first..used] {
-        bodies.push(BodySite{Site{site.unit,site.node,site.offset+adjust},index,generation});
+        var off=site.offset;
+        if off>=0 { off+=adjust; }
+        bodies.push(BodySite{Site{site.unit,site.node,off},index,generation});
     }
     rewind(first);
 }
@@ -86,7 +99,9 @@ fn finishCode(base:i64) {
         // Inference can emit a provisional body before the final one.
         if body.generation!=record.generation { continue; }
         let site=record.site;
-        sites.push(Site{site.unit,site.node,base+body.position+site.offset});
+        var off=site.offset;
+        if off>=0 { off=base+body.position+off; }
+        sites.push(Site{site.unit,site.node,off});
         committed_bodies.push(record);
     }
 }

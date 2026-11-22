@@ -329,18 +329,32 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     return result, blot_direct_types::Error.none;
 }
 
-recursive fn call(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+recursive fn call(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let previous_call = f.current_call;
     f.current_call = id;
-    let value, error = callInner(g, f, id);
+    let value, error = callInner(g, f, id, elide_nan);
     f.current_call = previous_call;
     return value, error;
 }
-recursive fn callInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let info = m.call(id);
     let target = g.resolve(m, info.target);
     let arguments = info.arguments;
+    var elide_args = false;
+    if arguments.len >= 1 && arguments.len <= 2 && g.hasUnit(target.unit) {
+        let resolved_prim = followAliasTarget(g, target);
+        if g.hasUnit(resolved_prim.unit) {
+            let rtm .= g.units[resolved_prim.unit - 1];
+            let palias, has_palias = primitiveAlias(rtm, resolved_prim.binding);
+            if has_palias {
+                let pinfo = rtm.primitive(palias);
+                if pinfo.kind == blot_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) && isF32CoreExpr(g, f, m, arguments[0]) {
+                    elide_args = true;
+                }
+            }
+        }
+    }
     let values = g.reserveVals(arguments.len);
     // Building a function value has no effects, so one whose type the other
     // arguments still determine is built after them.
@@ -351,7 +365,9 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             g.s.vals[values.start + at] = neverVal();
             continue;
         }
+        if elide_args { f.elide_f32_nan_node = argument; }
         let value, error = expr(g, f, argument);
+        f.elide_f32_nan_node = 0;
         if error != blot_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;
     }
@@ -379,7 +395,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     refine(g, f, info.callee_type, callee);
     let rest, error = restType(g, f, callee, values.len, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    return callTarget(g, f, target, values, callee, rest, id);
+    return callTarget(g, f, target, values, callee, rest, id, elide_nan);
 }
 // Parameter `index` of `target` as fixed by the evaluated `values` (entries
 // typed never are not yet evaluated), with holes.
@@ -669,7 +685,7 @@ fn lowers(g: Generator&, f: const Fn&, ty: TId) -> bool {
 }
 // Applies a resolved module-level binding to evaluated arguments. `callee` is
 // its concrete (curried) function type at this site.
-recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Vals, callee: Ty, result: Ty, id: u32) -> Val, Error {
+recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool = false) -> Val, Error {
     let tm .= g.units[target.unit - 1];
     let body .= tm.body(target.binding);
     if body && body.is_function {
@@ -747,7 +763,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         if next != target {
             g.recordInlined(target.unit, target.binding);
             f.forward_depth += 1;
-            let forwarded, ferr = callTarget(g, f, next, arguments, callee, result, id);
+            let forwarded, ferr = callTarget(g, f, next, arguments, callee, result, id, elide_nan);
             f.forward_depth -= 1;
             return forwarded, ferr;
         }
@@ -755,7 +771,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     let node, has_alias = primitiveAlias(tm, target.binding);
     if has_alias {
         g.recordInlined(target.unit, target.binding);
-        return applyPrimitive(g, f, tm.primitive(node), arguments, callee, result, target, id);
+        return applyPrimitive(g, f, tm.primitive(node), arguments, callee, result, target, id, elide_nan);
     }
     // A constant holding a function value: apply it one argument at a time.
     var value, error = namedValue(g, f, target, callee, id);
@@ -773,7 +789,7 @@ fn namedValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val
     callf(g, g.s.instances[instance].function);
     return received(g, f, ty, id);
 }
-fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, arguments: Vals, callee: Ty, result: Ty, target: BindingRef, id: u32) -> Val, Error {
+fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, arguments: Vals, callee: Ty, result: Ty, target: BindingRef, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     if primitive.kind != blot_check_core::PrimitiveKind.scalar { return neverVal(), g.fail(m, id, "array primitives are not supported yet"); }
     if arguments.len < primitive.arity {
@@ -783,7 +799,7 @@ fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, 
     }
     if arguments.len > primitive.arity { return neverVal(), g.fail(m, id, "primitive over-application"); }
     for at in 0..(arguments.len as i64) { push(g, g.s.vals[arguments.start + at]); }
-    let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id);
+    let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id, !elide_nan);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     return pop(g, f, result, id);
 }
@@ -1222,15 +1238,20 @@ fn curried(g: Generator&, arguments: Vals, result: Ty) -> Ty, Error {
 }
 
 // Operator or member dispatch on the left operand's concrete type.
-recursive fn associated(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
+    let elide_children = n.op != blot_check_core::Op.none && isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    if elide_children { f.elide_f32_nan_node = n.a; }
     let left, error = expr(g, f, n.a);
+    f.elide_f32_nan_node = 0;
     if error != blot_direct_types::Error.none { return left, error; }
     var has_right = false;
     var right = neverVal();
     if n.b != 0 {
+        if elide_children { f.elide_f32_nan_node = n.b; }
         let value, error = expr(g, f, n.b);
+        f.elide_f32_nan_node = 0;
         if error != blot_direct_types::Error.none { return value, error; }
         has_right = true;
         right = value;
@@ -1243,7 +1264,7 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         push(g, left);
         if has_right { push(g, right); }
-        let emitted = scalarOp(g, f, machine, left.ty, id);
+        let emitted = scalarOp(g, f, machine, left.ty, id, !elide_nan);
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
         var popped_ty = scalarResult(machine, left.ty);
         if has_result { popped_ty = result; }

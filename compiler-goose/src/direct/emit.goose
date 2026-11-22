@@ -242,6 +242,8 @@ root struct State {
     kernels: blot_check_wire_schema::KernelInfo[>..] = [],
     processes: blot_check_wire_schema::ProcessInfo[>..] = [],
     wire_word_tags: u8[>..] = [],
+    sparks_vectorized: i64 = 0,
+    sparks_scalar_fallback: i64 = 0,
 }
 
 fn recordDep(g: Generator&, id: u32) {

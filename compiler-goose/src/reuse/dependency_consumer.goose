@@ -189,15 +189,15 @@ fn write(self_:const Diagnostic&,out:u8[>..]&,filename:const u8[:])->Error {
 fn write<S>(self_:const Diagnostic&,stream:S&,filename:const u8[:])->Error {var bytes:u8[>..]=[];let error=self_.write(bytes,filename);if error!=blot_error::Error.none {return error;}return stream.writeAll(bytes[..]);}
 // The result of one project build. `compiled` owns the Wasm bytes or, after a
 // backend rejection, the diagnostic and its detail text.
-struct Compiled {bytes:u8[:]=default<u8[:]>(),failed:bool=false,diagnostic:blot_compile::Diagnostic=blot_compile::Diagnostic{..},message:u8[:]=default<u8[:]>(),emitted_functions:i64=0}
+struct Compiled {bytes:u8[:]=default<u8[:]>(),failed:bool=false,diagnostic:blot_compile::Diagnostic=blot_compile::Diagnostic{..},message:u8[:]=default<u8[:]>(),emitted_functions:i64=0,sparks_vectorized:i64=0,sparks_scalar_fallback:i64=0}
 fn text(self_:const Compiled&)->const u8[:] {return self_.diagnostic.code.message(self_.message);}
 struct Result {compiled:Compiled=Compiled{..},stats:Stats=Stats{},diagnostic:blot_support::Option<Diagnostic> =blot_support::none<Diagnostic>()}
 fn deinit(self_:Result&) {freeBytes(self_.compiled.bytes);freeBytes(self_.compiled.message);if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
 // Runs the backend and takes ownership of what it produced.
 fn compileUnits(units:const Core[:],entry:u32,build_inputs:i64 = -1)->Compiled,Error {
  var bytes:u8[>..<]=[];var message:u8[>..<]=[];let outcome=blot_compile::compile(units,entry,bytes,message,build_inputs);
- if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions, ..},blot_error::Error.none;}
- return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions, ..},blot_error::Error.none;
+ if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;}
+ return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;
 }
 struct HoleDetails {hole:blot_reuse_hole_diagnostics::Snapshot}
 struct ExplanationDetails {explanation:blot_reuse_dispatch_explanation::Explanation}

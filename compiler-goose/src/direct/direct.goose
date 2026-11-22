@@ -27,7 +27,7 @@ type Code = blot_check_diagnostic_code::Code;
 
 // `failed`: `unit`, `span` and `code` describe the diagnostic and `message`
 // holds its detail. Otherwise `bytes` holds the Wasm module.
-struct Result { failed: bool = false, unit: u32 = 0, span: blot_check_core::Span = blot_check_core::Span { 0, 0 }, code: Code = blot_check_diagnostic_code::Code.storage_unsupported, emitted_functions: i64 = 0 }
+struct Result { failed: bool = false, unit: u32 = 0, span: blot_check_core::Span = blot_check_core::Span { 0, 0 }, code: Code = blot_check_diagnostic_code::Code.storage_unsupported, emitted_functions: i64 = 0, sparks_vectorized: i64 = 0, sparks_scalar_fallback: i64 = 0 }
 
 fn compile(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
     var types = blot_direct_types::Types { units: units, .. };
@@ -55,7 +55,7 @@ fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Typ
         message.append(state.text[failure.message.start..failure.message.start + failure.message.len]);
         return Result { failed: true, unit: failure.unit, span: failure.span, code: failure.code };
     }
-    return Result { emitted_functions: module.functions.len };
+    return Result { emitted_functions: module.functions.len, sparks_vectorized: state.sparks_vectorized, sparks_scalar_fallback: state.sparks_scalar_fallback };
 }
 
 // Whether pool instance `left` initializes before `right`.

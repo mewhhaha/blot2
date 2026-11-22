@@ -2507,7 +2507,16 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let handle, base, alloc_err = createUninit(g, f, out_ty, count, id);
     if alloc_err != blot_direct_types::Error.none { return handle, alloc_err; }
 
-    let index = constLocal(g, f, 0);
+    let vectorized, vec_index, vec_err = tryEmitVectorSpark(g, f, id, out_ty, elem_ty, start_local, source_val, count, base);
+    if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+
+    var index: u32 = 0;
+    if vectorized {
+        index = vec_index;
+    } else {
+        g.s.sparks_scalar_fallback += 1;
+        index = constLocal(g, f, 0);
+    }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
     lget(g, index);

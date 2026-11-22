@@ -50,6 +50,8 @@ export type ZigProjectBuildStats = ZigProjectStats & {
   /** Distinct source acquisitions (including overlays) and prior syntax trees copied this build. */
   sourceLoad?: { sourceReads: number; reusedSyntaxModules: number };
   emittedFunctions: number;
+  sparksVectorized?: number;
+  sparksScalarFallback?: number;
   /** Phase clocks; empty unless `profileBackend` was set. */
   phaseProfile: ZigProjectStats;
 };

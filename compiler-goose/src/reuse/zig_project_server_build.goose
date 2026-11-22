@@ -5,14 +5,19 @@ struct AssetRange {id:u32,path:const u8[:],mediaType:const u8[:],sha256:const u8
 struct AssetDependency {path:const u8[:],sha256:Text}
 struct DefinitionRead {filename:const u8[:],start:u32,end:u32}
 struct SourceLoad {sourceReads:i64=0,reusedSyntaxModules:i64=0}
-struct BuildStats {sourceLoad:SourceLoad=SourceLoad{},relocatedOperands:i64=-1,reusedStagedWasm:bool=false,stagedDefinitions:const DefinitionRead[:]=default<const DefinitionRead[:]>(),frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,phaseProfile:blot_phase_profile::Record}
+struct BuildStats {sourceLoad:SourceLoad=SourceLoad{},relocatedOperands:i64=-1,reusedStagedWasm:bool=false,stagedDefinitions:const DefinitionRead[:]=default<const DefinitionRead[:]>(),frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,sparksVectorized:i64=0,sparksScalarFallback:i64=0,phaseProfile:blot_phase_profile::Record}
 struct BuildReply {id:u32,revision:u64,stats:BuildStats,wasm_bytes:i64,ranges:const AssetRange[:]=default<const AssetRange[:]>(),dependencies:const AssetDependency[:]=default<const AssetDependency[:]>(),assets:blot_backend_native_assets::Candidate?=null}
 fn jsonStringify(self_:BuildReply,writer:Writer&)->Error {writer.beginObject();writer.field("kind","build");writer.field("id",self_.id);writer.field("epoch",epoch);writer.field("revision",self_.revision);writer.field("success",true);writer.key("stats");writer.beginObject();
     writer.field("frontend",self_.stats.frontend);writer.field("sourceBytes",self_.stats.sourceBytes);
     writer.field("freshModules",self_.stats.freshModules);writer.field("cachedModules",self_.stats.cachedModules);
     writer.field("sourceLoad",self_.stats.sourceLoad);
     if self_.stats.relocatedOperands>=0 {writer.field("relocatedOperands",self_.stats.relocatedOperands);}
-    writer.field("emittedFunctions",self_.stats.emittedFunctions);writer.field("phaseProfile",self_.stats.phaseProfile);
+    writer.field("emittedFunctions",self_.stats.emittedFunctions);
+    if self_.stats.sparksVectorized!=0 || self_.stats.sparksScalarFallback!=0 {
+        writer.field("sparksVectorized",self_.stats.sparksVectorized);
+        writer.field("sparksScalarFallback",self_.stats.sparksScalarFallback);
+    }
+    writer.field("phaseProfile",self_.stats.phaseProfile);
     let inputs .= self_.assets;
     if inputs && inputs.tracks_inputs {writer.field("reusedStagedWasm",self_.stats.reusedStagedWasm);writer.field("stagedDefinitions",self_.stats.stagedDefinitions);}
     writer.endObject();let assets .= self_.assets;if assets {writer.field("wasmBytes",self_.wasm_bytes);writer.field("assets",self_.ranges);writer.field("assetDependencies",self_.dependencies);writer.field("assetStats",assets.stats);}writer.endObject();return writer.failure;}
@@ -118,7 +123,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             }
             var result=Emission{};
             if operands>=0 || replayed {
-                let compiled=blot_reuse_dependency_consumer::Compiled{bytes:bytes,emitted_functions:opened.image.functions,..};
+                let compiled=blot_reuse_dependency_consumer::Compiled{bytes:bytes,emitted_functions:opened.image.functions,sparks_vectorized:opened.image.sparks_vectorized,sparks_scalar_fallback:opened.image.sparks_scalar_fallback,..};
                 let cached=payload.value.cachedCount();
                 result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:compiled,stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,fresh_modules:payload.value.units.len-cached,cached_modules:cached,..};
             } else {
@@ -149,6 +154,8 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     opened.image.bytes=result.result.compiled.bytes;
                     result.result.compiled.bytes=default<u8[:]>();
                     opened.image.functions=result.result.compiled.emitted_functions;
+                    opened.image.sparks_vectorized=result.result.compiled.sparks_vectorized;
+                    opened.image.sparks_scalar_fallback=result.result.compiled.sparks_scalar_fallback;
                 }
                 if !replay.valid && replay.used { replay.needs_reset=true; }
             } else {
@@ -170,7 +177,7 @@ fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_ba
         }
         let saved=assets.keepStagedWasm(wasm,result.result.compiled.emitted_functions);if saved!=blot_error::Error.none {return false,saved;}
     }
-    let stats=BuildStats{sourceLoad:load,relocatedOperands:operands,reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,phaseProfile:phases};
+    let stats=BuildStats{sourceLoad:load,relocatedOperands:operands,reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,sparksVectorized:result.result.compiled.sparks_vectorized,sparksScalarFallback:result.result.compiled.sparks_scalar_fallback,phaseProfile:phases};
     var ranges:AssetRange[>..]=[];var dependencies:AssetDependency[>..]=[];var payload_size=wasm.len;
     if assets {
         if payload_size>blot_reuse_zig_project_frames::max_frame_bytes-8 {return false,operationFailure(writer,opened,id,"response_limit","Build reply exceeds protocol limits");}
