@@ -1,5 +1,64 @@
 # Working on Blot and Gdev
 
+## Compilation-speed and runtime-performance push (22 November 2026)
+
+Four reviewed, qualified checkpoints (`dfc8c989` R1, `a0ad4557` C1, `73aadb42` C2,
+`06d7ba75` R2) pushed both cold/retained compilation latency and direct-backend
+Wasm runtime performance:
+
+- **Direct-backend runtime optimizations (R1 `dfc8c989` + R2 `06d7ba75`):**
+  - R1: scoped `CheckedArray` / `CheckedGrow` / `CheckedView` hoisting,
+    in-place owner loop carries (`carryStaysInPlace`), method-call
+    `apply(project(...))` unwinding, single-op array/storage forwarding,
+    `createUninit` + dynamic repeated-byte `memory.fill`, inline
+    `GrowArray.push` fast path, dead-load elimination in `indexedUpdate`,
+    zero-allocation `continue` skipping, and zero-copy pure entry packet input
+    with overlap-safe output.
+  - R2: small pure leaf-function inlining (`inlineSmall`, <=72 Core nodes at
+    depth 0 / <=24 at depth 1, preserving caller `CheckedArray`/`CheckedView`
+    descriptors and recording inlined callees for replay soundness), bulk
+    contiguous slice/array-to-`GrowArray` push loops (`tryBulkPushLoop` ->
+    single ensure + `memory.copy`), small constant-array `for`-loop unrolling
+    (`tryUnrollConstArrayLoop`, 1..4 scalar/nullary elements), compile-time
+    constant-tag `match` arm pruning (`Fn.const_tags`), direct inline emission
+    of non-exported scalar and nullary-constructor constants (with
+    `suppressed_unit` replay soundness in `relocations.goose`), and
+    `noStorageResize` `Tag.construct` fix.
+- **Compiler latency & retained structural replay (C1 `a0ad4557` + C2 `73aadb42`):**
+  - Native asset ingestion & load fast paths, `probeHit` + reusable touched-slot
+    `WordMap`, stack free-variable sets, flat arrays in `uniqueness.goose`,
+    `blot_copy_u32` / `blot_copy_u8`, pooled container realloc-churn fixes,
+    checker `usesAsCapabilityParam` gate and `Tag.variable` leaf fast paths,
+    first-byte keyword lexer dispatch, flat per-unit direct-backend caches,
+    1-byte LEB128 fast paths, `putExecutionCore`/`getExecutionCore`
+    `Constructor.name` fix (24 B/ctor, restoring parallel-build scalar
+    relocation and `#variants`), `freezePersistent` trimming, and production
+    per-body structural Wasm replay (`reuse/body_image.goose::replayEdits` with
+    `State.inlined_callees` soundness tracking).
+- **Verified paired `-O2` runtime results (`benchmarks/tools/bench_checked_grid.py`, 3 rounds, Wasmtime Cranelift `inline1` unless noted):**
+
+  | Workload | Pre-R1 | R1/C2 (`-O2`) | **R2 (`-O2`)** | Rust (`-O3`) | R2 vs Pre-R1 | R2 vs Rust |
+  |---|---:|---:|---:|---:|---:|---:|
+  | `parse` | 194.50 µs | 50.06 µs | **15.25 µs** | 16.24 µs | 12.8× | 0.94× (faster) |
+  | `scan` | 11.62 µs | 7.99 µs | **7.92 µs** | 8.04 µs | 1.47× | 0.99× (faster) |
+  | `hills` | 725.34 µs | 434.92 µs | **275.34 µs** | 268.07 µs | 2.63× | 1.03× |
+  | `trees` | 1131.88 µs | 897.53 µs | **601.50 µs** | 530.43 µs | 1.88× | 1.13× |
+  | `packet` | 1.71 µs | 0.06 µs | **0.06 µs** | 0.05 µs | 28.5× | 1.20× |
+  | `view` (`inline0`/`1`) | 7.30 µs | 2.83 / 3.63 µs | **2.83 / 3.63 µs** | 1.84 µs | 2.58× | 1.54× |
+  | `write` (`inline0`/`1`) | 39.04 µs | 16.97 / 18.30 µs | **16.96 / 18.30 µs** | 12.29 µs | 2.30× | 1.38× |
+
+- **Verified paired cold & retained Gdev Main compile latency (295 modules, 2.55 MB source, 8 workers):**
+  - Cold Main: Pre-C1 (`-O2`) **565.97 ms** → C1 (`-O2`) **530.06 ms** → C2 (`-O2`) **428.12 ms** (5-round paired vs C1 `487.10 ms`; `444.76 ms` paired vs R2) → R2 (`-O2`) **473.40 ms** → **R2 (`-O2 + PGO`) 431.61 ms** (`load 53.9 ms`, `check 170.2 ms`, `lower 26.8 ms`, `backend 128.4 ms`; bit-for-bit identical Wasm).
+  - Retained Gdev edits (`src/effects/lighting_look.blot`, bit-for-bit oracle verified): `dark` **132.9 → 27.3 ms** (`27.7 ms` PGO), `choose_body` **745.5 → 26.9 ms** (`26.6 ms` PGO), `base_back` **727.2 → 26.7 ms** (`25.5 ms` PGO), `choose_scalar` **725.1 → 26.9 ms** (`26.0 ms` PGO).
+- **Verified identities & cross-repo qualification (R2 `06d7ba75`):**
+  - `blotc-goose` (`-O2`) SHA-256: `c465b06efe5542a7a4c23af0a8c226801c03b0333347d8f1b8085e82d8a0e4c9`
+  - `blotc-goose-pgo` (`-O2 + PGO`, training profile `633a026626dfe99860b0d0c99790f16c4f2d4930e50009fd9122e00a1019797f`) SHA-256: `51c9fb5019fe37ecbd0666c686b95b5af8544c137b3436188b4dc4642cbe75fb`
+  - Gdev Main Wasm (identical across `-O2` and PGO): **3,183,295 B**, **4,703** emitted functions (down from 6,228), SHA-256 `5c395121fa28aca2b9d77a297121780f83103fa091a783882cea21f1a54a8ab9`.
+  - `deno task test:compiler`: **exit 0** (`harness` 2.9s, `release-build` 154.2s, `test_direct.py` `runtime: 3373 B` / `writer: 352 B`, `test_uniqueness.py` **212/212**, `test_fixtures.py` **189/189**, `pack`, `guests` **1,141/1,141** in 22.6s).
+  - `pen` (`b7b3d0f`): `blot-host` **30/30**, `pen-plugins --test blot -- --test-threads=1` **8/8**, `bounce` **7/7**.
+  - `ink` (`113bfd7`): `pen test-blot` **285/285 Blot checks** across 74 modules in **1.2 s** (`111/113` native; only the 2 pre-existing 753-page committed-memory-cap tests fail).
+  - `gdev` (`5eaa821`): `scripts/integration/run_pen.py --launch --hardware` exited 0 (`compiled_wasm_unchanged: true`, `complete_render: true`), visually inspected 640×480 `frame.png` (`build/storage-integration/gdev-one-frame/attempt-oxekbekj/frame.png`).
+
 ## Blot vNext implementation and compiler prune (21 November 2026)
 
 Blot vNext ([docs/language/spec.md](docs/language/spec.md), Revision 4) is
