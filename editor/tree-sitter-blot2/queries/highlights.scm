@@ -56,9 +56,8 @@
 (integer) @constant.numeric.integer
 (float) @constant.numeric.float
 (operator) @operator
-"=>" @operator
-"->" @operator
-(separator) @punctuation.delimiter
+["=" "=>" "->"] @operator
+[(separator) ":" ","] @punctuation.delimiter
 (comment) @comment
 "." @punctuation.delimiter
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
@@ -66,10 +65,10 @@
 (function_binding name: (identifier) @function)
 (entry_kernel_function_header name: (identifier) @function)
 (entry_kernel_function_header parameter: (identifier) @variable.parameter)
-(entry_kernel_function_header parameter: (parenthesized . (identifier) @variable.parameter))
+(entry_kernel_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
 (named_function_header name: (identifier) @function)
 (named_function_header parameter: (identifier) @variable.parameter)
-(named_function_header parameter: (parenthesized . (identifier) @variable.parameter))
+(named_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
 (qualified_function_name name: (identifier) @function)
 (qualified_function_name owner: (identifier) @namespace)
 (infix_function "`" @operator)
@@ -78,7 +77,7 @@
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
 (completion_constructor_pattern (identifier) @variable.parameter)
-(lambda_header parameter: (parenthesized . (identifier) @variable.parameter))
+(lambda_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
 (record_field name: (identifier) @variable.other.member)
 (type_parameter_field name: (identifier) @variable.other.member)
 (member name: (_) @variable.other.member)

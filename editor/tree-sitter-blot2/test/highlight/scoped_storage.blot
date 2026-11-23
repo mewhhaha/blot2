@@ -8,3 +8,16 @@ const first = &values[0]
 //            ^ operator
 const link = ^values[0]
 //           ^ operator
+
+func step (own state: State) -> delta => return next (own state) delta
+//         ^^^ keyword.storage.modifier
+//             ^^^^^ variable.parameter
+//                    ^^^^^ type
+//                                                        ^^^^^ !variable.parameter
+
+const closure = func (own value) => return value
+//                        ^^^^^ variable.parameter
+//                                         ^^^^^ !variable.parameter
+
+entry kernel func scale (own x: U32): U32 => return x
+//                           ^ variable.parameter
