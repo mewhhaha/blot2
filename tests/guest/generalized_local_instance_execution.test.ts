@@ -1,4 +1,4 @@
-import { compileAndRun, equal } from "./compile_helpers.ts";
+import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
 // Issue #10: generalized locals whose instances agree on one layout prepare
 // checked storage at that instance instead of an erased payload.
@@ -138,32 +138,41 @@ entry const main = func (x: U32) => return do:
 `);
 });
 
-// Uses at different layouts share no physical value: closure ABI and field
-// words depend on the layout. A pure runtime producer instead runs once per
-// distinct use layout, and each use reads its own instance.
+// Under the value restriction (tasks/MEMORY_MODEL.md Phase 4), only a `let`
+// bound to a syntactic `func` generalizes across distinct use layouts.
+// Non-`func` bindings (such as partial applications or local aliases) keep one
+// monomorphic type.
 const pair = "const pair = func a => return func b => return (a, b)";
 
-Deno.test("runtime-dependent generalized locals used at different layouts evaluate one instance per layout", async () => {
+Deno.test("syntactic func locals used at different layouts evaluate one instance per layout", async () => {
   await returnsArgument(`
 ${pair}
 entry const main = func (x: U32) => return do:
-  let k = pair x
+  let k = func b => return pair x b
   let (a, _) = k x
   let (b, _) = k 1.5
   break a
 `);
-});
-
-Deno.test("each instance of a runtime-dependent generalized local keeps its own field layout", async () => {
-  await compileAndRun(`
+  await compileExpectedFailure(`
 ${pair}
 entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
   break a
+`, "type_mismatch");
+});
+
+Deno.test("each instance of a syntactic func local keeps its own field layout", async () => {
+  await compileAndRun(`
+${pair}
+entry const main = func (x: U32) => return do:
+  let k = func b => return pair x b
+  let (a, _) = k x
+  let (b, _) = k 1.5
+  break a
 entry const fraction = func (x: F32) => return do:
-  let k = pair x
+  let k = (func b => return pair x b)
   let (_, count) = k 3
   let (_, b) = k (x * 2.0)
   break b
@@ -177,12 +186,11 @@ entry const fraction = func (x: F32) => return do:
   });
 });
 
-Deno.test("allocating runtime producers release every instance", async () => {
+Deno.test("allocating captured values in syntactic func locals release every instance", async () => {
   await compileAndRun(`
-// A closure hands out a copy of the array it holds: its result is the caller's alone.
-const holding = func (a: Array U32) => return func b => return (a.copy, b)
 entry const main = func (x: U32) => return do:
-  let k = holding (@array.fill 64 x)
+  let arr = @array.fill 64 x
+  let k = func b => return (arr.copy, b)
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[3] + second.length - 64
@@ -195,12 +203,12 @@ entry const memory = func () : Array U32 => return #[]
 
 // Both uses read the edited array once: a second edit of the already edited
 // array would return 909 for 7.
-Deno.test("producers with a collection edit give every instance the same edited value", async () => {
+Deno.test("syntactic func locals capturing a collection edit give every instance the same edited value", async () => {
   await compileAndRun(`
-const holding = func (a: Array U32) => return func b => return (a.copy, b)
 entry const main = func (x: U32) => return do:
   let values = @array.fill 4 x
-  let k = holding (@array.set values 0 (values[0] + 1))
+  let edited = @array.set values 0 (values[0] + 1)
+  let k = func b => return (edited.copy, b)
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[0] * 100 + second[0]
@@ -210,11 +218,11 @@ entry const main = func (x: U32) => return do:
   });
 });
 
-Deno.test("repeated uses at one layout share their instance", async () => {
+Deno.test("repeated uses of a syntactic func local at one layout share their instance", async () => {
   await returnsArgument(`
 ${pair}
 entry const main = func (x: U32) => return do:
-  let k = pair x
+  let k = func b => return pair x b
   let (_, whole) = k (x + 1)
   let (_, half) = k 1.5
   let (a, same) = k whole
@@ -222,11 +230,11 @@ entry const main = func (x: U32) => return do:
 `);
 });
 
-Deno.test("uses in loops and early-returning branches read their own instance", async () => {
+Deno.test("syntactic func local uses in loops and early-returning branches read their own instance", async () => {
   await compileAndRun(`
 ${pair}
 entry const main = func (x: U32) => return do:
-  let k = pair x
+  let k = func b => return pair x b
   let total = 0
   for index in 0..3:
     let (a, step) = k index
@@ -242,15 +250,34 @@ entry const main = func (x: U32) => return do:
   });
 });
 
-Deno.test("an alias of a runtime-dependent generalized local instances both links", async () => {
-  await returnsArgument(`
+Deno.test("non-func aliases of polymorphic locals keep one monomorphic type", async () => {
+  await compileExpectedFailure(`
 ${pair}
 entry const main = func (x: U32) => return do:
-  let k = pair x
+  let k = func b => return pair x b
   let g = k
   let (a, _) = g x
   let (b, _) = g 1.5
   break a
+`, "type_mismatch");
+  await compileExpectedFailure(`
+const identity = func value => return value
+entry const main = func (x: U32) => return do:
+  let g = identity
+  let a = g x
+  let b = g 1.5
+  break a
+`, "type_mismatch");
+  await returnsArgument(`
+${pair}
+entry const main = func (x: U32) => return do:
+  let k = func b => return pair x b
+  let g = func b => return k b
+  let h = func b => return g b
+  let (d, _) = k x
+  let (a, _) = h x
+  let (b, _) = h 1.5
+  break a + d - x
 `);
 });
 

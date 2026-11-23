@@ -15,12 +15,28 @@ const Box.from = func value => return $Box value
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 const alias: a -> b where { result "from" a b } = convert
 entry const answer = func () => return do:
-  let local: a -> b where { result "from" a b ! {} } = alias
+  let local: a -> b where { result "from" a b ! {} } = func value => return alias value
   let $Box first: Box U32 = local 40
   let $Box second: Box F32 = local 2.5
   break @u32.add first (@f32.to_u32 second)
 `,
     (guest) => equal(guest.call("answer", null), 42),
+    { prelude: "none" },
+  );
+  await compileExpectedFailure(
+    `
+type Box a is data = $Box a
+const Box.from = func value => return $Box value
+const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
+const alias: a -> b where { result "from" a b } = convert
+entry const answer = func () => return do:
+  let local: a -> b where { result "from" a b ! {} } = alias
+  let $Box first: Box U32 = local 40
+  let $Box second: Box F32 = local 2.5
+  break @u32.add first (@f32.to_u32 second)
+`,
+    "type_mismatch",
+    undefined,
     { prelude: "none" },
   );
   await compileAndRun(

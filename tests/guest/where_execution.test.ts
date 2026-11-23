@@ -15,12 +15,26 @@ Deno.test("qualified aliases and local templates instantiate separate concrete e
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const alias = twice
 entry const answer = func () => return do:
-  let local = alias
+  let local = func value => return alias value
   let integer = local 20
   let choose: a -> a where { type_rep a } = func value => return value
   break @u32.add (choose integer) (@f32.to_u32 (local (choose 1.0)))
 `,
     (guest) => equal(guest.call("answer", null), 42),
+    { prelude },
+  );
+  await compileExpectedFailure(
+    `
+const twice: a -> a where { associated "add" a a a } = func value => return value + value
+const alias = twice
+entry const answer = func () => return do:
+  let local = alias
+  let integer = local 20
+  let choose: a -> a where { type_rep a } = func value => return value
+  break @u32.add (choose integer) (@f32.to_u32 (local (choose 1.0)))
+`,
+    "type_mismatch",
+    undefined,
     { prelude },
   );
 });

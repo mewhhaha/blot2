@@ -67,16 +67,16 @@ entry const branch = func (value: U32) => return do:
 
 Deno.test("single-use local creators preserve selected scalar and reference fields", async () => {
   for (
-    const [type, read] of [
-      ["U32", "@u32.add (mapper seed).item 1"],
-      ["F32", "@f32.add (mapper seed).item 1.0"],
-      ["Array U32", "@array.length (mapper seed).item"],
+    const [type, body, read] of [
+      ["U32", "{item: value}", "@u32.add (mapper seed).item 1"],
+      ["F32", "{item: value}", "@f32.add (mapper seed).item 1.0"],
+      ["Array U32", "{item: value.copy}", "@array.length (mapper seed).item"],
     ]
   ) {
     await compileAndRun(
       definitions + `
 entry const run = func (seed: ${type}) => return do:
-  let stored = box (func value => return {item: value})
+  let stored = box (func value => return ${body})
   let $Box mapper = stored
   break ${read}
 `,
@@ -95,6 +95,15 @@ entry const run = func (seed: ${type}) => return do:
       },
     );
   }
+  await compileExpectedFailure(
+    definitions + `
+entry const run = func (seed: Array U32) => return do:
+  let stored = box (func value => return {item: value})
+  let $Box mapper = stored
+  break @array.length (mapper seed).item
+`,
+    "result_not_owned",
+  );
 });
 
 // Direct backend gap: a generalized local value used at two types is rejected ("a local value is used at different types") (tasks/DELETE_SCOPED.md).

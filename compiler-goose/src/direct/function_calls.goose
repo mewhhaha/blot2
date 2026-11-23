@@ -832,20 +832,154 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     return list, true, blot_direct_types::Error.none;
 }
 // The value a closure captures for `binding`: a generalized local built at
-// each use is built here at the type its uses give it.
+// each use is instantiated here for closure `id`'s current environment without
+// mutating `f`'s environment or monomorphic bindings (other instantiations of
+// a polymorphic enclosing closure may capture `binding` at different types).
 recursive fn captureValue(g: Generator&, f: Fn&, binding: u32, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let bound, present = bindGet(g, f, binding);
     if present { return bound, blot_direct_types::Error.none; }
     let initializer, generalized = g.s.polymorphic.get(polyKey(f, binding));
     if !generalized { return neverVal(), g.fail(m, id, "closure capture without a value"); }
-    let typed = typeByUses(g, f, binding, initializer);
-    if typed != blot_direct_types::Error.none { return neverVal(), typed; }
+    var chosen: Ty = 0;
+    var has_chosen = false;
+    if m.node(id).tag == blot_check_core::Tag.closure {
+        let scan_err = usesTypeIn(g, f, m.closure(id).body, binding, initializer, chosen, has_chosen, 0);
+        if scan_err != blot_direct_types::Error.none { return neverVal(), scan_err; }
+    }
+    if !has_chosen {
+        let fallback_ty, found, fb_err = usesType(g, f, binding, initializer, 0);
+        if fb_err != blot_direct_types::Error.none { return neverVal(), fb_err; }
+        if found { chosen = fallback_ty; has_chosen = true; }
+    }
+    var env = f.env;
+    if has_chosen { g.types.match_(m, m.typeOf(initializer), chosen, env); }
+    let previous = f.env;
+    f.env = env;
     let value, error = expr(g, f, initializer);
-    if error != blot_direct_types::Error.none { return value, error; }
-    refine(g, f, m.binding(binding).ty, value.ty);
-    bindPut(g, f, binding, value);
-    return value, blot_direct_types::Error.none;
+    f.env = previous;
+    return value, error;
+}
+recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32, chosen: Ty&, has_chosen: bool&, depth: u32) -> Error {
+    if id == 0 || depth >= 128 { return blot_direct_types::Error.none; }
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    match n.tag {
+        reference => {
+            let target = m.references[n.a];
+            if (target.unit == 0 || target.unit == m.unit) && target.binding == binding {
+                var ty, error = g.types.lower(m, m.typeOf(id), f.env);
+                if error != blot_direct_types::Error.none {
+                    let aliased, found, aerr = aliasType(g, f, id, site, 0);
+                    if aerr != blot_direct_types::Error.none { return aerr; }
+                    if !found { return blot_direct_types::Error.none; }
+                    ty = aliased;
+                }
+                if has_chosen {
+                    if chosen != ty { return g.fail(m, site, "a local value is used at different types; give it an annotation"); }
+                } else { has_chosen = true; chosen = ty; }
+            }
+            return blot_direct_types::Error.none;
+        },
+        comptime_if, if_value, if_stmt, state_provider => {
+            let e1 = usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            let e2 = usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, depth + 1);
+            if e2 != blot_direct_types::Error.none { return e2; }
+            return usesTypeIn(g, f, n.c, binding, site, chosen, has_chosen, depth + 1);
+        },
+        suite, block_, product, record, array, array_op, storage => {
+            for child in m.children(id) {
+                let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, depth + 1);
+                if err != blot_direct_types::Error.none { return err; }
+            }
+            return blot_direct_types::Error.none;
+        },
+        call, contract_method, break_ => {
+            for child in m.extra[n.b..n.b + n.c] {
+                let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, depth + 1);
+                if err != blot_direct_types::Error.none { return err; }
+            }
+            return blot_direct_types::Error.none;
+        },
+        with_handle => {
+            for child in m.extra[n.b..n.b + n.c] {
+                let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, depth + 1);
+                if err != blot_direct_types::Error.none { return err; }
+            }
+            return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1);
+        },
+        bind, construct, comptime_for => {
+            return usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, depth + 1);
+        },
+        return_, project, result_associated, fork_ => {
+            return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1);
+        },
+        scalar, logical, apply, associated, type_same, effect_provider, handle, staging => {
+            let e1 = usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            return usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, depth + 1);
+        },
+        pattern_bind => {
+            let e1 = usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            return usesTypeIn(g, f, n.c, binding, site, chosen, has_chosen, depth + 1);
+        },
+        update => {
+            let u = m.updateInfo(id);
+            let e1 = usesTypeIn(g, f, u.root, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            for step in m.updateSelectors(id) {
+                let es = usesTypeIn(g, f, step.index, binding, site, chosen, has_chosen, depth + 1);
+                if es != blot_direct_types::Error.none { return es; }
+            }
+            return usesTypeIn(g, f, u.value, binding, site, chosen, has_chosen, depth + 1);
+        },
+        loop_ => {
+            let info = m.loopInfo(id);
+            let e1 = usesTypeIn(g, f, info.first, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            let e2 = usesTypeIn(g, f, info.end, binding, site, chosen, has_chosen, depth + 1);
+            if e2 != blot_direct_types::Error.none { return e2; }
+            return usesTypeIn(g, f, info.body, binding, site, chosen, has_chosen, depth + 1);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                let ei = usesTypeIn(g, f, inp, binding, site, chosen, has_chosen, depth + 1);
+                if ei != blot_direct_types::Error.none { return ei; }
+            }
+            for arm in m.matchArms(id) {
+                let eg = usesTypeIn(g, f, arm.guard_, binding, site, chosen, has_chosen, depth + 1);
+                if eg != blot_direct_types::Error.none { return eg; }
+                let eb = usesTypeIn(g, f, arm.body, binding, site, chosen, has_chosen, depth + 1);
+                if eb != blot_direct_types::Error.none { return eb; }
+            }
+            return blot_direct_types::Error.none;
+        },
+        closure => {
+            return usesTypeIn(g, f, m.closure(id).body, binding, site, chosen, has_chosen, depth + 1);
+        },
+        comptime_meta => {
+            if n.c == 0 { return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1); }
+            if n.c == 8 || n.c == 9 { return usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, depth + 1); }
+            return blot_direct_types::Error.none;
+        },
+        spark => {
+            let info = m.sparkInfo(id);
+            let e1 = usesTypeIn(g, f, info.source, binding, site, chosen, has_chosen, depth + 1);
+            if e1 != blot_direct_types::Error.none { return e1; }
+            let e2 = usesTypeIn(g, f, info.end, binding, site, chosen, has_chosen, depth + 1);
+            if e2 != blot_direct_types::Error.none { return e2; }
+            return usesTypeIn(g, f, info.body, binding, site, chosen, has_chosen, depth + 1);
+        },
+        flat_op => {
+            if n.c == blot_check_core::flat_op_encode || n.c == blot_check_core::flat_op_decode {
+                return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, depth + 1);
+            }
+            return blot_direct_types::Error.none;
+        },
+        _ => { return blot_direct_types::Error.none; },
+    }
 }
 // Binds the scheme variables of generalized local `binding` to the one
 // concrete type its references in this unit give it. References at different

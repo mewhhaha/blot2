@@ -47,7 +47,7 @@ entry const local = func (input: U32) : U32 => return do:
   let accessor = .value
   break accessor ($Box { value: input })
 entry const mixed = func () : U32 => return do:
-  let accessor = .value
+  let accessor = func box => return box.value
   let integer = accessor ($Box { value: 40 })
   let floating = accessor ($Box { value: 2.5 })
   break @u32.add integer (@f32.to_u32 floating)
@@ -58,6 +58,14 @@ entry const mixed = func () : U32 => return do:
     equal(guest.call("local", 42), 42);
     equal(guest.call("mixed", null), 42);
   });
+  await compileExpectedFailure(`
+type Box value is data = $Box { value: value }
+entry const mixed = func () : U32 => return do:
+  let accessor = .value
+  let integer = accessor ($Box { value: 40 })
+  let floating = accessor ($Box { value: 2.5 })
+  break @u32.add integer (@f32.to_u32 floating)
+`, "type_mismatch");
 });
 
 Deno.test("writable fields remain distinct from receiver methods", async () => {

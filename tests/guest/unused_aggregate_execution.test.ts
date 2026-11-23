@@ -16,7 +16,7 @@ const constructor = $Some
 const closure = (func captured => return func value => return @u32.add captured value) 2
 entry const answer = func () => return closure 40
 entry const probe = func () => return do:
-  let kept = (empty, nested, reference, constructor)
+  let kept: (Maybe U32, Maybe (Maybe U32), U32 -> U32, U32 -> Maybe U32) = (empty, nested, reference, constructor)
   break 0
 `,
       async (guest) => {
@@ -31,6 +31,22 @@ entry const probe = func () => return do:
     );
   });
 }
+Deno.test("unused tuple of polymorphic constants is not generalized under value restriction", async () => {
+  await compileExpectedFailure(
+    `
+type Maybe a is data = $Some a | $Nothing
+const identity = func value => return value
+const empty = $Nothing
+const nested = $Some ($Some 42)
+const reference = identity
+const constructor = $Some
+entry const probe = func () => return do:
+  let kept = (empty, nested, reference, constructor)
+  break 0
+`,
+    "storage_unsupported",
+  );
+});
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate eager-order (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(

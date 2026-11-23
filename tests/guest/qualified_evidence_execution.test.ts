@@ -4,8 +4,20 @@ import {
   equal,
 } from "./compile_helpers.ts";
 
-Deno.test("qualified calls prove named aliases and generic local aliases separately at each use", async () => {
+Deno.test("qualified calls prove named aliases and syntactic func locals separately at each use", async () => {
   await compileAndRun(
+    `
+const twice: a -> a where { associated "add" a a a } = func value => return value + value
+const alias = twice
+entry const answer = func () => return do:
+  let local = func value => return alias value
+  let integer = local 20
+  break @u32.add integer (@f32.to_u32 (local 1.0))
+`,
+    (guest) => equal(guest.call("answer", null), 42),
+    { prelude: "std/prelude.blot" },
+  );
+  await compileExpectedFailure(
     `
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const alias = twice
@@ -14,7 +26,8 @@ entry const answer = func () => return do:
   let integer = local 20
   break @u32.add integer (@f32.to_u32 (local 1.0))
 `,
-    (guest) => equal(guest.call("answer", null), 42),
+    "type_mismatch",
+    undefined,
     { prelude: "std/prelude.blot" },
   );
   await compileAndRun(

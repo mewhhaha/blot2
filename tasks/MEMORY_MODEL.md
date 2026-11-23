@@ -139,11 +139,11 @@ full gate green, and moves std, ../ink and ../gdev itself.
    `UpdateInfo.store` shim, and store-only grammar were deleted.
 4. **Value restriction** in full: a `let` generalizes only when its value
    is a syntactic `func` (phase 1 did the part for array-holding lets).
-   - Done for rebinding (15 November 2026): the new version a `:=` gives a
-     name is never generalized. No program in the suites, Ink or Gdev
-     changed.
-   - Measured for `let`, not built: "Phase 4: the value restriction for
-     `let`" below.
+   - **Done (23 November 2026):** implemented in `compiler-goose/src/check/check.goose`
+     (`functionValue` + `solveFields` for non-generalized `let` bindings),
+     along with fixing nested polymorphic local `func` capture instantiation in
+     `compiler-goose/src/direct/function_calls.goose::captureValue`. See
+     "Phase 4 complete" below.
 5. **Read-only references** (A4) and the end of references as a write
    path, after phase 3.
 
@@ -1351,8 +1351,17 @@ the Baba host parser:
   `attempt-4gq9mwv6/frame.png`), and `../pen` (`53a89f3`: `pen-codegen` 10/10,
   `blot-host` 5/5, `pen-plugins` 8/8, `pen kernels` 4/4).
 
-## Phase 4: the value restriction for `let` (measured 15 November 2026)
+## Phase 4 complete: the value restriction for `let` (23 November 2026)
 
+Implemented the full value restriction in the Goose compiler (`compiler-goose/src/check/check.goose::functionValue` and `letStatementBody`):
+
+- A `let` binding now generalizes only when its value (unwrapping parentheses) is a syntactic `func` (`tag_lambda`); non-`func` `let` bindings still run `solveFields()` so pending field/operator requirements settle at the same boundaries.
+- **Direct-backend capture soundness fix (`compiler-goose/src/direct/function_calls.goose::captureValue`):** fixed a latent bug surfaced by nested polymorphic local `func`s (`let k = func b => ...; let g = func b => return k b` called at `U32` and `F32`) where `captureValue` cached the first instantiation of `k` into `f.bindings` and mutated `f.env`, producing invalid Wasm on the second layout. `captureValue` now resolves the capture's concrete type from uses inside the capturing closure's body (`usesTypeIn`) and evaluates its initializer in a temporary copy of `f.env` without caching it into `f`'s monomorphic bindings.
+- **Uniqueness soundness improvement:** previously, `let stored = box (func value => return {item: value})` hid a borrowed `Array U32` return inside a generalized local scheme; under Phase 4, the lambda's parameter unifies with `Array U32` and uniqueness properly rejects it with `result_not_owned` (`tests/guest/local_storage_execution.test.ts`).
+- **std, `../ink`, and `../gdev` required zero source changes.**
+- Updated `docs/language/guide.md`, the 7 affected guest test files (adding explicit value-restriction rejection checks and nested polymorphic local `func` capture tests), and re-recorded `compiler-goose/tests/fixtures/expected.json` (`199/199` uniqueness laws and `2/2` direct laws unchanged).
+
+Earlier measurement (15 November 2026, Zig prototype):
 [The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)
 generalizes a `let` only when its value is a written `func`. It is 11
 lines in check.zig and is not applied.

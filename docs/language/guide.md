@@ -172,9 +172,9 @@ inferred, including generic functions and callback effects. Type syntax:
 `Array F32`, `Maybe U32`, `Result [U32, Bool]`, `(U32, Bool)`, `U32 -> F32`,
 `U32 -> U32 ! {Foreign}`. Arrows associate right; parenthesize function argument
 types. An annotation such as `(value: U32)` constrains the fresh argument type;
-`a is U32` describes that idea but is not source syntax. Pure local `let`
-bindings generalize; effectful `use` bindings do not introduce polymorphic
-effects.
+`a is U32` describes that idea but is not source syntax. Local `let` bindings
+generalize only when bound to a syntactic `func` (the value restriction);
+effectful `use` bindings and rebindings (`:=`) do not generalize.
 
 ## Blocks, shadowing, and composition
 
@@ -841,9 +841,10 @@ entry func successors () => return do:
 `successors` returns 22: `before` is a copy and keeps the old element, while
 `set_second` takes ownership of `rows` and updates it in place. Without
 `.copy`, `let before = rows` would make `rows[1] := 20` an `aliased_update`
-(and passing `rows` to an `own` parameter an `own_argument`). A local whose
-value holds storage keeps one type and is not generalized, so its updates and
-reads agree.
+(and passing `rows` to an `own` parameter an `own_argument`). Under the value
+restriction, only a `let` bound to a syntactic `func` generalizes, so every
+non-`func` local (including any storage-holding local) keeps one type and its
+updates and reads always agree.
 
 ### Ownership across calls
 

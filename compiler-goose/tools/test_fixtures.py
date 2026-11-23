@@ -95,6 +95,21 @@ build gating. Re-recorded the 92 direct-backend fixtures (+6 runtime helpers
 and updated runtime bytes); all 109 fixtures kept identical exit codes,
 diagnostics, and frontend counters.
 
+Memory Model Phase 4 (23 November 2026) implemented the full value restriction
+for `let` (`check/check.goose`: only a syntactic `func` generalizes; plain
+`let` bindings still settle pending field requirements via `solveFields`) and
+fixed direct-backend polymorphic local capture instantiation
+(`direct/function_calls.goose::captureValue` now scans the capturing closure's
+body under `f.env` and instantiates in a temporary copy of `f.env` instead of
+caching into `f`'s monomorphic bindings). Re-recorded `expected.json`:
+`discard-fixtures/original.blot` now exits 1 (`unresolved type variable` on an
+unannotated unused tuple of generic constants), `discard-fixtures/deferred-anonymous.blot`
+and `deferred-body.blot` now report `missing_member` at check stage instead of
+`storage_unsupported` in emit, `discard-fixtures/deferred-alias.blot` exits 0
+on its dead unreferenced alias tuple, `result_selected_operand.blot` drops from
+45 to 43 emitted functions, `discard-fixtures/runtime-panic.blot` drops from 35
+to 34 functions, and `direct/closures.blot` keeps monomorphic `let wrap = $Some`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """
