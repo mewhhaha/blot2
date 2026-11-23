@@ -5,5 +5,5 @@ entry func grid (n: U32): U32 => return do:
   return rows[0][0] + rows[0][1] + rows[1][0] + rows[1][1]
 entry func fields (n: U32): U32 => return do:
   let cells = #[$Cell { values: #[1, 2, 3], tag: 7 }]
-  cells[0].values[2] = self * n
+  cells[0].values[2] := self * n
   return cells[0].values[2] + cells[0].tag

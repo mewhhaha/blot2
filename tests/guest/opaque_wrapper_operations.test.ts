@@ -115,17 +115,15 @@ entry const run = func (value: U32) => return do:
   break @u32.add alias[0] 2
 entry const captured = func (value: U32) => return do:
   let original = #[value, 7]
-  let saved = capture original
-  original[0] = 0
+  let saved = capture (@storage.copy original)
+  original[0] := 0
   break @u32.add (saved ()) 2
 `;
         await inspectBuild(source, async (bytes) => {
           const guest = await instantiateGuest(bytes);
           try {
-            // The wrapper holds `original` itself, so it reads the write of 0
-            // (tasks/LANGUAGE_COHERENCE.md A7).
             assert.equal(guest.call("run", 40), 2);
-            assert.equal(guest.call("captured", 40), 2);
+            assert.equal(guest.call("captured", 40), 42);
           } finally {
             guest.dispose();
           }

@@ -57,9 +57,6 @@ let tag_field_access: Tag = 43;
 let tag_index_access: Tag = 44;
 let tag_let_stmt: Tag = 45;
 let tag_rebind_stmt: Tag = 46;
-// store_stmt(a=place,b=value): `place = value` writes storage in place.
-// The place is a name or atom followed by field and index steps.
-let tag_store_stmt: Tag = 47;
 let tag_use_stmt: Tag = 48;
 let tag_iterator_bind: Tag = 49;
 let tag_function_return_stmt: Tag = 50;

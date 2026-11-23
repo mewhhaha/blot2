@@ -118,7 +118,7 @@ fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
         let returned = m.node(tail[2]);
         if returned.tag != blot_check_core::Tag.return_ || localRef(m, returned.a) != next.a { return 0; }
         let update = m.updateInfo(next.b);
-        if update.store || !scratchFieldUpdate(m, update, next.b) { return 0; }
+        if !scratchFieldUpdate(m, update, next.b) { return 0; }
         let root = localRef(m, update.root);
         if root == 0 || root == producer.a { return 0; }
         let value, found = bindGet(g, f, root);

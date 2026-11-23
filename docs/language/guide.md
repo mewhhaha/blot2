@@ -206,8 +206,7 @@ closures keep old captures; aliases are not mutated. The new binding can have a
 different type and is visible in the remaining suite. An outer `self` is
 restored after the RHS. Rebinding requires purity, like `let`; record and array
 paths such as `world.camera.position := self + offset` are supported. A path
-through storage needs a unique root, and `place = value` stores in place
-instead (see [Stores and successors](#stores-and-successors)).
+through storage needs a unique root (see [Owned updates and copies](#owned-updates-and-copies)).
 
 `break value` finishes the nearest `do` block with that value, even from inside
 a loop. Bare `break` exits the nearest loop; `return value` exits the innermost
@@ -791,25 +790,17 @@ entry func answer () => return do:
   break copied[0] + copied[1] + copied[2]
 ```
 
-### Stores and successors
+### Owned updates and copies
 
-Arrays are storage: they have identity, and every alias of an array names the
-same storage. Records, tuples, sums and scalars are values. Two statements
-change data:
+Arrays are owned values backed by storage, while records, tuples, sums, and
+scalars are plain values. `:=` is the only update statement:
 
-- `place = value` stores into storage in place, and every alias sees the
-  write. The place is a path that reaches an array element: `rows[i]`,
-  `grid[r][c]`, `rows[i].x`, or any of these through record fields of a local
-  (`world.counts[i]`) or after any expression of array type
-  (`(pick flag left right)[0]`). The value sees the old leaf as `self` and must
-  be pure. `=` on a path that never reaches an array, such as `point.x = 1`
-  for a local record, is `store_without_storage`; use `:=`.
 - `name := value` and `name.path := value` build a successor and rebind the
-  local; aliases keep the old value. A path that reaches an array is still
+  local; prior snapshots keep the old value. A path that reaches an array is
   written in place, which is the successor only when nothing else can observe
-  the old root. The compiler proves that inside the one function and rejects
-  the rest with `aliased_update`: store with `=`, or take `values.copy` first to
-  keep the old value.
+  the old root. The compiler proves uniqueness inside the function and rejects
+  aliased updates with `aliased_update`: take `values.copy` first to keep the
+  old value, or end earlier borrows before updating.
 
 A root is unique after it is bound to an array literal, a comprehension,
 `values.copy`, or a fresh `@array` result (`fill`, `generate`, `set`, `concat`,
@@ -829,30 +820,30 @@ holder is unique if the local was: `let cells = #[0, 0]` followed by
 `cells` is not read again. A read is the last one when nothing on any path
 after it reads the local: not a later statement, a closure made later, or a
 loop that carries it. Inside a loop only a local bound in the same iteration
-moves. Parameters and constants are never unique; what crosses a call is
-described under "Ownership across calls" below. Branches keep
-uniqueness only when every arm that continues keeps it; an arm that returns
-contributes nothing. A loop carry is unique when its first value and every
-value it carries back are.
+moves. Parameters are borrowed unless marked `own`, and constants are never
+unique; what crosses a call is described under "Ownership across calls" below.
+Branches keep uniqueness only when every arm that continues keeps it; an arm
+that returns contributes nothing. A loop carry is unique when its first value
+and every value it carries back are.
 
 ```blot
-entry func stores () => return do:
-  let rows = #[1, 2, 3]
-  let alias = rows
-  rows[1] = 20
-  break alias[1]
+func set_second (items: own #[U32]) -> (value: U32): #[U32] =>
+  items[1] := value
+  return items
 
 entry func successors () => return do:
   let rows = #[1, 2, 3]
   let before = rows.copy
-  rows[1] := 20
-  break before[1] + rows[1]
+  let updated = set_second rows 20
+  break before[1] + updated[1]
 ```
 
-`stores` returns 20: the alias sees the store. `successors` returns 22: the
-copy keeps the old element. Without `.copy`, `let before = rows` would make
-`rows[1] := 20` an `aliased_update`. A local whose value holds storage keeps one
-type and is not generalized, so its stores and reads agree.
+`successors` returns 22: `before` is a copy and keeps the old element, while
+`set_second` takes ownership of `rows` and updates it in place. Without
+`.copy`, `let before = rows` would make `rows[1] := 20` an `aliased_update`
+(and passing `rows` to an `own` parameter an `own_argument`). A local whose
+value holds storage keeps one type and is not generalized, so its updates and
+reads agree.
 
 ### Ownership across calls
 
@@ -951,43 +942,14 @@ let mine = (grid.at 0).copy  // an array of its own; grid stays unique
 Such a function cannot be used as a value, or applied partly, where the
 variable is an array (`lent_result_value`): pass a function that copies.
 
-**Stores, while `=` exists.** A store `place = value` writes through
-storage the function does not own, and every holder sees the write. The
-rules above still hold around it:
-
-- The value stored is kept by that storage, so the arrays it owns must be
-  nobody else's: a fresh value or a local that alone holds its value.
-  Storing a parameter, or a part of one, is `kept_value`; store
-  `values.copy` of it. The same holds for a value pushed into growable
-  storage the function was given, and for a value given to an effect
-  operation, whose handler may keep it.
-- `@simd.store` on an array the function does not own is a store too.
-- Appending to an immutable `Array` can reuse its allocation when the
-  function owns it. A `ResizeArray` has separate operations that change its
-  length in place. During migration, `@storage.push` and
-  `@storage.truncate` on a borrowed parameter still change the length seen
-  by other names. To preserve a snapshot, copy it before handing the original
-  to a helper with an `own` parameter.
-
-**`lent` functions.** A function that still returns or keeps what it was
-lent is marked `lent`, before `func` or `const`; so is a constant that
-only names one (`lent const refit = refit_dense`):
-
-```blot
-lent func ground_of (world: World) => return world.ground
-```
-
-Its result is not checked, so it may be what the function was lent. In
-exchange its result is never unique, and it holds the arguments of the
-call: a name bound to it borrows them and gives them back at its last
-read, as with any borrowed value. It may not keep what it was lent
-anywhere else (storing or pushing it is `kept_value`, as in every
-function). A call that is given a `lent` function as an argument shares
-its arguments. A `lent`
-function cannot otherwise be used as a value, or applied partly, where
-its result owns an array and has no part that borrows
-(`lent_result_value`). `lent` is the list of what is left to convert: it
-goes from the language when `=` does.
+**Growable storage and kept values.** Values pushed into growable storage the
+function does not own, written via `@simd.store`, or passed to an effect
+operation (whose handler may keep them) must hold no borrowed arrays: passing a
+borrowed parameter or part of one is `kept_value`; pass `values.copy` instead.
+Appending to an immutable `Array` can reuse its allocation when the function
+owns it; a `ResizeArray` or `GrowArray` has explicit `@storage.push` and
+`@storage.truncate` operations. To preserve a snapshot before handing a value
+to a helper with an `own` parameter, copy it with `.copy`.
 
 **Closures passed to a call.** A closure holds what it captured, so a
 captured local is shared while the closure lives. A closure written as an

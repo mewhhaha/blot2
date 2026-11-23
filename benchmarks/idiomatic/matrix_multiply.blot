@@ -9,5 +9,5 @@ entry const run = func (seed: U32) : U32 => return do:
       let total = 0
       for inner in 0..size:
         total := self + left[row * size + inner] * right[inner * size + column]
-      output[row * size + column] = total
+      output[row * size + column] := total
   break array.fold_left (func total -> value => return total + value) 0 output

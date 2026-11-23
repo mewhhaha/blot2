@@ -7,8 +7,10 @@ Deno.test("data-stack host arrays copy packets and preserve application owners a
     `
 const world: ResizeArray U32 = #[40]
 entry const exchange = func (input: Array U32): Array U32 => return do:
+  let next = input[0]
   let previous = @storage.copy world
-  world[0] = input[0]
+  @storage.truncate world 0
+  @storage.push world next
   return @storage.freeze previous
 entry const read = func () => return world[0]
 entry const floats = func (input: Array F32): Array F32 => return do:
@@ -73,15 +75,15 @@ entry const floats = func (input: Array F32): Array F32 => return do:
 Deno.test("data-stack callbacks exchange independent packets without retaining heap objects", async () => {
   await compileAndRun(
     `
-const calls: ResizeArray U32 = #[0]
+const calls: ResizeArray U32 = #[]
 const invoke = func host -> packet => return host packet
 entry const exchange = func (host: Array F32 -> Array F32 ! {Foreign}): Array F32 => return do:
   let request: GrowArray F32 = #[1.5, 2.5]
-  calls[0] = @u32.add calls[0] 1
+  @storage.push calls 1
   use first <- invoke host (@storage.freeze request)
   use second <- host first
   return #[first[0], second[0], request[0]]
-entry const count = func () => return calls[0]
+entry const count = func () => return @storage.length calls
 `,
     (guest) => {
       let count = 0;
@@ -128,11 +130,11 @@ Deno.test("ordinary suspended host calls keep data stacks alive and exclude reen
 const world: ResizeArray U32 = #[7]
 entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   let scratch: GrowArray U32 = #[40]
-  let reference = &scratch[0]
-  use next <- host (@storage.load reference)
-  scratch[0] = next
-  world[0] = next
-  return @storage.load reference
+  use next <- host (@storage.load (&scratch[0]))
+  scratch[0] := next
+  @storage.truncate world 0
+  @storage.push world next
+  return @storage.load (&scratch[0])
 entry const read = func () => return world[0]
 `,
     async (guest) => {
@@ -172,15 +174,15 @@ entry const read = func () => return world[0]
 Deno.test("Foreign transport budgets both sides of a large copied packet", async () => {
   await compileAndRun(
     `
-const calls: ResizeArray U32 = #[0]
+const calls: ResizeArray U32 = #[]
 entry const exchange = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let request: GrowArray U32 = #[]
   for 0 .. 153600:
     let item = @storage.push request 42
   use response <- host (@storage.freeze request)
-  calls[0] = calls[0] + 1
+  @storage.push calls 1
   return response[153599] + request[0]
-entry const count = func () => return calls[0]
+entry const count = func () => return @storage.length calls
 `,
     (guest) => {
       const host = guest.capability({
@@ -212,9 +214,9 @@ Deno.test("data-stack ABI identifies scalar-only exports without transport", asy
     `
 const state: ResizeArray U32 = #[41]
 entry const next = func () => return do:
-  let pool = state
-  pool[0] = @u32.add pool[0] 1
-  return state[0]
+  let next_value = @u32.add state[@u32.sub (@storage.length state) 1] 1
+  @storage.push state next_value
+  return next_value
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);

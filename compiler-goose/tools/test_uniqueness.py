@@ -37,7 +37,11 @@ its last read, which moves it.
 
 Batch 1C (22 November 2026) retired `lent` functions and `BLOT_REPORT_STORES`,
 removing the 10 `lent`-only programs (h01..h06, n09..n12) and leaving 202
-programs with unchanged diagnostics.
+programs with unchanged diagnostics. Phase 3 (23 November 2026) removed the
+`=` borrowed-mutator store statement, retiring the 3 remaining store-only
+programs (h04_store_keeps_parameter, h05_store_keeps_owned,
+h06_store_through_lent_keeps_unique) and leaving 199 programs with unchanged
+diagnostics.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

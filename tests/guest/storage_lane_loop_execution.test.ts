@@ -3,14 +3,14 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const kernel =
-  `const recur = func (state: Array U32) -> (input: Array U32) -> (first: U32) -> (end: U32): Unit => return do:
+  `const recur = func (state: own Array U32) -> (input: Array U32) -> (first: U32) -> (end: U32): Array U32 => return do:
   for index in first .. end:
     let slot = index % 8
     let word = state[slot]
     word := (self << 5) + self + input[index]
     word := (self + (self << 10)) ^ (self >> 6)
-    state[slot] = word
-  return ()
+    state[slot] := word
+  return state
 `;
 const initial = [
   0x6a09e667,
@@ -27,24 +27,44 @@ const saved: Array U32 = #[0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510
 const short_state: Array U32 = #[0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A]
 const input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
 const short_input: Array U32 = @array.generate 19 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
+const saved_log: ResizeArray U32 = #[]
+const short_log: ResizeArray U32 = #[]
+const recur_logged = func (state: own Array U32) -> (src: Array U32) -> (log: ResizeArray U32) -> (end: U32): Array U32 => return do:
+  for index in 0 .. end:
+    let slot = index % 8
+    let word = state[slot]
+    word := (self << 5) + self + src[index]
+    word := (self + (self << 10)) ^ (self >> 6)
+    state[slot] := word
+    @storage.push log word
+  return state
 entry const run = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy saved
   let local_input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
-  recur state local_input bounds[0] bounds[1]
-  return state
+  return recur state local_input bounds[0] bounds[1]
 entry const alias = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy input
-  recur state state bounds[0] bounds[1]
+  return recur state state.copy bounds[0] bounds[1]
+entry const trap_input = func (): Unit => return do:
+  let _ = recur_logged (@storage.copy saved) short_input saved_log 40
+  return ()
+entry const trap_state = func (): Unit => return do:
+  let _ = recur_logged (@storage.copy short_state) input short_log 40
+  return ()
+entry const read = func (): Array U32 => return do:
+  let state = @storage.copy saved
+  for index in 0 .. @storage.length saved_log:
+    state[index % 8] := saved_log[index]
   return state
-entry const trap_input = func (): Unit => return recur saved short_input 0 40
-entry const trap_state = func (): Unit => return recur short_state input 0 40
-entry const read = func (): Array U32 => return @storage.copy saved
-entry const read_short = func (): Array U32 => return @storage.copy short_state
+entry const read_short = func (): Array U32 => return do:
+  let state = @storage.copy short_state
+  for index in 0 .. @storage.length short_log:
+    state[index % 8] := short_log[index]
+  return state
 entry const empty = func (bounds: Array U32): Array U32 => return do:
   let state: Array U32 = #[]
   let rows: Array U32 = #[]
-  recur state rows bounds[0] bounds[1]
-  return state
+  return recur state rows bounds[0] bounds[1]
 `;
 
 const dynamicSource = kernel.replace("const recur =", "const dynamic_recur =")
@@ -55,8 +75,7 @@ const dynamicSource = kernel.replace("const recur =", "const dynamic_recur =")
 entry const dynamic = func (end: U32): Array U32 => return do:
   let state = @storage.copy saved
   let local_input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
-  dynamic_recur state local_input 0 end
-  return state
+  return dynamic_recur state local_input 0 end
 `;
 
 function expected(

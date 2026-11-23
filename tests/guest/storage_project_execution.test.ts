@@ -9,10 +9,9 @@ Deno.test("imported generic access projections retain field names without concre
   try {
     await Deno.writeTextFile(
       `${directory}/access.blot`,
-      `const write = func access -> (value: U32) => return do:
-  let rows: Array U32 = access.rows
-  rows[0] = value
-  return rows[0]
+      `const write = func (own access) -> (value: U32) => return do:
+  access.rows[0] := value
+  return access
 `,
     );
     await Deno.writeTextFile(
@@ -22,7 +21,7 @@ entry const answer = func (value: U32) => return do:
   let marker: GrowArray U32 = #[]
   let rows: Array U32 = #[0]
   let result = access.write {rows} value
-  return rows[0]
+  return result.rows[0]
 `,
     );
     const compiler = await createZigProjectCompiler({

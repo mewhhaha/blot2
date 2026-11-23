@@ -5,14 +5,14 @@ import { instantiateGuest } from "../../host/guest.ts";
 const longField = "x".repeat(7000);
 const source = `import * as array from "std/array"
 const keeper: Array U32 = #[123]
-const implicit_pool: Array U32 = #[5]
+const implicit_pool: GrowArray U32 = #[5]
 const implicit_writer = func (destination: ResizeArray U32) => return do:
-  destination.push implicit_pool[0]
-const explicit_writer = func (destination: ResizeArray U32) -> (pool: Array U32) => return do:
-  destination.push pool[0]
+  destination.push implicit_pool[@u32.sub (@storage.length implicit_pool) 1]
+const explicit_writer = func (destination: ResizeArray U32) -> (pool: GrowArray U32) => return do:
+  destination.push pool[@u32.sub (@storage.length pool) 1]
 entry const global_writer = func (input: U32) => return do:
   let pool = implicit_pool
-  pool[0] = @u32.add input 7
+  @storage.push pool (@u32.add input 7)
   let destination: ResizeArray U32 = #[input]
   implicit_writer destination
   explicit_writer destination pool
@@ -89,7 +89,7 @@ entry const partial_floating = func (input: F32) => return do:
 entry const getters = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input]
   let second: ResizeArray U32 = #[10]
-  first[0] = @u32.add input 2
+  first[0] := @u32.add input 2
   first.push 99
   let read = first.at
   let shifted = $Shifted {rows: second}
@@ -108,19 +108,21 @@ entry const scratch_writer = func (input: U32) => return do:
     encoded_writer destination (@u32.add (@u32.add input (keeper[0] - 123)) index)
   return #[destination.length, destination[0], destination[1], destination[2], destination[297], destination[298], destination[299]]
 type LargeState = {${longField}: ResizeArray U32}
-const write_large = func (state: LargeState) -> (amount: U32) => return do:
-  state.${longField}[0] = @u32.add state.${longField}[0] amount
+const write_large = func (state: own LargeState) -> (amount: U32): LargeState => return do:
+  state.${longField}[0] := @u32.add state.${longField}[0] amount
+  return state
 const read_large = func (state: LargeState) => return state.${longField}[0]
 entry const large_key = func (input: U32) => return do:
   let rows: ResizeArray U32 = #[10]
   let state = {${longField}: rows}
-  write_large state input
+  state := write_large state input
   let before = read_large state
-  write_large state 1
-  return #[before, read_large state, rows[0]]
+  state := write_large state 1
+  return #[before, read_large state, state.${longField}[0]]
 type Research rows is data = $Research {rows: rows, add: U32}
 type Box value is data = $Box value
 const read = func (research: Research (&[U32])): U32 => return @u32.add research.rows[0] research.add
+const read_research = func (rows: ResizeArray U32) -> (add: U32): U32 => return read ($Research {rows: &rows[0..1], add})
 const unwrap = func (box: Box value) => return case box of
   $Box value => value
 const present = func (maybe: Maybe value) => return case maybe of
@@ -130,10 +132,10 @@ const factory = func base => return func extra => return $Box (base + extra)
 entry const answer = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input]
   let second: ResizeArray U32 = #[@u32.add input 10]
-  let before = read ($Research {rows: &first[0..1], add: 1})
-  first[0] = @u32.add input 100
-  let after = read ($Research {rows: &first[0..1], add: 2})
-  let other = read ($Research {rows: &second[0..1], add: 3})
+  let before = read_research first 1
+  first[0] := @u32.add input 100
+  let after = read_research first 2
+  let other = read_research second 3
   return #[before, after, other]
 entry const integer = func () => return do:
   let rows: ResizeArray U32 = #[1]

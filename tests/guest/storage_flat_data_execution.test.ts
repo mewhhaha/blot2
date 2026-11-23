@@ -41,14 +41,15 @@ Deno.test("owned flat Maybe rows preserve nested records guards and F32 payloads
   await compileAndRun(`
 type Span is data = $Span {start: U32, count: U32}
 const read_optional = func rows -> (id: U32) => return if id < rows.length then rows.at id else $Nothing
-const bump = func access => return do:
-  access.rows[0] = access.rows[0] + 1
-const run_known = func callback -> access => return callback access
+const bump = func (own access) => return do:
+  access.rows[0] := access.rows[0] + 1
+  return access
+const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) -> (access: own {rows: Array U32}) => return callback access
 const accept = func (calls: GrowArray U32) => return func (value: U32) => return do:
-  calls[0] = calls[0] + 1
+  @storage.push calls 1
   return value > 0
 entry const inspect = func (present: Bool) => return do:
-  let calls: GrowArray U32 = #[0]
+  let calls: GrowArray U32 = #[]
   let rows: Array {label: U32, item: Maybe (U32, F32)} = #[
     {label: 7, item: if present then $Some (40, 2.0) else $Nothing}
   ]
@@ -56,18 +57,17 @@ entry const inspect = func (present: Bool) => return do:
     $Some (value, scale) if accept calls value => value + @f32.to_u32 scale
     $Some _ => @panic "unchosen payload"
     $Nothing => 9
-  return amount + calls[0]
+  return amount + @storage.length calls
 entry const generic_update = func (chosen: Bool) => return do:
   let rows: Array U32 = #[0]
-  let access = {rows}
-  run_known bump access
+  let access = run_known bump {rows}
   let selected = case chosen of
     true => do:
-      if rows[0] == 1:
-        rows[0] = 41
+      if access.rows[0] == 1:
+        access.rows[0] := 41
       break true
     false => false
-  return rows[0] + (if selected then 1 else 0)
+  return access.rows[0] + (if selected then 1 else 0)
 entry const inferred_field = func () => return do:
   let rows: ResizeArray (Maybe Span) = #[$Some ($Span {start: 7, count: 11})]
   let $Some found = read_optional rows 0 else:

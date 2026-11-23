@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const source =
-  `const merge = func (dst: Array U32) -> (src: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32): Unit => return do:
+  `const merge = func (dst: own Array U32) -> (src: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32): Array U32 => return do:
   let i = left
   let j = @u32.add mid 1
   let k = left
@@ -13,44 +13,72 @@ const source =
     if @u32.lt right j:
       break
     if @u32.lt src[j] src[i]:
-      dst[k] = src[j]
+      dst[k] := src[j]
       j := @u32.add self 1
     else:
-      dst[k] = src[i]
+      dst[k] := src[i]
       i := @u32.add self 1
     k := @u32.add self 1
-  return ()
+  return dst
+const merge_logged = func (dst: own Array U32) -> (log: ResizeArray U32) -> (one: Array U32) -> (two: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32) -> (offset: U32): Array U32 => return do:
+  let i = left
+  let j = @u32.add mid 1
+  let k = offset
+  for ever:
+    if @u32.lt mid i:
+      break
+    if @u32.lt right j:
+      break
+    if @u32.lt one[j] two[i]:
+      let v = one[j]
+      dst[k] := v
+      @storage.push log k
+      @storage.push log v
+      j := @u32.add self 1
+    else:
+      let v = two[i]
+      dst[k] := v
+      @storage.push log k
+      @storage.push log v
+      i := @u32.add self 1
+    k := @u32.add self 1
+  return dst
+const replay = func (size: U32) -> (log: ResizeArray U32): Array U32 => return do:
+  let out: Array U32 = @array.fill size 99
+  let pairs = @u32.div (@storage.length log) 2
+  for p in 0 .. pairs:
+    let k = log[@u32.mul p 2]
+    let v = log[@u32.add (@u32.mul p 2) 1]
+    out[k] := v
+  return out
 const src: Array U32 = #[1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12]
-const dst: Array U32 = @array.fill 12 99
-const tiny: Array U32 = @array.fill 3 99
+const dst_log: ResizeArray U32 = #[]
+const tiny_log: ResizeArray U32 = #[]
 entry const reset = func () => return do:
-  let target = dst
-  let small = tiny
-  for index in 0 .. 12:
-    target[index] = 99
-  for index in 0 .. 3:
-    small[index] = 99
+  @storage.truncate dst_log 0
+  @storage.truncate tiny_log 0
   return ()
 entry const run = func (bounds: Array U32): Array U32 => return do:
-  merge dst src bounds[0] bounds[1] bounds[2]
-  return @storage.copy dst
-entry const short_target = func (): Unit => return merge tiny src 0 5 11
-entry const read = func (): Array U32 => return @storage.copy dst
-entry const read_tiny = func (): Array U32 => return @storage.copy tiny
+  let target: Array U32 = @array.fill 12 99
+  return merge_logged target dst_log src src bounds[0] bounds[1] bounds[2] bounds[0]
+entry const short_target = func (): Unit => return do:
+  let small: Array U32 = @array.fill 3 99
+  let _ = merge_logged small tiny_log src src 0 5 11 0
+  return ()
+entry const read = func (): Array U32 => return replay 12 dst_log
+entry const read_tiny = func (): Array U32 => return replay 3 tiny_log
 entry const alias = func (): Array U32 => return do:
   let rows: Array U32 = #[1, 3, 5, 2, 4, 6]
-  merge rows rows 0 2 5
-  return rows
+  return merge rows rows.copy 0 2 5
 entry const ties = func (): Array U32 => return do:
   let rows: Array U32 = #[2, 2, 2, 2, 2, 2]
   let result: Array U32 = @array.fill 6 99
-  merge result rows 0 2 5
-  return result
+  return merge result rows 0 2 5
 `;
 
-const mergeBody = source.slice(0, source.indexOf("\nconst src:"));
+const mergeBody = source.slice(0, source.indexOf("\nconst merge_logged ="));
 const offsetMerge = mergeBody.replace("const merge =", "const merge_offset =")
-  .replace("(right: U32): Unit", "(right: U32) -> (offset: U32): Unit")
+  .replace("(right: U32): Array U32", "(right: U32) -> (offset: U32): Array U32")
   .replace("let k = left", "let k = offset");
 const separateMerge = mergeBody.replace(
   "const merge =",
@@ -62,9 +90,9 @@ const cursorMerge = offsetMerge.replace(
   "const merge_offset =",
   "const merge_positions =",
 )
-  .replace("): Unit", "): U32")
+  .replace("): Array U32", "): U32")
   .replace(
-    "return ()",
+    "return dst",
     "return @u32.add (@u32.mul i 65536) (@u32.add (@u32.mul j 256) k)",
   );
 const ranges = offsetMerge + "\n" + separateMerge + "\n" + cursorMerge + `
@@ -72,7 +100,7 @@ const wide_src: Array U32 = @array.generate 48 (func index => return do:
   if @u32.lt index 24:
     return @u32.mul index 2
   return @u32.add (@u32.mul (@u32.sub index 24) 2) 1)
-const wide_dst: Array U32 = @array.fill 48 99
+const wide_log: ResizeArray U32 = #[]
 const late_src: Array U32 = @array.generate 48 (func index => return do:
   if @u32.lt index 24:
     return @u32.add index 100
@@ -82,37 +110,38 @@ const right_rows: Array U32 = @array.generate 64 (func index => return do:
   if @u32.lt index 32:
     return 0
   return @u32.add (@u32.mul (@u32.sub index 32) 2) 1)
-const separate_dst: Array U32 = @array.fill 64 99
+const separate_log: ResizeArray U32 = #[]
 entry const wide_reset = func () => return do:
-  let target = wide_dst
-  let other = separate_dst
-  for index in 0 .. 48:
-    target[index] = 99
-  for index in 0 .. 64:
-    other[index] = 99
+  @storage.truncate wide_log 0
+  @storage.truncate separate_log 0
   return ()
 entry const wide = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill bounds[3] 99
-  merge_offset target wide_src bounds[0] bounds[1] bounds[2] bounds[4]
-  return target
-entry const wide_store_trap = func (offset: U32): Unit => return merge_offset wide_dst wide_src 0 23 47 offset
-entry const wide_source_trap = func (): Unit => return merge wide_dst late_src 0 23 63
-entry const wide_read = func (): Array U32 => return @storage.copy wide_dst
+  return merge_offset target wide_src bounds[0] bounds[1] bounds[2] bounds[4]
+entry const wide_store_trap = func (offset: U32): Unit => return do:
+  let target: Array U32 = @array.fill 48 99
+  let _ = merge_logged target wide_log wide_src wide_src 0 23 47 offset
+  return ()
+entry const wide_source_trap = func (): Unit => return do:
+  let target: Array U32 = @array.fill 48 99
+  let _ = merge_logged target wide_log late_src late_src 0 23 63 0
+  return ()
+entry const wide_read = func (): Array U32 => return replay 48 wide_log
 entry const wide_alias = func (): Array U32 => return do:
   let rows = @storage.copy wide_src
-  merge rows rows 0 23 47
-  return rows
+  return merge rows rows.copy 0 23 47
 entry const wide_ties = func (right: U32): Array U32 => return do:
   let rows: Array U32 = @array.fill 48 7
   let target: Array U32 = @array.fill 24 99
-  merge target rows 0 23 right
-  return target
+  return merge target rows 0 23 right
 entry const separate = func (): Array U32 => return do:
   let target: Array U32 = @array.fill 63 99
-  merge_separate target right_rows left_rows 0 31 63
-  return target
-entry const separate_trap = func (): Unit => return merge_separate separate_dst right_rows left_rows 0 39 63
-entry const separate_read = func (): Array U32 => return @storage.copy separate_dst
+  return merge_separate target right_rows left_rows 0 31 63
+entry const separate_trap = func (): Unit => return do:
+  let target: Array U32 = @array.fill 64 99
+  let _ = merge_logged target separate_log right_rows left_rows 0 39 63 0
+  return ()
+entry const separate_read = func (): Array U32 => return replay 64 separate_log
 entry const positions = func (bounds: Array U32): U32 => return do:
   let target: Array U32 = @array.fill 64 99
   if @u32.eq bounds[5] 1:
@@ -122,7 +151,7 @@ entry const positions = func (bounds: Array U32): U32 => return do:
     return merge_positions target equal bounds[0] bounds[1] bounds[2] bounds[4]
   if @u32.eq bounds[5] 3:
     let rows = @storage.copy wide_src
-    return merge_positions rows rows bounds[0] bounds[1] bounds[2] bounds[4]
+    return merge_positions rows rows.copy bounds[0] bounds[1] bounds[2] bounds[4]
   return merge_positions target wide_src bounds[0] bounds[1] bounds[2] bounds[4]
 `;
 
@@ -206,7 +235,7 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
         const alias = [1, 3, 5, 2, 4, 6];
         assert.deepEqual(
           await call("alias"),
-          expected(alias, alias, 0, 2, 5),
+          expected(alias.slice(), alias.slice(), 0, 2, 5),
         );
         assert.deepEqual(
           await call("ties"),
@@ -267,7 +296,7 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
         const aliases = wide.slice();
         assert.deepEqual(
           await call("wide_alias"),
-          expected(aliases, aliases, 0, 23, 47),
+          expected(aliases.slice(), aliases.slice(), 0, 23, 47),
         );
         assert.deepEqual(
           await call("wide_ties", 47),
@@ -341,7 +370,7 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
           if (kind === 1) input = late.slice();
           if (kind === 2) input = Array(48).fill(7);
           let target = Array(64).fill(99);
-          if (kind === 3) target = input;
+          if (kind === 3) target = input.slice();
           const cursors: number[] = [];
           expectedSeparate(
             input,

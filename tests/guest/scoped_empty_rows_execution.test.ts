@@ -7,9 +7,9 @@ const executable = Deno.args[0] ??
 const source = `
 type Row is data = $Row {text: &[U32]}
 type Plain is data = $Plain {amount: U32}
-const effects: GrowArray U32 = #[0]
+const effects: GrowArray U32 = #[]
 const index_effect = func (index: U32): U32 => return do:
-  effects[0] = effects[0] + 1
+  @storage.push effects 1
   return index
 const append = func (rows: ResizeArray Row) -> (text: &[U32]) => return rows.push ($Row {text})
 const consume = func (row: Row): U32 => return row.text.at 0
@@ -70,7 +70,7 @@ entry const skipped = func (count: U32): U32 => return do:
 entry const direct = func (index: U32): U32 => return do:
   let rows: ResizeArray Row = #[]
   return rows[index_effect index].text.at 0
-entry const effect_count = func (): U32 => return effects[0]
+entry const effect_count = func (): U32 => return @storage.length effects
 entry const pattern = func (index: U32): U32 => return do:
   let rows: ResizeArray Row = #[]
   let $Row {text} = rows[index_effect index]

@@ -1,9 +1,9 @@
-const fresh = func (rows: Array U32): Array U32 => return do:
-  rows[0] = @u32.add self 1
+const fresh = func (rows: own Array U32): { rows: Array U32, result: Array U32 } => return do:
+  rows[0] := @u32.add self 1
   let result: Array U32 = #[rows[0]]
-  return result
+  return { rows: rows, result: result }
 entry const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   let a = fresh rows
-  let b = fresh rows
-  return #[rows[0], a[0], b[0]]
+  let b = fresh a.rows
+  return #[b.rows[0], a.result[0], b.result[0]]

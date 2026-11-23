@@ -1,83 +1,29 @@
 import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
-// The store `place = value` writes storage in place, and every alias sees
-// it. A `:=` through storage is accepted only when its root is unique; the
-// rest are `aliased_update` (tasks/MEMORY_MODEL.md rules 2, 4 and 5).
+// The `=` borrowed-mutator store statement was removed in Phase 3.
+// A `:=` through storage is accepted only when its root is unique; the
+// rest are `aliased_update` (tasks/MEMORY_MODEL.md).
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
-Deno.test("stores write elements, element fields and nested rows in place through every alias", async () => {
-  await compileAndRun(`
-type Point is data = $Point { x: U32, y: U32 }
-const pool: GrowArray U32 = #[1, 2]
-entry func element (n: U32) : U32 => return do:
+Deno.test("legacy = store statements are rejected as syntax errors", async () => {
+  for (
+    const snippet of [
+      `entry func element (n: U32) : U32 => return do:
   let rows = #[1, 2, 3]
-  let alias = rows
   rows[1] = n
-  break alias[1] * 10 + rows[1]
-entry func field (n: U32) : U32 => return do:
-  let points = #[$Point { x: 1, y: 2 }, $Point { x: 3, y: 4 }]
-  let alias = points
-  points[1].y = self + n
-  break alias[1].y + points[1].x
-entry func nested (n: U32) : U32 => return do:
-  let grid = #[#[1, 2], #[3, 4]]
-  let row = grid[1]
-  grid[1][0] = n
-  break row[0]
-entry func record_field (n: U32) : U32 => return do:
-  let world = { counts: #[0, 0], size: 2 }
-  let counts = world.counts
-  world.counts[1] = n
-  break counts[1] + world.size
-entry func global (n: U32) : U32 => return do:
-  pool[0] = n
-  break pool[0] + pool[1]
-entry func expression_root (flag: Bool) : U32 => return do:
-  let left = #[1]
-  let right = #[2]
-  (if flag then left else right)[0] = 9
-  break left[0] * 10 + right[0]
-entry func captured (n: U32) : U32 => return do:
-  let rows = #[0, 0]
-  let set = func (i: U32) => return do:
-    rows[i] = n
-  set 1
-  break rows[1]
-entry func looped (n: U32) : U32 => return do:
-  let rows: GrowArray U32 = #[]
-  for i in 0..n:
-    @storage.push rows 0
-    rows[i] = i * 2
-  let total = 0
-  for value in rows:
-    total := self + value
-  break total
-`, (guest) => {
-    equal(guest.call("element", 7), 77);
-    equal(guest.call("field", 5), 12);
-    equal(guest.call("nested", 8), 8);
-    equal(guest.call("record_field", 6), 8);
-    equal(guest.call("global", 40), 42);
-    equal(guest.call("expression_root", true), 92);
-    equal(guest.call("expression_root", false), 19);
-    equal(guest.call("captured", 5), 5);
-    equal(guest.call("looped", 4), 12);
-  }, { stdRoot });
-});
-
-Deno.test("a store on a path that never reaches storage is rejected", async () => {
-  await compileExpectedFailure(`
-entry func run (n: U32) : U32 => return do:
+  break rows[1]`,
+      `entry func run (n: U32) : U32 => return do:
   let point = { x: 1, y: 2 }
   point.x = n
-  break point.x
-`, "store_without_storage", undefined, { span: [76, 87] });
-  await compileExpectedFailure(`
-entry func run (n: U32) : U32 => return do:
+  break point.x`,
+      `entry func run (n: U32) : U32 => return do:
   let total = 0
   total = n
-  break total
-`, "store_without_storage");
+  break total`,
+    ]
+  ) {
+    await compileExpectedFailure(snippet + "\n", "GPU_FRONTEND_SYNTAX_ERROR");
+  }
 });
 
 Deno.test(":= through storage updates unique roots in place and keeps successor results", async () => {
@@ -243,7 +189,7 @@ entry func run (n: U32) : U32 => return do:${body}
       await compileExpectedFailure(
         source,
         "aliased_update",
-        "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value",
+        "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating",
         { stdRoot, span: [start - place.length, source.indexOf("\n", start)] },
       );
     } catch (error) {
@@ -252,13 +198,8 @@ entry func run (n: U32) : U32 => return do:${body}
   }
 });
 
-Deno.test("each rejected := keeps its meaning as a store, or its snapshot after an explicit copy", async () => {
+Deno.test("each rejected := keeps its snapshot after an explicit copy", async () => {
   await compileAndRun(`
-entry func stored (n: U32) : U32 => return do:
-  let rows = #[1, 2]
-  let before = rows
-  rows[0] = n
-  break before[0] + rows[0]
 entry func snapshot (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let before = rows
@@ -273,7 +214,6 @@ entry func grown (n: U32) : U32 => return do:
   fresh[0] := n
   break before.length * 100 + before[0] * 10 + fresh[1]
 `, (guest) => {
-    equal(guest.call("stored", 5), 10);
     equal(guest.call("snapshot", 5), 6);
     equal(guest.call("grown", 5), 115);
   });
@@ -391,10 +331,11 @@ entry func from_call (n: U32) : U32 => return do:
   }, { stdRoot });
 });
 
-Deno.test("a store writes through what was lent and a closure gives back what it captured", async () => {
-  await compileAndRun(`func fill (rows: Array U32) -> (n: U32) : U32 => return do:
-  rows[0] = n
-  break rows.length
+Deno.test("an own parameter updates in place and a closure gives back what it captured", async () => {
+  await compileAndRun(`func fill (rows: own Array U32) -> (n: U32) : (Array U32, U32) => return do:
+  rows[0] := n
+  let size = rows.length
+  break (rows, size)
 func each (count: U32) -> (visit: U32 -> Unit) : U32 => return do:
   for index in 0..count:
     visit index
@@ -403,11 +344,11 @@ func through (make: U32 -> Array U32) -> (n: U32) : Array U32 => return do:
   let rows = make n
   rows[0] := self + 1
   break rows
-entry func stored (n: U32) : U32 => return do:
+entry func owned (n: U32) : U32 => return do:
   let rows = #[1, 2]
-  let size = fill rows n
-  rows[1] := size
-  break rows[0] * 10 + rows[1]
+  let (updated, size) = fill rows n
+  updated[1] := size
+  break updated[0] * 10 + updated[1]
 entry func collected (n: U32) : U32 => return do:
   let seen: GrowArray U32 = #[]
   let count = each n (func index => return @storage.push seen (index * 2))
@@ -416,18 +357,18 @@ entry func collected (n: U32) : U32 => return do:
   break rows[0] * 100 + rows[n - 1]
 entry func made (n: U32) : U32 => return (through (func k => return #[k, k]) n)[0]
 `, (guest) => {
-    equal(guest.call("stored", 5), 52);
+    equal(guest.call("owned", 5), 52);
     equal(guest.call("collected", 4), 406);
     equal(guest.call("made", 8), 9);
   }, { stdRoot });
-  const kept = `func put (grid: Array (Array U32)) -> (row: Array U32) : U32 => return do:
-  grid[0] = row
+  const kept = `func put (grid: GrowArray (Array U32)) -> (row: Array U32) : U32 => return do:
+  @storage.push grid row
   break 0
 entry func run (n: U32) : U32 => return do:
-  let grid = #[#[n], #[2]]
+  let grid: GrowArray (Array U32) = #[#[n], #[2]]
   break put grid #[3] + grid[0][0]
 `;
-  const start = kept.indexOf("grid[0] = row");
+  const start = kept.indexOf("@storage.push grid row");
   await compileExpectedFailure(kept, "kept_value", undefined, { span: [start, kept.indexOf("\n", start)] });
 });
 
@@ -535,14 +476,15 @@ entry func each_round (n: U32) : U32 => return do:
   }
 });
 
-Deno.test("a shared store cannot write through a slice or through a helper with a field constraint", async () => {
+Deno.test("an owned update cannot write through a slice or through a helper with a field constraint", async () => {
   const declarations = `type Row is data = $Row {value: U32}
-func change state => return do:
+func change (own state) => return do:
   let old = state.rows[0].value
-  state.rows[0].value = old + 40
+  state.rows[0].value := old + 40
+  return state
 func slice (rows: Array Row): &[Row] => return &rows[0..rows.length]
 `;
-  for (const assignment of ["view[0].value = 42", "change {rows: view}"]) {
+  for (const assignment of ["view[0].value := 42", "let _ = change {rows: view}"]) {
     await compileExpectedFailure(declarations + `entry func test (): U32 => return do:
   let rows = #[$Row {value: 1}]
   let view = slice rows
@@ -553,8 +495,8 @@ func slice (rows: Array Row): &[Row] => return &rows[0..rows.length]
   await compileAndRun(declarations + `entry func test () => return do:
   let fixed = #[$Row {value: 1}]
   let resized: ResizeArray Row = #[$Row {value: 2}]
-  change {rows: fixed}
-  change {rows: resized}
-  return fixed[0].value + resized[0].value
+  let fixed_state = change {rows: fixed}
+  let resized_state = change {rows: resized}
+  return fixed_state.rows[0].value + resized_state.rows[0].value
 `, guest => equal(guest.call("test", null), 83));
 });

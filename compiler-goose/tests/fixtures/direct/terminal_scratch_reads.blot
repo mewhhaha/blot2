@@ -64,6 +64,6 @@ entry func alias_result (width: U32): U32 => return do:
   let world = make ()
   for tick in 0 .. 150:
     world := step world width tick
-  world.a := world.rows
-  world.rows[2] = world.rows[2] + 5
+  world.rows[2] := world.rows[2] + 5
+  world.a := world.rows.copy
   return world.rows[2] + world.a[2] + world.g[0]

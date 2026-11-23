@@ -646,10 +646,10 @@ Deno.test("Phase 3: inter-procedural escape_min_slot, box-aware @simd.load/@simd
   await compileAndRun(
     `type Big5 is data = $Big5 { a: U32, b: U32, c: U32, d: U32, e: U32 }
 
-func helper_store_fresh (dst: #[#[U32]]) -> (v: U32): Unit =>
+func helper_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   let fresh = #[v, @u32.add v 1, @u32.add v 2]
-  dst[0] = fresh
-  return ()
+  dst[0] := fresh
+  return dst
 
 func helper_simd_store_fresh (dst: #[#[U32]]) -> (v: U32): Unit =>
   let a = #[v]
@@ -661,7 +661,7 @@ func helper_simd_store_fresh (dst: #[#[U32]]) -> (v: U32): Unit =>
 
 entry func test_escape_helpers (x: U32): #[U32] =>
   let holder: #[#[U32]] = #[#[0], #[0], #[0], #[0]]
-  helper_store_fresh holder x
+  holder := helper_store_fresh holder x
   let a0 = holder[0][0]
   let a2 = holder[0][2]
   helper_simd_store_fresh holder (@u32.add x 10)
@@ -767,7 +767,7 @@ entry func test_flat_roundtrip (seed: U32): #[U32] =>
   // Verify non-canonical Bool (> 1) returns $Nothing in @flat.decode!
   // Field order of Packet (UTF-8 sorted!): bigs (60), flag (1 at index 60), grid (6)
   let bad_enc = @storage.copy enc
-  bad_enc[60] = 2
+  bad_enc[60] := 2
   let dec3: Maybe Packet = flat.decode bad_enc
   let bad_bool = case dec3 of
     $Nothing => 1

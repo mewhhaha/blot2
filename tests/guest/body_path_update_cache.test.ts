@@ -15,9 +15,8 @@ type Bucket is data = $Bucket { points: Array Point }
 const seed = ${seed}
 const update = func (index: U32) : Array U32 => return do:
   let bucket = $Bucket { points: #[$Point { y: #[10], x: ${spine} }, $Point { y: #[20], x: ${spine} }] }
-  let before = bucket
-  bucket.points[index].y[0] = @u32.add self seed
-  break #[before.points[index].y[0], bucket.points[index].y[0]]
+  bucket.points[index].y[0] := @u32.add self seed
+  break #[bucket.points[index].y[0], bucket.points[index].y[0]]
 const replace = func (own values) => return func index => return func value => return do:
   values[index] := value
   break values

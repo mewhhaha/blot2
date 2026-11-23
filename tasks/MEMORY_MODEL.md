@@ -132,15 +132,11 @@ full gate green, and moves std, ../ink and ../gdev itself.
      returning at a holder's last use, and the generic-read rule.
    - Fix the in-place append on non-owned arrays (below).
    - The state `modify`, once effects are records (round 2, item 4).
-3. **Move the apps off `=`.**
-   - Rewrite each `=` site in Ink and Gdev into the immutable style: take
-     the record or array `own`, update it with `:=`, return it, and rebind
-     at the call site.
-   - This is a style rewrite of how systems thread their world state, not a
-     mechanical one, so go module by module, keeping Ink's suite and the
-     Gdev frame green.
-   - Then delete the `=` statement, `migrate-stores` and `store`-only
-     grammar.
+3. **Move the apps off `=`.** — **done (23 November 2026)**, "Phase 3 complete"
+   below. Every `=` store across `../ink` (`71b1809` / `5ad36c0`), `../gdev`
+   (`a1aa3c9`), `../pen` (`53a89f3`), and `blot2` (tests, fixtures, examples,
+   benchmarks, docs) migrated to `own` / `:=`, and the `=` statement,
+   `UpdateInfo.store` shim, and store-only grammar were deleted.
 4. **Value restriction** in full: a `let` generalizes only when its value
    is a syntactic `func` (phase 1 did the part for array-holding lets).
    - Done for rebinding (15 November 2026): the new version a `:=` gives a
@@ -1323,6 +1319,37 @@ lending ends uniqueness, so an `own` argument is harder to give than it
 will be; code changed to `own` now would fail today. std, the tests, Ink
 and Gdev therefore change in their working trees with the switch on, and
 the default flips in the same step in all three repositories.
+
+## Phase 3 complete: `=` stores removed (23 November 2026)
+
+All four repositories are now free of `=` borrowed-mutator stores, and the
+compatibility shim (`tag_store_stmt`, `UpdateInfo.store`, and `store` grammar
+rules) has been deleted from the Goose compiler, its generated adapters, and
+the Baba host parser:
+
+- **Compiler & host parser (`blot2`):** removed `tag_store_stmt` and
+  `UpdateInfo.store` across `parse/{ast,parser,source_operators}`,
+  `check/{core,check,core_builder,purity,uniqueness,wire_schema}`,
+  `direct/{function_control,function_data}`,
+  `reuse/{body_image,editor_completion,global_references}`,
+  `tools/{dependency-wire-model.json,write_dependency_payload.py}`, and
+  `host/parser/{grammar.baba,baba.json}`; regenerated all 7 Goose adapters and
+  `generated/parser/*`; updated the `aliased_update` diagnostic text to stop
+  suggesting `=`.
+- **Recorded references & suites (`blot2`):** retired store-only uniqueness
+  laws `h04_store_keeps_parameter`, `h05_store_keeps_owned`, and
+  `h06_store_through_lent_keeps_unique` (`199/199` uniqueness programs pass);
+  migrated 16 fixtures (`109/109` pass), `examples/syntax.blot`,
+  `docs/language/guide.md`, all benchmark ports/idiomatic `.blot` programs and
+  tools, and 57 guest/host test files (`deno task test:compiler` exits 0 with
+  `1,091 passed, 0 failed, 76 ignored`).
+- **Apps & host (`../ink`, `../gdev`, `../pen`):** `../ink` (`71b1809` /
+  `5ad36c0`: 333/333 Blot checks, 177/177 native Rust tests), `../gdev`
+  (`a1aa3c9`: `pen check` clean, `build_gdev.ts` 6.70 s / 3,748,553 B,
+  `pen test-blot` 1,339 passed / 57 pre-existing failed with 0 regressions vs.
+  2026-11-17 baseline, real hardware Vulkan frame inspected at
+  `attempt-4gq9mwv6/frame.png`), and `../pen` (`53a89f3`: `pen-codegen` 10/10,
+  `blot-host` 5/5, `pen-plugins` 8/8, `pen kernels` 4/4).
 
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 

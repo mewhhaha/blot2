@@ -25,9 +25,9 @@ entry const staged_filter = (array.filter_map (func x => return if x == 1 then $
 entry const snapshots = func () => return do:
   let input = #[1, 2, 3]
   let scan = array.prefix_sums input
-  scan[0] = 99
+  scan[0] := 99
   let filtered = array.filter (func x => return true) input
-  filtered[0] = 7
+  filtered[0] := 7
   break #[input[0], scan[0], filtered[0]]
 `,
     (guest) => {

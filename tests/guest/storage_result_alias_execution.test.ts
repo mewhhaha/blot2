@@ -24,18 +24,18 @@ for (const width of [8, 600]) {
     }).join("");
   }
   const source =
-    `const carry = func row -> (flag: U32) -> (effects: Array U32) => return do:
-  effects[0] = @u32.add self 1
+    `const carry = func row -> (flag: U32) -> (effects: GrowArray U32) => return do:
+  @storage.push effects 1
   return ${returned}
 entry const answer = func (input: U32): Array U32 => return do:
-  let effects: Array U32 = #[0]
+  let effects: GrowArray U32 = #[]
   let original = {${fields}}
   let first = carry original 0 effects
   let second = carry original 1 effects
   let current = original
   for step in 0 .. 3:
     current := carry current (@u32.rem input 2) effects
-  return #[first.${first}, first.${last}, second.${last}, current.${last}, effects[0]]
+  return #[first.${first}, first.${last}, second.${last}, current.${last}, @storage.length effects]
 `;
   Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots`, async () => {
     const directory = await Deno.makeTempDir({

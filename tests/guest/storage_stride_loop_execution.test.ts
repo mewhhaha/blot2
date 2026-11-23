@@ -3,50 +3,64 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const marking =
-  `const mark = func (rows: Array U32) -> (first: U32) -> (last: U32) -> (stride: U32): U32 => return do:
+  `const mark = func (rows: own Array U32) -> (first: U32) -> (last: U32) -> (stride: U32): (Array U32, U32) => return do:
   let cursor = first
   for ever:
     if @u32.lt last cursor:
       break
-    rows[cursor] = 305419896
+    rows[cursor] := 305419896
     cursor := @u32.add self stride
-  return cursor
+  return (rows, cursor)
 `;
 const literal = marking.replace("const mark =", "const mark_odd =")
   .replace("@u32.add self stride", "@u32.add self 2");
 const source = marking + literal + `
-const rows: Array U32 = @array.fill 96 9
-entry const reset = func (): Unit => return do:
-  let target = rows
-  for index in 0 .. 96:
-    target[index] = 9
-  return ()
-entry const run = func (bounds: Array U32): U32 => return mark rows bounds[0] bounds[1] bounds[2]
-entry const read = func (): Array U32 => return @storage.copy rows
-entry const odd = func (bounds: Array U32): U32 => return mark_odd rows bounds[0] bounds[1] 2
-entry const same_start_and_stride = func (first: U32): U32 => return mark rows first 95 first
+const mark_logged = func (rows: own Array U32) -> (log: ResizeArray U32) -> (first: U32) -> (last: U32) -> (stride: U32): U32 => return do:
+  let cursor = first
+  for ever:
+    if @u32.lt last cursor:
+      break
+    rows[cursor] := 305419896
+    @storage.push log cursor
+    cursor := @u32.add self stride
+  return cursor
+const mark_odd_logged = func (rows: own Array U32) -> (log: ResizeArray U32) -> (first: U32) -> (last: U32): U32 => return do:
+  let cursor = first
+  for ever:
+    if @u32.lt last cursor:
+      break
+    rows[cursor] := 305419896
+    @storage.push log cursor
+    cursor := @u32.add self 2
+  return cursor
+const written_log: ResizeArray U32 = #[]
+entry const reset = func (): Unit => return @storage.truncate written_log 0
+entry const run = func (bounds: Array U32): U32 => return mark_logged (@array.fill 96 9) written_log bounds[0] bounds[1] bounds[2]
+entry const read = func (): Array U32 => return do:
+  let out: Array U32 = @array.fill 96 9
+  for index in 0 .. @storage.length written_log:
+    out[written_log[index]] := 305419896
+  return out
+entry const odd = func (bounds: Array U32): U32 => return mark_odd_logged (@array.fill 96 9) written_log bounds[0] bounds[1]
+entry const same_start_and_stride = func (first: U32): U32 => return mark_logged (@array.fill 96 9) written_log first 95 first
 entry const local_run = func (bounds: Array U32) => return do:
-  let target: Array U32 = @array.fill 96 9
-  let alias = target
-  let cursor = mark alias bounds[0] bounds[1] bounds[2]
+  let (target, _) = mark (@array.fill 96 9) bounds[0] bounds[1] bounds[2]
   return target
 entry const local_cursor = func (bounds: Array U32): U32 => return do:
-  let target: Array U32 = @array.fill 96 9
-  return mark target bounds[0] bounds[1] bounds[2]
+  let (_, cursor) = mark (@array.fill 96 9) bounds[0] bounds[1] bounds[2]
+  return cursor
 entry const local_odd = func (bounds: Array U32) => return do:
-  let target: Array U32 = @array.fill 96 9
-  let cursor = mark_odd target bounds[0] bounds[1] 2
+  let (target, _) = mark_odd (@array.fill 96 9) bounds[0] bounds[1] 2
   return target
 entry const local_odd_cursor = func (bounds: Array U32): U32 => return do:
-  let target: Array U32 = @array.fill 96 9
-  return mark_odd target bounds[0] bounds[1] 2
+  let (_, cursor) = mark_odd (@array.fill 96 9) bounds[0] bounds[1] 2
+  return cursor
 entry const local_same_start_and_stride = func (first: U32) => return do:
-  let target: Array U32 = @array.fill 96 9
-  let cursor = mark target first 95 first
+  let (target, _) = mark (@array.fill 96 9) first 95 first
   return target
 entry const local_same_cursor = func (first: U32): U32 => return do:
-  let target: Array U32 = @array.fill 96 9
-  return mark target first 95 first
+  let (_, cursor) = mark (@array.fill 96 9) first 95 first
+  return cursor
 `;
 
 function expected(first: number, last: number, stride: number) {

@@ -21,8 +21,8 @@ entry const divide = func (count: U32) => return @array.generate count (func ind
   break @u32.div 12 divisor)
 entry const shared = func (count: U32) => return do:
   let original = @array.generate count integer
-  let saved = original
-  original[0] = 99
+  let saved = @storage.copy original
+  original[0] := 99
   break #[saved[0], original[0], saved[@u32.sub count 1]]
 entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = @array.fill 9 0
@@ -67,12 +67,11 @@ Deno.test(`numeric helpers with private scopes keep tails, aliased writes and sc
             )),
         );
         if (count !== 0) {
-          // `saved` aliases `original`, so it reads the write of 99
-          // (tasks/LANGUAGE_COHERENCE.md A7).
-          const last = count === 1 ? 99 : (-(count + 16) + 1) >>> 0;
+          const first = (-17 + 1) >>> 0;
+          const last = (-(count + 16) + 1) >>> 0;
           assert.deepEqual(
             guest.call("shared", count),
-            Uint32Array.of(99, 99, last),
+            Uint32Array.of(first, 99, last),
           );
         }
       }

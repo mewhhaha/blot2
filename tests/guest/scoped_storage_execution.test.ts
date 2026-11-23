@@ -31,7 +31,8 @@ entry const count = func (add: Bool) => return do:
 entry const advance = func (n: U32) => return do:
   let scratch: GrowArray U32 = #[n]
   let previous = @storage.copy values
-  values[0] = scratch[0]
+  @storage.truncate values 0
+  @storage.push values scratch[0]
   return previous[0]
 entry const read = func (index: U32) => return do:
   let scratch: GrowArray U32 = #[17]
@@ -104,8 +105,7 @@ entry const answer = func () => return do:
   let view: &[U32] = &items[0..1]
   let saved = peek first
   let copied = @storage.copy items
-  let copy_ref = &copied[0]
-  copied[0] = 99
+  copied[0] := 99
   break @u32.add (@u32.add saved (@storage.load link)) view[0]
 entry const resized = func () => return do:
   let items: ResizeArray U32 = #[7, 8]
@@ -261,7 +261,7 @@ entry const answer = func () => return do:
   let grown = @storage.push rows {target: ^pool[1], value: 2}
   let row = rows[1]
   let copied = @storage.copy rows
-  copied[0] = {value: 9, target: ^pool[1]}
+  copied[0] := {value: 9, target: ^pool[1]}
   break @u32.add (@storage.load row.target) rows[0].value
 `,
     (guest) => equal(guest.call("answer", null), 43),

@@ -4,19 +4,19 @@
    "aliased_update",
    376,
    388,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    531,
    543,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    791,
    803,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -28,7 +28,7 @@
    "aliased_update",
    884,
    896,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -40,7 +40,7 @@
    "aliased_update",
    1641,
    1653,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -52,7 +52,7 @@
    "aliased_update",
    1795,
    1810,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -64,7 +64,7 @@
    "aliased_update",
    1919,
    1934,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -76,7 +76,7 @@
    "aliased_update",
    2121,
    2141,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -91,7 +91,7 @@
    "aliased_update",
    342,
    354,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b03_captured": [
@@ -99,7 +99,7 @@
    "aliased_update",
    364,
    376,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b04_passed": [],
@@ -108,7 +108,7 @@
    "aliased_update",
    341,
    353,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -122,7 +122,7 @@
    "aliased_update",
    307,
    319,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -140,7 +140,7 @@
    "aliased_update",
    395,
    407,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -154,7 +154,7 @@
    "aliased_update",
    369,
    384,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -168,7 +168,7 @@
    "aliased_update",
    333,
    348,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -182,7 +182,7 @@
    "aliased_update",
    389,
    409,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "result_not_owned",
@@ -198,7 +198,7 @@
    "aliased_update",
    348,
    366,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b18_pattern_bound": [],
@@ -207,7 +207,7 @@
    "aliased_update",
    366,
    380,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b20_intrinsics": [],
@@ -216,7 +216,7 @@
    "aliased_update",
    381,
    393,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b24_case_value_fresh": [],
@@ -227,7 +227,7 @@
    "aliased_update",
    435,
    459,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b28_loop_carry_fresh": [],
@@ -239,7 +239,7 @@
    "aliased_update",
    461,
    474,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b33_array_of_records": [
@@ -247,7 +247,7 @@
    "aliased_update",
    401,
    417,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b34_grow_push_shared": [
@@ -255,7 +255,7 @@
    "aliased_update",
    412,
    427,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b35_grow_push_fresh": [],
@@ -264,13 +264,13 @@
    "aliased_update",
    423,
    444,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    447,
    459,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b37_concat_slice": [],
@@ -279,7 +279,7 @@
    "aliased_update",
    361,
    376,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b39_loop_break_value": [
@@ -287,13 +287,13 @@
    "aliased_update",
    410,
    422,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    425,
    437,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b40_statement_if_join": [
@@ -301,7 +301,7 @@
    "aliased_update",
    383,
    395,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b41_block_value": [],
@@ -310,7 +310,7 @@
    "aliased_update",
    398,
    416,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b44_many_fields": [
@@ -318,7 +318,7 @@
    "aliased_update",
    387,
    402,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "b45_loop_join_inside": [
@@ -326,7 +326,7 @@
    "aliased_update",
    390,
    402,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c01_case_arms_accepted": [],
@@ -336,7 +336,7 @@
    "aliased_update",
    384,
    396,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c04_continue": [
@@ -344,7 +344,7 @@
    "aliased_update",
    549,
    561,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c05_construct_record": [],
@@ -353,7 +353,7 @@
    "aliased_update",
    676,
    688,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c07_iterate_rows": [],
@@ -369,7 +369,7 @@
    "aliased_update",
    665,
    680,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c16_freeze": [
@@ -377,7 +377,7 @@
    "aliased_update",
    462,
    476,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c17_resize": [
@@ -385,7 +385,7 @@
    "aliased_update",
    518,
    532,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c18_nested_case_loop": [
@@ -393,7 +393,7 @@
    "aliased_update",
    476,
    488,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c19_generate_capture": [
@@ -401,7 +401,7 @@
    "aliased_update",
    458,
    470,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c20_fill_shared_scalar": [
@@ -409,7 +409,7 @@
    "aliased_update",
    434,
    445,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c21_if_let": [
@@ -417,7 +417,7 @@
    "aliased_update",
    425,
    438,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c22_tuple_alias": [
@@ -425,7 +425,7 @@
    "aliased_update",
    409,
    421,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c23_nested_record_alias": [
@@ -433,7 +433,7 @@
    "aliased_update",
    501,
    525,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c24_loop_carry_record": [
@@ -441,13 +441,13 @@
    "aliased_update",
    449,
    469,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    474,
    493,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c25_break_block_alias": [
@@ -455,13 +455,13 @@
    "aliased_update",
    469,
    483,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    486,
    498,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "d01_inner_backedge_alias": [
@@ -469,13 +469,13 @@
    "aliased_update",
    205,
    217,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    243,
    255,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "d02_three_levels": [
@@ -483,19 +483,19 @@
    "aliased_update",
    208,
    220,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    246,
    258,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    288,
    300,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "d03_inner_fresh_outer_alias": [
@@ -503,13 +503,13 @@
    "aliased_update",
    265,
    277,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    297,
    309,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "d04_carry_swap": [
@@ -517,25 +517,25 @@
    "aliased_update",
    245,
    254,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    259,
    273,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    278,
    291,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    317,
    332,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "d05_forever_nested": [
@@ -543,13 +543,13 @@
    "aliased_update",
    266,
    278,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ],
   [
    "aliased_update",
    373,
    385,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "e01_own_local": [],
@@ -668,7 +668,7 @@
    "aliased_update",
    402,
    414,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f02_construct_then_read": [
@@ -676,7 +676,7 @@
    "aliased_update",
    392,
    412,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f03_store_row_then_read": [
@@ -684,7 +684,7 @@
    "aliased_update",
    368,
    383,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f04_move_rename": [],
@@ -693,7 +693,7 @@
    "aliased_update",
    377,
    392,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f06_move_then_captured": [
@@ -701,7 +701,7 @@
    "aliased_update",
    385,
    400,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f07_move_before_return": [],
@@ -710,7 +710,7 @@
    "aliased_update",
    386,
    401,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f09_move_loop_local": [],
@@ -719,7 +719,7 @@
    "aliased_update",
    360,
    377,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f11_move_closure_local": [],
@@ -728,7 +728,7 @@
    "aliased_update",
    386,
    401,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "f13_move_carry_out": [
@@ -736,7 +736,7 @@
    "aliased_update",
    374,
    386,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "g01_lent_read": [],
@@ -745,7 +745,7 @@
    "aliased_update",
    564,
    575,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "g03_lent_then_owner_updated": [
@@ -753,7 +753,7 @@
    "aliased_update",
    564,
    579,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "g04_lent_copied": [],
@@ -811,16 +811,6 @@
   ]
  ],
  "g16_result_of_call": [],
- "h04_store_keeps_parameter": [
-  [
-   "kept_value",
-   285,
-   298,
-   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
-  ]
- ],
- "h05_store_keeps_owned": [],
- "h06_store_through_lent_keeps_unique": [],
  "h07_push_keeps_parameter": [
   [
    "kept_value",
@@ -845,7 +835,7 @@
    "aliased_update",
    404,
    416,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "h15_function_parameter_kept": [
@@ -904,7 +894,7 @@
    "aliased_update",
    299,
    308,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "j03_borrowing_name_gives_back": [],
@@ -913,7 +903,7 @@
    "aliased_update",
    330,
    350,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "j05_borrowing_name_handed_on": [
@@ -921,7 +911,7 @@
    "aliased_update",
    351,
    371,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "j06_borrowed_in_a_loop_round": [],
@@ -930,7 +920,7 @@
    "aliased_update",
    358,
    377,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "j08_result_that_borrows_gives_back": [
@@ -938,7 +928,7 @@
    "aliased_update",
    502,
    522,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "k01_borrowed_argument_gives_back": [],
@@ -958,7 +948,7 @@
    "aliased_update",
    655,
    677,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "k07_last_read_beside_the_value_in_one_result": [],
@@ -976,7 +966,7 @@
    "aliased_update",
    615,
    630,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "k11_walked_value_given_away_in_the_loop": [
@@ -992,7 +982,7 @@
    "aliased_update",
    636,
    656,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "k13_two_names_borrow_the_same_and_end_out_of_order": [],
@@ -1090,7 +1080,7 @@
    "aliased_update",
    89,
    101,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "n04_field_of_an_own_local_returned": [],

@@ -36,19 +36,18 @@ entry const answer = func (input: F32) => return do:
   ],
 }, {
   name: "generated scratch declines implicit mutable global reads",
-  source: `const pool: Array U32 = #[0]
+  source: `const pool: GrowArray U32 = #[0]
 const write = func (destination: GrowArray U32) => return do:
   let generated = @array.generate 2 (func (index: U32) => return do:
     @storage.push destination index
-    return pool[0] + index)
+    return pool[@u32.sub (@storage.length pool) 1] + index)
   for value in generated:
     @storage.push destination value
 entry const answer = func (input: U32) => return do:
   let destination: GrowArray U32 = #[]
-  let live = pool
-  live[0] = input
+  @storage.push pool input
   write destination
-  live[0] = input + 10
+  @storage.push pool (input + 10)
   write destination
   return @storage.freeze destination
 `,

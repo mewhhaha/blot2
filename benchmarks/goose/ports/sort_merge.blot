@@ -10,22 +10,24 @@ entry const revision = func (): U32 => return arena_revision
 // All RNG states match the official 100000/400000 sizes and prepare maximum.
 // Other Goose-valid sizes can differ at exact-integer F64 rounding boundaries;
 // the entrypoint restricts inputs to those two proven arena profile sizes.
-const next_int = func (rng: Array U32) -> (maximum: U32): U32 => return do:
+const next_int = func (rng: own Array U32) -> (maximum: U32): (Array U32, U32) => return do:
   let next = @u32.rem (@u32.add (@u32.mul rng[0] 3877) 29573) 139968
-  rng[0] = next
+  rng[0] := next
   let high = @u32.mul next (@u32.div maximum 8192)
   let low = @u32.mul next (@u32.rem maximum 8192)
   let remainder = @u32.add (@u32.mul (@u32.rem high 139968) 8192) low
-  return @u32.add (@u32.mul (@u32.div high 139968) 8192) (@u32.div remainder 139968)
+  return (rng, @u32.add (@u32.mul (@u32.div high 139968) 8192) (@u32.div remainder 139968))
 
-const prepare = func (prepared: Array U32) -> (rng: Array U32) -> (size: U32): Unit => return do:
+const prepare = func (prepared: own Array U32) -> (rng: own Array U32) -> (size: U32): (Array U32, Array U32) => return do:
   for index in 0 .. size:
-    prepared[index] = next_int rng 1000000
-  return ()
+    let (next_rng, value) = next_int rng 1000000
+    rng := next_rng
+    prepared[index] := value
+  return (prepared, rng)
 
-const merge = func (arr: Array U32) -> (temp: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32): Unit => return do:
+const merge = func (arr: own Array U32) -> (temp: own Array U32) -> (left: U32) -> (mid: U32) -> (right: U32): (Array U32, Array U32) => return do:
   for index in left .. @u32.add right 1:
-    temp[index] = arr[index]
+    temp[index] := arr[index]
   let i = left
   let j = @u32.add mid 1
   let k = left
@@ -35,41 +37,43 @@ const merge = func (arr: Array U32) -> (temp: Array U32) -> (left: U32) -> (mid:
     if @u32.lt right j:
       break
     if @u32.lt temp[j] temp[i]:
-      arr[k] = temp[j]
+      arr[k] := temp[j]
       j := @u32.add self 1
     else:
-      arr[k] = temp[i]
+      arr[k] := temp[i]
       i := @u32.add self 1
     k := @u32.add self 1
   for ever:
     if @u32.lt mid i:
       break
-    arr[k] = temp[i]
+    arr[k] := temp[i]
     i := @u32.add self 1
     k := @u32.add self 1
-  return ()
+  return (arr, temp)
 
-const merge_sort_helper = func (arr: Array U32) -> (temp: Array U32) -> (left: U32) -> (right: U32): Unit => return do:
+const merge_sort_helper: own Array U32 -> own Array U32 -> U32 -> U32 -> (Array U32, Array U32) = func (arr: own Array U32) -> (temp: own Array U32) -> (left: U32) -> (right: U32): (Array U32, Array U32) => return do:
   if @u32.lt left right:
     let mid = @u32.div (@u32.add left right) 2
-    merge_sort_helper arr temp left mid
-    merge_sort_helper arr temp (@u32.add mid 1) right
-    merge arr temp left mid right
-  return ()
+    let (arr, temp) = merge_sort_helper own arr own temp left mid
+    let (arr, temp) = merge_sort_helper own arr own temp (@u32.add mid 1) right
+    return merge arr temp left mid right
+  return (arr, temp)
 
-const merge_sort_inplace = func (arr: Array U32) -> (temp: Array U32) -> (size: U32): Unit => return do:
+const merge_sort_inplace = func (arr: own Array U32) -> (temp: own Array U32) -> (size: U32): (Array U32, Array U32) => return do:
   // Original temp.resize(arr.len, 0) initializes the active prefix each run.
   for index in 0 .. size:
-    temp[index] = 0
-  merge_sort_helper arr temp 0 (@u32.sub size 1)
-  return ()
+    temp[index] := 0
+  return merge_sort_helper arr temp 0 (@u32.sub size 1)
 
-const run = func (prepared: Array U32) -> (working: Array U32) -> (temp: Array U32) -> (rng: Array U32) -> (size: U32): U32 => return do:
-  let before = prepared[next_int rng size]
+const run = func (prepared: Array U32) -> (working: own Array U32) -> (temp: own Array U32) -> (rng: own Array U32) -> (size: U32): (Array U32, Array U32, Array U32, U32) => return do:
+  let (rng, first_idx) = next_int rng size
+  let before = prepared[first_idx]
   for index in 0 .. size:
-    working[index] = prepared[index]
-  merge_sort_inplace working temp size
-  return @u32.add before working[next_int rng size]
+    working[index] := prepared[index]
+  let (working, temp) = merge_sort_inplace working temp size
+  let (rng, second_idx) = next_int rng size
+  let after = working[second_idx]
+  return (working, temp, rng, @u32.add before after)
 
 entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
@@ -87,17 +91,23 @@ entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {
       @panic "sort supports arena sizes 100000 or 400000"
   if @u32.eq iterations 0:
     @panic "sort iterations must be positive"
-  let prepared: Array U32 = @array.fill 400000 0
+  let (prepared, rng) = prepare (@array.fill 400000 0) #[42] size
   let working: Array U32 = @array.fill 400000 0
   let temp: Array U32 = @array.fill 400000 0
-  let rng: Array U32 = #[42]
-  prepare prepared rng size
   let checksum = 0
   for index in 0 .. warmups:
-    checksum := @u32.add self (run prepared working temp rng size)
-  rng[0] = 42
+    let (next_working, next_temp, next_rng, answer) = run prepared working temp rng size
+    working := next_working
+    temp := next_temp
+    rng := next_rng
+    checksum := @u32.add self answer
+  rng[0] := 42
   use started <- host #[1]
   for index in 0 .. iterations:
-    checksum := @u32.add self (run prepared working temp rng size)
+    let (next_working, next_temp, next_rng, answer) = run prepared working temp rng size
+    working := next_working
+    temp := next_temp
+    rng := next_rng
+    checksum := @u32.add self answer
   use finished <- host #[2]
   break checksum

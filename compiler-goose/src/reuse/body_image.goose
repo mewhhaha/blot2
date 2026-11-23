@@ -461,7 +461,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         update=>{
             let ua=a.updateInfo(ia);
             let ub=b.updateInfo(ib);
-            if ua.store!=ub.store || (ua.self_binding==0)!=(ub.self_binding==0) { return false; }
+            if (ua.self_binding==0)!=(ub.self_binding==0) { return false; }
             if !sameCoreExpr(old_units,a,ua.root,new_units,b,ub.root,locals,blocks,depth+1) { return false; }
             let pa=a.updatePath(ia);
             let pb=b.updatePath(ib);

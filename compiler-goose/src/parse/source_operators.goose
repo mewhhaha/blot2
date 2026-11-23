@@ -237,7 +237,6 @@ let a_field_access=blot_parse_ast::tag_field_access;
 let a_index_access=blot_parse_ast::tag_index_access;
 let a_let_stmt=blot_parse_ast::tag_let_stmt;
 let a_rebind_stmt=blot_parse_ast::tag_rebind_stmt;
-let a_store_stmt=blot_parse_ast::tag_store_stmt;
 let a_use_stmt=blot_parse_ast::tag_use_stmt;
 let a_iterator_bind=blot_parse_ast::tag_iterator_bind;
 let a_function_return_stmt=blot_parse_ast::tag_function_return_stmt;
@@ -414,9 +413,6 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
   var root=n.a; while tree.node(root).tag==a_field_access||tree.node(root).tag==a_index_access { root=tree.node(root).a; } let target=tree.node(root);
   if target.tag==a_name&&!local(self_,tree,pool,context,locals,target.a) { fail(self_,tree,pool,context,locals,c_unknown_rebinding,id,tree.span(root).start,target.a); return; }
   let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
- } else if n.tag==a_store_stmt {
-  // A store's place is an ordinary expression; only its value sees the old leaf as `self`.
-  walk(self_,tree,pool,context,locals,n.a,depth+1); let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
  } else if n.tag==a_if_expr||n.tag==a_if_stmt||n.tag==a_range_stmt { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); }
  else if n.tag==a_if_let_stmt {
   pattern_names(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); let body=tree.extra.items[n.c]; let fallback=tree.extra.items[n.c+1]; scope(self_,tree,pool,context,locals,n.a,body,depth+1); scope(self_,tree,pool,context,locals,0,fallback,depth+1);

@@ -2,14 +2,13 @@ const joined_hook = func (saved: U32) => return func (argument: U32): U32 => ret
 entry const active_address = func (input: U32): Array U32 => return do:
   let scalar = input
   let cell: Array U32 = #[input]
-  let pointer = &cell[0]
   let rows: Array U32 = #[input]
   let access = {rows: rows, hook: joined_hook scalar}
-  let before = @storage.load pointer
+  let before = @storage.load (&cell[0])
   if @u32.eq (@u32.rem input 2) 0:
-    cell[0] = @u32.add input 10
-    access.rows[0] = @u32.add self 1
+    cell[0] := @u32.add input 10
+    access.rows[0] := @u32.add self 1
   else:
-    cell[0] = @u32.add input 20
-    access.rows[0] = @u32.add self 2
-  return #[before, cell[0], access.hook 7, rows[0]]
+    cell[0] := @u32.add input 20
+    access.rows[0] := @u32.add self 2
+  return #[before, cell[0], access.hook 7, access.rows[0]]

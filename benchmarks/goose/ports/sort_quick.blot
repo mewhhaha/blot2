@@ -10,60 +10,64 @@ entry const revision = func (): U32 => return arena_revision
 // All RNG states match the official 100000/400000 sizes and prepare maximum.
 // Other Goose-valid sizes can differ at exact-integer F64 rounding boundaries;
 // the entrypoint restricts inputs to those two proven arena profile sizes.
-const next_int = func (rng: Array U32) -> (maximum: U32): U32 => return do:
+const next_int = func (rng: own Array U32) -> (maximum: U32): (Array U32, U32) => return do:
   let next = @u32.rem (@u32.add (@u32.mul rng[0] 3877) 29573) 139968
-  rng[0] = next
+  rng[0] := next
   let high = @u32.mul next (@u32.div maximum 8192)
   let low = @u32.mul next (@u32.rem maximum 8192)
   let remainder = @u32.add (@u32.mul (@u32.rem high 139968) 8192) low
-  return @u32.add (@u32.mul (@u32.div high 139968) 8192) (@u32.div remainder 139968)
+  return (rng, @u32.add (@u32.mul (@u32.div high 139968) 8192) (@u32.div remainder 139968))
 
-const prepare = func (prepared: Array U32) -> (rng: Array U32) -> (size: U32): Unit => return do:
+const prepare = func (prepared: own Array U32) -> (rng: own Array U32) -> (size: U32): (Array U32, Array U32) => return do:
   for index in 0 .. size:
-    prepared[index] = next_int rng 1000000
-  return ()
+    let (next_rng, value) = next_int rng 1000000
+    rng := next_rng
+    prepared[index] := value
+  return (prepared, rng)
 
 // Half-open bounds express each original slice without copying. end_j is
 // the original signed j + 1, so decrementing j to -1 becomes end_j = 0.
-const quick_sort = func (arr: Array U32) -> (start: U32) -> (end: U32): Unit => return do:
+const quick_sort: own Array U32 -> U32 -> U32 -> Array U32 = func (arr: own Array U32) -> (start: U32) -> (end: U32): Array U32 => return do:
   let size = @u32.sub end start
   if @u32.lt 1 size:
     let pivot = arr[@u32.add start (@u32.div size 2)]
     let i = start
     let end_j = end
     for ever:
-      if @u32.lt i end_j:
-        for ever:
-          if @u32.lt arr[i] pivot:
-            i := @u32.add self 1
-          else:
-            break
-        for ever:
-          if @u32.lt pivot arr[@u32.sub end_j 1]:
-            end_j := @u32.sub self 1
-          else:
-            break
-        if @u32.lt i end_j:
-          let value = arr[i]
-          arr[i] = arr[@u32.sub end_j 1]
-          arr[@u32.sub end_j 1] = value
-          i := @u32.add self 1
-          end_j := @u32.sub self 1
-      else:
+      if not (@u32.lt i end_j):
         break
+      for ever:
+        if @u32.lt arr[i] pivot:
+          i := @u32.add self 1
+        else:
+          break
+      for ever:
+        if @u32.lt pivot arr[@u32.sub end_j 1]:
+          end_j := @u32.sub self 1
+        else:
+          break
+      if @u32.lt i end_j:
+        let value = arr[i]
+        arr[i] := arr[@u32.sub end_j 1]
+        arr[@u32.sub end_j 1] := value
+        i := @u32.add self 1
+        end_j := @u32.sub self 1
     if @u32.lt (@u32.add start 1) end_j:
-      quick_sort arr start end_j
+      arr := quick_sort own self start end_j
     if @u32.lt i end:
-      quick_sort arr i end
-  return ()
+      arr := quick_sort own self i end
+  return arr
 
-const run = func (prepared: Array U32) -> (working: Array U32) -> (rng: Array U32) -> (size: U32): U32 => return do:
-  let before = prepared[next_int rng size]
+const run = func (prepared: Array U32) -> (working: own Array U32) -> (rng: own Array U32) -> (size: U32): (Array U32, Array U32, U32) => return do:
+  let (rng, first_idx) = next_int rng size
+  let before = prepared[first_idx]
   // Preserve the full per-run copy of the active bounded prefix.
   for index in 0 .. size:
-    working[index] = prepared[index]
-  quick_sort working 0 size
-  return @u32.add before working[next_int rng size]
+    working[index] := prepared[index]
+  let working = quick_sort working 0 size
+  let (rng, second_idx) = next_int rng size
+  let after = working[second_idx]
+  return (working, rng, @u32.add before after)
 
 entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
@@ -81,16 +85,20 @@ entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {
       @panic "sort supports arena sizes 100000 or 400000"
   if @u32.eq iterations 0:
     @panic "sort iterations must be positive"
-  let prepared: Array U32 = @array.fill 400000 0
+  let (prepared, rng) = prepare (@array.fill 400000 0) #[42] size
   let working: Array U32 = @array.fill 400000 0
-  let rng: Array U32 = #[42]
-  prepare prepared rng size
   let checksum = 0
   for index in 0 .. warmups:
-    checksum := @u32.add self (run prepared working rng size)
-  rng[0] = 42
+    let (next_working, next_rng, answer) = run prepared working rng size
+    working := next_working
+    rng := next_rng
+    checksum := @u32.add self answer
+  rng[0] := 42
   use started <- host #[1]
   for index in 0 .. iterations:
-    checksum := @u32.add self (run prepared working rng size)
+    let (next_working, next_rng, answer) = run prepared working rng size
+    working := next_working
+    rng := next_rng
+    checksum := @u32.add self answer
   use finished <- host #[2]
   break checksum

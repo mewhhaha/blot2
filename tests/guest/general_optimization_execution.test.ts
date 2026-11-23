@@ -34,27 +34,25 @@ entry const forever = func (count: U32) => return do:
     i := i + 1
   break values
 entry const versions = func () => return do:
-  let leaf = #[1, 2]
-  let store = $Store { left: leaf, right: leaf }
-  let saved = func () => return store.left[0]
+  let store = $Store { left: #[1, 2], right: #[1, 2] }
   for i in 0..2:
-    store.left[i] = 9
+    store.left[i] := 9
     if i == 0:
       break
-  store.left[1] = 8
-  break #[saved (), leaf[0], store.right[0], store.left[0], store.left[1]]
+  store.left[1] := 8
+  break #[store.right[0], store.left[0], store.left[1]]
 entry const extracted = func () => return do:
   let values = #[#[1], #[2]]
-  let first = values[0]
-  values[0][0] = 9
+  let first = values[0].copy
+  values[0][0] := 9
   break #[first[0], values[0][0]]
 entry const after_break = func () => return do:
   let values = #[1, 2]
-  let saved = values
+  let saved = values.copy
   for ever:
-    values[0] = 8
+    values[0] := 8
     break
-  values[1] = 9
+  values[1] := 9
   break #[saved[0], saved[1], values[0], values[1]]
 `,
     (guest) => {
@@ -69,15 +67,14 @@ entry const after_break = func () => return do:
           );
         }
       }
-      // Aliases of an array see its writes (tasks/LANGUAGE_COHERENCE.md A7).
-      assert.deepEqual(guest.call("extracted", null), new Uint32Array([9, 9]));
+      assert.deepEqual(guest.call("extracted", null), new Uint32Array([1, 9]));
       assert.deepEqual(
         guest.call("versions", null),
-        new Uint32Array([9, 9, 9, 9, 8]),
+        new Uint32Array([1, 9, 8]),
       );
       assert.deepEqual(
         guest.call("after_break", null),
-        new Uint32Array([8, 9, 8, 9]),
+        new Uint32Array([1, 2, 8, 9]),
       );
     },
   );
@@ -184,31 +181,27 @@ entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (
   );
 });
 
-Deno.test("staged indexed construction freezes once and writes through input aliases and repeated indices", async () => {
+Deno.test("staged indexed construction freezes once and preserves owned updates and repeated indices", async () => {
   await compileAndRun(
     `
-const build = func values => return do:
-  let saved = func () => return values[0]
+const build = func (values: own Array U32): Array U32 => return do:
   for i in 0..4096:
-    values[i] = i + 1
-  break saved ()
+    values[i] := i + 1
+  break values
 const source = @array.fill 4096 7
-const constructed = build source
+const constructed = build source.copy
 const repeated = do:
   let values = #[10, 20]
   for i in 0..4096:
     values[i % 2] := self + 1
   break values
-entry const answer = func () => return do:
-  let old = constructed
-  break #[source[0], old, source[0], source[4095], repeated[0], repeated[1]]
+entry const answer = func () => return
+  #[source[0], constructed[0], constructed[4095], repeated[0], repeated[1]]
 `,
     (guest) => {
-      // `build` writes through its parameter into `source`, and `saved`
-      // reads the same array (tasks/LANGUAGE_COHERENCE.md A7).
       assert.deepEqual(
         guest.call("answer", null),
-        new Uint32Array([1, 1, 1, 4096, 2058, 2068]),
+        new Uint32Array([7, 1, 4096, 2058, 2068]),
       );
     },
   );

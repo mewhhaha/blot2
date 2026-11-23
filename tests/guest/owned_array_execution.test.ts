@@ -7,7 +7,7 @@ entry const build = func (count: U32) : Array U32 => return do:
   let values = fill (@u32.mul count 2) 0
   for outer in 0 .. count:
     for inner in 0 .. 2:
-      values[@u32.add (@u32.mul outer 2) inner] = outer
+      values[@u32.add (@u32.mul outer 2) inner] := outer
   break values
 entry const floating = func (count: U32) : Array F32 => return do:
   let values = @array.generate count (func index => return @u32.to_f32 index)
@@ -36,74 +36,66 @@ entry const floating = func (count: U32) : Array F32 => return do:
     },
   );
 });
-// Writes through one alias are visible through every other alias, closure
-// capture and stored copy of the array (tasks/LANGUAGE_COHERENCE.md A7).
-Deno.test("array writes are visible through aliases captures state and iterators", async () => {
+// Unique owners update in place with `:=`; explicit copies preserve prior
+// snapshots and `own` parameters transfer ownership (tasks/MEMORY_MODEL.md).
+Deno.test("owned array updates preserve explicit copies, parameters, state, and nested rows", async () => {
   await compileAndRun(
     `
 type Cell value is data = $Cell value
 const stored = #[1, 2]
 const read = func values => return values[1]
 const delay = func (value: Array U32) => return func () => return value[1]
-entry const alias = func () => return do:
+entry const copy_snapshot = func () => return do:
   let values = #[1, 2]
-  let before = values
-  values[1] = 9
+  let before = values.copy
+  values[1] := 9
   break @u32.add before[1] values[1]
 entry const callback = func () => return do:
   let values = #[1, 2]
-  let before = func () => return values[1]
-  values[1] = 9
-  break @u32.add (before ()) values[1]
+  let before = values.copy
+  let read_before = func () => return before[1]
+  values[1] := 9
+  break @u32.add (read_before ()) values[1]
 entry const suspended = func () => return do:
   let values = #[1, 2]
-  let before = delay values
-  values[1] = 9
+  let before = delay values.copy
+  values[1] := 9
   break @u32.add (before ()) values[1]
-entry const iterator = func () => return do:
-  let values = #[1, 2]
-  let sum = 0
-  for value in values:
-    values[1] = 9
-    sum := @u32.add sum value
-  break sum
-entry const parameter = func (values: Array U32) => return do:
-  values[1] = 9
+entry const parameter = func (values: own Array U32) => return do:
+  values[1] := 9
   break values
-entry const global = func () => return do:
-  let values = stored
-  values[1] = 9
+entry const global_copy = func () => return do:
+  let values = stored.copy
+  values[1] := 9
   break @u32.add stored[1] values[1]
 entry const retained = func () => return do:
   let values = #[1, 2]
-  let state = $Cell values
-  values[1] = 9
+  let state = $Cell values.copy
+  values[1] := 9
   let ($Cell before, _) = @state.run state (func () => return ())
   break @u32.add before[1] values[1]
 entry const calls = func () => return do:
   let values = #[1, 2]
   let before = read values
-  values[1] = 9
+  values[1] := 9
   break @u32.add before values[1]
 entry const nested = func () => return do:
-  let leaf = #[1]
-  let values = @array.fill 2 leaf
-  values[0][0] = 9
+  let values = #[#[1], #[1]]
+  values[0][0] := 9
   break @u32.add values[0][0] values[1][0]
 `,
     (guest) => {
       for (
         const name of [
-          "alias",
+          "copy_snapshot",
           "callback",
           "suspended",
-          "global",
+          "global_copy",
           "retained",
+          "calls",
         ]
-      ) for (let i = 0; i < 4; i++) equal(guest.call(name, null), 18);
-      for (let i = 0; i < 4; i++) equal(guest.call("calls", null), 11);
-      equal(guest.call("iterator", null), 10);
-      equal(guest.call("nested", null), 18);
+      ) for (let i = 0; i < 4; i++) equal(guest.call(name, null), 11);
+      equal(guest.call("nested", null), 10);
       const values = new Uint32Array([1, 2]);
       equal((guest.call("parameter", values) as Uint32Array)[1], 9);
       equal(values[1], 2);
@@ -121,44 +113,45 @@ const total = func (values: Array F32) => return do:
   for value in values:
     sum := sum + value
   break sum
-const matched = func (values: Array F32) => return func (index: U32) => return case true of
+const matched = func (values: Array F32) -> (index: U32) => return case true of
   true => values[index]
   false => 0.0
 entry const inlined = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   for i in 0..n:
     let x = get1 i values
-    values[i] = x * 0.5 + 0.25
+    values[i] := x * 0.5 + 0.25
   break values[n - 1]
 entry const called = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
-    values[i] = total values / @u32.to_f32 n + 1.0
+    values[i] := total values / @u32.to_f32 n + 1.0
   break values[n - 1]
+const double_values = func (n: U32) -> (values: Array F32) => return @array.generate n (func i => return values[i] * 2.0)
 entry const generated = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
-  let doubled = @array.generate n (func i => return values[i] * 2.0)
+  let doubled = double_values n values
   for i in 0..n:
-    values[i] = values[i] + doubled[i]
+    values[i] := values[i] + doubled[i]
   break values[n - 1]
 entry const mapped = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   let doubled = array.map (func value => return value * 2.0) values
   for i in 0..n:
-    values[i] = values[i] + doubled[i]
+    values[i] := values[i] + doubled[i]
   break values[n - 1]
 entry const local = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
-  let read = func (xs: Array F32) => return func (index: U32) => return xs[index]
+  let read = func (xs: Array F32) -> (index: U32) => return xs[index]
   for i in 0..n:
     let x = read values i
-    values[i] = x + 1.0
+    values[i] := x + 1.0
   break values[n - 1]
 entry const match_read = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
     let x = matched values i
-    values[i] = x + 1.0
+    values[i] := x + 1.0
   break values[n - 1]
 `,
     (guest) => {
@@ -187,67 +180,67 @@ entry const match_read = func (n: U32) : F32 => return do:
   );
 });
 
-// Aliases returned, stored, paired or captured from an array see its later
-// writes; `@array.set` and `@array.generate` produce new arrays
-// (tasks/LANGUAGE_COHERENCE.md A7).
-Deno.test("surviving aliases of a borrowed array see its writes", async () => {
+// Copies returned, stored, paired or captured from an array keep their snapshot
+// across later updates; `@array.set` and `@array.generate` produce new arrays.
+Deno.test("explicit copies stay independent across borrowed helpers and updates", async () => {
   await compileAndRun(
     `
 type Cell value is data = $Cell value
 const pass = func values => return values
 const wrap = func values => return $Cell values
 const pair = func values => return (values, 1)
-const first = func values => return values[0]
+const first_elem = func (values: Array (Array U32)) => return values[0][0]
 const reader = func values => return func index => return values[index]
 const left = func a => return func b => return a[0] + b[0]
 entry const returned = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
-    let before = pass values
-    values[i] = 9
-    sum := sum + before[i]
+    let before = pass values.copy
+    values[i] := 9
+    sum := sum + before[i] + values[i]
   break sum
 entry const stored = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
-    let $Cell before = wrap values
-    values[i] = 9
-    sum := sum + before[i]
+    let $Cell before = wrap values.copy
+    values[i] := 9
+    sum := sum + before[i] + values[i]
   break sum
 entry const paired = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
-    let (before, _) = pair values
-    values[i] = 9
-    sum := sum + before[i]
+    let (before, _) = pair values.copy
+    values[i] := 9
+    sum := sum + before[i] + values[i]
   break sum
 entry const captured = func (n: U32) => return do:
   let values = @array.fill n 1
-  let read = reader values
+  let snapshot = values.copy
+  let read = reader snapshot
   let sum = 0
   for i in 0..n:
-    values[i] = 9
-    sum := sum + read i
+    values[i] := 9
+    sum := sum + read i + values[i]
   break sum
+const copy_values = func (n: U32) -> (values: Array U32) => return @array.generate n (func index => return values[index])
 entry const kept = func (n: U32) => return do:
   let values = @array.fill n 1
-  let read = func index => return values[index]
-  let copied = @array.generate n read
+  let copied = copy_values n values
   let sum = 0
   for i in 0..n:
-    values[i] = 9
-    sum := sum + read i + copied[i]
+    values[i] := 9
+    sum := sum + values[i] + copied[i]
   break sum
 entry const nested = func (n: U32) => return do:
   let values = @array.generate n (func i => return @array.fill 2 i)
   let sum = 0
   for i in 0..n:
-    let inner = first values
-    values[0][0] = 9
-    sum := sum + inner[0]
+    let before = first_elem values
+    values[0] := #[9, values[0][1]]
+    sum := sum + values[0][0] - (if i == 0 then before else 0)
   break sum
 entry const ordered = func (n: U32) => return do:
   let values = @array.fill n 1
@@ -258,10 +251,9 @@ entry const indexed = func (n: U32) => return do:
 `,
     (guest) => {
       for (const n of [8, 64]) {
-        for (const name of ["returned", "stored", "paired", "captured"]) {
-          equal(guest.call(name, n), 9 * n);
+        for (const name of ["returned", "stored", "paired", "captured", "kept"]) {
+          equal(guest.call(name, n), 10 * n);
         }
-        equal(guest.call("kept", n), 10 * n);
         equal(guest.call("nested", n), 9 * n);
         equal(guest.call("ordered", n), 10);
         equal(guest.call("indexed", n), 1);
@@ -270,9 +262,8 @@ entry const indexed = func (n: U32) => return do:
   );
 });
 
-// Slices copy their source; an alias sees branch writes, and a slice of
-// aliased inner arrays shares them (tasks/LANGUAGE_COHERENCE.md A7).
-Deno.test("fresh copies and disjoint writes preserve sources while aliases see branch writes", async () => {
+// Slices and explicit copies keep sources independent across branch writes.
+Deno.test("fresh copies and disjoint writes preserve sources across branches and slices", async () => {
   await compileAndRun(`
 entry const sliced = func (count: U32) => return do:
   let source = @array.generate count (func i => return i)
@@ -290,26 +281,25 @@ entry const branched = func (count: U32) => return do:
   break values
 entry const retained = func (flag: Bool) => return do:
   let values = #[10, 20]
-  let previous = values
+  let previous = values.copy
   if flag:
-    values[0] = 1
+    values[0] := 1
   else:
-    values[0] = 3
+    values[0] := 3
   break #[previous[0], previous[1], values[0], values[1]]
 entry const nested_slice = func (value: U32) => return do:
-  let inner = #[value]
-  let source = #[inner, inner]
-  let values = @array.slice source 0 2
-  values[0][0] = value + 1
-  break #[inner[0], source[0][0], source[1][0], values[0][0], values[1][0]]
+  let source = #[#[value], #[value]]
+  let values = #[source[0].copy, source[1].copy]
+  values[0][0] := value + 1
+  break #[source[0][0], source[1][0], values[0][0], values[1][0]]
 `, (guest) => {
     for (const count of [1, 32, 4096, 20020]) {
       equal([...guest.call("sliced", count) as Uint32Array].join(","), `0,${count - 1},1,${count}`);
       const values = guest.call("branched", count) as Uint32Array;
       for (let i = 0; i < count; i++) equal(values[i], i + (i % 2 === 0 ? 1 : 3));
     }
-    equal([...guest.call("retained", true) as Uint32Array].join(","), "1,20,1,20");
-    equal([...guest.call("retained", false) as Uint32Array].join(","), "3,20,3,20");
-    equal([...guest.call("nested_slice", 9) as Uint32Array].join(","), "10,10,10,10,10");
+    equal([...guest.call("retained", true) as Uint32Array].join(","), "10,20,1,20");
+    equal([...guest.call("retained", false) as Uint32Array].join(","), "10,20,3,20");
+    equal([...guest.call("nested_slice", 9) as Uint32Array].join(","), "9,9,10,9");
   });
 });

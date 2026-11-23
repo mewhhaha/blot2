@@ -3,53 +3,47 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const source =
-  `const copy = func (dst: Array U32) -> (src: Array U32) -> (first: U32) -> (end: U32): Unit => return do:
+  `const copy = func (dst: own Array U32) -> (src: Array U32) -> (first: U32) -> (end: U32): Array U32 => return do:
   for index in first .. end:
-    dst[index] = src[index]
-  return ()
-const fill = func (dst: Array U32) -> (first: U32) -> (end: U32): Unit => return do:
+    dst[index] := src[index]
+  return dst
+const fill = func (dst: own Array U32) -> (first: U32) -> (end: U32): Array U32 => return do:
   for index in first .. end:
-    dst[index] = 305419896
-  return ()
-const zero = func (dst: Array U32) -> (end: U32): Unit => return do:
+    dst[index] := 305419896
+  return dst
+const zero = func (dst: own Array U32) -> (end: U32): Array U32 => return do:
   for index in 0 .. end:
-    dst[index] = 0
-  return ()
-const fcopy = func (dst: Array F32) -> (src: Array F32) -> (end: U32): Unit => return do:
+    dst[index] := 0
+  return dst
+const fcopy = func (dst: own Array F32) -> (src: Array F32) -> (end: U32): Array F32 => return do:
   for index in 0 .. end:
-    dst[index] = src[index]
-  return ()
-const ffill = func (dst: Array F32) -> (end: U32): Unit => return do:
+    dst[index] := src[index]
+  return dst
+const ffill = func (dst: own Array F32) -> (end: U32): Array F32 => return do:
   for index in 0 .. end:
-    dst[index] = 1.5
-  return ()
+    dst[index] := 1.5
+  return dst
 entry const copied = func (bounds: Array U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
   let src: Array U32 = @array.generate 48 (func index => return @u32.add index 100)
-  copy dst src bounds[0] bounds[1]
-  return dst
+  return copy dst src bounds[0] bounds[1]
 entry const filled = func (bounds: Array U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
-  fill dst bounds[0] bounds[1]
-  return dst
+  return fill dst bounds[0] bounds[1]
 entry const zeroed = func (end: U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
-  zero dst end
-  return dst
+  return zero dst end
 entry const alias = func (end: U32): Array U32 => return do:
   let rows: Array U32 = @array.generate 48 (func index => return index)
-  copy rows rows 0 end
-  return rows
+  return copy rows rows.copy 0 end
 entry const floating = func (end: U32): Array F32 => return do:
   let dst: Array F32 = @array.fill 48 9.0
   let (negative_zero, nan, _, _) = @simd.u32x4.from_bits (0x80000000, 0x7fc01234, 0, 0)
   let src: Array F32 = @array.generate 48 (func index => return if @u32.eq index 0 then negative_zero else if @u32.eq index 1 then nan else 1.25)
-  fcopy dst src end
-  return dst
+  return fcopy dst src end
 entry const float_fill = func (end: U32): Array F32 => return do:
   let dst: Array F32 = @array.fill 48 9.0
-  ffill dst end
-  return dst
+  return ffill dst end
 entry const bool_fill = func (end: U32): Bool => return do:
   let dst: Array Bool = @array.fill 48 false
   for index in 0 .. end:
@@ -60,27 +54,30 @@ entry const shifted = func (end: U32): Array U32 => return do:
   for index in 1 .. end:
     rows[index] := rows[@u32.sub index 1]
   return rows
-const persisted: Array U32 = @array.fill 48 9
+const persisted: ResizeArray U32 = #[]
 const short: Array U32 = @array.fill 24 7
 const long: Array U32 = @array.fill 48 7
-entry const trap_source = func () => return copy persisted short 0 48
-entry const trap_target = func () => return copy persisted long 0 64
-entry const read = func () => return @storage.copy persisted
-entry const reset = func () => return zero persisted 48
-const effects: Array U32 = #[0]
+const push_range = func (dst: ResizeArray U32) -> (src: Array U32) -> (end: U32): Unit => return do:
+  for index in 0 .. end:
+    @storage.push dst src[index]
+  return ()
+entry const trap_source = func () => return push_range persisted short 48
+entry const trap_target = func () => return push_range persisted long 64
+entry const read = func () => return @storage.freeze (@storage.copy persisted)
+entry const reset = func () => return @storage.truncate persisted 0
+const effects: GrowArray U32 = #[]
 const rhs = func (index: U32): U32 => return do:
-  let counter = effects
-  counter[0] = @u32.add counter[0] 1
+  @storage.push effects 1
   return index
 entry const ordered = func (end: U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
   for index in 0 .. end:
     dst[index] := rhs index
   return dst
-entry const effect_count = func () => return effects[0]
-const fill_then_read = func (rows: Array U32) -> (first: U32) -> (end: U32) -> (read_index: U32): U32 => return do:
+entry const effect_count = func () => return @storage.length effects
+const fill_then_read = func (rows: own Array U32) -> (first: U32) -> (end: U32) -> (read_index: U32): U32 => return do:
   for index in first .. end:
-    rows[index] = 7
+    rows[index] := 7
   let selected = rows[read_index]
   return @u32.add selected rows[0]
 entry const reads_after_fill = func (bounds: Array U32): U32 => return do:
@@ -184,10 +181,7 @@ Deno.test(`bulk fixed scalar loops preserve ranges aliases bits and prefix traps
         );
         assert.deepEqual(
           await call("read"),
-          Uint32Array.from({ length: 48 }, (_, i) => {
-            if (i < 24) return 7;
-            return 9;
-          }),
+          new Uint32Array(24).fill(7),
         );
         await call("reset");
         await assert.rejects(

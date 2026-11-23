@@ -49,7 +49,7 @@ const stored = @array.generate 8193 (func i => return $Item { value: i })
 entry const frozen_item = func (index: U32) => return stored[index].value
 entry const frozen_edit = func (value: U32) => return do:
   let xs = @storage.copy stored
-  xs[8192].value = value
+  xs[8192].value := value
   break #[stored[8192].value, xs[8192].value]
 entry const answer = staged[1]
 entry const frozen_chunks = func (index: U32) => return large[index]
@@ -57,8 +57,8 @@ entry const floats = func (count: U32) => return
   #[x | x <- @array.generate count (func i => return @f32.add (@u32.to_f32 i) 0.5)]
 entry const float_update = func (x: F32) => return do:
   let xs = #[x, 2.5]
-  let before = xs
-  xs[0] = 4.5
+  let before = xs.copy
+  xs[0] := 4.5
   break #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
 @[func value => return value + 1]
 entry const tagged = 41
@@ -70,8 +70,7 @@ entry const tagged = 41
     for (const value of [42, 99, 123]) equal([...(guest.call("frozen_edit", value) as Uint32Array)].join(","), `8192,${value}`);
     const floats = guest.call("floats", 513) as Float32Array;
     for (let i = 0; i < floats.length; i++) equal(floats[i], i + 0.5);
-    // `before` aliases `xs`, so it sees the write (tasks/LANGUAGE_COHERENCE.md A7).
-    equal([...(guest.call("float_update", 1.5) as Float32Array)].join(","), "4.5,4.5,5.5");
+    equal([...(guest.call("float_update", 1.5) as Float32Array)].join(","), "1.5,4.5,5.5");
   });
 });
 

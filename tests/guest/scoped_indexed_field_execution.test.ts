@@ -7,28 +7,31 @@ const executable = Deno.args[0] ??
 const source = `
 type Mode is data = $Play | $Edit
 type Editor is data = $Editor {mode: Mode, counter: U32, nested: {mode: Mode}}
-const set_mode = func access => return do:
-  access.editor[0].mode = $Edit
-const toggle = func access => return do:
-  access.editor[0].mode = case self of
+const set_mode = func (own access) => return do:
+  access.editor[0].mode := $Edit
+  return access
+const toggle = func (own access) => return do:
+  access.editor[0].mode := case self of
     $Play => $Edit
     $Edit => $Play
-const increment = func access => return do:
-  access.editor[0].counter = self + 1
-const nested = func access => return do:
-  access.inner.editor[0].nested.mode = $Edit
+  return access
+const increment = func (own access) => return do:
+  access.editor[0].counter := self + 1
+  return access
+const nested = func (own access) => return do:
+  access.inner.editor[0].nested.mode := $Edit
+  return access
 const number = func (mode: Mode): U32 => return case mode of
   $Play => 0
   $Edit => 1
 entry const run = func (count: U32): Array U32 => return do:
-  let editor: Array Editor = #[$Editor {mode: $Play, counter: 0, nested: {mode: $Play}}]
-  let alias = editor
-  set_mode {editor}
+  let state = {editor: #[$Editor {mode: $Play, counter: 0, nested: {mode: $Play}}]}
+  state := set_mode state
   for index in 0 .. count:
-    toggle {editor}
-    increment {editor}
-  nested {inner: {editor}}
-  return #[number editor[0].mode, editor[0].counter, number editor[0].nested.mode, alias[0].counter]
+    state := toggle state
+    state := increment state
+  let done = nested {inner: state}
+  return #[number done.inner.editor[0].mode, done.inner.editor[0].counter, number done.inner.editor[0].nested.mode, done.inner.editor[0].counter]
 `;
 
 {

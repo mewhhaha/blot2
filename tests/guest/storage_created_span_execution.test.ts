@@ -4,49 +4,48 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 function source(createdFirst: boolean) {
   const calls = (other: string) => {
-    const pair = [`wrapped local ${other} 4`, `wrapped ${other} local 4`];
+    const pair = [
+      `let (local, ${other}) = wrapped local ${other} 4`,
+      `let (${other}, local) = wrapped ${other} local 4`,
+    ];
     if (!createdFirst) pair.reverse();
     return pair.map((call) => `  ${call}`).join("\n");
   };
-  return `const walk = func (left: Array U32) -> (right: Array U32) -> (remaining: U32): Unit => return do:
+  return `const walk: own Array U32 -> own Array U32 -> U32 -> (Array U32, Array U32) = func (left: own Array U32) -> (right: own Array U32) -> (remaining: U32): (Array U32, Array U32) => return do:
   if @u32.eq remaining 0:
-    return ()
+    return (left, right)
   let index = @u32.sub remaining 1
-  left[index] = @u32.add left[index] right[index]
-  walk left right index
-  right[index] = @u32.add self 1
-  return ()
-const wrapped = func (left: Array U32) -> (right: Array U32) -> (count: U32): Unit => return walk left right count
-const bump = func (rows: Array U32) -> (index: U32): Unit => return do:
-  rows[index] = @u32.add self 1
-  return ()
-const forwarded = func (rows: Array U32) -> (index: U32): Unit => return bump rows index
+  left[index] := @u32.add left[index] right[index]
+  let (left, right) = walk own left own right index
+  right[index] := @u32.add self 1
+  return (left, right)
+const wrapped = func (left: own Array U32) -> (right: own Array U32) -> (count: U32): (Array U32, Array U32) => return walk left right count
+const bump = func (rows: own Array U32) -> (index: U32): Array U32 => return do:
+  rows[index] := @u32.add self 1
+  return rows
+const forwarded = func (rows: own Array U32) -> (index: U32): Array U32 => return bump rows index
 const read_if = func (rows: Array U32) -> (index: U32) -> (flag: U32): U32 => return do:
   if @u32.eq flag 0:
     return 0
   return rows[index]
-const global: Array U32 = #[10, 20, 30, 40]
+const global: ResizeArray U32 = #[10, 20, 30, 40]
 entry const reset = func (): Unit => return do:
-  let rows = global
+  @storage.truncate global 0
   for index in 0 .. 4:
-    rows[index] = @u32.mul (@u32.add index 1) 10
+    @storage.push global (@u32.mul (@u32.add index 1) 10)
   return ()
-entry const mixed = func (input: Array U32): Array U32 => return do:
+entry const mixed = func (input: own Array U32): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
 ${calls("input")}
   return #[local[0], local[1], local[2], local[3], input[0], input[1], input[2], input[3]]
 entry const globals = func (): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
-${calls("global")}
-  return #[local[0], local[1], local[2], local[3], global[0], global[1], global[2], global[3]]
-entry const aliased = func (): Array U32 => return do:
-  let local: Array U32 = #[1, 2, 3, 4]
-  let alias = local
-  wrapped local alias 4
-  return local
-entry const skipped = func (input: Array U32): U32 => return do:
+  let g: Array U32 = @storage.freeze (@storage.copy global)
+${calls("g")}
+  return #[local[0], local[1], local[2], local[3], g[0], g[1], g[2], g[3]]
+entry const skipped = func (input: own Array U32): U32 => return do:
   let empty: Array U32 = #[]
-  wrapped empty input 0
+  let (empty, input) = wrapped empty input 0
   return @u32.add (read_if empty 4294967295 0) (read_if input 4294967295 0)
 entry const varying = func (iterations: U32): U32 => return do:
   let total = 0
@@ -55,32 +54,37 @@ entry const varying = func (iterations: U32): U32 => return do:
     let rows: Array U32 = @array.fill capacity 7
     if @u32.lt 0 capacity:
       let last = @u32.sub capacity 1
-      forwarded rows last
+      rows := forwarded rows last
       total := @u32.add self rows[last]
   return total
 entry const varying_oob = func (): Unit => return do:
   for iteration in 0 .. 3:
     let rows: Array U32 = @array.fill (@u32.sub 4 iteration) 7
-    forwarded rows 3
+    let _ = forwarded rows 3
   return ()
 entry const created_oob = func (index: U32): Unit => return do:
   let rows: Array U32 = @array.fill 4 7
-  forwarded rows index
+  let _ = forwarded rows index
   return ()
-entry const public_oob = func (input: Array U32): Unit => return forwarded input input.length
+entry const public_oob = func (input: own Array U32): Unit => return do:
+  let len = input.length
+  let _ = forwarded input len
+  return ()
 entry const prefix_trap = func (end: U32): Unit => return do:
+  let base: Array U32 = #[10, 20, 30, 40]
+  @storage.truncate global 0
   for index in 0 .. end:
-    forwarded global index
+    @storage.push global (@u32.add base[index] 1)
   return ()
-entry const read_global = func (): Array U32 => return @storage.copy global
-const copy_float = func (dst: Array F32) -> (src: Array F32) -> (index: U32): Unit => return do:
-  dst[index] = src[index]
-  return ()
-entry const floats = func (input: Array F32): Array F32 => return do:
+entry const read_global = func (): Array U32 => return @storage.freeze (@storage.copy global)
+const copy_float = func (dst: own Array F32) -> (src: Array F32) -> (index: U32): Array F32 => return do:
+  dst[index] := src[index]
+  return dst
+entry const floats = func (input: own Array F32): Array F32 => return do:
   let rows: Array F32 = @array.fill 2 0.0
-  copy_float rows input 0
-  copy_float rows input 1
-  copy_float input rows 0
+  rows := copy_float rows input 0
+  rows := copy_float rows input 1
+  input := copy_float input rows 0
   return rows
 `;
 }
@@ -132,10 +136,6 @@ for (const createdFirst of [true, false]) {
           assert.deepEqual(
             await call("globals"),
             mixedExpected(createdFirst),
-          );
-          assert.deepEqual(
-            await call("aliased"),
-            new Uint32Array([3, 5, 7, 9]),
           );
           assert.equal(await call("skipped", new Uint32Array()), 0);
           for (const count of [0, 1, 4, 6, 12, 21]) {

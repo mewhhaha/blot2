@@ -63,14 +63,15 @@ entry const invalid = func () => return do:
 Deno.test("fixed application literals remain independent", async () => {
   const names = Array.from({ length: 12 }, (_, index) => `slot_${index}`);
   const declarations = names.map((name, index) =>
-    `const ${name}: Array U32 = #[${index}]`
+    index === 0
+      ? `const ${name}: GrowArray U32 = #[${index}]`
+      : `const ${name}: Array U32 = #[${index}]`
   ).join("\n");
   await compileAndRun(
     `${declarations}
 entry const answer = func (): Array U32 => return do:
-  let current = slot_0
-  current[0] = current[0] + 1
-  return #[${names.map((name) => `${name}[0]`).join(" + ")}]
+  @storage.push slot_0 1
+  return #[slot_0.length - 1 + ${names.slice(1).map((name) => `${name}[0]`).join(" + ")}]
 `,
     (guest) => {
       assert.deepEqual(Array.from(guest.call("answer", null) as Uint32Array), [

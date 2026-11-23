@@ -1263,7 +1263,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     if tag == blot_check_core::Tag.bind {
         let value = m.node(n.b);
-        if value.tag == blot_check_core::Tag.update && !m.updateInfo(n.b).store {
+        if value.tag == blot_check_core::Tag.update {
             let upd = update(self_, m, n.b, n.a);
             if n.c >= 2 {
                 let outer_b = n.c - 2;
@@ -2811,7 +2811,7 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     // is unique when every array the path goes through is, and a value
     // read out of an array is only when the array is unique all the way
     // down. So `world.items := grown self x` can give the old leaf away.
-    if !info.store && info.self_binding != 0 && local(self_, info.self_binding) {
+    if info.self_binding != 0 && local(self_, info.self_binding) {
         var leaf: Fact = none;
         if local(self_, root.origin) && self_.facts[root.origin] != spent {
             leaf = self_.facts[root.origin];
@@ -2830,13 +2830,6 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     var leaf = m.typeOf(info.value);
     if selectors.len != 0 { leaf = selectors[selectors.len - 1].result_type; }
     let shared = holds(self_, m, leaf) && replacement != deep;
-    if info.store {
-        // A store through what the function was lent keeps the value there,
-        // so the arrays the value owns must be nobody else's.
-        if shared && !keeping(self_) && !(local(self_, root.origin) && accepts(self_, m, self_.facts[root.origin], selectors)) && (!ownedAs(self_, m, replacement, m.typeOf(info.value), 0) || lentHolder(self_, m, info.value)) { reject(self_, m, id, blot_check_core::Code.kept_value); }
-        if shared { sharedInto(self_, m, info.root, selectors); }
-        return Value { .. };
-    }
     var old: Fact = none;
     if local(self_, root.origin) { old = self_.facts[root.origin]; }
     let mark = self_.fields.len;

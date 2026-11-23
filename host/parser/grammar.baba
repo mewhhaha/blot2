@@ -141,7 +141,7 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:source_identifier (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(named_function | binding | rebinding | store | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | fork_statement | with_statement | comptime_for | comptime_if | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(named_function | binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | fork_statement | with_statement | comptime_for | comptime_if | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 fork_statement = ("fork" targets:source_identifier ("," targets:source_identifier)* ":" body:suite) ;
 with_statement = ("with" entries:with_entry ("," entries:with_entry)* ":" body:suite) ;
 with_entry = (target:type_application ("=" handler:expression)?) ;
@@ -150,8 +150,6 @@ comptime_if = ("#" "if" condition:expression ":" consequence:suite fallback:comp
 comptime_else = (LAYOUT_NEWLINE? "#" "else" ":" alternative:suite) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
-// `place = value` writes storage in place; the checker requires an index.
-store = (root:(source_identifier | group) path:(member_access | index_access)+ "=" value:expression) ;
 index_access = ("[" index:expression "]") ;
 slice_access = ("[" start:expression ".." end:expression "]") ;
 for_statement = ("for" "let"? pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;

@@ -231,15 +231,12 @@ struct UpdateStep {
     source_type: blot_check_types::Id,
     result_type: blot_check_types::Id
 }
-// A store (`place = value`) is an update whose root is the container
-// expression before the first index. It is a statement and rebinds nothing.
 struct UpdateInfo {
     root: Id,
     path: List,
     value: Id,
     self_binding: BindingId,
-    selectors: List = List {..},
-    store: bool = false
+    selectors: List = List {..}
 }
 struct ClosureInfo {
     qualifier: BindingId = 0,
@@ -415,7 +412,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         unresolved_binding => { return "Typed expression has no resolved binding identity"; },
         invalid_call => { return "Typed core requires a resolved named call or compiler primitive"; },
         complexity => { return "Typed core exceeds its nesting or table limit"; },
-        aliased_update => { return "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"; },
+        aliased_update => { return "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"; },
         spent_value => { return "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"; },
         own_argument => { return "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"; },
         result_not_owned => { return "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"; },

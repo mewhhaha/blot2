@@ -70,75 +70,72 @@ async function sortSource(): Promise<string> {
     return source.slice(first, last);
   };
   return extract(merge, "const merge =", "const merge_sort_inplace =") +
-    extract(quick, "const quick_sort =", "const run =") + `
+    extract(quick, "const quick_sort:", "const run =") + `
 entry const merge_sorted = func (input: Array U32): Array U32 => return do:
   let values = @storage.copy input
   let temp: Array U32 = @array.fill 64 0
   if @u32.lt 0 values.length:
-    merge_sort_helper values temp 0 (@u32.sub values.length 1)
+    let (sorted, _) = merge_sort_helper values temp 0 (@u32.sub values.length 1)
+    return sorted
   return values
 entry const quick_sorted = func (input: Array U32): Array U32 => return do:
   let values = @storage.copy input
-  quick_sort values 0 values.length
-  return values
+  return quick_sort values 0 values.length
 entry const empty_range = func (): Array U32 => return do:
   let values: Array U32 = #[9, 5, 3]
-  quick_sort values 1 1
-  return values
+  return quick_sort values 1 1
 entry const singleton_range = func (): Array U32 => return do:
   let values: Array U32 = #[9, 5, 3]
   let temp: Array U32 = #[0, 0, 0]
-  quick_sort values 1 2
-  merge_sort_helper values temp 1 1
+  let values = quick_sort values 1 2
+  let (values, _) = merge_sort_helper values temp 1 1
   return values
 `;
 }
 
 const depthSource =
-  `const descend = func (values: Array U32) -> (unused: Array U32) -> (remaining: U32) -> (left: U32) -> (right: U32): Unit => return do:
+  `const descend: own Array U32 -> Array U32 -> U32 -> U32 -> U32 -> Array U32 = func (values: own Array U32) -> (unused: Array U32) -> (remaining: U32) -> (left: U32) -> (right: U32): Array U32 => return do:
   if @u32.eq remaining 0:
-    return ()
+    return values
   let saved = @u32.add remaining 17
   if @u32.eq (@u32.rem remaining 2) 0:
-    values[0] = @u32.add values[0] left
-    descend values unused (@u32.sub remaining 1) (@u32.add left 1) (@u32.add right 3)
-    values[1] = @u32.add values[1] saved
+    values[0] := @u32.add values[0] left
+    values := descend own values unused (@u32.sub remaining 1) (@u32.add left 1) (@u32.add right 3)
+    values[1] := @u32.add values[1] saved
   else:
-    values[0] = @u32.add values[0] right
-    descend values unused (@u32.sub remaining 1) (@u32.add left 2) (@u32.add right 1)
-    values[2] = @u32.add values[2] saved
-  values[3] = @u32.add values[3] (@u32.add left right)
-  return ()
-const pair = func (left: Array U32) -> (right: Array U32) -> (remaining: U32): Unit => return do:
-  left[0] = @u32.add left[0] right[0]
+    values[0] := @u32.add values[0] right
+    values := descend own values unused (@u32.sub remaining 1) (@u32.add left 2) (@u32.add right 1)
+    values[2] := @u32.add values[2] saved
+  values[3] := @u32.add values[3] (@u32.add left right)
+  return values
+const pair: own Array U32 -> own Array U32 -> U32 -> (Array U32, Array U32) = func (left: own Array U32) -> (right: own Array U32) -> (remaining: U32): (Array U32, Array U32) => return do:
+  left[0] := @u32.add left[0] right[0]
   if @u32.lt 0 remaining:
-    pair left right (@u32.sub remaining 1)
-  right[0] = @u32.add right[0] 1
-  return ()
-const touch = func (values: Array U32) -> (remaining: U32): Unit => return do:
+    let (next_left, next_right) = pair own left own right (@u32.sub remaining 1)
+    left := next_left
+    right := next_right
+  right[0] := @u32.add right[0] 1
+  return (left, right)
+const touch: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -> (remaining: U32): Array U32 => return do:
   if @u32.lt 0 remaining:
-    touch values (@u32.sub remaining 1)
-  values[remaining] = remaining
-  return ()
+    values := touch own values (@u32.sub remaining 1)
+  values[remaining] := remaining
+  return values
 entry const answer = func (depth: U32): Array U32 => return do:
   let values: Array U32 = #[0, 0, 0, 0]
   let unused: Array U32 = #[]
   let caller = @u32.add depth 900
-  descend values unused depth 0 0
-  descend values unused depth depth 3
+  values := descend values unused depth 0 0
+  values := descend values unused depth depth 3
   return #[values[0], values[1], values[2], values[3], caller]
 entry const distinct = func (depth: U32): Array U32 => return do:
   let left: Array U32 = #[1]
   let right: Array U32 = #[2]
-  pair left right depth
+  let (left, right) = pair left right depth
   return #[left[0], right[0]]
-entry const aliased = func (depth: U32): Array U32 => return do:
-  let values: Array U32 = #[1]
-  pair values values depth
-  return #[values[0], values[0]]
 entry const checked = func (depth: U32): U32 => return do:
   let values: Array U32 = #[0, 0, 0, 0]
-  touch values depth
+  values := touch values depth
   return @u32.add (@u32.add values[0] values[1]) (@u32.add values[2] values[3])
 `;
 
@@ -180,69 +177,69 @@ const recursive: {
     name: "mutual recursion",
     expected: (n) => (n * (n - 1) / 2) >>> 0,
     source:
-      `const first = func (values: Array U32) -> (n: U32): Unit => return do:
+      `const first: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -> (n: U32): Array U32 => return do:
   if @u32.lt 0 n:
-    second values (@u32.sub n 1)
-  return ()
-const second = func (values: Array U32) -> (n: U32): Unit => return do:
-  values[0] = @u32.add values[0] n
-  first values n
-  return ()
+    return second own values (@u32.sub n 1)
+  return values
+const second: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -> (n: U32): Array U32 => return do:
+  values[0] := @u32.add values[0] n
+  return first own values n
 entry const bad = func (n: U32) => return do:
   let values: Array U32 = #[0]
-  first values n
+  values := first values n
   return values[0]
 `,
   },
   {
     name: "captured closure backedge",
     expected: (n) => n,
-    body: `  values[0] = @u32.add values[0] n
-  let again = func (next: U32): Unit => return walk values next
+    body: `  values[0] := @u32.add values[0] n
+  let again = func (vs: own Array U32) -> (next: U32): Array U32 => return walk own vs next
   if @u32.lt 0 n:
-    again (@u32.sub n 1)`,
+    values := again values (@u32.sub n 1)`,
   },
   {
     name: "local allocation",
     expected: (n) => n,
     body: `  let temporary: Array U32 = #[n]
-  values[0] = temporary[0]
+  values[0] := temporary[0]
   if @u32.lt 0 n:
-    walk values (@u32.sub n 1)`,
+    values := walk own values (@u32.sub n 1)`,
   },
   {
     name: "transitive allocation",
     expected: (n) => n,
     prefix:
-      `const allocate = func (values: Array U32) -> (n: U32): Unit => return do:
+      `const allocate = func (values: own Array U32) -> (n: U32): Array U32 => return do:
   let temporary: Array U32 = #[n]
-  values[0] = temporary[0]
-  return ()\n`,
-    body: `  allocate values n
+  values[0] := temporary[0]
+  return values\n`,
+    body: `  values := allocate values n
   if @u32.lt 0 n:
-    walk values (@u32.sub n 1)`,
+    values := walk own values (@u32.sub n 1)`,
   },
   {
     name: "implicit global owner",
     expected: (n) => n,
     prefix: "const hidden: Array U32 = #[42]\n",
-    body: `  values[0] = hidden[0]
+    body: `  values[0] := hidden[0]
   if @u32.lt 0 n:
-    walk values (@u32.sub n 1)`,
+    values := walk own values (@u32.sub n 1)`,
   },
   {
     name: "changed formal owner correspondence",
     expected: () => 2,
     source:
-      `const walk = func (left: Array U32) -> (right: Array U32) -> (n: U32): Unit => return do:
-  left[0] = right[0]
+      `const walk: own Array U32 -> own Array U32 -> U32 -> (Array U32, Array U32) = func (left: own Array U32) -> (right: own Array U32) -> (n: U32): (Array U32, Array U32) => return do:
+  left[0] := right[0]
   if @u32.lt 0 n:
-    walk right left (@u32.sub n 1)
-  return ()
+    let (next_right, next_left) = walk own right own left (@u32.sub n 1)
+    return (next_left, next_right)
+  return (left, right)
 entry const bad = func (n: U32) => return do:
   let left: Array U32 = #[1]
   let right: Array U32 = #[2]
-  walk left right n
+  let (left, _) = walk left right n
   return left[0]
 `,
   },
@@ -252,7 +249,7 @@ entry const bad = func (n: U32) => return do:
     mode: "ResizeArray",
     body: `  @storage.truncate values 0
   if @u32.lt 0 n:
-    walk values (@u32.sub n 1)`,
+    values := walk own values (@u32.sub n 1)`,
   },
   {
     name: "freeze",
@@ -260,20 +257,20 @@ entry const bad = func (n: U32) => return do:
     mode: "GrowArray",
     body: `  let fixed = @storage.freeze values
   if @u32.lt 0 n:
-    walk values (@u32.sub n 1)`,
+    values := walk own values (@u32.sub n 1)`,
   },
   {
     name: "borrowed formal",
     expected: (n) => n + 1,
-    source: `const walk = func (value: &U32) -> (sink: Array U32) -> (n: U32): Unit => return do:
-  sink[0] = @u32.add sink[0] (@storage.load value)
+    source: `const walk: &U32 -> own Array U32 -> U32 -> Array U32 = func (value: &U32) -> (sink: own Array U32) -> (n: U32): Array U32 => return do:
+  sink[0] := @u32.add sink[0] (@storage.load value)
   if @u32.lt 0 n:
-    walk value sink (@u32.sub n 1)
-  return ()
+    return walk value own sink (@u32.sub n 1)
+  return sink
 entry const bad = func (n: U32) => return do:
   let values: Array U32 = #[1]
   let sink: Array U32 = #[0]
-  walk (&values[0]) sink n
+  sink := walk (&values[0]) sink n
   return sink[0]
 `,
   },
@@ -285,12 +282,12 @@ function recursiveSource(item: typeof recursive[number]): string {
   if (item.mode !== undefined) mode = item.mode;
   let prefix = "";
   if (item.prefix !== undefined) prefix = item.prefix;
-  return `${prefix}const walk = func (values: ${mode} U32) -> (n: U32): Unit => return do:
+  return `${prefix}const walk: own ${mode} U32 -> U32 -> ${mode} U32 = func (values: own ${mode} U32) -> (n: U32): ${mode} U32 => return do:
 ${item.body}
-  return ()
+  return values
 entry const bad = func (n: U32) => return do:
   let values: ${mode} U32 = #[0]
-  walk values n
+  let _ = walk values n
   return n
 `;
 }
@@ -300,28 +297,29 @@ entry const bad = func (n: U32) => return do:
 // recursive call executes beneath an actual bank-sharing extracted region.
 const outlineUpdates = 1500;
 const outlineSource =
-  `const accumulate = func (values: Array U32) -> (remaining: U32): Unit => return do:
+  `const accumulate: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -> (remaining: U32): Array U32 => return do:
   if @u32.lt 0 remaining:
     let saved = values[0]
-    accumulate values (@u32.sub remaining 1)
-    values[0] = @u32.add values[0] remaining
-    values[1] = @u32.add values[1] saved
-  return ()
-const bulky = func (rows: ResizeArray U32) -> (values: Array U32) -> (input: U32): U32 => return do:
+    values := accumulate own values (@u32.sub remaining 1)
+    values[0] := @u32.add values[0] remaining
+    values[1] := @u32.add values[1] saved
+  return values
+const bulky = func (rows: own ResizeArray U32) -> (values: own Array U32) -> (input: U32): (ResizeArray U32, Array U32, U32) => return do:
   @storage.reserve rows 4
   let total = input
 ${
     "  total := @u32.add total input\n".repeat(outlineUpdates / 2)
-  }  accumulate values input
+  }  values := accumulate values input
 ${
     "  total := @u32.add total input\n".repeat(outlineUpdates / 2)
-  }  rows[0] = @u32.add rows[0] 1
-  return @u32.add total values[0]
+  }  rows[0] := @u32.add rows[0] 1
+  let result = @u32.add total values[0]
+  return (rows, values, result)
 entry const answer = func (input: U32): Array U32 => return do:
   let rows: ResizeArray U32 = #[input]
   let values: Array U32 = #[input, 0]
   let saved = @u32.add input 333
-  let result = bulky rows values input
+  let (rows, values, result) = bulky rows values input
   return #[result, values[0], values[1], rows[0], saved]
 `;
 
@@ -377,11 +375,6 @@ Deno.test(`recursive fixed ABI preserves scalars owner aliases and trap recovery
         assert.deepEqual(
           await call("distinct", depth),
           new Uint32Array([1 + 2 * (depth + 1), depth + 3]),
-        );
-        const aliased = (2 ** (depth + 1) + depth + 1) >>> 0;
-        assert.deepEqual(
-          await call("aliased", depth),
-          new Uint32Array([aliased, aliased]),
         );
       }
       await assert.rejects(() => call("checked", 5));

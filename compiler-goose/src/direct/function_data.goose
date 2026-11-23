@@ -35,7 +35,7 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let prev_reuse_node = f.reuse_node;
     let prev_reuse_block = f.reuse_block;
     let prev_reuse_ty = f.reuse_ty;
-    if !info.store && !g.runtime_().has_fork {
+    if !g.runtime_().has_fork {
         let root_binding = localRef(m, info.root);
         if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && uses(g, f, root_binding) == 1 && !bindingCaptured(g, f, root_binding) {
             let boxed, berr = isBoxed(g, f, root.ty, id);

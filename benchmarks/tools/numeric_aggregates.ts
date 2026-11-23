@@ -77,9 +77,8 @@ entry const constant_${id} = func () => return do:
   return shape.read_${id} values[1]
 entry const nested_edit_${id} = func (seed: F32) => return do:
   let values = @array.fill 2 (shape.make_${id} 1.0)
-  let old = values
-  values[0].${nested ? "a.x" : "ax"} = seed
-  return shape.read_${id} values[0] + shape.read_${id} old[0]
+  values[0].${nested ? "a.x" : "ax"} := seed
+  return shape.read_${id} values[0] + shape.read_${id} values[0]
 entry const list_${id} = func (count: U32) => return do:
   let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
   let old = values

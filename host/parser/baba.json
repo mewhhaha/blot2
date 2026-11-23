@@ -408,12 +408,6 @@
         }
       },
       {
-        "rule": "store",
-        "boundary": {
-          "kind": "root"
-        }
-      },
-      {
         "rule": "for_statement",
         "boundary": {
           "kind": "root"

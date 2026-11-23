@@ -15,7 +15,7 @@ entry const ragged = func (count: U32) => return do:
   let payload = array.fill (count * (count + 1) / 2) 0
   for i in 0 .. count:
     for j in 0 .. i + 1:
-      payload[commands[i].lanes.start + j] = i + j
+      payload[commands[i].lanes.start + j] := i + j
   let chunks = array.map (func c => return c.lanes) commands
   let lanes = array.flatten chunks payload
   break lanes.length

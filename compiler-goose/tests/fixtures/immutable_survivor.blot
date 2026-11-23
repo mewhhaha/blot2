@@ -6,10 +6,9 @@ entry const single = func (input: U32): Array U32 => return do:
   let selected = payload
   let candidate = if @u32.eq input 0 then $Nothing else $Some input
   if let $Some amount = candidate:
-    let alias = selected
     selected.cold.left := amount
-    selected.rows[0] = @u32.add self 2
-    alias.rows[0] = @u32.add self 1
+    selected.rows[0] := @u32.add self 2
+    selected.rows[0] := @u32.add self 1
   else:
     return #[99]
   return #[selected.rows[0], selected.cold.left, selected.hook 7]

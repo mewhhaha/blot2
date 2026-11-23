@@ -13,9 +13,9 @@ const size = func collections: U32 => return do:
     let text_length: U32 = row.text.length
     total := self + text_length
   return total
-const effects: GrowArray U32 = #[0]
+const effects: GrowArray U32 = #[]
 const tick = func (value: U32): U32 => return do:
-  effects[0] = effects[0] + 1
+  @storage.push effects 1
   return value
 entry const empty = func (count: U32): U32 => return do:
   let rows: ResizeArray Row = #[]
@@ -64,7 +64,7 @@ entry const dynamic = func (value: U32): U32 => return do:
   let $Some item = candidate else:
     return tick 99
   return item
-entry const effect_count = func (): U32 => return effects[0]
+entry const effect_count = func (): U32 => return @storage.length effects
 `;
 
 Deno.test(`refutable bindings preserve iterator and exiting fallback control flow`, async () => {

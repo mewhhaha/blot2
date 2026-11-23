@@ -118,7 +118,7 @@ entry const read = func (): Array F32 => return do:
   let $Position (z, x) = first
   let boxes: GrowArray (Box U32) = #[$Box 40]
   let pushed = @storage.push positions ($Position {x: 2.5, z: 9})
-  boxes[0] = $Box 42
+  boxes[0] := $Box 42
   let $Box number = boxes[0]
   return #[first.x, x, U32.to_f32 z, positions[1].x, U32.to_f32 boxes[0].value, U32.to_f32 number]
 `,
@@ -140,38 +140,39 @@ entry const read = func (): Array F32 => return do:
   );
 });
 
-Deno.test("nominal wrappers read their owner's stores through their borrows", async () => {
+Deno.test("nominal wrappers read their owner's updates through their borrows", async () => {
   await compileAndRun(
     `
 type Borrow is data = $Borrow {target: &U32}
 entry const answer = func () => return do:
   let items: GrowArray U32 = #[40]
+  items[0] := 42
   let borrowed = $Borrow (&items[0])
-  items[0] = 42
   return @storage.load borrowed.target
 `,
     (guest) => assert.equal(guest.call("answer", null), 42),
   );
 });
 
-Deno.test("inline updates copy records while array writes reach aliases and explicit copies stay independent", async () => {
+Deno.test("inline updates copy records while explicit copies stay independent", async () => {
   await compileAndRun(
     `
 type Point is data = $Point {z: U32, x: F32}
 type World is data = $World {points: GrowArray Point}
 const points: GrowArray Point = #[$Point (7, 1.5)]
 entry const answer = func (): Array F32 => return do:
-  let world = $World points
-  let alias = world
-  let checkpoint = @storage.copy points
+  let current = points[@u32.sub (@storage.length points) 1]
+  let world = $World #[current]
+  let checkpoint = @storage.copy world.points
   let before = world.points[0]
-  world.points[0].x = self + 1.0
+  world.points[0].x := self + 1.0
+  @storage.push points world.points[0]
   let row = world.points[0]
   row.z := 42
   let record = {nested: {z: 3, x: 2.0}, count: 1}
   let old = record
   record.nested.x := self * 2.0
-  return #[alias.points[0].x, checkpoint[0].x, before.x, U32.to_f32 row.z, U32.to_f32 points[0].z, record.nested.x, old.nested.x]
+  return #[world.points[0].x, checkpoint[0].x, before.x, U32.to_f32 row.z, U32.to_f32 points[0].z, record.nested.x, old.nested.x]
 `,
     (guest) => {
       assert.deepEqual(
@@ -189,13 +190,13 @@ entry const answer = func (): Array F32 => return do:
 Deno.test("indexed updates select once before RHS and pin the selected extent", async () => {
   await compileAndRun(
     `
-const calls: GrowArray U32 = #[0]
+const calls: GrowArray U32 = #[]
 const select = func () => return do:
-  calls[0] = calls[0] + 1
+  @storage.push calls 1
   return 0
 entry const answer = func () => return do:
   let values: GrowArray U32 = #[40]
-  values[select ()] := self + calls[0] + 1
+  values[select ()] := self + @storage.length calls + 1
   return values[0]
 `,
     (guest) => {
@@ -252,10 +253,9 @@ Deno.test("nested field writes preserve sibling mutations performed by the RHS",
 type Point is data = $Point {z: U32, x: U32}
 entry const answer = func (): Array U32 => return do:
   let rows: GrowArray {point: Point, count: U32} = #[{point: $Point (7, 1), count: 3}]
-  let alias = rows
-  rows[0].point.x = do:
-    alias[0].point.z = 9
-    alias[0].count = 4
+  rows[0].point.x := do:
+    rows[0].point.z := 9
+    rows[0].count := 4
     break self + 1
   return #[rows[0].point.x, rows[0].point.z, rows[0].count]
 `,
@@ -278,7 +278,7 @@ entry const answer = func (count: U32): Array U32 => return do:
   let joined = array.concat (array.slice 0 1 replaced) filled
   let borrowed = joined.view 1 joined.length
   let extended = array.push 9 borrowed
-  joined[1] = 100
+  joined[1] := 100
   return array.concat #[values[0], checkpoint[0], @storage.length storage] extended
 `,
     // `array.replace` returns a new array, so `values` keeps 10.
@@ -366,17 +366,17 @@ Deno.test("writing the complete borrow shape before a loop read remains admitted
 type Choice is data = $No | $Rows &[U32]
 entry const answer = func (): Array U32 => return do:
   let owner: GrowArray U32 = #[42]
-  let rows: Array Choice = #[$No]
   let total = 0
   for i in 0 .. 2:
-    rows[0] = $Rows (&owner[0..1])
+    let rows: Array Choice = #[$No]
+    rows[0] := $Rows (&owner[0..1])
     let copied = @storage.copy rows
     total := self + (case copied[0] of
       $No => 0
       $Rows view => view[0])
-  let generated_rows: Array Choice = #[$No]
   let counts = @array.generate 2 (func i => return do:
-    generated_rows[0] = $Rows (&owner[0..1])
+    let generated_rows: Array Choice = #[$No]
+    generated_rows[0] := $Rows (&owner[0..1])
     let copied = @storage.copy generated_rows
     return case copied[0] of
       $No => 0

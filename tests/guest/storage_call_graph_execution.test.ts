@@ -12,43 +12,41 @@ const ref_leaf = func (value: Ref U32): U32 => return @storage.load value
 const ref_twice = func (value: Ref U32): U32 => return @u32.add (ref_leaf value) (ref_leaf value)
 const link_leaf = func (value: Link U32): U32 => return @storage.load value
 const link_twice = func (value: Link U32): U32 => return @u32.add (link_leaf value) (link_leaf value)
+const read_link = func (rows: GrowArray U32) -> (index: U32): U32 => return link_twice (@storage.link rows index)
 const row_value = func (rows: ResizeArray U32): U32 => return rows[1]
-const mutate_pair = func (left: ResizeArray U32) -> (right: ResizeArray U32) -> (amount: U32): Unit => return do:
-  left[1] = @u32.add (row_value left) amount
-  right[1] = @u32.add (row_value right) (@u32.add amount 1)
-const invoke = func callback -> (amount: U32): Unit => return do:
-  callback amount
-  callback (@u32.add amount 1)
-const invoke_twice = func callback -> (amount: U32): Unit => return do:
-  invoke callback amount
-  invoke callback (@u32.add amount 2)
+const mutate_pair = func (left: own ResizeArray U32) -> (right: own ResizeArray U32) -> (amount: U32): (ResizeArray U32, ResizeArray U32) => return do:
+  left[1] := @u32.add (row_value left) amount
+  right[1] := @u32.add (row_value right) (@u32.add amount 1)
+  return (left, right)
+const invoke = func (callback: own ResizeArray U32 -> U32 -> ResizeArray U32) -> (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+  rows := callback rows amount
+  return callback rows (@u32.add amount 1)
+const invoke_twice = func (callback: own ResizeArray U32 -> U32 -> ResizeArray U32) -> (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+  rows := invoke callback rows amount
+  return invoke callback rows (@u32.add amount 2)
+const add_second = func (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+  rows[1] := @u32.add rows[1] amount
+  return rows
 entry const answer = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input, @u32.add input 10, @u32.add input 20]
   let second: ResizeArray U32 = #[@u32.add input 100, @u32.add input 110, @u32.add input 120]
   let links: GrowArray U32 = #[@u32.add input 200, @u32.add input 210]
-  let first_view = &first[1..3]
-  let second_view = &second[1..3]
-  let first_ref = @storage.at first 1
-  let second_ref = @storage.at second 1
-  let first_link = @storage.link links 0
-  let second_link = @storage.link links 1
-  let before = @u32.add (view_twice first_view) (@u32.add (ref_twice second_ref) (link_twice first_link))
-  mutate_pair first first input
-  mutate_pair first second 2
-  let write_first = func (amount: U32): Unit => return do:
-    first[1] = @u32.add first[1] amount
-  let write_second = func (amount: U32): Unit => return do:
-    second[1] = @u32.add second[1] amount
-  invoke_twice write_first 1
-  invoke_twice write_second 11
+  let before = @u32.add (view_twice (&first[1..3])) (@u32.add (ref_twice (@storage.at second 1)) (read_link links 0))
+  first[1] := @u32.add first[1] (@u32.add (@u32.mul 2 input) 1)
+  let (first, second) = mutate_pair first second 2
+  let first = invoke_twice add_second first 1
+  let second = invoke_twice add_second second 11
   let total: U32 = 0
   for index in 0 .. 3:
-    mutate_pair first second index
-    total := @u32.add total (@u32.add (view_twice first_view) (ref_twice second_ref))
-  links[0] = @u32.add links[0] 7
-  links[1] = @u32.add links[1] 9
-  return #[before, total, view_twice first_view, view_twice second_view,
-    ref_twice first_ref, ref_twice second_ref, link_twice first_link, link_twice second_link,
+    let (next_first, next_second) = mutate_pair first second index
+    first := next_first
+    second := next_second
+    total := @u32.add total (@u32.add (view_twice (&first[1..3])) (ref_twice (@storage.at second 1)))
+  links[0] := @u32.add links[0] 7
+  links[1] := @u32.add links[1] 9
+  return #[before, total, view_twice (&first[1..3]), view_twice (&second[1..3]),
+    ref_twice (@storage.at first 1), ref_twice (@storage.at second 1),
+    link_twice (@storage.link links 0), link_twice (@storage.link links 1),
     first[0], first[2], second[0], second[2]]
 `;
 
@@ -85,18 +83,17 @@ function witnessExpected(input: number): Uint32Array {
   ]);
 }
 
-const scratch = `const leaf = func (rows: GrowArray U32): Unit => return do:
+const scratch = `const leaf = func (rows: own GrowArray U32): GrowArray U32 => return do:
   let temporary: GrowArray U32 = #[rows[0], 3]
-  rows[0] = @u32.add temporary[0] temporary[1]
-const outer = func (rows: GrowArray U32): Unit => return do:
-  leaf rows
-  leaf rows
+  rows[0] := @u32.add temporary[0] temporary[1]
+  return rows
+const outer = func (rows: own GrowArray U32): GrowArray U32 => return leaf (leaf rows)
 entry const answer = func (input: U32) => return do:
   let rows: GrowArray U32 = #[input, 29]
-  leaf rows
-  outer rows
+  rows := leaf rows
+  rows := outer rows
   let live: GrowArray U32 = #[71, 73]
-  outer rows
+  rows := outer rows
   @storage.push live 79
   return #[rows[0], rows[1], live[0], live[1], live[2]]
 `;

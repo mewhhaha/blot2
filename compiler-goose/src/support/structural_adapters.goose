@@ -967,6 +967,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_wire_schema::Kerne
 fn blot_check_wire_schema::blotStructuralHash<StructuralSink>(value:blot_check_wire_schema::KernelInfo,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_wire_schema::NamedIndex)->bool {return equalFields(left,right);}
 fn blot_check_wire_schema::blotStructuralHash<StructuralSink>(value:blot_check_wire_schema::NamedIndex,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_wire_schema::NonStagedReceipt)->bool {return equalFields(left,right);}
+fn blot_check_wire_schema::blotStructuralHash<StructuralSink>(value:blot_check_wire_schema::NonStagedReceipt,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_wire_schema::ProcessInfo)->bool {return equalFields(left,right);}
 fn blot_check_wire_schema::blotStructuralHash<StructuralSink>(value:blot_check_wire_schema::ProcessInfo,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_wire_schema::SubstEntry)->bool {return equalFields(left,right);}
@@ -1311,6 +1313,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_project_packet::Writer)-
 fn blot_project_packet::blotStructuralHash<StructuralSink>(value:blot_project_packet::Writer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_image::Image)->bool {return equalFields(left,right);}
 fn blot_reuse_body_image::blotStructuralHash<StructuralSink>(value:blot_reuse_body_image::Image,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_image::LayoutReceipt)->bool {return equalFields(left,right);}
+fn blot_reuse_body_image::blotStructuralHash<StructuralSink>(value:blot_reuse_body_image::LayoutReceipt,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_image::LocalMap)->bool {return equalFields(left,right);}
 fn blot_reuse_body_image::blotStructuralHash<StructuralSink>(value:blot_reuse_body_image::LocalMap,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_image::LocalPair)->bool {return equalFields(left,right);}

@@ -2216,7 +2216,7 @@ recursive fn evalUpdate(st: Analyzer&, units: const Module[:], env: EvalEnv&, id
     let rhs_head = evalNode(st, units, env, info.value, depth + 1);
 
     var result_head: u32 = 0;
-    if !info.store && last_idx < 0 && step_len > 0 {
+    if last_idx < 0 && step_len > 0 {
         // Pure field functional rebind.
         let omark = st.head_stack.len;
         for k in 0..step_len {
@@ -2301,7 +2301,7 @@ recursive fn evalUpdate(st: Analyzer&, units: const Module[:], env: EvalEnv&, id
             let _ = listUnionHead(st, final_holders, stepCtorHead(st, env.ctx_id, cur));
             if addWrittenEdgesHeads(st, env.ctx_id, final_holders, final_flbl, rhs_head) { env.changed = true; }
         }
-        if !info.store { result_head = root_head; }
+        result_head = root_head;
     } else {
         var fb = root_head;
         if step_len > 0 { fb = st.head_stack[cmark + step_len]; }

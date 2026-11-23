@@ -60,13 +60,13 @@ entry const floating = func (bits: U32): Array U32 => return do:
 
 const persistentSource = `const pool: ResizeArray U32 = #[4]
 const peek = func (value: {x: U32}): {x: U32} => return do:
-  value.x := @u32.add self pool[0]
+  value.x := @u32.add self pool[@u32.sub (@storage.length pool) 1]
   return value
 entry const answer = func (input: U32): Array U32 => return do:
   let a = peek {x: input}
-  pool[0] = @u32.add pool[0] 10
+  @storage.push pool (@u32.add pool[@u32.sub (@storage.length pool) 1] 10)
   let b = peek {x: input}
-  return #[a.x,b.x,pool[0]]
+  return #[a.x,b.x,pool[@u32.sub (@storage.length pool) 1]]
 `;
 
 const hostSource =

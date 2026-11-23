@@ -44,18 +44,18 @@ entry const nominals = func (input: U32) => return do:
 const reading = func (captured: ResizeArray U32) => return do:
   let saved = captured
   return func (argument: ResizeArray U32): U32 => return @u32.add saved[0] argument[0]
-const update = func (captured: ResizeArray U32) -> (argument: ResizeArray U32) -> (amount: U32): Unit => return do:
+const update = func (captured: ResizeArray U32) -> (argument: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
   let value = (reading captured) argument
-  argument[0] = @u32.add value amount
-  return ()
+  argument[0] := @u32.add value amount
+  return argument
 entry const descriptors = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input, 31]
   let second: ResizeArray U32 = #[@u32.add input 10, 37]
-  update first first 1
-  update first second 2
+  first := update (@storage.copy first) first 1
+  second := update first second 2
   let total: U32 = 0
   for index in 0 .. 3:
-    update first second index
+    second := update first second index
     total := @u32.add total ((reading second) first)
   return #[first[0], second[0], total, first[1], second[1]]
 entry const snapshots = func (input: U32) => return do:

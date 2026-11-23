@@ -586,7 +586,7 @@ Deno.test("an integer call argument can reuse a checked body across edits and re
     await compare(source, 162);
     const store = source.replace(
       "return @u32.add a b",
-      "let lanes: Array U32 = #[0]\n  lanes[0] = a\n  return @u32.add lanes[0] b",
+      "let lanes: Array U32 = #[0]\n  lanes[0] := a\n  return @u32.add lanes[0] b",
     );
     await compare(store, 162);
     await compare(store.replace("a = numbers.sum 64", "a = numbers.sum 65"), 163, true);

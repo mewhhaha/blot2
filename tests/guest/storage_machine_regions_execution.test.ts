@@ -6,8 +6,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 // captures an outer scalar that must survive every reused consumer call.
 const padding = 2000;
 function sourceFor(scalar: "U32" | "F32"): string {
-  return `const calculate = func (counter: Array U32) -> (input: ${scalar}): ${scalar} => return do:
-  counter[0] = @u32.add counter[0] 1
+  return `const calculate = func (counter: GrowArray U32) -> (input: ${scalar}): ${scalar} => return do:
+  @storage.push counter 1
   return ${scalar === "U32" ? "@u32.add input 7" : "input"}
 const consume = func (destination: ResizeArray ${scalar}) -> (read: Unit -> ${scalar} ! {|e}): Unit => return do:
   let total = read ()
@@ -22,11 +22,11 @@ const exercise = func (value: ${scalar}) -> (destination: ResizeArray ${scalar})
     consume destination (func () => return value)
   return ()
 entry const answer = func (input: ${scalar}) => return do:
-  let counter: Array U32 = #[0]
+  let counter: GrowArray U32 = #[]
   let destination: ResizeArray ${scalar} = #[]
   exercise (calculate counter input) destination
   return #[${
-    scalar === "U32" ? "counter[0]" : "@u32.to_f32 counter[0]"
+    scalar === "U32" ? "@storage.length counter" : "@u32.to_f32 (@storage.length counter)"
   }, destination[0], destination[1], destination[2]]
 `;
 }

@@ -174,8 +174,8 @@ entry const packed = func (value: U32) => return do:
   let original = rows
   rows := #[{x: value + 40, y: value + 1}, ...self]
   let items = @storage.copy rows
-  let before = items
-  items[0] = {x: self.x + 1, y: self.y + 2}
+  let before = items.copy
+  items[0] := {x: self.x + 1, y: self.y + 2}
   break #[original[0].x, rows[0].x, before[0].x, items[0].x, items[0].y]
 entry const floating = func (value: F32) => return do:
   let original = $Large {alpha: value, child: #[40], value: 7, tail: 3}
@@ -199,10 +199,9 @@ entry const floating = func (value: F32) => return do:
                   [40, 41 + offset, 40, 7, 9],
                 );
               }
-              // `before` aliases `items`, so it sees the write (tasks/LANGUAGE_COHERENCE.md A7).
               assert.deepEqual(
                 Array.from(guest.call("packed", 1) as Uint32Array),
-                [1, 41, 42, 42, 4],
+                [1, 41, 41, 42, 4],
               );
               for (const value of [-0, 0, 1.25, -1.5]) {
                 assert(Object.is(guest.call("floating", value), value));

@@ -9,10 +9,11 @@ entry func callbacks (n: U32): U32 => return do:
   for index in 0..3:
     fs := @array.set self index (func () => return index + n)
   break (@array.get fs 0) () * 100 + (@array.get fs 1) () * 10 + (@array.get fs 2) ()
-func put (rows: Array (Array U32)) -> (n: U32) => return do:
-  rows[0] = #[n, n + 1]
+func put (rows: own Array (Array U32)) -> (n: U32): Array (Array U32) => return do:
+  rows[0] := #[n, n + 1]
+  return rows
 entry func stored (n: U32): U32 => return do:
   let rows = #[#[0, 0]]
-  put rows n
+  rows := put rows n
   let filler = #[9, 9, 9]
   break rows[0][0] + rows[0][1] + filler[0]

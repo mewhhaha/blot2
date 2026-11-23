@@ -315,7 +315,6 @@ let a_field_access=blot_parse_ast::tag_field_access;
 let a_index_access=blot_parse_ast::tag_index_access;
 let a_let_stmt=blot_parse_ast::tag_let_stmt;
 let a_rebind_stmt=blot_parse_ast::tag_rebind_stmt;
-let a_store_stmt=blot_parse_ast::tag_store_stmt;
 let a_use_stmt=blot_parse_ast::tag_use_stmt;
 let a_iterator_bind=blot_parse_ast::tag_iterator_bind;
 let a_function_return_stmt=blot_parse_ast::tag_function_return_stmt;
@@ -1227,7 +1226,6 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   if at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false) { return identifier_syntax(p,source,tokens); }
   if at(p,source,tokens,t_identifier) { let target=place(p,source,tokens,start); if p.failure!=blot_error::Error.none { return 0; } expect(p,source,tokens,t_colon_equal); let value=expression(p,source,tokens); return add(p,source,tokens,a_rebind_stmt,target,value,0,start); }
  }
- if assignment==t_equal { let target=place(p,source,tokens,start); if p.failure!=blot_error::Error.none { return 0; } expect(p,source,tokens,t_equal); let value=expression(p,source,tokens); return add(p,source,tokens,a_store_stmt,target,value,0,start); }
  return expression(p,source,tokens);
 }
 recursive fn local_function_declaration(p:Parser&,source:const u8[:],tokens:const Token[:])->Id {
@@ -1246,8 +1244,7 @@ fn has_use_binding(p: Parser&,tokens: const Token[:]) -> bool {
  }
  return false;
 }
-// The target of `:=` or `=`: a name (or, for a store, any atom) followed by
-// `.field` and `[index]` steps.
+// The target of `:=`: a name followed by `.field` and `[index]` steps.
 recursive fn place(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
  var target: Id=0; if at(p,source,tokens,t_identifier) { let name=lower_identifier(p,source,tokens); target=add(p,source,tokens,a_name,name,0,0,start); } else { target=atom(p,source,tokens); }
  while p.failure==blot_error::Error.none&&(at(p,source,tokens,t_dot)||at(p,source,tokens,t_l_bracket)) {
@@ -1258,12 +1255,11 @@ recursive fn place(p: Parser&,source: const u8[:],tokens: const Token[:],start: 
 }
 // Classify before allocating a target. An ordinary call such as f [a, b]
 // must not speculatively parse the argument as an index. A top-level `:=`
-// on the statement's line rebinds; a top-level `=` stores. The end-of-file
-// tag stands for neither.
+// on the statement's line rebinds; the end-of-file tag stands for none.
 fn assignment_operator(p: Parser&,tokens: const Token[:]) -> blot_parse_token::Tag {
  var nesting=0; var i=p.index;
  while i<tokens.len {
-  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal||tag==t_equal { return tag; } if tag==t_newline||tag==t_dedent||tag==t_eof||tag==t_comma||tag==t_r_brace||tag==t_r_paren||tag==t_r_bracket { return t_eof; } }
+  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal { return tag; } if tag==t_newline||tag==t_dedent||tag==t_eof||tag==t_comma||tag==t_r_brace||tag==t_r_paren||tag==t_r_bracket { return t_eof; } }
   if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nesting++; } else if (tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace)&&nesting!=0 { nesting--; } i++;
  }
  return t_eof;
@@ -1397,7 +1393,7 @@ fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i6
  return false;
 }
 fn is_statement_tag(tag: blot_parse_ast::Tag) -> bool {
- return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_store_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
+ return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
 }
 fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
 fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&) -> Parser {

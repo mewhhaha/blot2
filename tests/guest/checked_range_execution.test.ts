@@ -27,10 +27,10 @@ entry func stop (values: Array U32): U32 => do:
       break
     sum := self + values[i]
   return sum
-entry func replace (values: Array U32): U32 => do:
+entry func replace (values: own Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
-    values[i] = values[i] + 1
+    values[i] := values[i] + 1
     sum := self + values[i]
   return sum
 entry func next (values: Array U32): U32 => do:

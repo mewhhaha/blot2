@@ -1347,7 +1347,6 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
         },
         update => {
             let ui = m.updateInfo(id);
-            fnvByte(ctx.h, boolByte(ui.store));
             hashNode(ctx, units, m, ui.root, depth + 1);
             for st in m.updateSelectors(id) {
                 fnvByte(ctx.h, blot_check_core::updateKindCode(st.kind) as u8);

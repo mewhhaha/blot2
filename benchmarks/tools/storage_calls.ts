@@ -26,14 +26,15 @@ export function storageCallSource(
     }
   } else {
     lines.push(
-      "const stage_0 = func (rows: GrowArray U32) -> (amount: U32): Unit => return do:",
-      "  rows[0] = @u32.add rows[0] amount",
+      "const stage_0 = func (rows: own GrowArray U32) -> (amount: U32): GrowArray U32 => return do:",
+      "  rows[0] := @u32.add rows[0] amount",
+      "  return rows",
     );
     for (let level = 1; level <= depth; level++) {
       lines.push(
-        `const stage_${level} = func (rows: GrowArray U32) -> (amount: U32): Unit => return do:`,
-        `  stage_${level - 1} rows amount`,
-        `  stage_${level - 1} rows (@u32.add amount 1)`,
+        `const stage_${level} = func (rows: own GrowArray U32) -> (amount: U32): GrowArray U32 => return do:`,
+        `  rows := stage_${level - 1} rows amount`,
+        `  return stage_${level - 1} rows (@u32.add amount 1)`,
       );
     }
   }
@@ -49,12 +50,12 @@ export function storageCallSource(
       lines.push(
         `  total := @u32.add total (stage_${depth} first index)`,
         `  total := @u32.add total (stage_${depth} second index)`,
-        "  first[index] = @u32.add first[index] 3",
+        "  first[index] := @u32.add first[index] 3",
       );
     } else {
       lines.push(
-        `  stage_${depth} first (@u32.add input ${call})`,
-        `  stage_${depth} second (@u32.add input ${call + 7})`,
+        `  first := stage_${depth} first (@u32.add input ${call})`,
+        `  second := stage_${depth} second (@u32.add input ${call + 7})`,
         "  total := @u32.add total (@u32.add first[0] second[0])",
       );
     }

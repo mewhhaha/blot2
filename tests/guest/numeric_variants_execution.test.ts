@@ -16,8 +16,8 @@ entry const mixed = func (count: U32) => return do:
   break sum
 entry const saved = func (index: U32) => return do:
   let values = @array.generate 513 make
-  let old = values
-  values[index] = $Pair {x: 100, y: 200}
+  let old = values.copy
+  values[index] := $Pair {x: 100, y: 200}
   break read old[index] + read values[index]
 entry const static_values = func (index: U32) => return do:
   let values = #[$Empty, $One 7, $Pair {x: 2, y: 3}]
@@ -93,8 +93,7 @@ Deno.test(`numeric variants preserve active arms lists static values and snapsho
         );
       }
       for (const i of [0, 1, 2, 80, 81, 82, 243, 244, 245, 512]) {
-        // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
-        assert.equal(guest.call("saved", i), 600);
+        assert.equal(guest.call("saved", i), read(i) + 300);
         assert.equal(guest.call("conversions", i), read(i + 80));
         assert.equal(guest.call("callback", i), read(i));
       }

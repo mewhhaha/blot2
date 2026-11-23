@@ -3054,11 +3054,6 @@
           "selectors",
           "check.core.List",
           "selectors"
-        ],
-        [
-          "store",
-          "bool",
-          "store"
         ]
       ],
       "unwired": []

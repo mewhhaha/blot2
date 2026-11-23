@@ -65,11 +65,14 @@ entry func array_snapshot () =>
   next[1] := 20
   return original[1] + next[1]
 
-entry func array_store () =>
+func set_second (items: own #[U32]) -> (value: U32): #[U32] =>
+  items[1] := value
+  return items
+
+entry func array_update () =>
   let original = #[1, 2, 3]
-  let alias = original
-  alias[1] = 20
-  return original[1] + alias[1]
+  let updated = set_second original 20
+  return updated[0] + updated[1] + updated[2]
 
 type Counter a is effect = { advance: a -> a }
 const local_counter = @effect.provider (Counter.advance U32) (func value => value + 1)

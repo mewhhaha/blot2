@@ -13,16 +13,19 @@ const unbox = func fallback -> maybe => return case maybe of
 const pair_or = func fallback -> maybe => return case maybe of
   $Some value => value
   $Nothing => fallback
+const read_first = func (fallback: F32) -> (pool: ResizeArray (Envelope F32)): (F32, U32, F32) => return do:
+  let first = read pool
+  let box_val = unbox fallback first.box
+  let $Pair (id, amount) = pair_or ($Pair (0, 0.0)) first.pair
+  return (box_val, id, amount)
 entry const answer = func (input: F32) => return do:
   let floats: ResizeArray (Envelope F32) = #[$Envelope {box: $Some ($Box {value: input}), pair: $Some ($Pair (7, input + 1.0))}]
   let integers: ResizeArray (Envelope U32) = #[$Envelope {box: $Some ($Box {value: 13}), pair: $Nothing}]
-  let first = read floats
+  let (first_box, first_id, first_amount) = read_first (-1.0) floats
   let second = read integers
-  floats[0] = $Envelope {box: $Nothing, pair: $Some ($Pair (8, input + 10.0))}
-  let third = read floats
-  let $Pair (first_id, first_amount) = pair_or ($Pair (0, 0.0)) first.pair
-  let $Pair (third_id, third_amount) = pair_or ($Pair (0, 0.0)) third.pair
-  return #[unbox (-1.0) first.box, U32.to_f32 (unbox 0 second.box), unbox (-5.0) third.box,
+  floats[0] := $Envelope {box: $Nothing, pair: $Some ($Pair (8, input + 10.0))}
+  let (third_box, third_id, third_amount) = read_first (-5.0) floats
+  return #[first_box, U32.to_f32 (unbox 0 second.box), third_box,
     U32.to_f32 first_id, first_amount, U32.to_f32 third_id, third_amount]
 `;
 Deno.test(`closed generic layout witnesses survive mixed caller contexts`, async () => {

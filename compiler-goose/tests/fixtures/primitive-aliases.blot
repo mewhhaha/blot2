@@ -69,25 +69,22 @@ entry const snapshots = func (value: U32): Array U32 => return do:
 
 entry const references = func (value: U32): Array U32 => return do:
   let owner: GrowArray U32 = #[value]
-  let reference: &U32 = &owner[0]
-  let before = add (@storage.load reference)
-  owner[0] = apply_binary add (@storage.load reference) 10
-  let after = add (@storage.load reference)
+  let before = add (@storage.load (&owner[0]))
+  owner[0] := apply_binary add (@storage.load (&owner[0])) 10
+  let after = add (@storage.load (&owner[0]))
   return #[before 2, after 2, owner[0]]
 
 entry const scalar_reference = func (value: U32): Array U32 => return do:
   let current: Array U32 = #[value]
-  let reference: &U32 = &current[0]
-  let before = add (@storage.load reference)
-  current[0] = apply_binary multiply (@storage.load reference) 3
-  return #[before 2, add (@storage.load reference) 2, current[0]]
+  let before = add (@storage.load (&current[0]))
+  current[0] := apply_binary multiply (@storage.load (&current[0])) 3
+  return #[before 2, add (@storage.load (&current[0])) 2, current[0]]
 
 entry const float_reference = func (value: F32): Array F32 => return do:
   let current: Array F32 = #[value]
-  let reference: &F32 = &current[0]
-  let before = float_multiply (@storage.load reference)
-  current[0] = apply_unary negate (@storage.load reference)
-  return #[before 2.0, float_multiply (@storage.load reference) 2.0, current[0]]
+  let before = float_multiply (@storage.load (&current[0]))
+  current[0] := apply_unary negate (@storage.load (&current[0]))
+  return #[before 2.0, float_multiply (@storage.load (&current[0])) 2.0, current[0]]
 
 entry const floating = func (value: F32): Array F32 => return
   #[float_add value 0.5, float_subtract value 0.5,
@@ -119,10 +116,9 @@ entry const eager = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => retu
 const select_partial = func operation -> value => return operation value
 entry const partial_constants = func (value: U32): Array U32 => return do:
   let current: Array U32 = #[4]
-  let reference: &U32 = &current[0]
-  let before = add (@storage.load reference)
-  current[0] = 11
-  let after = add (@storage.load reference)
+  let before = add (@storage.load (&current[0]))
+  current[0] := 11
+  let after = add (@storage.load (&current[0]))
   return #[select_partial (add 2) value, select_partial (add 9) value,
     select_partial (add 2) value, select_partial (add 9) value,
     select_partial before value, select_partial after value]

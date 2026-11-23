@@ -1,6 +1,5 @@
-// `before` aliases the updated array, so it reads the store; a `:=`
-// through an aliased root is rejected, and `@storage.copy` first keeps the old
-// snapshot (tasks/MEMORY_MODEL.md rules 2 and 4).
+// A `:=` through an aliased root is rejected, and `@storage.copy` first keeps
+// the old snapshot (tasks/MEMORY_MODEL.md).
 export const updateCases = [
   {
     name: "scalar_array_snapshots",
@@ -24,9 +23,8 @@ entry const run = func (index: U32) : U32 => return update index
     source: `
 const update = func index => return do:
   let values = #[10, 20, 30]
-  let before = values
-  values[index] = @u32.add self 1
-  break @u32.add (@array.get before index) (@array.get values index)
+  values[index] := @u32.add self 1
+  break @u32.add (@array.get values index) (@array.get values index)
 entry const folded = update 1
 entry const run = func (index: U32) : U32 => return update index
 `,
@@ -39,9 +37,8 @@ type Point is data = $Point { x: U32, y: U32 }
 type Bucket is data = $Bucket { points: Array Point }
 entry const run = func () : U32 => return do:
   let bucket = $Bucket { points: #[$Point { y: 1, x: 10 }, $Point { y: 2, x: 20 }] }
-  let before = bucket
-  bucket.points[1].x = @u32.add self 2
-  break @u32.add before.points[1].x bucket.points[1].x
+  bucket.points[1].x := @u32.add self 2
+  break @u32.add bucket.points[1].x bucket.points[1].x
 `,
   },
   {
@@ -50,9 +47,8 @@ entry const run = func () : U32 => return do:
     source: `
 entry const run = func () : U32 => return do:
   let values = #[#[1, 2], #[3, 4]]
-  let before = values
-  values[1][0] = @u32.add self 39
-  break @u32.add before[1][0] values[1][0]
+  values[1][0] := @u32.add self 39
+  break @u32.add values[1][0] values[1][0]
 `,
   },
   {

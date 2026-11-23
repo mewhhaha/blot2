@@ -61,7 +61,7 @@ ELEMENT_BYTES = {
     'blot_check_core::PatternRow': 8,
     'blot_check_core::MatchArm': 24,
     'blot_check_core::MatchInfo': 20,
-    'blot_check_core::UpdateInfo': 32,
+    'blot_check_core::UpdateInfo': 28,
     'blot_check_core::UpdateStep': 20,
     'blot_check_core::ClosureInfo': 48,
     'blot_check_core::Associated': 24,

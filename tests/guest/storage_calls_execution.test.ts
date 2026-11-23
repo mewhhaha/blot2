@@ -152,20 +152,21 @@ entry const answer = func (input: U32) => return do:
 Deno.test("generic array traversal retains cursor identity and known stage callbacks", async () => {
   await compileAndRun(
     `
-const run = func stages -> access -> events => return do:
+const run = func (stages: {update: own {rows: GrowArray U32} -> U32 -> {rows: GrowArray U32}}) -> (access: own {rows: GrowArray U32}) -> events => return do:
   for event in events:
-    stages.update access event
-const update = func access -> event => return do:
-  let rows: GrowArray U32 = access.rows
-  rows[0] = rows[0] + event
+    access := stages.update access event
+  return access
+const update = func (access: own {rows: GrowArray U32}) -> event => return do:
+  access.rows[0] := access.rows[0] + event
+  return access
 const policy = {update}
 entry const answer = func (input: U32) => return do:
   let rows: GrowArray U32 = #[input]
   let access = {rows}
-  run policy access #[1, 2, 3]
+  access := run policy access #[1, 2, 3]
   let empty: Array U32 = #[]
-  run policy access empty
-  return rows[0]
+  access := run policy access empty
+  return access.rows[0]
 `,
     (guest) => {
       assert.equal(guest.call("answer", 10), 16);
@@ -209,12 +210,10 @@ const owned = func (rows: ResizeArray U32) => return @storage.read rows 0
 entry const answer = func (input: U32) => return do:
   let rows: ResizeArray U32 = #[input, 9]
   let other: ResizeArray U32 = #[7, 11]
-  let view = &rows[1..2]
-  let alternate = &other[0..1]
-  let first = read view 0
-  let second = read alternate 0
-  rows[1] = 12
-  let last = read view 0
+  let first = read (&rows[1..2]) 0
+  let second = read (&other[0..1]) 0
+  rows[1] := 12
+  let last = read (&rows[1..2]) 0
   let links: GrowArray U32 = #[12]
   let link = @storage.link links 0
   return @u32.add (owned rows) (@u32.add first (@u32.add second (@u32.add last (linked link))))
@@ -312,11 +311,10 @@ const reading = func (rows: &[U32]) -> (index: U32) => return do:
 entry const answer = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input, 9]
   let second: ResizeArray U32 = #[7, 11]
-  let view = &first[1..2]
-  let before = reading view 0
+  let before = reading (&first[1..2]) 0
   let other = reading (&second[0..1]) 0
-  first[1] = 12
-  let after = reading view 0
+  first[1] := 12
+  let after = reading (&first[1..2]) 0
   return @u32.add input (@u32.add before (@u32.add other after))
 `,
     (guest) => {
@@ -492,13 +490,15 @@ const folded = func (input: Bundle) => return do:
   for index in 0..input.rows.length:
     total := self + input.rows[index]
   return {total, count: input.rows.length}
+const folded_slice = func (rows: ResizeArray U32) -> (start: U32) -> (end: U32) -> (bias: U32) => return
+  folded ($Bundle {rows: &rows[start..end], bias})
 entry const answer = func (input: U32): U32 => return do:
   let first: ResizeArray U32 = #[99, input, 7]
   let second: ResizeArray U32 = #[11]
-  let older = folded ($Bundle {rows: &first[1..3], bias: 1})
-  let other = folded ($Bundle {rows: &second[0..1], bias: 2})
-  first[1] = 5
-  let fresh = folded ($Bundle {rows: &first[1..3], bias: 1})
+  let older = folded_slice first 1 3 1
+  let other = folded_slice second 0 1 2
+  first[1] := 5
+  let fresh = folded_slice first 1 3 1
   return older.total + other.total + fresh.total + older.count
 `,
     (guest) => {
@@ -531,18 +531,20 @@ const folded = func transform -> (rows: &[U32]): U32 => return do:
   for value in rows:
     total := self + transform value
   return total
+const folded_with_bias = func (bias: ResizeArray U32) -> (rows: &[U32]): U32 => return do:
+  let captured = &bias[0..1]
+  let add = func (value: U32): U32 => return value + captured[0]
+  return folded add rows
 entry const answer = func (input: U32): U32 => return do:
   let first: ResizeArray U32 = #[input, 2]
   let second: ResizeArray U32 = #[3]
   let bias: ResizeArray U32 = #[7]
-  let captured = &bias[0..1]
-  let add = func (value: U32): U32 => return value + captured[0]
+  let a = folded_with_bias bias (&first[0..2])
+  let b = folded_with_bias bias (&second[0..1])
   let subtract = func (value: U32): U32 => return value - 1
-  let a = folded add (&first[0..2])
-  let b = folded add (&second[0..1])
   let c = folded subtract (&first[0..2])
-  bias[0] = 9
-  let d = folded add (&second[0..1])
+  bias[0] := 9
+  let d = folded_with_bias bias (&second[0..1])
   return a + b + c + d
 `,
     (guest) => {
@@ -552,14 +554,15 @@ entry const answer = func (input: U32): U32 => return do:
   );
   await compileAndRun(
     `
-const apply_callback = func callback -> (value: U32): U32 => return callback value
+const apply_callback = func (callback: own ResizeArray U32 -> U32 -> (ResizeArray U32, U32)) -> (rows: own ResizeArray U32) -> (value: U32): (ResizeArray U32, U32) => return callback rows value
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray U32 = #[1]
-  let change = func (value: U32): U32 => return do:
-    rows[0] = rows[0] + value
-    return rows[0]
-  let first = apply_callback change input
-  let second = apply_callback change 2
+  let change = func (rows: own ResizeArray U32) -> (value: U32): (ResizeArray U32, U32) => return do:
+    rows[0] := rows[0] + value
+    let v = rows[0]
+    return (rows, v)
+  let (rows, first) = apply_callback change rows input
+  let (rows, second) = apply_callback change rows 2
   return first + second + rows[0]
 `,
     (guest) => assert.equal(guest.call("answer", 3), 16),
@@ -587,7 +590,7 @@ const copied = func (rows: ResizeArray U32) => return @storage.copy rows
 entry const answer = func (input: U32): U32 => return do:
   let original: ResizeArray U32 = #[input]
   let independent = copied original
-  independent[0] = 9
+  independent[0] := 9
   return original[0] + independent[0]
 `,
     (guest) => {
@@ -631,13 +634,12 @@ Deno.test("Unit writers preserve callback aliases growth views and ordered updat
     `
 const execute = func callback -> (rows: ResizeArray U32) -> (amount: U32): Unit => return do:
   callback amount
-  rows[0] = rows[0] + 1
+  @storage.push rows 1
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray U32 = #[input]
   let other: ResizeArray U32 = #[10]
   let view = &rows[0..1]
   let grow = func (amount: U32): Unit => return do:
-    rows[0] = rows[0] + amount
     @storage.push rows amount
   execute grow rows 2
   execute grow other 3
@@ -649,13 +651,14 @@ entry const answer = func (input: U32): U32 => return do:
   await compileAndRun(
     `
 type Stage is data = $Cold | $Hot U32
-const publish = func (rows: ResizeArray Stage) -> (value: U32): Unit => return do:
-  rows[0] = $Hot value
+const publish = func (rows: own ResizeArray Stage) -> (value: U32): ResizeArray Stage => return do:
+  rows[0] := $Hot value
+  return rows
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray Stage = #[$Cold]
   let total = 0
   for index in 0..3:
-    publish rows (input + index)
+    rows := publish rows (input + index)
     let value = case rows[0] of
       $Cold => 0
       $Hot value => value

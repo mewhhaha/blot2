@@ -88,21 +88,22 @@ for (
                     compared,
                     value,
                     value,
-                    count + 1,
+                    count + 4,
                   ]),
                 );
-                count++;
-                assert.equal(await call("observe", 0), value);
-                assert.equal(await call("observe", count - 1), input);
+                count += 4;
+                assert.equal(await call("observe", 0), 4);
+                assert.equal(await call("observe", count - 1), value);
                 assert.equal(await call("count", null), count);
               }
               // The same helper also sees an argument distinct from its global.
               value = (value + 1) >>> 0;
+              count += 1;
               assert.deepEqual(
                 await call("separate", 41),
                 new Uint32Array([43, value, value + 43, count]),
               );
-              assert.equal(await call("observe", 0), value);
+              assert.equal(await call("observe", count - 1), value);
               for (const flag of [false, true, false]) {
                 let mixed = value * 2;
                 let variant = value + 7;
@@ -112,7 +113,7 @@ for (
                 }
                 assert.equal(await call("mixed", flag), mixed >>> 0);
                 assert.equal(await call("inactive", flag), variant >>> 0);
-                assert.equal(await call("observe", 0), value);
+                assert.equal(await call("observe", count - 1), value);
               }
             } else {
               // Initializers append 1 then 2 to the audit; helper publication
