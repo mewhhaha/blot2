@@ -72,7 +72,9 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
         ready payload=>{
             let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);
-            // Validate wire schemas and concurrency purity before ANY retained/cached fast path.
+            // Validate wire schemas, concurrency purity, and full non-staged LayoutReceipt
+            // before ANY retained/cached fast path (§4.1 item 3).
+            var current_non_staged=blot_check_wire_schema::NonStagedReceipt{};
             {
                 var pinfo=blot_check_wire_schema::ProgramInfo{};
                 blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
@@ -97,15 +99,16 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     }
                     return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
                 }
+                current_non_staged=blot_check_wire_schema::computeNonStagedReceipt(payload.value.units,payload.value.entry,pinfo,pres.deeply_immutable_digest);
             }
             var inputs:i64=-1;
             if assets {
                 inputs=assets.allocation_index;
                 let previous .= opened.assets.value.last;
-                if previous && reused && payload.value.cachedCount()==payload.value.units.len && assets.reuseStagedWasm(previous) {
+                if previous && reused && payload.value.cachedCount()==payload.value.units.len && previous.cached_receipt_valid && blot_check_wire_schema::sameNonStagedReceipt(current_non_staged,previous.cached_receipt) && assets.reuseStagedWasm(previous) {
                     timing.exit();
                     let result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:blot_reuse_dependency_consumer::Compiled{bytes:blot_reuse_dependency_consumer::ownBytes(previous.cached_wasm),emitted_functions:previous.cached_functions,..},stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,cached_modules:payload.value.units.len,..};
-                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load);var owned=result;owned.deinit();return committed,error;
+                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,current_non_staged);var owned=result;owned.deinit();return committed,error;
                 }
             }
             // The asset evaluator owns its file read set. Projects declaring
@@ -115,7 +118,8 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             var operands:i64=-1;
             var replayed=false;
             var pending=blot_direct_relocations::Snapshot{};
-            if track && reused {
+            let can_reuse_image=track && reused && blot_reuse_body_image::canReuseReceipt(opened.image.receipt,current_non_staged,payload.value);
+            if can_reuse_image {
                 bytes,operands=blot_reuse_body_image::relocate(opened.image,opened.core,payload.value,replay);
                 if operands<0 && replay.valid {
                     replayed=blot_reuse_body_image::replayEdits(opened.image,opened.core,payload.value,replay,bytes,pending);
@@ -142,12 +146,20 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             }
             timing.exit();
             if reused && result.result.compiled.failed { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();result.deinit();retry=true;return false,blot_error::Error.none; }
-            let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,operands);
+            let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,current_non_staged,operands);
             if committed {
                 if operands<0 {
+                    var preserved_receipt=blot_reuse_body_image::LayoutReceipt{};
+                    if replayed {
+                        preserved_receipt=opened.image.receipt;
+                        opened.image.receipt=blot_reuse_body_image::LayoutReceipt{};
+                    }
                     opened.image.deinit();
                     opened.image.layout=pending;
                     pending=blot_direct_relocations::Snapshot{};
+                    if replayed {
+                        opened.image.receipt=preserved_receipt;
+                    }
                 }
                 if track {
                     blot_reuse_dependency_consumer::freeBytes(opened.image.bytes);
@@ -156,6 +168,17 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     opened.image.functions=result.result.compiled.emitted_functions;
                     opened.image.sparks_vectorized=result.result.compiled.sparks_vectorized;
                     opened.image.sparks_scalar_fallback=result.result.compiled.sparks_scalar_fallback;
+                    if operands<0 && !replayed {
+                        blot_reuse_body_image::deinitLayoutReceipt(opened.image.receipt);
+                        opened.image.receipt=blot_reuse_body_image::LayoutReceipt{
+                            valid:true,
+                            non_staged:current_non_staged,
+                            staged_dep_units_valid:result.result.compiled.staged_dep_units_valid,
+                            staged_dep_units:result.result.compiled.staged_dep_units,
+                            staged_value_digest:result.result.compiled.staged_value_digest,
+                        };
+                        result.result.compiled.staged_dep_units=default<u32[:]>();
+                    }
                 }
                 if !replay.valid && replay.used { replay.needs_reset=true; }
             } else {
@@ -165,7 +188,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
         }
     }
 }
-fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&,prepared:const blot_reuse_partial_dependency::Prepared&,load:SourceLoad,operands:i64=-1)->bool,Error {
+fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&,prepared:const blot_reuse_partial_dependency::Prepared&,load:SourceLoad,receipt:blot_check_wire_schema::NonStagedReceipt,operands:i64=-1)->bool,Error {
     if result.result.compiled.failed {let diagnostic,error=issue(result,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);}
     let wasm:const u8[:]=result.result.compiled.bytes;var phases=blot_phase_profile::Record{..};if profile.key.slot!=0 {phases=profile.record();}
     var reads:DefinitionRead[>..]=[];var reused_wasm=false;
@@ -175,7 +198,7 @@ fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_ba
             let span=prepared.units[use.unit-1].binding(use.binding).span;
             reads.push(DefinitionRead{prepared.paths[use.unit-1],span.start,span.end});
         }
-        let saved=assets.keepStagedWasm(wasm,result.result.compiled.emitted_functions);if saved!=blot_error::Error.none {return false,saved;}
+        let saved=assets.keepStagedWasm(wasm,result.result.compiled.emitted_functions,receipt);if saved!=blot_error::Error.none {return false,saved;}
     }
     let stats=BuildStats{sourceLoad:load,relocatedOperands:operands,reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,sparksVectorized:result.result.compiled.sparks_vectorized,sparksScalarFallback:result.result.compiled.sparks_scalar_fallback,phaseProfile:phases};
     var ranges:AssetRange[>..]=[];var dependencies:AssetDependency[>..]=[];var payload_size=wasm.len;

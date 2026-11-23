@@ -81,6 +81,20 @@ safe consumer peephole elision. Re-recorded the 14 fixtures containing F32
 arithmetic/rounding (+13 bytes per non-elided F32 op); all 109 fixtures kept
 identical exit codes, diagnostics, and frontend counters.
 
+Concurrency vNext Phase 3 (23 November 2026) upgraded `direct/runtime.goose`
+with history-independent logical stack/heap budgets (`stack_live_bytes`,
+`heap_live_bytes`), exact-cap active-only stack free lists (`stack_free_32k`,
+`stack_free_large`), dedicated transport pool (`alloc_transport`,
+`open_transport_pin`, `free_transport`, `detach_temp_slot`) with Page-0 offset
+640 `arena_oom_flag`, `live_flag` / `static_pool_flag`, inter-procedural
+`escape_min_slot`, box-aware `@simd.load`/`@simd.store`, trap-safe `fork`,
+iterative persistent state staging (`direct/function_persist.goose`),
+physical-stride `FlatNumeric` codecs + `entry kernel`/`entry process` ABI 8
+wrappers (`direct/function_kernels.goose`), and full `LayoutReceipt` retained
+build gating. Re-recorded the 92 direct-backend fixtures (+6 runtime helpers
+and updated runtime bytes); all 109 fixtures kept identical exit codes,
+diagnostics, and frontend counters.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

@@ -36,21 +36,59 @@ fn stopStage(s: Stage&, message: Chars) -> StageValue {
     return StageValue {};
 }
 
+recursive fn hashStageValue(g: Generator&, s: const Stage&, v: StageValue, depth: i64) {
+    g.mixStagedDigest(v.ty as u64);
+    if depth >= 64 { return; }
+    if v.ty == stage_function {
+        let fun = s.functions.items[v.bits];
+        g.mixStagedDigest(fun.unit as u64);
+        g.mixStagedDigest(fun.target as u64);
+        g.mixStagedDigest(fun.count as u64);
+        return;
+    }
+    if v.ty != stage_aggregate {
+        g.mixStagedDigest(v.bits as u64);
+        return;
+    }
+    let agg = s.aggregates.items[v.bits];
+    g.mixStagedDigest(blot_check_core::tagCode(agg.kind) as u64);
+    g.mixStagedDigest(agg.len as u64);
+    g.mixStagedDigest(agg.tag as u64);
+    if agg.kind == blot_check_core::Tag.array && agg.tag != 0 {
+        let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, agg.tag);
+        if found {
+            g.mixStagedDigest(bytes.len as u64);
+            for b in bytes { g.mixStagedDigest(b as u64); }
+        }
+        return;
+    }
+    for at in 0..(agg.len as i64) {
+        let part = s.parts.items[agg.start + at];
+        g.mixStagedDigest(part.name as u64);
+        hashStageValue(g, s, part.value, depth + 1);
+    }
+}
+
 fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     if m.node(id).c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) { return neverVal(), g.fail(m, id, "@build.read needs a surrounding #run"); }
+    g.recordStagedDepUnit(m.unit);
     var s = Stage {..};
     let value = evaluateStage(g, f, s, m, id, 0, 0);
     var result = neverVal();
     var error = blot_direct_types::Error.none;
     if s.failure.len != 0 { error = g.fail(m, id, s.failure); }
-    else if value.ty != stage_aggregate && value.ty != stage_function { result, error = constant(g, f, id, value.bits); }
     else {
-        let ty, lowered = typeOf(g, f, id);
-        error = lowered;
-        if error == blot_direct_types::Error.none {
-            var remaining: i64 = 65536;
-            result, error = emitStageValue(g, f, s, value, ty, id, remaining, 0);
+        g.mixStagedDigest(((m.unit as u64) << 32) | (id as u64));
+        hashStageValue(g, s, value, 0);
+        if value.ty != stage_aggregate && value.ty != stage_function { result, error = constant(g, f, id, value.bits); }
+        else {
+            let ty, lowered = typeOf(g, f, id);
+            error = lowered;
+            if error == blot_direct_types::Error.none {
+                var remaining: i64 = 65536;
+                result, error = emitStageValue(g, f, s, value, ty, id, remaining, 0);
+            }
         }
     }
     blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
@@ -135,6 +173,7 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
     if n.c == 2 {
         if cf.nominal_unit == 0 { return stageBool(false); }
         let owner .= g.units[cf.nominal_unit - 1];
+    g.recordStagedDepUnit(owner.unit);
         for tt in owner.type_tags {
             if tt.has_default && tt.nominal.unit == cf.nominal_unit && tt.nominal.decl == cf.nominal_decl && tt.constructor_tag == cf.ctor_tag && tt.field_name != 0 {
                 let sp = owner.fieldSpelling(tt.field_name);
@@ -149,6 +188,7 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
         return stopStage(s, "comptime .tag found no matching tag");
     }
     let owner .= g.units[cf.nominal_unit - 1];
+    g.recordStagedDepUnit(owner.unit);
     var want_ty: Ty = 0;
     var want_nom = blot_check_types::NominalIdentity { 0, 0 };
     var want_ctor_tag: u32 = 0;
@@ -342,6 +382,7 @@ recursive fn applyStage(g: Generator&, f: const Fn&, s: Stage&, fn_value: StageV
     if fn_value.ty != stage_function { return stopStage(s, "#run expected a function"); }
     let fun = s.functions.items[fn_value.bits];
     let owner .= g.units[fun.unit - 1];
+    g.recordStagedDepUnit(owner.unit);
     var root: u32 = 0;
     var parameter: u32 = 0;
     if fun.named {
@@ -380,6 +421,7 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
         if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != blot_check_core::Tag.reference { break; }
         blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
         blot_direct_relocations::stagedRead(target.unit, 0);
+        g.recordStagedDepUnit(target.unit);
         let next = g.resolve(cur_owner, cur_owner.reference(cur_body.root));
         if next == target || !g.hasUnit(next.unit) { break; }
         target = next;
@@ -398,6 +440,7 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
         return callback;
     }
     blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+    g.recordStagedDepUnit(target.unit);
     let alias, primitive = primitiveAlias(owner, target.binding);
     if primitive {
         let info = owner.primitive(alias);
@@ -450,6 +493,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
         },
         constant => {
             blot_direct_relocations::stagedRead(m.unit,id);
+            g.recordStagedDepUnit(m.unit);
             let ty = m.types.node(n.ty).tag;
             if ty == blot_check_types::Tag.unit { return StageValue {}; }
             if ty == blot_check_types::Tag.unsigned32 { return StageValue {n.a, blot_check_types::u32_type, 0}; }
@@ -470,6 +514,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 return stopStage(s, "#run depends on a runtime binding");
             }
             blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+    g.recordStagedDepUnit(target.unit);
             blot_direct_relocations::stagedRead(target.unit, 0);
             let body .= owner.body(target.binding);
             var root = binding.initializer;

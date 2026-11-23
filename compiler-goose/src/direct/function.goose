@@ -33,6 +33,8 @@ import .function_effects;
 import .function_entry;
 import .function_staging;
 import .function_spark;
+import .function_persist;
+import .function_kernels;
 
 type Ty = u32;
 type Error = blot_direct_types::Error;
@@ -131,14 +133,9 @@ struct Fn {
     inline_depth: u32 = 0,
     const_tags: ConstTag[8] = [ConstTag {}; 8],
     const_tags_len: i64 = 0,
-    // Stores of memory-holding values: a loop body that makes one cannot
-    // release per iteration, since older storage may now refer to it.
+    // Stores of memory-holding values into untracked cells/effects: a loop body
+    // or function that makes one cannot release its allocations.
     memory_stores: u32 = 0,
-    // Runtime-guarded stores into owner slots (disables release only when
-    // the destination owner predates the scope mark).
-    scoped_stores: u32 = 0,
-    entry_owner_mark: u32 = 0xffffffff,
-    entry_allow: u32 = 0xffffffff,
     // Where this body's part of each generator stack begins. Installed
     // providers are the first `handles_len` entries from `handles_base`:
     // Zig pops the list without restoring it after a failed operand, so the

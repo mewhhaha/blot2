@@ -4,6 +4,7 @@
 namespace blot_reuse_body_image;
 import check.core;
 import check.types;
+import check.wire_schema;
 import reuse.body_shape;
 import reuse.dependency_consumer;
 import reuse.partial_dependency;
@@ -23,16 +24,41 @@ type Core=blot_check_core::Module;
 type Prepared=blot_reuse_partial_dependency::Prepared;
 type Emission=blot_reuse_partial_dependency::Result;
 
+struct LayoutReceipt {
+    valid:bool=false,
+    non_staged:blot_check_wire_schema::NonStagedReceipt=blot_check_wire_schema::NonStagedReceipt{},
+    staged_dep_units_valid:bool=false,
+    staged_dep_units:u32[:]=default<u32[:]>(),
+    staged_value_digest:u64=0
+}
+fn deinitLayoutReceipt(receipt:LayoutReceipt&) {
+    blot_reuse_dependency_consumer::freeU32s(receipt.staged_dep_units);
+    receipt=LayoutReceipt{};
+}
+fn canReuseReceipt(prev:const LayoutReceipt&,cur:blot_check_wire_schema::NonStagedReceipt,next:const Prepared&)->bool {
+    if !prev.valid { return false; }
+    if !blot_check_wire_schema::sameNonStagedReceipt(prev.non_staged,cur) { return false; }
+    if cur.kernel_staging_sites_count!=0 {
+        if !prev.staged_dep_units_valid { return false; }
+        for u in prev.staged_dep_units {
+            if u==0 || (u as i64)>next.borrowed.len || !next.borrowed[u-1] { return false; }
+        }
+    }
+    return true;
+}
+
 struct Image {
     layout:blot_direct_relocations::Snapshot=blot_direct_relocations::Snapshot{},
     bytes:u8[:]=default<u8[:]>(),
     functions:i64=0,
     sparks_vectorized:i64=0,
-    sparks_scalar_fallback:i64=0
+    sparks_scalar_fallback:i64=0,
+    receipt:LayoutReceipt=LayoutReceipt{}
 }
 fn deinit(image:Image&) {
     image.layout.deinit();
     blot_reuse_dependency_consumer::freeBytes(image.bytes);
+    deinitLayoutReceipt(image.receipt);
     image=Image{};
 }
 
@@ -53,7 +79,6 @@ fn encode(out:u8[>..<]&,opcode:u8,value:u32)->bool {
 
 fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&)->u8[:],i64 {
     if image.bytes.len==0 || previous.entry!=next.entry || previous.units.len!=next.units.len { return default<u8[:]>(),-1; }
-    for unit in next.units { if unit.kernels.len!=0 || unit.processes.len!=0 { return default<u8[:]>(),-1; } }
     var changed=blot_direct_map::U64Map{};
     for unit,i in next.units {
         if next.borrowed[i] { continue; }
@@ -716,7 +741,6 @@ fn hasStagedUnit(sites:const blot_direct_relocations::Site[:],unit:u32)->bool {
 fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&,out_bytes:u8[:]&,pending:blot_direct_relocations::Snapshot&)->bool {
     if !replay.valid || image.bytes.len==0 { return false; }
     if previous.entry!=next.entry || previous.units.len!=next.units.len { return false; }
-    for unit in next.units { if unit.kernels.len!=0 || unit.processes.len!=0 { return false; } }
     var differing:u32[>..<]=[];
     for unit,i in next.units {
         if next.borrowed[i] { continue; }
@@ -865,7 +889,10 @@ fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emissi
             bytes:blot_reuse_dependency_consumer::ownBytes(bytes[..]),
             emitted_functions:built.emitted_functions,
             sparks_vectorized:built.sparks_vectorized,
-            sparks_scalar_fallback:built.sparks_scalar_fallback,..
+            sparks_scalar_fallback:built.sparks_scalar_fallback,
+            staged_dep_units_valid:built.staged_dep_units_valid,
+            staged_dep_units:blot_reuse_dependency_consumer::ownU32s(replay.state.staged_dep_units[..]),
+            staged_value_digest:built.staged_value_digest,..
         };
         replay.valid=true;
     }

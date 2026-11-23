@@ -258,6 +258,7 @@ struct Issue {
 
 struct Result {
     issue: Issue = Issue {},
+    deeply_immutable_digest: u64 = 0,
 }
 
 root struct Analyzer {
@@ -2964,6 +2965,11 @@ fn isDeeplyImmutable(map: const dictionary<BindingRef, bool>&, gref: BindingRef)
 }
 
 fn analyze(units: const Module[:], entry: u32) -> Result {
+    var ignored: u64[>..] = [];
+    return analyzeInto(units, entry, ignored);
+}
+
+fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..]& ) -> Result {
     var res = Result {};
     if !hasUnit(units, entry) { return res; }
     if !hasAnyConcurrencyFeature(units, entry) { return res; }
@@ -3182,6 +3188,34 @@ fn analyze(units: const Module[:], entry: u32) -> Result {
             }
         }
         deeply_immutable.insert(pg, imm);
+    }
+    // Emit sorted deeply-immutable pool keys and deterministic whole-program digest for LayoutReceipt (§4.1).
+    {
+        var sorted_pgs: BindingRef[>..] = [];
+        for pg in st.pool_globals { sorted_pgs.push(pg); }
+        for i in 1..sorted_pgs.len {
+            let moved = sorted_pgs[i];
+            var j = i;
+            while j > 0 && (moved.unit < sorted_pgs[j - 1].unit || (moved.unit == sorted_pgs[j - 1].unit && moved.binding < sorted_pgs[j - 1].binding)) {
+                sorted_pgs[j] = sorted_pgs[j - 1];
+                j -= 1;
+            }
+            sorted_pgs[j] = moved;
+        }
+        var dig: u64 = 0xcbf29ce484222325;
+        let prime: u64 = 0x100000001b3;
+        for pg in sorted_pgs {
+            let imm = isDeeplyImmutable(deeply_immutable, pg);
+            dig = (dig ^ (pg.unit as u64)) * prime;
+            dig = (dig ^ (pg.binding as u64)) * prime;
+            var ib: u64 = 0;
+            if imm {
+                ib = 1;
+                out_deeply_immutable.push(((pg.unit as u64) << 32) | (pg.binding as u64));
+            }
+            dig = (dig ^ ib) * prime;
+        }
+        res.deeply_immutable_digest = dig;
     }
 
     // 6. Enforce Mathematical Law 1: `spark` read-only footprint (`spark_mutates_capture`).

@@ -1,0 +1,11 @@
+// Canonical FlatNumeric codecs and kernel handle metadata accessors.
+// Wraps compiler-internal @flat.* intrinsics for std and user modules.
+
+func encode value => return @flat.encode value
+func decode words => return @flat.decode words
+func schema_hash value => return @flat.schema_hash value
+
+func kernel_id k => return @flat.kernel_id k
+func kernel_binding_hash k => return @flat.kernel_binding_hash k
+func kernel_ctx_hash k => return @flat.kernel_ctx_hash k
+func kernel_io_hash k => return @flat.kernel_io_hash k

@@ -146,10 +146,9 @@ struct Label {
     release_stack: u32 = 0,
     allocations: u32 = 0,
     used: bool = false,
-    // The local that allows iteration releases (no memory-holding value was
-    // stored during the body), and the carried owner slots that must
-    // predate the iteration for a release to be safe.
-    allow: u32 = 0,
+    // The local holding the enclosing scope's saved `rt.escape_min_slot`,
+    // and the carried owner slots that must predate the iteration for a release to be safe.
+    saved_esc: u32 = 0,
     guards: Words = Words {},
     // Carries held in loop slots (boxed values copied in place): one word
     // per carry, nonzero when held.
@@ -239,11 +238,27 @@ root struct State {
     dep_frame_mark: i64 = 0,
     dep_match: bool = true,
     inlined_callees: U64Map = U64Map {},
+    deeply_immutable_pools: U64Map = U64Map {},
+    persist_rec_helpers: U64Map = U64Map {},
     kernels: blot_check_wire_schema::KernelInfo[>..] = [],
     processes: blot_check_wire_schema::ProcessInfo[>..] = [],
     wire_word_tags: u8[>..] = [],
     sparks_vectorized: i64 = 0,
     sparks_scalar_fallback: i64 = 0,
+    // Unconditional #run staging dependency & value digest tracking (§4.1 item 3).
+    staged_dep_units_valid: bool = false,
+    staged_dep_units: u32[>..] = [],
+    staged_value_digest: u64 = 0xcbf29ce484222325,
+}
+
+fn recordStagedDepUnit(g: Generator&, unit: u32) {
+    if unit == 0 { return; }
+    for existing in g.s.staged_dep_units { if existing == unit { return; } }
+    g.s.staged_dep_units.push(unit);
+}
+
+fn mixStagedDigest(g: Generator&, v: u64) {
+    g.s.staged_value_digest = (g.s.staged_value_digest ^ v) * 0x100000001b3;
 }
 
 fn recordDep(g: Generator&, id: u32) {
@@ -622,9 +637,15 @@ fn unitsHaveFork(units: const Module[:]) -> bool {
     }
     return false;
 }
+fn unitsHavePersistentState(units: const Module[:]) -> bool {
+    for m in units {
+        if m.kernels.len != 0 || m.processes.len != 0 { return true; }
+    }
+    return false;
+}
 fn runtime_(g: Generator&) -> const Runtime& {
     if !g.s.has_rt {
-        g.s.rt = blot_direct_runtime::emitWithFork(g.module, blot_direct_runtime::Budgets {}, unitsHaveFork(g.units));
+        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, blot_direct_runtime::Budgets {}, unitsHaveFork(g.units), unitsHavePersistentState(g.units));
         g.s.has_rt = true;
     }
     return g.s.rt;

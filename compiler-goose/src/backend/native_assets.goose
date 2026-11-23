@@ -1,6 +1,7 @@
 // Captured native inputs and generated modules share transactional ownership.
 namespace blot_backend_native_assets;
 import reuse.source_overlays;
+import check.wire_schema;
 import support.option;
 import support.error;
 import support.json;
@@ -19,7 +20,7 @@ struct Resources {storage: Resource[:] = default<Resource[:]>(),items: Resource[
 struct Texts {storage: const u8[:][:] = default<const u8[:][:]>(),items: const u8[:][:] = default<const u8[:][:]>()}
 struct DefinitionRead {unit:u32,binding:u32}
 reusable[] var definition_read_runs:DefinitionRead[>..]=[];
-struct Candidate {tracks_inputs:bool=false,reused_wasm:bool=false,cached_wasm:const u8[:]=default<const u8[:]>(),cached_functions:i64=0,read_definitions:blot_support_pooled_buffer::Buffer<DefinitionRead> = blot_support_pooled_buffer::Buffer<DefinitionRead>{..},owner_id: u64 = 0,allocation_index:i64=-1,modules: Modules = Modules {..},sources: Sources = Sources {..},dependencies: Dependencies = Dependencies {..},resources: Resources = Resources {..},texts: Texts = Texts {..},stats: Stats = Stats {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>()}
+struct Candidate {tracks_inputs:bool=false,reused_wasm:bool=false,cached_wasm:const u8[:]=default<const u8[:]>(),cached_functions:i64=0,cached_receipt_valid:bool=false,cached_receipt:blot_check_wire_schema::NonStagedReceipt=blot_check_wire_schema::NonStagedReceipt{},read_definitions:blot_support_pooled_buffer::Buffer<DefinitionRead> = blot_support_pooled_buffer::Buffer<DefinitionRead>{..},owner_id: u64 = 0,allocation_index:i64=-1,modules: Modules = Modules {..},sources: Sources = Sources {..},dependencies: Dependencies = Dependencies {..},resources: Resources = Resources {..},texts: Texts = Texts {..},stats: Stats = Stats {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>()}
 struct Session {options: Options = Options {..},last: Candidate? = null,texts: Texts = Texts {..},owned_definitions: Definition[:] = default<Definition[:]>(),owned_roots: const u8[:][:] = default<const u8[:][:]>()}
 fn jsonStringify(self_: Definition,writer: blot_json::Writer&) -> blot_error::Error {writer.beginObject();writer.field("module",self_.module);writer.field("path",self_.path);writer.field("kind",self_.kind);writer.field("type",self_.ty);writer.field("export",self_.export_name);writer.field("mediaType",self_.mediaType);writer.endObject();return writer.failure;}
 import dictionary;
@@ -215,13 +216,13 @@ fn reuseStagedWasm(c:Candidate&,last:const Candidate&)->bool {
     return true;
 }
 
-fn keepStagedWasm(c:Candidate&,wasm:const u8[:],functions:i64)->Error {
+fn keepStagedWasm(c:Candidate&,wasm:const u8[:],functions:i64,receipt:blot_check_wire_schema::NonStagedReceipt)->Error {
     if !c.tracks_inputs {return blot_error::Error.none;}
     for m in c.modules.items {
         if !m.read {continue;}
         let owned,error=c.own(wasm);
         if error!=blot_error::Error.none {return error;}
-        c.cached_wasm=registeredText(c.texts,owned);c.cached_functions=functions;break;
+        c.cached_wasm=registeredText(c.texts,owned);c.cached_functions=functions;c.cached_receipt_valid=true;c.cached_receipt=receipt;break;
     }
     return blot_error::Error.none;
 }

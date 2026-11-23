@@ -16,10 +16,15 @@ fn message(self_: Diagnostic, detail: const u8[:]) -> const u8[:] { return blot_
 
 // Either `bytes` holds a module, or `has_diagnostic` is set and `detail`
 // holds the diagnostic's detail.
-struct Result { has_diagnostic: bool = false, diagnostic: Diagnostic = Diagnostic {}, emitted_functions: i64 = 0, sparks_vectorized: i64 = 0, sparks_scalar_fallback: i64 = 0 }
+struct Result { has_diagnostic: bool = false, diagnostic: Diagnostic = Diagnostic {}, emitted_functions: i64 = 0, sparks_vectorized: i64 = 0, sparks_scalar_fallback: i64 = 0, staged_dep_units_valid: bool = false, staged_value_digest: u64 = 0 }
 
 fn compile(units: const blot_check_core::Module[:], entry: u32, bytes: u8[>..<]&, detail: u8[>..<]&, build_inputs:i64 = -1) -> Result {
-    let built = blot_direct::compile(units, entry, bytes, detail, build_inputs);
+    var staged_units: u32[>..<] = [];
+    return compileWithStaged(units, entry, bytes, detail, staged_units, build_inputs);
+}
+
+fn compileWithStaged(units: const blot_check_core::Module[:], entry: u32, bytes: u8[>..<]&, detail: u8[>..<]&, staged_units: u32[>..<]&, build_inputs:i64 = -1) -> Result {
+    let built = blot_direct::compileWithStaged(units, entry, bytes, detail, staged_units, build_inputs);
     if built.failed { return Result { has_diagnostic: true, diagnostic: Diagnostic { unit: built.unit, span: built.span, code: built.code } }; }
-    return Result { emitted_functions: built.emitted_functions, sparks_vectorized: built.sparks_vectorized, sparks_scalar_fallback: built.sparks_scalar_fallback };
+    return Result { emitted_functions: built.emitted_functions, sparks_vectorized: built.sparks_vectorized, sparks_scalar_fallback: built.sparks_scalar_fallback, staged_dep_units_valid: built.staged_dep_units_valid, staged_value_digest: built.staged_value_digest };
 }

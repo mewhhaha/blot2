@@ -27,14 +27,23 @@ type Code = blot_check_diagnostic_code::Code;
 
 // `failed`: `unit`, `span` and `code` describe the diagnostic and `message`
 // holds its detail. Otherwise `bytes` holds the Wasm module.
-struct Result { failed: bool = false, unit: u32 = 0, span: blot_check_core::Span = blot_check_core::Span { 0, 0 }, code: Code = blot_check_diagnostic_code::Code.storage_unsupported, emitted_functions: i64 = 0, sparks_vectorized: i64 = 0, sparks_scalar_fallback: i64 = 0 }
+struct Result { failed: bool = false, unit: u32 = 0, span: blot_check_core::Span = blot_check_core::Span { 0, 0 }, code: Code = blot_check_diagnostic_code::Code.storage_unsupported, emitted_functions: i64 = 0, sparks_vectorized: i64 = 0, sparks_scalar_fallback: i64 = 0, staged_dep_units_valid: bool = false, staged_value_digest: u64 = 0 }
 
 fn compile(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    var staged_units: u32[>..<] = [];
+    return compileWithStaged(units, entry, bytes, message, staged_units, build_inputs);
+}
+
+fn compileWithStaged(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..<]&, staged_units: u32[>..<]&, build_inputs:i64 = -1) -> Result {
     var types = blot_direct_types::Types { units: units, .. };
     blot_direct_types::init(types);
     var module = blot_direct_writer::Module { .. };
     var state = blot_direct_emit::State { .. };
-    return compileWith(units, entry, types, module, state, bytes, message, build_inputs);
+    let res = compileWith(units, entry, types, module, state, bytes, message, build_inputs);
+    if !res.failed && state.staged_dep_units_valid {
+        staged_units.append(state.staged_dep_units[..]);
+    }
+    return res;
 }
 
 fn compileTracked(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
@@ -55,7 +64,7 @@ fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Typ
         message.append(state.text[failure.message.start..failure.message.start + failure.message.len]);
         return Result { failed: true, unit: failure.unit, span: failure.span, code: failure.code };
     }
-    return Result { emitted_functions: module.functions.len, sparks_vectorized: state.sparks_vectorized, sparks_scalar_fallback: state.sparks_scalar_fallback };
+    return Result { emitted_functions: module.functions.len, sparks_vectorized: state.sparks_vectorized, sparks_scalar_fallback: state.sparks_scalar_fallback, staged_dep_units_valid: state.staged_dep_units_valid, staged_value_digest: state.staged_value_digest };
 }
 
 // Whether pool instance `left` initializes before `right`.
@@ -79,12 +88,14 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     g.s.kernels.append(pinfo.kernels[..]);
     g.s.processes.append(pinfo.processes[..]);
     g.s.wire_word_tags.append(pinfo.word_tags[..]);
-    let pres = blot_check_purity::analyze(g.units, entry);
+    var imm_pools: u64[>..] = [];
+    let pres = blot_check_purity::analyzeInto(g.units, entry, imm_pools);
     if pres.issue.failed {
         var err_unit = pres.issue.unit;
         if !g.hasUnit(err_unit) { err_unit = entry; }
         return g.failSpanCode(err_unit, pres.issue.span, pres.issue.code, pres.issue.message);
     }
+    for ik in imm_pools { g.s.deeply_immutable_pools.put(ik, 1); }
     let m .= g.units[entry - 1];
     var entries: u8[>..<] = [];
     var constants: u8[>..<] = [];
@@ -117,7 +128,13 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
         if error != blot_direct_types::Error.none { return error; }
         inits.push(init_function);
     }
-    if count == 0 && inits.len == 0 && m.kernels.len == 0 && m.processes.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
+    let kernel_exports, kerr = blot_direct_function::emitKernelExports(g, m, entries);
+    if kerr != blot_direct_types::Error.none { return kerr; }
+    count += kernel_exports;
+    let process_exports, perr = blot_direct_function::emitProcessExports(g, m, entries);
+    if perr != blot_direct_types::Error.none { return perr; }
+    count += process_exports;
+    if count == 0 && inits.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
     let emitted = g.emitAll();
     if emitted != blot_direct_types::Error.none { return emitted; }
     var starts: u32[>..<] = [];
@@ -158,6 +175,16 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     blot_direct_writer::raw(abi, constants[..]);
     g.module.custom("blot:abi", abi[..]);
     if count != 0 { blot_direct_function::emitInvocationFinish(g, m); }
+    for si in 1..g.s.staged_dep_units.len {
+        let key = g.s.staged_dep_units[si];
+        var sj = si;
+        while sj > 0 && g.s.staged_dep_units[sj - 1] > key {
+            g.s.staged_dep_units[sj] = g.s.staged_dep_units[sj - 1];
+            sj -= 1;
+        }
+        g.s.staged_dep_units[sj] = key;
+    }
+    g.s.staged_dep_units_valid = true;
     blot_direct_writer::assemble(g.module, bytes);
     return blot_direct_types::Error.none;
 }

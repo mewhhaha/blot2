@@ -408,13 +408,21 @@ fn lengthOf(g: Generator&, f: Fn&, container: Val, id: u32) -> u32, Error {
     return length, blot_direct_types::Error.none;
 }
 // When the module uses `fork`, journals `[address + offset .. + bytes]`
-// before mutating an owner opened before the active `fork`.
+// before mutating an owner opened before the active `fork` or a persistent owner.
 fn recordBeforeWrite(g: Generator&, f: Fn&, slot_local: u32, address: u32, offset: u32, bytes: u32) {
     let rt = g.runtime_();
     if !rt.has_fork || bytes == 0 { return; }
+    gget(g, rt.fork_depth);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
     lget(g, slot_local);
     gget(g, rt.fork_owner_mark);
     op(g, OP_i32_lt_u);
+    lget(g, slot_local);
+    i32Const(g, rt.layout.persistent_split);
+    op(g, OP_i32_ge_u);
+    op(g, OP_i32_or);
+    op(g, OP_i32_and);
     let opened = open(g, f, OP_if_);
     lget(g, address);
     if offset != 0 {
@@ -724,13 +732,62 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let element, error = elementOf(g, f, container.ty, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let elem_stride, serr = stride(g, f, element, id);
+            if serr != blot_direct_types::Error.none { return neverVal(), serr; }
             let lane_ty, error = g.types.tuple([element, element, element, element]);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            if operation == blot_backend_collection_ops::Op.simd_load { return loadAt(g, f, address, 0, lane_ty, id); }
+            if operation == blot_backend_collection_ops::Op.simd_load {
+                var lanes_vals: Val[4] = [neverVal(); 4];
+                for li in 0..4 {
+                    var lane_addr = address;
+                    if li != 0 {
+                        lane_addr = local32(g, f);
+                        lget(g, address);
+                        i32Const(g, (li as u32) * elem_stride);
+                        op(g, OP_i32_add);
+                        lset(g, lane_addr);
+                    }
+                    let lv, lerr = loadElement(g, f, lane_addr, 0, element, id);
+                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    lanes_vals[li] = lv;
+                }
+                let lane_boxed, berr = isBoxed(g, f, lane_ty, id);
+                if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+                if lane_boxed {
+                    let blk, merr = newBlock(g, f, lane_ty, id);
+                    if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+                    for li in 0..4 {
+                        let off, oerr = itemOffset(g, f, lane_ty, li, id);
+                        if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+                        let werr = writeFlat(g, f, blk, off, lanes_vals[li], id);
+                        if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+                    }
+                    return valOf1(g, lane_ty, blk), blot_direct_types::Error.none;
+                }
+                let start_w = g.s.words.len as u32;
+                for li in 0..4 {
+                    let lv = lanes_vals[li];
+                    for wi in 0..(lv.len as i64) { let lw = g.s.words[lv.start + wi]; g.s.words.push(lw); }
+                }
+                return Val { lane_ty, start_w, (g.s.words.len as u32) - start_w }, blot_direct_types::Error.none;
+            }
             let lanes_value, error = expr(g, f, children[2]);
             if error != blot_direct_types::Error.none { return lanes_value, error; }
-            recordBeforeWrite(g, f, w(g, container, 0), address, 0, 16);
-            storeAt(g, f, address, 0, lanes_value);
+            let noted = noteStoreToSlot(g, f, w(g, container, 0), lanes_value);
+            if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+            var store_addr = address;
+            if tagOf(g, container.ty) != blot_direct_types::Tag.array {
+                let recomputed, rerr = elementAddress(g, f, container, index, id);
+                if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                store_addr = recomputed;
+            }
+            recordBeforeWrite(g, f, w(g, container, 0), store_addr, 0, elem_stride * 4);
+            for li in 0..4 {
+                let lv, lerr = tupleItem(g, f, lanes_value, li, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                let werr = writeFlat(g, f, store_addr, (li as u32) * elem_stride, lv, id);
+                if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            }
             return container, blot_direct_types::Error.none;
         },
         flatten => {
@@ -952,12 +1009,20 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
         op(g, OP_i32_add);
         lset(g, next_len);
         let need = emitScaledBytes(g, f, next_len, step);
-        lget(g, need);
+        let cap = local32(g, f);
         lget(g, entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-        i32Const(g, blot_direct_runtime::heap_flag);
-        op(g, OP_i32_xor);
-        op(g, OP_i32_le_s);
+        ltee(g, cap);
+        i32Const(g, blot_direct_runtime::flag_mask);
+        op(g, OP_i32_and);
+        i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
+        op(g, OP_i32_eq);
+        lget(g, need);
+        lget(g, cap);
+        i32Const(g, blot_direct_runtime::capacity_mask);
+        op(g, OP_i32_and);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
         let fast = open(g, f, OP_if_);
         lget(g, entry);
         lget(g, next_len);

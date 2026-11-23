@@ -31,9 +31,7 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
         lset(g, base);
         let bytes = emitScaledBytes(g, f, length, 4);
         lget(g, bytes);
-        gget(g, rt.transport_base);
-        gget(g, rt.transport_cap);
-        op(g, OP_i32_add);
+        gget(g, rt.transport_top);
         lget(g, base);
         op(g, OP_i32_sub);
         op(g, OP_i32_gt_u);
@@ -105,12 +103,16 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     close(g, f);
     popCheckedArraysAt(f, fast);
     op(g, OP_else_);
+    let pin_slot = local32(g, f);
+    let pin_gen = local32(g, f);
     let new_base = local32(g, f);
     let new_cap = local32(g, f);
     lget(g, total);
-    callf(g, rt.heap_alloc);
+    callf(g, rt.open_transport_pin);
     lset(g, new_cap);
     lset(g, new_base);
+    lset(g, pin_gen);
+    lset(g, pin_slot);
     let non_empty2 = open(g, f, OP_block);
     lget(g, length);
     op(g, OP_i32_eqz);
@@ -126,11 +128,13 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     op(g, 0);
     op(g, 0);
     close(g, f);
+    lget(g, pin_slot);
+    callf(g, rt.detach_temp_slot);
     gget(g, rt.transport_cap);
     let had_old = open(g, f, OP_if_);
     gget(g, rt.transport_base);
     gget(g, rt.transport_cap);
-    callf(g, rt.heap_free);
+    callf(g, rt.free_transport);
     close(g, f);
     lget(g, new_base);
     gset(g, rt.transport_base);
@@ -273,7 +277,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     f.parameter_words = localCount(g, f);
     let owner_mark = local(g, f, VT_i32);
     let stack_mark = local(g, f, VT_i32);
-    f.entry_owner_mark = owner_mark;
+    let saved_esc = local(g, f, VT_i32);
     var captures = Vals {};
     if closure {
         let loaded, error = loadCaptures(g, f, g.s.instances[id].captures, 0);
@@ -347,7 +351,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
                 let bytes, berr = flatBytes(g, f, arg.ty, root);
                 if berr != blot_direct_types::Error.none { return berr; }
                 if bytes != 0 {
-                    gget(g, rt.fork_owner_mark);
+                    gget(g, rt.fork_depth);
                     let opened = open(g, f, OP_if_);
                     lget(g, 0);
                     i32Const(g, bytes);
@@ -377,25 +381,27 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         release = !holds && f.memory_stores == 0;
     }
     if release {
-        if f.scoped_stores != 0 && f.entry_allow != 0xffffffff {
-            lget(g, f.entry_allow);
-            let opened = open(g, f, OP_if_);
-            releaseTo(g, owner_mark, stack_mark);
-            close(g, f);
-        } else {
-            releaseTo(g, owner_mark, stack_mark);
-        }
+        let rt = g.runtime_();
+        let fn_esc = local32(g, f);
+        gget(g, rt.escape_min_slot);
+        ltee(g, fn_esc);
+        lget(g, owner_mark);
+        op(g, OP_i32_ge_u);
+        let opened = open(g, f, OP_if_);
+        releaseTo(g, owner_mark, stack_mark);
+        close(g, f);
+        emitMergeEscapeMin(g, f, fn_esc, saved_esc);
     }
     if result.ty == blot_direct_types::never { op(g, OP_unreachable_); } else { push(g, result); }
     op(g, OP_end);
-    finishWith(g, g.s.instances[id].function, f, release, owner_mark, stack_mark);
+    finishWith(g, g.s.instances[id].function, f, release, owner_mark, stack_mark, saved_esc);
     return blot_direct_types::Error.none;
 }
 
 // Encodes the body and gives the generator's stacks back. Only for bodies
 // that are not nested in another one (exports and start functions).
 fn finish(g: Generator&, function: u32, f: const Fn&) {
-    finishWith(g, function, f, false, 0, 0);
+    finishWith(g, function, f, false, 0, 0, 0);
     g.s.code.resize(f.code_base);
     g.s.locals.resize(f.locals_base);
     g.s.labels.resize(f.labels_base);
@@ -407,7 +413,7 @@ var finish_body_scratch: u8[>..<] = [];
 
 // Encodes the body: local declarations (in runs of one type), the marks a
 // releasing body records on entry, then code.
-fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_mark: u32, stack_mark: u32) {
+fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_mark: u32, stack_mark: u32, saved_esc: u32) {
     let mark = finish_body_scratch.len;
     let first = f.locals_base + f.parameter_words;
     let count = g.s.locals.len - first;
@@ -430,12 +436,15 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
     }
     if release {
         markInto(g, finish_body_scratch, owner_mark, stack_mark);
-        if f.scoped_stores != 0 && f.entry_allow != 0xffffffff {
-            finish_body_scratch.push(OP_i32_const);
-            blot_direct_writer::sleb(finish_body_scratch, 1);
-            finish_body_scratch.push(OP_local_set);
-            blot_direct_writer::uleb(finish_body_scratch, f.entry_allow);
-        }
+        let esc_global = g.runtime_().escape_min_slot;
+        finish_body_scratch.push(OP_global_get);
+        blot_direct_writer::uleb(finish_body_scratch, esc_global);
+        finish_body_scratch.push(OP_local_set);
+        blot_direct_writer::uleb(finish_body_scratch, saved_esc);
+        finish_body_scratch.push(OP_i32_const);
+        blot_direct_writer::sleb(finish_body_scratch, -1);
+        finish_body_scratch.push(OP_global_set);
+        blot_direct_writer::uleb(finish_body_scratch, esc_global);
     }
     blot_direct_relocations::finishBody(f.sites_base,(finish_body_scratch.len-mark)-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
     blot_direct_writer::raw(finish_body_scratch, g.s.code[f.code_base..g.s.code.len]);
@@ -516,21 +525,26 @@ fn hostImport(g: Generator&, first: Abi, second: Abi) -> u32 {
 
 // ----- exports -----------------------------------------------------------
 
-// Recovers temporaries and providers a trapped earlier call left behind.
+// Recovers temporaries, speculative fork state, and providers a trapped earlier call left behind.
+// Rewinds fork journal BEFORE releasing owners so realloc sentinels free cleanly and pre-fork entries restore.
 fn resetEntry(g: Generator&) {
     let rt = g.runtime_();
+    if rt.has_fork {
+        i32Const(g, 0);
+        callf(g, rt.undo_rewind);
+        i32Const(g, 0);
+        gset(g, rt.fork_depth);
+        i32Const(g, 0);
+        gset(g, rt.fork_owner_mark);
+    }
     i32Const(g, 1);
     callf(g, rt.release);
     i32Const(g, 0);
     callf(g, rt.rewind_stack);
     i32Const(g, 0);
     gset(g, rt.effect_context);
-    if rt.has_fork {
-        i32Const(g, 0);
-        gset(g, rt.fork_owner_mark);
-        gget(g, rt.undo_base);
-        gset(g, rt.undo_sp);
-    }
+    i32Const(g, 0xffffffff);
+    gset(g, rt.escape_min_slot);
 }
 fn releaseEntry(g: Generator&) {
     let rt = g.runtime_();

@@ -41,8 +41,11 @@ struct Publication {
 struct Details {bytes:const u8[:]}
 fn jsonStringify(self_:Details,writer:Writer&)->Error {return blot_json::write(writer,blot_json::Raw{self_.bytes});}
 reusable[] var diagnostic_bytes:u8[>..]=[];
+reusable[] var staged_unit_runs:u32[>..]=[];
 fn ownBytes(bytes:const u8[:])->u8[:] {let result=diagnostic_bytes.alloc_slice(bytes.len);if bytes.len!=0 {blot_native::copy_u8(result[0],bytes[0],bytes.len as u64);}return result;}
 fn freeBytes(bytes:u8[:]) {if bytes.len!=0 {diagnostic_bytes.free_slice(bytes);}}
+fn ownU32s(items:const u32[:])->u32[:] {let result=staged_unit_runs.alloc_slice(items.len);for v,i in items {result[i]=v;}return result;}
+fn freeU32s(items:u32[:]) {if items.len!=0 {staged_unit_runs.free_slice(items);}}
 struct Diagnostic {
  stage:const u8[:]=default<const u8[:]>(),unit:u32=0,code:u8[:]=default<u8[:]>(),start:u32=0,end:u32=0,message:u8[:]=default<u8[:]>(),publication:blot_support::Option<Publication> =blot_support::none<Publication>(),
 }
@@ -189,15 +192,15 @@ fn write(self_:const Diagnostic&,out:u8[>..]&,filename:const u8[:])->Error {
 fn write<S>(self_:const Diagnostic&,stream:S&,filename:const u8[:])->Error {var bytes:u8[>..]=[];let error=self_.write(bytes,filename);if error!=blot_error::Error.none {return error;}return stream.writeAll(bytes[..]);}
 // The result of one project build. `compiled` owns the Wasm bytes or, after a
 // backend rejection, the diagnostic and its detail text.
-struct Compiled {bytes:u8[:]=default<u8[:]>(),failed:bool=false,diagnostic:blot_compile::Diagnostic=blot_compile::Diagnostic{..},message:u8[:]=default<u8[:]>(),emitted_functions:i64=0,sparks_vectorized:i64=0,sparks_scalar_fallback:i64=0}
+struct Compiled {bytes:u8[:]=default<u8[:]>(),failed:bool=false,diagnostic:blot_compile::Diagnostic=blot_compile::Diagnostic{..},message:u8[:]=default<u8[:]>(),emitted_functions:i64=0,sparks_vectorized:i64=0,sparks_scalar_fallback:i64=0,staged_dep_units_valid:bool=false,staged_dep_units:u32[:]=default<u32[:]>(),staged_value_digest:u64=0}
 fn text(self_:const Compiled&)->const u8[:] {return self_.diagnostic.code.message(self_.message);}
 struct Result {compiled:Compiled=Compiled{..},stats:Stats=Stats{},diagnostic:blot_support::Option<Diagnostic> =blot_support::none<Diagnostic>()}
-fn deinit(self_:Result&) {freeBytes(self_.compiled.bytes);freeBytes(self_.compiled.message);if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
+fn deinit(self_:Result&) {freeBytes(self_.compiled.bytes);freeBytes(self_.compiled.message);freeU32s(self_.compiled.staged_dep_units);if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
 // Runs the backend and takes ownership of what it produced.
 fn compileUnits(units:const Core[:],entry:u32,build_inputs:i64 = -1)->Compiled,Error {
- var bytes:u8[>..<]=[];var message:u8[>..<]=[];let outcome=blot_compile::compile(units,entry,bytes,message,build_inputs);
+ var bytes:u8[>..<]=[];var message:u8[>..<]=[];var staged_units:u32[>..<]=[];let outcome=blot_compile::compileWithStaged(units,entry,bytes,message,staged_units,build_inputs);
  if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;}
- return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;
+ return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback,staged_dep_units_valid:outcome.staged_dep_units_valid,staged_dep_units:ownU32s(staged_units[..]),staged_value_digest:outcome.staged_value_digest, ..},blot_error::Error.none;
 }
 struct HoleDetails {hole:blot_reuse_hole_diagnostics::Snapshot}
 struct ExplanationDetails {explanation:blot_reuse_dispatch_explanation::Explanation}

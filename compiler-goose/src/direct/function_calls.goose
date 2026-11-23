@@ -277,6 +277,260 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
     callf(g, g.s.instances[instance].function);
     return pop(g, f, ty, id);
 }
+// Emit a memoized helper `persist_rec(old_ptr: i32) -> new_ptr: i32` that copies a
+// recursive nominal node into the persistent bump region and recursively persists
+// all nested owners and recursive pointers, recording deeply-immutable boxes in `static_blocks`.
+recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bool) -> u32, Error {
+    var flag: u32 = 0;
+    if is_imm { flag = 1; }
+    let key = blot_direct_emit::key64(ty, flag);
+    let existing, found = g.s.persist_rec_helpers.get(key);
+    if found { return existing, blot_direct_types::Error.none; }
+    let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
+    g.s.persist_rec_helpers.put(key, fn_id);
+    let s .= g.s;
+    let code_mark = s.code.len;
+    let sites_mark = blot_direct_relocations::mark();
+    let locals_mark = s.locals.len;
+    let labels_mark = s.labels.len;
+    let handles_mark = s.handles.len;
+    let handle_cells_mark = s.handle_cells_len;
+    var nf = newFn(g, unit, 0);
+    let old_ptr = local(g, nf, VT_i32);
+    nf.parameter_words = 1;
+    let bbytes, berr = blockBytes(g, nf, ty, 0);
+    if berr != blot_direct_types::Error.none {
+        blot_direct_relocations::rewind(sites_mark);
+        s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+        return 0, berr;
+    }
+    let rt = g.runtime_();
+    let new_ptr = local32(g, nf);
+    lget(g, old_ptr);
+    op(g, OP_i32_eqz);
+    let z_if = open(g, nf, OP_if_);
+    i32Const(g, 0);
+    op(g, OP_return_);
+    close(g, nf);
+    i32Const(g, bbytes);
+    callf(g, rt.alloc_persistent);
+    lset(g, new_ptr);
+    memoryCopy(g, new_ptr, 0, old_ptr, bbytes);
+    if is_imm && rt.has_persistent_state {
+        lget(g, new_ptr);
+        i32Const(g, bbytes);
+        i32Const(g, ty);
+        callf(g, rt.record_static_block);
+    }
+    let cases, cerr = g.types.variants(ty);
+    if cerr != blot_direct_types::Error.none {
+        blot_direct_relocations::rewind(sites_mark);
+        s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+        return 0, cerr;
+    }
+    if cases.len == 1 {
+        let perr = persistFlatAt(g, nf, new_ptr, 0, g.types.variant_payloads[cases.payloads], is_imm, 0, 0);
+        if perr != blot_direct_types::Error.none {
+            blot_direct_relocations::rewind(sites_mark);
+            s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+            return 0, perr;
+        }
+    } else if cases.len > 1 {
+        let tag_loc = local32(g, nf);
+        lget(g, new_ptr);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+        lset(g, tag_loc);
+        for ci in 0..(cases.len as i64) {
+            let pty = g.types.variant_payloads[cases.payloads + ci];
+            let pholds, herr = g.contentsHoldMemory(pty);
+            if herr != blot_direct_types::Error.none {
+                blot_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return 0, herr;
+            }
+            if !pholds { continue; }
+            lget(g, tag_loc);
+            i32Const(g, g.types.variant_tags[cases.tags + ci]);
+            op(g, OP_i32_eq);
+            let cif = open(g, nf, OP_if_);
+            let perr = persistFlatAt(g, nf, new_ptr, 4, pty, is_imm, 0, 0);
+            if perr != blot_direct_types::Error.none {
+                blot_direct_relocations::rewind(sites_mark);
+                s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+                return 0, perr;
+            }
+            close(g, nf);
+        }
+    }
+    lget(g, new_ptr);
+    op(g, OP_end);
+    finishWith(g, fn_id, nf, false, 0, 0, 0);
+    blot_direct_relocations::rewind(sites_mark);
+    s.code.resize(code_mark);
+    s.locals.resize(locals_mark);
+    s.labels.resize(labels_mark);
+    s.handles.resize(handles_mark);
+    s.handle_cells_len = handle_cells_mark;
+    return fn_id, blot_direct_types::Error.none;
+}
+
+// Recursively persists nested owned arrays and recursive boxes stored flat at `base + offset`.
+recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty, is_imm: bool, id: u32, depth: i64) -> Error {
+    if depth > 32 { return blot_direct_types::Error.none; }
+    let holds, herr = g.contentsHoldMemory(ty);
+    if herr != blot_direct_types::Error.none { return herr; }
+    if !holds { return blot_direct_types::Error.none; }
+    let is_rec, rerr = g.types.isRecursive(ty);
+    if rerr != blot_direct_types::Error.none { return rerr; }
+    if is_rec {
+        let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, ty, is_imm);
+        if aerr != blot_direct_types::Error.none { return aerr; }
+        let old_p = local32(g, f);
+        lget(g, base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+        lset(g, old_p);
+        lget(g, base);
+        lget(g, old_p);
+        callf(g, helper_fn);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+        return blot_direct_types::Error.none;
+    }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, grow, resize => {
+            let c_slot = local32(g, f);
+            let c_gen = local32(g, f);
+            let p_slot = local32(g, f);
+            let p_gen = local32(g, f);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+            lset(g, c_slot);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
+            lset(g, c_gen);
+            let elem_ty = n.a;
+            let elem_step, serr = stride(g, f, elem_ty, id);
+            if serr != blot_direct_types::Error.none { return serr; }
+            var mode: u32 = 0;
+            if growable(g, ty) { mode = 1; } else if is_imm { mode = 2; }
+            lget(g, c_slot);
+            lget(g, c_gen);
+            i32Const(g, elem_step);
+            i32Const(g, mode);
+            callf(g, g.runtime_().persist);
+            lset(g, p_gen);
+            lset(g, p_slot);
+            lget(g, base);
+            lget(g, p_slot);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+            lget(g, base);
+            lget(g, p_gen);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
+            let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
+            if eherr != blot_direct_types::Error.none { return eherr; }
+            if elem_holds {
+                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, is_imm, id, depth + 1);
+                if perr != blot_direct_types::Error.none { return perr; }
+            }
+            return blot_direct_types::Error.none;
+        },
+        tuple => {
+            var off = offset;
+            for at in 0..(n.b as i64) {
+                let item_ty = g.types.words[n.a + at];
+                let perr = persistFlatAt(g, f, base, off, item_ty, is_imm, id, depth + 1);
+                if perr != blot_direct_types::Error.none { return perr; }
+                let fb, ferr = flatBytes(g, f, item_ty, id);
+                if ferr != blot_direct_types::Error.none { return ferr; }
+                off += fb;
+            }
+            return blot_direct_types::Error.none;
+        },
+        record => {
+            var off = offset;
+            for idx in 0..(n.b as i64) {
+                let field_ty = g.types.recordField(ty, idx).ty;
+                let perr = persistFlatAt(g, f, base, off, field_ty, is_imm, id, depth + 1);
+                if perr != blot_direct_types::Error.none { return perr; }
+                let fb, ferr = flatBytes(g, f, field_ty, id);
+                if ferr != blot_direct_types::Error.none { return ferr; }
+                off += fb;
+            }
+            return blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(ty);
+            if cerr != blot_direct_types::Error.none { return cerr; }
+            if cases.len == 1 {
+                return persistFlatAt(g, f, base, offset, g.types.variant_payloads[cases.payloads], is_imm, id, depth + 1);
+            }
+            if cases.len > 1 {
+                let tag_loc = local32(g, f);
+                lget(g, base);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+                lset(g, tag_loc);
+                for ci in 0..(cases.len as i64) {
+                    let pty = g.types.variant_payloads[cases.payloads + ci];
+                    let pholds, pherr = g.contentsHoldMemory(pty);
+                    if pherr != blot_direct_types::Error.none { return pherr; }
+                    if !pholds { continue; }
+                    lget(g, tag_loc);
+                    i32Const(g, g.types.variant_tags[cases.tags + ci]);
+                    op(g, OP_i32_eq);
+                    let cif = open(g, f, OP_if_);
+                    let perr = persistFlatAt(g, f, base, offset + 4, pty, is_imm, id, depth + 1);
+                    if perr != blot_direct_types::Error.none { return perr; }
+                    close(g, f);
+                }
+            }
+            return blot_direct_types::Error.none;
+        },
+        _ => { return blot_direct_types::Error.none; },
+    }
+}
+
+recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32, elem_ty: Ty, elem_step: u32, is_imm: bool, id: u32, depth: i64) -> Error {
+    let rt = g.runtime_();
+    let entry = local32(g, f);
+    let arr_base = local32(g, f);
+    let arr_len = local32(g, f);
+    let idx = local32(g, f);
+    let elem_addr = local32(g, f);
+    lget(g, p_slot);
+    lget(g, p_gen);
+    callf(g, rt.check);
+    ltee(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, arr_base);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lset(g, arr_len);
+    i32Const(g, 0);
+    lset(g, idx);
+    let exit = open(g, f, OP_block);
+    let top = open(g, f, OP_loop);
+    lget(g, idx);
+    lget(g, arr_len);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, exit);
+    lget(g, arr_base);
+    lget(g, idx);
+    i32Const(g, elem_step);
+    op(g, OP_i32_mul);
+    op(g, OP_i32_add);
+    lset(g, elem_addr);
+    let perr = persistFlatAt(g, f, elem_addr, 0, elem_ty, is_imm, id, depth);
+    if perr != blot_direct_types::Error.none { return perr; }
+    lget(g, idx);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    lset(g, idx);
+    br(g, f, OP_br, top);
+    close(g, f);
+    close(g, f);
+    return blot_direct_types::Error.none;
+}
+
 recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let at = g.s.instances[f.instance_id].pool_offset;
@@ -284,8 +538,10 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let slot_global = g.s.pool_words[at];
     let generation_global = g.s.pool_words[at + 1];
     let state_global = g.s.pool_words[at + 2];
-    let persist = g.runtime_().persist;
+    let rt = g.runtime_();
+    let persist = rt.persist;
     let key = g.s.instances[instance_id].key;
+    let _, is_imm = g.s.deeply_immutable_pools.get(blot_direct_emit::key64(key.unit, key.id));
     gget(g, state_global);
     i32Const(g, 1);
     op(g, OP_i32_ne);
@@ -312,11 +568,27 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let step, error = stride(g, f, element, 0);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     i32Const(g, step);
-    i32Const(g, boolWord(growable(g, key.ty)));
+    var mode: u32 = 0;
+    if growable(g, key.ty) { mode = 1; } else if is_imm { mode = 2; }
+    i32Const(g, mode);
     callf(g, persist);
-    gset(g, generation_global);
+    let p_slot = local32(g, f);
+    let p_gen = local32(g, f);
+    lset(g, p_gen);
+    lset(g, p_slot);
+    let elem_holds, eherr = g.contentsHoldMemory(element);
+    if eherr != blot_direct_types::Error.none { return neverVal(), eherr; }
+    if elem_holds {
+        let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, is_imm, 0, 0);
+        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+    }
+    lget(g, p_slot);
     gset(g, slot_global);
+    lget(g, p_gen);
+    gset(g, generation_global);
     releaseTo(g, owner_mark, stack_mark);
+    i32Const(g, 0xffffffff);
+    gset(g, rt.escape_min_slot);
     i32Const(g, 1);
     gset(g, state_global);
     close(g, f);
@@ -384,6 +656,54 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
             let value, error = expr(g, f, argument);
             if error != blot_direct_types::Error.none { return value, error; }
             g.s.vals[values.start + index] = value;
+        }
+    }
+    // Intercept 1-argument std/ `@flat.encode` / `@flat.decode` / `@flat.schema_hash`
+    // forwarding helpers at the call site so caller-side concrete Core types (including
+    // `#[K; E]` length literals and nominal identities) are preserved through generics.
+    if arguments.len == 1 && !deferred && g.hasUnit(target.unit) {
+        let resolved_f = followAliasTarget(g, target);
+        if g.hasUnit(resolved_f.unit) {
+            let tm .= g.units[resolved_f.unit - 1];
+            let tbody .= tm.body(resolved_f.binding);
+            if tbody && tbody.is_function {
+                let tparams = tm.bodyParameters(tbody);
+                if tparams.len == 1 {
+                    let inner = unwrapSingleBody(tm, tbody.root);
+                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.flat_op {
+                        let fn_node = tm.node(inner);
+                        if localRef(tm, fn_node.a) == tparams[0].binding {
+                            let arg_ct = m.typeOf(arguments[0]);
+                            let res_ct = m.typeOf(id);
+                            if fn_node.c == blot_check_core::flat_op_encode && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                                let out_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatEncodeVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
+                            }
+                            if fn_node.c == blot_check_core::flat_op_decode && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                                let maybe_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatDecodeVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
+                            }
+                            if fn_node.c == blot_check_core::flat_op_schema_hash && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                                let out_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                let h, ok = blot_check_wire_schema::computeSchemaHash(g.units, f.unit, arg_ct);
+                                if !ok {
+                                    return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
+                                }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                let lo = constLocal(g, f, (h & 0xffffffff) as u32);
+                                let hi = constLocal(g, f, (h >> 32) as u32);
+                                let words = g.saveWords([lo, hi]);
+                                return Val { out_ty, words.start, words.len }, blot_direct_types::Error.none;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     var callee, error = g.types.lower(m, info.callee_type, f.env);

@@ -4,9 +4,11 @@
 Each law in compiler-goose/tests/direct is NAME.goose, which prints bytes as
 hex, beside NAME.expected. `writer.expected` preserves the exact bytes the Zig
 direct backend produced on 15 November 2026; `runtime.expected` was updated on
-22 November 2026 for the on-demand 64 KiB linear memory allocator (paged owner
-directory, chunk-list scratch stack, lazy transport/undo buffers). The output
-must equal the record, and Goose must not warn.
+23 November 2026 for Phase 3 of Concurrency vNext (history-independent logical
+stack/heap budgets, exact-cap active-only stack free lists, dedicated transport
+pool with Page-0 offset 640 `arena_oom_flag`, `live_flag` / `static_pool_flag`,
+inter-procedural `escape_min_slot`, and trap-safe `fork` / persistent staging).
+The output must equal the record, and Goose must not warn.
 
 Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]
 """

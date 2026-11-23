@@ -322,7 +322,13 @@ entry func run_big (iters: U32): U32 => test_fbip_big_record iters
   );
 
   // Verify linked #[n; U32] eliminates runtime.address bounds checks inside dot's loop body.
-  const callsInDot = (wasm: Uint8Array): number[] => {
+  // Inspect the Wasm `name` section + code section to verify `named.dot` calls
+  // ONLY `runtime.check` (no `runtime.address` calls) and elides the inline
+  // bounds-check trap on `b[i]` when linked (`0` unreachable opcodes vs `> 0`).
+  function parseWasmFunctions(wasm: Uint8Array): {
+    bodies: Uint8Array[];
+    names: Map<number, string>;
+  } {
     let p = 8;
     const readU = () => {
       let v = 0, s = 0;
@@ -348,8 +354,53 @@ entry func run_big (iters: U32): U32 => test_fbip_big_record iters
       }
       p = end;
     }
-    // Find the largest user body (dot), skipping runtime helpers at the start.
-    const dotBody = bodies.slice(-6).reduce((a, b) => (b.length > a.length ? b : a));
+    const names = new Map<number, string>();
+    const mod = new WebAssembly.Module(wasm as Uint8Array<ArrayBuffer>);
+    const nameSecs = WebAssembly.Module.customSections(mod, "name");
+    if (nameSecs.length > 0) {
+      const b = new Uint8Array(nameSecs[0]);
+      let q = 0;
+      const ru = () => {
+        let v = 0, s = 0;
+        while (true) {
+          const x = b[q++];
+          v |= (x & 127) << s;
+          if (!(x & 128)) return v;
+          s += 7;
+        }
+      };
+      while (q < b.length) {
+        const subId = b[q++];
+        const sz = ru();
+        const subEnd = q + sz;
+        if (subId === 1) {
+          const cnt = ru();
+          for (let i = 0; i < cnt; i++) {
+            const idx = ru();
+            const nl = ru();
+            names.set(idx, new TextDecoder().decode(b.slice(q, q + nl)));
+            q += nl;
+          }
+        }
+        q = subEnd;
+      }
+    }
+    return { bodies, names };
+  }
+  function findDotBody(wasm: Uint8Array): {
+    body: Uint8Array;
+    names: Map<number, string>;
+  } {
+    const { bodies, names } = parseWasmFunctions(wasm);
+    for (const [idx, nm] of names) {
+      if (nm.startsWith("named.dot#") && idx < bodies.length) {
+        return { body: bodies[idx], names };
+      }
+    }
+    throw new Error("Could not find named.dot in Wasm name section");
+  }
+  const callsInDot = (wasm: Uint8Array): string[] => {
+    const { body: dotBody, names } = findDotBody(wasm);
     let q = 0;
     const readBU = () => {
       let v = 0, s = 0;
@@ -365,15 +416,24 @@ entry func run_big (iters: U32): U32 => test_fbip_big_record iters
       readBU();
       q++;
     }
-    const calls: number[] = [];
+    const calls: string[] = [];
     while (q < dotBody.length) {
       const op = dotBody[q++];
-      if (op === 0x10) calls.push(readBU());
+      if (op === 0x10) {
+        const callee = readBU();
+        calls.push(names.get(callee) ?? `#${callee}`);
+      } else if (op === 0x02 || op === 0x03 || op === 0x04) q++;
+      else if (op === 0x0c || op === 0x0d || op === 0x20 || op === 0x21 || op === 0x22 || op === 0x23 || op === 0x24 || op === 0x41) {
+        while ((dotBody[q++] & 0x80) !== 0) {}
+      } else if (op === 0x28 || op === 0x36) {
+        while ((dotBody[q++] & 0x80) !== 0) {}
+        while ((dotBody[q++] & 0x80) !== 0) {}
+      } else if (op === 0x43) q += 4;
     }
     return calls;
   };
-  let linkedCalls: number[] = [];
-  let unlinkedCalls: number[] = [];
+  let linkedCalls: string[] = [];
+  let unlinkedCalls: string[] = [];
   await compileAndRun(
     `
 func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 =>
@@ -408,36 +468,8 @@ entry func main (): U32 =>
       unlinkedCalls = callsInDot(bytes);
     },
   );
-  // Both linked and unlinked dot hoist handle validation (runtime.check, no
-  // runtime.address calls), and linked #[n; U32] dot also elides the inline
-  // bounds-check trap on b[i] (0 unreachable opcodes vs >0 unlinked).
   function trapsInDot(wasm: Uint8Array): number {
-    let p = 8;
-    const readU = () => {
-      let v = 0, s = 0;
-      while (true) {
-        const b = wasm[p++];
-        v |= (b & 127) << s;
-        if (!(b & 128)) return v;
-        s += 7;
-      }
-    };
-    const bodies: Uint8Array[] = [];
-    while (p < wasm.length) {
-      const id = wasm[p++];
-      const size = readU();
-      const end = p + size;
-      if (id === 10) {
-        const count = readU();
-        for (let i = 0; i < count; i++) {
-          const bsize = readU();
-          bodies.push(wasm.slice(p, p + bsize));
-          p += bsize;
-        }
-      }
-      p = end;
-    }
-    const dotBody = bodies.slice(-6).reduce((a, b) => (b.length > a.length ? b : a));
+    const { body: dotBody } = findDotBody(wasm);
     let q = 0;
     const readBU = () => {
       let v = 0, s = 0;
@@ -497,7 +529,12 @@ entry func main (): U32 =>
 `,
     (_guest, bytes) => { unlinkedTraps = trapsInDot(bytes); },
   );
-  if (linkedCalls.some((c) => c > 6) || linkedTraps !== 0 || unlinkedTraps <= 0) {
-    throw new Error(`Expected linked #[n; U32] dot to elide b[i] bounds trap (0 traps vs >0 unlinked), got linkedTraps=${linkedTraps} unlinkedTraps=${unlinkedTraps} calls=${JSON.stringify(linkedCalls)}`);
+  if (
+    linkedCalls.some((c) => c !== "runtime.check") ||
+    unlinkedCalls.some((c) => c !== "runtime.check") ||
+    linkedTraps !== 0 ||
+    unlinkedTraps <= 0
+  ) {
+    throw new Error(`Expected linked #[n; U32] dot to call only runtime.check and elide b[i] bounds trap (0 traps vs >0 unlinked), got linkedTraps=${linkedTraps} unlinkedTraps=${unlinkedTraps} linkedCalls=${JSON.stringify(linkedCalls)} unlinkedCalls=${JSON.stringify(unlinkedCalls)}`);
   }
 });

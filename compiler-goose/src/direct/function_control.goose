@@ -634,6 +634,15 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if (label.target != n.b && label.kind != blot_direct_emit::LabelKind.function) || label.kind == blot_direct_emit::LabelKind.loop_ { continue; }
         let delivered = deliver(g, f, value, label.result, id);
         if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+        // Merge saved escape marks for every enclosing releasing loop left by this return.
+        var lk = g.s.labels.len;
+        while lk > at + 1 {
+            lk -= 1;
+            if g.s.labels[lk].kind == blot_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
+                g.s.labels[lk].used = true;
+                emitMergeEscapeMinCurrent(g, f, g.s.labels[lk].saved_esc);
+            }
+        }
         let left = leaveHandles(g, f, label.depth);
         if left != blot_direct_types::Error.none { return neverVal(), left; }
         br(g, f, OP_br, label.depth);
@@ -1738,6 +1747,12 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lget(g, cap);
     i32Const(g, blot_direct_runtime::heap_flag);
     op(g, OP_i32_and);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
+    lget(g, cap_bytes);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
+    op(g, OP_i32_and);
     let free_if = open(g, f, OP_if_);
     lget(g, old_base);
     lget(g, cap_bytes);
@@ -1748,7 +1763,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
     lget(g, entry);
     lget(g, fresh_size);
-    i32Const(g, blot_direct_runtime::heap_flag);
+    i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
     op(g, OP_i32_or);
     op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
     close(g, f);
@@ -1935,7 +1950,7 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
         }
         let s .= g.s;
         let labels_mark = s.labels.len;
-        s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: iter_done, iteration: iteration, outgoing: outgoing, unchanged: 0xffffffff, has_release: false, release_owner: 0, release_stack: 0, allocations: f.allocations, slots: slots, allow: 0, guards: Words {} });
+        s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: iter_done, iteration: iteration, outgoing: outgoing, unchanged: 0xffffffff, has_release: false, release_owner: 0, release_stack: 0, allocations: f.allocations, slots: slots, saved_esc: 0, guards: Words {} });
         let body_val, body_err = stmt(g, f, info.body);
         s.labels.resize(labels_mark);
         if body_err != blot_direct_types::Error.none { return false, body_err; }
@@ -2221,13 +2236,13 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     s.scratch.resize(scratch_mark);
     let owner_mark = local32(g, f);
     let stack_mark = local32(g, f);
-    let allow = local32(g, f);
+    let saved_esc = local32(g, f);
     let mark_at = s.code.len;
     let allocations = f.allocations;
     let stores = f.memory_stores;
     let unused = g.newSlot();
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, allocations: allocations, slots: slots, allow: allow, guards: guards });
+    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, allocations: allocations, slots: slots, saved_esc: saved_esc, guards: guards });
     let previous_range = f.checked_range;
     f.checked_range = range;
     let body, error = stmt(g, f, info.body);
@@ -2245,18 +2260,30 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         let assigned = assignCarries(g, f, backedge, iteration, slots, unchanged, owner_mark, stack_mark, id);
         if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
-        if label.has_release && f.allocations != allocations { releaseIteration(g, f, label); }
+        if label.has_release && (f.allocations != allocations || label.used) {
+            let iter_esc = local32(g, f);
+            gget(g, g.runtime_().escape_min_slot);
+            lset(g, iter_esc);
+            if f.allocations != allocations && f.memory_stores == stores {
+                releaseIteration(g, f, label, iter_esc);
+            }
+            emitMergeEscapeMin(g, f, iter_esc, label.saved_esc);
+        }
         br(g, f, OP_br, top);
     }
     if release && (f.allocations != allocations || label.used) {
-        // Insert the iteration's marks at its start, now that the body is
-        // known to allocate.
+        // Insert the iteration's marks and escape save/reset at its start.
         var prefix: u8[>..<] = [];
         markInto(g, prefix, owner_mark, stack_mark);
-        prefix.push(OP_i32_const);
-        blot_direct_writer::sleb(prefix, boolWord(f.memory_stores == stores));
+        let esc_global = g.runtime_().escape_min_slot;
+        prefix.push(OP_global_get);
+        blot_direct_writer::uleb(prefix, esc_global);
         prefix.push(OP_local_set);
-        blot_direct_writer::uleb(prefix, allow);
+        blot_direct_writer::uleb(prefix, saved_esc);
+        prefix.push(OP_i32_const);
+        blot_direct_writer::sleb(prefix, -1);
+        prefix.push(OP_global_set);
+        blot_direct_writer::uleb(prefix, esc_global);
         blot_direct_relocations::insert(f.sites_base,mark_at,prefix.len);
         let old_len = s.code.len;
         for byte in prefix { s.code.push(byte); }
@@ -2273,57 +2300,59 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if info.kind == blot_check_core::LoopKind.forever && !info.can_exit { return neverVal(), blot_direct_types::Error.none; }
     return unitVal(), blot_direct_types::Error.none;
 }
-// Records a store into an existing owner, which may predate this scope.
+// Merges `min_u(cur_esc, saved_esc)` back into `rt.escape_min_slot`.
+fn emitMergeEscapeMin(g: Generator&, f: Fn&, cur_esc: u32, saved_esc: u32) {
+    let rt = g.runtime_();
+    lget(g, cur_esc);
+    lget(g, saved_esc);
+    lget(g, cur_esc);
+    lget(g, saved_esc);
+    op(g, OP_i32_lt_u);
+    op(g, OP_select);
+    gset(g, rt.escape_min_slot);
+}
+fn emitMergeEscapeMinCurrent(g: Generator&, f: Fn&, saved_esc: u32) {
+    let cur_esc = local32(g, f);
+    gget(g, g.runtime_().escape_min_slot);
+    lset(g, cur_esc);
+    emitMergeEscapeMin(g, f, cur_esc, saved_esc);
+}
+// Records a store into an untracked cell/effect, conservatively escaping to age 0.
 fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
     let holds, error = g.contentsHoldMemory(value.ty);
     if error != blot_direct_types::Error.none { return error; }
-    if holds { f.memory_stores += 1; }
+    if holds {
+        f.memory_stores += 1;
+        i32Const(g, 0);
+        gset(g, g.runtime_().escape_min_slot);
+    }
     return blot_direct_types::Error.none;
 }
-// Records a store into the owner at `dst_slot`, disabling scope release only
-// if `dst_slot` predates the scope's owner mark at run time.
+// Records a store into the owner at `dst_slot`, propagating normalized age into `rt.escape_min_slot`.
 fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
     let holds, error = g.contentsHoldMemory(value.ty);
     if error != blot_direct_types::Error.none { return error; }
     if !holds { return blot_direct_types::Error.none; }
-    let s .= g.s;
-    for idx in f.labels_base..s.labels.len {
-        if s.labels[idx].kind == blot_direct_emit::LabelKind.loop_ && s.labels[idx].has_release {
-            s.labels[idx].used = true;
-            let mark_local = s.labels[idx].release_owner;
-            let allow_local = s.labels[idx].allow;
-            lget(g, dst_slot);
-            lget(g, mark_local);
-            op(g, OP_i32_lt_u);
-            let opened = open(g, f, OP_if_);
-            i32Const(g, 0);
-            lset(g, allow_local);
-            close(g, f);
-        }
-    }
-    if f.entry_owner_mark != 0xffffffff {
-        if f.entry_allow == 0xffffffff {
-            f.entry_allow = local32(g, f);
-        }
-        f.scoped_stores += 1;
-        lget(g, dst_slot);
-        lget(g, f.entry_owner_mark);
-        op(g, OP_i32_lt_u);
-        let opened = open(g, f, OP_if_);
-        i32Const(g, 0);
-        lset(g, f.entry_allow);
-        close(g, f);
-    } else {
-        f.memory_stores += 1;
-    }
+    let rt = g.runtime_();
+    let age = local32(g, f);
+    i32Const(g, 0);
+    lget(g, dst_slot);
+    lget(g, dst_slot);
+    i32Const(g, rt.layout.persistent_split);
+    op(g, OP_i32_ge_u);
+    op(g, OP_select);
+    lset(g, age);
+    emitMergeEscapeMinCurrent(g, f, age);
     return blot_direct_types::Error.none;
 }
-// Releases an iteration's allocations when its loop allows it and every
-// carried owner predates the iteration.
-fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label) {
-    lget(g, label.allow);
+// Releases an iteration's allocations when no inter-procedural store escaped past
+// `label.release_owner` and every carried owner predates the iteration.
+fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label, iter_esc: u32) {
+    lget(g, iter_esc);
+    lget(g, label.release_owner);
+    op(g, OP_i32_ge_u);
     if label.unchanged != 0xffffffff {
         lget(g, label.unchanged);
         op(g, OP_i32_and);
@@ -2413,17 +2442,36 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return value, error; }
             g.s.vals[values.start + vi] = value;
         }
+        // Merge saved escape marks for every inner releasing loop strictly inside `at`.
+        var lk = g.s.labels.len;
+        while lk > at + 1 {
+            lk -= 1;
+            if g.s.labels[lk].kind == blot_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
+                g.s.labels[lk].used = true;
+                emitMergeEscapeMinCurrent(g, f, g.s.labels[lk].saved_esc);
+            }
+        }
         if n.op == blot_check_core::Op.continue_ {
             let assigned = assignCarries(g, f, values, label.iteration, label.slots, label.unchanged, label.release_owner, label.release_stack, id);
             if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
-            if label.has_release && f.allocations != label.allocations {
-                releaseIteration(g, f, label);
+            if label.has_release {
                 g.s.labels[at].used = true;
+                let iter_esc = local32(g, f);
+                gget(g, g.runtime_().escape_min_slot);
+                lset(g, iter_esc);
+                if f.allocations != label.allocations {
+                    releaseIteration(g, f, label, iter_esc);
+                }
+                emitMergeEscapeMin(g, f, iter_esc, label.saved_esc);
             }
             br(g, f, OP_br, label.top);
         } else {
             let assigned = assign(g, f, values, label.outgoing, id);
             if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
+            if label.has_release {
+                g.s.labels[at].used = true;
+                emitMergeEscapeMinCurrent(g, f, label.saved_esc);
+            }
             br(g, f, OP_br, label.depth);
         }
         return neverVal(), blot_direct_types::Error.none;
@@ -2526,10 +2574,10 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 
     let owner_mark = local32(g, f);
     let stack_mark = local32(g, f);
+    let saved_esc = local32(g, f);
     let mark_at = g.s.code.len;
     let allocs_before = f.allocations;
     let stores_before = f.memory_stores;
-    let scoped_before = f.scoped_stores;
 
     var item = neverVal();
     if info.is_range {
@@ -2560,12 +2608,29 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let written = writeFlat(g, f, dst_addr, 0, val, id);
         if written != blot_direct_types::Error.none { return neverVal(), written; }
         // Escape-safe per-iteration scratch release: only release when output
-        // elements cannot hold scope memory and the body made no escaping store.
-        let release_ok = !elem_holds && f.memory_stores == stores_before && f.scoped_stores == scoped_before && f.allocations != allocs_before;
+        // elements cannot hold scope memory and no store escaped past owner_mark.
+        let release_ok = !elem_holds && f.memory_stores == stores_before && f.allocations != allocs_before;
         if release_ok {
+            let iter_esc = local32(g, f);
+            gget(g, g.runtime_().escape_min_slot);
+            ltee(g, iter_esc);
+            lget(g, owner_mark);
+            op(g, OP_i32_ge_u);
+            let rel_if = open(g, f, OP_if_);
             releaseTo(g, owner_mark, stack_mark);
+            close(g, f);
+            emitMergeEscapeMin(g, f, iter_esc, saved_esc);
             var prefix: u8[>..<] = [];
             markInto(g, prefix, owner_mark, stack_mark);
+            let esc_global = g.runtime_().escape_min_slot;
+            prefix.push(OP_global_get);
+            blot_direct_writer::uleb(prefix, esc_global);
+            prefix.push(OP_local_set);
+            blot_direct_writer::uleb(prefix, saved_esc);
+            prefix.push(OP_i32_const);
+            blot_direct_writer::sleb(prefix, -1);
+            prefix.push(OP_global_set);
+            blot_direct_writer::uleb(prefix, esc_global);
             blot_direct_relocations::insert(f.sites_base, mark_at, prefix.len);
             let old_len = g.s.code.len;
             for byte in prefix { g.s.code.push(byte); }
@@ -2691,5 +2756,19 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let words = g.saveWords([lo, hi]);
         return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
     }
-    return neverVal(), g.fail(m, id, "@flat.encode/@flat.decode lowering is implemented in Phase 3");
+    if n.c == blot_check_core::flat_op_encode {
+        let arg_val, aerr = expr(g, f, n.a);
+        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        let out_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatEncodeVal(g, f, arg_val, n.b, out_ty, id);
+    }
+    if n.c == blot_check_core::flat_op_decode {
+        let src_val, serr = expr(g, f, n.a);
+        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        let maybe_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatDecodeVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
+    }
+    return neverVal(), g.fail(m, id, "unknown @flat intrinsic");
 }

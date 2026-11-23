@@ -80,7 +80,34 @@ root struct ProgramInfo {
     kernels: KernelInfo[>..] = [],
     processes: ProcessInfo[>..] = [],
     word_tags: u8[>..] = [],
+    kernel_staging_sites_count: u32 = 0,
+    kernel_staging_sites_digest: u64 = FNV_OFFSET,
+    process_closures_digest: u64 = FNV_OFFSET,
     issue: Issue = Issue {},
+}
+
+struct NonStagedReceipt {
+    has_fork: bool = false,
+    has_persistent_state: bool = false,
+    exported_storage: bool = false,
+    deeply_immutable_digest: u64 = 0,
+    kernel_count: u32 = 0,
+    process_count: u32 = 0,
+    kernel_staging_sites_count: u32 = 0,
+    kernel_staging_sites_digest: u64 = FNV_OFFSET,
+    schemas_and_closures_digest: u64 = FNV_OFFSET,
+}
+
+fn sameNonStagedReceipt(a: NonStagedReceipt, b: NonStagedReceipt) -> bool {
+    return a.has_fork == b.has_fork
+        && a.has_persistent_state == b.has_persistent_state
+        && a.exported_storage == b.exported_storage
+        && a.deeply_immutable_digest == b.deeply_immutable_digest
+        && a.kernel_count == b.kernel_count
+        && a.process_count == b.process_count
+        && a.kernel_staging_sites_count == b.kernel_staging_sites_count
+        && a.kernel_staging_sites_digest == b.kernel_staging_sites_digest
+        && a.schemas_and_closures_digest == b.schemas_and_closures_digest;
 }
 
 struct TypeRef {
@@ -1089,11 +1116,12 @@ fn resolveBindingTarget(units: const Module[:], from_unit: u32, ref_: BindingRef
     return BindingRef { 0, 0 };
 }
 
-// Transitive Core implementation hasher for `impl_hash` (§2.4).
+// Transitive Core implementation hasher for `impl_hash` (§2.4 & §4.1 item 3).
 root struct ImplHashCtx {
     h: Hasher = Hasher {},
     visited: dictionary<BindingRef, bool> = dictionary<BindingRef, bool>{},
     queue: BindingRef[>..] = [],
+    staging_sites: u64[>..] = [],
 }
 
 fn enqueueBody(ctx: ImplHashCtx&, units: const Module[:], from_unit: u32, ref_: BindingRef) {
@@ -1103,6 +1131,23 @@ fn enqueueBody(ctx: ImplHashCtx&, units: const Module[:], from_unit: u32, ref_: 
         ctx.visited.insert(resolved, true);
         ctx.queue.push(resolved);
     }
+}
+
+fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, units: const Module[:], want: Chars) {
+    for u_mod in units {
+        for assoc in u_mod.associated {
+            let asp = u_mod.fieldSpelling(assoc.member);
+            if asp.present && asp.value == want {
+                enqueueBody(ctx, units, u_mod.unit, assoc.target);
+            }
+        }
+    }
+}
+
+fn recordStagingSite(ctx: ImplHashCtx&, unit: u32, node_id: u32) {
+    let key = ((unit as u64) << 32) | (node_id as u64);
+    for existing in ctx.staging_sites { if existing == key { return; } }
+    ctx.staging_sites.push(key);
 }
 
 recursive fn hashPattern(ctx: ImplHashCtx&, units: const Module[:], m: const Module&, pid: u32, depth: i64) {
@@ -1162,20 +1207,32 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             fnvUleb(ctx.h, ci.arguments.len as u64);
             for arg in ci.arguments { hashNode(ctx, units, m, arg, depth + 1); }
         },
-        scalar, logical, apply, type_same, effect_provider, handle, staging => {
+        scalar, logical, apply, type_same, effect_provider, handle => {
+            fnvU32Le(ctx.h, n.c);
+            hashNode(ctx, units, m, n.a, depth + 1);
+            hashNode(ctx, units, m, n.b, depth + 1);
+        },
+        staging => {
+            recordStagingSite(ctx, m.unit, id);
             fnvU32Le(ctx.h, n.c);
             hashNode(ctx, units, m, n.a, depth + 1);
             hashNode(ctx, units, m, n.b, depth + 1);
         },
         associated => {
             let sp = m.fieldSpelling(n.c);
-            if sp.present { fnvStr(ctx.h, sp.value); }
+            if sp.present {
+                fnvStr(ctx.h, sp.value);
+                enqueueAssociatedBySpelling(ctx, units, sp.value);
+            }
             hashNode(ctx, units, m, n.a, depth + 1);
             hashNode(ctx, units, m, n.b, depth + 1);
         },
         result_associated => {
             let sp = m.fieldSpelling(n.b);
-            if sp.present { fnvStr(ctx.h, sp.value); }
+            if sp.present {
+                fnvStr(ctx.h, sp.value);
+                enqueueAssociatedBySpelling(ctx, units, sp.value);
+            }
             hashNode(ctx, units, m, n.a, depth + 1);
         },
         if_value, if_stmt, state_provider, comptime_if => {
@@ -1183,8 +1240,27 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             hashNode(ctx, units, m, n.b, depth + 1);
             hashNode(ctx, units, m, n.c, depth + 1);
         },
-        block_, suite, product, array, array_op, storage, contract_method => {
+        block_, suite, product, array, array_op, storage => {
             fnvU32Le(ctx.h, n.c);
+            let kids = m.children(id);
+            fnvUleb(ctx.h, kids.len as u64);
+            for k in kids { hashNode(ctx, units, m, k, depth + 1); }
+        },
+        contract_method => {
+            fnvU32Le(ctx.h, n.c);
+            if (n.a as i64) < m.member_templates.len {
+                let tmpl = m.member_templates[n.a];
+                for u_mod in units {
+                    for impl_ in u_mod.implementations {
+                        if impl_.contract != tmpl.contract { continue; }
+                        for im in u_mod.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
+                            if im.kind == blot_reuse_principal_interface::ImplementationMemberKind.value {
+                                enqueueBody(ctx, units, u_mod.unit, BindingRef { im.target.unit, im.target.binding });
+                            }
+                        }
+                    }
+                }
+            }
             let kids = m.children(id);
             fnvUleb(ctx.h, kids.len as u64);
             for k in kids { hashNode(ctx, units, m, k, depth + 1); }
@@ -1223,11 +1299,14 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             let sp = m.fieldSpelling(pr.field);
             if sp.present { fnvStr(ctx.h, sp.value); }
             // Also enqueue any matching associated member target on that nominal so impl changes invalidate impl_hash.
-            if pr.nominal.decl != 0 {
+            if pr.nominal.decl != 0 && sp.present {
                 for u_mod in units {
                     for assoc in u_mod.associated {
-                        if assoc.identity == pr.nominal && assoc.member == pr.field {
-                            enqueueBody(ctx, units, u_mod.unit, assoc.target);
+                        if assoc.identity == pr.nominal {
+                            let asp = u_mod.fieldSpelling(assoc.member);
+                            if asp.present && asp.value == sp.value {
+                                enqueueBody(ctx, units, u_mod.unit, assoc.target);
+                            }
                         }
                     }
                 }
@@ -1317,14 +1396,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
     }
 }
 
-fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl) -> u64 {
-    var ctx = ImplHashCtx {};
-    fnvByte(ctx.h, 0x03);
-    fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
-    if decl.has_context {
-        enqueueBody(ctx, units, entry, decl.prepare_target);
-    }
-    enqueueBody(ctx, units, entry, decl.run_target);
+fn drainImplHashQueue(ctx: ImplHashCtx&, units: const Module[:]) {
     var cursor: i64 = 0;
     while cursor < ctx.queue.len {
         let target = ctx.queue[cursor];
@@ -1332,12 +1404,169 @@ fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::Ke
         if !hasUnit(units, target.unit) { continue; }
         let tm .= units[target.unit - 1];
         let body .= tm.body(target.binding);
-        if !body { continue; }
-        fnvByte(ctx.h, boolByte(body.is_function));
-        fnvUleb(ctx.h, body.parameters.len as u64);
-        hashNode(ctx, units, tm, body.root, 0);
+        if body {
+            fnvByte(ctx.h, 1);
+            fnvByte(ctx.h, boolByte(body.is_function));
+            fnvByte(ctx.h, boolByte(body.is_kernel));
+            fnvUleb(ctx.h, body.parameters.len as u64);
+            hashNode(ctx, units, tm, body.root, 0);
+        } else if (target.binding as i64) < tm.bindings.len {
+            let bi = tm.binding(target.binding);
+            fnvByte(ctx.h, 2);
+            if bi.initializer != 0 { hashNode(ctx, units, tm, bi.initializer, 0); }
+        }
+    }
+}
+
+fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&) -> u64 {
+    var ctx = ImplHashCtx {};
+    fnvByte(ctx.h, 0x03);
+    fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
+    if decl.has_context {
+        enqueueBody(ctx, units, entry, decl.prepare_target);
+    }
+    enqueueBody(ctx, units, entry, decl.run_target);
+    drainImplHashQueue(ctx, units);
+    for site in ctx.staging_sites {
+        var seen = false;
+        for ex in all_staging_sites { if ex == site { seen = true; break; } }
+        if !seen { all_staging_sites.push(site); }
     }
     return ctx.h.h;
+}
+
+fn computeProcessClosureHash(units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl) -> u64 {
+    var ctx = ImplHashCtx {};
+    fnvByte(ctx.h, 0x05);
+    fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
+    enqueueBody(ctx, units, entry, decl.init_target);
+    enqueueBody(ctx, units, entry, decl.step_target);
+    drainImplHashQueue(ctx, units);
+    return ctx.h.h;
+}
+
+fn sortU64(items: u64[>..]& ) {
+    for i in 1..items.len {
+        let key = items[i];
+        var j = i;
+        while j > 0 && items[j - 1] > key {
+            items[j] = items[j - 1];
+            j -= 1;
+        }
+        items[j] = key;
+    }
+}
+
+fn hashWireSchemaFull(h: Hasher&, info: const ProgramInfo&, s: WireSchema) {
+    fnvByte(h, s.kind);
+    fnvByte(h, s.wire_tag);
+    fnvUleb(h, s.stride as u64);
+    if s.kind == SCHEMA_KIND_FLAT_FIXED {
+        for ti in 0..(s.tags_len as i64) {
+            fnvByte(h, info.word_tags[(s.tags_start as i64) + ti]);
+        }
+    }
+    fnvU64Le(h, s.schema_hash);
+}
+
+fn isCoreArrayType(m: const Module&, tid: TId) -> bool {
+    var cur = tid;
+    for _ in 0..32 {
+        if cur == 0 || (cur as i64) >= m.types.nodes.len { return false; }
+        let n = m.types.node(cur);
+        if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.forall { cur = n.a; continue; }
+        if n.tag == blot_check_types::Tag.array { return true; }
+        if blot_check_storage_types::info(m.types, cur).present { return true; }
+        return false;
+    }
+    return false;
+}
+
+fn unwrapCoreType(m: const Module&, tid: TId) -> TId {
+    var cur = tid;
+    for _ in 0..32 {
+        if cur == 0 || (cur as i64) >= m.types.nodes.len { return cur; }
+        let n = m.types.node(cur);
+        if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.forall { cur = n.a; continue; }
+        return cur;
+    }
+    return cur;
+}
+
+fn computeExportedStorage(units: const Module[:], entry: u32, info: const ProgramInfo&) -> bool {
+    if info.kernels.len != 0 { return true; }
+    for p in info.processes {
+        if p.config_schema.wire_tag >= 5 || p.cmd_schema.wire_tag >= 5 || p.reply_schema.wire_tag >= 5 { return true; }
+    }
+    if !hasUnit(units, entry) { return false; }
+    let m .= units[entry - 1];
+    for body in m.bodies {
+        if !body.exported || (body.binding as i64) >= m.bindings.len { continue; }
+        let bty = unwrapCoreType(m, m.binding(body.binding).ty);
+        if bty == 0 || (bty as i64) >= m.types.nodes.len { continue; }
+        let fn_node = m.types.node(bty);
+        if fn_node.tag != blot_check_types::Tag.function { continue; }
+        let param_ty = unwrapCoreType(m, fn_node.a);
+        let res_ty = unwrapCoreType(m, fn_node.b);
+        if isCoreArrayType(m, param_ty) || isCoreArrayType(m, res_ty) { return true; }
+        if param_ty != 0 && (param_ty as i64) < m.types.nodes.len {
+            let pn = m.types.node(param_ty);
+            if pn.tag == blot_check_types::Tag.function && (isCoreArrayType(m, pn.a) || isCoreArrayType(m, pn.b)) { return true; }
+        }
+    }
+    return false;
+}
+
+fn computeNonStagedReceipt(units: const Module[:], entry: u32, info: const ProgramInfo&, deeply_immutable_digest: u64) -> NonStagedReceipt {
+    var has_fork = false;
+    var has_persistent = false;
+    for u in units {
+        if !has_persistent && (u.kernels.len != 0 || u.processes.len != 0) { has_persistent = true; }
+        if !has_fork {
+            for node in u.nodes {
+                if node.tag == blot_check_core::Tag.fork_ { has_fork = true; break; }
+            }
+        }
+    }
+    var h = Hasher {};
+    fnvByte(h, 0x10);
+    if hasUnit(units, entry) {
+        let m .= units[entry - 1];
+        fnvUleb(h, m.kernels.len as u64);
+        for ki in 0..info.kernels.len {
+            let decl = m.kernels[ki];
+            let kinfo = info.kernels[ki];
+            fnvStr(h, m.name(decl.name));
+            fnvByte(h, kinfo.flags);
+            if kinfo.has_context { hashWireSchemaFull(h, info, kinfo.ctx_schema); }
+            hashWireSchemaFull(h, info, kinfo.in_schema);
+            hashWireSchemaFull(h, info, kinfo.out_schema);
+            fnvU64Le(h, kinfo.io_schema_hash);
+            fnvU64Le(h, kinfo.impl_hash);
+            fnvU64Le(h, kinfo.binding_hash);
+        }
+        fnvUleb(h, m.processes.len as u64);
+        for pi in 0..info.processes.len {
+            let decl = m.processes[pi];
+            let pinfo = info.processes[pi];
+            fnvStr(h, m.name(decl.name));
+            hashWireSchemaFull(h, info, pinfo.config_schema);
+            hashWireSchemaFull(h, info, pinfo.cmd_schema);
+            hashWireSchemaFull(h, info, pinfo.reply_schema);
+        }
+        fnvU64Le(h, info.process_closures_digest);
+    }
+    return NonStagedReceipt {
+        has_fork: has_fork,
+        has_persistent_state: has_persistent,
+        exported_storage: computeExportedStorage(units, entry, info),
+        deeply_immutable_digest: deeply_immutable_digest,
+        kernel_count: info.kernels.len as u32,
+        process_count: info.processes.len as u32,
+        kernel_staging_sites_count: info.kernel_staging_sites_count,
+        kernel_staging_sites_digest: info.kernel_staging_sites_digest,
+        schemas_and_closures_digest: h.h,
+    };
 }
 
 fn verifyNamedFunctionArity(units: const Module[:], from_unit: u32, ref_: BindingRef, expected_arity: i64) -> bool {
@@ -1369,6 +1598,7 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
     var cache = UnitIdCache {};
     initUnitIdCache(units, cache);
     let empty_subst: SubstEntry[0] = [];
+    var all_kernel_staging_sites: u64[>..] = [];
 
     for ki in 0..m.kernels.len {
         let decl = m.kernels[ki];
@@ -1432,7 +1662,7 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
         fnvByte(ioh, flags);
         kinfo.io_schema_hash = ioh.h;
         // impl_hash
-        kinfo.impl_hash = computeImplHash(units, entry, decl);
+        kinfo.impl_hash = computeImplHash(units, entry, decl, all_kernel_staging_sites);
         // binding_hash = fnv1a64(0x04 || ctx_schema_hash_le || in_schema_hash_le || out_schema_hash_le || [flags] || impl_hash_le)
         var bh = Hasher {};
         fnvByte(bh, 0x04);
@@ -1446,7 +1676,15 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
         kinfo.binding_hash = bh.h;
         info.kernels.push(kinfo);
     }
+    sortU64(all_kernel_staging_sites);
+    info.kernel_staging_sites_count = all_kernel_staging_sites.len as u32;
+    var sth = Hasher {};
+    fnvByte(sth, 0x11);
+    for site in all_kernel_staging_sites { fnvU64Le(sth, site); }
+    info.kernel_staging_sites_digest = sth.h;
 
+    var pch = Hasher {};
+    fnvByte(pch, 0x12);
     for pi in 0..m.processes.len {
         let decl = m.processes[pi];
         var pinfo = ProcessInfo { decl_index: pi as u32 };
@@ -1483,6 +1721,8 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
         pinfo.config_schema = cfg_s;
         pinfo.cmd_schema = cmd_s;
         pinfo.reply_schema = rep_s;
+        fnvU64Le(pch, computeProcessClosureHash(units, entry, decl));
         info.processes.push(pinfo);
     }
+    info.process_closures_digest = pch.h;
 }
