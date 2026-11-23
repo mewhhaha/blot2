@@ -1,0 +1,101 @@
+// Represented Kernel handle metadata, 64-bit FNV-1a hashing, and exact wire
+// integer packing for Pen `service::KERNEL` (code 15) and standalone hosts.
+
+import * as flat from "./flat"
+
+type Hash64 is data = $Hash64 { lo: U32, hi: U32 }
+
+const zero_hash = $Hash64 { lo: 0, hi: 0 }
+
+func same_hash (a: Hash64) -> (b: Hash64) => a.lo == b.lo and a.hi == b.hi
+
+func id k => return flat.kernel_id k
+
+func binding_hash k =>
+  let (lo, hi) = flat.kernel_binding_hash k
+  return $Hash64 { lo, hi }
+
+func ctx_hash k =>
+  let (lo, hi) = flat.kernel_ctx_hash k
+  return $Hash64 { lo, hi }
+
+func io_hash k =>
+  let (lo, hi) = flat.kernel_io_hash k
+  return $Hash64 { lo, hi }
+
+func encode value => return flat.encode value
+func decode words => return flat.decode words
+func schema_hash value => return flat.schema_hash value
+
+// Lossless 32-bit <-> two 16-bit exact-integer F32 lanes (zero precision loss
+// above 16,777,215).
+func pack_u32 (value: U32) => (U32.to_f32 (value & 65535), U32.to_f32 (value >> 16))
+
+func unpack_u16 (lane: F32): Maybe U32 =>
+  if not (is_finite lane) or lane < 0.0 or lane > 65535.0:
+    return $Nothing
+  let v = F32.to_u32 lane
+  if U32.to_f32 v != lane:
+    return $Nothing
+  return $Some v
+
+func unpack_u32 (lo_lane: F32) -> (hi_lane: F32): Maybe U32 =>
+  let $Some lo = unpack_u16 lo_lane else:
+    return $Nothing
+  let $Some hi = unpack_u16 hi_lane else:
+    return $Nothing
+  return $Some (lo | (hi << 16))
+
+// Lossless 64-bit hash <-> four 16-bit exact-integer F32 lanes.
+func pack_hash (h: Hash64) =>
+  (U32.to_f32 (h.lo & 65535), U32.to_f32 (h.lo >> 16), U32.to_f32 (h.hi & 65535), U32.to_f32 (h.hi >> 16))
+
+func unpack_hash (w0: F32) -> (w1: F32) -> (w2: F32) -> (w3: F32): Maybe Hash64 =>
+  let $Some lo = unpack_u32 w0 w1 else:
+    return $Nothing
+  let $Some hi = unpack_u32 w2 w3 else:
+    return $Nothing
+  return $Some ($Hash64 { lo, hi })
+
+// Single-byte step of standard 64-bit FNV-1a:
+//   H = (H ^ byte) * 0x00000100_000001b3  (mod 2^64)
+// Computed using 16-bit products so intermediate values stay < 2^25.
+func fnv1a64_byte (lo: U32) -> (hi: U32) -> (byte: U32) =>
+  let xlo = lo ^ (byte & 255)
+  let p0 = (xlo & 65535) * 435
+  let p1 = (xlo >> 16) * 435 + (p0 >> 16)
+  let new_lo = (p0 & 65535) | ((p1 & 65535) << 16)
+  let carry = p1 >> 16
+  let new_hi = hi * 435 + carry + (xlo << 8)
+  return (new_lo, new_hi)
+
+func fnv1a64_word (lo: U32) -> (hi: U32) -> (word: U32) =>
+  let (lo0, hi0) = fnv1a64_byte lo hi (word & 255)
+  let (lo1, hi1) = fnv1a64_byte lo0 hi0 ((word >> 8) & 255)
+  let (lo2, hi2) = fnv1a64_byte lo1 hi1 ((word >> 16) & 255)
+  return fnv1a64_byte lo2 hi2 ((word >> 24) & 255)
+
+func f32_bits (value: F32): U32 =>
+  let encoded: #[U32] = flat.encode value
+  return encoded[0]
+
+// Standard 64-bit FNV-1a over little-endian bytes of a u32 word slice.
+func fnv1a64_words (words: &[U32]): Hash64 =>
+  let lo: U32 = 0x84222325
+  let hi: U32 = 0xcbf29ce4
+  for i in 0 .. words.length:
+    let (nlo, nhi) = fnv1a64_word lo hi words[i]
+    lo := nlo
+    hi := nhi
+  return $Hash64 { lo, hi }
+
+// Standard 64-bit FNV-1a over little-endian IEEE-754 bytes of an F32 slice.
+// Matches Rust `fnv1a64_words` over `f.to_bits()` bit-for-bit.
+func fnv1a64_f32s (values: &[F32]): Hash64 =>
+  let lo: U32 = 0x84222325
+  let hi: U32 = 0xcbf29ce4
+  for i in 0 .. values.length:
+    let (nlo, nhi) = fnv1a64_word lo hi (f32_bits values[i])
+    lo := nlo
+    hi := nhi
+  return $Hash64 { lo, hi }

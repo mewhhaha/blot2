@@ -1,51 +1,68 @@
 # Working on Blot and Gdev
 
-## Next step: Blot vNext Concurrency, Data-Parallelism & Kernel Architecture (`tasks/CONCURRENCY_VNEXT.md`)
+## Current frontier: Blot vNext Concurrency, SIMD `spark`, `KernelPool`, `Processes` & Pen/Gdev Bridge — Phases 1–5 Complete (23 November 2026)
 
-The approved end-to-end architecture plan is finalized and checked in at
-[tasks/CONCURRENCY_VNEXT.md](tasks/CONCURRENCY_VNEXT.md) (`v38`, commit
-`4d1ded71`; dual-audited to **9.0/10** by GPT 6.2 Sol High and **10.0/10** by
-Second Neon on `v37`, with the final `v37` box-aware 4-lane `@simd.load`/`@simd.store`,
-standalone native repackaging, and Pen Web asset-list polish folded in).
+All five phases of [tasks/CONCURRENCY_VNEXT.md](tasks/CONCURRENCY_VNEXT.md)
+(`v38`, Laws #1–#6) are implemented, qualified end to end across all four
+repositories (`blot2`, `../pen`, `../ink`, `../gdev`), and checkpointed on
+`origin/main`:
 
-- **Hard invariants preserved:** Guest ABI 8 (`blot:abi` v8, `blot:invocation`
-  v1, zero extra exports), Session Protocol 2 (`Operation 0..=6`, live-only
-  unrecorded `CAP`, `request == 0` kernel provenance), Save Schema 26
-  (`ink/lib/services.blot` `max_id = 16,777,215` untouched), and canonical
-  `0x7fc00000` quiet NaN determinism.
-- **Live checkouts at plan lock:** `blot2` (`4d1ded71`), `../pen` (`1505604`,
-  preserve existing uncommitted local edits), `../ink` (`4adfd09`, preserve
-  untracked `tools/native/target/`), `../gdev` (`a13c3f1`).
-- **Start here when resuming ([tasks/CONCURRENCY_VNEXT.md §6.2](tasks/CONCURRENCY_VNEXT.md#62-phased-rollout--checkpoints)):**
-  1. **Pre-Phase 1:** Capture and pin the exact pre-change Gdev `pen test-blot`
-     passing/failing test identities on live `../gdev` `HEAD` (`a13c3f1`) before
-     making any code edits.
-  2. **Phase 1:** Language spec updates, lexer/parser/checker/Core for `spark`,
-     `entry kernel`, `entry process`, §2.5 context-sensitive relational purity
-     proof, `@flat.*` frontend/Core, Phase 1 direct-backend `k == 1` tuple-record
-     fixes, escape-safe scalar `Tag.spark` lowering, Phase 1 syntax cleanup
-     (incl. renaming both `spark` bindings in `../gdev/src/actors/kites.blot:536, 540`),
-     Goose adapters, and Baba/formatter/Tree-sitter (`deno task test:compiler` +
-     Law #3).
-  3. **Phase 2:** `function_spark.goose` 4-wide Wasm SIMD `v128` auto-vectorization,
-     uniform producer-site `0x7fc00000` NaN canonicalization across all 4 emitters,
-     `offset = -2` `unpatchableOperand`, and fixture requalification.
-  4. **Phase 3:** Persistent arena runtime (active-only exact-cap stack free lists,
-     unified transport pool + `blot:reset` release, zero-export Page-0 offset `640`
-     `arena_oom_flag`, `rt.escape_min_slot` + `must_undo` + box-aware 4-lane
-     `@simd.load`/`@simd.store`, iterative two-phase staging, recursive
-     physical-stride `FlatNumeric`, `[0xffffffff]` sentinel, `blot:kernels` /
-     `blot:processes`, transitive `LayoutReceipt`) + Laws #1 & #2.
-  5. **Phase 4:** Unified `KernelPool` & deterministic `Processes` across Pen
-     Rust, Deno TS (`Deno.Command` subprocesses), and Pen Web (`kernels.js` +
-     worker script wired into `build.sh`, `Justfile`, and `project.rs:918`),
-     plus lockstep migration/retirement of legacy workers/sparks + Laws #4 & #5.
-  6. **Phase 5:** Pen `service::KERNEL = 15`, `std/kernel`, `KernelService`,
-     Gdev shared `colony_paths.build_mesh_into` + query-keyed route pre-warm,
-     Law #6, canonical Save-26/render equivalence, and inspected hardware
-     `frame.png`.
-
-Commit and push verified checkpoints to `origin/main` after each phase.
+- **Hard invariants preserved:**
+  - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero
+    extra exports; Page-0 offset `640` carries `arena_oom_flag`).
+  - **Session Protocol 2:** `Operation 0..=6` unchanged; `service::KERNEL = 15`
+    with unambiguous `request == 0` host→guest provenance (`CAP`, `CTL`,
+    `BATCH_ERR`, `BATCH_OK`), live-only unrecorded `CAP` stripped before
+    `Recorded` (preserving old-Pen `service <= 14` replay compatibility), and
+    `pen_protocol::canonical_render_packet` stripping `service::KERNEL` records
+    and updating header slots `134` (`SERVICE_COUNT`) & `135` (`SERVICE_LANES`).
+  - **Save Schema 26:** `../ink/lib/services.blot` (`max_id = 16,777,215`)
+    remains **100% untouched**; ephemeral `KernelTransport` and Gdev
+    `prewarm_entries` are excluded from Save 26 and cleared on restore.
+  - **Canonical `0x7fc00000` quiet NaN** determinism across `function_spark`,
+    `scalarOp`, `std/simd`, and `#run`.
+- **Phase 5 (`service::KERNEL = 15`, `std/kernel`, Pen `KernelService` & Gdev pre-warmed routes) verified evidence:**
+  - **Checkpoints on `origin/main`:** `../pen` `15620ae9`, `../ink` `2f15da10`,
+    `../gdev` `c4edf26d`, plus this `blot2` commit (`std/kernel.blot`,
+    `tests/guest/kernel_std.test.ts`, `CONTINUE.md`).
+  - **Compiler & host identities:**
+    - `compiler-goose/build/blotc-goose` SHA-256:
+      `8aad01ec27f825a50c4f10f4a3cdcafed662a6a995d8bb21bddbc427598fe887`
+      (source identity `c37395b1256943f8a1b957bcbaeddf2eaa81bb9fcaf6eb367c09748417b19c5c`)
+    - `std/prelude.blot` SHA-256:
+      `cc908f217d65f9adb519c0df21ed57006544eb2ea896b397747bdc32655242c9`
+    - `../pen/target/release/pen` (`15620ae9`) SHA-256:
+      `2282282228547c81ec76178cb67732e24d7b1f3b99c44fe4629d2f340d0646c0`
+  - **Qualification gates:**
+    - `blot2`: `deno fmt --check` (85 files), `deno check`, `deno task test:editor`
+      (6/6), `deno task check:editor` (10/10 parses, 19/19 highlight suites),
+      concurrency & `std/kernel` suite **16/16 passed** (`kernel_std.test.ts`,
+      `spark_spawn_execution.test.ts`, `spark_copy_execution.test.ts`,
+      `process_replay_execution.test.ts`, `concurrency_phase4.test.ts`).
+    - `../pen` (`15620ae9`): `pen-codegen` **10/10**, `pen-protocol` unit
+      **11/11** (incl. `canonical_render_packet_strips_only_kernel_services_and_updates_both_header_slots`),
+      `pen-runtime mods` **5/5** (incl. `splice_enforces_max_events_bound`),
+      `pen kernels` **4/4** (all nine Law #6 witnesses (a)–(i) + real Gdev
+      `main.blot` `plan_routes` across `workers = 0, 1, 2, 4` and Worker ON vs
+      OFF bit-identical Save-26 & `canonical_render_packet` equivalence),
+      `pen services` (**6/6** + `services::replay` **1/1** on fresh exported Gdev
+      bundle), `pen net::tests` (**3/3** incl. `two_peers_play_the_game_over_udp`
+      on fresh exported Gdev bundle), `pen --no-default-features` check clean,
+      `pen-web --target wasm32-unknown-unknown` check clean.
+    - `../ink` (`2f15da10`): `ink/tools/native` `cargo +1.99.0 test` **113/113
+      passed, 0 failed** (incl. `std/kernel.fnv1a64_f32s` bit-exact Rust match,
+      `host.measure_frame_floats` == `1 + encoded.length`, separate canonical
+      `0x800000` / `service::KERNEL = 15` lanes, and `lib/services.blot` 0 diff).
+    - `../gdev` (`c4edf26d`): `pen codegen --check` & `pen check` clean (`main.blot`
+      with `entry kernel plan_routes`, `saved.json`, `devtools/main.blot`, 557
+      assets), `build_gdev.ts --timeout-ms 15000` pass (`wasmBytes: 3,532,591`,
+      `buildMs: 9.61 s`), `pen test-blot` **zero new failing test identities vs.
+      pinned pre-Phase-1 baseline (`a13c3f17c65b`: 81 pre-existing failures;
+      1,315 passed across 219 modules incl. 3/3 new `tests/kernel_routes.blot`
+      tests and 27/27 devtools tests)**, and real hardware Vulkan capture
+      `run_pen.py --launch --hardware` exit 0 (`success: true`,
+      `screenshot_640x480: true`, visually inspected
+      `build/storage-integration/gdev-one-frame/attempt-c4blf46t/frame.png`).
 
 ## Phase 1 compiler pruning, on-demand memory, and Batch 1B–1D completion (22 November 2026)
 
@@ -152,12 +169,7 @@ their dedicated task and measurement records:
 
 ## Remaining work
 
-1. **Execute Blot vNext concurrency, SIMD `spark`, `KernelPool` & `Processes`
-   ([tasks/CONCURRENCY_VNEXT.md](tasks/CONCURRENCY_VNEXT.md), Pre-Phase 1 →
-   Phase 5).**
-   Start with Pre-Phase 1 live Gdev baseline capture on `a13c3f1`, then land
-   Phases 1–5 with verified checkpoints pushed to `origin/main`.
-2. **Migrate remaining borrowed-mutator `=` stores (`tasks/MEMORY_MODEL.md`
+1. **Migrate remaining borrowed-mutator `=` stores (`tasks/MEMORY_MODEL.md`
    Phase 3) and remove the ~25-LOC `=` compatibility shim.**
    `lent` is completely retired (0 occurrences across all four repos), and
    `#[+T]` / `#[~T]` ownership checks cover array length changes. The remaining
@@ -167,11 +179,13 @@ their dedicated task and measurement records:
    (including Gdev's `salt.decode_rows_into` / `write_rows`, tracked by
    [count_stores.py](scripts/integration/count_stores.py)). Once those callers
    migrate to `own` / `:=`, remove the `=` shim completely.
-3. **Work through the remaining 83 Gdev `pen test-blot` failures by name.**
-   Down from 108 failures at `be489b79` to **83** (`1,291 passed, 83 failed`
-   across all 218 modules). Compare affected tests and the 120-frame replay
-   against the pinned reference ([raw evidence](benchmarks/evidence/qualification/2026-11-17-owned-runtime.raw.json.gz)).
-4. **Compile-speed & runtime follow-ups.**
+2. **Work through the remaining 81 pre-existing Gdev `pen test-blot` failures by name.**
+   Down from 108 failures at `be489b79` to **81** (`1,315 passed, 81 failed`
+   across all 219 modules). Compare affected tests and the 120-frame replay
+   against the pinned reference ([raw evidence](benchmarks/evidence/qualification/2026-11-17-owned-runtime.raw.json.gz)),
+   and investigate the pre-existing Session-2 post-restore `viewport` offset in
+   Pen `timeline::contract_tests` rewinds.
+3. **Compile-speed & runtime follow-ups.**
    The [compile-speed plan](tasks/FAST_COMPILE.md) retains the subsecond and
    Wasm-size targets (cold Gdev Main is 565 ms `-O2` / 432 ms PGO; retained
    edits are 26–37 ms). Further `trees` / `view` / `write` runtime tuning can
