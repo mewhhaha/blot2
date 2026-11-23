@@ -21,6 +21,142 @@ import {
 
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
+/** Default logical transport packet ceiling in bytes (2 MiB). */
+export const DEFAULT_TRANSPORT_BUDGET = 2_097_152;
+/** `blot:kernels` flag bit 0: kernel has a prepared context (`prepare`). */
+export const KERNEL_FLAG_HAS_CONTEXT = 1 << 0;
+/** `blot:kernels` flag bit 1: kernel emits variable-length `[len, words...]` output. */
+export const KERNEL_FLAG_VARIABLE_OUTPUT = 1 << 1;
+/** Page-0 byte offset of the zero-export `arena_oom_flag` (`u32`). */
+export const ARENA_OOM_OFFSET = 640;
+
+// Captured intrinsics for side-effect-free private byte copying.
+const TypedArrayProto = Object.getPrototypeOf(Uint8Array.prototype);
+const TypedArrayPrototypeIndexOf = TypedArrayProto.indexOf as (
+  searchElement: number,
+  fromIndex?: number,
+) => number;
+const TypedArrayPrototypeBuffer = Object.getOwnPropertyDescriptor(
+  TypedArrayProto,
+  "buffer",
+)!.get as () => ArrayBufferLike;
+const TypedArrayPrototypeByteOffset = Object.getOwnPropertyDescriptor(
+  TypedArrayProto,
+  "byteOffset",
+)!.get as () => number;
+const TypedArrayPrototypeByteLength = Object.getOwnPropertyDescriptor(
+  TypedArrayProto,
+  "byteLength",
+)!.get as () => number;
+const DataViewPrototypeBuffer = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "buffer",
+)!.get as () => ArrayBufferLike;
+const DataViewPrototypeByteOffset = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "byteOffset",
+)!.get as () => number;
+const DataViewPrototypeByteLength = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "byteLength",
+)!.get as () => number;
+const ArrayBufferPrototypeByteLength = Object.getOwnPropertyDescriptor(
+  ArrayBuffer.prototype,
+  "byteLength",
+)!.get as () => number;
+const Uint8ArrayPrototypeSet = Uint8Array.prototype.set;
+
+/**
+ * Copy caller-provided bytes into a brand-new private unshared `Uint8Array`.
+ * Uses captured ECMAScript primordials:
+ * - O(1) `ValidateTypedArray` rejects detached AND shrunk out-of-bounds
+ *   resizable `ArrayBuffer` views with `TypeError`.
+ * - `ArrayBuffer.prototype.byteLength` getter rejects `SharedArrayBuffer`
+ *   views with `TypeError`.
+ * - Avoids caller-overridable `.slice()`, `Symbol.species`, and `Symbol.iterator`.
+ */
+export function copyPrivateBytes(
+  view: ArrayBufferView,
+): Uint8Array<ArrayBuffer> {
+  if (!ArrayBuffer.isView(view)) {
+    throw new TypeError(
+      "Expected an ArrayBufferView backed by an unshared ArrayBuffer",
+    );
+  }
+  let buf: ArrayBufferLike;
+  let offset: number;
+  let byteLen: number;
+  if (view instanceof DataView) {
+    buf = Reflect.apply(DataViewPrototypeBuffer, view, []);
+    offset = Reflect.apply(DataViewPrototypeByteOffset, view, []);
+    byteLen = Reflect.apply(DataViewPrototypeByteLength, view, []);
+  } else {
+    // O(1) ECMAScript ValidateTypedArray check (rejects detached & OOB RAB).
+    Reflect.apply(TypedArrayPrototypeIndexOf, view, [0, Infinity]);
+    buf = Reflect.apply(TypedArrayPrototypeBuffer, view, []);
+    offset = Reflect.apply(TypedArrayPrototypeByteOffset, view, []);
+    byteLen = Reflect.apply(TypedArrayPrototypeByteLength, view, []);
+  }
+  // Reject SharedArrayBuffer (and any non-ArrayBuffer) using primordial getter.
+  const totalBufBytes = Reflect.apply(ArrayBufferPrototypeByteLength, buf, []);
+  if (offset < 0 || byteLen < 0 || offset + byteLen > totalBufBytes) {
+    throw new TypeError("ArrayBufferView lies outside its backing ArrayBuffer");
+  }
+  const out = new Uint8Array(new ArrayBuffer(byteLen));
+  if (byteLen > 0) {
+    Reflect.apply(Uint8ArrayPrototypeSet, out, [
+      new Uint8Array(buf as ArrayBuffer, offset, byteLen),
+    ]);
+  }
+  return out;
+}
+
+export type WireSchemaKind = "Unit" | "FlatFixed" | "VarU32" | "VarF32";
+
+export interface WireSchema {
+  readonly kind: WireSchemaKind;
+  readonly wireTag: ValueType;
+  readonly wireTagCode: number;
+  readonly stride: number;
+  readonly wordTags: readonly ScalarType[];
+  readonly schemaHash: bigint;
+}
+
+export interface KernelManifest {
+  readonly id: number;
+  readonly name: string;
+  readonly flags: number;
+  readonly hasContext: boolean;
+  readonly variableOutput: boolean;
+  readonly inSchema: WireSchema;
+  readonly outSchema: WireSchema;
+  readonly ioSchemaHash: bigint;
+  readonly implHash: bigint;
+  readonly bindingHash: bigint;
+  readonly ctxSchema?: WireSchema;
+  readonly ctxExport?: string;
+  readonly clearExport?: string;
+}
+
+export interface ProcessManifest {
+  readonly name: string;
+  readonly initExport: string;
+  readonly stepExport: string;
+  readonly configSchema: WireSchema;
+  readonly cmdSchema: WireSchema;
+  readonly replySchema: WireSchema;
+}
+
+export interface MemoryShape {
+  readonly sectionPresent: boolean;
+  readonly hasMemory: boolean;
+  readonly memory64: boolean;
+  readonly shared: boolean;
+  readonly pageSizeLog2: number;
+  readonly initialPages: number;
+  readonly maximumPages?: number;
+}
+
 const scalarTypes = ["Unit", "U32", "Bool", "F32"] as const;
 export type ScalarType = typeof scalarTypes[number];
 export type ScalarValue<T extends ScalarType = ScalarType> = T extends "Unit"
@@ -81,6 +217,10 @@ export interface GuestAbi {
   readonly resourceTransfer?: boolean;
   readonly publicOwners?: boolean;
   readonly invocationFinish?: true;
+  readonly kernels?: readonly KernelManifest[];
+  readonly processes?: readonly ProcessManifest[];
+  readonly transportBudget?: number;
+  readonly hostInternal?: readonly string[];
 }
 
 const dataTypeBrand = Symbol("CleanupDataType");
@@ -294,11 +434,508 @@ class AbiReader {
     return this.publicValue(tag);
   }
 
+  u64Le(): bigint {
+    if (this.bytes.length - this.#offset < 8) {
+      throw new GuestError("invalid_abi", "Truncated u64 in custom section");
+    }
+    const view = new DataView(
+      this.bytes.buffer,
+      this.bytes.byteOffset + this.#offset,
+      8,
+    );
+    this.#offset += 8;
+    return view.getBigUint64(0, true);
+  }
+
   end(): void {
     if (this.#offset !== this.bytes.length) {
       throw new GuestError("invalid_abi", "Trailing bytes in blot:abi section");
     }
   }
+}
+
+const wireSchemaKinds: readonly WireSchemaKind[] = [
+  "Unit",
+  "FlatFixed",
+  "VarU32",
+  "VarF32",
+];
+
+function valueTypeFromTag(tag: number): ValueType {
+  if (tag === 5) return "Array U32";
+  if (tag === 6) return "Array F32";
+  const scalar = scalarTypes[tag];
+  if (scalar === undefined) {
+    throw new GuestError("invalid_abi", `Unknown value ABI tag ${tag}`);
+  }
+  return scalar;
+}
+
+function parseWireSchema(
+  reader: AbiReader,
+  transportBudget: number,
+): WireSchema {
+  const kindByte = reader.byte();
+  const kind = wireSchemaKinds[kindByte];
+  if (kind === undefined) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unknown wire schema kind ${kindByte}`,
+    );
+  }
+  const wireTagCode = reader.byte();
+  const wireTag = valueTypeFromTag(wireTagCode);
+  const stride = reader.count();
+  const wordTags: ScalarType[] = [];
+  if (kind === "Unit") {
+    if (wireTag !== "Unit" || stride !== 0) {
+      throw new GuestError("invalid_abi", "Malformed Unit wire schema");
+    }
+  } else if (kind === "FlatFixed") {
+    if (stride < 1 || stride * 4 + 4 > transportBudget) {
+      throw new GuestError(
+        "invalid_abi",
+        `FlatFixed stride ${stride} exceeds transport budget ${transportBudget}`,
+      );
+    }
+    for (let i = 0; i < stride; i++) {
+      const tag = reader.scalar();
+      if (tag !== "U32" && tag !== "Bool" && tag !== "F32") {
+        throw new GuestError(
+          "invalid_abi",
+          `FlatFixed word_tag must be U32, Bool, or F32, got ${tag}`,
+        );
+      }
+      wordTags.push(tag);
+    }
+    if (stride === 1) {
+      if (wireTag !== wordTags[0] && !isArrayType(wireTag)) {
+        throw new GuestError(
+          "invalid_abi",
+          `1-word FlatFixed wire_tag ${wireTag} incompatible with ${
+            wordTags[0]
+          }`,
+        );
+      }
+    } else if (!isArrayType(wireTag)) {
+      throw new GuestError(
+        "invalid_abi",
+        "Multi-word FlatFixed wire_tag must be an array",
+      );
+    }
+  } else if (kind === "VarU32") {
+    if (stride !== 0 || wireTag !== "Array U32") {
+      throw new GuestError("invalid_abi", "Malformed VarU32 wire schema");
+    }
+  } else if (kind === "VarF32") {
+    if (stride !== 0 || (wireTag !== "Array U32" && wireTag !== "Array F32")) {
+      throw new GuestError("invalid_abi", "Malformed VarF32 wire schema");
+    }
+  }
+  const schemaHash = reader.u64Le();
+  return Object.freeze({
+    kind,
+    wireTag,
+    wireTagCode,
+    stride,
+    wordTags: Object.freeze(wordTags),
+    schemaHash,
+  });
+}
+
+function parseKernelsSection(
+  payload: Uint8Array,
+  functionsByName: ReadonlyMap<string, GuestFunction>,
+): { transportBudget: number; kernels: readonly KernelManifest[] } {
+  const reader = new AbiReader(payload);
+  const version = reader.count();
+  if (version !== 1) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unsupported blot:kernels version ${version}`,
+    );
+  }
+  const transportBudget = reader.count();
+  if (transportBudget < 8 || transportBudget % 4 !== 0) {
+    throw new GuestError(
+      "invalid_abi",
+      `Invalid blot:kernels transport_budget ${transportBudget}`,
+    );
+  }
+  const count = reader.count();
+  const kernels: KernelManifest[] = [];
+  const seen = new Set<string>();
+  for (let id = 0; id < count; id++) {
+    const name = reader.name();
+    if (seen.has(name)) {
+      throw new GuestError("invalid_abi", `Duplicate kernel ${name}`);
+    }
+    seen.add(name);
+    const flags = reader.byte();
+    if ((flags & ~0x03) !== 0) {
+      throw new GuestError(
+        "invalid_abi",
+        `Kernel ${name} has unknown flags 0x${flags.toString(16)}`,
+      );
+    }
+    const hasContext = (flags & KERNEL_FLAG_HAS_CONTEXT) !== 0;
+    const variableOutput = (flags & KERNEL_FLAG_VARIABLE_OUTPUT) !== 0;
+    const inSchema = parseWireSchema(reader, transportBudget);
+    if (inSchema.kind !== "FlatFixed" || !isArrayType(inSchema.wireTag)) {
+      throw new GuestError(
+        "invalid_abi",
+        `Kernel ${name} input must be FlatFixed array wire`,
+      );
+    }
+    const outSchema = parseWireSchema(reader, transportBudget);
+    if (variableOutput) {
+      if (
+        (outSchema.kind !== "VarU32" && outSchema.kind !== "VarF32") ||
+        outSchema.wireTag !== "Array U32"
+      ) {
+        throw new GuestError(
+          "invalid_abi",
+          `Variable-output kernel ${name} must have VarU32/VarF32 schema with Array U32 wire`,
+        );
+      }
+    } else if (
+      outSchema.kind !== "FlatFixed" || !isArrayType(outSchema.wireTag)
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        `Fixed-output kernel ${name} must have FlatFixed array wire`,
+      );
+    }
+    const entry = functionsByName.get(name);
+    if (
+      !entry || entry.parameter !== inSchema.wireTag ||
+      entry.result !== outSchema.wireTag
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        `Kernel ${name} signature mismatch against blot:abi`,
+      );
+    }
+    const ioSchemaHash = reader.u64Le();
+    const implHash = reader.u64Le();
+    const bindingHash = reader.u64Le();
+    let ctxSchema: WireSchema | undefined;
+    let ctxExport: string | undefined;
+    let clearExport: string | undefined;
+    if (hasContext) {
+      ctxSchema = parseWireSchema(reader, transportBudget);
+      if (ctxSchema.kind === "Unit") {
+        throw new GuestError(
+          "invalid_abi",
+          `Kernel ${name} context schema cannot be Unit`,
+        );
+      }
+      ctxExport = reader.name();
+      clearExport = reader.name();
+      const ctxFn = functionsByName.get(ctxExport);
+      if (
+        !ctxFn || ctxFn.parameter !== ctxSchema.wireTag ||
+        ctxFn.result !== "Unit"
+      ) {
+        throw new GuestError(
+          "invalid_abi",
+          `Kernel ${name} ctx_export ${ctxExport} signature mismatch`,
+        );
+      }
+      const clearFn = functionsByName.get(clearExport);
+      if (
+        !clearFn || clearFn.parameter !== "Unit" || clearFn.result !== "Unit"
+      ) {
+        throw new GuestError(
+          "invalid_abi",
+          `Kernel ${name} clear_export ${clearExport} signature mismatch`,
+        );
+      }
+    }
+    kernels.push(Object.freeze({
+      id,
+      name,
+      flags,
+      hasContext,
+      variableOutput,
+      inSchema,
+      outSchema,
+      ioSchemaHash,
+      implHash,
+      bindingHash,
+      ...(hasContext ? { ctxSchema, ctxExport, clearExport } : {}),
+    }));
+  }
+  reader.end();
+  return { transportBudget, kernels: Object.freeze(kernels) };
+}
+
+function parseProcessesSection(
+  payload: Uint8Array,
+  functionsByName: ReadonlyMap<string, GuestFunction>,
+): { transportBudget: number; processes: readonly ProcessManifest[] } {
+  const reader = new AbiReader(payload);
+  const version = reader.count();
+  if (version !== 1) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unsupported blot:processes version ${version}`,
+    );
+  }
+  const transportBudget = reader.count();
+  if (transportBudget < 8 || transportBudget % 4 !== 0) {
+    throw new GuestError(
+      "invalid_abi",
+      `Invalid blot:processes transport_budget ${transportBudget}`,
+    );
+  }
+  const count = reader.count();
+  const processes: ProcessManifest[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < count; i++) {
+    const name = reader.name();
+    if (seen.has(name)) {
+      throw new GuestError("invalid_abi", `Duplicate process ${name}`);
+    }
+    seen.add(name);
+    const initExport = reader.name();
+    const stepExport = reader.name();
+    const configSchema = parseWireSchema(reader, transportBudget);
+    const cmdSchema = parseWireSchema(reader, transportBudget);
+    const replySchema = parseWireSchema(reader, transportBudget);
+    const initFn = functionsByName.get(initExport);
+    if (
+      !initFn || initFn.parameter !== configSchema.wireTag ||
+      initFn.result !== "Unit"
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        `Process ${name} init_export ${initExport} signature mismatch`,
+      );
+    }
+    const stepFn = functionsByName.get(stepExport);
+    if (
+      !stepFn || stepFn.parameter !== cmdSchema.wireTag ||
+      stepFn.result !== replySchema.wireTag
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        `Process ${name} step_export ${stepExport} signature mismatch`,
+      );
+    }
+    processes.push(Object.freeze({
+      name,
+      initExport,
+      stepExport,
+      configSchema,
+      cmdSchema,
+      replySchema,
+    }));
+  }
+  reader.end();
+  return { transportBudget, processes: Object.freeze(processes) };
+}
+
+function readUleb(bytes: Uint8Array, state: { at: number }): number {
+  let result = 0;
+  let shift = 0;
+  for (let i = 0; i < 10; i++) {
+    if (state.at >= bytes.length) {
+      throw new GuestError("invalid_abi", "Truncated ULEB128 in Wasm module");
+    }
+    const byte = bytes[state.at++];
+    result += (byte & 0x7f) * 2 ** shift;
+    if ((byte & 0x80) === 0) return result;
+    shift += 7;
+  }
+  throw new GuestError("invalid_abi", "ULEB128 overflow in Wasm module");
+}
+
+/**
+ * Parse Wasm Section ID 5 (`MemorySection`) directly from raw Wasm bytes.
+ * Handles 32-bit, shared (`0x02`), memory64 (`0x04`), and custom page size (`0x08`).
+ */
+export function readMemoryShape(bytes: Uint8Array): MemoryShape {
+  if (
+    bytes.length < 8 ||
+    bytes[0] !== 0x00 || bytes[1] !== 0x61 ||
+    bytes[2] !== 0x73 || bytes[3] !== 0x6d ||
+    bytes[4] !== 0x01 || bytes[5] !== 0x00 ||
+    bytes[6] !== 0x00 || bytes[7] !== 0x00
+  ) {
+    throw new GuestError("invalid_abi", "Invalid WebAssembly module header");
+  }
+  const state = { at: 8 };
+  let memorySection: Uint8Array | undefined;
+  while (state.at < bytes.length) {
+    const id = bytes[state.at++];
+    const size = readUleb(bytes, state);
+    if (size < 0 || state.at + size > bytes.length) {
+      throw new GuestError("invalid_abi", "Truncated Wasm section");
+    }
+    if (id === 5) {
+      if (memorySection !== undefined) {
+        throw new GuestError("invalid_abi", "Duplicate Wasm MemorySection");
+      }
+      memorySection = bytes.subarray(state.at, state.at + size);
+    }
+    state.at += size;
+  }
+  if (memorySection === undefined) {
+    return Object.freeze({
+      sectionPresent: false,
+      hasMemory: false,
+      memory64: false,
+      shared: false,
+      pageSizeLog2: 16,
+      initialPages: 0,
+    });
+  }
+  const ms = { at: 0 };
+  const count = readUleb(memorySection, ms);
+  if (count === 0) {
+    if (ms.at !== memorySection.length) {
+      throw new GuestError("invalid_abi", "Trailing bytes in MemorySection");
+    }
+    return Object.freeze({
+      sectionPresent: true,
+      hasMemory: false,
+      memory64: false,
+      shared: false,
+      pageSizeLog2: 16,
+      initialPages: 0,
+    });
+  }
+  if (count > 1) {
+    throw new GuestError(
+      "invalid_abi",
+      `Wasm module defines ${count} linear memories; at most 1 is permitted`,
+    );
+  }
+  if (ms.at >= memorySection.length) {
+    throw new GuestError("invalid_abi", "Truncated MemorySection entry");
+  }
+  const flags = memorySection[ms.at++];
+  if ((flags & ~0x0f) !== 0) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unknown MemorySection flags 0x${flags.toString(16)}`,
+    );
+  }
+  const hasMax = (flags & 0x01) !== 0;
+  const shared = (flags & 0x02) !== 0;
+  const memory64 = (flags & 0x04) !== 0;
+  const hasPageSize = (flags & 0x08) !== 0;
+  const initialPages = readUleb(memorySection, ms);
+  const maximumPages = hasMax ? readUleb(memorySection, ms) : undefined;
+  const pageSizeLog2 = hasPageSize ? readUleb(memorySection, ms) : 16;
+  if (ms.at !== memorySection.length) {
+    throw new GuestError("invalid_abi", "Trailing bytes in MemorySection");
+  }
+  return Object.freeze({
+    sectionPresent: true,
+    hasMemory: true,
+    memory64,
+    shared,
+    pageSizeLog2,
+    initialPages,
+    ...(maximumPages !== undefined ? { maximumPages } : {}),
+  });
+}
+
+export function validateMemoryShape(shape: MemoryShape): void {
+  if (!shape.hasMemory) return;
+  if (shape.shared) {
+    throw new GuestError(
+      "invalid_abi",
+      "Shared Wasm linear memory is unsupported",
+    );
+  }
+  if (shape.memory64) {
+    throw new GuestError(
+      "invalid_abi",
+      "Memory64 Wasm linear memory is unsupported",
+    );
+  }
+  if (shape.pageSizeLog2 !== 16) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unsupported Wasm page size 2^${shape.pageSizeLog2}; expected 64 KiB (2^16)`,
+    );
+  }
+}
+
+const compiledReceiptBrand = Symbol("CompiledModuleReceipt");
+
+export interface CompiledModuleReceipt {
+  readonly [compiledReceiptBrand]: true;
+  readonly module: WebAssembly.Module;
+  readonly abi: GuestAbi;
+  readonly memoryShape: MemoryShape;
+}
+
+export interface ValidatedModuleMeta {
+  readonly module: WebAssembly.Module;
+  readonly snapshot: Uint8Array<ArrayBuffer>;
+  readonly abi: GuestAbi;
+  readonly memoryShape: MemoryShape;
+}
+
+const validatedModuleMetaMap = new WeakMap<
+  WebAssembly.Module,
+  ValidatedModuleMeta
+>();
+const validatedReceiptMetaMap = new WeakMap<object, ValidatedModuleMeta>();
+
+/**
+ * Copy raw Wasm bytes into an immutable private unshared snapshot, validate
+ * its `MemoryShape` and ABI 8 manifest, and compile an unforgeable receipt
+ * accepted by `KernelPool.open` and `Processes`.
+ */
+export function compileKernelModule(
+  bytes: Uint8Array,
+): CompiledModuleReceipt {
+  const snapshot = copyPrivateBytes(bytes);
+  const memoryShape = readMemoryShape(snapshot);
+  validateMemoryShape(memoryShape);
+  const module = new WebAssembly.Module(snapshot);
+  const abi = readGuestAbi(module);
+  const meta: ValidatedModuleMeta = Object.freeze({
+    module,
+    snapshot,
+    abi,
+    memoryShape,
+  });
+  validatedModuleMetaMap.set(module, meta);
+  const receipt: CompiledModuleReceipt = Object.freeze({
+    [compiledReceiptBrand]: true as const,
+    module,
+    abi,
+    memoryShape,
+  });
+  validatedReceiptMetaMap.set(receipt, meta);
+  return receipt;
+}
+
+/**
+ * Resolve either raw Wasm `Uint8Array` bytes or an unforgeable
+ * `CompiledModuleReceipt`. Arbitrary opaque `WebAssembly.Module` objects are
+ * explicitly rejected so memory-shape validation can never be bypassed.
+ */
+export function resolveValidatedModule(
+  source: Uint8Array | CompiledModuleReceipt,
+): ValidatedModuleMeta {
+  if (typeof source === "object" && source !== null) {
+    const fromReceipt = validatedReceiptMetaMap.get(source);
+    if (fromReceipt !== undefined) return fromReceipt;
+  }
+  if (source instanceof Uint8Array) {
+    const receipt = compileKernelModule(source);
+    return validatedReceiptMetaMap.get(receipt)!;
+  }
+  throw new TypeError(
+    "Expected raw Wasm Uint8Array bytes or a CompiledModuleReceipt from compileKernelModule()",
+  );
 }
 
 function importModule(signature: CallbackType): string {
@@ -687,6 +1324,67 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   if (signatures.size !== 0) {
     throw new GuestError("invalid_abi", "Missing generic callback import");
   }
+  const kernelsSections = WebAssembly.Module.customSections(
+    module,
+    "blot:kernels",
+  );
+  if (kernelsSections.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate blot:kernels section");
+  }
+  if (kernelsSections.length === 1 && version !== 8) {
+    throw new GuestError("invalid_abi", "blot:kernels requires ABI 8");
+  }
+  const processesSections = WebAssembly.Module.customSections(
+    module,
+    "blot:processes",
+  );
+  if (processesSections.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate blot:processes section");
+  }
+  if (processesSections.length === 1 && version !== 8) {
+    throw new GuestError("invalid_abi", "blot:processes requires ABI 8");
+  }
+  const functionsByName = new Map(functions.map((fn) => [fn.name, fn]));
+  const hostInternal: string[] = [];
+  let kernels: readonly KernelManifest[] | undefined;
+  let processes: readonly ProcessManifest[] | undefined;
+  let transportBudget: number | undefined;
+  if (kernelsSections.length === 1) {
+    const parsed = parseKernelsSection(
+      new Uint8Array(kernelsSections[0]),
+      functionsByName,
+    );
+    transportBudget = parsed.transportBudget;
+    kernels = parsed.kernels;
+    for (const kernel of kernels) {
+      if (kernel.ctxExport !== undefined) hostInternal.push(kernel.ctxExport);
+      if (kernel.clearExport !== undefined) {
+        hostInternal.push(kernel.clearExport);
+      }
+    }
+  }
+  if (processesSections.length === 1) {
+    const parsed = parseProcessesSection(
+      new Uint8Array(processesSections[0]),
+      functionsByName,
+    );
+    if (
+      transportBudget !== undefined &&
+      transportBudget !== parsed.transportBudget
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        `blot:kernels transport_budget (${transportBudget}) != blot:processes transport_budget (${parsed.transportBudget})`,
+      );
+    }
+    transportBudget = parsed.transportBudget;
+    processes = parsed.processes;
+    for (const proc of processes) {
+      hostInternal.push(proc.initExport);
+      hostInternal.push(proc.stepExport);
+    }
+  }
+
   const result: GuestAbi = {
     version,
     functions: Object.freeze(functions),
@@ -705,6 +1403,18 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   if (invocation.length !== 0) {
     Object.assign(result, { invocationFinish: true });
+  }
+  if (kernels !== undefined) {
+    Object.assign(result, { kernels });
+  }
+  if (processes !== undefined) {
+    Object.assign(result, { processes });
+  }
+  if (transportBudget !== undefined) {
+    Object.assign(result, { transportBudget });
+  }
+  if (hostInternal.length > 0) {
+    Object.assign(result, { hostInternal: Object.freeze(hostInternal) });
   }
   if (dataSchemas) abiDataSchemas.set(result, dataSchemas);
   return Object.freeze(result);
@@ -922,8 +1632,8 @@ type InvokeCallback = (value: GuestValue | DataValue) => unknown;
 export interface Guest {
   /** Committed linear-memory bytes, including temporary allocation capacity. */
   memoryBytes(): number;
-  /** Upper bound on one ABI 8 numeric payload in the fixed transport bank. */
-  numericPacketCapacity(): number;
+  /** Upper bound on one ABI 8 numeric payload in the transport bank. */
+  numericPacketCapacity(overrideBytes?: number): number;
   /** Temporary owners reclaimed by the previous invocation's finish hook. */
   lastReclaimedOwners(): number | undefined;
   readonly abi: GuestAbi;
@@ -2243,7 +2953,7 @@ export async function instantiateGuest(
       if (memory instanceof WebAssembly.Memory) return memory.buffer.byteLength;
       return 0;
     },
-    numericPacketCapacity() {
+    numericPacketCapacity(overrideBytes?: number) {
       idle();
       if (abi.version !== 8 || !arena) {
         throw new GuestError(
@@ -2251,15 +2961,18 @@ export async function instantiateGuest(
           "Expected an ABI 8 numeric transport bank",
         );
       }
-      // Reset returns to the packet bank's base. The direct backend places the
-      // bank last in fixed memory. Page padding only makes the bound wider.
-      arena.reset(0);
-      try {
-        const base = arrayRange(arena, arena.allocate(4), 0);
-        return arena.memory.buffer.byteLength - base - 4;
-      } finally {
-        arena.reset(0);
+      if (overrideBytes !== undefined) {
+        if (
+          !Number.isSafeInteger(overrideBytes) || overrideBytes < 8 ||
+          overrideBytes % 4 !== 0
+        ) {
+          throw new RangeError(
+            "numericPacketCapacity override must be a safe positive multiple of 4",
+          );
+        }
+        return overrideBytes;
       }
+      return abi.transportBudget ?? DEFAULT_TRANSPORT_BUDGET;
     },
     cleanupDataType(name) {
       idle();
@@ -2356,10 +3069,11 @@ export async function instantiateGuest(
       const { fn, value, exported } = begin(name, argument, false, batch);
       let outcome = 1;
       try {
-        // An ABI 8 array entry unpacks the transport into a fresh guest array.
+        // ABI 8 zero-copy array entries read the transport bank directly.
         if (batch?.observeCopy) {
-          const length = (argument as Uint32Array).length +
-            (batch.prefix?.length ?? 0);
+          const length = abi.version === 8
+            ? 0
+            : (argument as Uint32Array).length + (batch.prefix?.length ?? 0);
           batch.observeCopy("guestUnpack", length * 4);
         }
         const raw = exported(value);

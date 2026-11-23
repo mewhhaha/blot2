@@ -770,4 +770,44 @@ entry func precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x |
       equal(String(guest.call("precise_spark", Uint32Array.of(1, 2))), "102,103");
     },
   );
+
+  // Positive precision for `entry kernel`: plain-record context projection,
+  // nested higher-order callable captures (`array.map` -> `array.generate`),
+  // curried multi-arg callbacks, and pure-scalar `WireCtx` elements pushed
+  // into locally allocated storage without false aliasing to `WireCtx`.
+  await compileAndRun(
+    `import * as array from "std/array"
+type Storage is data = $Storage { values: #[~F32] }
+type PreparedCtx = { storage: Storage, count: U32 }
+
+func with_curried (xs: #[F32]) -> consume =>
+  return consume xs.length xs
+
+func append_into (storage: Storage) -> (xs: #[F32]): U32 =>
+  for x in xs:
+    @storage.push storage.values x
+  return xs.length
+
+func prep (wire: #[F32]): PreparedCtx =>
+  let values: #[~F32] = #[]
+  let storage = $Storage { values }
+  let scaled = array.map (func v => v * 2.0) wire
+  let count = with_curried scaled (func n -> ys =>
+    let _ = append_into storage ys
+    return n)
+  return { storage, count }
+
+func solve (ctx: PreparedCtx) -> (idx: U32): F32 =>
+  if idx < ctx.count:
+    return ctx.storage.values[idx]
+  return 0.0
+
+entry kernel k: Kernel [#[F32], U32, F32] = { prepare: prep, run: solve }
+entry func smoke (): U32 => return 1
+`,
+    (guest) => {
+      equal(guest.call("smoke", null), 1);
+    },
+    { stdRoot },
+  );
 });

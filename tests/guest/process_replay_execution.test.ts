@@ -1,4 +1,4 @@
-import { ProcessHost } from "../../host/processes.ts";
+import { Processes, type ProcessHandle } from "../../host/processes.ts";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const source = await Deno.readTextFile(
@@ -7,20 +7,30 @@ const source = await Deno.readTextFile(
 
 Deno.test("one-thread process admissions, refusals and deliveries replay at their application tick", async () => {
   await compileAndRun(source, async (guest, bytes) => {
-    const host = new ProcessHost(
-      await WebAssembly.compile(bytes),
-      [
-        { name: "planner", initWork: 1, stepWork: 1 },
-      ],
-      2,
-      1,
+    const host = new Processes(
+      bytes,
+      [{
+        name: "planner",
+        initWork: 1,
+        stepWork: 1,
+        mailbox: 1,
+        mailboxBytes: 64,
+        maxReplyBytes: 4,
+      }],
+      { slots: 2 },
     );
+    const handles = new Map<number, ProcessHandle>();
     const admissions: { packet: Uint32Array; outcome: number }[] = [];
     const start = guest.capability({
       parameter: "Array U32",
       result: "U32",
       call: (packet) => {
-        const outcome = host.admit(packet);
+        const name = new TextDecoder().decode(
+          Uint8Array.from(packet.subarray(1)),
+        );
+        const h = host.admit(name, packet[0]);
+        const outcome = h === null ? 0 : h.endpoint;
+        if (h !== null) handles.set(outcome, h);
         admissions.push({ packet, outcome });
         return outcome;
       },
@@ -37,11 +47,13 @@ Deno.test("one-thread process admissions, refusals and deliveries replay at thei
     try {
       equal(guest.call("local", 4), 4);
       equal(guest.call("local", 5), 0);
-      const [a, b, refused] = guest.call("live", start) as Uint32Array;
-      equal(a !== 0 && b !== 0 && a !== b, true);
+      const [aId, bId, refused] = guest.call("live", start) as Uint32Array;
+      equal(aId !== 0 && bId !== 0 && aId !== bId, true);
       equal(refused, 0);
+      const a = handles.get(aId)!;
+      const b = handles.get(bId)!;
       equal(host.send(a, 99), "starting");
-      apply(...[a, b, refused], 0);
+      apply(...[aId, bId, refused], 0);
       equal(await host.advance(2), 2);
       equal(host.status(a), "ready");
       equal(host.status(b), "ready");
@@ -59,7 +71,7 @@ Deno.test("one-thread process admissions, refusals and deliveries replay at thei
       equal(ack2.ticket, second);
       equal(ack1.value, 11);
       equal(ack2.value, 107);
-      apply(0, ack2.value, ack1.value); // Preserve application order, not worker order.
+      apply(0, ack2.value as number, ack1.value as number); // Preserve application order, not worker order.
       equal(await host.advance(2), 0);
       const woke = host.send(a, 2);
       equal(await host.advance(1), 1);
@@ -69,9 +81,9 @@ Deno.test("one-thread process admissions, refusals and deliveries replay at thei
       }
       equal(ack3.ticket, woke);
       equal(ack3.value, 13);
-      apply(ack3.value);
+      apply(ack3.value as number);
     } finally {
-      host.restore();
+      await host.restore();
     }
 
     let accepted = 0;

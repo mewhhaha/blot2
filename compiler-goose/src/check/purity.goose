@@ -556,6 +556,52 @@ fn isPoolType(m: const Module&, tid: TId) -> bool {
     return blot_check_storage_types::isArray(m.types, cur);
 }
 
+// Sound closed-world check: returns true ONLY when `tid` is provably a concrete
+// pure-data value type that cannot hold any heap storage, mutable array, view,
+// closure, effect operation, or uninstantiated type parameter.
+recursive fn isPureScalarValueType(units: const Module[:], unit: u32, tid: TId, depth: i64) -> bool {
+    if depth > 16 || !hasUnit(units, unit) { return false; }
+    let m .= units[unit - 1];
+    if (tid as i64) >= m.types.nodes.len { return false; }
+    let n = m.types.node(tid);
+    match n.tag {
+        unit, boolean, unsigned32, floating32, never => { return true; },
+        usage => { return isPureScalarValueType(units, unit, n.a, depth + 1); },
+        product => {
+            for c in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
+                if !isPureScalarValueType(units, unit, c, depth + 1) { return false; }
+            }
+            return true;
+        },
+        record => {
+            for i in 0..(n.b as i64) {
+                if !isPureScalarValueType(units, unit, m.types.recordField(n, i).ty, depth + 1) { return false; }
+            }
+            return true;
+        },
+        nominal => {
+            if blot_check_storage_types::info(m.types, tid).present { return false; }
+            if n.a == 0xffffffff || !hasUnit(units, n.a) { return false; }
+            let args = m.types.nominalArguments(n);
+            if args.len != 0 { return false; }
+            let dm .= units[n.a - 1];
+            let want = Identity { unit: n.a, decl: n.b };
+            for i in 1..dm.nominals.len {
+                if dm.nominals[i].identity == want {
+                    if dm.nominals[i].is_opaque || dm.nominals[i].parameters.len != 0 { return false; }
+                    for cid in dm.nominalConstructors(i as u32) {
+                        let c = dm.constructor(cid);
+                        if c.payload != 0 && !isPureScalarValueType(units, n.a, c.payload, depth + 1) { return false; }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+
 recursive fn typeHasMutableArray(units: const Module[:], unit: u32, tid: TId, depth: i64) -> bool {
     if depth > 64 || !hasUnit(units, unit) { return false; }
     let m .= units[unit - 1];
@@ -900,6 +946,54 @@ fn handlersEqual(a: const HandlerSpec[:], b: const HandlerSpec[:]) -> bool {
     return true;
 }
 
+fn bindNestedCallableEnv(st: Analyzer&, ctx_id: u32, base_slot: u32, pe: u32, target_fn: u32, applied: u8, cspecs: const CallableSpec[:]) {
+    var own_caps: i64 = 0;
+    if st.fn_defs[target_fn].kind == FN_CLOSURE { own_caps = st.fn_defs[target_fn].capture_len as i64; }
+    let k_caps = own_caps + (applied as i64);
+    for ci in 0..k_caps {
+        var nslot: u32 = 0xffffffff;
+        if ci < 64 {
+            if base_slot >= 1000 && base_slot < 2000 {
+                nslot = 100000 + (base_slot - 1000) * 64 + (ci as u32);
+            } else if base_slot < 1000 {
+                nslot = 2000 + base_slot * 64 + (ci as u32);
+            }
+        }
+        var nested_spec = false;
+        if nslot != 0xffffffff {
+            for ncs in cspecs {
+                if ncs.slot != nslot { continue; }
+                nested_spec = true;
+                if ncs.tag_kind == 0 {
+                    let npe = symParamEnv(st, nslot, ncs.target_a);
+                    registerPreExistingRoot(st, ctx_id, npe, false);
+                    let nfv = symFnVal(st, ncs.target_a, npe, ncs.applied);
+                    addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), nfv);
+                    var n_own: i64 = 0;
+                    if st.fn_defs[ncs.target_a].kind == FN_CLOSURE { n_own = st.fn_defs[ncs.target_a].capture_len as i64; }
+                    let n_caps = n_own + (ncs.applied as i64);
+                    for ki in 0..n_caps {
+                        let ncn = symCapNode(st, nslot, ncs.target_a, ki as u32);
+                        registerPreExistingRoot(st, ctx_id, ncn, true);
+                        addBaseEdge(st, ctx_id, npe, LBL_CAPTURE_BASE + (ki as u32), ncn);
+                    }
+                } else if ncs.tag_kind == 1 {
+                    addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), symOpVal(st, ncs.target_a));
+                } else if ncs.tag_kind == 2 {
+                    addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), symCtorFn(st, ncs.target_a, ncs.target_b));
+                } else if ncs.tag_kind == 3 {
+                    addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), symPrimFn(st, ncs.target_a, ncs.target_b));
+                }
+            }
+        }
+        if !nested_spec {
+            let cn = symCapNode(st, base_slot, target_fn, ci as u32);
+            registerPreExistingRoot(st, ctx_id, cn, true);
+            addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), cn);
+        }
+    }
+}
+
 fn getOrCreateCtx(
     st: Analyzer&,
     fn_id: u32,
@@ -954,13 +1048,7 @@ fn getOrCreateCtx(
                     registerPreExistingRoot(st, ctx_id, pe, false);
                     let fv = symFnVal(st, cs.target_a, pe, cs.applied);
                     let _ = addBindingSym(st, ctx_id, pb, fv);
-                    var k_caps: i64 = st.fn_defs[cs.target_a].capture_len as i64;
-                    if cs.applied > 0 { k_caps = cs.applied as i64; }
-                    for ci in 0..k_caps {
-                        let cn = symCapNode(st, pi as u32, cs.target_a, ci as u32);
-                        registerPreExistingRoot(st, ctx_id, cn, true);
-                        addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ci as u32), cn);
-                    }
+                    bindNestedCallableEnv(st, ctx_id, pi as u32, pe, cs.target_a, cs.applied, cspecs);
                 } else if cs.tag_kind == 1 {
                     let _ = addBindingSym(st, ctx_id, pb, symOpVal(st, cs.target_a));
                 } else if cs.tag_kind == 2 {
@@ -988,13 +1076,7 @@ fn getOrCreateCtx(
                     registerPreExistingRoot(st, ctx_id, pe, false);
                     let fv = symFnVal(st, cs.target_a, pe, cs.applied);
                     let _ = addBindingSym(st, ctx_id, cb, fv);
-                    var k_caps: i64 = st.fn_defs[cs.target_a].capture_len as i64;
-                    if cs.applied > 0 { k_caps = cs.applied as i64; }
-                    for ki in 0..k_caps {
-                        let cn = symCapNode(st, cap_slot, cs.target_a, ki as u32);
-                        registerPreExistingRoot(st, ctx_id, cn, true);
-                        addBaseEdge(st, ctx_id, pe, LBL_CAPTURE_BASE + (ki as u32), cn);
-                    }
+                    bindNestedCallableEnv(st, ctx_id, cap_slot, pe, cs.target_a, cs.applied, cspecs);
                 } else if cs.tag_kind == 1 {
                     let _ = addBindingSym(st, ctx_id, cb, symOpVal(st, cs.target_a));
                 }
@@ -1345,7 +1427,29 @@ recursive fn applySigmaStar(
     }
     if sk.kind == SYM_PARAM_ENV {
         var src_head: u32 = 0;
-        if sk.a >= 1000 {
+        if sk.a >= 2000 {
+            var outer_head: u32 = 0;
+            var nested_ci: u32 = 0;
+            if sk.a >= 100000 {
+                let k = ((sk.a - 100000) / 64) as i64;
+                nested_ci = (sk.a - 100000) % 64;
+                if k < cap_range.len { outer_head = st.head_stack[cap_range.start + k]; }
+            } else {
+                let j = ((sk.a - 2000) / 64) as i64;
+                nested_ci = (sk.a - 2000) % 64;
+                if j < arg_range.len { outer_head = st.head_stack[arg_range.start + j]; }
+            }
+            var outer_envs: u32 = 0;
+            var oc = outer_head;
+            while oc != 0 {
+                let os = st.u32_nodes[oc].val;
+                let on = st.u32_nodes[oc].next;
+                let osk = st.syms[os];
+                if osk.kind == SYM_FN_VAL { let _ = listAdd(st, outer_envs, osk.b); }
+                oc = on;
+            }
+            src_head = stepCaptureHead(st, caller_ctx, outer_envs, nested_ci);
+        } else if sk.a >= 1000 {
             let ci = (sk.a - 1000) as i64;
             if ci < cap_range.len { src_head = st.head_stack[cap_range.start + ci]; }
         } else if (sk.a as i64) < arg_range.len {
@@ -1405,7 +1509,47 @@ recursive fn applySigmaStar(
     return listSingle(st, sum_sym);
 }
 
-fn buildCallableSpecsRange(st: const Analyzer&, arg_range: Range, cap_range: Range) -> CallableSpec[>..] {
+fn pushUniqueCallableSpec(specs: CallableSpec[>..]& , cs: CallableSpec) {
+    for prev in specs {
+        if prev.slot == cs.slot && prev.tag_kind == cs.tag_kind && prev.applied == cs.applied && prev.target_a == cs.target_a && prev.target_b == cs.target_b { return; }
+    }
+    specs.push(cs);
+}
+
+fn inspectNestedCallableCaptures(st: Analyzer&, caller_ctx: u32, base_slot: u32, target_fn: u32, env_sym: u32, applied: u8, specs: CallableSpec[>..]&) {
+    var own_caps: i64 = 0;
+    if st.fn_defs[target_fn].kind == FN_CLOSURE { own_caps = st.fn_defs[target_fn].capture_len as i64; }
+    let total_caps = own_caps + (applied as i64);
+    let env_h = listSingle(st, env_sym);
+    for ci in 0..total_caps {
+        if ci >= 64 { break; }
+        let cap_head = stepCaptureHead(st, caller_ctx, env_h, ci as u32);
+        if cap_head == 0 { continue; }
+        var all_callable = true;
+        var cur = cap_head;
+        while cur != 0 {
+            let k = st.syms[st.u32_nodes[cur].val].kind;
+            if k != SYM_FN_VAL && k != SYM_OP_VAL && k != SYM_CTOR_FN && k != SYM_PRIM_FN { all_callable = false; break; }
+            cur = st.u32_nodes[cur].next;
+        }
+        if !all_callable { continue; }
+        var nslot: u32 = 2000 + base_slot * 64 + (ci as u32);
+        if base_slot >= 1000 { nslot = 100000 + (base_slot - 1000) * 64 + (ci as u32); }
+        cur = cap_head;
+        while cur != 0 {
+            let nsk = st.syms[st.u32_nodes[cur].val];
+            var ncs = CallableSpec { slot: nslot };
+            if nsk.kind == SYM_FN_VAL { ncs.tag_kind = 0; ncs.applied = nsk.sub; ncs.target_a = nsk.a; }
+            else if nsk.kind == SYM_OP_VAL { ncs.tag_kind = 1; ncs.target_a = nsk.a; }
+            else if nsk.kind == SYM_CTOR_FN { ncs.tag_kind = 2; ncs.target_a = nsk.a; ncs.target_b = nsk.b; }
+            else if nsk.kind == SYM_PRIM_FN { ncs.tag_kind = 3; ncs.target_a = nsk.a; ncs.target_b = nsk.b; }
+            pushUniqueCallableSpec(specs, ncs);
+            cur = st.u32_nodes[cur].next;
+        }
+    }
+}
+
+fn buildCallableSpecsRange(st: Analyzer&, caller_ctx: u32, arg_range: Range, cap_range: Range) -> CallableSpec[>..] {
     var specs: CallableSpec[>..] = [];
     for j in 0..arg_range.len {
         let head = st.head_stack[arg_range.start + j];
@@ -1426,11 +1570,10 @@ fn buildCallableSpecsRange(st: const Analyzer&, arg_range: Range, cap_range: Ran
             else if sk.kind == SYM_OP_VAL { cs.tag_kind = 1; cs.target_a = sk.a; }
             else if sk.kind == SYM_CTOR_FN { cs.tag_kind = 2; cs.target_a = sk.a; cs.target_b = sk.b; }
             else if sk.kind == SYM_PRIM_FN { cs.tag_kind = 3; cs.target_a = sk.a; cs.target_b = sk.b; }
-            var dup = false;
-            for prev in specs {
-                if prev.slot == cs.slot && prev.tag_kind == cs.tag_kind && prev.applied == cs.applied && prev.target_a == cs.target_a && prev.target_b == cs.target_b { dup = true; break; }
+            pushUniqueCallableSpec(specs, cs);
+            if sk.kind == SYM_FN_VAL {
+                inspectNestedCallableCaptures(st, caller_ctx, j as u32, sk.a, sk.b, sk.sub, specs);
             }
-            if !dup { specs.push(cs); }
             cur = st.u32_nodes[cur].next;
         }
     }
@@ -1441,21 +1584,23 @@ fn buildCallableSpecsRange(st: const Analyzer&, arg_range: Range, cap_range: Ran
         var cur = head;
         while cur != 0 {
             let k = st.syms[st.u32_nodes[cur].val].kind;
-            if k != SYM_FN_VAL && k != SYM_OP_VAL { all_callable = false; break; }
+            if k != SYM_FN_VAL && k != SYM_OP_VAL && k != SYM_CTOR_FN && k != SYM_PRIM_FN { all_callable = false; break; }
             cur = st.u32_nodes[cur].next;
         }
         if !all_callable { continue; }
         cur = head;
         while cur != 0 {
             let sk = st.syms[st.u32_nodes[cur].val];
-            var cs = CallableSpec { slot: 1000 + (ci as u32) };
+            let cslot = 1000 + (ci as u32);
+            var cs = CallableSpec { slot: cslot };
             if sk.kind == SYM_FN_VAL { cs.tag_kind = 0; cs.applied = sk.sub; cs.target_a = sk.a; }
-            else { cs.tag_kind = 1; cs.target_a = sk.a; }
-            var dup = false;
-            for prev in specs {
-                if prev.slot == cs.slot && prev.tag_kind == cs.tag_kind && prev.applied == cs.applied && prev.target_a == cs.target_a && prev.target_b == cs.target_b { dup = true; break; }
+            else if sk.kind == SYM_OP_VAL { cs.tag_kind = 1; cs.target_a = sk.a; }
+            else if sk.kind == SYM_CTOR_FN { cs.tag_kind = 2; cs.target_a = sk.a; cs.target_b = sk.b; }
+            else if sk.kind == SYM_PRIM_FN { cs.tag_kind = 3; cs.target_a = sk.a; cs.target_b = sk.b; }
+            pushUniqueCallableSpec(specs, cs);
+            if sk.kind == SYM_FN_VAL {
+                inspectNestedCallableCaptures(st, caller_ctx, cslot, sk.a, sk.b, sk.sub, specs);
             }
-            if !dup { specs.push(cs); }
             cur = st.u32_nodes[cur].next;
         }
     }
@@ -1483,7 +1628,7 @@ fn invokeSummary(
     err_span: blot_check_core::Span,
     changed: bool&
 ) -> u32 {
-    let cspecs = buildCallableSpecsRange(st, arg_range, cap_range);
+    let cspecs = buildCallableSpecsRange(st, caller_ctx, arg_range, cap_range);
     let hspecs = buildHandlerSpecsRange(st, h_range);
     let callee_ctx, ok = getOrCreateCtx(st, target_fn, cspecs[..], hspecs[..], err_unit, err_span);
     if !ok {
@@ -1569,7 +1714,9 @@ recursive fn bindPattern(st: Analyzer&, units: const Module[:], env: EvalEnv&, p
             let _ = evalNode(st, units, env, pat.a, depth + 1);
         },
         bind => {
-            bindLocal(st, env, pat.a, val_head);
+            if val_head != 0 && !isPureScalarValueType(units, env.unit, pat.ty, 0) {
+                bindLocal(st, env, pat.a, val_head);
+            }
         },
         product => {
             let kids = m.patternChildren(pid);
@@ -1695,6 +1842,53 @@ fn evalConstructValue(
     return listSingle(st, fresh);
 }
 
+// Check whether `project` on `recv_ty` accesses a data field (plain record or
+// single-constructor nominal record payload) rather than an associated method.
+fn isDataFieldProjection(units: const Module[:], m: const Module&, recv_ty: TId, field_name: Chars) -> bool {
+    var cur = recv_ty;
+    for _ in 0..8 {
+        if (cur as i64) >= m.types.nodes.len { return false; }
+        let n = m.types.node(cur);
+        if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.forall { cur = n.a; continue; }
+        let sh = blot_check_storage_types::sharedInner(m.types, cur);
+        if sh.present { cur = sh.value; continue; }
+        break;
+    }
+    if (cur as i64) >= m.types.nodes.len { return false; }
+    let rn = m.types.node(cur);
+    if rn.tag == blot_check_types::Tag.record {
+        for fi in 0..(rn.b as i64) {
+            let rf = m.types.recordField(rn, fi);
+            let sp = m.fieldSpelling(rf.name);
+            if sp.present && sp.value == field_name { return true; }
+        }
+        return false;
+    }
+    if rn.tag == blot_check_types::Tag.nominal && !blot_check_storage_types::identity(rn.a, rn.b).present && hasUnit(units, rn.a) {
+        let dm .= units[rn.a - 1];
+        let want = Identity { rn.a, rn.b };
+        var ctor_count: i64 = 0;
+        var matched = false;
+        for ctor in dm.constructors {
+            if dm.nominal(ctor.nominal).identity != want { continue; }
+            ctor_count += 1;
+            if ctor_count > 1 { return false; }
+            if ctor.payload != 0 && (ctor.payload as i64) < dm.types.nodes.len {
+                let pn = dm.types.node(ctor.payload);
+                if pn.tag == blot_check_types::Tag.record {
+                    for fi in 0..(pn.b as i64) {
+                        let rf = dm.types.recordField(pn, fi);
+                        let sp = dm.fieldSpelling(rf.name);
+                        if sp.present && sp.value == field_name { matched = true; break; }
+                    }
+                }
+            }
+        }
+        return ctor_count == 1 && matched;
+    }
+    return false;
+}
+
 // Push matching associated/trait method targets onto `st.target_stack`; returns Range.
 fn pushAssociatedMethodTargets(st: Analyzer&, units: const Module[:], m: const Module&, recv_ty: TId, field_name: Chars, op: blot_check_types::Operator) -> Range {
     let tmark = st.target_stack.len;
@@ -1744,8 +1938,35 @@ fn pushAssociatedMethodTargets(st: Analyzer&, units: const Module[:], m: const M
                 }
             }
         }
-        if op == blot_check_types::Operator.none {
+    }
+    if op == blot_check_types::Operator.none && st.target_stack.len == tmark {
+        for u_idx in 0..units.len {
+            let um .= units[u_idx];
             for impl_ in um.implementations {
+                if has_id {
+                    let head_list = um.types.list(impl_.head);
+                    if head_list.len != 0 {
+                        var hcur = head_list[0];
+                        for _ in 0..8 {
+                            if (hcur as i64) >= um.types.nodes.len { break; }
+                            let hn = um.types.node(hcur);
+                            if hn.tag == blot_check_types::Tag.usage || hn.tag == blot_check_types::Tag.forall { hcur = hn.a; continue; }
+                            break;
+                        }
+                        if (hcur as i64) < um.types.nodes.len {
+                            let hn = um.types.node(hcur);
+                            if hn.tag == blot_check_types::Tag.nominal {
+                                let hid = Identity { hn.a, hn.b };
+                                if hid != ident && (!has_alt || hid != alt_ident) { continue; }
+                            } else if blot_check_storage_types::isArray(um.types, hcur) {
+                                let arr_id = Identity { 0, 0xffffffff };
+                                if arr_id != ident && (!has_alt || arr_id != alt_ident) { continue; }
+                            } else if hn.tag == blot_check_types::Tag.unsigned32 || hn.tag == blot_check_types::Tag.floating32 || hn.tag == blot_check_types::Tag.boolean {
+                                continue;
+                            }
+                        }
+                    }
+                }
                 for mem in um.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
                     if mem.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
                     let msp = um.fieldSpelling(mem.name);
@@ -1784,28 +2005,28 @@ recursive fn evalApplyValues(st: Analyzer&, units: const Module[:], env: EvalEnv
             let applied = sk.sub as i64;
             let tdef = st.fn_defs[target_fn];
             let arity = tdef.param_len as i64;
+            var own_caps: i64 = 0;
+            if tdef.kind == FN_CLOSURE { own_caps = tdef.capture_len as i64; }
             if applied + 1 < arity {
                 let next_env = symFresh(st, env.unit, id, 200 + sub_site);
                 let env_h = listSingle(st, env_sym);
-                for k in 0..applied {
+                for k in 0..(own_caps + applied) {
                     let prev_a = stepCaptureHead(st, env.ctx_id, env_h, k as u32);
                     if addWrittenEdgesSingleSrc(st, env.ctx_id, next_env, LBL_CAPTURE_BASE + (k as u32), prev_a) { env.changed = true; }
                 }
-                if addWrittenEdgesSingleSrc(st, env.ctx_id, next_env, LBL_CAPTURE_BASE + (applied as u32), arg_head) { env.changed = true; }
+                if addWrittenEdgesSingleSrc(st, env.ctx_id, next_env, LBL_CAPTURE_BASE + ((own_caps + applied) as u32), arg_head) { env.changed = true; }
                 let _ = listAdd(st, out, symFnVal(st, target_fn, next_env, (applied + 1) as u8));
             } else {
                 let hmark = st.head_stack.len;
                 let env_h = listSingle(st, env_sym);
                 for k in 0..applied {
-                    st.head_stack.push(stepCaptureHead(st, env.ctx_id, env_h, k as u32));
+                    st.head_stack.push(stepCaptureHead(st, env.ctx_id, env_h, (own_caps + k) as u32));
                 }
                 st.head_stack.push(arg_head);
                 let ar = Range { start: hmark, len: st.head_stack.len - hmark };
                 let cmark = st.head_stack.len;
-                if tdef.kind == FN_CLOSURE {
-                    for ci in 0..(tdef.capture_len as i64) {
-                        st.head_stack.push(stepCaptureHead(st, env.ctx_id, env_h, ci as u32));
-                    }
+                for ci in 0..own_caps {
+                    st.head_stack.push(stepCaptureHead(st, env.ctx_id, env_h, ci as u32));
                 }
                 let cr = Range { start: cmark, len: st.head_stack.len - cmark };
                 let cs_id = internCallSite(st, st.ctxs[env.ctx_id].fn_id, env.unit, id, sub_site);
@@ -2096,6 +2317,13 @@ recursive fn evalNode(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: 
     if id == 0 || depth > 256 { return 0; }
     let m .= units[env.unit - 1];
     if (id as i64) >= m.nodes.len { return 0; }
+    let res = evalNodeRaw(st, units, env, id, depth);
+    if res != 0 && isPureScalarValueType(units, env.unit, m.node(id).ty, 0) { return 0; }
+    return res;
+}
+
+recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: u32, depth: i64) -> u32 {
+    let m .= units[env.unit - 1];
     let n = m.node(id);
     let cur_hrange = Range { start: env.handlers_base, len: st.handler_stack.len - env.handlers_base };
     match n.tag {
@@ -2291,8 +2519,8 @@ recursive fn evalNode(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: 
             if pr.field == 0 && variants.len == 1 {
                 return stepTupleHead(st, env.ctx_id, recv_head, variants[0].field);
             }
-            if variants.len != 0 {
-                let sp = m.fieldSpelling(pr.field);
+            let sp = m.fieldSpelling(pr.field);
+            if variants.len != 0 || (sp.present && isDataFieldProjection(units, m, m.typeOf(n.a), sp.value)) {
                 let ctor_inner = stepCtorHead(st, env.ctx_id, recv_head);
                 var combined: u32 = 0;
                 if sp.present {
@@ -2305,7 +2533,6 @@ recursive fn evalNode(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: 
                 let _ = listUnionHead(st, combined, stepAnyHead(st, env.ctx_id, ctor_inner));
                 return combined;
             }
-            let sp = m.fieldSpelling(pr.field);
             if !sp.present {
                 recordUnresolved(st, env, env.unit, m.span(id), blot_check_diagnostic_code::Code.purity_limit, "unresolved method projection in purity analysis");
                 return 0;
@@ -2855,7 +3082,7 @@ recursive fn evalNode(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: 
             let elem_ret = invokeSummary(st, env.ctx_id, sfn_id, cs_id, ar, cr, empty_hr, env.unit, m.span(id), env.changed);
             var found_sctx: u32 = 0xffffffff;
             {
-                let cspecs = buildCallableSpecsRange(st, ar, cr);
+                let cspecs = buildCallableSpecsRange(st, env.ctx_id, ar, cr);
                 let empty_hs: HandlerSpec[0] = [];
                 let sc_id, ok = getOrCreateCtx(st, sfn_id, cspecs[..], empty_hs[..], env.unit, m.span(id));
                 if ok { found_sctx = sc_id; }

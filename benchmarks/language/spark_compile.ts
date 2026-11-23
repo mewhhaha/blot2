@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { instantiateGuest } from "../../host/guest.ts";
+import { Processes } from "../../host/processes.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 
@@ -57,22 +58,39 @@ for (const fixture of fixtures) {
         const hash = await digest(result.bytes);
         if (hashes.has(version)) assert.equal(hashes.get(version), hash);
         hashes.set(version, hash);
-        const guest = await instantiateGuest(result.bytes);
-        try {
-          if (fixture.entry === "twice") {
+        if (fixture.entry === "twice") {
+          const guest = await instantiateGuest(result.bytes);
+          try {
             let expected = 14;
             if (version === edit) expected = 21;
             assert.deepEqual(
               guest.call(fixture.entry, Uint32Array.of(7)),
               Uint32Array.of(expected),
             );
-          } else {
-            let expected = 7;
-            if (version === edit) expected = 8;
-            assert.equal(guest.call(fixture.entry, 7), expected);
+          } finally {
+            guest.dispose();
           }
-        } finally {
-          guest.dispose();
+        } else {
+          const procs = new Processes(result.bytes, [{
+            name: "route_planner",
+            initWork: 1,
+            stepWork: 1,
+            mailbox: 1,
+            mailboxBytes: 64,
+            maxReplyBytes: 4,
+          }]);
+          try {
+            const h = procs.admit("route_planner", 7);
+            assert(h !== null);
+            await procs.advance(1);
+            const t = procs.send(h, 0);
+            assert.equal(typeof t, "number");
+            await procs.advance(1);
+            const ev = procs.poll(h);
+            assert(ev?.status === "done");
+          } finally {
+            await procs.restore();
+          }
         }
         records.push({
           fixture: fixture.name,

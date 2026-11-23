@@ -945,18 +945,26 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         finish(h, module, r.check);
     }
 
-    // stack_slow(need) -> address: active-only order-independent exact-cap free lists.
+    // stack_slow(need) -> address: active-only order-independent canonical-cap free lists.
     // Caller (`rt.stack`) has already checked logical `stack_live_bytes + need <= stack_budget`.
+    // Allocations in `(std_cap .. min(16 MiB, stack_budget / 4)]` use power-of-two physical
+    // chunk capacities (`cur + 12`) so varying frame-to-frame large arrays reuse existing chunks
+    // without unbounded `stack_total` growth, while `cur + 8` (`stack_limit`) is ALWAYS clamped
+    // to `result + need` for `need > std_cap` so warm workers NEVER pack more into a large chunk
+    // than a fresh worker (`warm_memory_bytes(P) >= fresh_memory_bytes(P)`).
     {
         var h = H { parameters: 1, locals: 1, .. };
         let want_cap = temp(h);
+        let tmp_class = temp(h);
         let cur = temp(h);
         let prev_free = temp(h);
         let chunk_bytes = temp(h);
         let tail = temp(h);
         let result = temp(h);
         let limit = temp(h);
-        // Canonical want_cap = if need <= std_cap then std_cap else need.
+        var pow2_cap_limit: u32 = 16777216;
+        if stack_budget / 4 < pow2_cap_limit { pow2_cap_limit = stack_budget / 4; }
+        // Canonical want_cap = std_cap (need <= std_cap), next_pow2(need) (std_cap < need <= pow2_cap_limit), else need.
         get(h, 0);
         k(h, std_cap);
         op(h, blot_direct_writer::OP_i32_le_u);
@@ -972,7 +980,14 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         op(h, blot_direct_writer::OP_end);
         op(h, blot_direct_writer::OP_else_);
         get(h, 0);
+        k(h, pow2_cap_limit);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        open(h, blot_direct_writer::OP_if_);
+        emitPow2Class(h, 0, tmp_class, want_cap);
+        op(h, blot_direct_writer::OP_else_);
+        get(h, 0);
         set(h, want_cap);
+        op(h, blot_direct_writer::OP_end);
         k(h, 0);
         set(h, prev_free);
         gget(h, r.stack_free_large);
@@ -1009,7 +1024,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         op(h, blot_direct_writer::OP_end);
         op(h, blot_direct_writer::OP_end);
         op(h, blot_direct_writer::OP_end);
-        // Miss: carve a new exact-cap chunk (`want_cap + 32` bytes), marking offset 640 on physical ceiling.
+        // Miss: carve a new canonical-cap chunk (`want_cap + 32` bytes), marking offset 640 on physical ceiling.
         get(h, cur);
         op(h, blot_direct_writer::OP_i32_eqz);
         open(h, blot_direct_writer::OP_if_);
@@ -1039,15 +1054,6 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         get(h, chunk_bytes);
         op(h, blot_direct_writer::OP_i32_add);
         gset(h, r.stack_total);
-        get(h, cur);
-        k(h, stack_header_bytes);
-        op(h, blot_direct_writer::OP_i32_add);
-        get(h, want_cap);
-        op(h, blot_direct_writer::OP_i32_add);
-        set(h, limit);
-        get(h, cur);
-        get(h, limit);
-        store(h, 8);
         get(h, cur);
         get(h, want_cap);
         store(h, 12);
@@ -1080,11 +1086,22 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         get(h, result);
         store(h, 16);
         op(h, blot_direct_writer::OP_drop);
+        // Effective active limit: `result + std_cap` for standard chunks, `result + need` for large chunks.
+        get(h, result);
+        k(h, std_cap);
+        get(h, 0);
+        get(h, 0);
+        k(h, std_cap);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        op(h, blot_direct_writer::OP_select);
+        op(h, blot_direct_writer::OP_i32_add);
+        tee(h, limit);
+        gset(h, r.stack_limit);
+        get(h, cur);
+        get(h, limit);
+        store(h, 8);
         get(h, cur);
         gset(h, r.stack_chunk);
-        get(h, cur);
-        load(h, 8);
-        gset(h, r.stack_limit);
         get(h, result);
         get(h, 0);
         op(h, blot_direct_writer::OP_i32_add);

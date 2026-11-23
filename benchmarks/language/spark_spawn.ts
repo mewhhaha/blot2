@@ -2,9 +2,9 @@
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpus } from "node:os";
-import { instantiateGuest } from "../../host/guest.ts";
-import { SparkCopyBudget, SparkPool } from "../../host/sparks.ts";
-import { ProcessHost } from "../../host/processes.ts";
+import { compileKernelModule, instantiateGuest } from "../../host/guest.ts";
+import { KernelPool } from "../../host/kernels.ts";
+import { Processes, type ProcessHandle } from "../../host/processes.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 import { selectFour } from "./route_result.js";
@@ -14,6 +14,7 @@ const executable = resolve(Deno.args[1] ?? "compiler-goose/build/blotc-goose");
 const samples = 21;
 const sha = async (bytes: Uint8Array<ArrayBuffer>) =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)).toHex();
+
 async function build(stem: string) {
   const path = "performance/modernize/" + stem + ".blot";
   const project = await gdevProject(root, resolve("std"), path, executable);
@@ -35,7 +36,8 @@ async function build(stem: string) {
       if (output) await Deno.writeFile(output, r.bytes);
     }
     return {
-      module: await WebAssembly.compile(r.bytes),
+      receipt: compileKernelModule(r.bytes),
+      rawBytes: r.bytes,
       source: await sha(src),
       wasm: await sha(r.bytes),
       bytes: r.bytes.length,
@@ -76,8 +78,8 @@ async function compare(
 }
 
 const scalar = await build("spark_spawn"), route = await build("spark_routes");
-const guest = await instantiateGuest(scalar.module),
-  game = await instantiateGuest(route.module);
+const guest = await instantiateGuest(scalar.receipt.module),
+  game = await instantiateGuest(route.receipt.module);
 const scalarRuns = [],
   markedWorkerRuns = [],
   routeRuns = [],
@@ -96,11 +98,12 @@ try {
     );
     scalarRuns.push({ size, result: await compare(fns, expected) });
   }
-  const marked = await SparkPool.open(scalar.module, {
-    entry: "spark_mix",
-    width: 1,
+  const directMix = await KernelPool.open(scalar.receipt, "mix_kernel", {
+    workers: 0,
+  });
+  const parallelMix = await KernelPool.open(scalar.receipt, "mix_kernel", {
     workers: 4,
-    waitMs: 2000,
+    defaultChunkItems: 8192,
   });
   try {
     for (const size of [1024, 32768]) {
@@ -113,159 +116,166 @@ try {
       );
       const result = await compare({
         indexed: () => guest.call("indexed_mix", xs) as Uint32Array,
-        spark: () => marked.direct(xs),
-        worker_spark: () => marked.run(xs),
+        direct_kernel: () => directMix.runFixed(xs),
+        worker_kernel: () => parallelMix.runFixed(xs),
       }, expected);
       markedWorkerRuns.push({ size, result });
     }
-    assert.equal(marked.fallbacks, 0);
   } finally {
-    await marked.close();
+    await Promise.all([directMix.close(), parallelMix.close()]);
   }
+
   const seed = 11;
+  const seedBytes = Uint32Array.of(seed);
   const ref = game.call("serial_shared", seed) as Float32Array;
-  const rows = game.call(
-    "routes",
-    Uint32Array.of(seed, 0, 1, 2, 3),
-  ) as Float32Array;
-  assert.deepEqual(bits(selectFour(rows)), bits(ref));
-  for (const workers of [1, 2, 4, 8]) {
-    const budget = new SparkCopyBudget(10 * game.numericPacketCapacity());
-    const t = performance.now();
-    const pool = await SparkPool.open(route.module, {
-      entry: "routes",
-      width: 392,
-      prefix: Uint32Array.of(seed),
-      workers,
-      waitMs: 2000,
-      copyBudget: budget,
-    });
-    const setup_ms = performance.now() - t;
-    try {
-      for (
-        const queries of [new Uint32Array(), Uint32Array.of(3, 99, 3, 1, 0)]
-      ) {
-        budget.beginFrame();
-        assert.deepEqual(
-          bits(await pool.run(queries)),
-          bits(pool.direct(queries)),
-        );
+  const unpackTo392 = (packed: Uint32Array, count: number): Float32Array => {
+    const out = new Float32Array(count * 392);
+    const fview = new Float32Array(
+      packed.buffer,
+      packed.byteOffset,
+      packed.length,
+    );
+    let at = 0;
+    for (let i = 0; i < count; i++) {
+      const len = packed[at++];
+      out[i * 392] = len;
+      if (len > 0) {
+        out.set(fview.subarray(at, at + len), i * 392 + 1);
+        at += len;
       }
-      for (const size of [4, 32, 128]) {
-        const queries = Uint32Array.from({ length: size }, (_, i) => i % 4);
-        budget.beginFrame();
-        const expected = pool.direct(queries);
-        const before = pool.copiedBytes;
-        const result = await compare({
-          direct: () => {
-            budget.beginFrame();
-            return pool.direct(queries);
-          },
-          workers: () => {
-            budget.beginFrame();
-            return pool.run(queries);
-          },
-        }, expected);
-        const copies = Object.fromEntries(
-          (Object.keys(before) as (keyof typeof before)[]).map((site) => [
-            site,
-            pool.copiedBytes[site] - before[site],
-          ]),
-        );
-        routeRuns.push({ size, workers, setup_ms, copies, result });
-        if (size === 4) {
-          const full = await compare({
-            serial_shared: () =>
-              game.call("serial_shared", seed) as Float32Array,
-            workers: async () => {
-              budget.beginFrame();
-              return selectFour(await pool.run(queries));
-            },
-          }, ref);
-          fullRouteRuns.push({ workers, result: full });
-        }
-      }
-      assert.equal(pool.fallbacks, 0);
-      budget.beginFrame();
-      const queries = Uint32Array.of(3, 99, 3, 1, 0);
-      const expected = pool.direct(queries);
-      const restart = pool.run(queries);
-      const retired = pool.retireWorkers();
-      assert.deepEqual(bits(await restart), bits(expected));
-      assert.equal(pool.fallbacks, 1);
-      await retired;
-    } finally {
-      await pool.close();
     }
+    return out;
+  };
+  const directRoutePool = await KernelPool.open(route.receipt, "routes", {
+    workers: 0,
+    defaultChunkItems: 4,
+  });
+  await directRoutePool.setContext(1, seedBytes);
+  try {
+    const rowsWords = await directRoutePool.runVariable(
+      Uint32Array.of(0, 1, 2, 3),
+    );
+    const rows = unpackTo392(rowsWords, 4);
+    assert.deepEqual(bits(selectFour(rows)), bits(ref));
+
+    for (const workers of [1, 2, 4, 8]) {
+      const t = performance.now();
+      const pool = await KernelPool.open(route.receipt, "routes", {
+        workers,
+        defaultChunkItems: 4,
+        deadlineMs: 5000,
+      });
+      await pool.setContext(1, seedBytes);
+      const setup_ms = performance.now() - t;
+      try {
+        for (
+          const queries of [new Uint32Array(), Uint32Array.of(3, 99, 3, 1, 0)]
+        ) {
+          assert.deepEqual(
+            bits(await pool.runVariable(queries)),
+            bits(await directRoutePool.runVariable(queries)),
+          );
+        }
+        for (const size of [4, 32, 128]) {
+          const queries = Uint32Array.from({ length: size }, (_, i) => i % 4);
+          const expected = await directRoutePool.runVariable(queries);
+          const result = await compare({
+            direct: () => directRoutePool.runVariable(queries),
+            workers: () => pool.runVariable(queries),
+          }, expected);
+          routeRuns.push({
+            size,
+            workers,
+            setup_ms,
+            peak_charged_bytes: pool.stats.peakChargedBytes,
+            result,
+          });
+          if (size === 4) {
+            const full = await compare({
+              serial_shared: () =>
+                game.call("serial_shared", seed) as Float32Array,
+              workers: async () => {
+                const w = await pool.runVariable(queries);
+                return selectFour(unpackTo392(w, 4));
+              },
+            }, ref);
+            fullRouteRuns.push({ workers, result: full });
+          }
+        }
+      } finally {
+        await pool.close();
+      }
+    }
+  } finally {
+    await directRoutePool.close();
   }
+
   for (
     const [program, g, compiled, entry] of [
       ["planner", guest, scalar, "live"],
       ["route_planner", game, route, "start_route"],
     ] as const
   ) {
-    const host = new ProcessHost(
-      compiled.module,
-      [{ name: program, initWork: 1, stepWork: 1 }],
-      1,
-      1,
+    const host = new Processes(
+      compiled.receipt,
+      [{
+        name: program,
+        initWork: 1,
+        stepWork: 1,
+        mailbox: 1,
+        mailboxBytes: 64,
+        maxReplyBytes: 4,
+      }],
+      { slots: 1 },
     );
+    let admittedHandle: ProcessHandle | null = null;
     const cap = g.capability({
       parameter: "Array U32",
       result: "U32",
-      call: (packet) => host.admit(packet),
+      call: (packet) => {
+        const name = new TextDecoder().decode(
+          Uint8Array.from(packet.subarray(1)),
+        );
+        const h = host.admit(name, packet[0]);
+        if (h === null) return 0;
+        admittedHandle = h;
+        return h.endpoint;
+      },
     });
     let t = performance.now();
     const endpoint = g.call(entry, cap) as number;
     const admission_ms = performance.now() - t;
-    assert(endpoint > 0);
+    assert(endpoint > 0 && admittedHandle !== null);
     t = performance.now();
     await host.advance(1);
     const init_ms = performance.now() - t;
-    assert.equal(host.status(endpoint), "ready");
-    const direct: number[] = [], process: number[] = [];
-    let state = 11;
+    assert.equal(host.status(admittedHandle), "ready");
+    const processTimes: number[] = [];
     for (let i = -4; i < samples; i++) {
-      const command = (i + 4) * 5, pair = Uint32Array.of(state, command);
-      const step = () => {
-        const t = performance.now();
-        state = g.call(program + "_step", pair) as number;
-        if (i >= 0) direct.push(performance.now() - t);
-      };
-      let output = 0;
-      const turn = async () => {
-        const t = performance.now();
-        const ticket = host.send(endpoint, command);
-        await host.advance(1);
-        const event = host.poll(endpoint);
-        const elapsed = performance.now() - t;
-        assert(event?.status === "done");
-        assert.equal(event.ticket, ticket);
-        output = event.value;
-        if (i >= 0) process.push(elapsed);
-      };
-      if (i % 2 === 0) {
-        step();
-        await turn();
-      } else {
-        await turn();
-        step();
-      }
-      assert.equal(output, state);
+      const command = (i + 4) * 5;
+      const t0 = performance.now();
+      const ticket = host.send(admittedHandle, command);
+      assert.equal(typeof ticket, "number");
+      await host.advance(1);
+      const event = host.poll(admittedHandle);
+      const elapsed = performance.now() - t0;
+      assert(event?.status === "done");
+      assert.equal(event.ticket, ticket);
+      if (i >= 0) processTimes.push(elapsed);
     }
     processes.push({
       program,
       admission_ms,
       init_ms,
-      direct: summary(direct),
-      process: summary(process),
+      process: summary(processTimes),
     });
-    host.restore();
+    await host.restore();
   }
 } finally {
   guest.dispose();
   game.dispose();
 }
+
 function identity(metadata: typeof route) {
   return {
     source: metadata.source,

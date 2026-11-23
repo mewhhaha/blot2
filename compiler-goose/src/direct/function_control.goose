@@ -2329,7 +2329,124 @@ fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
     }
     return blot_direct_types::Error.none;
 }
+// Collect byte offsets of plain-element owner/view handles inside the flat memory
+// layout of a non-recursive copied-box value (`copiedBox == true`). Returns `false`
+// if any memory-holding part is recursive, nested-owner, closure, multi-variant sum,
+// or exceeds the fixed 16-slot buffer.
+recursive fn collectFlatPlainOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, out: u32[16]&, out_len: i64&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != blot_direct_types::Error.none { return false, error; }
+    if !holds { return true, blot_direct_types::Error.none; }
+    let rec, rerr = g.types.isRecursive(ty);
+    if rerr != blot_direct_types::Error.none { return false, rerr; }
+    if rec { return false, blot_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, grow, resize, view, ref, link => {
+            let elem_holds, herr = g.contentsHoldMemory(n.a);
+            if herr != blot_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
+            out[out_len] = base_off;
+            out_len += 1;
+            return true, blot_direct_types::Error.none;
+        },
+        tuple => {
+            var off = base_off;
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let ok, oerr = collectFlatPlainOwnerOffsets(g, item, off, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let bytes, berr = g.types.flatBytes(item);
+                if berr != blot_direct_types::Error.none { return false, berr; }
+                off += bytes;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        record => {
+            var off = base_off;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let ok, oerr = collectFlatPlainOwnerOffsets(g, field, off, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let bytes, berr = g.types.flatBytes(field);
+                if berr != blot_direct_types::Error.none { return false, berr; }
+                off += bytes;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != blot_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectFlatPlainOwnerOffsets(g, payload, base_off, out, out_len);
+        },
+        _ => { return false, blot_direct_types::Error.none; },
+    }
+}
+// Collect owner-slot locals of plain-element owner/view handles inside an unboxed Val.
+recursive fn collectRegPlainOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u32[16]&, out_len: i64&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != blot_direct_types::Error.none { return false, error; }
+    if !holds { return true, blot_direct_types::Error.none; }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != blot_direct_types::Error.none { return false, berr; }
+    if boxed { return false, blot_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, grow, resize, view, ref, link => {
+            let elem_holds, herr = g.contentsHoldMemory(n.a);
+            if herr != blot_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
+            out[out_len] = g.s.words[words];
+            out_len += 1;
+            return true, blot_direct_types::Error.none;
+        },
+        tuple => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let layout, lerr = g.types.layout(item);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                let width = layout.len as u32;
+                let ok, oerr = collectRegPlainOwnerSlots(g, item, words + at, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                at += width;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        record => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let layout, lerr = g.types.layout(field);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                let width = layout.len as u32;
+                let ok, oerr = collectRegPlainOwnerSlots(g, field, words + at, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                at += width;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != blot_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectRegPlainOwnerSlots(g, payload, words, out, out_len);
+        },
+        _ => { return false, blot_direct_types::Error.none; },
+    }
+}
 // Records a store into the owner at `dst_slot`, propagating normalized age into `rt.escape_min_slot`.
+// When `value` is a non-recursive flat value whose only memory-holding leaves are plain-element
+// owners/views (such as `render.Draw` holding static `&no_extra[0..0]`), only a leaf temporary
+// handle strictly newer than `dst_slot` (`src_slot < persistent_split && age < src_slot`) can
+// escape and disable enclosing scope releases.
 fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
     let holds, error = g.contentsHoldMemory(value.ty);
@@ -2344,6 +2461,58 @@ fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
     op(g, OP_i32_ge_u);
     op(g, OP_select);
     lset(g, age);
+    let boxed, berr = g.types.boxed(value.ty);
+    if berr != blot_direct_types::Error.none { return berr; }
+    let rec, rerr = g.types.isRecursive(value.ty);
+    if rerr != blot_direct_types::Error.none { return rerr; }
+    var items: u32[16] = [0; 16];
+    var count: i64 = 0;
+    if boxed && !rec {
+        let ok, cerr = collectFlatPlainOwnerOffsets(g, value.ty, 0, items, count);
+        if cerr != blot_direct_types::Error.none { return cerr; }
+        if ok {
+            if count > 0 {
+                let src_slot = local32(g, f);
+                for i in 0..count {
+                    let off = items[i];
+                    lget(g, w(g, value, 0));
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+                    ltee(g, src_slot);
+                    i32Const(g, rt.layout.persistent_split);
+                    op(g, OP_i32_lt_u);
+                    lget(g, age);
+                    lget(g, src_slot);
+                    op(g, OP_i32_lt_u);
+                    op(g, OP_i32_and);
+                    let esc_if = open(g, f, OP_if_);
+                    emitMergeEscapeMinCurrent(g, f, age);
+                    close(g, f);
+                }
+            }
+            return blot_direct_types::Error.none;
+        }
+    } else if !boxed {
+        let ok, cerr = collectRegPlainOwnerSlots(g, value.ty, value.start, items, count);
+        if cerr != blot_direct_types::Error.none { return cerr; }
+        if ok {
+            if count > 0 {
+                for i in 0..count {
+                    let src_slot = items[i];
+                    lget(g, src_slot);
+                    i32Const(g, rt.layout.persistent_split);
+                    op(g, OP_i32_lt_u);
+                    lget(g, age);
+                    lget(g, src_slot);
+                    op(g, OP_i32_lt_u);
+                    op(g, OP_i32_and);
+                    let esc_if = open(g, f, OP_if_);
+                    emitMergeEscapeMinCurrent(g, f, age);
+                    close(g, f);
+                }
+            }
+            return blot_direct_types::Error.none;
+        }
+    }
     emitMergeEscapeMinCurrent(g, f, age);
     return blot_direct_types::Error.none;
 }

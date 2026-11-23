@@ -3,20 +3,21 @@ import {
   compileExpectedFailure,
   equal,
 } from "./compile_helpers.ts";
-import { ProcessHost } from "../../host/processes.ts";
-import { SparkPool } from "../../host/sparks.ts";
+import { compileKernelModule } from "../../host/guest.ts";
+import { KernelPool } from "../../host/kernels.ts";
+import { Processes, type ProcessHandle } from "../../host/processes.ts";
 
 const program = await Deno.readTextFile(
   new URL("../../benchmarks/language/spark_spawn.blot", import.meta.url),
 );
 
-Deno.test("spark source maps and worker recovery preserve bits, cardinality and order", async () => {
+Deno.test("spark source maps and KernelPool execution preserve bits, cardinality and order", async () => {
   await compileAndRun(
     program + `
 entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
 entry func keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
-entry func negative (xs: Array U32): Array F32 => return spark #[@f32.neg (@u32.to_f32 x) | x <- xs]
-entry func reciprocal (xs: Array U32): Array F32 => return spark #[@f32.div 1.0 (@u32.to_f32 x) | x <- xs]
+entry kernel func negative (x: U32): F32 => return @f32.neg (@u32.to_f32 x)
+entry kernel func reciprocal (x: U32): F32 => return @f32.div 1.0 (@u32.to_f32 x)
 `,
     async (guest, bytes) => {
       const floating = Float32Array.of(-0, Infinity, -Infinity, 1.25);
@@ -37,12 +38,15 @@ entry func reciprocal (xs: Array U32): Array F32 => return spark #[@f32.div 1.0 
       });
       equal(String(guest.call("snapshot", read)), "4294967294,16,2");
       equal(calls, 1);
-      const module = await WebAssembly.compile(bytes);
-      const pool = await SparkPool.open(module, {
-        entry: "negative",
-        width: 1,
+
+      const receipt = compileKernelModule(bytes);
+      const directPool = await KernelPool.open(receipt, "negative", {
+        workers: 0,
+      });
+      const pool = await KernelPool.open(receipt, "negative", {
         workers: 3,
-        waitMs: 2000,
+        defaultChunkItems: 2,
+        deadlineMs: 2000,
       });
       try {
         for (
@@ -52,8 +56,10 @@ entry func reciprocal (xs: Array U32): Array F32 => return spark #[@f32.div 1.0 
             Uint32Array.of(8, 0, 5, 2, 5, 3, 0xffffffff),
           ]
         ) {
-          const direct = pool.direct(xs);
-          const copied = await pool.run(xs);
+          const directWords = await directPool.runFixed(xs);
+          const copiedWords = await pool.runFixed(xs);
+          const direct = new Float32Array(directWords.buffer);
+          const copied = new Float32Array(copiedWords.buffer);
           equal(copied.length, xs.length);
           for (const [i, x] of xs.entries()) {
             equal(direct[i], -Math.fround(x));
@@ -68,75 +74,88 @@ entry func reciprocal (xs: Array U32): Array F32 => return spark #[@f32.div 1.0 
             String(guest.call("indexed_mix", xs)),
           );
         }
-        equal(pool.fallbacks, 0);
+        // Mutating caller input right after runFixed must not alter snapshot bytes.
         const xs = Uint32Array.of(7, 0, 12);
-        const pending = pool.run(xs);
+        const pending = pool.runFixed(xs);
         xs.fill(255);
-        pool.retireWorkers();
-        const result = await pending;
+        const resultWords = await pending;
+        const result = new Float32Array(resultWords.buffer);
         equal(result[0], -7);
         equal(result[1], -0);
         equal(result[2], -12);
-        equal(pool.fallbacks, 1);
-        equal((await pool.run(xs))[0], -255);
+        const afterWords = await pool.runFixed(xs);
+        equal(new Float32Array(afterWords.buffer)[0], -255);
       } finally {
-        await pool.close();
+        await Promise.all([directPool.close(), pool.close()]);
       }
-      const reciprocal = await SparkPool.open(module, {
-        entry: "reciprocal",
-        width: 1,
+
+      const directRecip = await KernelPool.open(receipt, "reciprocal", {
+        workers: 0,
+      });
+      const reciprocal = await KernelPool.open(receipt, "reciprocal", {
         workers: 2,
-        waitMs: 2000,
+        defaultChunkItems: 1,
+        deadlineMs: 2000,
       });
       try {
         const rows = Uint32Array.of(1, 0, 4);
-        const direct = reciprocal.direct(rows);
-        const copied = await reciprocal.run(rows);
-        equal(direct[1], Infinity);
-        equal(
-          String(new Uint32Array(copied.buffer)),
-          String(new Uint32Array(direct.buffer)),
-        );
-        equal(reciprocal.fallbacks, 0);
+        const direct = await directRecip.runFixed(rows);
+        const copied = await reciprocal.runFixed(rows);
+        equal(new Float32Array(direct.buffer)[1], Infinity);
+        equal(String(copied), String(direct));
       } finally {
-        await reciprocal.close();
+        await Promise.all([directRecip.close(), reciprocal.close()]);
       }
     },
   );
 });
 
-Deno.test("spawn uses scoped admission and isolated budgeted turns with reserved terminal events", async () => {
+Deno.test("Processes uses scoped admission and isolated budgeted turns with reserved terminal events", async () => {
   await compileAndRun(
     program + `
-entry func faulty (seed: U32): U32 => return @panic "initialization"
-entry func faulty_step (pair: Array U32): U32 => return 0
-entry func fragile (seed: U32): U32 => return seed
-entry func fragile_step (pair: Array U32): U32 => return @panic "step"
+func faulty_init (seed: U32): U32 => return @panic "initialization"
+func faulty_step (st: own U32) -> (cmd: U32): (U32, U32) => return (st, 0)
+entry process faulty: Process [U32, U32, U32] = { init: faulty_init, step: faulty_step }
+
+func fragile_init (seed: U32): U32 => return seed
+func fragile_step (st: own U32) -> (cmd: U32): (U32, U32) => return @panic "step"
+entry process fragile: Process [U32, U32, U32] = { init: fragile_init, step: fragile_step }
 `,
     async (guest, bytes) => {
-      const module = await WebAssembly.compile(bytes);
-      const host = new ProcessHost(
-        module,
+      const host = new Processes(
+        bytes,
         ["planner", "faulty", "fragile"].map((name) => ({
           name,
           initWork: 2,
           stepWork: 1,
+          mailbox: 2,
+          mailboxBytes: 64,
+          maxReplyBytes: 4,
         })),
-        2,
-        2,
+        { slots: 2 },
       );
+      const handles = new Map<number, ProcessHandle>();
       const cap = guest.capability({
         parameter: "Array U32",
         result: "U32",
-        call: (packet) => host.admit(packet),
+        call: (packet) => {
+          const name = new TextDecoder().decode(
+            Uint8Array.from(packet.subarray(1)),
+          );
+          const h = host.admit(name, packet[0]);
+          if (h === null) return 0;
+          handles.set(h.endpoint, h);
+          return h.endpoint;
+        },
       });
-      const start = () => guest.call("live", cap) as number;
-      const raw = (name: string) =>
-        host.admit(Uint32Array.of(11, ...new TextEncoder().encode(name)));
+      const start = () => {
+        const id = guest.call("live", cap) as number;
+        return id === 0 ? null : handles.get(id)!;
+      };
       equal(guest.call("local", 7), 7);
-      const a = start(), b = start();
-      equal(a > 0 && b > a, true);
-      equal(start(), 0);
+      const a = start()!, b = start()!;
+      equal(a.endpoint > 0 && b.endpoint > a.endpoint, true);
+      equal(start(), null);
       equal(host.send(a, 1), "starting");
       equal(await host.advance(1), 0);
       equal(await host.advance(2), 2);
@@ -158,20 +177,31 @@ entry func fragile_step (pair: Array U32): U32 => return @panic "step"
       );
       equal(
         JSON.stringify(host.poll(a)),
-        JSON.stringify({ ticket: aa, status: "done", value: 13 }),
+        JSON.stringify({
+          ticket: aa,
+          status: "done",
+          value: 13,
+          logicalReplyBytes: 4,
+        }),
       );
       equal(
         JSON.stringify(host.poll(b)),
-        JSON.stringify({ ticket: ba, status: "done", value: 16 }),
+        JSON.stringify({
+          ticket: ba,
+          status: "done",
+          value: 16,
+          logicalReplyBytes: 4,
+        }),
       );
       host.send(a, 1);
-      host.close(a);
+      await host.close(a);
       equal(host.release(a), false);
       equal(host.poll(a)?.status, "cancelled");
       equal(host.release(a), true);
-      host.close(b);
+      await host.close(b);
       equal(host.release(b), true);
-      const bad = raw("faulty"), fail = raw("fragile");
+
+      const bad = host.admit("faulty", 11)!, fail = host.admit("fragile", 11)!;
       await host.advance(4);
       equal(host.status(bad), "failed");
       host.send(fail, 1);
@@ -180,11 +210,13 @@ entry func fragile_step (pair: Array U32): U32 => return @panic "step"
       equal(host.status(fail), "failed");
       equal(host.poll(fail)?.status, "failed");
       equal(host.poll(fail)?.status, "failed");
-      host.restore();
-      equal(host.send(a, 3), "closed");
-      const old = start(), turn = host.advance(8);
-      host.restore();
-      const fresh = start();
+      await host.restore();
+      equal(host.send(a, 3), "stale");
+
+      const old = start()!;
+      const turn = host.advance(8);
+      await host.restore();
+      const fresh = start()!;
       await turn;
       equal(host.status(old), "closed");
       equal(host.status(fresh), "starting");
@@ -193,16 +225,16 @@ entry func fragile_step (pair: Array U32): U32 => return @panic "step"
       const done = host.send(fresh, 2), pending = host.send(fresh, 3);
       await host.advance(1);
       equal(host.send(fresh, 4), "full");
-      const retired = host.restore();
+      const retired = await host.restore();
       equal(
         JSON.stringify(retired.get(fresh)),
         JSON.stringify([
-          { ticket: done, status: "done", value: 13 },
+          { ticket: done, status: "done", value: 13, logicalReplyBytes: 4 },
           { ticket: pending, status: "cancelled" },
         ]),
       );
       equal(host.poll(fresh), undefined);
-      equal(host.restore().size, 0);
+      equal((await host.restore()).size, 0);
     },
   );
 });
@@ -210,25 +242,39 @@ entry func fragile_step (pair: Array U32): U32 => return @panic "step"
 Deno.test("a process skipped for the remaining work gets the next full allowance", async () => {
   await compileAndRun(
     program + `
-entry func slower (seed: U32): U32 => return seed
-entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
+func slower_init (seed: U32): U32 => return seed
+func slower_step (st: own U32) -> (delta: U32): (U32, U32) =>
+  let next = @u32.add st delta
+  return (next, next)
+entry process slower: Process [U32, U32, U32] = { init: slower_init, step: slower_step }
 `,
     async (_guest, bytes) => {
-      const host = new ProcessHost(
-        await WebAssembly.compile(bytes),
+      const host = new Processes(
+        bytes,
         [
-          { name: "planner", initWork: 1, stepWork: 1 },
-          { name: "slower", initWork: 1, stepWork: 2 },
+          {
+            name: "planner",
+            initWork: 1,
+            stepWork: 1,
+            mailbox: 1,
+            mailboxBytes: 64,
+            maxReplyBytes: 4,
+          },
+          {
+            name: "slower",
+            initWork: 1,
+            stepWork: 2,
+            mailbox: 1,
+            mailboxBytes: 64,
+            maxReplyBytes: 4,
+          },
         ],
-        3,
-        1,
+        { slots: 3 },
       );
       try {
-        const admit = (name: string) =>
-          host.admit(Uint32Array.of(10, ...new TextEncoder().encode(name)));
-        const left = admit("planner"),
-          deferred = admit("slower"),
-          right = admit("planner");
+        const left = host.admit("planner", 10)!,
+          deferred = host.admit("slower", 10)!,
+          right = host.admit("planner", 10)!;
         equal(await host.advance(3), 3);
         const first = host.send(left, 1);
         const later = host.send(deferred, 20);
@@ -248,6 +294,7 @@ entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
             ticket: later,
             status: "done",
             value: 30,
+            logicalReplyBytes: 4,
           }),
         );
         equal(host.poll(left), undefined);
@@ -256,7 +303,7 @@ entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
         equal(host.poll(left)?.ticket, nextLeft);
         equal(host.poll(right)?.ticket, nextRight);
       } finally {
-        host.restore();
+        await host.restore();
       }
     },
   );
