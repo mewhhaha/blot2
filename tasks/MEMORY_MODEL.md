@@ -146,6 +146,15 @@ full gate green, and moves std, ../ink and ../gdev itself.
      "Phase 4 complete" below.
 5. **Read-only references** (A4) and the end of references as a write
    path, after phase 3.
+   - **Done (24 November 2026):** implemented read-only `&local` / `&record.field`
+     (`Op.ref`) in the direct backend (`direct/function_storage.goose`) and
+     persistent `const` pool staging (`direct/function_calls.goose::persistFlatAt`),
+     fixed `check/purity.goose` `Op.ref` points-to tracking so `@storage.load (&pool)`
+     cannot bypass `spark`/`kernel` purity checks, unified `Op.link` borrow/return
+     tracking with `Op.view`/`Op.ref`/`Op.at` in `check/uniqueness.goose`, and
+     enforced ownership on `@simd.store` and `@storage.freeze` (with precision
+     preservation for owned 4-lane `@simd.store` tuples and wildcard `let _ = ...`).
+     See "Phase 5 complete" below.
 
 ## Phase 1 as built (14 November 2026)
 
@@ -1360,6 +1369,21 @@ Implemented the full value restriction in the Goose compiler (`compiler-goose/sr
 - **Uniqueness soundness improvement:** previously, `let stored = box (func value => return {item: value})` hid a borrowed `Array U32` return inside a generalized local scheme; under Phase 4, the lambda's parameter unifies with `Array U32` and uniqueness properly rejects it with `result_not_owned` (`tests/guest/local_storage_execution.test.ts`).
 - **std, `../ink`, and `../gdev` required zero source changes.**
 - Updated `docs/language/guide.md`, the 7 affected guest test files (adding explicit value-restriction rejection checks and nested polymorphic local `func` capture tests), and re-recorded `compiler-goose/tests/fixtures/expected.json` (`199/199` uniqueness laws and `2/2` direct laws unchanged).
+
+## Phase 5 complete: read-only references (A4) and ownership on remaining in-place paths (24 November 2026)
+
+All five phases of Memory Model A are now implemented and verified across all four repositories:
+
+- **Read-only `&local` / `&record.field` (`Op.ref`, A4) in the direct backend (`compiler-goose/src/direct/function_storage.goose`, `direct/function_calls.goose`):**
+  - Lowered `Op.ref` to a 1-element stack owner (`rt.stack` + `rt.open`, `writeFlat` + `noteStoreToSlot`) returning the standard 3-word `Ref` handle `(slot, generation, 0)` consumed by `@storage.load`. Supports scalars, `Unit`, boxed structs, recursive nominals, polymorphic `ref_of`, nested `&&`, loop scratch reclamation, and value-semantic rebinding (`x := ...` leaves earlier `&x` reading the previous value).
+  - Updated `persistFlatAt` to persist stack-backed `Ref`/`Link`/`View` slots (`slot < persistent_split`) placed inside persistent module `const` pools without duplicating already-persistent pools.
+- **Purity tracking for `Op.ref` (`compiler-goose/src/check/purity.goose`):**
+  - Modeled `Op.ref` as a fresh 1-element container (`f --LBL_ELEM--> target`) rather than forwarding `target` directly, so `@storage.load (&pool)` resolves to `pool` instead of stepping one extra `LBL_ELEM` past it and cannot bypass `spark`/`kernel` read-only footprint checks.
+- **Ownership enforcement on `@simd.store` and `@storage.freeze`, plus `Op.link` borrow-return (`compiler-goose/src/check/uniqueness.goose`):**
+  - Added `ownedInPlace` and enforced unique ownership on `@simd.store` (rejecting borrowed parameters, module `const`s, aliased locals, active-borrow conflicts, overlapping call arguments, and outer closure/fork captures with `aliased_update`, while preserving `deep` when all 4 stored lanes are uniquely owned and weakening `deep -> shell` only when a lane may be shared).
+  - Enforced ownership on `@storage.freeze` (`seal`), blocking freezes of borrowed parameters, aliases of borrowed parameters, non-unique record fields, outer captures, and locals with active lexical borrow loans, while preserving direct module-level global `GrowArray` pools and returning a non-unique read-only `Array` when freezing a whole same-function local whose uniqueness was conservatively dropped by an earlier borrowing call.
+  - Added `Op.link` (`^pool[i]`) to the borrow-and-return-at-last-read path alongside `Op.view`, `Op.ref`, and `Op.at`, and stopped wildcard `let _ = ...` (`PatternTag.wildcard`) from spuriously escaping discarded expressions.
+- **Docs & verification:** updated `docs/language/guide.md`, added Phase 5 execution/rejection tests in `tests/guest/scoped_storage_execution.test.ts` and `tests/guest/store_uniqueness_execution.test.ts`, and updated `@simd.store` test probes in `tests/guest/concurrency_purity_phase1.test.ts` and `tests/guest/concurrency_runtime_phase3.test.ts`. Zero changes required in `std/`, `../ink`, or `../gdev` (`199/199` uniqueness laws and `109/109` fixture records unchanged; `1,095/1,095` guest/host tests, `379/379` Ink Blot tests, `1,398/1,398` Gdev Blot tests + `16/16` native `gdev-tech` tests, and hardware Vulkan frame verified byte-identical).
 
 Earlier measurement (15 November 2026, Zig prototype):
 [The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)

@@ -1067,7 +1067,7 @@ fn source(self_: const Analyzer&, m: const Module&, id: u32) -> Place, bool {
             if operation != blot_backend_collection_ops::Op.get && operation != blot_backend_collection_ops::Op.identity { return Place { .. }, false; }
         } else if n.tag == blot_check_core::Tag.storage {
             let operation, unknown = blot_check_storage_ops::opFromCode(n.c);
-            if unknown != blot_error::Error.none || (operation != blot_check_storage_ops::Op.view && operation != blot_check_storage_ops::Op.read && operation != blot_check_storage_ops::Op.ref && operation != blot_check_storage_ops::Op.at) { return Place { .. }, false; }
+            if unknown != blot_error::Error.none || (operation != blot_check_storage_ops::Op.view && operation != blot_check_storage_ops::Op.read && operation != blot_check_storage_ops::Op.ref && operation != blot_check_storage_ops::Op.at && operation != blot_check_storage_ops::Op.link) { return Place { .. }, false; }
         } else {
             return Place { .. }, false;
         }
@@ -1391,9 +1391,12 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.match_ { return match_(self_, m, id); }
     if tag == blot_check_core::Tag.pattern_bind {
         // Taking a value apart: the parts of a value nothing else holds
-        // are each their name's alone.
+        // are each their name's alone. A wildcard `_` binds nothing and
+        // does not retain an alias to `whole.origin`.
         let whole = visit(self_, m, n.b);
-        if taken(self_, m, n.b, whole) == deep { ownPattern(self_, m, n.a, 0); }
+        if m.pattern(n.a).tag != blot_check_core::PatternTag.wildcard {
+            if taken(self_, m, n.b, whole) == deep { ownPattern(self_, m, n.a, 0); }
+        }
         if self_.in_fork != 0 {
             let taint = nodeTaint(self_, m, n.b, 0);
             if taint != 0 { taintPattern(self_, m, n.a, taint, 0); }
@@ -1981,6 +1984,27 @@ fn containerOwned(self_: Analyzer&, m: const Module&, node: u32) -> bool {
     if unique(fact) { return true; }
     if fact >= first_record && fact < spent { return ownedAs(self_, m, fact, m.typeOf(node), 0); }
     return false;
+}
+fn ownedInPlace(self_: Analyzer&, m: const Module&, node: u32, origin: u32) -> bool {
+    let target, found = place(self_, m, node);
+    if !found || !local(self_, target.binding) || origin != target.binding { return false; }
+    let in_same_fn = self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1];
+    if !in_same_fn {
+        if self_.in_fork != 0 { return false; }
+        for entry in self_.captured {
+            if entry.binding != target.binding { continue; }
+            var part = entry.fact;
+            if target.len != 0 { part = partFact(self_, entry.fact, target.fields[..target.len]); }
+            if unique(part) || (part >= first_record && part < spent && ownedAs(self_, m, part, m.typeOf(node), 0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    for held in self_.argument_places {
+        if placesOverlap(held, target) { return false; }
+    }
+    return containerOwned(self_, m, node);
 }
 fn checkLengthMutation(self_: Analyzer&, m: const Module&, container_node: u32, site_id: u32) {
     let target, found = place(self_, m, container_node);
@@ -2905,20 +2929,37 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
     }
     if operation == blot_backend_collection_ops::Op.identity { return visit(self_, m, children[0]); }
     if operation == blot_backend_collection_ops::Op.simd_store {
-        // Writes four elements in place and returns the same storage. On
-        // storage the function does not own that is a store like `=`: the
-        // result is the same shared storage. It needs an owner when `=` goes.
+        // Writes four elements in place and returns the same storage; requires
+        // unique ownership of the target container.
         let container = visit(self_, m, children[0]);
         let fresh = container.origin == 0 && unique(container.fact);
-        for child in children[1..] { visitEscaping(self_, m, child); }
-        if fresh { return Value { fact: container.fact, exits: container.exits, .. }; }
+        var exits = container.exits;
+        let idx_val = visitEscaping(self_, m, children[1]);
+        exits = idx_val.exits || exits;
+        let lanes_val = visit(self_, m, children[2]);
+        let lanes_fact = taken(self_, m, children[2], lanes_val);
+        exits = lanes_val.exits || exits;
+        let elem_holds = elementHolds(self_, m, n.ty);
+        let lanes_shared = elem_holds && !ownedAs(self_, m, lanes_fact, m.typeOf(children[2]), 0);
+        if fresh {
+            var fact = container.fact;
+            if lanes_shared && fact == deep { fact = shell; }
+            return Value { fact: fact, exits: exits, .. };
+        }
+        if !ownedInPlace(self_, m, children[0], container.origin) {
+            reject(self_, m, id, blot_check_core::Code.aliased_update);
+            escape(self_, container);
+            return Value { exits: exits, .. };
+        }
         // A local written at its last read hands its storage on.
         if container.origin != 0 && moves(self_, m, children[0], container.origin) {
-            let fact = self_.facts[container.origin];
+            var fact = self_.facts[container.origin];
+            if lanes_shared && fact == deep { fact = shell; }
             kill(self_, container.origin);
-            return Value { fact: fact, exits: container.exits, .. };
+            return Value { fact: fact, exits: exits, .. };
         }
-        return Value { origin: container.origin, exits: container.exits, .. };
+        if lanes_shared { sharedInto(self_, m, children[0], []); }
+        return Value { origin: container.origin, exits: exits, .. };
     }
     if bound && operation == blot_backend_collection_ops::Op.append && children.len == 2 && m.node(children[0]).tag == blot_check_core::Tag.reference {
         // The backend grows an input named once in place, so the result is
@@ -3010,9 +3051,9 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if holds(self_, m, n.ty) { return Value { origin: container.origin, exits: container.exits, .. }; }
             return Value { exits: container.exits, .. };
         }
-        if operation == blot_check_storage_ops::Op.view || operation == blot_check_storage_ops::Op.ref || operation == blot_check_storage_ops::Op.at {
-            // A view or ref borrows the storage it names, as a value read out of
-            // it does: it is given back where the view/ref is last used.
+        if operation == blot_check_storage_ops::Op.view || operation == blot_check_storage_ops::Op.ref || operation == blot_check_storage_ops::Op.at || operation == blot_check_storage_ops::Op.link {
+            // A view, ref, or link borrows the storage it names, as a value read out
+            // of it does: it is given back where the borrow is last used.
             let container = visit(self_, m, children[0]);
             var exits = container.exits;
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
@@ -3094,14 +3135,41 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if operation == blot_check_storage_ops::Op.freeze {
             let container = visit(self_, m, children[0]);
+            // A fresh value frozen is still that fresh value.
+            if container.origin == 0 && unique(container.fact) { return Value { fact: container.fact, exits: container.exits, .. }; }
+            // Module-level growable pools remain freezable directly.
+            var global_ref = false;
+            if m.node(children[0]).tag == blot_check_core::Tag.reference {
+                let target_ref = m.reference(children[0]);
+                global_ref = (target_ref.unit != 0 && target_ref.unit != m.unit) || !local(self_, target_ref.binding) || m.bindings[target_ref.binding].kind == blot_reuse_principal_interface::Kind.global;
+            }
+            if global_ref { return Value { fact: none, exits: container.exits, .. }; }
+            if !ownedInPlace(self_, m, children[0], container.origin) {
+                // Freezing a whole local owner born in this function whose uniqueness
+                // was conservatively dropped by an earlier borrowing call (with no
+                // active lexical borrow loan) stays safe as a non-unique read-only
+                // Array (cannot be updated with `:=` or returned as owned).
+                let target, found = place(self_, m, children[0]);
+                var local_born_unloaned = found && target.len == 0 && local(self_, target.binding) && container.origin == target.binding && self_.ever_owned[target.binding] && self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1] && wholeLoan(self_, target.binding) < 0;
+                if local_born_unloaned {
+                    for held in self_.argument_places {
+                        if placesOverlap(held, target) { local_born_unloaned = false; break; }
+                    }
+                }
+                if local_born_unloaned {
+                    escape(self_, container);
+                    return Value { fact: none, exits: container.exits, .. };
+                }
+                reject(self_, m, id, blot_check_core::Code.aliased_update);
+                escape(self_, container);
+                return Value { exits: container.exits, .. };
+            }
             // Freezing a local at its last read gives its storage away.
             if container.origin != 0 && moves(self_, m, children[0], container.origin) {
                 let fact = self_.facts[container.origin];
                 kill(self_, container.origin);
                 return Value { fact: fact, exits: container.exits, .. };
             }
-            // A fresh value frozen is still that fresh value.
-            if container.origin == 0 { return Value { fact: container.fact, exits: container.exits, .. }; }
             return Value { origin: container.origin, exits: container.exits, .. };
         }
     }

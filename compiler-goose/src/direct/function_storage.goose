@@ -1314,9 +1314,36 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lset(g, address);
             return loadElement(g, f, address, 0, element, id);
         },
-        ref => { return neverVal(), g.fail(m, id, "references to whole values are not supported yet"); },
-        // An operation the Zig backend has no arm for (the checker lowers
-        // `write` to a store).
+        ref => {
+            let value, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return value, error; }
+            if value.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+            let element, error = elementOf(g, f, ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let step, error = stride(g, f, element, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let rt = g.runtime_();
+            noteAllocation(f);
+            let base = local32(g, f);
+            i32Const(g, step);
+            callf(g, rt.stack);
+            lset(g, base);
+            lget(g, base);
+            i32Const(g, 1);
+            i32Const(g, step);
+            callf(g, rt.open);
+            let result, error = fresh(g, f, ty, id);
+            if error != blot_direct_types::Error.none { return result, error; }
+            lset(g, w(g, result, 1));
+            lset(g, w(g, result, 0));
+            i32Const(g, 0);
+            lset(g, w(g, result, 2));
+            let noted = noteStoreToSlot(g, f, w(g, result, 0), value);
+            if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+            let written = writeFlat(g, f, base, 0, value, id);
+            if written != blot_direct_types::Error.none { return neverVal(), written; }
+            return result, blot_direct_types::Error.none;
+        },
         _ => { abort("storage operation without a direct lowering"); },
     }
 }

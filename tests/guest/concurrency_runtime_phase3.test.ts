@@ -651,20 +651,19 @@ func helper_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   dst[0] := fresh
   return dst
 
-func helper_simd_store_fresh (dst: #[#[U32]]) -> (v: U32): Unit =>
+func helper_simd_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   let a = #[v]
   let b = #[@u32.add v 1]
   let c = #[@u32.add v 2]
   let d = #[@u32.add v 3]
-  let _ = @simd.store dst 0 (a, b, c, d)
-  return ()
+  return @simd.store dst 0 (a, b, c, d)
 
 entry func test_escape_helpers (x: U32): #[U32] =>
   let holder: #[#[U32]] = #[#[0], #[0], #[0], #[0]]
   holder := helper_store_fresh holder x
   let a0 = holder[0][0]
   let a2 = holder[0][2]
-  helper_simd_store_fresh holder (@u32.add x 10)
+  holder := helper_simd_store_fresh holder (@u32.add x 10)
   return #[a0, a2, holder[0][0], holder[1][0], holder[2][0], holder[3][0]]
 
 entry func test_box_simd_and_fork (x: U32): #[U32] =>

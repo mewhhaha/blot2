@@ -500,3 +500,206 @@ func slice (rows: Array Row): &[Row] => return &rows[0..rows.length]
   return fixed_state.rows[0].value + resized_state.rows[0].value
 `, guest => equal(guest.call("test", null), 83));
 });
+
+Deno.test("references, views, links, and shared handles reject writes (Phase 5)", async () => {
+  for (
+    const [snippet, expectedCode] of [
+      [
+        `entry func bad (): U32 =>
+  let rows = #[1, 2]
+  let r: &#[U32] = &rows
+  r[0] := 9
+  return 0`,
+        "type_mismatch",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let pool: GrowArray #[U32] = #[#[1, 2]]
+  let lk: ^#[U32] = ^pool[0]
+  lk[0] := 9
+  return 0`,
+        "type_mismatch",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let s: *#[U32] = freeze #[1, 2]
+  s[0] := 9
+  return 0`,
+        "type_mismatch",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let p = { x: 1, y: 2 }
+  let r: &{ x: U32, y: U32 } = &p
+  r.x := 9
+  return 0`,
+        "missing_field",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let pool: GrowArray { x: U32, y: U32 } = #[{ x: 1, y: 2 }]
+  let lk: ^{ x: U32, y: U32 } = ^pool[0]
+  lk.x := 9
+  return 0`,
+        "missing_field",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let s: *{ x: U32, y: U32 } = freeze { x: 1, y: 2 }
+  s.x := 9
+  return 0`,
+        "missing_field",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let rows: GrowArray U32 = #[1, 2]
+  let view = &rows[0..2]
+  @storage.push view 3
+  return 0`,
+        "type_mismatch",
+      ],
+      [
+        `entry func bad (): U32 =>
+  let rows: GrowArray U32 = #[1, 2]
+  let s = freeze rows
+  @storage.push s 3
+  return 0`,
+        "type_mismatch",
+      ],
+    ] as [string, string][]
+  ) {
+    await compileExpectedFailure(snippet + "\n", expectedCode);
+  }
+});
+
+Deno.test("@simd.store and @storage.freeze enforce unique ownership (Phase 5)", async () => {
+  await compileAndRun(
+    `
+func step_move (p: own #[U32]) -> (v: U32): #[U32] =>
+  for i in 0..1:
+    p := @simd.store p i (v, v + 1, v + 2, v + 3)
+  return p
+
+func step_inplace (p: own #[U32]) -> (v: U32): #[U32] =>
+  for i in 0..1:
+    @simd.store p i (v, v + 1, v + 2, v + 3)
+  return p
+
+entry func ok (v: U32): U32 =>
+  let a = @simd.store #[0, 0, 0, 0] 0 (v, 1, 2, 3)
+  let b = step_move a (v + 10)
+  let c = step_inplace b (v + 20)
+  let rec = { lanes: #[0, 0, 0, 0], tag: 1 }
+  let _ = @simd.store rec.lanes 0 (1, 2, 3, 4)
+  let g: GrowArray U32 = #[v]
+  let frozen = @storage.freeze g
+  return c[0] + c[3] + rec.lanes[2] + frozen[0]
+`,
+    (guest) => {
+      equal(guest.call("ok", 5), 25 + 28 + 3 + 5);
+    },
+  );
+
+  const rejected: [string, string][] = [
+    [
+      "@simd.store on borrowed parameter",
+      `func touch (xs: #[U32]): U32 =>
+  let _ = @simd.store xs 0 (1, 2, 3, 4)
+  return xs[0]
+entry func bad (): U32 => return touch #[0, 0, 0, 0]`,
+    ],
+    [
+      "@simd.store on module const",
+      `const table: #[U32] = #[1, 2, 3, 4]
+entry func bad (): U32 =>
+  let _ = @simd.store table 0 (9, 0, 0, 0)
+  return table[0]`,
+    ],
+    [
+      "@simd.store on aliased local",
+      `entry func bad (): U32 =>
+  let xs = #[1, 2, 3, 4]
+  let alias = xs
+  let _ = @simd.store xs 0 (9, 0, 0, 0)
+  return alias[0]`,
+    ],
+    [
+      "@simd.store while &xs borrow is live",
+      `entry func bad (): U32 =>
+  let xs = #[1, 2, 3, 4]
+  let r = &xs
+  let _ = @simd.store xs 0 (9, 0, 0, 0)
+  return (@storage.load r)[0]`,
+    ],
+    [
+      "@simd.store of nested arrays weakens deep to shell",
+      `entry func bad (): U32 =>
+  let grid = #[#[1], #[2], #[3], #[4]]
+  let shared = #[9]
+  let g2 = @simd.store grid 0 (shared, #[5], #[6], #[7])
+  g2[0][0] := 99
+  return shared[0]`,
+    ],
+    [
+      "@simd.store overlapping call argument",
+      `func pair (a: #[U32]) -> (b: #[U32]): U32 => return a[0] + b[0]
+entry func bad (): U32 =>
+  let xs = #[1, 2, 3, 4]
+  return pair xs (@simd.store xs 0 (9, 0, 0, 0))`,
+    ],
+    [
+      "@simd.store on outer local captured by closure",
+      `entry func bad (): U32 =>
+  let xs = #[1, 2, 3, 4]
+  let mutate = func () => do:
+    let _ = @simd.store xs 0 (9, 0, 0, 0)
+    return 0
+  let _ = mutate ()
+  return xs[0]`,
+    ],
+    [
+      "@storage.freeze on borrowed GrowArray parameter",
+      `func sneak (xs: GrowArray U32): U32 =>
+  let fixed = @storage.freeze xs
+  return fixed[0]
+entry func bad (): U32 =>
+  let items: GrowArray U32 = #[1]
+  return sneak items`,
+    ],
+    [
+      "@storage.freeze on aliased GrowArray local",
+      `entry func bad (): U32 =>
+  let items: GrowArray U32 = #[1]
+  let alias = items
+  let fixed = @storage.freeze items
+  return alias[0] + fixed[0]`,
+    ],
+    [
+      "@storage.freeze on local alias of borrowed GrowArray parameter",
+      `func sneak (xs: GrowArray U32): U32 =>
+  let alias = xs
+  let fixed = @storage.freeze alias
+  return fixed[0]
+entry func bad (): U32 =>
+  let items: GrowArray U32 = #[1]
+  return sneak items`,
+    ],
+    [
+      "@storage.freeze on borrowed GrowArray field beside owned sibling field",
+      `func sneak (xs: GrowArray U32): U32 =>
+  let r = { g: xs, other: #[1] }
+  let fixed = @storage.freeze r.g
+  return fixed[0] + r.other[0]
+entry func bad (): U32 =>
+  let items: GrowArray U32 = #[1]
+  return sneak items`,
+    ],
+  ];
+  for (const [name, source] of rejected) {
+    try {
+      await compileExpectedFailure(source + "\n", "aliased_update");
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
+});

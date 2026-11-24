@@ -1824,20 +1824,29 @@ entry func answer () => return do:
   let fixed: Array U32 = #[7]
   let growing: GrowArray U32 = #[41]
   let resizable: ResizeArray U32 = #[]
+  let score = 42
+  let _ = @storage.push growing 9
+  growing[0] := 42
   let first: &U32 = &growing[0]
-  let appended = @storage.push growing 9
-  growing[0] = 42
-  break @storage.load first
+  let local_ref: &U32 = &score
+  break @u32.add (@storage.load first) (@storage.load local_ref)
 ```
 
 Without an expected type, `#[...]` means `Array`; `[...]` remains a list.
-Existing arrays do not coerce between modes. `&T` borrows one value, `&[T]`
-borrows a range (`&items[start..end]`), and `^T` links to an element of a stable
-pool (`^items[index]`). The named forms are `Ref T`, `View T`, and `Link T`.
+Existing arrays do not coerce between modes. `&T` borrows one value
+(`&local`, `&record.field`, or `&items[index]`), `&[T]` borrows a range
+(`&items[start..end]`), and `^T` links to an element of a stable pool
+(`^items[index]`). The named forms are `Ref T`, `View T`, and `Link T`.
 `@storage.load` reads a reference/link and `@storage.read` reads a view/array.
-References are read-only: write the owner with `=`, and every reference and
-alias sees it. `@storage.copy` (`values.copy`) makes an independent array.
-`@storage.freeze` consumes the growth capability across aliases.
+References, views, links, and shared handles (`*T`) are strictly read-only:
+none of them permit indexed `:=`, field `:=`, `@simd.store`, or length
+mutations. Updates use `:=` on a uniquely owned local or `own` parameter
+(and fail with `aliased_update` while any borrow or alias is live; rebinding
+a scalar/record local with `:=` produces a new version while existing `&local`
+references keep reading the earlier value). `@storage.copy` (`values.copy`)
+makes an independent copy. `@storage.freeze` consumes an owned (or global)
+growable array's growth capability; `@simd.store` likewise requires unique
+ownership.
 
 `@storage.reserve owner 1048576` requests a minimum planned capacity in elements
 for one `GrowArray` or `ResizeArray` owner. The count must be a U32 integer

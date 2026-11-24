@@ -1,25 +1,31 @@
 # Working on Blot and Gdev
 
-## Current frontier: Memory Model Phase 4 Complete — Full Value Restriction for `let` (23 November 2026)
+## Current frontier: Memory Model Phases 1–5 Complete — Read-Only References (A4) & Remaining In-Place Ownership Paths (24 November 2026)
 
-Memory Model Phase 4 is implemented and verified across all four repositories:
-local `let` bindings now generalize only when bound to a syntactic `func`
-(`compiler-goose/src/check/check.goose::functionValue`), while non-`func`
-`let` bindings still settle pending field requirements via `solveFields`.
-A latent direct-backend capture bug surfaced by nested polymorphic local
-`func`s (`compiler-goose/src/direct/function_calls.goose::captureValue`) is
-also fixed so each instantiation of an enclosing polymorphic closure resolves
-and builds captured polymorphic locals against its own body and environment
-without polluting `f`'s monomorphic bindings. `std`, `../ink`, and `../gdev`
-required zero source changes.
+All five phases of Memory Model A ([tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md))
+are now complete and verified across `blot2`, `std`, `../ink`, and `../gdev`:
+
+- **Phase 5 (`direct/function_storage.goose`, `direct/function_calls.goose`,
+  `check/purity.goose`, `check/uniqueness.goose`):**
+  - Implemented read-only `&local` / `&record.field` (`Op.ref`, A4) in the
+    direct backend (1-element stack owner with `noteStoreToSlot`, `writeFlat`,
+    and persistent `const`-pool support in `persistFlatAt` for stack-backed
+    `Ref`/`Link`/`View`).
+  - Fixed `purity.goose` `Op.ref` points-to modeling (`f --LBL_ELEM--> target`)
+    so `@storage.load (&pool)` cannot bypass `spark`/`kernel` purity checks.
+  - Enforced unique ownership on `@simd.store` and `@storage.freeze` (`seal`) in
+    `uniqueness.goose`, unified `Op.link` (`^pool[i]`) with `Op.view`/`Op.ref`/
+    `Op.at` borrow-and-return-at-last-read tracking, and prevented wildcard
+    `let _ = ...` from spuriously killing owned values.
+  - `std`, `../ink`, and `../gdev` required zero source changes.
 
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `71cf5629`) | Memory Model Phase 4 value restriction + polymorphic capture fix, Phase 3 (`1560e6a7`), Concurrency Phases 1–5 (`67fc95b8`) |
-| `../pen` | `4916c95` | Bloom glare (`4916c95`), Session-2 double-restore (`913d470`), Law #6 owned migration (`53a89f3`), auto exposure/grade (`8973e37` / `f50b644`) |
-| `../ink` | `15ad905` | Auto exposure/grade (`15ad905`), editor `camera_previous` + snapshotted scene component writer (`056494f`), Phase 3 (`71b1809`) |
-| `../gdev` | `5a717c7` | Firepit/snowman finger status (`5a717c7`), exposure bindings (`6eb58fb`), all 57 `pen test-blot` failures + `gdev-tech` fixed (`92de220`, `c55f3a9`) |
+| `blot2` | this commit (after `9b589d5c`) | Memory Model Phase 5 read-only references (A4) & `@simd.store`/`@storage.freeze` ownership, Phase 4 (`9b589d5c`), Phase 3 (`1560e6a7`), Concurrency Phases 1–5 (`67fc95b8`) |
+| `../pen` | `f58251f` | Standard surface lighting (`f58251f`), bloom glare (`4916c95`), Session-2 double-restore (`913d470`), Law #6 owned migration (`53a89f3`) |
+| `../ink` | `891f396` | Test/inventory cleanup (`891f396`), lighting/clear-coat (`75e013f`, `a89fd5d`), auto exposure/grade (`15ad905`), Phase 3 (`71b1809`) |
+| `../gdev` | `7d9f482` | Shared lighting sync (`7d9f482`), volumetric fog (`e503911`), firepit/snowman finger status (`5a717c7`), all `pen test-blot` + `gdev-tech` clean |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra
@@ -38,39 +44,41 @@ required zero source changes.
   order, and immediate `restore_scene` with `app.hold_frame` on `restore_stash`.
 - **Canonical `0x7fc00000` quiet NaN** determinism across `function_spark`,
   `scalarOp`, `std/simd`, and `#run`.
-- **Single update operator `:=` & value restriction:** Zero `=` store
-  statements remain (`lent` and `=` shim removed in Phase 3); local `let`
-  generalizes only on syntactic `func` values (Phase 4).
+- **Single update operator `:=`, value restriction, and read-only references:**
+  Zero `=` store statements remain (`lent` and `=` shim removed in Phase 3);
+  local `let` generalizes only on syntactic `func` values (Phase 4); `&T`,
+  `&[T]`, `^T`, and `*T` are strictly read-only, `&local`/`&field` lower in the
+  direct backend, and `@simd.store` / `@storage.freeze` enforce ownership
+  (Phase 5).
 
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `448317454e99283690048828c604f36cfcfb042bfc5e46fadc70e9e97e88904b`
-    (source identity `e5193634d544ba48a581987bfe1f484c1ea2736d13ed19e86d914255512b9727`)
+    `077d87db8c2c20070bf0ac72537fb9c1726101b89692d65655d73cd2c81dbb6c`
+    (source identity `0776bd250cd19900404eefa0e8292a4da7c50f2de7e0754e70a5ef9c73b04fbe`)
   - `generated/compiler/blotc.gz` SHA-256:
-    `c8c325392532fb77ec6d8ee5d06cbeb2aaca96a86a0cadeb22c17d32bb23b9c4`
-    (3,615,457 bytes)
+    `a021d47dfc9f365a068c9a081645459a5190a8ed457b5083613a2d3a0fc4cbae`
   - `std/prelude.blot` SHA-256:
     `cc908f217d65f9adb519c0df21ed57006544eb2ea896b397747bdc32655242c9`
   - `../pen/target/release/pen` SHA-256:
-    `1341e8a385b7f7943903024ae7187d70060bc7205d9a77d541869894198d9e9c`
+    `c7223d469ca8055f5b7b84aa42d59fd9e4a27faf5036b9d1ba2761fc2172e807`
 - **Qualification gates:**
   - `blot2` (this commit): `deno task test:compiler` exit 0 (`harness` **25/25**,
-    `release-build` 88.06 s, `reference-direct` **2/2**,
+    `release-build` 84.44 s, `reference-direct` **2/2**,
     `reference-uniqueness` **199/199**, `reference-fixtures` **109/109**,
-    `pack` OK, `guests` **1,092 passed, 0 failed, 76 ignored**);
+    `pack` OK, `guests` **1,095 passed, 0 failed, 76 ignored**);
     `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**).
-  - `../ink` (`15ad905`): `pen test-blot` **347 passed, 0 failed** in 82
-    modules + **190 passed, 0 failed** native Ink Rust tests.
-  - `../gdev` (`5a717c7`): `pen check` clean (`main.blot`, `saved.json`,
+  - `../ink` (`891f396`): `pen test-blot` **379 passed, 0 failed** in 90 Blot
+    modules (`45/45` must-trap, `4/4` must-not-compile).
+  - `../gdev` (`7d9f482`): `pen check` clean (`main.blot`, `saved.json`,
     `devtools/main.blot`, 562 assets); `pen test-blot`: **1,398 passed,
     0 failed** across 219 modules (**1,243/1,243** checks, **148/148**
     must-trap, **7/7** must-not-compile) plus `tools/tech` (`gdev-tech`)
     **16/16** native tests; `build_gdev.ts --timeout-ms 15000`:
-    `wasmBytes: 3,799,962`, `buildMs: 7.05 s`, `freshModules: 306`,
-    `emittedFunctions: 5,032`; `run_pen.py --launch --hardware` exit 0
+    `wasmBytes: 3,813,902`, `buildMs: 7.06 s`, `freshModules: 306`,
+    `emittedFunctions: 5,042`; `run_pen.py --launch --hardware` exit 0
     (`success: true`, `screenshot_640x480: true`, visually inspected
-    `build/storage-integration/gdev-one-frame/attempt-w9zoy3qc/frame.png`,
+    `build/storage-integration/gdev-one-frame/attempt-e3n13cel/frame.png`,
     byte-identical SHA-256 `e9cd29bf2f844cc5fc5f0b285591ea4d5f908bde1a46fde254e510d540d6a931`).
   - `../pen` (historical `913d470` / `f50b644` / `53a89f3`): `pen-runtime`
     **173/173**, `pen-codegen` **10/10**, `blot-host --test concurrency_phase4`
@@ -78,15 +86,12 @@ required zero source changes.
 
 ## Remaining work
 
-1. **Memory model Phase 5** ([tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md)):
-   read-only references (`A4`) and retiring references as a write path (audit
-   remaining `Ref`/`Link` write paths and update docs/tests).
-2. **Compile-speed & runtime follow-ups.**
+1. **Compile-speed & runtime follow-ups.**
    The [compile-speed plan](tasks/FAST_COMPILE.md) retains the subsecond and
    Wasm-size targets (cold Gdev Main 565 ms `-O2` / 432 ms PGO; retained edits
    26–37 ms). Further `trees` / `view` / `write` runtime tuning can target the
    remaining 1.4–1.55× gap to Rust `-O3`.
-3. **Pen `timeline::contract_tests` rewind determinism (2 items):**
+2. **Pen `timeline::contract_tests` rewind determinism (2 items):**
    - `../ink` `15ad905` (`feat/exposure`): `app.invalidate` sets `exposure.cut := true`
      on the first frame after every restore, causing `exposure[13].cut` (`false`
      vs `true`) to diverge across all 6 `timeline::contract_tests` rewinds.

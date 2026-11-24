@@ -2750,7 +2750,12 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             match op {
                 length, reserve => { res = 0; },
                 read, load => { res = stepElemHead(st, env.ctx_id, st.head_stack[hmark]); },
-                view, at, link, ref => { res = st.head_stack[hmark]; },
+                view, at, link => { res = st.head_stack[hmark]; },
+                ref => {
+                    let f = symFresh(st, env.unit, id, 0);
+                    if addWrittenEdgesSingleSrc(st, env.ctx_id, f, LBL_ELEM, st.head_stack[hmark]) { env.changed = true; }
+                    res = listSingle(st, f);
+                },
                 push => {
                     if listUnionHead(st, st.ctxs[env.ctx_id].mutated_head, st.head_stack[hmark]) { env.changed = true; }
                     if addWrittenEdgesHeads(st, env.ctx_id, st.head_stack[hmark], LBL_ELEM, st.head_stack[hmark + 1]) { env.changed = true; }

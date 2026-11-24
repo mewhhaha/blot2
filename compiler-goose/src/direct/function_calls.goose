@@ -434,6 +434,46 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             }
             return blot_direct_types::Error.none;
         },
+        ref, link, view => {
+            let c_slot = local32(g, f);
+            let c_gen = local32(g, f);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+            lset(g, c_slot);
+            lget(g, c_slot);
+            i32Const(g, g.runtime_().layout.persistent_split);
+            op(g, OP_i32_lt_u);
+            let _ = open(g, f, OP_if_);
+            lget(g, base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
+            lset(g, c_gen);
+            let elem_ty = n.a;
+            let elem_step, serr = stride(g, f, elem_ty, id);
+            if serr != blot_direct_types::Error.none { return serr; }
+            let p_slot = local32(g, f);
+            let p_gen = local32(g, f);
+            lget(g, c_slot);
+            lget(g, c_gen);
+            i32Const(g, elem_step);
+            i32Const(g, 2);
+            callf(g, g.runtime_().persist);
+            lset(g, p_gen);
+            lset(g, p_slot);
+            lget(g, base);
+            lget(g, p_slot);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+            lget(g, base);
+            lget(g, p_gen);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
+            let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
+            if eherr != blot_direct_types::Error.none { return eherr; }
+            if elem_holds {
+                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, true, id, depth + 1);
+                if perr != blot_direct_types::Error.none { return perr; }
+            }
+            close(g, f);
+            return blot_direct_types::Error.none;
+        },
         tuple => {
             var off = offset;
             for at in 0..(n.b as i64) {

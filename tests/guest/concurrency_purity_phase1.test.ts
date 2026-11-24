@@ -241,19 +241,22 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 
   // (b3) Fresh-literal spark source mutation & outer-array spark source mutation
   await compileExpectedFailure(
-    `func touch (row: #[U32]): U32 =>
-  let _ = @simd.store row 0 (1, 0, 0, 0)
+    `func touch (row: #[+U32]): U32 =>
+  @storage.push row 1
   return row[0]
-entry func bad (): #[U32] => return spark #[touch row | row <- #[#[0, 0, 0, 0]]]
+entry func bad (): #[U32] =>
+  let seed: #[+U32] = #[0]
+  return spark #[touch row | row <- #[seed]]
 `,
     "spark_mutates_capture",
   );
   await compileExpectedFailure(
-    `func touch (row: #[U32]): U32 =>
-  let _ = @simd.store row 0 (1, 0, 0, 0)
+    `func touch (row: #[+U32]): U32 =>
+  @storage.push row 1
   return row[0]
 entry func bad (): #[U32] =>
-  let xs = #[#[0, 0, 0, 0]]
+  let seed: #[+U32] = #[0]
+  let xs: #[#[+U32]] = #[seed]
   return spark #[touch row | row <- xs]
 `,
     "spark_mutates_capture",
@@ -283,6 +286,9 @@ entry process bad2: Process [U32, U32, U32] = { init: p_init, step: p_step }
 `,
     "process_mutates_global",
   );
+  // Flat-numeric `entry process` Config/Cmd inputs are borrowed `#[U32]`:
+  // Phase 5 enforces `@simd.store` ownership at lowering (`aliased_update`)
+  // before purity even runs, closing in-place mutation of borrowed wire inputs.
   await compileExpectedFailure(
     `func p_init (cfg: #[U32]): #[U32] =>
   let _ = @simd.store cfg 0 (99, 0, 0, 0)
@@ -290,7 +296,7 @@ entry process bad2: Process [U32, U32, U32] = { init: p_init, step: p_step }
 func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) => return (s, cmd)
 entry process bad_cfg: Process [#[U32], U32, U32] = { init: p_init, step: p_step }
 `,
-    "kernel_mutates_context",
+    "aliased_update",
   );
   await compileExpectedFailure(
     `func p_init (_: U32): #[U32] => return #[0]
@@ -299,7 +305,7 @@ func p_step (s: own #[U32]) -> (cmd: #[U32]): (#[U32], U32) =>
   return (s, cmd[0])
 entry process bad_cmd: Process [U32, #[U32], U32] = { init: p_init, step: p_step }
 `,
-    "kernel_mutates_context",
+    "aliased_update",
   );
   await compileAndRun(
     `const shared_arr: #[U32] = #[1, 2, 3]
@@ -320,13 +326,15 @@ entry func ok (): U32 => return 1
   const curriedBase = `func with_search (f: U32 -> U32 -> U32) -> (a: U32) -> (b: U32): U32 =>
   let step = f a
   return step b
-func prep (w: #[U32]): #[U32] => return @storage.copy w
+func prep (w: #[U32]): #[+U32] =>
+  let out: #[+U32] = #[w[0]]
+  return out
 `;
   await compileExpectedFailure(
-    curriedBase + `func bad_run (ctx: #[U32]) -> (x: U32): U32 =>
+    curriedBase + `func bad_run (ctx: #[+U32]) -> (x: U32): U32 =>
   let out: #[+U32] = #[0]
   return with_search (func a -> b => do:
-    let _ = @simd.store ctx 0 (a, 0, 0, 0)
+    @storage.push ctx a
     @storage.push out b
     return out[@u32.sub out.length 1]) x 1
 entry kernel k: Kernel [#[U32], U32, U32] = { prepare: prep, run: bad_run }
@@ -334,7 +342,7 @@ entry kernel k: Kernel [#[U32], U32, U32] = { prepare: prep, run: bad_run }
     "kernel_mutates_context",
   );
   await compileAndRun(
-    curriedBase + `func good_run (ctx: #[U32]) -> (x: U32): U32 =>
+    curriedBase + `func good_run (ctx: #[+U32]) -> (x: U32): U32 =>
   let out: #[+U32] = #[0]
   return with_search (func a -> b => do:
     @storage.push out (@u32.add ctx[0] (@u32.add a b))
@@ -350,6 +358,10 @@ entry func ok (): U32 => return 1
 
 Deno.test("Law #3 (c): rebinding, branch merge, loops, updatePath, index expr, trailing field store, nominal/record patterns, getters, and self", async () => {
   const mkSpark = (extraDecls: string, body: string) => `const pool: #[+U32] = #[1, 2, 3]
+func push_grow (dst: #[+U32]) -> (v: U32): Unit =>
+  let box = #[dst]
+  @storage.push box[0] v
+  return ()
 ${extraDecls}
 func body (x: U32): U32 =>
   let scratch: #[+U32] = #[0, 0]
@@ -364,30 +376,30 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
     ["multi-scrutinee guarded case", "", `let target = case x, pool of\n    0, arr if x == 0 => arr\n    _, _ => scratch\n  @storage.push target 99`],
     ["for-in loop element", "", `for row in #[pool]:\n    @storage.push row 42`],
     ["for-in destructured tuple", "", `for (_, b) in #[(scratch, pool)]:\n    @storage.push b 42`],
-    ["loop carry backedge", `const pool4: #[U32] = #[1, 2, 3, 4]`, `let selected: #[U32] = #[0, 0, 0, 0]\n  for i in 0..2:\n    let _ = @simd.store selected 0 (i, 0, 0, 0)\n    selected := pool4`],
+    ["loop carry backedge", "", `let selected: #[+U32] = #[0]\n  for i in 0..2:\n    push_grow selected i\n    selected := pool`],
     ["loop carry break", "", `let selected = scratch\n  for i in 0..2:\n    selected := pool\n    break\n  @storage.push selected 99`],
-    ["loop carry continue", `const pool4: #[U32] = #[1, 2, 3, 4]`, `let selected: #[U32] = #[0, 0, 0, 0]\n  for i in 0..2:\n    if i == 0:\n      selected := pool4\n      continue\n    let _ = @simd.store selected 0 (99, 0, 0, 0)`],
-    ["plain record field rebind", `const pool4: #[U32] = #[1, 2, 3, 4]`, `let r = { a: scratch, b: #[0, 0, 0, 0] }\n  r.b := pool4\n  let _ = @simd.store r.b 0 (98, 0, 0, 0)`],
+    ["loop carry continue", "", `let selected: #[+U32] = #[0]\n  for i in 0..2:\n    if i == 0:\n      selected := pool\n      continue\n    push_grow selected 99`],
+    ["plain record field rebind", "", `let b0: #[+U32] = #[0]\n  let r = { a: scratch, b: b0 }\n  r.b := pool\n  push_grow r.b 98`],
     [
       "nominal field rebind",
-      "type Box is data = $Box { a: #[+U32], b: #[U32] }\nconst pool4: #[U32] = #[1, 2, 3, 4]",
-      `let b = $Box { a: scratch, b: #[0, 0, 0, 0] }\n  b.b := pool4\n  let _ = case b of\n    $Box { a: _, b: q } => do:\n      let _ = @simd.store q 0 (99, 0, 0, 0)\n      break ()`,
+      "type Box is data = $Box { a: #[+U32], b: #[+U32] }",
+      `let b0: #[+U32] = #[0]\n  let b = $Box { a: scratch, b: b0 }\n  b.b := pool\n  let _ = case b of\n    $Box { a: _, b: q } => do:\n      push_grow q 99\n      break ()`,
     ],
     [
       "index-expression mutation",
       `func mutate_idx (p: #[+U32]): U32 =>\n  @storage.push p 77\n  return 0`,
       `scratch[mutate_idx pool] := 42`,
     ],
-    ["trailing-field store on record array", `const pool4: #[U32] = #[1, 2, 3, 4]`, `let arr = #[{ a: scratch, b: #[0, 0, 0, 0] }]\n  arr[0].b := pool4\n  let _ = @simd.store arr[0].b 0 (99, 0, 0, 0)`],
+    ["trailing-field store on record array", "", `let b0: #[+U32] = #[0]\n  let arr = #[{ a: scratch, b: b0 }]\n  arr[0].b := pool\n  push_grow arr[0].b 99`],
     [
       "trailing-field store on nominal array (named)",
-      "type Row is data = $Row { a: #[+U32], b: #[U32] }\nconst pool4: #[U32] = #[1, 2, 3, 4]",
-      `let rows = #[$Row { a: scratch, b: #[0, 0, 0, 0] }]\n  rows[0].b := pool4\n  let _ = case rows[0] of\n    $Row { a: _, b } => do:\n      let _ = @simd.store b 0 (99, 0, 0, 0)\n      break ()`,
+      "type Row is data = $Row { a: #[+U32], b: #[+U32] }",
+      `let b0: #[+U32] = #[0]\n  let rows = #[$Row { a: scratch, b: b0 }]\n  rows[0].b := pool\n  let _ = case rows[0] of\n    $Row { a: _, b } => do:\n      push_grow b 99\n      break ()`,
     ],
     [
       "trailing-field store on nominal array (positional)",
-      "type Row is data = $Row { a: #[+U32], b: #[U32] }\nconst pool4: #[U32] = #[1, 2, 3, 4]",
-      `let rows = #[$Row { a: scratch, b: #[0, 0, 0, 0] }]\n  rows[0].b := pool4\n  let _ = case rows[0] of\n    $Row (_, b) => do:\n      let _ = @simd.store b 0 (99, 0, 0, 0)\n      break ()`,
+      "type Row is data = $Row { a: #[+U32], b: #[+U32] }",
+      `let b0: #[+U32] = #[0]\n  let rows = #[$Row { a: scratch, b: b0 }]\n  rows[0].b := pool\n  let _ = case rows[0] of\n    $Row (_, b) => do:\n      push_grow b 99\n      break ()`,
     ],
     ["named record destructuring", "", `let { a: _, b } = { a: scratch, b: pool }\n  @storage.push b 99`],
     [
@@ -621,10 +633,13 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
     }
   }
   await compileExpectedFailure(
-    `const pool: #[U32] = #[1, 2, 3, 4]
+    `const pool: #[+U32] = #[1, 2, 3, 4]
+func push_grow (dst: #[+U32]) -> (v: U32): Unit =>
+  @storage.push dst v
+  return ()
 func body (x: U32): U32 =>
-  let ys = #[...pool]
-  let _ = @simd.store ys 0 (99, 0, 0, 0)
+  let ys = #[...#[pool]]
+  push_grow ys[0] 99
   return x
 entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
@@ -641,6 +656,22 @@ func body (sw: *Holder) -> (x: U32): U32 =>
 entry func bad (xs: #[U32]): #[U32] =>
   let sw: *Holder = freeze ($Holder { arr: #[1, 2, 3, 4] })
   return spark #[body sw x | x <- xs]
+`,
+    "spark_mutates_capture",
+  );
+
+  // (i2) Op.ref (`&pool`) + `@storage.load` tracks the referenced storage into purity!
+  await compileExpectedFailure(
+    `const pool: #[+U32] = #[1, 2, 3]
+func push_grow (dst: #[+U32]) -> (v: U32): Unit =>
+  @storage.push dst v
+  return ()
+func body (x: U32): U32 =>
+  let r = &pool
+  let p = @storage.load r
+  push_grow p 99
+  return x
+entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "spark_mutates_capture",
   );
@@ -709,10 +740,14 @@ func build_lut (): #[U32] =>
   return out
 const computed_lut: #[U32] = build_lut ()
 
-type Row is data = $Row { a: #[U32], b: #[U32] }
-type TupBox is data = $TupBox { p: (#[U32], #[U32]) }
-type Pair is data = $Pair { a: #[U32], b: #[U32] }
+type Row is data = $Row { a: #[+U32], b: #[U32] }
+type TupBox is data = $TupBox { p: (#[+U32], #[U32]) }
+type Pair is data = $Pair { a: #[+U32], b: #[U32] }
 
+func push_grow (dst: #[+U32]) -> (v: U32): Unit =>
+  let box = #[dst]
+  @storage.push box[0] v
+  return ()
 func read_only (rows: #[#[U32]]): U32 => return @u32.add rows[0][0] rows[1][0]
 func identity (x: a): a => return x
 func make_one_box (v: a): #[a] => return #[v]
@@ -726,35 +761,45 @@ entry kernel func read_computed_lut (x: U32): U32 => return @u32.add x computed_
 func precise_body (x: U32): U32 =>
   let scratch: #[U32] = #[1, 2, 0, 0]
   let _ = read_only #[scratch, pool]
-  let _ = @simd.store scratch 0 (99, 0, 0, 0)
+  let scratch_own: #[U32] = #[1, 2, 0, 0]
+  let _ = @simd.store scratch_own 0 (99, 0, 0, 0)
 
-  let r = { a: scratch, b: pool }
+  let r = { a: scratch_own, b: pool }
   let _ = @simd.store r.a 0 (98, 0, 0, 0)
 
-  let arr = #[{ a: #[1, 0, 0, 0], b: #[0, 0, 0, 0] }]
+  let a0: #[+U32] = #[1]
+  let arr = #[{ a: a0, b: #[0, 0, 0, 0] }]
   arr[0].b := pool
-  let _ = @simd.store arr[0].a 0 (97, 0, 0, 0)
+  push_grow arr[0].a 97
 
-  let rows = #[$Row { a: #[1, 0, 0, 0], b: #[0, 0, 0, 0] }]
+  let a1: #[+U32] = #[1]
+  let rows = #[$Row { a: a1, b: #[0, 0, 0, 0] }]
   rows[0].b := pool
   let _ = case rows[0] of
     $Row { a: ra, b: _ } => do:
-      let _ = @simd.store ra 0 (96, 0, 0, 0)
+      push_grow ra 96
       break ()
 
-  let tb = $TupBox (#[1, 0, 0, 0], pool)
+  let a2: #[+U32] = #[1]
+  let tb = $TupBox (a2, pool)
   let (t0, _) = tb.p
-  let _ = @simd.store t0 0 (95, 0, 0, 0)
+  push_grow t0 95
 
-  let pr = $Pair (#[1, 0, 0, 0], pool)
-  let _ = @simd.store pr.a 0 (94, 0, 0, 0)
+  let a3: #[+U32] = #[1]
+  let pr = $Pair (a3, pool)
+  push_grow pr.a 94
 
-  let { a: local_a, b: _ } = { a: #[1, 0, 0, 0], b: pool }
-  let _ = @simd.store local_a 0 (93, 0, 0, 0)
+  let a4: #[+U32] = #[1]
+  let { a: local_a, b: _ } = { a: a4, b: pool }
+  push_grow local_a 93
 
   let grow_s: #[+U32] = #[1]
   for (la, _) in #[(grow_s, pool)]:
     @storage.push la 42
+
+  let ref_s: #[+U32] = #[1]
+  let ref_box = &ref_s
+  push_grow (@storage.load ref_box) 91
 
   let fresh_r = pool
   fresh_r := #[1]
@@ -763,8 +808,9 @@ func precise_body (x: U32): U32 =>
   let copied = @storage.copy pool
   copied[0] := 91
 
-  let id_local = identity #[1, 0, 0, 0]
-  let _ = @simd.store id_local 0 (90, 0, 0, 0)
+  let id_seed: #[+U32] = #[1]
+  let id_local = identity id_seed
+  push_grow id_local 90
   let _ = identity pool
 
   let fresh_s: #[+U32] = #[1]

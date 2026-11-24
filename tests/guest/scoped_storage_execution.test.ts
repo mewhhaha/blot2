@@ -153,7 +153,7 @@ entry const checked = func (index: U32) => return do:
   );
 });
 
-// Direct backend gap: staging expressions and references to whole scalar locals are not supported (tasks/DELETE_SCOPED.md).
+// Direct backend gap: staging expressions (`#do:`) are not supported (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("staged values and references to scalar locals", async () => {
   await compileAndRun(
     `
@@ -421,4 +421,106 @@ entry const pattern = func (stop: Bool) => return do:
       }
     },
   );
+});
+
+Deno.test("read-only &local and &record.field references (A4)", async () => {
+  await compileAndRun(
+    `
+type Big is data = $Big {
+  a: U32, b: U32, c: U32, d: U32, e: U32, f: U32,
+  g: U32, h: U32, i: U32, j: U32, k: U32, l: U32
+}
+type Chain is data = $Nil | $Cons (U32, Chain)
+
+const base_const: U32 = 42
+const const_refs: #[&U32] = #[&base_const]
+
+const peek_u32 = func (r: &U32): U32 => return @storage.load r
+const ref_of = func (x: a): &a => return &x
+
+entry func scalar_and_rebind (): U32 =>
+  let value = 41
+  let reference = &value
+  value := 99
+  return @u32.add value (@storage.load reference)
+
+entry func field_and_nested (): U32 =>
+  let point = { x: 17, y: 25 }
+  let rx = &point.x
+  let ry = &point.y
+  let rrx = &rx
+  let unit_val = ()
+  let ru = &unit_val
+  let _ = @storage.load ru
+  return @u32.add (peek_u32 (@storage.load rrx)) (@storage.load ry)
+
+entry func boxed_and_recursive (): U32 =>
+  let big = $Big { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9, j: 10, k: 11, l: 12 }
+  let rb = ref_of big
+  let loaded = @storage.load rb
+  let list = $Cons (10, $Cons (20, $Nil))
+  let rl = &list
+  let head = case @storage.load rl of
+    $Cons (h, _) => h
+    $Nil => 0
+  return @u32.add (@u32.add loaded.a loaded.l) head
+
+entry func helper_and_loop (): U32 =>
+  let sum = 0
+  for i in 0..5000:
+    let r = &i
+    sum := @u32.add sum (@storage.load r)
+  let seed = 0
+  let carried = &seed
+  for i in 1..6:
+    carried := &i
+  return @u32.add sum (@storage.load carried)
+
+entry func persistent_ref (): U32 =>
+  return @storage.load const_refs[0]
+
+entry func borrow_and_return (): U32 =>
+  let xs = #[10, 20]
+  let r = &xs
+  let first = (@storage.load r)[0]
+  xs[0] := 99
+  let pool: GrowArray U32 = #[3, 4]
+  let lk = ^pool[0]
+  let linked = @storage.load lk
+  pool[0] := 77
+  return @u32.add (@u32.add first xs[0]) (@u32.add linked pool[0])
+`,
+    (guest) => {
+      equal(guest.call("scalar_and_rebind", null), 140);
+      equal(guest.call("field_and_nested", null), 42);
+      equal(guest.call("boxed_and_recursive", null), 23);
+      equal(guest.call("helper_and_loop", null), (4999 * 5000) / 2 + 5);
+      equal(guest.call("persistent_ref", null), 42);
+      equal(guest.call("persistent_ref", null), 42);
+      equal(guest.call("borrow_and_return", null), 10 + 99 + 3 + 77);
+    },
+  );
+  // Updating an array while &arr, a chained @storage.load, or ^pool[0] is still live fails with aliased_update.
+  for (
+    const snippet of [
+      `entry func bad (): U32 =>
+  let xs = #[1, 2]
+  let r = &xs
+  xs[0] := 9
+  return (@storage.load r)[0]`,
+      `entry func bad (): U32 =>
+  let xs = #[1, 2]
+  let r = &xs
+  let alias = @storage.load r
+  xs[0] := 9
+  return alias[0]`,
+      `entry func bad (): U32 =>
+  let pool: GrowArray U32 = #[1, 2]
+  let lk = ^pool[0]
+  pool[0] := 9
+  return @storage.load lk`,
+    ]
+  ) {
+    await compileExpectedFailure(snippet + "\n", "aliased_update");
+  }
 });
