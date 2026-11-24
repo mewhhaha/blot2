@@ -253,8 +253,8 @@
  "b34_grow_push_shared": [
   [
    "aliased_update",
-   412,
-   427,
+   408,
+   423,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
@@ -367,24 +367,30 @@
  "c15_storage_ops": [
   [
    "aliased_update",
-   665,
-   680,
+   657,
+   672,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c16_freeze": [
   [
+   "spent_value",
+   457,
+   471,
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
+  ],
+  [
    "aliased_update",
-   462,
-   476,
+   457,
+   471,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "c17_resize": [
   [
    "aliased_update",
-   518,
-   532,
+   512,
+   526,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
@@ -813,10 +819,10 @@
  "g16_result_of_call": [],
  "h07_push_keeps_parameter": [
   [
-   "kept_value",
-   282,
-   303,
-   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
+   "result_not_owned",
+   319,
+   322,
+   "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
   ]
  ],
  "h08_function_value_result_owned": [],
@@ -838,14 +844,7 @@
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
- "h15_function_parameter_kept": [
-  [
-   "kept_value",
-   292,
-   320,
-   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
-  ]
- ],
+ "h15_function_parameter_kept": [],
  "h16_member_call_lends": [],
  "h18_return_in_loop_moves": [],
  "i01_lambda_own_parameter": [],
@@ -1130,6 +1129,61 @@
    438,
    443,
    "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
+  ]
+ ],
+ "o01_push_lent_param": [
+  [
+   "aliased_update",
+   114,
+   134,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ]
+ ],
+ "o02_push_captured_local": [
+  [
+   "aliased_update",
+   201,
+   221,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ]
+ ],
+ "o03_push_global": [
+  [
+   "aliased_update",
+   111,
+   131,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ]
+ ],
+ "o04_push_aliased_local": [
+  [
+   "aliased_update",
+   143,
+   163,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ]
+ ],
+ "o05_truncate_pop_lent": [
+  [
+   "aliased_update",
+   106,
+   130,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ],
+  [
+   "aliased_update",
+   140,
+   157,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
+  ]
+ ],
+ "o06_push_own_param": [],
+ "o07_push_shell_element": [
+  [
+   "aliased_update",
+   153,
+   176,
+   "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ]
 }

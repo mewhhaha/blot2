@@ -10,81 +10,81 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
 
 entry const trace = func (count: U32): Array U32 => return do:
   let best: Maybe U32 = $Nothing
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
     let replace: Bool = true
     if let $Some previous = best:
       replace := index < previous
     if replace:
       best := $Some index
-    observations.push (Maybe.unwrap_or 99 best)
-  return @storage.freeze observations
+    @storage.push observations (Maybe.unwrap_or 99 best)
+  return observations
 
 entry const nested = func (count: U32): Array U32 => return do:
   let state: {best: Maybe U32, visits: U32} = {best: $Nothing, visits: 0}
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
     if let $Some previous = state.best:
       state.visits := self + 1
     else:
       state.best := $Some index
-    observations.push (Maybe.unwrap_or 99 state.best)
-  observations.push state.visits
-  return @storage.freeze observations
+    @storage.push observations (Maybe.unwrap_or 99 state.best)
+  @storage.push observations state.visits
+  return observations
 
 entry const alternating = func (count: U32): Array U32 => return do:
   let state: Maybe (Maybe U32) = $Some $Nothing
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
     if let $Some value = state:
       if let $Some previous = value:
-        observations.push previous
+        @storage.push observations previous
         state := $Nothing
         continue
       state := $Some ($Some index)
     else:
       state := $Some $Nothing
-    observations.push (100 + index)
-  return @storage.freeze observations
+    @storage.push observations (100 + index)
+  return observations
 
 entry const mixed = func (count: U32): Array U32 => return do:
   let state: Mixed = $Left 10
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
     if let $Left value = state:
-      observations.push value
+      @storage.push observations value
       state := $Right 20
     else:
       let $Right value = state else:
         return @panic "borrow variant was never constructed"
-      observations.push value
+      @storage.push observations value
       state := $Left 10
-  return @storage.freeze observations
+  return observations
 
 entry const borrowed = func (count: U32): Array U32 => return do:
   let labels: Array U32 = #[7]
   let view = &labels[0..1]
   let selected: Maybe (&[U32]) = $Some view
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
-    observations.push (case selected of
+    @storage.push observations (case selected of
       $Some values => values.at 0
       $Nothing => 99)
     selected := if index % 2 == 0 then $Nothing else $Some view
-  return @storage.freeze observations
+  return observations
 
 entry const borrowed_continue = func (count: U32): Array U32 => return do:
   let labels: Array U32 = #[7]
   let view = &labels[0..1]
   let selected: Maybe (&[U32]) = $Some view
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   for index in 0 .. count:
-    observations.push (case selected of
+    @storage.push observations (case selected of
       $Some values => values.at 0
       $Nothing => 99)
     selected := if index % 2 == 0 then $Nothing else $Some view
     continue
-  return @storage.freeze observations
+  return observations
 
 const arrived = func (value: Forecast) => return case value.end of
   $Arrived => true

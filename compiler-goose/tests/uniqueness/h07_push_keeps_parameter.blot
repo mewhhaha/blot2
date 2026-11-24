@@ -1,9 +1,11 @@
 type Box is data = $Box (Array U32)
 type World is data = $World { counts: Array U32, other: Array U32 }
 const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
-const add = func (bag: GrowArray (Array U32)) -> (row: Array U32) => return @storage.push bag row
+const add = func (bag: own Array (Array U32)) -> (row: Array U32) => return do:
+  @storage.push bag row
+  return bag
 const run = func (n: U32) => return do:
-  let bag: GrowArray (Array U32) = #[]
+  let bag: Array (Array U32) = #[]
   let row = #[n]
-  add bag row
+  let _ = add bag row
   break row[0]

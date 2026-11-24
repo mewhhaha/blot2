@@ -65,8 +65,8 @@ entry func main (): U32 =>
   let fv: *Vec2 = freeze ($Vec2 { x: 3, y: 4 })
   let fv2: *Vec2 = freeze ($Vec2 { x: 3, y: 4 })
   let eq_shared = if fv.eq fv2 then 1 else 0
-  // Array trait lift: #[+U32] and *#[U32] covered by Array.Eq and Array.Collection
-  let grow: #[+U32] = #[10, 20, 30]
+  // Array trait lift: #[U32] and *#[U32] covered by Array.Eq and Array.Collection
+  let grow: #[U32] = #[10, 20, 30]
   let eq_grow = if grow.eq grow then 1 else 0
   let fl_grow = first_plus_len grow
   let frozen_arr: *#[U32] = freeze grow
@@ -123,7 +123,7 @@ func bump_state (delta: U32): U32 !{ State U32, Log } =>
   use Log.write next
   return next
 
-func push_grow (a: own #[+U32]) -> (x: U32): #[+U32] =>
+func push_grow (a: own #[U32]) -> (x: U32): #[U32] =>
   @storage.push a x
   return a
 
@@ -131,9 +131,9 @@ entry func main (): U32 =>
   // 1. Pre-built effect record and passing Log as parameter
   let r1 = run_with_log quiet 9
 
-  // 2. Inline handler linearly shadowing outer U32 and growable array, plus multi-entry with
+  // 2. Inline handler linearly shadowing outer U32 and dynamic array, plus multi-entry with
   let total = 0
-  let log: #[+U32] = #[]
+  let log: #[U32] = #[]
   let n = 10
   with Log = { write: func x => log := push_grow self x }, State U32 = { get: func () => n, put: func v => n := v }:
     use a <- bump_state 5

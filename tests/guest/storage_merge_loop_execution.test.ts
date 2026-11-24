@@ -20,7 +20,7 @@ const source =
       i := @u32.add self 1
     k := @u32.add self 1
   return dst
-const merge_logged = func (dst: own Array U32) -> (log: ResizeArray U32) -> (one: Array U32) -> (two: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32) -> (offset: U32): Array U32 => return do:
+const merge_logged = func (dst: own Array U32) -> (log: Array U32 -> U32 ! {Foreign}) -> (one: Array U32) -> (two: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32) -> (offset: U32): Array U32 ! {Foreign} => return do:
   let i = left
   let j = @u32.add mid 1
   let k = offset
@@ -32,41 +32,27 @@ const merge_logged = func (dst: own Array U32) -> (log: ResizeArray U32) -> (one
     if @u32.lt one[j] two[i]:
       let v = one[j]
       dst[k] := v
-      @storage.push log k
-      @storage.push log v
+      use _ <- log #[k, v]
       j := @u32.add self 1
     else:
       let v = two[i]
       dst[k] := v
-      @storage.push log k
-      @storage.push log v
+      use _ <- log #[k, v]
       i := @u32.add self 1
     k := @u32.add self 1
   return dst
-const replay = func (size: U32) -> (log: ResizeArray U32): Array U32 => return do:
-  let out: Array U32 = @array.fill size 99
-  let pairs = @u32.div (@storage.length log) 2
-  for p in 0 .. pairs:
-    let k = log[@u32.mul p 2]
-    let v = log[@u32.add (@u32.mul p 2) 1]
-    out[k] := v
-  return out
 const src: Array U32 = #[1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12]
-const dst_log: ResizeArray U32 = #[]
-const tiny_log: ResizeArray U32 = #[]
-entry const reset = func () => return do:
-  @storage.truncate dst_log 0
-  @storage.truncate tiny_log 0
-  return ()
 entry const run = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill 12 99
-  return merge_logged target dst_log src src bounds[0] bounds[1] bounds[2] bounds[0]
-entry const short_target = func (): Unit => return do:
-  let small: Array U32 = @array.fill 3 99
-  let _ = merge_logged small tiny_log src src 0 5 11 0
+  return merge target src bounds[0] bounds[1] bounds[2]
+entry const run_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+  let target: Array U32 = @array.fill 12 99
+  use _ <- merge_logged target log src src 0 5 12 0
   return ()
-entry const read = func (): Array U32 => return replay 12 dst_log
-entry const read_tiny = func (): Array U32 => return replay 3 tiny_log
+entry const short_target = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+  let small: Array U32 = @array.fill 3 99
+  use _ <- merge_logged small log src src 0 5 11 0
+  return ()
 entry const alias = func (): Array U32 => return do:
   let rows: Array U32 = #[1, 3, 5, 2, 4, 6]
   return merge rows rows.copy 0 2 5
@@ -100,7 +86,6 @@ const wide_src: Array U32 = @array.generate 48 (func index => return do:
   if @u32.lt index 24:
     return @u32.mul index 2
   return @u32.add (@u32.mul (@u32.sub index 24) 2) 1)
-const wide_log: ResizeArray U32 = #[]
 const late_src: Array U32 = @array.generate 48 (func index => return do:
   if @u32.lt index 24:
     return @u32.add index 100
@@ -110,23 +95,18 @@ const right_rows: Array U32 = @array.generate 64 (func index => return do:
   if @u32.lt index 32:
     return 0
   return @u32.add (@u32.mul (@u32.sub index 32) 2) 1)
-const separate_log: ResizeArray U32 = #[]
-entry const wide_reset = func () => return do:
-  @storage.truncate wide_log 0
-  @storage.truncate separate_log 0
-  return ()
 entry const wide = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill bounds[3] 99
   return merge_offset target wide_src bounds[0] bounds[1] bounds[2] bounds[4]
-entry const wide_store_trap = func (offset: U32): Unit => return do:
+entry const wide_store_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 48 99
-  let _ = merge_logged target wide_log wide_src wide_src 0 23 47 offset
+  use offset <- log #[]
+  use _ <- merge_logged target log wide_src wide_src 0 23 47 offset
   return ()
-entry const wide_source_trap = func (): Unit => return do:
+entry const wide_source_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 48 99
-  let _ = merge_logged target wide_log late_src late_src 0 23 63 0
+  use _ <- merge_logged target log late_src late_src 0 23 63 0
   return ()
-entry const wide_read = func (): Array U32 => return replay 48 wide_log
 entry const wide_alias = func (): Array U32 => return do:
   let rows = @storage.copy wide_src
   return merge rows rows.copy 0 23 47
@@ -137,11 +117,10 @@ entry const wide_ties = func (right: U32): Array U32 => return do:
 entry const separate = func (): Array U32 => return do:
   let target: Array U32 = @array.fill 63 99
   return merge_separate target right_rows left_rows 0 31 63
-entry const separate_trap = func (): Unit => return do:
+entry const separate_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 64 99
-  let _ = merge_logged target separate_log right_rows left_rows 0 39 63 0
+  use _ <- merge_logged target log right_rows left_rows 0 39 63 0
   return ()
-entry const separate_read = func (): Array U32 => return replay 64 separate_log
 entry const positions = func (bounds: Array U32): U32 => return do:
   let target: Array U32 = @array.fill 64 99
   if @u32.eq bounds[5] 1:
@@ -216,6 +195,22 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
         return guest.call(name, input);
       };
       try {
+        let logPairs: [number, number][] = [];
+        let queryOffset = 0;
+        const logCap = guest.capability({
+          parameter: "Array U32",
+          result: "U32",
+          call: (pair: Uint32Array) => {
+            if (pair.length === 0) return queryOffset;
+            logPairs.push([pair[0], pair[1]]);
+            return 0;
+          },
+        });
+        const replay = (size: number) => {
+          const out = Array(size).fill(99);
+          for (const [k, v] of logPairs) out[k] = v;
+          return Uint32Array.from(out);
+        };
         const values = [1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12];
         for (
           const [left, mid, right] of [
@@ -226,7 +221,6 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
             [0xffffffff, 5, 11],
           ]
         ) {
-          await call("reset");
           assert.deepEqual(
             await call("run", new Uint32Array([left, mid, right])),
             expected(values, Array(12).fill(99), left, mid, right),
@@ -241,22 +235,21 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
           await call("ties"),
           new Uint32Array([2, 2, 2, 99, 99, 99]),
         );
-        await call("reset");
+        logPairs = [];
         await assert.rejects(
-          () => call("short_target"),
+          () => call("short_target", logCap),
           WebAssembly.RuntimeError,
         );
-        assert.deepEqual(await call("read_tiny"), new Uint32Array([1, 2, 3]));
-        await call("reset");
+        assert.deepEqual(replay(3), new Uint32Array([1, 2, 3]));
+        logPairs = [];
         await assert.rejects(
-          () => call("run", new Uint32Array([0, 5, 12])),
+          () => call("run_trap", logCap),
           WebAssembly.RuntimeError,
         );
         assert.deepEqual(
-          await call("read"),
+          replay(12),
           expected(values, Array(12).fill(99), 0, 5, 12),
         );
-        await call("reset");
         assert.deepEqual(
           await call("run", new Uint32Array([0, 0xffffffff, 0])),
           expected(values, Array(12).fill(99), 0, 0xffffffff, 0),
@@ -307,13 +300,14 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
           new Uint32Array(24).fill(7),
         );
         for (const offset of [2, 0xfffffffe, 0xffffffff]) {
-          await call("wide_reset");
+          logPairs = [];
+          queryOffset = offset;
           await assert.rejects(
-            () => call("wide_store_trap", offset),
+            () => call("wide_store_trap", logCap),
             WebAssembly.RuntimeError,
           );
           assert.deepEqual(
-            await call("wide_read"),
+            replay(48),
             expectedSeparate(
               wide,
               wide,
@@ -325,9 +319,9 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
             ),
           );
         }
-        await call("wide_reset");
+        logPairs = [];
         await assert.rejects(
-          () => call("wide_source_trap"),
+          () => call("wide_source_trap", logCap),
           WebAssembly.RuntimeError,
         );
         const late = Array.from({ length: 48 }, (_, i) => {
@@ -335,7 +329,7 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
           return i - 24;
         });
         assert.deepEqual(
-          await call("wide_read"),
+          replay(48),
           expected(late, Array(48).fill(99), 0, 23, 63),
         );
         const left = Array.from({ length: 32 }, (_, i) => i * 2);
@@ -347,13 +341,13 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
           await call("separate"),
           expectedSeparate(right, left, Array(63).fill(99), 0, 31, 63, 0),
         );
-        await call("wide_reset");
+        logPairs = [];
         await assert.rejects(
-          () => call("separate_trap"),
+          () => call("separate_trap", logCap),
           WebAssembly.RuntimeError,
         );
         assert.deepEqual(
-          await call("separate_read"),
+          replay(64),
           expectedSeparate(right, left, Array(64).fill(99), 0, 39, 63, 0),
         );
         for (

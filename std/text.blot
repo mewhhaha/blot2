@@ -86,8 +86,8 @@ func parse_u32 value: Maybe U32 =>
     result := self * 10 + digit
   return $Some result
 
-// Append into a growable #[+U32]; sealing produces the final Text with zero copy.
-type Builder = #[+U32]
+// Append into an owned #[U32] builder; finishing returns the final Text with zero copy.
+type Builder = #[U32]
 func builder () : Builder => #[]
 func push scalar -> (out: own Builder) : Builder =>
   @storage.push out scalar
@@ -96,7 +96,7 @@ func append (value: Text) -> (out: own Builder) : Builder =>
   for scalar in value:
     @storage.push out scalar
   return out
-func finish (out: own Builder) : Text => seal out
+func finish (out: own Builder) : Text => out
 func join (separator: Text) -> (pieces: #[Text]) : Text =>
   let out = builder ()
   let first = true
@@ -110,7 +110,7 @@ func join (separator: Text) -> (pieces: #[Text]) : Text =>
 func from_u32 (value: U32) : Text =>
   if value < 10:
     return #[value + 48]
-  let rev: #[+U32] = #[]
+  let rev: #[U32] = #[]
   let current = value
   for ever:
     @storage.push rev (current % 10 + 48)

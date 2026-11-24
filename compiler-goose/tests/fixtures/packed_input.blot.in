@@ -1,7 +1,7 @@
 type Pick is data = $Small U32 | $Large {left: U32, right: U32}
 const leaf = func state -> (flag: U32): U32 => return @u32.add (if @u32.eq flag 0 then state.f0 else state.f599) state.rows[0]
 const middle = func state -> (flag: U32): U32 => return do:
-  let scratch: GrowArray U32 = #[flag]
+  let scratch: Array U32 = #[flag]
   @storage.push scratch 1
   return leaf state flag
 const forward = func state -> (flag: U32): U32 => return do:

@@ -15,34 +15,39 @@ const marking =
 const literal = marking.replace("const mark =", "const mark_odd =")
   .replace("@u32.add self stride", "@u32.add self 2");
 const source = marking + literal + `
-const mark_logged = func (rows: own Array U32) -> (log: ResizeArray U32) -> (first: U32) -> (last: U32) -> (stride: U32): U32 => return do:
+const mark_logged = func (rows: own Array U32) -> (log: Array U32 -> U32 ! {Foreign}) -> (first: U32) -> (last: U32) -> (stride: U32): U32 ! {Foreign} => return do:
   let cursor = first
   for ever:
     if @u32.lt last cursor:
       break
     rows[cursor] := 305419896
-    @storage.push log cursor
+    use _ <- log #[cursor]
     cursor := @u32.add self stride
   return cursor
-const mark_odd_logged = func (rows: own Array U32) -> (log: ResizeArray U32) -> (first: U32) -> (last: U32): U32 => return do:
+const mark_odd_logged = func (rows: own Array U32) -> (log: Array U32 -> U32 ! {Foreign}) -> (first: U32) -> (last: U32): U32 ! {Foreign} => return do:
   let cursor = first
   for ever:
     if @u32.lt last cursor:
       break
     rows[cursor] := 305419896
-    @storage.push log cursor
+    use _ <- log #[cursor]
     cursor := @u32.add self 2
   return cursor
-const written_log: ResizeArray U32 = #[]
-entry const reset = func (): Unit => return @storage.truncate written_log 0
-entry const run = func (bounds: Array U32): U32 => return mark_logged (@array.fill 96 9) written_log bounds[0] bounds[1] bounds[2]
-entry const read = func (): Array U32 => return do:
-  let out: Array U32 = @array.fill 96 9
-  for index in 0 .. @storage.length written_log:
-    out[written_log[index]] := 305419896
+entry const run = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use first <- log #[0, 0]
+  use last <- log #[0, 1]
+  use stride <- log #[0, 2]
+  use out <- mark_logged (@array.fill 96 9) log first last stride
   return out
-entry const odd = func (bounds: Array U32): U32 => return mark_odd_logged (@array.fill 96 9) written_log bounds[0] bounds[1]
-entry const same_start_and_stride = func (first: U32): U32 => return mark_logged (@array.fill 96 9) written_log first 95 first
+entry const odd = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use first <- log #[0, 0]
+  use last <- log #[0, 1]
+  use out <- mark_odd_logged (@array.fill 96 9) log first last
+  return out
+entry const same_start_and_stride = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use first <- log #[0, 0]
+  use out <- mark_logged (@array.fill 96 9) log first 95 first
+  return out
 entry const local_run = func (bounds: Array U32) => return do:
   let (target, _) = mark (@array.fill 96 9) bounds[0] bounds[1] bounds[2]
   return target
@@ -100,6 +105,22 @@ Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`,
         return guest.call(name, input);
       };
       try {
+        let params: number[] = [];
+        let written: number[] = [];
+        const logCap = guest.capability({
+          parameter: "Array U32",
+          result: "U32",
+          call: (msg: Uint32Array) => {
+            if (msg.length === 2) return params[msg[1]];
+            written.push(msg[0]);
+            return 0;
+          },
+        });
+        const replay = () => {
+          const out = new Uint32Array(96).fill(9);
+          for (const idx of written) out[idx] = 0x12345678;
+          return out;
+        };
         for (
           const [first, last, stride] of [
             [0, 95, 1],
@@ -121,10 +142,10 @@ Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`,
             [0xffffffff, 0xffffffff, 1],
           ]
         ) {
-          await call("reset");
+          params = [first, last, stride];
+          written = [];
           const scalar = expected(first, last, stride);
-          const run = () =>
-            call("run", new Uint32Array([first, last, stride]));
+          const run = () => call("run", logCap);
           const local = () =>
             call("local_run", new Uint32Array([first, last, stride]));
           if (scalar.trapped) {
@@ -141,16 +162,17 @@ Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`,
               scalar.cursor,
             );
           }
-          assert.deepEqual(await call("read"), scalar.rows);
+          assert.deepEqual(replay(), scalar.rows);
         }
         for (const [first, last] of [[3, 95], [5, 94], [96, 95]]) {
-          await call("reset");
+          params = [first, last];
+          written = [];
           const scalar = expected(first, last, 2);
           assert.equal(
-            await call("odd", new Uint32Array([first, last])),
+            await call("odd", logCap),
             scalar.cursor,
           );
-          assert.deepEqual(await call("read"), scalar.rows);
+          assert.deepEqual(replay(), scalar.rows);
           assert.deepEqual(
             await call("local_odd", new Uint32Array([first, last])),
             scalar.rows,
@@ -161,13 +183,14 @@ Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`,
           );
         }
         for (const first of [1, 3, 7, 95]) {
-          await call("reset");
+          params = [first];
+          written = [];
           const scalar = expected(first, 95, first);
           assert.equal(
-            await call("same_start_and_stride", first),
+            await call("same_start_and_stride", logCap),
             scalar.cursor,
           );
-          assert.deepEqual(await call("read"), scalar.rows);
+          assert.deepEqual(replay(), scalar.rows);
           assert.deepEqual(
             await call("local_same_start_and_stride", first),
             scalar.rows,

@@ -13,7 +13,7 @@ const record = func (fixed: {${fields}}) -> payload => return {fixed, payload}
 const boxed = func fixed -> value => return $Box {value, fixed}
 const visit = func callback -> value => return callback value
 entry const integers = func (input: U32) => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let plain = record fixed marker[0]
   let nominal = boxed plain.fixed (@u32.add plain.payload ${bump})
   let result = visit (func (value: U32) => return @u32.add value nominal.fixed.f63) nominal.value

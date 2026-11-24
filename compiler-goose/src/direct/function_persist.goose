@@ -213,7 +213,7 @@ recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64)
     out.push(ty);
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize => {
+        array => {
             return collectPersistTys(g, n.a, out, depth + 1);
         },
         tuple => {
@@ -493,7 +493,6 @@ fn emitStageRoot(
     let o_base = local32(g, f);
     let o_len = local32(g, f);
     let o_cap = local32(g, f);
-    let o_frozen = local32(g, f);
     let m_val = local32(g, f);
     let m_found = local32(g, f);
     let steal_idx = local32(g, f);
@@ -537,7 +536,7 @@ fn emitStageRoot(
             let t_if = open(g, f, OP_if_);
             let tn = g.types.node(t);
             match tn.tag {
-                array, grow, resize => {
+                array => {
                     let elem_ty = tn.a;
                     let elem_step, serr = stride(g, f, elem_ty, 0);
                     if serr != blot_direct_types::Error.none { return serr; }
@@ -606,7 +605,6 @@ fn emitStageRoot(
                     lget(g, steal_idx); i32Const(g, 1); op(g, OP_i32_add);
                     callf(g, rt.hmap_put);
                     emitPushFixup(g, owner_fix_slot, w_a, steal_idx, dst_tmp);
-                    lget(g, o_cap); i32Const(g, blot_direct_runtime::frozen_flag); op(g, OP_i32_and); lset(g, o_frozen);
                     // Classify: Empty (len == 0) vs StealHeap (heap_flag != 0) vs CopiedHeap (stack/transport).
                     lget(g, o_len); op(g, OP_i32_eqz);
                     let empty_o_if = open(g, f, OP_if_);
@@ -617,7 +615,7 @@ fn emitStageRoot(
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
-                    lget(g, dst_tmp); lget(g, o_frozen); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                    lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                     op(g, OP_else_);
                     lget(g, o_cap); i32Const(g, blot_direct_runtime::heap_flag); op(g, OP_i32_and);
                     let heap_o_if = open(g, f, OP_if_);
@@ -628,7 +626,7 @@ fn emitStageRoot(
                     lget(g, dst_tmp); lget(g, o_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
                     lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
                     lget(g, dst_tmp); lget(g, o_cap); i32Const(g, blot_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
-                    lget(g, dst_tmp); lget(g, o_frozen); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                    lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                     lget(g, o_base); lset(g, dst_base);
                     op(g, OP_else_);
                     // CopiedHeap: allocate via rt.open_heap, copy raw bytes, queue steal_kind = 2 with pin_slot!
@@ -642,7 +640,7 @@ fn emitStageRoot(
                     lget(g, dst_tmp); lget(g, dst_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
                     lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
                     lget(g, dst_tmp); lget(g, dst_cap); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
-                    lget(g, dst_tmp); lget(g, o_frozen); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
+                    lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                     close(g, f); // heap_o_if
                     if elem_cidx >= 0 {
                         // Push InlineRow strictly targeting destination buffer `dst_base`!

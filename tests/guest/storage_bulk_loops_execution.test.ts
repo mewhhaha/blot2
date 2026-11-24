@@ -54,27 +54,20 @@ entry const shifted = func (end: U32): Array U32 => return do:
   for index in 1 .. end:
     rows[index] := rows[@u32.sub index 1]
   return rows
-const persisted: ResizeArray U32 = #[]
 const short: Array U32 = @array.fill 24 7
 const long: Array U32 = @array.fill 48 7
-const push_range = func (dst: ResizeArray U32) -> (src: Array U32) -> (end: U32): Unit => return do:
+const push_range = func (emit: U32 -> U32 ! {Foreign}) -> (src: Array U32) -> (end: U32): Unit ! {Foreign} => return do:
   for index in 0 .. end:
-    @storage.push dst src[index]
+    use _ <- emit src[index]
   return ()
-entry const trap_source = func () => return push_range persisted short 48
-entry const trap_target = func () => return push_range persisted long 64
-entry const read = func () => return @storage.freeze (@storage.copy persisted)
-entry const reset = func () => return @storage.truncate persisted 0
-const effects: GrowArray U32 = #[]
-const rhs = func (index: U32): U32 => return do:
-  @storage.push effects 1
-  return index
-entry const ordered = func (end: U32): Array U32 => return do:
+entry const trap_source = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit short 48
+entry const trap_target = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit long 64
+entry const ordered_trap = func (emit: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
   let dst: Array U32 = @array.fill 48 9
-  for index in 0 .. end:
-    dst[index] := rhs index
+  for index in 0 .. 49:
+    dst[index] := if @u32.eq index 48 then @u32.div 1 0 else index
+    use _ <- emit 1
   return dst
-entry const effect_count = func () => return @storage.length effects
 const fill_then_read = func (rows: own Array U32) -> (first: U32) -> (end: U32) -> (read_index: U32): U32 => return do:
   for index in first .. end:
     rows[index] := 7
@@ -175,25 +168,38 @@ Deno.test(`bulk fixed scalar loops preserve ranges aliases bits and prefix traps
         );
         assert.equal(await call("bool_fill", 48), true);
         assert.deepEqual(await call("shifted", 48), new Uint32Array(48));
+        let emitted: number[] = [];
+        const emit = guest.capability({
+          parameter: "U32",
+          result: "U32",
+          call: (value: number) => {
+            emitted.push(value);
+            return value;
+          },
+        });
         await assert.rejects(
-          () => call("trap_source"),
+          () => call("trap_source", emit),
           WebAssembly.RuntimeError,
         );
         assert.deepEqual(
-          await call("read"),
+          Uint32Array.from(emitted),
           new Uint32Array(24).fill(7),
         );
-        await call("reset");
+        emitted = [];
         await assert.rejects(
-          () => call("trap_target"),
+          () => call("trap_target", emit),
           WebAssembly.RuntimeError,
         );
-        assert.deepEqual(await call("read"), new Uint32Array(48).fill(7));
+        assert.deepEqual(
+          Uint32Array.from(emitted),
+          new Uint32Array(48).fill(7),
+        );
+        emitted = [];
         await assert.rejects(
-          () => call("ordered", 49),
+          () => call("ordered_trap", emit),
           WebAssembly.RuntimeError,
         );
-        assert.equal(await call("effect_count"), 48);
+        assert.equal(emitted.length, 48);
         for (
           const [first, end, readIndex, expected] of [
             [0, 48, 47, 14],

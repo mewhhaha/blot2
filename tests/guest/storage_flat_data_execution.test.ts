@@ -5,7 +5,7 @@ Deno.test("source storage admission covers a reached library beyond 128 declarat
   const calls = Array.from({length: 150}, (_, index) => `  total := self + part_${index} 1`).join("\n");
   await compileAndRun(`${helpers}
 entry const sum = func () => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let total = 0
 ${calls}
   return total
@@ -22,8 +22,8 @@ const sum_pool = func values => return do:
     total := self + value
   return total
 entry const lengths = func () => return do:
-  let growing: GrowArray U32 = #[10, 20]
-  let changing: ResizeArray U32 = #[30]
+  let growing: Array U32 = #[10, 20]
+  let changing: Array U32 = #[30]
   let pushed = @storage.push growing 40
   let borrowed = &growing[0..2]
   let total = 0
@@ -45,16 +45,15 @@ const bump = func (own access) => return do:
   access.rows[0] := access.rows[0] + 1
   return access
 const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) -> (access: own {rows: Array U32}) => return callback access
-const accept = func (calls: GrowArray U32) => return func (value: U32) => return do:
-  @storage.push calls 1
-  return value > 0
 entry const inspect = func (present: Bool) => return do:
-  let calls: GrowArray U32 = #[]
+  let calls: Array U32 = #[]
   let rows: Array {label: U32, item: Maybe (U32, F32)} = #[
     {label: 7, item: if present then $Some (40, 2.0) else $Nothing}
   ]
   let amount = case rows[0].item of
-    $Some (value, scale) if accept calls value => value + @f32.to_u32 scale
+    $Some (value, scale) if (do:
+      @storage.push calls 1
+      break value > 0) => value + @f32.to_u32 scale
     $Some _ => @panic "unchosen payload"
     $Nothing => 9
   return amount + @storage.length calls
@@ -69,7 +68,7 @@ entry const generic_update = func (chosen: Bool) => return do:
     false => false
   return access.rows[0] + (if selected then 1 else 0)
 entry const inferred_field = func () => return do:
-  let rows: ResizeArray (Maybe Span) = #[$Some ($Span {start: 7, count: 11})]
+  let rows: Array (Maybe Span) = #[$Some ($Span {start: 7, count: 11})]
   let $Some found = read_optional rows 0 else:
     return 0
   return found.start + found.count
@@ -86,13 +85,13 @@ Deno.test("normal branch joins array results while exits and aggregate carries r
   await compileAndRun(`
 type Change is data = $Plus U32 | $Set U32 | $Scale U32 | $Skip
 entry const branch = func (early: Bool) => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let rows = if early then (do:
     return 7
   ) else #[40, 2]
   return rows[0] + rows[1]
 entry const traverse = func (count: U32) => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let state = (1, 2)
   for index in 0..count:
     let (left, right) = state
@@ -106,7 +105,7 @@ entry const traverse = func (count: U32) => return do:
     total := self + row.amount
   return left * 10 + total
 entry const sort_three = func () => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let rows: Array U32 = #[3, 1, 2]
   for i in 1..3:
     let j = i
@@ -119,7 +118,7 @@ entry const sort_three = func () => return do:
       j := self - 1
   return rows[0] * 100 + rows[1] * 10 + rows[2]
 entry const match_rebind = func () => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let rows: Array U32 = #[0]
   let total = 0
   for change in #[$Plus 3, $Skip, $Set 7, $Scale 2]:
@@ -151,7 +150,7 @@ const create = func (n: U32) => return do:
   let scratch = #[n, n]
   return #[scratch[0]]
 entry const repeat = func () => return do:
-  let anchor: GrowArray U32 = #[]
+  let anchor: Array U32 = #[]
   let total = 0
   for index in 0..5000:
     let rows = create index

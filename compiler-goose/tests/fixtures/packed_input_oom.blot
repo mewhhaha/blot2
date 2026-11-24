@@ -1,6 +1,6 @@
 const leaf = func state -> (flag: U32): U32 => return if @u32.eq flag 0 then state.tree.a.a.a.a.a.a.a.a.a else state.tree.b.b.b.b.b.b.b.b.b
 const forward = func state -> (flag: U32): U32 => return do:
-  let scratch: GrowArray U32 = #[flag]
+  let scratch: Array U32 = #[flag]
   @storage.push scratch 1
   return leaf state flag
 entry const answer = func (input: U32): U32 => return do:

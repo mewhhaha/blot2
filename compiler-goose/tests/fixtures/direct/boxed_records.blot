@@ -13,7 +13,7 @@ entry func nested (n: U32): U32 => return do:
   o.left.a := 50
   break o.left.a + o.right.a + o.tag + o.left.r
 entry func stored (n: U32): U32 => return do:
-  let items: GrowArray Wide = #[wide 1]
+  let items: Array Wide = #[wide 1]
   @storage.push items (wide n)
   items[0].a := 77
   let first = items[0]

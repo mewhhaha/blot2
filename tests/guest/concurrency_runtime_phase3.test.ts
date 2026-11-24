@@ -178,11 +178,11 @@ function pairToU64(lo: number, hi: number): bigint {
 // ============================================================================
 // Acceptance Law #1: Recursive nodes, 80-byte wide copiedBox with nested
 // owners, projected interior box, nested temp owners (stack CopiedHeap +
-// StealHeap), grown-then-truncated length==0 #[~U32], and 0 heap_live_bytes
+// StealHeap), grown-then-truncated length==0 #[U32], and 0 heap_live_bytes
 // drift across 100+ repeated proc_step array replies.
 // ============================================================================
 
-Deno.test("Phase 3 Law #1: recursive node, 80B wide box, interior projection, nested temp owners, truncated #[~U32], and zero heap drift", async () => {
+Deno.test("Phase 3 Law #1: recursive node, 80B wide box, interior projection, nested temp owners, truncated #[U32], and zero heap drift", async () => {
   await compileAndRun(
     `type RecNode is data = $Empty | $Node { a: U32, b: U32, c: U32, d: U32, next: RecNode }
 
@@ -192,7 +192,7 @@ type WideBox is data = $WideBox {
   w8: U32, w9: U32, w10: U32, w11: U32,
   w12: U32, w13: U32, w14: U32, w15: U32,
   nested_stack: #[#[U32]],
-  nested_grow: #[+#[+U32]]
+  nested_grow: #[#[U32]]
 }
 
 type OuterBox is data = $OuterBox {
@@ -203,7 +203,7 @@ type OuterBox is data = $OuterBox {
 type FullState is data = $FullState {
   chain: RecNode,
   outer: OuterBox,
-  trunc_buf: #[~U32],
+  trunc_buf: #[U32],
   turn: U32
 }
 
@@ -213,11 +213,11 @@ func make_wide (seed: U32): WideBox =>
   let s0 = #[seed, @u32.add seed 1]
   let s1 = #[@u32.add seed 2, @u32.add seed 3]
   let ns: #[#[U32]] = #[s0, s1]
-  let g0: #[+U32] = #[@u32.add seed 10]
+  let g0: #[U32] = #[@u32.add seed 10]
   @storage.push g0 (@u32.add seed 11)
-  let g1: #[+U32] = #[@u32.add seed 20]
+  let g1: #[U32] = #[@u32.add seed 20]
   @storage.push g1 (@u32.add seed 21)
-  let ng: #[+#[+U32]] = #[g0]
+  let ng: #[#[U32]] = #[g0]
   @storage.push ng g1
   return $WideBox {
     w0: seed, w1: 1, w2: 2, w3: 3,
@@ -246,7 +246,7 @@ func p_init (seed: U32): FullState =>
   let c1 = $Node { a: @u32.add seed 10, b: 4, c: 5, d: 6, next: c0 }
   let wb = make_wide seed
   let outer = $OuterBox { tag_id: 77, big: wb }
-  let tb: #[~U32] = #[]
+  let tb: #[U32] = #[]
   for i in 0..64:
     @storage.push tb i
   @storage.truncate tb 0
@@ -336,20 +336,20 @@ entry process proj_proc: Process [U32, U32, #[U32]] = { init: proj_init, step: p
   );
 
   // Dedicated zero-drift witness in a clean Store: 110 repeated turns allocating 256 KiB reply +
-  // 256 KiB grown-then-truncated length==0 #[~U32], followed by allocating 127.75 MiB of 128 MiB heap_budget!
-  // Any single leaked 256 KiB block from either Empty #[~U32] or reply_pin_slot would immediately trap!
+  // 256 KiB grown-then-truncated length==0 #[U32], followed by allocating 127.75 MiB of 128 MiB heap_budget!
+  // Any single leaked 256 KiB block from either Empty #[U32] or reply_pin_slot would immediately trap!
   await compileAndRun(
-    `func alloc_heap_u32 (n: U32) -> (v: U32): #[+U32] =>
-  let out: #[+U32] = #[]
+    `func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
+  let out: #[U32] = #[]
   for _ in 0..n:
     @storage.push out v
   return out
 
-func drift_init (_: U32): #[~U32] =>
-  let b: #[~U32] = #[]
+func drift_init (_: U32): #[U32] =>
+  let b: #[U32] = #[]
   return b
 
-func drift_step (st: own #[~U32]) -> (cmd: U32): (#[~U32], #[U32]) =>
+func drift_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
   if @u32.eq cmd 999:
     // Allocate 32+32+16+16+8+8+4+4+2+2+1+1 = 126 MiB live in heap_budget (128 MiB)!
     // Peak heap_top = 126 MiB + <1 MiB scratch free-lists < 128 MiB, while any >2 MiB heap_live_bytes leak traps!
@@ -369,8 +369,8 @@ func drift_step (st: own #[~U32]) -> (cmd: U32): (#[~U32], #[U32]) =>
     let s2 = @u32.add (@u32.add c1[0] c2[0]) (@u32.add d1[0] d2[0])
     let s3 = @u32.add (@u32.add e1[0] e2[0]) (@u32.add f1[0] f2[0])
     return (st, #[@u32.add s1 (@u32.add s2 s3), a1.length])
-  // Grow a fresh temporary #[~U32] via real @storage.push to 256 KiB (65536 words) then truncate to 0!
-  let tmp: #[~U32] = #[]
+  // Grow a fresh temporary #[U32] via real @storage.push to 256 KiB (65536 words) then truncate to 0!
+  let tmp: #[U32] = #[]
   for i in 0..65536:
     @storage.push tmp i
   @storage.truncate tmp 0
@@ -405,8 +405,8 @@ entry process drift_proc: Process [U32, U32, #[U32]] = { init: drift_init, step:
 
 Deno.test("Phase 3: Page-0 offset 640 arena_oom_flag distinguishes logical OOM (0) vs physical fragmentation OOM (1)", async () => {
   const bytes = await compileToWasm(`
-func alloc_heap_u32 (n: U32) -> (v: U32): #[+U32] =>
-  let out: #[+U32] = #[]
+func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
+  let out: #[U32] = #[]
   for _ in 0..n:
     @storage.push out v
   return out
@@ -547,8 +547,8 @@ entry func roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
   let r2 = cb #[33, 44]
   return #[r1.length, r1[0], r1[2], r2.length, r2[0], r2[4]]
 
-func alloc_heap_u32 (n: U32) -> (v: U32): #[+U32] =>
-  let out: #[+U32] = #[]
+func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
+  let out: #[U32] = #[]
   for _ in 0..n:
     @storage.push out v
   return out
@@ -674,8 +674,8 @@ entry func test_box_simd_and_fork (x: U32): #[U32] =>
   let _ = fork arr:
     let _ = @simd.store arr 0 (mk 90, mk 91, mk 92, mk 93)
     return 1
-  // Roll back a growing #[+U32] realloc inside nested fork!
-  let g: #[+U32] = #[1, 2]
+  // Roll back a growing #[U32] realloc inside nested fork!
+  let g: #[U32] = #[1, 2]
   let _ = fork g:
     for i in 0..64:
       @storage.push g i
@@ -1100,11 +1100,11 @@ entry func reversed_rewind (_: #[U32]): #[U32] =>
   const procBytes = await compileToWasm(`
 const STATIC_LUT: #[U32] = #[10, 20, 30, 40]
 
-func fp_init (seed: U32): #[+U32] =>
-  let d: #[+U32] = #[seed, @u32.add seed 1]
+func fp_init (seed: U32): #[U32] =>
+  let d: #[U32] = #[seed, @u32.add seed 1]
   return d
 
-func fp_step (st: own #[+U32]) -> (cmd: U32): (#[+U32], #[U32]) =>
+func fp_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
   if @u32.eq cmd 999:
     @panic "poison turn"
   // Speculatively mutate persistent State array inside fork and roll back!

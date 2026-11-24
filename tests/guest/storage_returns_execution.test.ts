@@ -16,7 +16,7 @@ const decode = func (input: Array F32) => return func (start: U32) => return do:
       return $Move {x: 2.0, y: 3.0}
     _ => @panic "invalid"
 entry const answer = func (tag: U32) => return do:
-  let marker: ResizeArray U32 = #[0]
+  let marker: Array U32 = #[0]
   let values: Array F32 = #[@u32.to_f32 (@u32.add tag marker[0]), 0.0]
   let event = decode values 0
   return case event of
@@ -25,7 +25,7 @@ entry const answer = func (tag: U32) => return do:
     $None => 0
 
 entry const mixed = func (tag: U32) => return do:
-  let rows: ResizeArray U32 = #[tag]
+  let rows: Array U32 = #[tag]
   return case rows[0] of
     0 => do:
       return 10

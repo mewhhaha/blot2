@@ -41,7 +41,13 @@ programs with unchanged diagnostics. Phase 3 (23 November 2026) removed the
 `=` borrowed-mutator store statement, retiring the 3 remaining store-only
 programs (h04_store_keeps_parameter, h05_store_keeps_owned,
 h06_store_through_lent_keeps_unique) and leaving 199 programs with unchanged
-diagnostics.
+diagnostics. Unified Dynamic Arrays Phase 5 (24 November 2026) removed
+`#[+T]`/`#[~T]`/`GrowArray`/`ResizeArray`/`seal`/`@storage.freeze`/
+`@storage.reserve`, enforced unique ownership (`ownedInPlacePath`) on
+`@storage.push`/`@storage.pop`/`@storage.truncate`, migrated the 9 legacy
+programs (`b34`, `b35`, `c15`, `c16`, `c17`, `h07`, `h13`, `h15`, `h18`), and
+added 7 strict length-mutation laws (`o01..o07`), bringing the suite to 206
+programs.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

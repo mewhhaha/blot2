@@ -5,44 +5,48 @@ import { instantiateGuest } from "../../host/guest.ts";
 const longField = "x".repeat(7000);
 const source = `import * as array from "std/array"
 const keeper: Array U32 = #[123]
-const implicit_pool: GrowArray U32 = #[5]
-const implicit_writer = func (destination: ResizeArray U32) => return do:
-  destination.push implicit_pool[@u32.sub (@storage.length implicit_pool) 1]
-const explicit_writer = func (destination: ResizeArray U32) -> (pool: GrowArray U32) => return do:
-  destination.push pool[@u32.sub (@storage.length pool) 1]
+const implicit_pool: Array U32 = #[5]
+const implicit_writer = func (destination: own Array U32): Array U32 => return do:
+  @storage.push destination implicit_pool[@u32.sub (@storage.length implicit_pool) 1]
+  return destination
+const explicit_writer = func (destination: own Array U32) -> (pool: Array U32): Array U32 => return do:
+  @storage.push destination pool[@u32.sub (@storage.length pool) 1]
+  return destination
 entry const global_writer = func (input: U32) => return do:
-  let pool = implicit_pool
+  let pool = @storage.copy implicit_pool
   @storage.push pool (@u32.add input 7)
-  let destination: ResizeArray U32 = #[input]
-  implicit_writer destination
-  explicit_writer destination pool
+  let destination: Array U32 = #[input]
+  destination := implicit_writer self
+  destination := explicit_writer self pool
   return #[destination[0], destination[1], destination[2]]
-const region_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
-  let first: GrowArray U32 = #[input]
-  let second: ResizeArray U32 = #[@u32.add input 1]
-  destination.push first[0]
-  destination.push second[0]
+const region_writer = func (destination: own Array U32) -> (input: U32): Array U32 => return do:
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[@u32.add input 1]
+  @storage.push destination first[0]
+  @storage.push destination second[0]
+  return destination
 entry const region_reuse = func (input: U32) => return do:
-  let destination: ResizeArray U32 = #[input]
-  region_writer destination input
-  do:
-    let busy: GrowArray U32 = #[77]
-    region_writer destination (@u32.add input 10)
-    busy.push 78
+  let destination: Array U32 = #[input]
+  destination := region_writer self input
+  destination := do:
+    let busy: Array U32 = #[77]
+    let next = region_writer self (@u32.add input 10)
+    @storage.push busy 78
     if busy[0] != 77 or busy[1] != 78:
       @panic "writer changed a live caller region"
-    region_writer destination (@u32.add input 20)
-  region_writer destination (@u32.add input 30)
-  do:
+    break region_writer next (@u32.add input 20)
+  destination := region_writer self (@u32.add input 30)
+  destination := do:
     let busy = do:
-      let temporary: GrowArray U32 = #[0]
-      let kept: GrowArray U32 = #[77]
+      let temporary: Array U32 = #[0]
+      let kept: Array U32 = #[77]
       break kept
-    region_writer destination (@u32.add input 40)
-    busy.push 78
+    let next = region_writer self (@u32.add input 40)
+    @storage.push busy 78
     if busy[0] != 77 or busy[1] != 78:
       @panic "writer changed its second scratch region"
-  region_writer destination (@u32.add input 50)
+    break next
+  destination := region_writer self (@u32.add input 50)
   if keeper[0] != 123:
     @panic "writer changed a persistent pool"
   return array.generate destination.length (func index => return destination[index])
@@ -52,7 +56,7 @@ const Magnitude.abs = func (value: Magnitude) => return case value of
 const Magnitude.plus = func (value: Magnitude) -> (extra: F32) => return case value of
   $Magnitude number => number + extra
 entry const primitive_getters = func (input: F32) => return do:
-  let rows: ResizeArray F32 = #[input]
+  let rows: Array F32 = #[input]
   let value = rows[0]
   let magnitude = $Magnitude value
   let add = magnitude.plus
@@ -64,20 +68,18 @@ entry const nested_readers = func (input: U32) => return do:
     if outer == 99:
       @panic "unvisited suffix"
     return array.any (func inner => return inner == outer) needles) values
-type Shifted is data = $Shifted {rows: ResizeArray U32}
+type Shifted is data = $Shifted {rows: Array U32}
 const Shifted.length = func (value: Shifted) => return @u32.add (@storage.length value.rows) 100
 const Shifted.at = func (value: Shifted) -> (index: U32) => return @u32.add value.rows[index] 200
 const add_three = func first -> second -> third => return first + second + third
-const write_three = func (first: U32) -> (second: U32) -> (rows: ResizeArray U32) => return do:
-  rows.push (@u32.add first second)
-  return rows.length
+const compute_three = func (first: U32) -> (second: U32) -> (extra: U32) => return @u32.add first (@u32.add second extra)
 entry const staged_effect = func (input: U32) => return do:
-  let rows: ResizeArray U32 = #[]
-  let first = write_three input
+  let rows: Array U32 = #[]
+  let first = compute_three input
   let second = first 1
   let before = rows.length
-  let result = second rows
-  return #[before, result, rows[0]]
+  @storage.push rows (second 0)
+  return #[before, rows.length, rows[0]]
 entry const partial_integer = func (input: U32) => return do:
   let first = add_three input
   let second = first 2
@@ -87,33 +89,34 @@ entry const partial_floating = func (input: F32) => return do:
   let second = first 2.25
   return second 3.5
 entry const getters = func (input: U32) => return do:
-  let first: ResizeArray U32 = #[input]
-  let second: ResizeArray U32 = #[10]
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[10]
   first[0] := @u32.add input 2
-  first.push 99
+  @storage.push first 99
   let read = first.at
   let shifted = $Shifted {rows: second}
   return #[first.length, read 0, shifted.length, shifted.at 0]
-const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
+const encoded_writer = func (destination: own Array U32) -> (input: U32): Array U32 => return do:
   let encode = func (value: U32): Array U32 => return #[value, @u32.add value 1]
   let encoded = encode input
-  let scratch: GrowArray U32 = #[]
-  scratch.push encoded[0]
+  let scratch: Array U32 = #[]
+  @storage.push scratch encoded[0]
   for value in encoded:
-    destination.push value
-  destination.push scratch[0]
+    @storage.push destination value
+  @storage.push destination scratch[0]
+  return destination
 entry const scratch_writer = func (input: U32) => return do:
-  let destination: ResizeArray U32 = #[]
+  let destination: Array U32 = #[]
   for index in 0 .. 100:
-    encoded_writer destination (@u32.add (@u32.add input (keeper[0] - 123)) index)
+    destination := encoded_writer self (@u32.add (@u32.add input (keeper[0] - 123)) index)
   return #[destination.length, destination[0], destination[1], destination[2], destination[297], destination[298], destination[299]]
-type LargeState = {${longField}: ResizeArray U32}
+type LargeState = {${longField}: Array U32}
 const write_large = func (state: own LargeState) -> (amount: U32): LargeState => return do:
   state.${longField}[0] := @u32.add state.${longField}[0] amount
   return state
 const read_large = func (state: LargeState) => return state.${longField}[0]
 entry const large_key = func (input: U32) => return do:
-  let rows: ResizeArray U32 = #[10]
+  let rows: Array U32 = #[10]
   let state = {${longField}: rows}
   state := write_large state input
   let before = read_large state
@@ -122,7 +125,7 @@ entry const large_key = func (input: U32) => return do:
 type Research rows is data = $Research {rows: rows, add: U32}
 type Box value is data = $Box value
 const read = func (research: Research (&[U32])): U32 => return @u32.add research.rows[0] research.add
-const read_research = func (rows: ResizeArray U32) -> (add: U32): U32 => return read ($Research {rows: &rows[0..1], add})
+const read_research = func (rows: Array U32) -> (add: U32): U32 => return read ($Research {rows: &rows[0..1], add})
 const unwrap = func (box: Box value) => return case box of
   $Box value => value
 const present = func (maybe: Maybe value) => return case maybe of
@@ -130,19 +133,19 @@ const present = func (maybe: Maybe value) => return case maybe of
   $Nothing => @panic "missing"
 const factory = func base => return func extra => return $Box (base + extra)
 entry const answer = func (input: U32) => return do:
-  let first: ResizeArray U32 = #[input]
-  let second: ResizeArray U32 = #[@u32.add input 10]
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[@u32.add input 10]
   let before = read_research first 1
   first[0] := @u32.add input 100
   let after = read_research first 2
   let other = read_research second 3
   return #[before, after, other]
 entry const integer = func () => return do:
-  let rows: ResizeArray U32 = #[1]
+  let rows: Array U32 = #[1]
   let wrap = factory rows[0]
   return unwrap (present ($Some (wrap 2)))
 entry const floating = func () => return do:
-  let rows: ResizeArray F32 = #[1.25]
+  let rows: Array F32 = #[1.25]
   let wrap = factory rows[0]
   return unwrap (present ($Some (wrap 2.5)))
 `;
@@ -183,7 +186,7 @@ Deno.test(`selected generic readers retain nominal payloads and captured instant
         for (const input of [0, 1, 100]) {
           assert.deepEqual(
             await call("global_writer", input),
-            new Uint32Array([input, input + 7, input + 7]),
+            new Uint32Array([input, 5, input + 7]),
           );
           assert.deepEqual(
             await call("region_reuse", input),

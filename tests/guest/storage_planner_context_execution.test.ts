@@ -21,11 +21,11 @@ const Meter.amount = func ($Meter value) => return value
 const read = func (context: {${fields}, zrows: rows, zvalues: values, zmeter: meter}) => return
   if context.zmeter.amount == 0 then false else helper.nested context.zrows context.zvalues
 entry const integer = func (input: U32) => return do:
-  let marker: ResizeArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let rows: Array {value: U32} = #[{value: marker[0]}]
   return read {${values}, zrows: rows, zvalues: #[2], zmeter: $Meter 1}
 entry const floating = func (input: F32) => return do:
-  let marker: ResizeArray F32 = #[input]
+  let marker: Array F32 = #[input]
   let rows: Array {value: F32} = #[{value: marker[0]}]
   return read {${values}, zrows: rows, zvalues: #[2.5], zmeter: $Meter 1}
 `;

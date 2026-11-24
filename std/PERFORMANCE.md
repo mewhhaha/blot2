@@ -9,24 +9,23 @@ Earlier counted-runtime/List-layout measurements and optimizer details remain in
 
 ## Collections and ownership
 
-Choose a fixed `Array` when the extent is known, `GrowArray` for append and
-`ResizeArray` when shrinking is needed. Current arrays have checked contiguous
-row storage. An access record, view or callback capture preserves aliases;
-updates do not silently preserve an older array version. Use `@storage.copy` and
-copy referenced payloads for independently retained state.
+Use `Array a` (`#[a]`) for dynamic contiguous rows and `#[N; a]` when the
+length is statically fixed. Current arrays have checked contiguous row storage;
+in-place element writes and length mutations (`@storage.push`, `@storage.pop`,
+`@storage.truncate`) require unique ownership. Use `@storage.copy` when an
+independent snapshot is needed, and `freeze` (`*T`) for O(1) read-only sharing.
 
 Collection-producing helpers may copy substantial rows. Keep input and output
-owners' simultaneous live extents within the configured plan. Large builders can
-need a separately named destination, followed by freeze. `freeze` removes growth
-authority across aliases; it does not copy data or create a snapshot. Preserve
+owners' simultaneous live extents within the configured plan. Preserve
 overflow, range and lifetime checks instead of increasing capacities to pass a
 workload.
 
 `prefix_sums` scans in input order into one independent destination. Array
-`indices`, `filter` and `filter_map` append into a named grower and freeze once.
-`concat` and `flatten` preserve ordering and length-overflow checks. Lists are
-distinct from arrays; general runtime List support is not promised by the owned
-profile. Keep grammar and compile-time semantics separate from backend support.
+`indices`, `filter` and `filter_map` append into a local `Array` and return it
+directly. `concat` and `flatten` preserve ordering and length-overflow checks.
+Lists are distinct from arrays; general runtime List support is not promised by
+the owned profile. Keep grammar and compile-time semantics separate from
+backend support.
 
 ## Effects and numerical behavior
 

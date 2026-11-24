@@ -6,8 +6,10 @@ hex, beside NAME.expected. `writer.expected` preserves the exact bytes the Zig
 direct backend produced on 15 November 2026; `runtime.expected` was updated on
 23 November 2026 for Phase 3 of Concurrency vNext (history-independent logical
 stack/heap budgets, exact-cap active-only stack free lists, dedicated transport
-pool with Page-0 offset 640 `arena_oom_flag`, `live_flag` / `static_pool_flag`,
-inter-procedural `escape_min_slot`, and trap-safe `fork` / persistent staging).
+pool with Page-0 offset 640 `arena_oom_flag`, `live_flag` / `static_pool_flag`, inter-procedural `escape_min_slot`, and
+trap-safe `fork` / persistent staging), and on 24 November 2026 for Unified
+Dynamic Arrays Phase 5 (removed `Runtime.freeze` and the `GrowArray`/
+`ResizeArray` distinction; `runtime.expected` shrinks to 7707 bytes).
 The output must equal the record, and Goose must not warn.
 
 Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]

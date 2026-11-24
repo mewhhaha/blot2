@@ -13,58 +13,67 @@ const size = func collections: U32 => return do:
     let text_length: U32 = row.text.length
     total := self + text_length
   return total
-const effects: GrowArray U32 = #[]
-const tick = func (value: U32): U32 => return do:
-  @storage.push effects 1
-  return value
 entry const empty = func (count: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   return size {rows: &rows[0..rows.length]}
 entry const populated = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65, 66]
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   if count > 0:
-    rows.push ($Row {text: &labels[0..2]})
+    @storage.push rows ($Row {text: &labels[0..2]})
   return size {rows: &rows[0..rows.length]}
 entry const joined = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65, 66]
-  let first: ResizeArray Row = #[]
-  let second: ResizeArray Row = #[$Row {text: &labels[0..2]}]
+  let first: Array Row = #[]
+  let second: Array Row = #[$Row {text: &labels[0..2]}]
   let selected = if count == 0 then first else second
   return size {rows: &selected[0..selected.length]}
-entry const fallback_return = func (value: U32): U32 => return do:
+entry const fallback_return = func (value: U32): Array U32 => return do:
+  let ticks: Array U32 = #[]
   let absent: Maybe Row = $Nothing
   let $Some row = absent else:
-    return tick value
-  return row.text.at 0
-entry const fallback_break = func (count: U32): U32 => return do:
+    @storage.push ticks 1
+    return #[value, @storage.length ticks]
+  return #[row.text.at 0, @storage.length ticks]
+entry const fallback_break = func (count: U32): Array U32 => return do:
+  let ticks: Array U32 = #[]
   for index in 0 .. count:
     let absent: Maybe Row = $Nothing
     let $Some row = absent else:
-      tick index
+      @storage.push ticks 1
       break
-    return row.text.at 0
-  return 42
-entry const fallback_continue = func (count: U32): U32 => return do:
+    return #[row.text.at 0, @storage.length ticks]
+  return #[42, @storage.length ticks]
+entry const fallback_continue = func (count: U32): Array U32 => return do:
+  let ticks: Array U32 = #[]
   for index in 0 .. count:
     let absent: Maybe Row = $Nothing
     let $Some row = absent else:
-      tick index
+      @storage.push ticks 1
       continue
-    return row.text.at 0
-  return 42
-entry const evaluated = func (value: U32): U32 => return do:
-  let needle = tick value
+    return #[row.text.at 0, @storage.length ticks]
+  return #[42, @storage.length ticks]
+entry const evaluated = func (value: U32): Array U32 => return do:
+  let ticks: Array U32 = #[]
+  @storage.push ticks 1
+  let needle = value
   let absent: Maybe U32 = $Nothing
-  let ($Some item, ^needle) = (absent, tick value) else:
-    return tick 99
-  return item
-entry const dynamic = func (value: U32): U32 => return do:
-  let candidate: Maybe U32 = if value == 0 then $Nothing else $Some (tick value)
+  let second = do:
+    @storage.push ticks 1
+    break value
+  let ($Some item, ^needle) = (absent, second) else:
+    @storage.push ticks 1
+    return #[99, @storage.length ticks]
+  return #[item, @storage.length ticks]
+entry const dynamic = func (value: U32): Array U32 => return do:
+  let ticks: Array U32 = #[]
+  let candidate: Maybe U32 = if value == 0 then $Nothing else do:
+    @storage.push ticks 1
+    break $Some value
   let $Some item = candidate else:
-    return tick 99
-  return item
-entry const effect_count = func (): U32 => return @storage.length effects
+    @storage.push ticks 1
+    return #[99, @storage.length ticks]
+  return #[item, @storage.length ticks]
 `;
 
 Deno.test(`refutable bindings preserve iterator and exiting fallback control flow`, async () => {
@@ -88,29 +97,33 @@ Deno.test(`refutable bindings preserve iterator and exiting fallback control flo
       const guest = await instantiateGuest(result.bytes, { asynchronous });
       const call = (name: string, value: number | null) =>
         asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
-      let effects = 0;
       try {
         for (const count of [0, 1, 4]) {
           assert.equal(await call("empty", count), 0);
           assert.equal(await call("populated", count), count === 0 ? 0 : 2);
           assert.equal(await call("joined", count), count === 0 ? 0 : 2);
-          assert.equal(await call("fallback_break", count), 42);
-          effects += count === 0 ? 0 : 1;
-          assert.equal(await call("fallback_continue", count), 42);
-          effects += count;
-          assert.equal(await call("effect_count", null), effects);
+          assert.deepEqual(
+            await call("fallback_break", count),
+            Uint32Array.of(42, count === 0 ? 0 : 1),
+          );
+          assert.deepEqual(
+            await call("fallback_continue", count),
+            Uint32Array.of(42, count),
+          );
         }
         for (const value of [0, 1, 42, 0xFFFFFFFF]) {
-          assert.equal(await call("fallback_return", value), value);
-          effects++;
-          assert.equal(await call("evaluated", value), 99);
-          effects += 3;
-          assert.equal(
-            await call("dynamic", value),
-            value === 0 ? 99 : value,
+          assert.deepEqual(
+            await call("fallback_return", value),
+            Uint32Array.of(value, 1),
           );
-          effects++;
-          assert.equal(await call("effect_count", null), effects);
+          assert.deepEqual(
+            await call("evaluated", value),
+            Uint32Array.of(99, 3),
+          );
+          assert.deepEqual(
+            await call("dynamic", value),
+            Uint32Array.of(value === 0 ? 99 : value, 1),
+          );
         }
       } finally {
         guest.dispose();

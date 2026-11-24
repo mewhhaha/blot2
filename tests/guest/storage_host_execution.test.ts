@@ -5,36 +5,35 @@ import { compileAndRun } from "./compile_helpers.ts";
 Deno.test("data-stack host arrays copy packets and preserve application owners after traps", async () => {
   await compileAndRun(
     `
-const world: ResizeArray U32 = #[40]
+const world: Array U32 = #[40]
 entry const exchange = func (input: Array U32): Array U32 => return do:
   let next = input[0]
-  let previous = @storage.copy world
-  @storage.truncate world 0
-  @storage.push world next
-  return @storage.freeze previous
+  let out = @storage.copy world
+  @storage.push out next
+  return out
 entry const read = func () => return world[0]
 entry const floats = func (input: Array F32): Array F32 => return do:
-  let scratch: GrowArray F32 = #[input[1], input[0]]
-  return @storage.freeze scratch
+  let scratch: Array F32 = #[input[1], input[0]]
+  return scratch
 `,
     (guest, bytes) => {
       const input = new Uint32Array([42]);
       const output = guest.call("exchange", input);
-      assert.deepEqual(output, new Uint32Array([40]));
+      assert.deepEqual(output, new Uint32Array([40, 42]));
       input[0] = 99;
-      assert.equal(guest.call("read", null), 42);
+      assert.equal(guest.call("read", null), 40);
       assert.throws(() => guest.call("exchange", new Uint32Array()));
-      assert.equal(guest.call("read", null), 42);
+      assert.equal(guest.call("read", null), 40);
       assert.deepEqual(
         guest.call("exchange", new Uint32Array([7])),
-        new Uint32Array([42]),
+        new Uint32Array([40, 7]),
       );
-      assert.deepEqual(output, new Uint32Array([40]));
+      assert.deepEqual(output, new Uint32Array([40, 42]));
       assert.deepEqual(
         guest.call("floats", new Float32Array([1.5, -2.25])),
         new Float32Array([-2.25, 1.5]),
       );
-      assert.equal(guest.call("read", null), 7);
+      assert.equal(guest.call("read", null), 40);
       const module = new WebAssembly.Module(bytes);
       assert.equal(readGuestAbi(module).version, 8);
       assert.equal(
@@ -75,15 +74,12 @@ entry const floats = func (input: Array F32): Array F32 => return do:
 Deno.test("data-stack callbacks exchange independent packets without retaining heap objects", async () => {
   await compileAndRun(
     `
-const calls: ResizeArray U32 = #[]
 const invoke = func host -> packet => return host packet
 entry const exchange = func (host: Array F32 -> Array F32 ! {Foreign}): Array F32 => return do:
-  let request: GrowArray F32 = #[1.5, 2.5]
-  @storage.push calls 1
-  use first <- invoke host (@storage.freeze request)
+  let request: Array F32 = #[1.5, 2.5]
+  use first <- invoke host request
   use second <- host first
   return #[first[0], second[0], request[0]]
-entry const count = func () => return @storage.length calls
 `,
     (guest) => {
       let count = 0;
@@ -106,7 +102,7 @@ entry const count = func () => return @storage.length calls
           new Float32Array([40, 42, 1.5]),
         );
       }
-      assert.equal(guest.call("count", null), 32);
+      assert.equal(count, 64);
       const failed = guest.capability({
         parameter: "Array F32",
         result: "Array F32",
@@ -115,7 +111,6 @@ entry const count = func () => return @storage.length calls
         },
       });
       assert.throws(() => guest.call("exchange", failed));
-      assert.equal(guest.call("count", null), 33);
       assert.deepEqual(
         guest.call("exchange", host),
         new Float32Array([40, 42, 1.5]),
@@ -127,13 +122,11 @@ entry const count = func () => return @storage.length calls
 Deno.test("ordinary suspended host calls keep data stacks alive and exclude reentry", async () => {
   await compileAndRun(
     `
-const world: ResizeArray U32 = #[7]
+const world: Array U32 = #[7]
 entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
-  let scratch: GrowArray U32 = #[40]
+  let scratch: Array U32 = #[40]
   use next <- host (@storage.load (&scratch[0]))
   scratch[0] := next
-  @storage.truncate world 0
-  @storage.push world next
   return @storage.load (&scratch[0])
 entry const read = func () => return world[0]
 `,
@@ -156,7 +149,7 @@ entry const read = func () => return world[0]
       assert.throws(() => guest.dispose(), { code: "reentrant_call" });
       resolve(42);
       assert.equal(await pending, 42);
-      assert.equal(await guest.callAsync("read", null), 42);
+      assert.equal(await guest.callAsync("read", null), 7);
       const failed = guest.capabilityAsync({
         parameter: "U32",
         result: "U32",
@@ -165,7 +158,7 @@ entry const read = func () => return world[0]
       await assert.rejects(() => guest.callAsync("main", failed), {
         code: "host_exception",
       });
-      assert.equal(await guest.callAsync("read", null), 42);
+      assert.equal(await guest.callAsync("read", null), 7);
     },
     { asynchronous: true },
   );
@@ -174,21 +167,20 @@ entry const read = func () => return world[0]
 Deno.test("Foreign transport budgets both sides of a large copied packet", async () => {
   await compileAndRun(
     `
-const calls: ResizeArray U32 = #[]
 entry const exchange = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
-  let request: GrowArray U32 = #[]
+  let request: Array U32 = #[]
   for 0 .. 153600:
-    let item = @storage.push request 42
-  use response <- host (@storage.freeze request)
-  @storage.push calls 1
+    @storage.push request 42
+  use response <- host request
   return response[153599] + request[0]
-entry const count = func () => return @storage.length calls
 `,
     (guest) => {
+      let count = 0;
       const host = guest.capability({
         parameter: "Array U32",
         result: "Array U32",
         call: (values) => {
+          count++;
           assert.equal(values.length, 153600);
           assert.equal(values[0], 42);
           values[0] = 100;
@@ -196,14 +188,14 @@ entry const count = func () => return @storage.length calls
         },
       });
       assert.equal(guest.call("exchange", host), 49);
-      assert.equal(guest.call("count", null), 1);
+      assert.equal(count, 1);
       const tooLarge = guest.capability({
         parameter: "Array U32",
         result: "Array U32",
         call: () => new Uint32Array(600000),
       });
       assert.throws(() => guest.call("exchange", tooLarge));
-      assert.equal(guest.call("count", null), 1);
+      assert.equal(count, 1);
       assert.equal(guest.call("exchange", host), 49);
     },
   );
@@ -212,11 +204,8 @@ entry const count = func () => return @storage.length calls
 Deno.test("data-stack ABI identifies scalar-only exports without transport", async () => {
   await compileAndRun(
     `
-const state: ResizeArray U32 = #[41]
-entry const next = func () => return do:
-  let next_value = @u32.add state[@u32.sub (@storage.length state) 1] 1
-  @storage.push state next_value
-  return next_value
+const state: Array U32 = #[41]
+entry const next = func (delta: U32) => return @u32.add state[0] delta
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -229,8 +218,8 @@ entry const next = func () => return do:
         WebAssembly.Module.exports(module).map(({ name }) => name),
         ["next", "blot:finish_invocation"],
       );
-      assert.equal(guest.call("next", null), 42);
-      assert.equal(guest.call("next", null), 43);
+      assert.equal(guest.call("next", 1), 42);
+      assert.equal(guest.call("next", 2), 43);
       // An ABI version cannot disguise either legacy runtime contract.
       for (
         const [name, payload] of [

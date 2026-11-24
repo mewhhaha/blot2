@@ -229,10 +229,7 @@ root struct Analyzer {
     fork_taint: u32[>..] = [],
     block_taint: dictionary<u32, u32> = dictionary<u32, u32> {},
     non_freezable: bool[>..] = [],
-    ever_owned: bool[>..] = [],
-    borrows_owned: bool[>..] = [],
     loop_outer: LoopOuter[>..<] = [],
-    length_mut_params: u32[>..] = [],
     non_escaping_params: u32[>..] = [],
     non_escaping_arity: u8[>..] = [],
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
@@ -270,9 +267,6 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.reader_state.resize(binding_count, 0);
         analyzer.reader_arity.resize(binding_count, 0);
         analyzer.member_kind.resize(binding_count, 0);
-        analyzer.ever_owned.resize(binding_count, false);
-        analyzer.borrows_owned.resize(binding_count, false);
-        analyzer.length_mut_params.resize(binding_count, 0);
         analyzer.non_escaping_params.resize(binding_count, 0);
         analyzer.non_escaping_arity.resize(binding_count, 0);
         for binding, index in module.bindings {
@@ -288,27 +282,6 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
             let known .= analyzer.identity_ids.get(key);
             if known { let existing: u32 = known; identity_id = existing; } else { analyzer.identity_ids.insert(key, identity_id); }
             analyzer.members.insert(((identity_id as u64) << 32) | method.member, index);
-            let st_kind = blot_check_storage_types::identity(method.identity.unit, method.identity.decl);
-            if st_kind.present && blot_check_storage_types::isGrowable(st_kind.value) {
-                let sp = module.fieldSpelling(method.member);
-                if sp.present && (sp.value == "push" || sp.value == "truncate" || sp.value == "pop") {
-                    analyzer.length_mut_params[index] |= 1;
-                }
-                if sp.present && (sp.value == "push" || sp.value == "truncate") {
-                    analyzer.non_escaping_params[index] |= 1;
-                    analyzer.non_escaping_arity[index] = 2;
-                }
-            }
-        }
-        // Detect same-module functions whose body directly mutates a parameter's storage length.
-        for body, bi in module.bodies {
-            if bi == 0 || body.root == 0 || !body.is_function { continue; }
-            let params = module.bodyParameters(body);
-            if params.len == 0 { continue; }
-            let mask = scanLengthMutParams(analyzer, module, body.root, params, 0);
-            if mask != 0 && body.binding < analyzer.length_mut_params.len {
-                analyzer.length_mut_params[body.binding] |= mask;
-            }
         }
     }
     for template in module.member_templates { if template.binding < analyzer.member_kind.len { analyzer.member_kind[template.binding] = 1; } }
@@ -439,7 +412,6 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.trail.push(Change { binding: binding, old: self_.facts[binding] });
     self_.facts[binding] = fact;
     self_.touch[binding] += 1;
-    if !self_.dry && fact != none && fact != spent && fact != top { self_.ever_owned[binding] = true; }
 }
 fn kill(self_: Analyzer&, binding: u32) {
     if !local(self_, binding) { return; }
@@ -461,9 +433,6 @@ fn kill(self_: Analyzer&, binding: u32) {
 // field `symbol`. The local, or that field, is shared while the name is in
 // use and gets its fact back afterwards.
 fn borrow(self_: Analyzer&, holder: u32, source: u32, symbol: u32) {
-    if !self_.dry && local(self_, holder) && local(self_, source) && (self_.ever_owned[source] || self_.borrows_owned[source]) {
-        self_.borrows_owned[holder] = true;
-    }
     if !local(self_, holder) || !local(self_, source) || self_.facts[source] == spent || self_.loan_holds[source] != 0 { kill(self_, source); return; }
     var saved = self_.facts[source];
     let whole = wholeLoan(self_, source);
@@ -1003,7 +972,7 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
         if kind == blot_check_storage_types::shared {
             return false;
         }
-        if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize || kind == blot_check_storage_types::sized_array || kind == blot_check_storage_types::sized_grow || kind == blot_check_storage_types::sized_resize {
+        if kind == blot_check_storage_types::sized_array {
             if want == 0 { return true; }
             for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
             return false;
@@ -1104,7 +1073,7 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
             let sk = blot_check_storage_types::identity(n.a, n.b);
             if sk.present {
                 if sk.value == blot_check_storage_types::shared { return false; }
-                if sk.value == blot_check_storage_types::grow || sk.value == blot_check_storage_types::resize || sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::sized_grow || sk.value == blot_check_storage_types::sized_resize {
+                if sk.value == blot_check_storage_types::sized_array {
                     let inner = element(self_, m, ty);
                     if !inner.present { return true; }
                     var elem = inner.value;
@@ -1166,7 +1135,7 @@ recursive fn copyResultFact(self_: Analyzer&, m: const Module&, ty: u32, depth: 
             if blot_check_storage_types::isLengthLiteral(n.a, n.b) { return deep; }
             let sk = blot_check_storage_types::identity(n.a, n.b);
             if sk.present {
-                if sk.value == blot_check_storage_types::grow || sk.value == blot_check_storage_types::resize || sk.value == blot_check_storage_types::sized_array || sk.value == blot_check_storage_types::sized_grow || sk.value == blot_check_storage_types::sized_resize {
+                if sk.value == blot_check_storage_types::sized_array {
                     return freshContainer(self_, m, ty, false);
                 }
                 return none;
@@ -1250,6 +1219,12 @@ recursive fn weaken(self_: Analyzer&, fact: Fact, fields: const u32[:]) -> Fact 
     let inner = weaken(self_, field(self_, fact, fields[0]), fields[1..]);
     return withField(self_, fact, fields[0], inner);
 }
+fn sharedIntoPlace(self_: Analyzer&, target: Place) {
+    if !local(self_, target.binding) { return; }
+    if self_.facts[target.binding] == spent { return; }
+    let weakened = weaken(self_, self_.facts[target.binding], target.fields[..target.len]);
+    set(self_, target.binding, weakened);
+}
 // After a value that may be shared is stored into the storage that `id` and
 // the field steps of `selectors` before their first index select.
 fn sharedInto(self_: Analyzer&, m: const Module&, id: u32, selectors: const UpdateStep[:]) {
@@ -1261,9 +1236,7 @@ fn sharedInto(self_: Analyzer&, m: const Module&, id: u32, selectors: const Upda
         target.fields[target.len] = m.projection(step.projection).field;
         target.len += 1;
     }
-    if self_.facts[target.binding] == spent { return; }
-    let weakened = weaken(self_, self_.facts[target.binding], target.fields[..target.len]);
-    set(self_, target.binding, weakened);
+    sharedIntoPlace(self_, target);
 }
 
 // ---- Visits ------------------------------------------------------------
@@ -1458,9 +1431,6 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { exits: result.exits, .. };
         }
         let fact = taken(self_, m, n.b, result);
-        if !self_.dry && local(self_, n.a) && fact == none && result.origin != 0 && local(self_, result.origin) && (self_.ever_owned[result.origin] || self_.borrows_owned[result.origin]) {
-            self_.borrows_owned[n.a] = true;
-        }
         if n.c >= 2 {
             let outer_b = n.c - 2;
             if local(self_, outer_b) {
@@ -1732,7 +1702,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 return Value { exits: value.exits, .. };
             }
         }
-        if !holds(self_, m, n.ty) { return Value { exits: value.exits, .. }; }
+        if !based && !holds(self_, m, n.ty) { return Value { exits: value.exits, .. }; }
         return Value { origin: value.origin, exits: value.exits, .. };
     }
     if tag == blot_check_core::Tag.array {
@@ -1982,12 +1952,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let held_base = self_.arguments_held.len;
             let place_base = self_.argument_places.len;
             if tag == blot_check_core::Tag.call {
-                var lmut: u32 = 0;
-                if binding != 0 && binding < self_.length_mut_params.len { lmut = self_.length_mut_params[binding]; }
                 for child, pos in m.call(id).arguments {
-                    if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
-                        checkLengthMutation(self_, m, child, id);
-                    }
                     let arg_holder = holder && !(pos < 32 && ((non_esc >> (pos as! u32)) & 1) != 0);
                     let value = lend(self_, m, child, arg_holder, lends_to, brief);
                     exits = exits || value.exits;
@@ -2010,12 +1975,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     let all = visitChildren(self_, m, id);
                     return Value { exits: all, .. };
                 }
-                var lmut: u32 = 0;
-                if binding != 0 && binding < self_.length_mut_params.len { lmut = self_.length_mut_params[binding]; }
                 // The value of `value.member` is the first argument.
                 var callee = Value { .. };
                 if head_tag == blot_check_core::Tag.project {
-                    if (lmut & 1) != 0 { checkLengthMutation(self_, m, m.node(head).a, id); }
                     let recv_holder = holder && (non_esc & 1) == 0;
                     callee = lend(self_, m, m.node(head).a, recv_holder, lends_to, brief);
                 } else {
@@ -2027,9 +1989,6 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 for back in 0..given {
                     let arg_node = arguments[given - 1 - back];
                     let pos = arg_offset + back;
-                    if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
-                        checkLengthMutation(self_, m, arg_node, id);
-                    }
                     let arg_holder = holder && !(pos < 32 && ((non_esc >> (pos as! u32)) & 1) != 0);
                     let value = lend(self_, m, arg_node, arg_holder, lends_to, brief);
                     exits = exits || value.exits;
@@ -2111,81 +2070,6 @@ fn storageOwned(self_: const Analyzer&, m: const Module&, node: u32) -> bool {
     if fact == spent { return false; }
     for at in 0..target.len { fact = field(self_, fact, target.fields[at]); }
     return unique(fact);
-}
-fn paramIndexOfNode(m: const Module&, node: u32, params: const blot_check_core::Parameter[:]) -> i64 {
-    var cur = node;
-    var steps: i64 = 0;
-    while steps < 16 && cur != 0 && cur < m.nodes.len {
-        let n = m.node(cur);
-        if n.tag == blot_check_core::Tag.project { cur = n.a; steps += 1; continue; }
-        if n.tag == blot_check_core::Tag.reference {
-            let ref = m.reference(cur);
-            if ref.unit != 0 && ref.unit != m.unit { return -1; }
-            for p, idx in params {
-                if p.binding == ref.binding { return idx; }
-            }
-        }
-        return -1;
-    }
-    return -1;
-}
-recursive fn scanLengthMutParams(self_: const Analyzer&, m: const Module&, id: u32, params: const blot_check_core::Parameter[:], depth: i64) -> u32 {
-    if id == 0 || id >= m.nodes.len || depth > 64 { return 0; }
-    let n = m.node(id);
-    var mask: u32 = 0;
-    if n.tag == blot_check_core::Tag.storage {
-        let op, err = blot_check_storage_ops::opFromCode(n.c);
-        if err == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || op == blot_check_storage_ops::Op.truncate || op == blot_check_storage_ops::Op.pop) {
-            let children = m.children(id);
-            if children.len != 0 {
-                let idx = paramIndexOfNode(m, children[0], params);
-                if idx >= 0 && idx < 32 { mask |= (1 as u32) << (idx as! u32); }
-            }
-        }
-    } else if n.tag == blot_check_core::Tag.apply {
-        var head = id;
-        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; }
-        if m.node(head).tag == blot_check_core::Tag.project {
-            let binding = calleeBinding(self_, m, head);
-            if binding != 0 && binding < self_.length_mut_params.len && (self_.length_mut_params[binding] & 1) != 0 {
-                let idx = paramIndexOfNode(m, m.node(head).a, params);
-                if idx >= 0 && idx < 32 { mask |= (1 as u32) << (idx as! u32); }
-            }
-        }
-    }
-    match n.tag {
-        suite, block_, array, array_op, storage, product, record, construct, call, break_, contract_method, with_handle => {
-            for child in m.children(id) { mask |= scanLengthMutParams(self_, m, child, params, depth + 1); }
-        },
-        bind, return_ => {
-            if n.tag == blot_check_core::Tag.bind { mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1); }
-            else { mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1); }
-        },
-        if_value, if_stmt => {
-            mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1);
-            mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1);
-            mask |= scanLengthMutParams(self_, m, n.c, params, depth + 1);
-        },
-        match_ => {
-            for inp in m.matchInputs(id) { mask |= scanLengthMutParams(self_, m, inp, params, depth + 1); }
-            for arm in m.matchArms(id) {
-                mask |= scanLengthMutParams(self_, m, arm.guard_, params, depth + 1);
-                mask |= scanLengthMutParams(self_, m, arm.body, params, depth + 1);
-            }
-        },
-        loop_ => {
-            let info = m.loopInfo(id);
-            mask |= scanLengthMutParams(self_, m, info.first, params, depth + 1);
-            mask |= scanLengthMutParams(self_, m, info.end, params, depth + 1);
-            mask |= scanLengthMutParams(self_, m, info.body, params, depth + 1);
-        },
-        apply => {
-            mask |= scanLengthMutParams(self_, m, n.a, params, depth + 1);
-            mask |= scanLengthMutParams(self_, m, n.b, params, depth + 1);
-        },
-        _ => {},
-    }
-    return mask;
 }
 fn isExactParamRef(m: const Module&, node: u32, param_binding: u32) -> bool {
     if node == 0 || node >= m.nodes.len || m.node(node).tag != blot_check_core::Tag.reference { return false; }
@@ -2354,63 +2238,82 @@ fn placesOverlap(a: Place, b: Place) -> bool {
     }
     return true;
 }
-fn containerOwned(self_: Analyzer&, m: const Module&, node: u32) -> bool {
-    let target, found = place(self_, m, node);
-    if !found || !local(self_, target.binding) { return false; }
-    var fact = self_.facts[target.binding];
-    if fact == spent { return false; }
-    for at in 0..target.len { fact = field(self_, fact, target.fields[at]); }
-    if unique(fact) { return true; }
-    if fact >= first_record && fact < spent { return ownedAs(self_, m, fact, m.typeOf(node), 0); }
-    return false;
-}
-fn ownedInPlace(self_: Analyzer&, m: const Module&, node: u32, origin: u32) -> bool {
-    let target, found = place(self_, m, node);
-    if !found || !local(self_, target.binding) || origin != target.binding { return false; }
-    if self_.function_roots.len == 0 || self_.home[target.binding] != self_.function_roots[self_.function_roots.len - 1] { return false; }
+fn ownedInPlacePath(self_: Analyzer&, m: const Module&, node: u32, origin: u32) -> Place, bool {
+    var rev_kind: u8[16] = [0; 16];
+    var rev_field: u32[16] = [0; 16];
+    var count: i64 = 0;
+    var cursor = node;
+    var root: u32 = 0;
+    loop {
+        let n = m.node(cursor);
+        if n.tag == blot_check_core::Tag.reference {
+            let target = m.reference(cursor);
+            if target.unit != 0 && target.unit != m.unit { return Place { .. }, false; }
+            root = target.binding;
+            break;
+        }
+        if count == 16 { return Place { .. }, false; }
+        if n.tag == blot_check_core::Tag.project {
+            if m.dispatchSignature(cursor) != 0 && calleeBinding(self_, m, cursor) != 0 { return Place { .. }, false; }
+            if blot_check_storage_types::isShared(m.types, m.typeOf(n.a)) { return Place { .. }, false; }
+            rev_kind[count] = 0;
+            rev_field[count] = m.projection(n.b).field;
+            count += 1;
+            cursor = n.a;
+            continue;
+        }
+        if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(cursor) == blot_backend_collection_ops::Op.get {
+            let children = m.children(cursor);
+            if children.len == 0 || !blot_check_storage_types::isArray(m.types, m.typeOf(children[0])) { return Place { .. }, false; }
+            rev_kind[count] = 1;
+            rev_field[count] = 0;
+            count += 1;
+            cursor = children[0];
+            continue;
+        }
+        if n.tag == blot_check_core::Tag.storage {
+            let op, err = blot_check_storage_ops::opFromCode(n.c);
+            if err == blot_error::Error.none && op == blot_check_storage_ops::Op.read {
+                let children = m.children(cursor);
+                if children.len == 0 || !blot_check_storage_types::isArray(m.types, m.typeOf(children[0])) { return Place { .. }, false; }
+                rev_kind[count] = 1;
+                rev_field[count] = 0;
+                count += 1;
+                cursor = children[0];
+                continue;
+            }
+        }
+        return Place { .. }, false;
+    }
+    if !local(self_, root) || origin != root { return Place { .. }, false; }
+    if self_.function_roots.len == 0 || self_.home[root] != self_.function_roots[self_.function_roots.len - 1] { return Place { .. }, false; }
+    var base = Place { binding: root, .. };
+    var fact = self_.facts[root];
+    if fact == spent { return Place { .. }, false; }
+    var crossed_index = false;
+    var step = count - 1;
+    while step >= 0 {
+        if rev_kind[step] == 0 {
+            let f = rev_field[step];
+            fact = field(self_, fact, f);
+            if !crossed_index {
+                if base.len == 8 { return Place { .. }, false; }
+                base.fields[base.len] = f;
+                base.len += 1;
+            }
+        } else {
+            crossed_index = true;
+            if !unique(fact) { return Place { .. }, false; }
+            if fact != deep { fact = none; }
+        }
+        step -= 1;
+    }
     for held in self_.argument_places {
-        if placesOverlap(held, target) { return false; }
+        if placesOverlap(held, base) { return Place { .. }, false; }
     }
-    return containerOwned(self_, m, node);
-}
-fn checkLengthMutation(self_: Analyzer&, m: const Module&, container_node: u32, site_id: u32) {
-    let target, found = place(self_, m, container_node);
-    if !found || !local(self_, target.binding) { return; }
-    let tracked = self_.ever_owned[target.binding] || self_.borrows_owned[target.binding];
-    let in_same_fn = self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1];
-    if !in_same_fn {
-        if self_.in_fork != 0 {
-            reject(self_, m, site_id, blot_check_core::Code.aliased_update);
-            return;
-        }
-        if tracked {
-            var sole_downward = false;
-            for entry in self_.captured {
-                if entry.binding != target.binding { continue; }
-                var part = entry.fact;
-                if target.len != 0 { part = partFact(self_, entry.fact, target.fields[..target.len]); }
-                if unique(part) || (part >= first_record && part < spent && ownedAs(self_, m, part, m.typeOf(container_node), 0)) {
-                    sole_downward = true;
-                    break;
-                }
-            }
-            if !sole_downward {
-                reject(self_, m, site_id, blot_check_core::Code.aliased_update);
-            }
-        }
-        return;
-    }
-    if tracked {
-        for held in self_.argument_places {
-            if placesOverlap(held, target) {
-                reject(self_, m, site_id, blot_check_core::Code.aliased_update);
-                return;
-            }
-        }
-    }
-    if tracked && !containerOwned(self_, m, container_node) {
-        reject(self_, m, site_id, blot_check_core::Code.aliased_update);
-    }
+    if unique(fact) { return base, true; }
+    if fact >= first_record && fact < spent && ownedAs(self_, m, fact, m.typeOf(node), 0) { return base, true; }
+    return Place { .. }, false;
 }
 // The identity the backend's dispatch gives a receiver of type `ty`.
 fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdentity, bool {
@@ -3309,7 +3212,7 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
         let place_base = self_.argument_places.len;
         if local(self_, container.origin) {
             var locked = Place { binding: container.origin, .. };
-            let src, found = place(self_, m, children[0]);
+            let src, found = source(self_, m, children[0]);
             if found && src.binding == container.origin { locked = src; }
             self_.argument_places.push(locked);
         }
@@ -3326,7 +3229,8 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
             if lanes_shared && fact == deep { fact = shell; }
             return Value { fact: fact, exits: exits, .. };
         }
-        if !ownedInPlace(self_, m, children[0], container.origin) {
+        let base, ok = ownedInPlacePath(self_, m, children[0], container.origin);
+        if !ok {
             reject(self_, m, id, blot_check_core::Code.aliased_update);
             escape(self_, container);
             return Value { exits: exits, .. };
@@ -3338,7 +3242,7 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool, b
             kill(self_, container.origin);
             return Value { fact: fact, exits: exits, .. };
         }
-        if lanes_shared { sharedInto(self_, m, children[0], []); }
+        if lanes_shared { sharedIntoPlace(self_, base); }
         return Value { origin: container.origin, exits: exits, .. };
     }
     if bound && operation == blot_backend_collection_ops::Op.append && children.len == 2 && m.node(children[0]).tag == blot_check_core::Tag.reference {
@@ -3410,19 +3314,26 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     let children = m.children(id);
     let operation, unknown = blot_check_storage_ops::opFromCode(n.c);
     if unknown == blot_error::Error.none {
-        if operation == blot_check_storage_ops::Op.length || operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.reserve || operation == blot_check_storage_ops::Op.pop {
+        if operation == blot_check_storage_ops::Op.length {
             let container = visit(self_, m, children[0]);
-            if operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.pop {
-                var cty = m.typeOf(children[0]);
-                while cty != 0 && cty < m.types.nodes.len && m.types.node(cty).tag == blot_check_types::Tag.usage { cty = m.types.node(cty).a; }
-                if cty != 0 && cty < m.types.nodes.len && m.types.node(cty).tag == blot_check_types::Tag.array {
-                    if !ownedInPlace(self_, m, children[0], container.origin) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
-                } else {
-                    checkLengthMutation(self_, m, children[0], id);
-                }
+            var exits = container.exits;
+            for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
+            return Value { exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.pop {
+            let container = visit(self_, m, children[0]);
+            let place_base = self_.argument_places.len;
+            if local(self_, container.origin) {
+                var locked = Place { binding: container.origin, .. };
+                let src, found = source(self_, m, children[0]);
+                if found && src.binding == container.origin { locked = src; }
+                self_.argument_places.push(locked);
             }
             var exits = container.exits;
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
+            self_.argument_places.resize(place_base);
+            let _, ok = ownedInPlacePath(self_, m, children[0], container.origin);
+            if !ok { reject(self_, m, id, blot_check_core::Code.aliased_update); }
             return Value { exits: exits, .. };
         }
         if operation == blot_check_storage_ops::Op.read {
@@ -3447,21 +3358,22 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if operation == blot_check_storage_ops::Op.push {
             let container = visit(self_, m, children[0]);
-            var cty = m.typeOf(children[0]);
-            while cty != 0 && cty < m.types.nodes.len && m.types.node(cty).tag == blot_check_types::Tag.usage { cty = m.types.node(cty).a; }
-            if cty != 0 && cty < m.types.nodes.len && m.types.node(cty).tag == blot_check_types::Tag.array {
-                if !ownedInPlace(self_, m, children[0], container.origin) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
-            } else {
-                checkLengthMutation(self_, m, children[0], id);
+            let place_base = self_.argument_places.len;
+            if local(self_, container.origin) {
+                var locked = Place { binding: container.origin, .. };
+                let src, found = source(self_, m, children[0]);
+                if found && src.binding == container.origin { locked = src; }
+                self_.argument_places.push(locked);
             }
             let value = visit(self_, m, children[1]);
             let pushed = taken(self_, m, children[1], value);
-            // A push into storage the function was lent is a store like
-            // `=` (until that goes). It may put there only a value it
-            // owns, or the caller would go on updating in place what the
-            // storage now holds.
-            if !keeping(self_) && !storageOwned(self_, m, children[0]) && (!ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) || lentHolder(self_, m, children[1])) { reject(self_, m, id, blot_check_core::Code.kept_value); }
-            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) { sharedInto(self_, m, children[0], []); }
+            self_.argument_places.resize(place_base);
+            let base, ok = ownedInPlacePath(self_, m, children[0], container.origin);
+            if !ok {
+                reject(self_, m, id, blot_check_core::Code.aliased_update);
+            } else if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) {
+                sharedIntoPlace(self_, base);
+            }
             return Value { exits: container.exits || value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {
@@ -3521,39 +3433,6 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 escape(self_, value);
             }
             return Value { fact: none, exits: value.exits, .. };
-        }
-        if operation == blot_check_storage_ops::Op.freeze {
-            let container = visit(self_, m, children[0]);
-            // A fresh value frozen is still that fresh value.
-            if container.origin == 0 && unique(container.fact) { return Value { fact: container.fact, exits: container.exits, .. }; }
-            // Module-level growable pools remain freezable directly.
-            var global_ref = false;
-            if m.node(children[0]).tag == blot_check_core::Tag.reference {
-                let target_ref = m.reference(children[0]);
-                global_ref = (target_ref.unit != 0 && target_ref.unit != m.unit) || !local(self_, target_ref.binding) || m.bindings[target_ref.binding].kind == blot_reuse_principal_interface::Kind.global;
-            }
-            if global_ref { return Value { fact: none, exits: container.exits, .. }; }
-            if !ownedInPlace(self_, m, children[0], container.origin) {
-                reject(self_, m, id, blot_check_core::Code.aliased_update);
-                escape(self_, container);
-                return Value { exits: container.exits, .. };
-            }
-            // Freezing a local at its last read gives its storage away.
-            if container.origin != 0 && moves(self_, m, children[0], container.origin) {
-                let fact = self_.facts[container.origin];
-                kill(self_, container.origin);
-                return Value { fact: fact, exits: container.exits, .. };
-            }
-            // Freezing permanently sets frozen_flag on the runtime slot: never
-            // treat a non-moved freeze as a reversible borrow loan.
-            let target, found = place(self_, m, children[0]);
-            if found && target.len != 0 && local(self_, target.binding) {
-                let frozen_rec = replace(self_, self_.facts[target.binding], target.fields[..target.len], none);
-                set(self_, target.binding, frozen_rec);
-            } else {
-                kill(self_, container.origin);
-            }
-            return Value { fact: none, exits: container.exits, .. };
         }
     }
     // References, views and links alias the storage they name.

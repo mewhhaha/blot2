@@ -1,0 +1,5 @@
+// @storage.push on a lent (non-own) parameter is rejected.
+func append_lent (rows: #[U32]) -> (v: U32): U32 =>
+  @storage.push rows v
+  return @storage.length rows
+entry func run (): U32 => return append_lent #[1] 2

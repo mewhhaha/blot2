@@ -388,13 +388,12 @@ export function deriveCodec(
       for (const field of fields) {
         if (unwrapArrayType(field.type)) {
           lines.push(
-            `    let collected${field.index}: #[+U32] = #[v${field.index}.length]`,
+            `    let payload${field.index}: #[U32] = #[v${field.index}.length]`,
             `    for item${field.index} in v${field.index}:`,
             `      let item_words${field.index} = _derive_codec.encode item${field.index}`,
-            `      @storage.push collected${field.index} item_words${field.index}.length`,
+            `      @storage.push payload${field.index} item_words${field.index}.length`,
             `      for word${field.index} in item_words${field.index}:`,
-            `        @storage.push collected${field.index} word${field.index}`,
-            `    let payload${field.index} = seal collected${field.index}`,
+            `        @storage.push payload${field.index} word${field.index}`,
           );
         } else {lines.push(
             `    let payload${field.index} = _derive_codec.encode v${field.index}`,
@@ -483,7 +482,7 @@ export function deriveCodec(
             `      if element_count${field.index} > payload${position}.length - 1:`,
             "        return $Nothing",
             `      let cursor${field.index} = 1`,
-            `      let elements${field.index}: #[+${element}] = #[]`,
+            `      let value${field.index}: #[${element}] = #[]`,
             `      for ignored${field.index} in 0..element_count${field.index}:`,
             `        if cursor${field.index} >= payload${position}.length:`,
             "          return $Nothing",
@@ -497,11 +496,10 @@ export function deriveCodec(
             } = _derive_codec.Codec.decode item_words${field.index}`,
             `        let $Some item${field.index} = item_decoded${field.index} else:`,
             "          return $Nothing",
-            `        @storage.push elements${field.index} item${field.index}`,
+            `        @storage.push value${field.index} item${field.index}`,
             `        cursor${field.index} := self + element_width${field.index}`,
             `      if cursor${field.index} != payload${position}.length:`,
             "        return $Nothing",
-            `      let value${field.index} = seal elements${field.index}`,
           );
         } else {lines.push(
             `      let decoded${field.index}: Maybe ${

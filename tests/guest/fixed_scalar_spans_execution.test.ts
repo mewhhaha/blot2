@@ -62,22 +62,22 @@ Deno.test(`fixed scalar spans preserve invocation lengths lazy reads lifetimes a
             ),
           );
         }
-        assert.equal(await call("event_count", null), 0);
         for (const index of [2, 0xffff_ffff]) {
           await assert.rejects(
             () => call("ordered", index),
             WebAssembly.RuntimeError,
           );
-          assert.equal(await call("event_count", null), 0);
+          await assert.rejects(
+            () => call("ordered_trap", index),
+            /unreachable/,
+          );
         }
-        assert.equal(await call("ordered", 0), 42);
-        assert.equal(await call("ordered", 1), 7);
-        assert.equal(await call("event_count", null), 2);
         await assert.rejects(
-          () => call("ordered", 2),
-          WebAssembly.RuntimeError,
+          () => call("ordered_trap", 0),
+          /divide by zero/,
         );
-        assert.equal(await call("event_count", null), 2);
+        assert.deepEqual(await call("ordered", 0), Uint32Array.of(42, 1));
+        assert.deepEqual(await call("ordered", 1), Uint32Array.of(7, 1));
       } finally {
         guest.dispose();
       }

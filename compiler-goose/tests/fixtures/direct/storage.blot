@@ -1,5 +1,5 @@
 entry func sum_array (n: U32): U32 => return do:
-  let values: GrowArray U32 = #[]
+  let values: Array U32 = #[]
   for i in 0..n:
     @storage.push values (i * i)
   let total = 0
@@ -12,7 +12,7 @@ entry func fixed (n: U32): U32 => return do:
   break values[1] + values[3]
 type Cell is data = $Cell { value: U32, flag: Bool }
 entry func records (n: U32): U32 => return do:
-  let cells: ResizeArray Cell = #[$Cell { value: 1, flag: true }]
+  let cells: Array Cell = #[$Cell { value: 1, flag: true }]
   @storage.push cells ($Cell { value: n, flag: false })
   cells[1].value := self * 2
   let total = 0
@@ -32,7 +32,7 @@ entry func views (n: U32): U32 => return do:
     total := self + v
   break total + n
 entry func copies (n: U32): U32 => return do:
-  let values: GrowArray U32 = #[1, 2]
+  let values: Array U32 = #[1, 2]
   let original = @storage.copy values
   values[0] := n
   break original[0] * 100 + values[0]

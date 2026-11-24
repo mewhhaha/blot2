@@ -22,7 +22,7 @@ func test_basic_fork (): U32 =>
   return spec * 1000 + xs[0] + xs[1] + xs[2]
 
 func test_grow_fork (): U32 =>
-  let buf: #[+U32] = #[1, 2]
+  let buf: #[U32] = #[1, 2]
   let spec = fork buf:
     for i in 0..20:
       @storage.push buf (i + 10)
@@ -33,14 +33,13 @@ func test_grow_fork (): U32 =>
   return spec + buf.length * 100 + buf[0] + buf[1] + buf[2]
 
 func test_resize_and_seal_fork (): U32 =>
-  let buf: #[~U32] = #[5, 10, 15, 20]
+  let buf: #[U32] = #[5, 10, 15, 20]
   let spec = fork buf:
     let p = @storage.pop buf
     @storage.truncate buf 2
     @storage.push buf 77
-    let sealed: #[U32] = seal buf
-    return p + sealed.length * 100 + sealed[0] + sealed[2]
-  // After rollback, buf is still #[5, 10, 15, 20] and NOT sealed (push still works!)
+    return p + buf.length * 100 + buf[0] + buf[2]
+  // After rollback, buf is still #[5, 10, 15, 20] and push still works!
   @storage.push buf 25
   return spec * 1000 + buf.length * 100 + buf[0] + buf[1] + buf[2] + buf[3] + buf[4]
 

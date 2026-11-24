@@ -28,19 +28,14 @@ const read_if = func (rows: Array U32) -> (index: U32) -> (flag: U32): U32 => re
   if @u32.eq flag 0:
     return 0
   return rows[index]
-const global: ResizeArray U32 = #[10, 20, 30, 40]
-entry const reset = func (): Unit => return do:
-  @storage.truncate global 0
-  for index in 0 .. 4:
-    @storage.push global (@u32.mul (@u32.add index 1) 10)
-  return ()
+const global: Array U32 = #[10, 20, 30, 40]
 entry const mixed = func (input: own Array U32): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
 ${calls("input")}
   return #[local[0], local[1], local[2], local[3], input[0], input[1], input[2], input[3]]
 entry const globals = func (): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
-  let g: Array U32 = @storage.freeze (@storage.copy global)
+  let g: Array U32 = @storage.copy global
 ${calls("g")}
   return #[local[0], local[1], local[2], local[3], g[0], g[1], g[2], g[3]]
 entry const skipped = func (input: own Array U32): U32 => return do:
@@ -70,13 +65,13 @@ entry const public_oob = func (input: own Array U32): Unit => return do:
   let len = input.length
   let _ = forwarded input len
   return ()
-entry const prefix_trap = func (end: U32): Unit => return do:
+entry const prefix_trap = func (end: U32): Array U32 => return do:
   let base: Array U32 = #[10, 20, 30, 40]
-  @storage.truncate global 0
+  let out: Array U32 = #[]
   for index in 0 .. end:
-    @storage.push global (@u32.add base[index] 1)
-  return ()
-entry const read_global = func (): Array U32 => return @storage.freeze (@storage.copy global)
+    @storage.push out (@u32.add base[index] 1)
+  return out
+entry const read_global = func (): Array U32 => return @storage.copy global
 const copy_float = func (dst: own Array F32) -> (src: Array F32) -> (index: U32): Array F32 => return do:
   dst[index] := src[index]
   return dst
@@ -132,7 +127,6 @@ for (const createdFirst of [true, false]) {
             await call("mixed", new Uint32Array([10, 20, 30, 40])),
             mixedExpected(createdFirst),
           );
-          await call("reset");
           assert.deepEqual(
             await call("globals"),
             mixedExpected(createdFirst),
@@ -153,14 +147,17 @@ for (const createdFirst of [true, false]) {
               WebAssembly.RuntimeError,
             );
           }
-          await call("reset");
           await assert.rejects(
             () => call("prefix_trap", 6),
             WebAssembly.RuntimeError,
           );
           assert.deepEqual(
-            await call("read_global"),
+            await call("prefix_trap", 4),
             new Uint32Array([11, 21, 31, 41]),
+          );
+          assert.deepEqual(
+            await call("read_global"),
+            new Uint32Array([10, 20, 30, 40]),
           );
           const bits = new Uint32Array([0x80000000, 0x7fc01234]);
           const floats = await call(

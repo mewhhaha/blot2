@@ -7,14 +7,12 @@ const executable = Deno.args[0] ??
 const source = `
 type Row is data = $Row {text: &[U32]}
 type Plain is data = $Plain {amount: U32}
-const effects: GrowArray U32 = #[]
-const index_effect = func (index: U32): U32 => return do:
-  @storage.push effects 1
-  return index
-const append = func (rows: ResizeArray Row) -> (text: &[U32]) => return rows.push ($Row {text})
+const append = func (rows: own Array Row) -> (text: &[U32]): Array Row => return do:
+  @storage.push rows ($Row {text})
+  return rows
 const consume = func (row: Row): U32 => return row.text.at 0
 entry const empty = func (count: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   let total = 0
   for row in rows:
     for code in row.text:
@@ -22,17 +20,17 @@ entry const empty = func (count: U32): U32 => return do:
   return total
 entry const seeded = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65]
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   if count > 0:
-    rows.push ($Row {text: &labels[0..1]})
+    @storage.push rows ($Row {text: &labels[0..1]})
   let total = 0
   for row in rows:
     for code in row.text:
       total := self + code
   return total
 entry const joined = func (choose: U32): U32 => return do:
-  let first: ResizeArray Row = #[]
-  let second: ResizeArray Row = #[]
+  let first: Array Row = #[]
+  let second: Array Row = #[]
   let rows = if choose == 0 then first else second
   let total = 0
   for row in rows:
@@ -41,8 +39,8 @@ entry const joined = func (choose: U32): U32 => return do:
   return total
 entry const mixed = func (choose: U32): U32 => return do:
   let labels: Array U32 = #[65]
-  let first: ResizeArray Row = #[]
-  let second: ResizeArray Row = #[$Row {text: &labels[0..1]}]
+  let first: Array Row = #[]
+  let second: Array Row = #[$Row {text: &labels[0..1]}]
   let rows = if choose == 0 then first else second
   let total = 0
   for row in rows:
@@ -51,51 +49,56 @@ entry const mixed = func (choose: U32): U32 => return do:
   return total
 entry const alias_write = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65]
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   for index in 0 .. count:
-    append rows (&labels[0..1])
+    rows := append self (&labels[0..1])
   let total = 0
   for row in rows:
     for code in row.text:
       total := self + code
   return total
-entry const skipped = func (count: U32): U32 => return do:
+entry const skipped = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let labels: Array U32 = #[65]
-  let rows: ResizeArray Row = #[]
-  if count > 0:
-    let row = rows[index_effect 0]
+  let rows: Array Row = #[]
+  if false:
+    use idx <- index_effect 0
+    let row = rows[idx]
     return row.text.at 0
-  rows.push ($Row {text: &labels[0..1]})
+  @storage.push rows ($Row {text: &labels[0..1]})
   return rows[0].text.at 0
-entry const direct = func (index: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
-  return rows[index_effect index].text.at 0
-entry const effect_count = func (): U32 => return @storage.length effects
-entry const pattern = func (index: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
-  let $Row {text} = rows[index_effect index]
+entry const direct = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  let rows: Array Row = #[]
+  use idx <- index_effect 0
+  return rows[idx].text.at 0
+entry const pattern = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  let rows: Array Row = #[]
+  use idx <- index_effect 0
+  let $Row {text} = rows[idx]
   return text.at 0
-entry const argument = func (index: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
-  return consume rows[index_effect index]
-entry const record = func (index: U32): U32 => return do:
-  let rows: ResizeArray Row = #[]
-  let stored = {row: rows[index_effect index]}
+entry const argument = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  let rows: Array Row = #[]
+  use idx <- index_effect 0
+  return consume rows[idx]
+entry const record = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  let rows: Array Row = #[]
+  use idx <- index_effect 0
+  let stored = {row: rows[idx]}
   return stored.row.text.at 0
-entry const array = func (index: U32): Array U32 => return do:
-  let rows: ResizeArray Row = #[]
-  return #[rows[index_effect index].text.at 0]
+entry const array = func (index_effect: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
+  let rows: Array Row = #[]
+  use idx <- index_effect 0
+  return #[rows[idx].text.at 0]
 entry const copied = func (): U32 => return do:
-  let rows: ResizeArray Row = #[]
+  let rows: Array Row = #[]
   let copy = @storage.copy rows
   return copy.length
 entry const plain = func (count: U32): U32 => return do:
-  let rows: ResizeArray Plain = #[]
+  let rows: Array Plain = #[]
   let total = 0
   for index in 0 .. count:
     if index > 0:
       total := self + rows[0].amount
-    rows.push ($Plain {amount: index + 1})
+    @storage.push rows ($Plain {amount: index + 1})
   return total
 `;
 
@@ -113,7 +116,7 @@ Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds
     assert(result.success, JSON.stringify(result));
     for (const asynchronous of [false, true]) {
       const guest = await instantiateGuest(result.bytes, { asynchronous });
-      const call = (name: string, value: number | null) =>
+      const call = (name: string, value: unknown) =>
         asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
       try {
         for (const count of [0, 1, 4]) {
@@ -124,16 +127,27 @@ Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds
           assert.equal(await call("alias_write", count), count * 65);
           assert.equal(await call("plain", count), Math.max(0, count - 1));
         }
-        assert.equal(await call("skipped", 0), 65);
+        let effects = 0;
+        let currentIndex = 0;
+        const indexEffect = guest.capability({
+          parameter: "U32",
+          result: "U32",
+          call: () => {
+            effects++;
+            return currentIndex;
+          },
+        });
+        assert.equal(await call("skipped", indexEffect), 65);
         assert.equal(await call("copied", null), 0);
-        assert.equal(await call("effect_count", null), 0);
+        assert.equal(effects, 0);
         for (
           const name of ["direct", "pattern", "argument", "record", "array"]
         ) {
           for (const index of [0, 1, 0xFFFFFFFF]) {
+            currentIndex = index;
             let trapped = false;
             try {
-              await call(name, index);
+              await call(name, indexEffect);
             } catch (error) {
               assert(error instanceof WebAssembly.RuntimeError);
               trapped = true;
@@ -141,7 +155,7 @@ Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds
             assert(trapped);
           }
         }
-        assert.equal(await call("effect_count", null), 15);
+        assert.equal(effects, 15);
         assert.equal(await call("seeded", 1), 65);
         assert.equal(await call("empty", 0), 0);
       } finally {

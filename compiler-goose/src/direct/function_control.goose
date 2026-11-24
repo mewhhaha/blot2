@@ -1191,7 +1191,7 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
     if require_immutable {
         lget(g, entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-        i32Const(g, blot_direct_runtime::static_pool_flag | blot_direct_runtime::frozen_flag);
+        i32Const(g, blot_direct_runtime::static_pool_flag);
         op(g, OP_i32_and);
         i32Const(g, 0);
         op(g, OP_i32_ne);
@@ -1629,7 +1629,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
             dest_binding = localRef(m, proj.a);
             if dest_binding == 0 { return false, blot_direct_types::Error.none; }
             let dest_check, has_dest = bindGet(g, f, dest_binding);
-            if !has_dest || (tagOf(g, dest_check.ty) != blot_direct_types::Tag.grow && tagOf(g, dest_check.ty) != blot_direct_types::Tag.resize) {
+            if !has_dest || tagOf(g, dest_check.ty) != blot_direct_types::Tag.array {
                 return false, blot_direct_types::Error.none;
             }
             let identity, has_id = g.receiverIdentity(dest_check.ty);
@@ -1660,7 +1660,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
         if !has_dest { return false, blot_direct_types::Error.none; }
         dest = found_dest;
         let dtag = tagOf(g, dest.ty);
-        if dtag != blot_direct_types::Tag.array && dtag != blot_direct_types::Tag.grow && dtag != blot_direct_types::Tag.resize {
+        if dtag != blot_direct_types::Tag.array {
             return false, blot_direct_types::Error.none;
         }
         let elem, elem_err = elementOf(g, f, dest.ty, id);
@@ -1677,7 +1677,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
         let src_ty, sty_err = g.types.lower(m, m.typeOf(info.first), f.env);
         if sty_err != blot_direct_types::Error.none { return false, blot_direct_types::Error.none; }
         stag = tagOf(g, src_ty);
-        if stag != blot_direct_types::Tag.array && stag != blot_direct_types::Tag.view && stag != blot_direct_types::Tag.grow && stag != blot_direct_types::Tag.resize {
+        if stag != blot_direct_types::Tag.array && stag != blot_direct_types::Tag.view {
             return false, blot_direct_types::Error.none;
         }
         if g.types.node(src_ty).a != elem { return false, blot_direct_types::Error.none; }
@@ -1697,7 +1697,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lget(g, entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
     ltee(g, cap);
-    i32Const(g, blot_direct_runtime::frozen_flag | blot_direct_runtime::static_pool_flag);
+    i32Const(g, blot_direct_runtime::static_pool_flag);
     op(g, OP_i32_and);
     trap(g, f);
     let old_len = local32(g, f);
@@ -2025,7 +2025,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let ctag = tagOf(g, value.ty);
             var in_place = false;
-            if !held && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
+            if !held && ctag == blot_direct_types::Tag.array {
                 var cbudget: i64 = 256;
                 in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
             }
@@ -2353,7 +2353,7 @@ recursive fn collectFlatPlainOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, 
     if rec { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize, view, ref, link => {
+        array, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
             if herr != blot_direct_types::Error.none { return false, herr; }
             if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
@@ -2407,7 +2407,7 @@ recursive fn collectRegPlainOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u
     if boxed { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize, view, ref, link => {
+        array, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
             if herr != blot_direct_types::Error.none { return false, herr; }
             if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
@@ -2564,7 +2564,7 @@ recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
     if boxed { return false, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize, view, ref, link => {
+        array, view, ref, link => {
             let element_holds, error = g.contentsHoldMemory(n.a);
             if error != blot_direct_types::Error.none { return false, error; }
             if element_holds { return false, blot_direct_types::Error.none; }

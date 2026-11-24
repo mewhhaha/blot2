@@ -4,7 +4,7 @@ import { compileAndRun } from "./compile_helpers.ts";
 
 const source = `
 entry func run (host: U32 -> U32 ! {Foreign}) : U32 ! {Foreign} => return do:
-  let values: ResizeArray U32 = #[7, 11]
+  let values: Array U32 = #[7, 11]
   use at <- host values[0]
   if at >= values.length:
     return @panic "outside the invocation"

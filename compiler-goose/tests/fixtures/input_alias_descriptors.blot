@@ -8,7 +8,7 @@ const variant = func (choice: Choice) -> (live: Array U32): U32 => return do:
   return @u32.add (@u32.mul value 10) live[0]
 const windows = func (first: &[U32]) -> (second: &[U32]): U32 => return
   @u32.add (@u32.add (@u32.mul (@storage.length first) 1000) (@u32.mul (@storage.length second) 100)) (@u32.add (@u32.mul first[0] 10) second[0])
-const append = func (first: own GrowArray U32): {rows: GrowArray U32, before: U32, after: U32, last: U32} => return do:
+const append = func (first: own Array U32): {rows: Array U32, before: U32, after: U32, last: U32} => return do:
   let before = @storage.length first
   @storage.push first 99
   first[0] := @u32.add self 3
@@ -33,7 +33,7 @@ entry const answer = func (input: U32): Array U32 => return do:
   let different_offsets = windows middle tail
   let different_lengths = windows middle longer
   let same_windows = windows middle middle
-  let growing: GrowArray U32 = #[input, @u32.add input 1]
+  let growing: Array U32 = #[input, @u32.add input 1]
   let first = append growing
   let second = append first.rows
   let view = &second.rows[0..1]

@@ -39,8 +39,8 @@ const walk = func operation -> (seed: U32): U32 => return do:
     total := operation total index
   return total
 
-// The named growth capability explicitly selects storage ABI 8 for every entry.
-const profile: GrowArray U32 = #[0]
+// The storage array constant selects storage ABI 8 for every entry.
+const profile: Array U32 = #[0]
 
 entry const integers = func (value: U32): Array U32 => return do:
   let local = add
@@ -68,7 +68,7 @@ entry const snapshots = func (value: U32): Array U32 => return do:
   return #[first 2, second 2, first 3, current]
 
 entry const references = func (value: U32): Array U32 => return do:
-  let owner: GrowArray U32 = #[value]
+  let owner: Array U32 = #[value]
   let before = add (@storage.load (&owner[0]))
   owner[0] := apply_binary add (@storage.load (&owner[0])) 10
   let after = add (@storage.load (&owner[0]))

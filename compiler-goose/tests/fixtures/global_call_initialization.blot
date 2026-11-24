@@ -1,13 +1,10 @@
-const audit: GrowArray U32 = #[0]
-const last_audit = func (): U32 => return audit[@u32.sub (@storage.length audit) 1]
-const tick = func (value: U32): U32 => return do:
-  let next = @u32.add (@u32.mul (last_audit ()) 10) value
-  @storage.push audit next
-  return next
-const first: Array U32 = #[tick 1]
-const second: Array U32 = #[@u32.add first[0] (tick 2)]
+const base: Array U32 = #[10]
+const last_u32 = func (xs: Array U32): U32 => return xs[@u32.sub (@storage.length xs) 1]
+const compute = func (value: U32): U32 => return @u32.add (@u32.mul (last_u32 base) 10) value
+const first: Array U32 = #[compute 1]
+const second: Array U32 = #[@u32.add first[0] (compute 2)]
 const read = func (value: U32): U32 => return
-  @u32.add (@u32.add (last_audit ()) first[0]) (@u32.add second[0] value)
+  @u32.add (@u32.add (last_u32 base) first[0]) (@u32.add second[0] value)
 entry const answer = func (input: U32): Array U32 => return
-  #[last_audit (), first[0], second[0], read input, read input]
-entry const advance = func (value: U32): U32 => return tick value
+  #[last_u32 base, first[0], second[0], read input, read input]
+entry const advance = func (value: U32): U32 => return compute value

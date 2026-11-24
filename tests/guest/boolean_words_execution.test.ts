@@ -9,7 +9,7 @@ entry const classify = func (value: Bool) => return case value of
   true => 42
   false => 7
 entry const scoped = func (value: Bool) => return do:
-  let calls: GrowArray U32 = #[0]
+  let calls: Array U32 = #[0]
   let result = value and (do:
     calls[0] := @u32.add calls[0] 1
     break true

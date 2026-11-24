@@ -4,7 +4,7 @@ const total = func (row: FloatBundle): F32 => return do:
 __READS__
   return result
 entry const answer = func (bits: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[bits]
+  let marker: Array U32 = #[bits]
   let (input, ignored_a, ignored_b, ignored_c) = @simd.u32x4.from_bits (marker[0], marker[0], marker[0], marker[0])
   let words: Array F32 = #[input]
   let row = $FloatBundle {__FIELDS__}

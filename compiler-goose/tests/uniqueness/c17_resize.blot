@@ -6,7 +6,7 @@ type Point is data = $Point { x: U32, y: U32 }
 const keep = func (values: Array U32) => return values[0]
 const table = #[1, 2, 3]
 const run = func (n: U32) => return do:
-  let counts: ResizeArray U32 = #[]
+  let counts: Array U32 = #[]
   @storage.push counts n
   @storage.push counts n
   @storage.truncate counts 1

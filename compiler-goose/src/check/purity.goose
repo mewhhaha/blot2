@@ -668,7 +668,6 @@ recursive fn typeHasMutableArray(units: const Module[:], unit: u32, tid: TId, de
         nominal => {
             let si = blot_check_storage_types::info(m.types, tid);
             if si.present {
-                if blot_check_storage_types::isGrowable(si.value.kind) { return true; }
                 return typeHasMutableArray(units, unit, si.value.element, depth + 1);
             }
             if !hasUnit(units, n.a) || n.a == 0xffffffff { return false; }
@@ -2989,7 +2988,7 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             }
             var res: u32 = 0;
             match op {
-                length, reserve => { res = 0; },
+                length => { res = 0; },
                 read, load => { res = stepElemHead(st, env.ctx_id, st.head_stack[hmark]); },
                 view, at, link => { res = st.head_stack[hmark]; },
                 ref => {
@@ -3010,7 +3009,7 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
                     if listUnionHead(st, st.ctxs[env.ctx_id].mutated_head, st.head_stack[hmark]) { env.changed = true; }
                     res = 0;
                 },
-                freeze, share => {
+                share => {
                     let r = reachHead(st, env.ctx_id, st.head_stack[hmark]);
                     if listUnionHead(st, st.ctxs[env.ctx_id].mutated_head, r) { env.changed = true; }
                     res = st.head_stack[hmark];

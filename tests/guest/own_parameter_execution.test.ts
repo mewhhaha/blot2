@@ -220,9 +220,9 @@ entry func lent_beside (n: U32) : U32 => return do:
 // field of a local that leaves with the function moves out of it.
 Deno.test("a view of one field is lent beside another given, and fields leave in a result", async () => {
   await compileAndRun(`${declarations}
-type Frame is data = $Frame { rows: ResizeArray U32, out: ResizeArray U32, count: U32 }
-type Sides is data = $Sides { left: ResizeArray U32, right: ResizeArray U32 }
-func doubled (rows: &[U32]) -> (out: own ResizeArray U32): ResizeArray U32 => return do:
+type Frame is data = $Frame { rows: Array U32, out: Array U32, count: U32 }
+type Sides is data = $Sides { left: Array U32, right: Array U32 }
+func doubled (rows: &[U32]) -> (out: own Array U32): Array U32 => return do:
   @storage.truncate out 0
   for value in rows:
     @storage.push out (value * 2)
@@ -232,10 +232,10 @@ func encode (frame: own Frame): Frame => return do:
   frame.rows[0] := frame.out[1]
   break frame
 func made (n: U32): Frame => return do:
-  let rows: ResizeArray U32 = #[n, 3]
-  let out: ResizeArray U32 = #[]
+  let rows: Array U32 = #[n, 3]
+  let out: Array U32 = #[]
   break encode ($Frame { rows, out, count: 2 })
-func out_of (frame: own Frame): ResizeArray U32 => return frame.out
+func out_of (frame: own Frame): Array U32 => return frame.out
 func parts (frame: own Frame) => return (frame.rows, frame.out)
 func swapped (sides: own Sides): Sides => return $Sides { left: sides.right, right: sides.left }
 entry func beside (n: U32) : U32 => return do:
@@ -250,14 +250,14 @@ entry func apart (n: U32) : U32 => return do:
   rows[1] := rows[1] + out[0]
   break rows[0] * 100 + rows[1]
 entry func swap (n: U32) : U32 => return do:
-  let left: ResizeArray U32 = #[n]
-  let right: ResizeArray U32 = #[9]
+  let left: Array U32 = #[n]
+  let right: Array U32 = #[9]
   let sides = swapped ($Sides { left, right })
   sides.left[0] := sides.left[0] + 1
   break sides.left[0] * 10 + sides.right[0]
 entry func after_view (n: U32) : U32 => return do:
-  let rows: ResizeArray U32 = #[n, 3]
-  let out: ResizeArray U32 = #[]
+  let rows: Array U32 = #[n, 3]
+  let out: Array U32 = #[]
   let twice = doubled (&rows[0..2]) out
   rows[0] := twice[1]
   break rows[0] * 10 + rows[1]
@@ -537,15 +537,15 @@ func bump (own access) => return do:
   item.count := item.count + access.log[0] + access.fixed[1]
   access.items[0] := item
   access.log[0] := item.count
-  access.log.push 7
+  @storage.push access.log 7
   access.fixed[0] := access.log.length
   break access
 func first r => return r.items[0]
 `;
 Deno.test("a field of a record that is not known yet is indexed and updated in place", async () => {
   const body = `entry func run (n: U32) : U32 => return do:
-  let log: ResizeArray U32 = #[1]
-  let items: ResizeArray Item = #[$Item { open: true, count: n }]
+  let log: Array U32 = #[1]
+  let items: Array Item = #[$Item { open: true, count: n }]
   let world = { items, log, fixed: #[0, 2] }
   world := bump world
   break world.items[0].count * 100 + world.log[0] * 10 + world.fixed[0]

@@ -6,7 +6,7 @@ const fixture = new URL("../../compiler-goose/tests/fixtures/primitive-aliases.b
 const importedSource = `import * as primitives from "./primitives"
 const apply = func operation -> left -> right => return operation left right
 entry const imported = func (value: U32): Array U32 => return do:
-  let owner: GrowArray U32 = #[value]
+  let owner: Array U32 = #[value]
   let alias = primitives.add
   let partial = primitives.subtract owner[0]
   return #[alias owner[0] 7, apply primitives.multiply value 7, partial 7]
@@ -23,7 +23,7 @@ const Number.add = func (left: Number) -> (right: Number): Number => return do:
   let $Number b = right
   return $Number (a + b + 100)
 entry const operators = func (value: U32): Array U32 => return do:
-  let owner: GrowArray U32 = #[value]
+  let owner: Array U32 = #[value]
   let partial = U32.add owner[0]
   let $Number nominal = $Number value + $Number 2
   return #[value + 2, value - 2, value * 3, partial 2, nominal,

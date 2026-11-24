@@ -33,7 +33,7 @@ fn show(text: u8[>..<]&, budgets: blot_direct_runtime::Budgets, shifted: bool) {
     for value in [l.free_lists, l.owner_table, l.owner_capacity, l.persistent_base, l.persistent_end, l.stack_base, l.stack_end, l.heap_base, l.heap_end, l.transport_base, l.transport_end, l.total] { number(text, value); }
     text.push('\n');
     text.append("runtime ");
-    for value in [r.owner_top, r.persistent_bottom, r.stack_pointer, r.heap_top, r.persistent_top, r.transport_top, r.effect_context, r.open, r.open_persistent, r.release, r.check, r.stack, r.heap_alloc, r.heap_free, r.address, r.length, r.push, r.pop, r.truncate, r.freeze, r.create, r.copy, r.persist, r.allocate, r.reset, r.packet_length] { number(text, value); }
+    for value in [r.owner_top, r.persistent_bottom, r.stack_pointer, r.heap_top, r.persistent_top, r.transport_top, r.effect_context, r.open, r.open_persistent, r.release, r.check, r.stack, r.heap_alloc, r.heap_free, r.address, r.length, r.push, r.pop, r.truncate, r.create, r.copy, r.persist, r.allocate, r.reset, r.packet_length] { number(text, value); }
     text.push('\n');
     var out: u8[>..<] = [];
     blot_direct_writer::assemble(m, out);

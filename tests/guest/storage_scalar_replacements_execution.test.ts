@@ -27,15 +27,15 @@ entry const booleans = func (input: Bool): Bool => return do:
       return false
     return true
   return rows[1]
-const target: ResizeArray U32 = #[9]
+const target: Array U32 = #[9]
 entry const rhs_trap = func (denominator: U32): U32 => return do:
+  let local = @storage.copy target
   let value = @u32.div 42 denominator
-  @storage.truncate target 0
-  @storage.push target value
-  return target[0]
+  local[0] := value
+  return local[0]
 entry const read = func (): U32 => return target[0]
 entry const destination_first = func (index: U32): U32 => return do:
-  let rows = @storage.freeze (@storage.copy target)
+  let rows = @storage.copy target
   rows[index] := @u32.div 42 (@u32.sub index 1)
   return rows[0]
 `;
@@ -89,7 +89,7 @@ Deno.test(`scalar replacements preserve aliases self bits and destination-before
         });
         assert.equal(await call("read"), 9);
         assert.equal(await call("rhs_trap", 2), 21);
-        assert.equal(await call("read"), 21);
+        assert.equal(await call("read"), 9);
       } finally {
         guest.dispose();
       }

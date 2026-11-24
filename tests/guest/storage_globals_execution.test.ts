@@ -5,8 +5,8 @@ Deno.test("plain global payload copies preserve variant fields and exact scalar 
   await compileAndRun(
     `
 type Sample is data = $Empty | $Reading {word: U32, value: F32}
-const samples: ResizeArray Sample = #[$Reading {word: 0xffffffff, value: -0.0}, $Empty, $Reading {word: 0x80000000, value: 1.5}]
-const saved: Array Sample = @storage.freeze (@storage.copy samples)
+const samples: Array Sample = #[$Reading {word: 0xffffffff, value: -0.0}, $Empty, $Reading {word: 0x80000000, value: 1.5}]
+const saved: Array Sample = @storage.copy samples
 const value_of = func (sample: Sample): F32 => return case sample of
   $Reading {word, value} => value
   $Empty => 9.0
@@ -15,10 +15,11 @@ const word_of = func (sample: Sample): U32 => return case sample of
   $Empty => 7
 entry const values = func () => return #[value_of saved[0], value_of saved[2]]
 entry const words = func () => return #[word_of saved[0], word_of saved[1], word_of saved[2]]
-entry const change = func () => return do:
-  @storage.truncate samples 0
-  @storage.push samples $Empty
-  return 0
+entry const change_copy = func () => return do:
+  let local = @storage.copy samples
+  @storage.truncate local 0
+  @storage.push local $Empty
+  return word_of local[0]
 `,
     (guest) => {
       assert.deepEqual(guest.call("values", null), new Float32Array([-0, 1.5]));
@@ -26,7 +27,7 @@ entry const change = func () => return do:
         guest.call("words", null),
         new Uint32Array([0xffffffff, 7, 0x80000000]),
       );
-      guest.call("change", null);
+      assert.equal(guest.call("change_copy", null), 7);
       assert.deepEqual(guest.call("values", null), new Float32Array([-0, 1.5]));
       assert.deepEqual(
         guest.call("words", null),
@@ -39,23 +40,24 @@ entry const change = func () => return do:
 Deno.test("computed instance pools initialize in dependency order and retain independent copies", async () => {
   await compileAndRun(
     `
-const seed: GrowArray U32 = #[41]
-const build = func (items: GrowArray U32): GrowArray U32 => return do:
-  let result: GrowArray U32 = #[items[0] + 1]
+const seed: Array U32 = #[41]
+const build = func (items: Array U32): Array U32 => return do:
+  let result: Array U32 = #[items[0] + 1]
   return result
-const rows: GrowArray U32 = build seed
-const saved: Array U32 = @storage.freeze (@storage.copy seed)
+const rows: Array U32 = build seed
+const saved: Array U32 = @storage.copy seed
 entry const read = func () => return rows[@u32.sub (@storage.length rows) 1] + saved[0]
-entry const change = func (value: U32) => return do:
-  @storage.push seed value
-  @storage.push rows (value + 1)
-  return saved[0]
+entry const change_copy = func (value: U32) => return do:
+  let local_seed = @storage.copy seed
+  let local_rows = @storage.copy rows
+  @storage.push local_seed value
+  @storage.push local_rows (value + 1)
+  return local_rows[1] + local_seed[1] + saved[0]
 `,
     (guest) => {
       assert.equal(guest.call("read", null), 83);
-      assert.equal(guest.call("change", 7), 41);
-      assert.equal(guest.call("read", null), 49);
-      assert.equal(guest.call("read", null), 49);
+      assert.equal(guest.call("change_copy", 7), 56);
+      assert.equal(guest.call("read", null), 83);
     },
   );
 });
@@ -65,15 +67,9 @@ entry const change = func (value: U32) => return do:
 Deno.test("failed computed initialization traps at instantiation", async () => {
   await assert.rejects(compileAndRun(
     `
-const attempts: ResizeArray U32 = #[]
-const build = func (): Array U32 => return do:
-  @storage.push attempts 1
-  if @storage.length attempts == 1:
-    return @panic "first initialization fails"
-  return #[40 + @storage.length attempts]
+const build = func (): Array U32 => return @panic "initialization fails"
 const rows: Array U32 = build ()
 entry const answer = func () => return rows[0]
-entry const count = func () => return @storage.length attempts
 `,
     () => {},
   ), WebAssembly.RuntimeError);

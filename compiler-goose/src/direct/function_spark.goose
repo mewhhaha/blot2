@@ -152,7 +152,7 @@ fn findAffineStream(plan: const SparkVecPlan&, unit: u32, node_id: u32) -> i64 {
 }
 fn isContiguousScalarContainer(g: const Generator&, ty: Ty) -> blot_direct_types::Tag, bool {
     let n = g.types.node(ty);
-    if n.tag != blot_direct_types::Tag.array && n.tag != blot_direct_types::Tag.grow && n.tag != blot_direct_types::Tag.resize && n.tag != blot_direct_types::Tag.view {
+    if n.tag != blot_direct_types::Tag.array && n.tag != blot_direct_types::Tag.view {
         return blot_direct_types::Tag.unit, false;
     }
     let elem = g.types.node(n.a).tag;
@@ -352,7 +352,7 @@ fn checkAffineStreamArray(
     let ty, ok = lowerInEnv(g, m, m.typeOf(arr_id), env);
     if !ok { return 0, blot_direct_types::Tag.unit, false; }
     let tag = tagOf(g, ty);
-    if tag != blot_direct_types::Tag.array && tag != blot_direct_types::Tag.grow && tag != blot_direct_types::Tag.resize {
+    if tag != blot_direct_types::Tag.array {
         return 0, blot_direct_types::Tag.unit, false;
     }
     let etag, eok = isContiguousScalarContainer(g, ty);

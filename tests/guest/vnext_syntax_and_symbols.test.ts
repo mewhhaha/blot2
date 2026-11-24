@@ -116,7 +116,7 @@ entry func test_for_ever_return (n: U32): U32 => count_to n
   );
 });
 
-Deno.test("vNext symbols: #[T], #[+T], #[~T], #[n; T], *T, freeze, seal, copy, and borrowed array coercion", async () => {
+Deno.test("vNext symbols: #[T], #[n; T], *T, freeze, copy, and borrowed array coercion", async () => {
   await compileAndRun(
     `
 type World is data = $World {
@@ -145,17 +145,17 @@ func sum_pair (p: Pair n): U32 => dot_linked p.xs p.ys
 
 func read_world_score (w: World): U32 => w.tick + sum_borrowed w.scores
 
-func build_and_seal (): U32 =>
-  let buf: #[+U32] = #[]
+func build_and_read (): U32 =>
+  let buf: #[U32] = #[]
   @storage.push buf 10
   @storage.push buf 20
   let s1 = sum_borrowed buf
-  let fixed: #[U32] = seal buf
+  let fixed: #[U32] = buf
   let s2 = sum_borrowed fixed
   return s1 + s2
 
 func build_resize_and_freeze (): U32 =>
-  let buf: #[~U32] = #[5, 10, 15]
+  let buf: #[U32] = #[5, 10, 15]
   let popped = @storage.pop buf
   let shared: *#[U32] = freeze buf
   // shared is freely aliasable!
@@ -185,7 +185,7 @@ func linked_lengths (): U32 =>
   let p = $Pair { xs: a, ys: b }
   return sum_pair p
 
-entry func test_seal (): U32 => build_and_seal ()
+entry func test_seal (): U32 => build_and_read ()
 entry func test_freeze_copy (): U32 => build_resize_and_freeze ()
 entry func test_world (): U32 => freeze_and_copy_world ()
 entry func test_linked (): U32 => linked_lengths ()

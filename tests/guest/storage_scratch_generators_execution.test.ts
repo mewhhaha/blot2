@@ -1,22 +1,24 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
+import { compileExpectedFailure } from "./compile_helpers.ts";
 
 const sources = [{
-  name: "generated scratch preserves captured destination effects",
+  name: "generated scratch appends cleanly into owned destination",
   source:
-    `const write = func (destination: GrowArray F32) -> (input: F32) => return do:
+    `const write = func (destination: own Array F32) -> (input: F32): Array F32 => return do:
   let seed = @array.fill 3 input
-  let generated = @array.generate 3 (func (index: U32) => return do:
+  for index in 0 .. 3:
     @storage.push destination (input + U32.to_f32 index)
-    return seed[index] * 2.0 + U32.to_f32 index)
+  let generated = @array.generate 3 (func (index: U32) => return seed[index] * 2.0 + U32.to_f32 index)
   for value in generated:
     @storage.push destination value
+  return destination
 entry const answer = func (input: F32) => return do:
-  let destination: GrowArray F32 = #[]
-  write destination input
-  write destination (input + 10.0)
-  return @storage.freeze destination
+  let destination: Array F32 = #[]
+  destination := write self input
+  destination := write self (input + 10.0)
+  return destination
 `,
   expected: (
     input: number,
@@ -34,26 +36,6 @@ entry const answer = func (input: F32) => return do:
     (input + 10) * 2 + 1,
     (input + 10) * 2 + 2,
   ],
-}, {
-  name: "generated scratch declines implicit mutable global reads",
-  source: `const pool: GrowArray U32 = #[0]
-const write = func (destination: GrowArray U32) => return do:
-  let generated = @array.generate 2 (func (index: U32) => return do:
-    @storage.push destination index
-    return pool[@u32.sub (@storage.length pool) 1] + index)
-  for value in generated:
-    @storage.push destination value
-entry const answer = func (input: U32) => return do:
-  let destination: GrowArray U32 = #[]
-  @storage.push pool input
-  write destination
-  @storage.push pool (input + 10)
-  write destination
-  return @storage.freeze destination
-`,
-  expected: (
-    input: number,
-  ) => [0, 1, input, input + 1, 0, 1, input + 10, input + 11],
 }];
 for (const item of sources) {
   Deno.test(`${item.name}`, async () => {
@@ -95,3 +77,24 @@ for (const item of sources) {
     }
   });
 }
+
+Deno.test("generated scratch rejects mutating captured destination or module global", async () => {
+  await compileExpectedFailure(
+    `const write = func (destination: own Array F32) -> (input: F32): Array F32 => return do:
+  let _ = @array.generate 3 (func (index: U32) => return do:
+    @storage.push destination (input + U32.to_f32 index)
+    return input)
+  return destination
+entry const answer = func (input: F32) => return write #[] input
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `const pool: Array U32 = #[0]
+entry const answer = func (input: U32) => return do:
+  @storage.push pool input
+  return pool[0]
+`,
+    "aliased_update",
+  );
+});

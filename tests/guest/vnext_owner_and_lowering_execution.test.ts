@@ -11,7 +11,7 @@ Deno.test("Item 1: array length mutations require sole ownership and preserve ex
   await compileExpectedFailure(
     `
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
   @storage.push rows 2
   return @storage.length saved
@@ -21,7 +21,7 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
   @storage.truncate rows 0
   return @storage.length saved
@@ -31,7 +31,7 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1, 2]
+  let rows: #[U32] = #[1, 2]
   let saved = rows
   let _ = @storage.pop rows
   return @storage.length saved
@@ -41,34 +41,34 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
-  rows.push 2
+  rows := self.push 2
   return saved.length
 `,
-    "aliased_update",
+    "own_argument",
     undefined,
     { stdRoot },
   );
   await compileExpectedFailure(
     `
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
-  rows.truncate 0
+  rows := self.truncate 0
   return saved.length
 `,
-    "aliased_update",
+    "own_argument",
     undefined,
     { stdRoot },
   );
   await compileExpectedFailure(
     `
-func add_one (xs: #[~U32]): Unit =>
+func add_one (xs: #[U32]): Unit =>
   @storage.push xs 9
   return ()
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
   add_one rows
   return @storage.length saved
@@ -77,11 +77,11 @@ entry func bad (): U32 =>
   );
   await compileExpectedFailure(
     `
-func add_one_owned (xs: own #[~U32]): #[~U32] =>
+func add_one_owned (xs: own #[U32]): #[U32] =>
   @storage.push xs 9
   return xs
 entry func bad (): U32 =>
-  let rows: #[~U32] = #[1]
+  let rows: #[U32] = #[1]
   let saved = rows
   rows := add_one_owned self
   return @storage.length saved + @storage.length rows
@@ -90,14 +90,14 @@ entry func bad (): U32 =>
   );
   await compileAndRun(
     `
-func add_one_owned (xs: own #[~U32]): #[~U32] =>
+func add_one_owned (xs: own #[U32]): #[U32] =>
   @storage.push xs 9
   return xs
-func shrink_owned (xs: own #[~U32]): #[~U32] =>
+func shrink_owned (xs: own #[U32]): #[U32] =>
   @storage.truncate xs 0
   return xs
 entry func main (): #[U32] =>
-  let rows: #[~U32] = #[42]
+  let rows: #[U32] = #[42]
   let saved = @storage.copy rows
   rows := add_one_owned self
   let grown_len = @storage.length rows
@@ -114,19 +114,19 @@ entry func main (): #[U32] =>
   );
   await compileAndRun(
     `
-type Pools = { draws: #[~U32], sounds: #[~U32] }
-func fill (draws: #[~U32]) -> (sounds: #[~U32]): U32 =>
+type Pools = { draws: #[U32], sounds: #[U32] }
+func fill (draws: own #[U32]) -> (sounds: own #[U32]): (#[U32], #[U32]) =>
   @storage.truncate draws 0
   @storage.truncate sounds 0
   @storage.push draws 7
   @storage.push sounds 9
-  return @storage.length draws + @storage.length sounds
+  return (draws, sounds)
 func run (pools: own Pools): Pools =>
-  let _ = fill pools.draws pools.sounds
-  return pools
+  let (draws, sounds) = fill pools.draws pools.sounds
+  return { draws, sounds }
 entry func main (): #[U32] =>
-  let draws: #[~U32] = #[1, 2]
-  let sounds: #[~U32] = #[3]
+  let draws: #[U32] = #[1, 2]
+  let sounds: #[U32] = #[3]
   let pools: Pools = { draws, sounds }
   pools := run self
   return #[pools.draws[0], pools.sounds[0]]
@@ -140,33 +140,47 @@ entry func main (): #[U32] =>
   );
   await compileExpectedFailure(
     `
-type Pools = { draws: #[~U32], sounds: #[~U32] }
-func fill (a: #[~U32]) -> (b: #[~U32]): U32 =>
+type Pools = { draws: #[U32], sounds: #[U32] }
+func fill (a: own #[U32]) -> (b: own #[U32]): (#[U32], #[U32]) =>
   @storage.push a 7
   @storage.push b 9
-  return @storage.length a
+  return (a, b)
 func run (pools: own Pools): Pools =>
-  let _ = fill pools.draws pools.draws
-  return pools
+  let (a, b) = fill pools.draws pools.draws
+  return { draws: a, sounds: b }
 entry func main (): U32 =>
-  let draws: #[~U32] = #[1]
-  let sounds: #[~U32] = #[3]
+  let draws: #[U32] = #[1]
+  let sounds: #[U32] = #[3]
   let pools: Pools = { draws, sounds }
   pools := run self
   return @storage.length pools.draws
+`,
+    "spent_value",
+  );
+  await compileExpectedFailure(
+    `
+type Holder = { rows: #[U32] }
+func append (h: Holder) -> (v: U32): U32 =>
+  @storage.push h.rows v
+  return @storage.length h.rows
+entry func main (): U32 =>
+  let base: #[U32] = #[1]
+  let fresh: Holder = { rows: @storage.copy base }
+  return append fresh 9 + @storage.length base
 `,
     "aliased_update",
   );
   await compileAndRun(
     `
-type Holder = { rows: #[~U32] }
-func append (h: Holder) -> (v: U32): U32 =>
+type Holder = { rows: #[U32] }
+func append (h: own Holder) -> (v: U32): Holder =>
   @storage.push h.rows v
-  return @storage.length h.rows
+  return h
 entry func main (): U32 =>
-  let base: #[~U32] = #[1]
+  let base: #[U32] = #[1]
   let fresh: Holder = { rows: @storage.copy base }
-  return append fresh 9 + @storage.length base
+  fresh := append self 9
+  return @storage.length fresh.rows + @storage.length base
 `,
     (guest) => {
       equal(guest.call("main", null), 3);
@@ -319,7 +333,7 @@ entry func main (): #[U32] =>
   let base: #[U32] = #[10, 20, 30, 40]
   let total = 0
   for round in 0 .. 4000:
-    let local: #[~SliceHolder] = #[]
+    let local: #[SliceHolder] = #[]
     for i in 0 .. 16:
       @storage.push local { span: &base[0..4], tag: (round + i) % 4 }
     let items = #[{ span: &base[0..4], tag: (round + j) % 4 } | j <- base]
@@ -344,14 +358,14 @@ entry func main (): #[U32] =>
   );
   await compileAndRun(
     `
-func append_rows (dst: #[~#[U32]]) -> (n: U32): Unit =>
+func append_rows (dst: own #[#[U32]]) -> (n: U32): #[#[U32]] =>
   for i in 0 .. n:
     let row = #[i + 1, i + 10]
     @storage.push dst row
-  return ()
+  return dst
 entry func main (): #[U32] =>
-  let rows: #[~#[U32]] = #[]
-  append_rows rows 4
+  let rows: #[#[U32]] = #[]
+  rows := append_rows self 4
   return #[rows[0][0], rows[1][1], rows[2][0], rows[3][1]]
 `,
     (guest) => {

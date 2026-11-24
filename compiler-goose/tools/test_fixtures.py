@@ -110,6 +110,16 @@ on its dead unreferenced alias tuple, `result_selected_operand.blot` drops from
 45 to 43 emitted functions, `discard-fixtures/runtime-panic.blot` drops from 35
 to 34 functions, and `direct/closures.blot` keeps monomorphic `let wrap = $Some`.
 
+Unified Dynamic Arrays Phase 5 (24 November 2026) removed `#[+T]`/`#[~T]`/
+`GrowArray`/`ResizeArray`/`seal`/`@storage.freeze`/`@storage.reserve`, unified
+all dynamic arrays onto `Array T` (`#[T]`), hardened `Tag.array` backend
+invariants (heap promotion, `fork` journaling, checked-array invalidation,
+`escape_min_slot` promotion), and enforced `ownedInPlacePath` on
+`@storage.push`/`@storage.pop`/`@storage.truncate`. Re-recorded `expected.json`
+for all 109 fixtures (migrating legacy grow/resize/freeze fixtures to `Array`
+and `own`-threaded helpers; `global_call_freeze.blot` now exits 1 with
+`aliased_update` on mutating an aliased module `const` array).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

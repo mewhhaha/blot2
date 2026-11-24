@@ -622,15 +622,11 @@ recursive fn encodeTypeId(
                     if lnode.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
                     let k = blot_check_storage_types::lengthLiteralValue(lnode.b);
                     if kind == blot_check_storage_types::sized_array { cache.out_buf.push(0x12); }
-                    else if kind == blot_check_storage_types::sized_grow { cache.out_buf.push(0x28); }
-                    else if kind == blot_check_storage_types::sized_resize { cache.out_buf.push(0x29); }
                     else { return false; }
                     pushUleb(cache.out_buf, k as u64);
                     return encodeTypeId(units, cache, unit, elem, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1);
                 }
-                if kind == blot_check_storage_types::grow { cache.out_buf.push(0x21); }
-                else if kind == blot_check_storage_types::resize { cache.out_buf.push(0x22); }
-                else if kind == blot_check_storage_types::view { cache.out_buf.push(0x23); }
+                if kind == blot_check_storage_types::view { cache.out_buf.push(0x23); }
                 else if kind == blot_check_storage_types::shared { cache.out_buf.push(0x24); }
                 else if kind == blot_check_storage_types::ref { cache.out_buf.push(0x2a); }
                 else if kind == blot_check_storage_types::link { cache.out_buf.push(0x2b); }
@@ -1040,12 +1036,8 @@ recursive fn checkPersistentSafe(
             let sinfo = blot_check_storage_types::info(m.types, tid);
             if sinfo.present {
                 let kind = sinfo.value.kind;
-                if kind == blot_check_storage_types::grow ||
-                   kind == blot_check_storage_types::resize ||
-                   kind == blot_check_storage_types::shared ||
-                   kind == blot_check_storage_types::sized_array ||
-                   kind == blot_check_storage_types::sized_grow ||
-                   kind == blot_check_storage_types::sized_resize {
+                if kind == blot_check_storage_types::shared ||
+                   kind == blot_check_storage_types::sized_array {
                     if blot_check_storage_types::isSized(kind) {
                         let len_opt = blot_check_storage_types::lengthOf(m.types, tid);
                         if !len_opt.present { return false; }

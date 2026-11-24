@@ -22,12 +22,12 @@ const invoke_left = func (callback: U32 -> U32) -> (argument: U32): U32 => retur
 const invoke_right = func (callback: U32 -> U32) -> (argument: U32): U32 => return callback argument
 const invoke_twice = func (callback: U32 -> U32) -> (argument: U32): U32 => return @u32.add (invoke_left callback argument) (invoke_right callback argument)
 entry const shared_parents = func (input: U32): U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let first = invoke_twice (make_scalar marker[0]) 3
   let second = invoke_twice (make_scalar (@u32.add marker[0] 11)) 7
   return @u32.add first second
 entry const integers = func (input: U32) => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let first = outer {value: marker[0], stamp: 3} {value: @u32.add marker[0] 7, stamp: 5}
   let second = outer {stamp: 11, value: @u32.add marker[0] 13} {stamp: 17, value: @u32.add marker[0] 19}
   return #[first.captured.value, first.captured.stamp, first.argument.value, first.argument.stamp, second.captured.value, second.captured.stamp, second.argument.value, second.argument.stamp]
@@ -41,16 +41,16 @@ entry const nominals = func (input: U32) => return do:
   let first = outer ($First {value: input}) ($Second {value: @u32.add input 1})
   let second = outer ($Second {value: @u32.add input 2}) ($First {value: @u32.add input 3})
   return #[first.captured.value, first.argument.value, second.captured.value, second.argument.value]
-const reading = func (captured: ResizeArray U32) => return do:
+const reading = func (captured: Array U32) => return do:
   let saved = captured
-  return func (argument: ResizeArray U32): U32 => return @u32.add saved[0] argument[0]
-const update = func (captured: ResizeArray U32) -> (argument: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+  return func (argument: Array U32): U32 => return @u32.add saved[0] argument[0]
+const update = func (captured: Array U32) -> (argument: own Array U32) -> (amount: U32): Array U32 => return do:
   let value = (reading captured) argument
   argument[0] := @u32.add value amount
   return argument
 entry const descriptors = func (input: U32) => return do:
-  let first: ResizeArray U32 = #[input, 31]
-  let second: ResizeArray U32 = #[@u32.add input 10, 37]
+  let first: Array U32 = #[input, 31]
+  let second: Array U32 = #[@u32.add input 10, 37]
   first := update (@storage.copy first) first 1
   second := update first second 2
   let total: U32 = 0
@@ -70,7 +70,7 @@ const inspect = func (choice: Choice): U32 => return case choice of
   $Fraction number => @u32.add 100 (@f32.to_u32 number)
   $Absent => 31
 entry const variants = func (input: U32) => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let missing = inspect $Absent
   let whole = inspect ($Whole marker[0])
   let fraction = inspect ($Fraction 3.5)

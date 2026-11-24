@@ -11,29 +11,29 @@ type StoredCodec = {encode: Stored -> Array U32}
 const appearance_codec = $Codec {encode: func (value: Appearance) => return #[value.mesh, value.material]}
 const stored_codec = func (offset: Array U32): StoredCodec => return {
   encode: func (value: Stored) => return #[value.start + offset[0], value.count]}
-const append_pool = func codec -> pool -> (destination: ResizeArray U32) => return do:
+const append_pool = func codec -> pool -> (destination: own Array U32): Array U32 => return do:
   let read: U32 -> Maybe a = pool.at
   let encode: a -> Array U32 = codec.encode
   for id in 0 .. pool.length:
     if let $Some value = read id:
       let encoded = encode value
       for word in encoded:
-        destination.push word
-const write_component = func codec -> pool -> destination => return
+        @storage.push destination word
+  return destination
+const write_component = func codec -> pool -> (destination: own Array U32): Array U32 => return
   append_pool codec pool destination
-const write_stored = func access -> destination => return
+const write_stored = func access -> (destination: own Array U32): Array U32 => return
   write_component (stored_codec access.offset) access.stored destination
-const write = func access -> destination => return do:
-  write_stored access destination
-  write_component appearance_codec access.appearance destination
-  write_stored access destination
+const write = func access -> (destination: own Array U32): Array U32 => return do:
+  destination := write_stored access self
+  destination := write_component appearance_codec access.appearance self
+  return write_stored access destination
 entry const answer = func (offset: U32) => return do:
-  let stored: ResizeArray (Maybe Stored) = #[$Some ($Stored {start: 7, count: 3}), $Nothing]
-  let appearance: ResizeArray (Maybe Appearance) = #[$Nothing, $Some ($Appearance {mesh: 41, material: 19})]
+  let stored: Array (Maybe Stored) = #[$Some ($Stored {start: 7, count: 3}), $Nothing]
+  let appearance: Array (Maybe Appearance) = #[$Nothing, $Some ($Appearance {mesh: 41, material: 19})]
   let offsets: Array U32 = #[offset]
-  let output: ResizeArray U32 = #[]
-  write {stored, appearance, offset: offsets} output
-  return @storage.freeze output
+  let output: Array U32 = #[]
+  return write {stored, appearance, offset: offsets} output
 `,
     (guest) => {
       assert.deepEqual(

@@ -28,7 +28,7 @@ entry const forever = func (count: U32): U32 => return do:
   return total
 
 entry const temporary = func (count: U32): U32 => return do:
-  let kept: ResizeArray U32 = #[7]
+  let kept: Array U32 = #[7]
   let total = 0
   for index in 0 .. count:
     let closed = do:
@@ -63,19 +63,18 @@ const choose_scratch = func (count: U32): Array U32 => return do:
 entry const conditional_scratch = func (count: U32): Array U32 => return choose_scratch count
 
 entry const bounds = func (index: U32): U32 => return do:
-  let rows: ResizeArray U32 = #[41, 42]
+  let rows: Array U32 = #[41, 42]
   return rows[index]
 
-const append_rhs = func (rows: own ResizeArray U32) -> (value: U32): ResizeArray U32 => return do:
+const append_rhs = func (rows: own Array U32) -> (value: U32): Array U32 => return do:
   @storage.push rows (@u32.add value 1)
   rows[0] := @u32.add value 10
   return rows
 
 entry const grow_rhs = func (value: U32): Array U32 => return do:
-  let rows: ResizeArray U32 = #[value]
-  @storage.reserve rows 2
+  let rows: Array U32 = #[value]
   rows := append_rhs self value
-  return @storage.freeze rows
+  return rows
 
 const mutate_sibling = func (rows: own Array {left: U32, right: U32}) -> (value: U32): Array {left: U32, right: U32} => return do:
   rows[0].right := @u32.add value 1
@@ -87,14 +86,15 @@ entry const sibling_rhs = func (value: U32): Array U32 => return do:
   rows := mutate_sibling self value
   return #[rows[0].left, rows[0].right]
 
-const counter: GrowArray U32 = #[]
-const bump = func (): U32 => return do:
-  @storage.push counter 1
-  return 42
+entry const checked_order = func (index: U32): Array U32 => return do:
+  let rows: Array U32 = #[1]
+  let trace: Array U32 = #[]
+  rows[index] := do:
+    @storage.push trace 1
+    break 42
+  return #[rows[0], @storage.length trace]
 
-entry const counter_read = func (): U32 => return @storage.length counter
-
-entry const checked_order = func (index: U32): U32 => return do:
-  let rows: ResizeArray U32 = #[1]
-  rows[index] := bump ()
+entry const checked_order_trap = func (index: U32): U32 => return do:
+  let rows: Array U32 = #[1]
+  rows[index] := @u32.div 42 0
   return rows[0]

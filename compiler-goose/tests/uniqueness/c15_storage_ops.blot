@@ -6,14 +6,14 @@ type Point is data = $Point { x: U32, y: U32 }
 const keep = func (values: Array U32) => return values[0]
 const table = #[1, 2, 3]
 const run = func (n: U32) => return do:
-  let counts: GrowArray U32 = #[]
+  let counts: Array U32 = #[]
   @storage.push counts n
   @storage.push counts n
   let size = @storage.length counts
   counts[0] := size
   let value = @storage.read counts 0
   counts[1] := value
-  let grid: GrowArray (Array U32) = #[]
+  let grid: Array (Array U32) = #[]
   @storage.push grid #[1, 2]
   let row = @storage.read grid 0
   grid[0][0] := n

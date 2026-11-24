@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const caller = `import * as values from "./values"
 entry const answer = func (input: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let left = values.four marker[0]
   let right = values.four (@u32.add input 10)
   let latest = values.one 99
@@ -13,7 +13,7 @@ entry const answer = func (input: U32): Array U32 => return do:
   let (a, b, c, d) = @simd.f32x4.bits (mixed.zero, mixed.nan, mixed.zero, mixed.nan)
   return #[left.one.x, left.y, left.z, left.w, right.one.x, right.w, latest.x, mixed.word, a, b, c, d, overwrite.one.x]
 entry const fallback = func (input: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let row = values.five marker[0]
   let selected = values.choice input
   let word = case selected of
@@ -21,12 +21,12 @@ entry const fallback = func (input: U32): Array U32 => return do:
     $values.Right value => @u32.add value 1
   return #[row.a, row.e, word]
 entry const guarded = func (input: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let first = values.four marker[0]
   let row = values.guarded input
   return #[first.one.x, first.w, row.one.x, row.w]
 entry const stopped = func (input: U32): U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   return (values.stopped marker[0]).one.x
 `;
 function producer(offset: number): string {
@@ -147,10 +147,10 @@ Deno.test(`inline return registers retain nested results bits traps and source e
 
 const plannedSource = `type Pair is data = $Pair {x: U32, y: U32}
 const pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
-const calculate = func (counter: GrowArray U32) -> (input: U32): U32 => return do:
+const calculate = func (counter: own Array U32) -> (input: U32): (Array U32, U32) => return do:
   @storage.push counter 1
-  return input
-const consume = func (destination: ResizeArray U32) -> (read: Unit -> U32 ! {|e}): Unit => return do:
+  return (counter, input)
+const consume = func (destination: own Array U32) -> (read: Unit -> U32 ! {|e}): Array U32 => return do:
   let total = read ()
 ${"  total := @u32.add total 1\n".repeat(1000)}  let first = pair total
 ${"  total := @u32.add total 1\n".repeat(1000)}  let second = pair total
@@ -158,34 +158,37 @@ ${"  total := @u32.add total 1\n".repeat(1000)}  let second = pair total
   @storage.push destination first.y
   @storage.push destination second.x
   @storage.push destination second.y
-  return ()
-const exercise = func (value: U32) -> (destination: ResizeArray U32): Unit => return do:
+  return destination
+const exercise = func (value: U32) -> (destination: own Array U32): Array U32 => return do:
   for index in 0 .. 3:
-    consume destination (func () => return value)
-  return ()
+    destination := consume self (func () => return value)
+  return destination
 entry const answer = func (input: U32): Array U32 => return do:
-  let counter: GrowArray U32 = #[]
-  let destination: ResizeArray U32 = #[]
+  let counter: Array U32 = #[]
+  let destination: Array U32 = #[]
   let held = pair input
-  exercise (calculate counter input) destination
+  let (counter, computed) = calculate counter input
+  destination := exercise computed self
   return #[held.x, held.y, @storage.length counter, destination[0], destination[1], destination[2], destination[3], destination[8], destination[9], destination[10], destination[11]]
-type Row is data = $Row {owner: GrowArray U32, index: U32}
+type Row is data = $Row {owner: Array U32, index: U32}
 const rollback_pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
-const bump = func (rows: ResizeArray Row): Unit => return do:
-  for row in rows:
-    @storage.push row.owner (@u32.add row.owner[row.index] 1)
-const change = func (rows: ResizeArray Row): U32 => return do:
+const bump = func (rows: own Array Row): Array Row => return do:
+  for i in 0 .. @storage.length rows:
+    @storage.push rows[i].owner (@u32.add rows[i].owner[rows[i].index] 1)
+  return rows
+const change = func (rows: own Array Row): Array U32 => return do:
   let held = rollback_pair (@storage.length rows)
-  bump rows
+  rows := bump self
+  let v0 = rows[0].owner[1]
+  let v1 = rows[1].owner[1]
   @storage.truncate rows 1
   let later = rollback_pair 9
-  return @u32.add held.y later.y
+  return #[v0, v1, @u32.add held.y later.y]
 entry const rollback = func (input: U32): Array U32 => return do:
-  let left: GrowArray U32 = #[input]
-  let right: GrowArray U32 = #[@u32.add input 10]
-  let rows: ResizeArray Row = #[$Row {owner: left, index: 0}, $Row {owner: right, index: 0}]
-  let count = change rows
-  return #[left[1], right[1], count]
+  let left: Array U32 = #[input]
+  let right: Array U32 = #[@u32.add input 10]
+  let rows: Array Row = #[$Row {owner: left, index: 0}, $Row {owner: right, index: 0}]
+  return change rows
 `;
 Deno.test(`inline return registers survive reusable helpers and enclosing loops`, async () => {
   const directory = await Deno.makeTempDir({

@@ -246,7 +246,7 @@ entry const bad = func (n: U32) => return do:
   {
     name: "resize",
     expected: (n) => n,
-    mode: "ResizeArray",
+    mode: "Array",
     body: `  @storage.truncate values 0
   if @u32.lt 0 n:
     values := walk own values (@u32.sub n 1)`,
@@ -254,8 +254,8 @@ entry const bad = func (n: U32) => return do:
   {
     name: "freeze",
     expected: (n) => n,
-    mode: "GrowArray",
-    body: `  let fixed = @storage.freeze (@storage.copy values)
+    mode: "Array",
+    body: `  let fixed = @storage.share (@storage.copy values)
   if @u32.lt 0 n:
     values := walk own values (@u32.sub n 1)`,
   },
@@ -304,8 +304,7 @@ const outlineSource =
     values[0] := @u32.add values[0] remaining
     values[1] := @u32.add values[1] saved
   return values
-const bulky = func (rows: own ResizeArray U32) -> (values: own Array U32) -> (input: U32): (ResizeArray U32, Array U32, U32) => return do:
-  @storage.reserve rows 4
+const bulky = func (rows: own Array U32) -> (values: own Array U32) -> (input: U32): (Array U32, Array U32, U32) => return do:
   let total = input
 ${
     "  total := @u32.add total input\n".repeat(outlineUpdates / 2)
@@ -316,7 +315,7 @@ ${
   let result = @u32.add total values[0]
   return (rows, values, result)
 entry const answer = func (input: U32): Array U32 => return do:
-  let rows: ResizeArray U32 = #[input]
+  let rows: Array U32 = #[input]
   let values: Array U32 = #[input, 0]
   let saved = @u32.add input 333
   let (rows, values, result) = bulky rows values input

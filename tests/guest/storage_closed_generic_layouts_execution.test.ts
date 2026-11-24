@@ -6,21 +6,21 @@ const source = `type Box a is data = $Box {value: a}
 type Pair [a, b] is data = $Pair (a, b)
 type Envelope a is data = $Envelope {box: Maybe (Box a), pair: Maybe (Pair [U32, a])}
 const Box.item = func ($Box {value}) => return value
-const read = func (pool: ResizeArray (Envelope a)) => return pool[0]
+const read = func (pool: Array (Envelope a)) => return pool[0]
 const unbox = func fallback -> maybe => return case maybe of
   $Some box => box.item
   $Nothing => fallback
 const pair_or = func fallback -> maybe => return case maybe of
   $Some value => value
   $Nothing => fallback
-const read_first = func (fallback: F32) -> (pool: ResizeArray (Envelope F32)): (F32, U32, F32) => return do:
+const read_first = func (fallback: F32) -> (pool: Array (Envelope F32)): (F32, U32, F32) => return do:
   let first = read pool
   let box_val = unbox fallback first.box
   let $Pair (id, amount) = pair_or ($Pair (0, 0.0)) first.pair
   return (box_val, id, amount)
 entry const answer = func (input: F32) => return do:
-  let floats: ResizeArray (Envelope F32) = #[$Envelope {box: $Some ($Box {value: input}), pair: $Some ($Pair (7, input + 1.0))}]
-  let integers: ResizeArray (Envelope U32) = #[$Envelope {box: $Some ($Box {value: 13}), pair: $Nothing}]
+  let floats: Array (Envelope F32) = #[$Envelope {box: $Some ($Box {value: input}), pair: $Some ($Pair (7, input + 1.0))}]
+  let integers: Array (Envelope U32) = #[$Envelope {box: $Some ($Box {value: 13}), pair: $Nothing}]
   let (first_box, first_id, first_amount) = read_first (-1.0) floats
   let second = read integers
   floats[0] := $Envelope {box: $Nothing, pair: $Some ($Pair (8, input + 10.0))}

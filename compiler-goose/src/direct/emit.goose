@@ -526,8 +526,6 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
         unit => { return NominalIdentity { 0, blot_check_types::unit }, true; },
         array => { return NominalIdentity { 0, 0xffffffff }, true; },
         // Storage capabilities are compiler-owned nominal identities.
-        grow => { return NominalIdentity { 0xffffffff, blot_check_storage_types::grow }, true; },
-        resize => { return NominalIdentity { 0xffffffff, blot_check_storage_types::resize }, true; },
         ref => { return NominalIdentity { 0xffffffff, blot_check_storage_types::ref }, true; },
         view => { return NominalIdentity { 0xffffffff, blot_check_storage_types::view }, true; },
         link => { return NominalIdentity { 0xffffffff, blot_check_storage_types::link }, true; },
@@ -667,7 +665,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, grow, resize, ref, view, link, cell => { result = true; },
+        function, provider, array, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -719,7 +717,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, grow, resize, ref, view, link, cell => { result = true; },
+        function, provider, array, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -1311,7 +1309,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let n = g.types.node(receiver);
             if goal.kind == blot_check_types::ObligationKind.collection {
                 match n.tag {
-                    array, grow, resize, view => { g.types.match_(m, goal.result, n.a, env); },
+                    array, view => { g.types.match_(m, goal.result, n.a, env); },
                     _ => {},
                 }
                 continue;

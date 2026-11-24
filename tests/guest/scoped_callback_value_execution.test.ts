@@ -15,13 +15,13 @@ const source = `
 import * as factory from "./forward"
 entry const run = func (count: U32): Array F32 => return do:
   let codec = factory.metadata 23
-  let output: GrowArray F32 = #[]
-  output.push (U32.to_f32 codec.key)
-  output.push (U32.to_f32 codec.version)
+  let output: Array F32 = #[]
+  @storage.push output (U32.to_f32 codec.key)
+  @storage.push output (U32.to_f32 codec.version)
   for index in 0 .. count:
     let value = U32.to_f32 (codec.wrap (codec.identity index)).value
-    output.push (codec.decode (codec.encode value))
-  return @storage.freeze output
+    @storage.push output (codec.decode (codec.encode value))
+  return output
 `;
 
 Deno.test(`ordinary callback values survive imports fresh and retained builds and failed revisions`, async () => {

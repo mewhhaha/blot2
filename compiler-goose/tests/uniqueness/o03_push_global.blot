@@ -1,0 +1,5 @@
+// @storage.push on a module const array is rejected.
+const pool: #[U32] = #[1, 2]
+entry func run (): U32 =>
+  @storage.push pool 3
+  return @storage.length pool

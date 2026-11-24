@@ -24,12 +24,12 @@ for (
   const name of [
     "global_call_read.blot",
     "global_call_conditional.blot",
-    "global_call_mutation.blot",
     "global_call_initialization.blot",
+    "global_call_mutation.blot",
   ]
 ) {
   const test = Deno.test;
-  test(`globals retain initialization aliases and cross-export mutation: ${name}`, async () => {
+  test(`globals retain initialization aliases across calls: ${name}`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
     const entry = `${directory}/main.blot`;
     const compiler = await createCompiler(entry);
@@ -73,69 +73,23 @@ for (
                 if (flag) expected = 32;
                 assert.equal(await call("answer", flag), expected);
               }
-            } else if (name === "global_call_mutation.blot") {
-              let value = 4;
-              let count = 1;
-              assert.equal(await call("count", null), count);
-              for (const input of [0, 2, 5, 0xffff_ffff, 0, 7]) {
-                const compared = (value + input * 2 + 1) * 2;
-                value = (value + input * 2 + 3) >>> 0;
-                assert.deepEqual(
-                  await call("mutate", input),
-                  new Uint32Array([
-                    count,
-                    count + 1,
-                    compared,
-                    value,
-                    value,
-                    count + 4,
-                  ]),
-                );
-                count += 4;
-                assert.equal(await call("observe", 0), 4);
-                assert.equal(await call("observe", count - 1), value);
-                assert.equal(await call("count", null), count);
-              }
-              // The same helper also sees an argument distinct from its global.
-              value = (value + 1) >>> 0;
-              count += 1;
+            } else if (name === "global_call_initialization.blot") {
               assert.deepEqual(
-                await call("separate", 41),
-                new Uint32Array([43, value, value + 43, count]),
+                await call("answer", 5),
+                new Uint32Array([10, 101, 203, 319, 319]),
               );
-              assert.equal(await call("observe", count - 1), value);
-              for (const flag of [false, true, false]) {
-                let mixed = value * 2;
-                let variant = value + 7;
-                if (flag) {
-                  mixed = value + 99;
-                  variant = value * 2;
-                }
-                assert.equal(await call("mixed", flag), mixed >>> 0);
-                assert.equal(await call("inactive", flag), variant >>> 0);
-                assert.equal(await call("observe", count - 1), value);
-              }
+              assert.equal(await call("advance", 7), 107);
             } else {
-              // Initializers append 1 then 2 to the audit; helper publication
-              // and repeated entry calls must not replay either operation.
               assert.deepEqual(
-                await call("answer", 0),
-                new Uint32Array([12, 1, 13, 26, 26]),
+                await call("mutate", 3),
+                new Uint32Array([1, 2, 4, 9, 3]),
               );
-              let audit = 12;
-              for (const input of [3, 4, 0, 7]) {
-                audit = (audit * 10 + input) >>> 0;
-                assert.equal(await call("advance", input), audit);
-                const expected = new Uint32Array([
-                  audit,
-                  1,
-                  13,
-                  audit + 19,
-                  audit + 19,
-                ]);
-                assert.deepEqual(await call("answer", 5), expected);
-                assert.deepEqual(await call("answer", 5), expected);
-              }
+              assert.equal(await call("observe", 0), 4);
+              assert.equal(await call("count", null), 1);
+              assert.equal(await call("mixed", false), 8);
+              assert.equal(await call("mixed", true), 103);
+              assert.equal(await call("inactive", false), 11);
+              assert.equal(await call("inactive", true), 8);
             }
           } finally {
             guest.dispose();
@@ -149,26 +103,26 @@ for (
   });
 }
 
-// Ownership is checked at run time: pushing through an alias of a frozen
-// global traps.
-Deno.test(`a push through an alias of a frozen global traps`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
-  const entry = `${directory}/main.blot`;
-  const compiler = await createCompiler(entry);
-  try {
-    const built = await compiler.build({
-      sources: { [entry]: await fixture("global_call_freeze.blot") },
-      signal: AbortSignal.timeout(5000),
-    });
-    assert(built.success, JSON.stringify(built));
-    const guest = await instantiateGuest(built.bytes);
+// Ownership is checked at compile time: mutating a module const global is
+// rejected as aliased_update.
+for (const name of ["global_call_freeze.blot"]) {
+  Deno.test(`mutating a module const global is rejected at compile time: ${name}`, async () => {
+    const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
+    const entry = `${directory}/main.blot`;
+    const compiler = await createCompiler(entry);
     try {
-      assert.throws(() => guest.call("answer", null), WebAssembly.RuntimeError);
+      const built = await compiler.build({
+        sources: { [entry]: await fixture(name) },
+        signal: AbortSignal.timeout(5000),
+      });
+      assert(!built.success, JSON.stringify(built));
+      assert(
+        built.diagnostics.some((d) => d.code === "aliased_update"),
+        JSON.stringify(built),
+      );
     } finally {
-      guest.dispose();
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
     }
-  } finally {
-    await compiler.dispose();
-    await Deno.remove(directory, { recursive: true });
-  }
-});
+  });
+}

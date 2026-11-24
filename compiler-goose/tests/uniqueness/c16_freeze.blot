@@ -6,8 +6,8 @@ type Point is data = $Point { x: U32, y: U32 }
 const keep = func (values: Array U32) => return values[0]
 const table = #[1, 2, 3]
 const run = func (n: U32) => return do:
-  let counts: GrowArray U32 = #[]
+  let counts: Array U32 = #[]
   @storage.push counts n
-  let frozen = @storage.freeze counts
+  let frozen = @storage.share counts
   counts[0] := n
   break frozen[0]

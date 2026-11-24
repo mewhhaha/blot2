@@ -11,7 +11,7 @@ ${
   }  use reply <- host #[total, input]
   return reply[0]
 entry const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
-  let marker: GrowArray U32 = #[0]
+  let marker: Array U32 = #[0]
   let total: U32 = 0
 ${
     Array.from({ length: calls }, (_, i) =>

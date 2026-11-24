@@ -72,14 +72,22 @@ const entry =
               [value, value + 1],
             );
           }
-          assert.equal(await call("counter_read", null), 0);
           await assert.rejects(
             () => call("checked_order", 1),
             WebAssembly.RuntimeError,
           );
-          assert.equal(await call("counter_read", null), 0);
-          assert.equal(await call("checked_order", 0), 42);
-          assert.equal(await call("counter_read", null), 1);
+          await assert.rejects(
+            () => call("checked_order_trap", 1),
+            /unreachable/,
+          );
+          await assert.rejects(
+            () => call("checked_order_trap", 0),
+            /divide by zero/,
+          );
+          assert.deepEqual(
+            Array.from(await call("checked_order", 0) as Uint32Array),
+            [42, 1],
+          );
         } finally {
           guest.dispose();
         }
@@ -88,11 +96,11 @@ const entry =
       const truncated = await compiler.build({
         sources: {
           [entry]: await Deno.readTextFile(entry) + `
-const shrink_rhs = func (rows: ResizeArray U32): U32 => return do:
+const shrink_rhs = func (rows: Array U32): U32 => return do:
   @storage.truncate rows 0
   return 42
 entry const invalid = func (): U32 => return do:
-  let rows: ResizeArray U32 = #[1]
+  let rows: Array U32 = #[1]
   let alias = rows
   rows[0] := shrink_rhs alias
   return rows[0]
@@ -117,9 +125,9 @@ func make_row (base: &[U32]) -> (i: U32): Boxed =>
 entry func main (count: U32): U32 =>
   let backing: #[U32] = #[10, 20, 30, 40]
   let view = &backing[0..backing.length]
-  let out: #[+Boxed] = #[]
+  let out: #[Boxed] = #[]
   for i in 0 .. count:
-    out.push (make_row view i)
+    out := self.push (make_row view i)
   let total = 0
   for row in out:
     total := self + row.a + row.view[0]

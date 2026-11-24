@@ -24,18 +24,25 @@ for (const width of [8, 600]) {
     }).join("");
   }
   const source =
-    `const carry = func row -> (flag: U32) -> (effects: GrowArray U32) => return do:
-  @storage.push effects 1
+    `type Tick is effect = { bump: Unit -> Unit }
+const carry = func row -> (flag: U32) => return do:
+  use Tick.bump ()
   return ${returned}
 entry const answer = func (input: U32): Array U32 => return do:
-  let effects: GrowArray U32 = #[]
+  let effects = 0
   let original = {${fields}}
-  let first = carry original 0 effects
-  let second = carry original 1 effects
+  let first = original
+  let second = original
   let current = original
-  for step in 0 .. 3:
-    current := carry current (@u32.rem input 2) effects
-  return #[first.${first}, first.${last}, second.${last}, current.${last}, @storage.length effects]
+  with Tick = { bump: func () => effects := @u32.add self 1 }:
+    use f <- carry original 0
+    first := f
+    use s <- carry original 1
+    second := s
+    for step in 0 .. 3:
+      use c <- carry current (@u32.rem input 2)
+      current := c
+  return #[first.${first}, first.${last}, second.${last}, current.${last}, effects]
 `;
   Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots`, async () => {
     const directory = await Deno.makeTempDir({

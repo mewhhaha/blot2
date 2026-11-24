@@ -6,7 +6,7 @@ import support.structural_adapters;
 
 import support.structural;
 import std;
-enum Op { ref, at, link, view, load, length, read, push, pop, truncate, freeze, copy, reserve, share }
+enum Op { ref, at, link, view, load, length, read, push, pop, truncate, copy, share }
 fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if !starts_with(name, "@storage.") { return blot_support::Option<Op> { false, Op.ref , ..}; }
     let tail = name[9..];
@@ -20,21 +20,19 @@ fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if tail == "push" { return blot_support::Option<Op> { true, Op.push , ..}; }
     if tail == "pop" { return blot_support::Option<Op> { true, Op.pop , ..}; }
     if tail == "truncate" { return blot_support::Option<Op> { true, Op.truncate , ..}; }
-    if tail == "freeze" || tail == "seal" { return blot_support::Option<Op> { true, Op.freeze , ..}; }
     if tail == "copy" { return blot_support::Option<Op> { true, Op.copy , ..}; }
-    if tail == "reserve" { return blot_support::Option<Op> { true, Op.reserve , ..}; }
     if tail == "share" { return blot_support::Option<Op> { true, Op.share , ..}; }
     return blot_support::Option<Op> { false, Op.ref , ..};
 }
 fn arity(op: Op) -> u32 {
     match op {
-        ref, load, length, pop, freeze, copy, share => { return 1; },
-        at, link, read, push, truncate, reserve => { return 2; },
+        ref, load, length, pop, copy, share => { return 1; },
+        at, link, read, push, truncate => { return 2; },
         view => { return 3; },
     }
 }
 fn writes(op: Op) -> bool {
-    match op { push, pop, truncate, freeze, reserve, share => { return true; }, _ => { return false; }, }
+    match op { push, pop, truncate, share => { return true; }, _ => { return false; }, }
 }
 
 fn opCode(value: Op) -> u32 {
@@ -49,9 +47,7 @@ fn opCode(value: Op) -> u32 {
         push => { return 7; },
         pop => { return 8; },
         truncate => { return 9; },
-        freeze => { return 10; },
         copy => { return 11; },
-        reserve => { return 12; },
         share => { return 13; },
     }
 }
@@ -67,9 +63,7 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         7 => { return Op.push, blot_error::Error.none; },
         8 => { return Op.pop, blot_error::Error.none; },
         9 => { return Op.truncate, blot_error::Error.none; },
-        10 => { return Op.freeze, blot_error::Error.none; },
         11 => { return Op.copy, blot_error::Error.none; },
-        12 => { return Op.reserve, blot_error::Error.none; },
         13 => { return Op.share, blot_error::Error.none; },
         _ => { return Op.ref, blot_error::Error.invalid_artifact; },
     }

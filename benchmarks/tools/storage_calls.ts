@@ -14,11 +14,11 @@ export function storageCallSource(
   const lines: string[] = [];
   if (kind === "reader") {
     lines.push(
-      "const stage_0 = func (rows: GrowArray U32) -> (index: U32): U32 => return @storage.read rows index",
+      "const stage_0 = func (rows: Array U32) -> (index: U32): U32 => return @storage.read rows index",
     );
     for (let level = 1; level <= depth; level++) {
       lines.push(
-        `const stage_${level} = func (rows: GrowArray U32) -> (index: U32): U32 => return`,
+        `const stage_${level} = func (rows: Array U32) -> (index: U32): U32 => return`,
         `  @u32.add (stage_${level - 1} rows index) (stage_${
           level - 1
         } rows index)`,
@@ -26,13 +26,13 @@ export function storageCallSource(
     }
   } else {
     lines.push(
-      "const stage_0 = func (rows: own GrowArray U32) -> (amount: U32): GrowArray U32 => return do:",
+      "const stage_0 = func (rows: own Array U32) -> (amount: U32): Array U32 => return do:",
       "  rows[0] := @u32.add rows[0] amount",
       "  return rows",
     );
     for (let level = 1; level <= depth; level++) {
       lines.push(
-        `const stage_${level} = func (rows: own GrowArray U32) -> (amount: U32): GrowArray U32 => return do:`,
+        `const stage_${level} = func (rows: own Array U32) -> (amount: U32): Array U32 => return do:`,
         `  rows := stage_${level - 1} rows amount`,
         `  return stage_${level - 1} rows (@u32.add amount 1)`,
       );
@@ -40,8 +40,8 @@ export function storageCallSource(
   }
   lines.push(
     "entry const answer = func (input: U32) => return do:",
-    "  let first: GrowArray U32 = #[input, @u32.add input 11]",
-    "  let second: GrowArray U32 = #[@u32.add input 101, @u32.add input 211]",
+    "  let first: Array U32 = #[input, @u32.add input 11]",
+    "  let second: Array U32 = #[@u32.add input 101, @u32.add input 211]",
     "  let index = @u32.rem input 2",
     "  let total: U32 = 0",
   );

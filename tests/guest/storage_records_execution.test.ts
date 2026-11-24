@@ -19,7 +19,7 @@ Deno.test("closed catalog layouts reuse proof without sharing owner or field sta
 const catalog: Catalog = $Catalog {${values}}
 ${owners}
 entry const answer = func () => return do:
-  let selected: ResizeArray U32 = #[0]
+  let selected: Array U32 = #[0]
   let changed = #[catalog]
   let independent = #[catalog]
   changed[0].f0 := 900
@@ -52,7 +52,7 @@ const count = func (choice: Choice): U32 => return case choice of
       total := self + value
     break total
 entry const answer = func (): U32 => return do:
-  let marker: GrowArray U32 = #[]
+  let marker: Array U32 = #[]
   let rows: Array Choice = #[$No]
   return count rows[0]
 `,
@@ -69,7 +69,7 @@ const choose = func (absent: Bool): Maybe Choice => return do:
     return $Nothing
   return $Some $No
 entry const answer = func (absent: Bool): U32 => return do:
-  let marker: GrowArray U32 = #[]
+  let marker: Array U32 = #[]
   let values: Array (Maybe Choice) = #[choose absent]
   return case values[0] of
     $Nothing => 7
@@ -87,7 +87,7 @@ Deno.test("empty owner alternatives contribute no fabricated stored borrow", asy
   await compileAndRun(
     `
 entry const answer = func (present: Bool): U32 => return do:
-  let source: GrowArray U32 = #[21]
+  let source: Array U32 = #[21]
   let early_empty: Array {rows: &[U32]} = #[]
   let populated: Array {rows: &[U32]} = #[{rows: &source[0..1]}]
   let late_empty: Array {rows: &[U32]} = #[]
@@ -112,11 +112,12 @@ Deno.test("data stacks inline named records and preserve constructor and field o
     `
 type Position is data = $Position {z: U32, x: F32}
 type Box a is data = $Box {value: a}
-const positions: GrowArray Position = #[$Position (7, 1.5)]
+const seed_positions: Array Position = #[$Position (7, 1.5)]
 entry const read = func (): Array F32 => return do:
+  let positions = @storage.copy seed_positions
   let first = positions[0]
   let $Position (z, x) = first
-  let boxes: GrowArray (Box U32) = #[$Box 40]
+  let boxes: Array (Box U32) = #[$Box 40]
   let pushed = @storage.push positions ($Position {x: 2.5, z: 9})
   boxes[0] := $Box 42
   let $Box number = boxes[0]
@@ -145,7 +146,7 @@ Deno.test("nominal wrappers read their owner's updates through their borrows", a
     `
 type Borrow is data = $Borrow {target: &U32}
 entry const answer = func () => return do:
-  let items: GrowArray U32 = #[40]
+  let items: Array U32 = #[40]
   items[0] := 42
   let borrowed = $Borrow (&items[0])
   return @storage.load borrowed.target
@@ -158,15 +159,14 @@ Deno.test("inline updates copy records while explicit copies stay independent", 
   await compileAndRun(
     `
 type Point is data = $Point {z: U32, x: F32}
-type World is data = $World {points: GrowArray Point}
-const points: GrowArray Point = #[$Point (7, 1.5)]
-entry const answer = func (): Array F32 => return do:
-  let current = points[@u32.sub (@storage.length points) 1]
+type World is data = $World {points: Array Point}
+const points: Array Point = #[$Point (7, 1.5)]
+entry const answer = func (step: F32): Array F32 => return do:
+  let current = $Point (points[0].z, points[0].x + step)
   let world = $World #[current]
   let checkpoint = @storage.copy world.points
   let before = world.points[0]
   world.points[0].x := self + 1.0
-  @storage.push points world.points[0]
   let row = world.points[0]
   row.z := 42
   let record = {nested: {z: 3, x: 2.0}, count: 1}
@@ -176,11 +176,11 @@ entry const answer = func (): Array F32 => return do:
 `,
     (guest) => {
       assert.deepEqual(
-        guest.call("answer", null),
+        guest.call("answer", 0.0),
         new Float32Array([2.5, 1.5, 1.5, 42, 7, 4, 2]),
       );
       assert.deepEqual(
-        guest.call("answer", null),
+        guest.call("answer", 1.0),
         new Float32Array([3.5, 2.5, 2.5, 42, 7, 4, 2]),
       );
     },
@@ -190,13 +190,12 @@ entry const answer = func (): Array F32 => return do:
 Deno.test("indexed updates select once before RHS and pin the selected extent", async () => {
   await compileAndRun(
     `
-const calls: GrowArray U32 = #[]
-const select = func () => return do:
-  @storage.push calls 1
-  return 0
 entry const answer = func () => return do:
-  let values: GrowArray U32 = #[40]
-  values[select ()] := self + @storage.length calls + 1
+  let calls: Array U32 = #[]
+  let values: Array U32 = #[40]
+  values[(do:
+    @storage.push calls 1
+    break 0)] := self + @storage.length calls + 1
   return values[0]
 `,
     (guest) => {
@@ -208,7 +207,7 @@ entry const answer = func () => return do:
   await compileAndRun(
     `
 entry const bad = func () => return do:
-  let values: ResizeArray U32 = #[40]
+  let values: Array U32 = #[40]
   values[0] := do:
     let removed = @storage.pop values
     break 42
@@ -223,20 +222,20 @@ entry const bad = func () => return do:
 Deno.test("generic pool helpers specialize empty owners and inline records per call", async () => {
   await compileAndRun(
     `
-type Pool a is data = $Pool {values: GrowArray a}
+type Pool a is data = $Pool {values: Array a}
 const empty = func (): Pool a => return $Pool #[]
-const add = func (pool: Pool a) -> (value: a) => return @storage.push pool.values value
+const add = func (pool: own Pool a) -> (value: a): Pool a => return do:
+  @storage.push pool.values value
+  return pool
 const first = func (pool: Pool a): a => return pool.values[0]
 const create = func (value: a): Pool a => return do:
   let pool: Pool a = empty ()
-  let added = add pool value
-  return pool
+  return add pool value
 entry const answer = func (): Array F32 => return do:
   let integers = create 41
   let floats = create 2.5
   let points = create {x: 1.5, z: 9}
-  let add_integer = add integers
-  let appended = add_integer 42
+  integers := add self 42
   return #[U32.to_f32 (first integers), first floats, (first points).x, U32.to_f32 integers.values[1]]
 `,
     (guest) =>
@@ -252,7 +251,7 @@ Deno.test("nested field writes preserve sibling mutations performed by the RHS",
     `
 type Point is data = $Point {z: U32, x: U32}
 entry const answer = func (): Array U32 => return do:
-  let rows: GrowArray {point: Point, count: U32} = #[{point: $Point (7, 1), count: 3}]
+  let rows: Array {point: Point, count: U32} = #[{point: $Point (7, 1), count: 3}]
   rows[0].point.x := do:
     rows[0].point.z := 9
     rows[0].count := 4
@@ -270,7 +269,7 @@ Deno.test("fixed array builders specialize generic callbacks and replace into a 
 import * as array from "std/array"
 const copied = func (items: Array a): Array a => return array.generate items.length (func index => return items[index])
 entry const answer = func (count: U32): Array U32 => return do:
-  let storage: GrowArray U32 = #[1]
+  let storage: Array U32 = #[1]
   let values = array.generate count (func index => return index + 10)
   let checkpoint = copied values
   let replaced = array.replace 0 42 values
@@ -297,8 +296,8 @@ Deno.test("local optional owners retain selected descriptors across branches and
 const choose = func (value: U32): Maybe (Array U32) => return do:
   if value == 0:
     return $Nothing
-  let rows: GrowArray U32 = #[value, value + 1]
-  return $Some (@storage.freeze rows)
+  let rows: Array U32 = #[value, value + 1]
+  return $Some rows
 entry const answer = func (value: U32): U32 => return do:
   let result = choose value
   let other = choose (value + 2)
@@ -326,7 +325,7 @@ type Read is data = $Items { rows: Wrapped [&[U32], U32], next: U32 } | $Reset U
 const read = func (rows: &[U32]) -> (reset: Bool): Read => return
   if reset then $Reset 7 else $Items { rows: $Wrapped { value: rows, count: 1 }, next: 3 }
 entry const answer = func (reset: Bool): U32 => return do:
-  let values: GrowArray U32 = #[42]
+  let values: Array U32 = #[42]
   return case read (&values[0..1]) reset of
     $Reset next => next
     $Items {rows, next} => rows.value[0] + next
@@ -343,7 +342,7 @@ Deno.test("copying variants preserves only initialized borrow alternatives", asy
     `
 type Choice is data = $No | $Rows &[U32] | $Other Bool
 entry const answer = func (borrow: Bool): U32 => return do:
-  let owner: GrowArray U32 = #[42]
+  let owner: Array U32 = #[42]
   let plain: Array Choice = #[$No, $Other true]
   let copied = @array.generate plain.length (func i => return plain[i])
   let mixed: Array Choice = #[if borrow then $Rows (&owner[0..1]) else copied[1]]
@@ -365,7 +364,7 @@ Deno.test("writing the complete borrow shape before a loop read remains admitted
     `
 type Choice is data = $No | $Rows &[U32]
 entry const answer = func (): Array U32 => return do:
-  let owner: GrowArray U32 = #[42]
+  let owner: Array U32 = #[42]
   let total = 0
   for i in 0 .. 2:
     let rows: Array Choice = #[$No]

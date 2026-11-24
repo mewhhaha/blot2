@@ -878,7 +878,7 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
     if body {
         if body.is_function { return partial(g, f, blot_direct_emit::InstanceKind.partial, target, ty, Vals {}, id); }
         match tagOf(g, ty) {
-            array, grow, resize => { return pool(g, f, target, ty, id); },
+            array => { return pool(g, f, target, ty, id); },
             _ => {},
         }
         // Inline non-exported scalar or nullary-constructor constants directly
@@ -987,7 +987,7 @@ recursive fn layoutFree(g: Generator&, ty: Ty, depth: i64) -> bool {
     let n = g.types.node(ty);
     match n.tag {
         never => { return false; },
-        function, array, grow, resize, ref, view, link, cell => { return true; },
+        function, array, ref, view, link, cell => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if !layoutFree(g, g.types.words[n.a + at], depth + 1) { return false; } }
             return true;

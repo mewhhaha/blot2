@@ -24,19 +24,19 @@ const Bool.Codec: Codec Bool = {
 
 // Each array element is length-framed so a nested codec can have any width.
 func sequence_encode (values: #[a]): #[U32] where { Codec a } =>
-  let out: #[+U32] = #[values.length]
+  let out: #[U32] = #[values.length]
   for value in values:
     let payload = encode value
     @storage.push out payload.length
     for word in payload:
       @storage.push out word
-  return seal out
+  return out
 func sequence_decode (words: #[U32]): Maybe #[a] where { Codec a } =>
   if words.length == 0:
     return $Nothing
   let count = words[0]
   let cursor = 1
-  let output: #[+a] = #[]
+  let output: #[a] = #[]
   for ignored in 0..count:
     if cursor >= words.length:
       return $Nothing
@@ -52,7 +52,7 @@ func sequence_decode (words: #[U32]): Maybe #[a] where { Codec a } =>
     cursor := self + width
   if cursor != words.length:
     return $Nothing
-  return $Some (seal output)
+  return $Some output
 const Array.Codec: Codec #[a] where { Codec a } = {
   encode: func values => sequence_encode values,
   decode: func words => sequence_decode words,

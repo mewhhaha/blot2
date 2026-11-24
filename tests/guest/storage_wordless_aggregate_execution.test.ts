@@ -10,7 +10,7 @@ const unpack = func (box: Box) => return case box of
   $Box {inner, stamp} => {inner, stamp}
 const advance = func (state: {inner: {n: U32, left: U32, right: U32}, stamp: U32}) => return {inner: {n: @u32.add state.inner.n 1, left: state.inner.left, right: state.inner.right}, stamp: state.stamp}
 entry const answer = func (count: U32): Array U32 => return do:
-  let rows: GrowArray Box = #[wrap 1]
+  let rows: Array Box = #[wrap 1]
   let state = unpack rows[0]
   for index in 0 .. count:
     state := advance state

@@ -2,21 +2,14 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 const source = `import * as array from "std/array"
-const accepted = func (trace: GrowArray U32) -> (value: U32): Bool => return do:
-  @storage.push trace (@u32.mul value 10)
-  return value != 2
-const recorded = func (trace: GrowArray U32) -> (value: U32): U32 => return do:
-  @storage.push trace (@u32.add (@u32.mul value 10) 1)
-  return value
 const flatten = func (rows: Array {x: F32, y: F32}): Array F32 => return #[value | row <- rows, value <- #[row.x, row.y]]
-const traced_flatten = func (trace: GrowArray U32) -> (rows: Array {x: F32, y: F32}): Array F32 => return
-  #[@u32.to_f32 (recorded trace (@f32.to_u32 value)) | row <- rows, accepted trace (@f32.to_u32 row.x), value <- #[row.x, row.y]]
+const checked_keep = func (value: U32): U32 => return @u32.add value (@u32.div 0 (@u32.sub value 2))
+const guarded_flatten = func (rows: Array {x: F32, y: F32}): Array F32 => return
+  #[@u32.to_f32 (@u32.add (@f32.to_u32 value) (@u32.div 0 (@u32.sub (@f32.to_u32 row.x) 3))) | row <- rows, @f32.to_u32 row.x != 3, value <- #[row.x, row.y]]
 type Row is data = $Row {x: F32, count: U32}
 entry const ordered = func () => return do:
-  let trace: GrowArray U32 = #[]
   let input: Array U32 = #[1, 2, 3]
-  let kept = #[recorded trace x | x <- input, accepted trace x]
-  return array.concat kept (@storage.freeze trace)
+  return #[checked_keep x | x <- input, x != 2]
 entry const selected = func (limit: U32) => return do:
   let input: Array U32 = #[1, 2, 3, 4]
   return #[@u32.mul x 10 | x <- input, @u32.lt x limit]
@@ -37,10 +30,7 @@ entry const generic = func () => return do:
   return flatten rows
 entry const generic_ordered = func (count: U32) => return do:
   let rows = array.generate count (func index => return {x: @u32.to_f32 (@u32.add (@u32.mul index 2) 1), y: @u32.to_f32 (@u32.add (@u32.mul index 2) 2)})
-  let trace: GrowArray U32 = #[]
-  let kept = traced_flatten trace rows
-  let observed = @storage.freeze trace
-  return array.concat kept #[@u32.to_f32 item | item <- observed]
+  return guarded_flatten rows
 `;
 const staged = `const table = #run (@array.get (#[@u32.mul x 2 | x <- #[1, 2, 3], @u32.lt x 3]) 1)
 entry const staged = func () => return do:
@@ -71,7 +61,7 @@ Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async 
       try {
         assert.deepEqual(
           await call("ordered"),
-          new Uint32Array([1, 3, 10, 11, 20, 30, 31]),
+          new Uint32Array([1, 3]),
         );
         assert.deepEqual(await call("selected", 0), new Uint32Array([]));
         assert.deepEqual(
@@ -93,8 +83,8 @@ Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async 
           new Float32Array([]),
         );
         assert.deepEqual(
-          await call("generic_ordered", 2),
-          new Float32Array([1, 2, 3, 4, 10, 11, 21, 30, 31, 41]),
+          await call("generic_ordered", 3),
+          new Float32Array([1, 2, 5, 6]),
         );
       } finally {
         guest.dispose();

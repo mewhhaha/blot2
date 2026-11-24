@@ -250,12 +250,8 @@ func Result.to_maybe candidate => case candidate of
   $Err _ => $Nothing
 
 func Array.length (values: #[a]): U32 => @array.length values
-func GrowArray.length (values: #[+a]): U32 => @storage.length values
-func ResizeArray.length (values: #[~a]): U32 => @storage.length values
 func View.length (values: &[a]): U32 => @storage.length values
 func Array.at (values: #[a]) -> (index: U32) => @array.get values index
-func GrowArray.at (values: #[+a]) -> (index: U32) => @storage.read values index
-func ResizeArray.at (values: #[~a]) -> (index: U32) => @storage.read values index
 func View.at (values: &[a]) -> (index: U32) => @storage.read values index
 func Array.is_empty (values: #[a]): Bool => Array.length values == 0
 func Array.get (values: #[a]) -> (index: U32): Maybe a =>
@@ -267,12 +263,9 @@ func Array.set (values: #[a]) -> (index: U32) -> (value: a): Maybe #[a] =>
     return $Some (@array.set values index value)
   return $Nothing
 
-// Pool iteration borrows a captured range. Growth preserves its addresses and
-// initial length; shortening the owner while traversal is live is rejected.
+// Pool iteration borrows a captured range.
 type PoolCursor a is data = $PoolCursor { values: &[a], index: U32 }
 func Array.iter (values: #[a]) => $PoolCursor {values: &values[0..values.length], index: 0}
-func GrowArray.iter (values: #[+a]) => $PoolCursor {values: &values[0..values.length], index: 0}
-func ResizeArray.iter (values: #[~a]) => $PoolCursor {values: &values[0..values.length], index: 0}
 func View.iter (values: &[a]) => $PoolCursor {values, index: 0}
 func PoolCursor.iter (cursor: PoolCursor a) => cursor
 func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.length then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1}) else $Nothing
@@ -287,14 +280,7 @@ func Array.truncate (values: own #[a]) -> (count: U32): #[a] =>
 func Array.pop (values: own #[a]): (#[a], a) =>
   let value = @storage.pop values
   return (values, value)
-func GrowArray.push (values: #[+a]) -> (value: a) => @storage.push values value
-func ResizeArray.push (values: #[~a]) -> (value: a) => @storage.push values value
-func ResizeArray.truncate (values: #[~a]) -> (count: U32) => @storage.truncate values count
 // `values.copy` is independent storage with the same elements.
 func Array.copy (values: #[a]): #[a] => @storage.copy values
-func GrowArray.copy (values: #[+a]): #[+a] => @storage.copy values
-func ResizeArray.copy (values: #[~a]): #[~a] => @storage.copy values
 func Array.view (values: #[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
-func GrowArray.view (values: #[+a]) -> (start: U32) -> (end: U32) => @storage.view values start end
-func ResizeArray.view (values: #[~a]) -> (start: U32) -> (end: U32) => @storage.view values start end
 func View.view (values: &[a]) -> (start: U32) -> (end: U32) => @storage.view values start end

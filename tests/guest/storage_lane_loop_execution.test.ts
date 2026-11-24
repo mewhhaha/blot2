@@ -27,16 +27,14 @@ const saved: Array U32 = #[0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510
 const short_state: Array U32 = #[0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A]
 const input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
 const short_input: Array U32 = @array.generate 19 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
-const saved_log: ResizeArray U32 = #[]
-const short_log: ResizeArray U32 = #[]
-const recur_logged = func (state: own Array U32) -> (src: Array U32) -> (log: ResizeArray U32) -> (end: U32): Array U32 => return do:
+const recur_logged = func (state: own Array U32) -> (src: Array U32) -> (log: U32 -> U32 ! {Foreign}) -> (end: U32): Array U32 ! {Foreign} => return do:
   for index in 0 .. end:
     let slot = index % 8
     let word = state[slot]
     word := (self << 5) + self + src[index]
     word := (self + (self << 10)) ^ (self >> 6)
     state[slot] := word
-    @storage.push log word
+    use _ <- log word
   return state
 entry const run = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy saved
@@ -45,22 +43,12 @@ entry const run = func (bounds: Array U32): Array U32 => return do:
 entry const alias = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy input
   return recur state state.copy bounds[0] bounds[1]
-entry const trap_input = func (): Unit => return do:
-  let _ = recur_logged (@storage.copy saved) short_input saved_log 40
+entry const trap_input = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+  use _ <- recur_logged (@storage.copy saved) short_input log 40
   return ()
-entry const trap_state = func (): Unit => return do:
-  let _ = recur_logged (@storage.copy short_state) input short_log 40
+entry const trap_state = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+  use _ <- recur_logged (@storage.copy short_state) input log 40
   return ()
-entry const read = func (): Array U32 => return do:
-  let state = @storage.copy saved
-  for index in 0 .. @storage.length saved_log:
-    state[index % 8] := saved_log[index]
-  return state
-entry const read_short = func (): Array U32 => return do:
-  let state = @storage.copy short_state
-  for index in 0 .. @storage.length short_log:
-    state[index % 8] := short_log[index]
-  return state
 entry const empty = func (bounds: Array U32): Array U32 => return do:
   let state: Array U32 = #[]
   let rows: Array U32 = #[]
@@ -154,20 +142,37 @@ Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes`, asy
             new Uint32Array(),
           );
         }
+        let logged: number[] = [];
+        const logCap = guest.capability({
+          parameter: "U32",
+          result: "U32",
+          call: (word: number) => {
+            logged.push(word);
+            return 0;
+          },
+        });
+        const replay = (base: number[]) => {
+          const st = base.slice();
+          logged.forEach((w, i) => {
+            st[i % 8] = w;
+          });
+          return Uint32Array.from(st);
+        };
         await assert.rejects(
-          () => call("trap_input"),
+          () => call("trap_input", logCap),
           WebAssembly.RuntimeError,
         );
         assert.deepEqual(
-          await call("read"),
+          replay(initial),
           expected(initial.slice(), rows.slice(0, 19), 0, 40),
         );
+        logged = [];
         await assert.rejects(
-          () => call("trap_state"),
+          () => call("trap_state", logCap),
           WebAssembly.RuntimeError,
         );
         assert.deepEqual(
-          await call("read_short"),
+          replay(initial.slice(0, 4)),
           expected(initial.slice(0, 4), rows, 0, 40),
         );
       } finally {

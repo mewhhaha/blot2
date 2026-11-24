@@ -12,25 +12,25 @@ const ref_leaf = func (value: Ref U32): U32 => return @storage.load value
 const ref_twice = func (value: Ref U32): U32 => return @u32.add (ref_leaf value) (ref_leaf value)
 const link_leaf = func (value: Link U32): U32 => return @storage.load value
 const link_twice = func (value: Link U32): U32 => return @u32.add (link_leaf value) (link_leaf value)
-const read_link = func (rows: GrowArray U32) -> (index: U32): U32 => return link_twice (@storage.link rows index)
-const row_value = func (rows: ResizeArray U32): U32 => return rows[1]
-const mutate_pair = func (left: own ResizeArray U32) -> (right: own ResizeArray U32) -> (amount: U32): (ResizeArray U32, ResizeArray U32) => return do:
+const read_link = func (rows: Array U32) -> (index: U32): U32 => return link_twice (@storage.link rows index)
+const row_value = func (rows: Array U32): U32 => return rows[1]
+const mutate_pair = func (left: own Array U32) -> (right: own Array U32) -> (amount: U32): (Array U32, Array U32) => return do:
   left[1] := @u32.add (row_value left) amount
   right[1] := @u32.add (row_value right) (@u32.add amount 1)
   return (left, right)
-const invoke = func (callback: own ResizeArray U32 -> U32 -> ResizeArray U32) -> (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+const invoke = func (callback: own Array U32 -> U32 -> Array U32) -> (rows: own Array U32) -> (amount: U32): Array U32 => return do:
   rows := callback rows amount
   return callback rows (@u32.add amount 1)
-const invoke_twice = func (callback: own ResizeArray U32 -> U32 -> ResizeArray U32) -> (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+const invoke_twice = func (callback: own Array U32 -> U32 -> Array U32) -> (rows: own Array U32) -> (amount: U32): Array U32 => return do:
   rows := invoke callback rows amount
   return invoke callback rows (@u32.add amount 2)
-const add_second = func (rows: own ResizeArray U32) -> (amount: U32): ResizeArray U32 => return do:
+const add_second = func (rows: own Array U32) -> (amount: U32): Array U32 => return do:
   rows[1] := @u32.add rows[1] amount
   return rows
 entry const answer = func (input: U32) => return do:
-  let first: ResizeArray U32 = #[input, @u32.add input 10, @u32.add input 20]
-  let second: ResizeArray U32 = #[@u32.add input 100, @u32.add input 110, @u32.add input 120]
-  let links: GrowArray U32 = #[@u32.add input 200, @u32.add input 210]
+  let first: Array U32 = #[input, @u32.add input 10, @u32.add input 20]
+  let second: Array U32 = #[@u32.add input 100, @u32.add input 110, @u32.add input 120]
+  let links: Array U32 = #[@u32.add input 200, @u32.add input 210]
   let before = @u32.add (view_twice (&first[1..3])) (@u32.add (ref_twice (@storage.at second 1)) (read_link links 0))
   first[1] := @u32.add first[1] (@u32.add (@u32.mul 2 input) 1)
   let (first, second) = mutate_pair first second 2
@@ -83,16 +83,16 @@ function witnessExpected(input: number): Uint32Array {
   ]);
 }
 
-const scratch = `const leaf = func (rows: own GrowArray U32): GrowArray U32 => return do:
-  let temporary: GrowArray U32 = #[rows[0], 3]
+const scratch = `const leaf = func (rows: own Array U32): Array U32 => return do:
+  let temporary: Array U32 = #[rows[0], 3]
   rows[0] := @u32.add temporary[0] temporary[1]
   return rows
-const outer = func (rows: own GrowArray U32): GrowArray U32 => return leaf (leaf rows)
+const outer = func (rows: own Array U32): Array U32 => return leaf (leaf rows)
 entry const answer = func (input: U32) => return do:
-  let rows: GrowArray U32 = #[input, 29]
+  let rows: Array U32 = #[input, 29]
   rows := leaf rows
   rows := outer rows
-  let live: GrowArray U32 = #[71, 73]
+  let live: Array U32 = #[71, 73]
   rows := outer rows
   @storage.push live 79
   return #[rows[0], rows[1], live[0], live[1], live[2]]

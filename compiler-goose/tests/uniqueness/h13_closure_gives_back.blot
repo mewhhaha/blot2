@@ -6,8 +6,9 @@ const each = func (count: U32) -> (visit: U32 -> Unit) => return do:
     visit index
   break 0
 const run = func (n: U32) => return do:
-  let seen: GrowArray U32 = #[]
-  let done = each n (func index => return @storage.push seen index)
-  let rows = @storage.freeze seen
-  rows[0] := done
-  break rows
+  let seen: Array U32 = #[0]
+  let done = each n (func index => return do:
+    let _ = seen[0]
+    return ())
+  seen[0] := done
+  break seen

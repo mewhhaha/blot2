@@ -16,13 +16,11 @@ let entry_length: u32 = 4;
 let entry_capacity: u32 = 8;
 let entry_generation: u32 = 12;
 // Capacity flags:
-// - frozen_flag (sign bit): growth authority removed
 // - heap_flag: backing owned by rt.heap (free via heap_free)
 // - static_pool_flag: on persistent slots (>= persistent_split) marks a deeply-immutable
 //   static const pool; on temporary slots (< persistent_split) with heap_flag == 0 marks
 //   a transport pin (free via free_transport)
 // - live_flag: entry is currently live and valid
-let frozen_flag: u32 = 0x80000000;
 let heap_flag: u32 = 0x40000000;
 let static_pool_flag: u32 = 0x20000000;
 let live_flag: u32 = 0x10000000;
@@ -171,7 +169,6 @@ struct Runtime {
     push: u32 = 0,
     pop: u32 = 0,
     truncate: u32 = 0,
-    freeze: u32 = 0,
     create: u32 = 0,
     copy: u32 = 0,
     persist: u32 = 0,
@@ -537,7 +534,6 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
     r.push = helper(module, 3, 1);
     r.pop = helper(module, 3, 1);
     r.truncate = helper(module, 3, 0);
-    r.freeze = helper(module, 2, 0);
     r.create = helper(module, 3, 2);
     r.copy = helper(module, 4, 2);
     r.persist = helper(module, 4, 2);
@@ -1462,7 +1458,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         tee(h, entry);
         load(h, entry_capacity);
         tee(h, capacity);
-        k(h, frozen_flag);
+        k(h, static_pool_flag);
         op(h, blot_direct_writer::OP_i32_and);
         trapIf(h);
         if has_fork {
@@ -1592,7 +1588,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         call(h, r.check);
         tee(h, entry);
         load(h, entry_capacity);
-        k(h, frozen_flag);
+        k(h, static_pool_flag);
         op(h, blot_direct_writer::OP_i32_and);
         trapIf(h);
         get(h, entry);
@@ -1634,7 +1630,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         call(h, r.check);
         tee(h, entry);
         load(h, entry_capacity);
-        k(h, frozen_flag);
+        k(h, static_pool_flag);
         op(h, blot_direct_writer::OP_i32_and);
         trapIf(h);
         get(h, 2);
@@ -1656,32 +1652,6 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         get(h, 2);
         store(h, entry_length);
         finish(h, module, r.truncate);
-    }
-
-    // freeze(slot, generation)
-    {
-        var h = H { parameters: 2, locals: 2, .. };
-        let entry = temp(h);
-        get(h, 0);
-        get(h, 1);
-        call(h, r.check);
-        tee(h, entry);
-        if has_fork {
-            emitMustUndo(h, r, 0);
-            open(h, blot_direct_writer::OP_if_);
-            get(h, entry);
-            k(h, entry_capacity);
-            op(h, blot_direct_writer::OP_i32_add);
-            k(h, 4);
-            call(h, r.undo_record);
-            op(h, blot_direct_writer::OP_end);
-        }
-        get(h, entry);
-        load(h, entry_capacity);
-        k(h, frozen_flag);
-        op(h, blot_direct_writer::OP_i32_or);
-        store(h, entry_capacity);
-        finish(h, module, r.freeze);
     }
 
     // create(length, stride, growable) -> (slot, generation), zeroed, reserve-slot-first.
@@ -1781,7 +1751,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
     // persist(slot, generation, stride, mode) -> persistent copy, reserve-slot-first.
     // mode: 0 = non-growable mutable/not deeply immutable (live_flag),
     //       1 = growable on rt.heap (heap_flag | live_flag),
-    //       2 = non-growable deeply-immutable static const pool (frozen_flag | static_pool_flag | live_flag).
+    //       2 = deeply-immutable static const pool (static_pool_flag | live_flag).
     {
         var h = H { parameters: 4, locals: 4, .. };
         let entry = temp(h);
@@ -1829,7 +1799,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         op(h, blot_direct_writer::OP_i32_eq);
         open(h, blot_direct_writer::OP_if_);
         get(h, bytes);
-        k(h, frozen_flag | static_pool_flag | live_flag);
+        k(h, static_pool_flag | live_flag);
         op(h, blot_direct_writer::OP_i32_or);
         set(h, size);
         op(h, blot_direct_writer::OP_else_);
@@ -2882,7 +2852,6 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
     blot_direct_writer::setName(module, r.push, "runtime.push");
     blot_direct_writer::setName(module, r.pop, "runtime.pop");
     blot_direct_writer::setName(module, r.truncate, "runtime.truncate");
-    blot_direct_writer::setName(module, r.freeze, "runtime.freeze");
     blot_direct_writer::setName(module, r.create, "runtime.create");
     blot_direct_writer::setName(module, r.copy, "runtime.copy");
     blot_direct_writer::setName(module, r.persist, "runtime.persist");

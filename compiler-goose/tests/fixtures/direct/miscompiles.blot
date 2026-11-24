@@ -11,7 +11,7 @@ entry func positional (n: U32): F32 => return do:
   let p = $Position (n, 1.5)
   return p.x * 100.0 + U32.to_f32 p.z
 entry func grown (n: U32): U32 => return do:
-  let rows: GrowArray U32 = #[5]
+  let rows: Array U32 = #[5]
   for i in 0..64:
     @storage.push rows i
   rows[0] := self + n

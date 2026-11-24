@@ -5,7 +5,7 @@ Deno.test("data stack SIMD preserves masks lane selection and exact floating bit
   await compileAndRun(`
 const broadcast = func values -> lane => return @simd.u32x4.broadcast values lane
 entry const answer = func () => return do:
-  let owner: GrowArray U32 = #[]
+  let owner: Array U32 = #[]
   let floats = @simd.u32x4.from_bits (0x80000000, 0x7FC00000, 0x3F800000, 0x40800000)
   let limits = (0.0, 3.0, 2.0, 4.0)
   let mask = @simd.f32x4.lt floats limits
@@ -35,7 +35,7 @@ Deno.test("data stack SIMD stores validate the whole span and write only the cop
   await compileAndRun(`
 const words = #[11,22,33,44,55,66]
 entry const write = func (index: U32) => return do:
-  let owner: GrowArray U32 = #[]
+  let owner: Array U32 = #[]
   let changed = @simd.store (@storage.copy words) index (9,8,7,6)
   return changed[0]
 entry const read = func () => return do:

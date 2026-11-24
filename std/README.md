@@ -349,9 +349,9 @@ JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 ## Lists and arrays
 
 In the compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
-`Array U32` by default. A type annotation selects fixed-length `Array a`,
-append-only `GrowArray a`, or `ResizeArray a` with push and truncate
-capabilities; all three use `#[...]` literals. Lists and arrays are separate
+`Array U32` (dynamic array, supporting `@storage.push`, `@storage.pop`, and
+`@storage.truncate` when uniquely owned). A fixed-length type annotation
+`#[N; T]` selects a statically sized array. Lists and arrays are separate
 types, with `List.from_array` and `Array.from_list` for explicit conversion.
 Both expose `length` and `is_empty`. Only arrays support indexing, indexed
 updates, `get`, and `set`. Numeric arrays remain the collection type accepted by
@@ -384,10 +384,10 @@ list.splice_many [
 ```
 
 List operations retain their value semantics; runtime List support depends on
-the selected backend. Arrays use contiguous checked rows. Persistent helpers
-such as `array.push` construct independent output; use a named `GrowArray` when
-appending into the same owner is intended. Access records and views retain
-aliases, so copy explicitly for an independent version. See
+the selected backend. Arrays use contiguous checked rows. Helpers such as
+`Array.push` take `own Array a -> a -> Array a` to append in place and return
+the updated owner. Access records and views retain aliases, so copy explicitly
+for an independent version. See
 [the list example](../examples/lists.blot) and
 [collection and ownership contracts](../docs/language/guide.md#lists-arrays-and-libraries).
 
@@ -573,10 +573,10 @@ Additional functions in `std/array`:
 
 Filtering evaluates its predicate/transform once per element. These helpers
 handle empty arrays. An invalid slice traps or fails constant evaluation.
-Filtering and `indices` append selected values into a private `GrowArray`, then
-freeze it into the result array. `prefix_sums` traverses the input in order,
-writing each inclusive sum into one independent fixed-length destination.
-Evaluator operation and storage limits still apply.
+Filtering and `indices` append selected values into a local `Array` and return
+it directly. `prefix_sums` traverses the input in order, writing each inclusive
+sum into one independent destination. Evaluator operation and storage limits
+still apply.
 
 ## Constructor spelling
 

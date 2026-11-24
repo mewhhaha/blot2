@@ -6,15 +6,11 @@ import support.option;
 
 import std;
 type Kind = u32;
-let grow: Kind = 20;
-let resize: Kind = 21;
 let ref: Kind = 22;
 let view: Kind = 23;
 let link: Kind = 24;
 let shared: Kind = 25;
 let sized_array: Kind = 26;
-let sized_grow: Kind = 27;
-let sized_resize: Kind = 28;
 let length_literal_base: u32 = 0x10000000;
 let length_literal_limit: u32 = 0x80000000;
 
@@ -41,43 +37,33 @@ fn makeLengthLiteral(store: blot_check_types::Store&, value: u32) -> blot_check_
     return store.nominal(blot_check_types::NominalIdentity { 0xffffffff, length_literal_base + value, .. }, []);
 }
 fn arity(kind: Kind) -> u32 {
-    if kind == sized_array || kind == sized_grow || kind == sized_resize { return 2; }
+    if kind == sized_array { return 2; }
     return 1;
 }
-fn isSized(kind: Kind) -> bool { return kind == sized_array || kind == sized_grow || kind == sized_resize; }
-fn isGrowable(kind: Kind) -> bool { return kind == grow || kind == resize || kind == sized_grow || kind == sized_resize; }
-fn isResizable(kind: Kind) -> bool { return kind == resize || kind == sized_resize; }
+fn isSized(kind: Kind) -> bool { return kind == sized_array; }
 
 fn named(spelling: const u8[:]) -> blot_support::Option<Kind> {
     var text = spelling;
     if starts_with(text, "@storage.") { text = text[9..]; }
-    if text == "GrowArray" { return blot_support::Option<Kind> { true, grow , ..}; }
-    if text == "ResizeArray" { return blot_support::Option<Kind> { true, resize , ..}; }
     if text == "Ref" { return blot_support::Option<Kind> { true, ref , ..}; }
     if text == "View" { return blot_support::Option<Kind> { true, view , ..}; }
     if text == "Link" { return blot_support::Option<Kind> { true, link , ..}; }
     if text == "Shared" { return blot_support::Option<Kind> { true, shared , ..}; }
     if text == "SizedArray" { return blot_support::Option<Kind> { true, sized_array , ..}; }
-    if text == "SizedGrowArray" { return blot_support::Option<Kind> { true, sized_grow , ..}; }
-    if text == "SizedResizeArray" { return blot_support::Option<Kind> { true, sized_resize , ..}; }
     return blot_support::Option<Kind> { false, 0 , ..};
 }
 fn name(kind: Kind) -> const u8[:] {
     match kind {
-        20 => { return "GrowArray"; },
-        21 => { return "ResizeArray"; },
         22 => { return "Ref"; },
         23 => { return "View"; },
         24 => { return "Link"; },
         25 => { return "Shared"; },
         26 => { return "SizedArray"; },
-        27 => { return "SizedGrowArray"; },
-        28 => { return "SizedResizeArray"; },
         _ => { assert(false); return ""; },
     }
 }
 fn identity(unit: u32, declaration: u32) -> blot_support::Option<Kind> {
-    if unit == 0xffffffff && declaration >= grow && declaration <= sized_resize {
+    if unit == 0xffffffff && declaration >= ref && declaration <= sized_array {
         return blot_support::Option<Kind> { true, declaration , ..};
     }
     return blot_support::Option<Kind> { false, 0 , ..};
@@ -127,7 +113,7 @@ fn arrayElement(store, id: blot_check_types::Id) -> blot_support::Option<blot_ch
     let node = store.node(id);
     if node.tag == blot_check_types::Tag.array { return blot_support::Option<blot_check_types::Id> { true, node.a , ..}; }
     let value = info(store, id);
-    if value.present && (value.value.kind == grow || value.value.kind == resize || value.value.kind == sized_array || value.value.kind == sized_grow || value.value.kind == sized_resize) {
+    if value.present && value.value.kind == sized_array {
         return blot_support::Option<blot_check_types::Id> { true, value.value.element , ..};
     }
     return blot_support::Option<blot_check_types::Id> { false, 0 , ..};

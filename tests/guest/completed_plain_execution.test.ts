@@ -47,26 +47,25 @@ const floating = func (bits: U32): Array U32 => return do:
 const mainSource = `import * as left from "trial/left"
 import * as right from "trial/right"
 entry const integer = func (input: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[input]
+  let marker: Array U32 = #[input]
   let a = left.integer marker[0]
   let b = right.integer input
   return #[a[0],a[1],a[2],a[3],a[4],a[5],a[6],b[0],b[1],b[2],b[3],b[4],b[5],b[6]]
 entry const floating = func (bits: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[bits]
+  let marker: Array U32 = #[bits]
   let a = left.floating marker[0]
   let b = right.floating bits
   return #[a[0],a[1],a[2],a[3],a[4],a[5],a[6],b[0],b[1],b[2],b[3],b[4],b[5],b[6]]
 `;
 
-const persistentSource = `const pool: ResizeArray U32 = #[4]
-const peek = func (value: {x: U32}): {x: U32} => return do:
-  value.x := @u32.add self pool[@u32.sub (@storage.length pool) 1]
+const persistentSource = `const pool: Array U32 = #[4, 14]
+const peek = func (value: {x: U32}) -> (index: U32): {x: U32} => return do:
+  value.x := @u32.add self pool[index]
   return value
 entry const answer = func (input: U32): Array U32 => return do:
-  let a = peek {x: input}
-  @storage.push pool (@u32.add pool[@u32.sub (@storage.length pool) 1] 10)
-  let b = peek {x: input}
-  return #[a.x,b.x,pool[@u32.sub (@storage.length pool) 1]]
+  let a = peek {x: input} 0
+  let b = peek {x: input} 1
+  return #[a.x,b.x,pool[1]]
 `;
 
 const hostSource =
@@ -75,7 +74,7 @@ const hostSource =
   use reply <- host value.x
   return @u32.add reply value.x
 entry const answer = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
-  let marker: GrowArray U32 = #[7]
+  let marker: Array U32 = #[7]
   use reply <- invoke host {x: marker[0]}
   return reply
 `;
@@ -189,16 +188,14 @@ Deno.test(`completed plain plans keep hidden pools and host effects`, async () =
         asynchronous,
       });
       try {
-        let pool = 4;
         for (const input of [0, 7, 0xfffffffd, 0]) {
           let actual;
           if (asynchronous) actual = await guest.callAsync("answer", input);
           else actual = guest.call("answer", input);
           assert.deepEqual(
             actual,
-            new Uint32Array([input + pool, input + pool + 10, pool + 10]),
+            new Uint32Array([input + 4, input + 14, 14]),
           );
-          pool += 10;
         }
       } finally {
         guest.dispose();
@@ -262,7 +259,7 @@ const total = func (input: U32): U32 => return do:
   let values: Array U32 = #[input, @u32.add input 1]
   return @u32.add values[0] values[1]
 entry const answer = func (bits: U32): Array U32 => return do:
-  let marker: GrowArray U32 = #[bits]
+  let marker: Array U32 = #[bits]
   let (input,a,b,c) = @simd.u32x4.from_bits (bits,bits,bits,bits)
   let result = floating input
   let (output,d,e,f) = @simd.f32x4.bits (result,result,result,result)

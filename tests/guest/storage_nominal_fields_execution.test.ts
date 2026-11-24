@@ -6,7 +6,7 @@ const shapes = `type Vector is data = $Vector {x: F32}
 type Pose is data = $Pose {position: Vector}
 const vector = func (x: F32) => return $Vector {x}
 const Vector.add = func (left: Vector) -> (right: Vector) => return vector (@f32.add left.x right.x)
-const rows = func (pool: ResizeArray (Maybe a)): &[Maybe a] => return &pool[0..pool.length]
+const rows = func (pool: Array (Maybe a)): &[Maybe a] => return &pool[0..pool.length]
 `;
 const source = `import * as shapes from "./shapes"
 const shifted = func access -> tag => return do:
@@ -14,9 +14,9 @@ const shifted = func access -> tag => return do:
   let $Some pose = poses.at 0 else:
     return (tag, shapes.vector 0.0)
   return (tag, pose.position + shapes.vector 1.0)
-const shifted_pool = func (pool: ResizeArray (Maybe shapes.Pose)) -> tag => return shifted {pool} tag
+const shifted_pool = func (pool: Array (Maybe shapes.Pose)) -> tag => return shifted {pool} tag
 entry const answer = func (input: F32) => return do:
-  let pool: ResizeArray (Maybe shapes.Pose) = #[$Some $shapes.Pose {position: shapes.vector input}]
+  let pool: Array (Maybe shapes.Pose) = #[$Some $shapes.Pose {position: shapes.vector input}]
   let (integer, first) = shifted_pool pool 7
   pool[0] := $Some $shapes.Pose {position: shapes.vector (input + 10.0)}
   let (floating, second) = shifted_pool pool input
@@ -34,7 +34,7 @@ const carried = func token => return carry (carry token)
 const integer_token = func (token: Token U32) -> (value: U32): U32 => return @u32.add value 1
 const floating_token = func (token: Token F32) -> (value: U32): U32 => return @u32.add value 2
 entry const integers = func (input: U32) => return do:
-  let live: GrowArray U32 = #[input]
+  let live: Array U32 = #[input]
   let first = selected ($Some ($Payload {right: 3, left: live[0]})) ($Payload {left: 99, right: 99})
   let second = selected $Nothing ($Payload {right: live[0], left: 7})
   let third = selected ($Some ($Payload {left: @u32.add live[0] 11, right: 13})) first
@@ -43,7 +43,7 @@ entry const integers = func (input: U32) => return do:
   return #[first.left, first.right, second.left, second.right, sum first, sum second,
     sum third, integer_token (carried integer) live[0], floating_token (carried floating) live[0]]
 entry const floats = func (input: F32) => return do:
-  let live: GrowArray F32 = #[input]
+  let live: Array F32 = #[input]
   let first = selected ($Some ($Payload {left: live[0], right: 2.5})) ($Payload {right: 99.0, left: 99.0})
   let second = selected $Nothing ($Payload {right: live[0], left: 7.25})
   let third = selected ($Some ($Payload {right: 1.5, left: live[0]})) first

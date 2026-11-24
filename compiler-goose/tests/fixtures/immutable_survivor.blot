@@ -14,9 +14,9 @@ entry const single = func (input: U32): Array U32 => return do:
   return #[selected.rows[0], selected.cold.left, selected.hook 7]
 type Pick is data = $Left U32 | $Right U32 | $Empty
 entry const rowed = func (input: U32): Array U32 => return do:
-  let observations: GrowArray U32 = #[]
+  let observations: Array U32 = #[]
   let candidate = if @u32.eq (@u32.rem input 2) 0 then $Left input else $Right input
   case candidate of
     $Left value | $Right value => @storage.push observations value
     $Empty => ()
-  return @storage.freeze observations
+  return observations

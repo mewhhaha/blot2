@@ -18,7 +18,7 @@ Deno.test("imported generic access projections retain field names without concre
       entry,
       `import * as access from "./access"
 entry const answer = func (value: U32) => return do:
-  let marker: GrowArray U32 = #[]
+  let marker: Array U32 = #[]
   let rows: Array U32 = #[0]
   let result = access.write {rows} value
   return result.rows[0]
@@ -51,7 +51,7 @@ Deno.test("project service retains data-stack output across edits errors and bac
   const directory = await Deno.makeTempDir({ prefix: "blot-storage-project-" });
   const entry = `${directory}/main.blot`;
   const source = (value: number) =>
-    `const values: GrowArray U32 = #[${value}]
+    `const values: Array U32 = #[${value}]
 entry const answer = func () => return values[0]
 `;
   try {

@@ -21,30 +21,31 @@ async function trapsAtRun(source: string, input: unknown = null) {
 Deno.test("application arrays survive entries while frame storage and failed calls are reclaimed", async () => {
   await compileAndRun(
     `
-const values: ResizeArray U32 = #[40]
-const other: GrowArray {amount: U32} = #[{amount: 7}]
-const append = func (n: U32) => return @storage.push values n
+const values: Array U32 = #[40, 9]
+const other: Array {amount: U32} = #[{amount: 7}]
 entry const count = func (add: Bool) => return do:
+  let local = @storage.copy values
   if add:
-    let written = append 9
-  return @storage.length values
+    @storage.push local 11
+  return @storage.length local
 entry const advance = func (n: U32) => return do:
-  let scratch: GrowArray U32 = #[n]
-  let previous = @storage.copy values
-  @storage.truncate values 0
-  @storage.push values scratch[0]
-  return previous[0]
+  let scratch: Array U32 = #[n]
+  let local = @storage.copy values
+  let previous = @storage.copy local
+  @storage.truncate local 0
+  @storage.push local scratch[0]
+  return @u32.add previous[0] local[0]
 entry const read = func (index: U32) => return do:
-  let scratch: GrowArray U32 = #[17]
+  let scratch: Array U32 = #[17]
   return @u32.add values[index] (@u32.sub scratch[0] 17)
 entry const second = func () => return other[0].amount
 `,
     (guest, bytes) => {
-      equal(guest.call("count", false), 1);
+      equal(guest.call("count", false), 2);
       equal(guest.call("second", null), 7);
-      equal(guest.call("advance", 42), 40);
-      equal(guest.call("read", 0), 42);
-      equal(guest.call("count", true), 2);
+      equal(guest.call("advance", 42), 82);
+      equal(guest.call("read", 0), 40);
+      equal(guest.call("count", true), 3);
       equal(guest.call("read", 1), 9);
       let trapped = false;
       try {
@@ -53,9 +54,9 @@ entry const second = func () => return other[0].amount
         trapped = true;
       }
       equal(trapped, true);
-      equal(guest.call("read", 0), 42);
+      equal(guest.call("read", 0), 40);
       for (let n = 0; n < 512; n++) {
-        equal(guest.call("advance", n), n === 0 ? 42 : n - 1);
+        equal(guest.call("advance", n), 40 + n);
       }
       equal(guest.call("second", null), 7);
       const module = new WebAssembly.Module(bytes);
@@ -68,7 +69,6 @@ entry const second = func () => return other[0].amount
       );
       const fresh = new WebAssembly.Instance(module).exports;
       equal((fresh.read as CallableFunction)(0), 40);
-      equal(guest.call("read", 0), 511);
     },
   );
 });
@@ -76,15 +76,15 @@ entry const second = func () => return other[0].amount
 Deno.test("application storage holds borrowed elements and ignores unreachable initializers", async () => {
   await compileAndRun(
     `
-const values: GrowArray {borrow: &U32} = #[]
+const values: Array {borrow: &U32} = #[]
 entry const answer = func () => return @storage.length values
 `,
     (guest) => equal(guest.call("answer", null), 0),
   );
   await compileAndRun(
     `
-const unused: GrowArray {borrow: &U32} = #[]
-const live: GrowArray U32 = #[42]
+const unused: Array {borrow: &U32} = #[]
+const live: Array U32 = #[42]
 entry const answer = func () => return live[0]
 `,
     (guest) => equal(guest.call("answer", null), 42),
@@ -94,10 +94,10 @@ entry const answer = func () => return live[0]
 Deno.test("source arrays keep references views and links stable across growth", async () => {
   await compileAndRun(
     `
-const make = func (): GrowArray U32 => return #[40]
+const make = func (): Array U32 => return #[40]
 const peek = func (item: &U32) => return @storage.load item
 entry const answer = func () => return do:
-  let items: GrowArray U32 = make ()
+  let items: Array U32 = make ()
   let grown = @storage.push items 7
   items[0] := 42
   let first: &U32 = &items[0]
@@ -108,18 +108,18 @@ entry const answer = func () => return do:
   copied[0] := 99
   break @u32.add (@u32.add saved (@storage.load link)) view[0]
 entry const resized = func () => return do:
-  let items: ResizeArray U32 = #[7, 8]
+  let items: Array U32 = #[7, 8]
   let popped = @storage.pop items
   let grown = @storage.push items 42
   let trimmed = @storage.truncate items 1
   break @u32.add popped (@storage.length items)
 entry const frozen = func () => return do:
-  let items: GrowArray U32 = #[]
+  let items: Array U32 = #[]
   let grown = @storage.push items 42
-  let fixed: Array U32 = @storage.freeze items
+  let fixed: *#[U32] = @storage.share items
   break fixed[0]
 entry const checked = func (index: U32) => return do:
-  let items: GrowArray U32 = #[42]
+  let items: Array U32 = #[42]
   break items[index]
 `,
     (guest, bytes) => {
@@ -173,7 +173,7 @@ entry const scalar_ref = func () => return do:
   await compileExpectedFailure(
     `
 entry const bad = func () => return do:
-  let items: GrowArray U32 = #[42]
+  let items: Array U32 = #[42]
   let staged = #run @storage.length items
   break staged
 `,
@@ -181,12 +181,12 @@ entry const bad = func () => return do:
   );
 });
 
-Deno.test("storage rejects mode coercion and traps on invalidated borrows", async () => {
+Deno.test("storage rejects fixed-length push and invalidated borrows", async () => {
   await compileExpectedFailure(
     `
 entry const bad = func () => return do:
-  let fixed = #[42]
-  let grow: GrowArray U32 = fixed
+  let fixed: #[1; U32] = #[42]
+  @storage.push fixed 1
   break 0
 `,
     "type_mismatch",
@@ -194,7 +194,7 @@ entry const bad = func () => return do:
   await compileExpectedFailure(
     `
 entry const bad = func () => return do:
-  let items: ResizeArray U32 = #[42]
+  let items: Array U32 = #[42]
   let first = &items[0]
   let alias = items
   let shrunk = @storage.truncate alias 0
@@ -205,13 +205,13 @@ entry const bad = func () => return do:
   await compileExpectedFailure(
     `
 entry const bad = func () => return do:
-  let items: GrowArray U32 = #[42]
+  let items: Array U32 = #[42]
   let alias = items
-  let fixed = @storage.freeze items
+  let fixed = @storage.share items
   let grown = @storage.push alias 1
   break fixed[0]
 `,
-    "aliased_update",
+    "own_argument",
   );
 });
 
@@ -219,19 +219,19 @@ Deno.test("data stacks reclaim lexical owners and admit shrinking after the fina
   await compileAndRun(
     `
 const temporary = func (x: U32) => return do:
-  let items: GrowArray U32 = #[x]
+  let items: Array U32 = #[x]
   break items[0]
-const choose = func (flag: Bool): GrowArray U32 => return
+const choose = func (flag: Bool): Array U32 => return
   if flag then #[40] else #[41]
 entry const grow = func () => return do:
-  let items: GrowArray U32 = #[42]
+  let items: Array U32 = #[42]
   for i in 0..5000:
     let pushed = @storage.push items i
     let used = temporary i
   let reference = &items[0]
   break @u32.add (@storage.load reference) (@storage.length items)
 entry const shrink = func () => return do:
-  let items: ResizeArray U32 = #[42, 7]
+  let items: Array U32 = #[42, 7]
   let reference = &items[0]
   let saved = @storage.load reference
   let removed = @storage.pop items
@@ -255,8 +255,8 @@ Deno.test("data-stack arrays store records and preserve the roots of their links
   await compileAndRun(
     `
 entry const answer = func () => return do:
-  let pool: GrowArray U32 = #[40, 42]
-  let rows: GrowArray {value: U32, target: ^U32} = #[]
+  let pool: Array U32 = #[40, 42]
+  let rows: Array {value: U32, target: ^U32} = #[]
   let grown = @storage.push rows {value: 1, target: ^pool[0]}
   let grown = @storage.push rows {target: ^pool[1], value: 2}
   let row = rows[1]
@@ -272,14 +272,14 @@ Deno.test("data-stack numeric layouts preserve F32 fields and reclaim loop exits
   await compileAndRun(
     `
 entry const numeric = func (input: F32) => return do:
-  let rows: GrowArray {x: F32, y: U32} = #[{y: 1, x: input}]
+  let rows: Array {x: F32, y: U32} = #[{y: 1, x: input}]
   let pushed = @storage.push rows {x: @f32.add input 1.0, y: 2}
   break @f32.add rows[0].x rows[1].x
 entry const exits = func (limit: U32) => return do:
-  let outer: GrowArray U32 = #[42]
+  let outer: Array U32 = #[42]
   let total = 0
   for i in 0..limit:
-    let temporary: GrowArray U32 = #[i]
+    let temporary: Array U32 = #[i]
     if i == 2:
       continue
     if i == 5:
@@ -300,7 +300,7 @@ Deno.test("known callbacks and partial applications preserve captured storage ro
 const apply = func transform -> value => return transform value
 const add = func (left: U32) -> (right: U32) => return @u32.add left right
 entry const answer = func () => return do:
-  let items: GrowArray U32 = #[40]
+  let items: Array U32 = #[40]
   let grown = @storage.push items 99
   let reference = &items[0]
   let read = func (offset: U32) => return @u32.add (@storage.load reference) offset
@@ -312,7 +312,7 @@ entry const answer = func () => return do:
   await compileExpectedFailure(
     `
 entry const bad = func () => return do:
-  let items: ResizeArray U32 = #[42]
+  let items: Array U32 = #[42]
   let reference = &items[0]
   let read = func () => return @storage.load reference
   let shrunk = @storage.truncate items 0
@@ -326,8 +326,8 @@ Deno.test("joined aliases and caller temporaries retain every possible borrow ro
   await compileAndRun(
     `
 entry const answer = func (flag: Bool) => return do:
-  let left: GrowArray U32 = #[40]
-  let right: GrowArray U32 = #[42]
+  let left: Array U32 = #[40]
+  let right: Array U32 = #[42]
   let selected = if flag then right else left
   let pushed = @storage.push selected 1
   let reference = &selected[0]
@@ -341,8 +341,8 @@ entry const answer = func (flag: Bool) => return do:
   await compileExpectedFailure(
     `
 entry const bad = func (flag: Bool) => return do:
-  let left: ResizeArray U32 = #[40]
-  let right: ResizeArray U32 = #[42]
+  let left: Array U32 = #[40]
+  let right: Array U32 = #[42]
   let reference = if flag then &left[0] else &right[0]
   let shrunk = @storage.truncate right 0
   break @storage.load reference
@@ -353,7 +353,7 @@ entry const bad = func (flag: Bool) => return do:
     `
 const consume = func (reference: &U32) -> (removed: U32) => return @storage.load reference
 entry const bad = func () => return do:
-  let items: ResizeArray U32 = #[42]
+  let items: Array U32 = #[42]
   break consume (&items[0]) (@storage.pop items)
 `,
     "aliased_update",
@@ -363,15 +363,15 @@ entry const bad = func () => return do:
 Deno.test("conditional owned returns release earlier loop iterations and transfer only the selected owner", async () => {
   await compileAndRun(
     `
-const choose = func (limit: U32): GrowArray U32 => do:
+const choose = func (limit: U32): Array U32 => do:
   for i in 0..limit:
-    let items: GrowArray U32 = #[i]
+    let items: Array U32 = #[i]
     if i == 5:
       return items
   return #[42]
 entry const answer = func (limit: U32) => return do:
   let selected = choose limit
-  let independent: GrowArray U32 = #[100]
+  let independent: Array U32 = #[100]
   let grown = @storage.push selected 7
   break @u32.add selected[0] independent[0]
 `,
@@ -484,7 +484,7 @@ entry func borrow_and_return (): U32 =>
   let r = &xs
   let first = (@storage.load r)[0]
   xs[0] := 99
-  let pool: GrowArray U32 = #[3, 4]
+  let pool: Array U32 = #[3, 4]
   let lk = ^pool[0]
   let linked = @storage.load lk
   pool[0] := 77
@@ -515,7 +515,7 @@ entry func borrow_and_return (): U32 =>
   xs[0] := 9
   return alias[0]`,
       `entry func bad (): U32 =>
-  let pool: GrowArray U32 = #[1, 2]
+  let pool: Array U32 = #[1, 2]
   let lk = ^pool[0]
   pool[0] := 9
   return @storage.load lk`,

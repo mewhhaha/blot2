@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const source = `entry const transport = func (input: U32): Array U32 => return do:
-  let rows: GrowArray U32 = #[input]
+  let rows: Array U32 = #[input]
   let first = input
   let second = @u32.add input 10
   for index in 0 .. 4:
@@ -18,7 +18,7 @@ const source = `entry const transport = func (input: U32): Array U32 => return d
         break
   return #[rows[0], first, second, @u32.add 19 (@u32.add first second)]
 entry const typed = func (input: F32): F32 => return do:
-  let marker: GrowArray U32 = #[0]
+  let marker: Array U32 = #[0]
   let first = input
   let second = -0.0
   for index in 0 .. 2:

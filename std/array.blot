@@ -29,36 +29,38 @@ func prefix_sums (values: #[U32]) : #[U32] =>
     result[index] := total
   return result
 
-// One traversal; append into an owner whose growth capability is consumed.
+// One traversal; append into an owner.
 func indices (keep: #[Bool]) =>
-  let selected: #[+U32] = #[]
+  let selected: #[U32] = #[]
   for index in 0..keep.length:
     if keep[index]:
       @storage.push selected index
-  return seal selected
+  return selected
 
 func filter (predicate: a -> Bool) -> values =>
-  let selected: #[+a] = #[]
+  let selected: #[a] = #[]
   for index in 0..values.length:
     let value = values.at index
     if predicate value:
       @storage.push selected value
-  return seal selected
+  return selected
 
 func filter_map (transform: a -> Maybe b) -> values =>
-  let selected: #[+b] = #[]
+  let selected: #[b] = #[]
   for index in 0..values.length:
     let value = values.at index
     let candidate = transform value
     if let $Some result = candidate:
       @storage.push selected result
-  return seal selected
+  return selected
 
-// Append readable elements in source order into the caller's named owner.
-func append_into (destination: #[+a]) -> source =>
-  for index in 0 .. source.length:
-    destination.push (source.at index)
-  return ()
+// Append readable elements in source order into the caller's owned array.
+func extend (destination: own #[a]) -> source : #[a] =>
+  let count: U32 = source.length
+  let at: U32 -> a = source.at
+  for index in 0 .. count:
+    @storage.push destination (at index)
+  return destination
 
 // Ranges name one separately owned readable payload. Validate every range and
 // the combined length before constructing an independent flat result.
@@ -73,12 +75,12 @@ func flatten_read (read: U32 -> a) -> (length: U32) -> ranges =>
     if next < total:
       panic "array flatten length overflow"
     total := next
-  let result: #[+a] = #[]
+  let result: #[a] = #[]
   for index in 0 .. ranges.length:
     let range = ranges.at index
     for offset in 0 .. range.count:
-      result.push (read (range.start + offset))
-  return seal result
+      @storage.push result (read (range.start + offset))
+  return result
 func flatten ranges -> payload => return
   flatten_read (func (index: U32) => payload.at index) payload.length ranges
 

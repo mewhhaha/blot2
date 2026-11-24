@@ -5,12 +5,12 @@ import { instantiateGuest } from "../../host/guest.ts";
 const source = `const view_value = func (values: &[U32]) => return values[0]
 const ref_value = func (value: Ref U32) => return @storage.load value
 const link_value = func (value: Link U32) => return @storage.load value
-const read = func (rows: ResizeArray U32) -> (links: GrowArray U32) -> (index: U32) => return
+const read = func (rows: Array U32) -> (links: Array U32) -> (index: U32) => return
   @u32.add (view_value (&rows[0..2])) (@u32.add (ref_value (@storage.at rows 1)) (link_value (@storage.link links index)))
 entry const answer = func (input: U32) => return do:
-  let first: ResizeArray U32 = #[@u32.add input 10, @u32.add input 20, @u32.add input 30]
-  let second: ResizeArray U32 = #[@u32.add input 110, @u32.add input 120, @u32.add input 130]
-  let links: GrowArray U32 = #[@u32.add input 30, @u32.add input 130]
+  let first: Array U32 = #[@u32.add input 10, @u32.add input 20, @u32.add input 30]
+  let second: Array U32 = #[@u32.add input 110, @u32.add input 120, @u32.add input 130]
+  let links: Array U32 = #[@u32.add input 30, @u32.add input 130]
   return @u32.add (read first links 0) (read second links 1)
 `;
 Deno.test(`planned borrows retain their checked View Ref and Link witnesses`, async () => {

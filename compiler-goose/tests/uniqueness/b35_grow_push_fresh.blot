@@ -4,11 +4,11 @@ type Opt is data = $Has (Array U32) | $Missing
 type Point is data = $Point { x: U32, y: U32 }
 const keep = func (values: Array U32) => return values[0]
 const run = func (n: U32) => return do:
-  let grid: GrowArray (Array U32) = #[]
+  let grid: Array (Array U32) = #[]
   @storage.push grid #[1, 2]
   @storage.push grid #[3, 4]
   grid[1][0] := n
-  let counts: GrowArray U32 = #[]
+  let counts: Array U32 = #[]
   @storage.push counts n
   counts[0] := n
   break grid[1][0]

@@ -520,12 +520,6 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
  }
  if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#"&&peek(p,tokens,1)==t_l_bracket {
   advance(p,source,tokens); advance(p,source,tokens);
-  var mode: u32=0;
-  if at(p,source,tokens,t_symbol) {
-   let sigil=text(p,source,current(p,source,tokens));
-   if sigil=="+" { mode=1; advance(p,source,tokens); }
-   else if sigil=="~" { mode=2; advance(p,source,tokens); }
-  }
   var has_semi=false; var nest=0; var scan=p.index;
   while scan<tokens.len {
    let st=tokens[scan].tag;
@@ -552,17 +546,11 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   let elem=type_expression(p,source,tokens);
   expect(p,source,tokens,t_r_bracket);
   if has_semi {
-   var head_name: const u8[:]="@storage.SizedArray";
-   if mode==1 { head_name="@storage.SizedGrowArray"; }
-   else if mode==2 { head_name="@storage.SizedResizeArray"; }
-   let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,head_name),0,0,start);
+   let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,"@storage.SizedArray"),0,0,start);
    let partial=add(p,source,tokens,a_type_apply,head,len_node,0,start);
    let __cleanup_result_sized_0: Id = add(p,source,tokens,a_type_apply,partial,elem,0,start); { p.depth--; } return __cleanup_result_sized_0;
   }
-  var head_name: const u8[:]="Array";
-  if mode==1 { head_name="@storage.GrowArray"; }
-  else if mode==2 { head_name="@storage.ResizeArray"; }
-  let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,head_name),0,0,start);
+  let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,"Array"),0,0,start);
   let __cleanup_result_arr_0: Id = add(p,source,tokens,a_type_apply,head,elem,0,start); { p.depth--; } return __cleanup_result_arr_0;
  }
  if at(p,source,tokens,t_caret)||(at(p,source,tokens,t_symbol)&&text(p,source,current(p,source,tokens))=="&") {

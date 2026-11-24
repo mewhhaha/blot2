@@ -1,0 +1,9 @@
+// @storage.push/truncate/pop on an own parameter and nested deep element are accepted.
+func mutate (rows: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
+  @storage.push rows[0] v
+  let _ = @storage.pop rows[0]
+  @storage.truncate rows[0] 1
+  return rows
+entry func run (): U32 =>
+  let grid = mutate #[#[1, 2]] 9
+  return grid[0][0]

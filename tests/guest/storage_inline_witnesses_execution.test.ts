@@ -6,7 +6,7 @@ const source = `type Actor is data = $Actor U32
 type Pose is data = $Pose U32
 const consume = func ($Actor actor) -> ($Pose pose) => return @u32.add (@u32.mul actor 100) pose
 entry const answer = func (input: U32) => return do:
-  let owner: ResizeArray U32 = #[input]
+  let owner: Array U32 = #[input]
   let actors: Maybe Actor = if @u32.eq (@u32.bit_and input 1) 0 then $Nothing else $Some ($Actor (@u32.add owner[0] 1))
   let poses: Maybe Pose = if @u32.eq (@u32.bit_and input 2) 0 then $Nothing else $Some ($Pose (@u32.add owner[0] 2))
   let actor = Maybe.unwrap_or ($Actor 10) actors

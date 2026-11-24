@@ -17,10 +17,10 @@ entry func from_view (n: U32): U32 => return do:
   let rows = #[t + n | t <- v, t > 5]
   break rows[0] + rows.length
 func touching (t: U32) -> (others: &[U32]) => return if t > others.length then 3 else 0
-func maker (destination: GrowArray U32) => return func faces => return do:
+func maker (destination: Array U32) => return func faces => return do:
   let points = #[1, 2]
   let kept = #[plane | plane <- faces, touching plane (points.view 0 points.length) >= 3]
   return kept.length + destination.length
 entry func nested (n: U32): U32 => return do:
-  let destination: GrowArray U32 = #[9]
+  let destination: Array U32 = #[9]
   break maker destination #[n, 1, 5, 7]

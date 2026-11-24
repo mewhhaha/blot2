@@ -57,7 +57,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     match shape.tag {
         unit, boolean, u32_, f32_ => { return true; },
         function, provider, state_provider, cell, never => { return false; },
-        array, grow, resize, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
+        array, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
             for child in g.types.words[shape.a..shape.a + shape.b] {
                 if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
@@ -115,10 +115,7 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
                 let lowered, lerr = g.types.lower(unit, head_arg, match_env);
                 if lerr != blot_direct_types::Error.none { matches = false; break; }
                 if lowered != want {
-                    let pn = g.types.node(want);
-                    let rn = g.types.node(lowered);
-                    let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
-                    if !array_lift { matches = false; break; }
+                    matches = false; break;
                 }
             }
             if !matches { continue; }
@@ -397,7 +394,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
     }
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize => {
+        array => {
             let c_slot = local32(g, f);
             let c_gen = local32(g, f);
             let p_slot = local32(g, f);
@@ -412,7 +409,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             let elem_step, serr = stride(g, f, elem_ty, id);
             if serr != blot_direct_types::Error.none { return serr; }
             var mode: u32 = 0;
-            if growable(g, ty) { mode = 1; } else if is_imm { mode = 2; }
+            if is_imm { mode = 2; }
             lget(g, c_slot);
             lget(g, c_gen);
             i32Const(g, elem_step);
@@ -609,7 +606,7 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     i32Const(g, step);
     var mode: u32 = 0;
-    if growable(g, key.ty) { mode = 1; } else if is_imm { mode = 2; }
+    if is_imm { mode = 2; }
     i32Const(g, mode);
     callf(g, persist);
     let p_slot = local32(g, f);
@@ -1749,14 +1746,6 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 lget(g, count);
                 callf(g, g.runtime_().truncate);
                 return unitVal(), true, blot_direct_types::Error.none;
-            },
-            freeze => {
-                if operand_count != 1 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
-                let container = g.s.vals[forwarded.start];
-                lget(g, w(g, container, 0));
-                lget(g, w(g, container, 1));
-                callf(g, g.runtime_().freeze);
-                return Val { result, container.start, container.len }, true, blot_direct_types::Error.none;
             },
             copy => {
                 if operand_count != 1 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }

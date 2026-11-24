@@ -195,7 +195,7 @@ fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u3
 }
 fn elementOf(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Ty, Error {
     match tagOf(g, ty) {
-        array, grow, resize, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
+        array, view, ref, link => { return g.types.node(ty).a, blot_direct_types::Error.none; },
         _ => {
             g.failOpen(g.units[f.unit - 1], id);
             g.put("storage operation on a ");
@@ -203,10 +203,6 @@ fn elementOf(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Ty, Error {
             return 0, g.failClose();
         },
     }
-}
-fn growable(g: const Generator&, ty: Ty) -> bool {
-    let tag = tagOf(g, ty);
-    return tag == blot_direct_types::Tag.grow || tag == blot_direct_types::Tag.resize;
 }
 fn boolWord(value: bool) -> u32 { if value { return 1; } return 0; }
 fn memoryFillOp(g: Generator&) {
@@ -340,28 +336,10 @@ fn create(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, Error {
     let step, error = stride(g, f, element, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     i32Const(g, step);
-    i32Const(g, boolWord(growable(g, ty)));
+    i32Const(g, 0);
     callf(g, create_function);
     let handle, error = pop(g, f, ty, id);
     if error != blot_direct_types::Error.none { return handle, error; }
-    if tagOf(g, ty) == blot_direct_types::Tag.grow || tagOf(g, ty) == blot_direct_types::Tag.resize {
-        let entry = local32(g, f);
-        let slot_loc = w(g, handle, 0);
-        lget(g, slot_loc);
-        i32Const(g, 8);
-        op(g, OP_i32_shr_u);
-        i32Const(g, 2);
-        op(g, OP_i32_shl);
-        op(g, OP_i32_load); uleb(g, 2); uleb(g, g.runtime_().layout.owner_table);
-        lget(g, slot_loc);
-        i32Const(g, 255);
-        op(g, OP_i32_and);
-        i32Const(g, 4);
-        op(g, OP_i32_shl);
-        op(g, OP_i32_add);
-        lset(g, entry);
-        recordCheckedGrow(f, slot_loc, w(g, handle, 1), entry);
-    }
     return handle, blot_direct_types::Error.none;
 }
 // The address of element 0 of an owner handle.
@@ -387,16 +365,6 @@ fn lengthOf(g: Generator&, f: Fn&, container: Val, id: u32) -> u32, Error {
     if tagOf(g, container.ty) == blot_direct_types::Tag.array {
         let _, length = ensureCheckedArray(g, f, container);
         return length, blot_direct_types::Error.none;
-    }
-    if tagOf(g, container.ty) == blot_direct_types::Tag.grow || tagOf(g, container.ty) == blot_direct_types::Tag.resize {
-        let cached = findCheckedGrow(f, w(g, container, 0), w(g, container, 1));
-        if cached >= 0 {
-            let length = local32(g, f);
-            lget(g, f.checked_grows[cached].entry);
-            op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
-            lset(g, length);
-            return length, blot_direct_types::Error.none;
-        }
     }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return 0, error; }
@@ -1000,7 +968,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let address = local32(g, f);
     let ctag = tagOf(g, container.ty);
-    if !g.runtime_().has_fork && step > 0 && step <= 65536 && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
+    if !g.runtime_().has_fork && step > 0 && step <= 65536 && ctag == blot_direct_types::Tag.array {
         let entry = ensureCheckedGrow(g, f, container);
         let len = local32(g, f);
         let next_len = local32(g, f);
@@ -1190,11 +1158,6 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let address_function = g.runtime_().address;
     match operation {
-        reserve => {
-            let ignored, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return ignored, error; }
-            return unitVal(), blot_direct_types::Error.none;
-        },
         length => {
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
@@ -1248,19 +1211,9 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             invalidateCheckedContainers(f);
             return unitVal(), blot_direct_types::Error.none;
         },
-        freeze => {
-            let container, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return container, error; }
-            lget(g, w(g, container, 0));
-            lget(g, w(g, container, 1));
-            callf(g, g.runtime_().freeze);
-            return Val { ty, container.start, container.len }, blot_direct_types::Error.none;
-        },
         share => {
             let value, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return value, error; }
-            let froze = freezeValue(g, f, value, id, 0);
-            if froze != blot_direct_types::Error.none { return neverVal(), froze; }
             return Val { ty, value.start, value.len }, blot_direct_types::Error.none;
         },
         copy => {
@@ -1353,83 +1306,11 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
 }
 
-recursive fn holdsGrowable(g: Generator&, ty: Ty, depth: i64) -> bool {
-    if depth > 32 { return false; }
-    let n = g.types.node(ty);
-    match n.tag {
-        grow, resize => { return true; },
-        tuple => {
-            for at in 0..(n.b as i64) { if holdsGrowable(g, g.types.words[n.a + at], depth + 1) { return true; } }
-            return false;
-        },
-        record => {
-            for index in 0..(n.b as i64) { if holdsGrowable(g, g.types.recordField(ty, index).ty, depth + 1) { return true; } }
-            return false;
-        },
-        nominal => {
-            let cases, error = g.types.variants(ty);
-            if error != blot_direct_types::Error.none { return false; }
-            for at in 0..(cases.len as i64) {
-                let payload = g.types.variant_payloads[cases.payloads + at];
-                if payload != ty && holdsGrowable(g, payload, depth + 1) { return true; }
-            }
-            return false;
-        },
-        _ => { return false; },
-    }
-}
-
-recursive fn freezeValue(g: Generator&, f: Fn&, value: Val, id: u32, depth: i64) -> Error {
-    if depth > 32 || value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
-    let tag = tagOf(g, value.ty);
-    if tag == blot_direct_types::Tag.grow || tag == blot_direct_types::Tag.resize {
-        lget(g, w(g, value, 0));
-        lget(g, w(g, value, 1));
-        callf(g, g.runtime_().freeze);
-        return blot_direct_types::Error.none;
-    }
-    if !holdsGrowable(g, value.ty, 0) { return blot_direct_types::Error.none; }
-    if tag == blot_direct_types::Tag.record {
-        let count = g.types.node(value.ty).b as i64;
-        for index in 0..count {
-            let field_ty = g.types.recordField(value.ty, index).ty;
-            if !holdsGrowable(g, field_ty, 0) { continue; }
-            let field, error = recordField(g, f, value, index, id);
-            if error != blot_direct_types::Error.none { return error; }
-            let err = freezeValue(g, f, field, id, depth + 1);
-            if err != blot_direct_types::Error.none { return err; }
-        }
-        return blot_direct_types::Error.none;
-    }
-    if tag == blot_direct_types::Tag.tuple {
-        let n = g.types.node(value.ty);
-        for index in 0..(n.b as i64) {
-            let item_ty = g.types.words[n.a + index];
-            if !holdsGrowable(g, item_ty, 0) { continue; }
-            let item, error = tupleItem(g, f, value, index, id);
-            if error != blot_direct_types::Error.none { return error; }
-            let err = freezeValue(g, f, item, id, depth + 1);
-            if err != blot_direct_types::Error.none { return err; }
-        }
-        return blot_direct_types::Error.none;
-    }
-    if tag == blot_direct_types::Tag.nominal {
-        let cases, error = g.types.variants(value.ty);
-        if error != blot_direct_types::Error.none { return g.typeFailure(g.units[f.unit - 1], id); }
-        if cases.len == 1 {
-            let unwrapped, error = unwrapVariant(g, f, value, g.types.variant_tags[cases.tags], id);
-            if error != blot_direct_types::Error.none { return error; }
-            return freezeValue(g, f, unwrapped, id, depth + 1);
-        }
-    }
-    return blot_direct_types::Error.none;
-}
-
 recursive fn holdsContainer(g: Generator&, ty: Ty, depth: i64) -> bool {
     if depth > 32 { return false; }
     let n = g.types.node(ty);
     match n.tag {
-        array, grow, resize => { return true; },
+        array => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if holdsContainer(g, g.types.words[n.a + at], depth + 1) { return true; } }
             return false;
@@ -1454,7 +1335,7 @@ recursive fn holdsContainer(g: Generator&, ty: Ty, depth: i64) -> bool {
 recursive fn deepCopyValue(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, depth: i64) -> Val, Error {
     if depth > 32 || value.ty == blot_direct_types::never { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
     let tag = tagOf(g, ty);
-    if tag == blot_direct_types::Tag.array || tag == blot_direct_types::Tag.grow || tag == blot_direct_types::Tag.resize {
+    if tag == blot_direct_types::Tag.array {
         return copyContainer(g, f, value, ty, id);
     }
     if !holdsContainer(g, ty, 0) { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }

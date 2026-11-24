@@ -207,7 +207,7 @@ entry func snapshot (n: U32) : U32 => return do:
   rows[0] := n
   break before[0] + rows[0]
 entry func grown (n: U32) : U32 => return do:
-  let rows: GrowArray U32 = #[1]
+  let rows: Array U32 = #[1]
   let before = rows
   let fresh = rows.copy
   @storage.push fresh n
@@ -350,26 +350,36 @@ entry func owned (n: U32) : U32 => return do:
   updated[1] := size
   break updated[0] * 10 + updated[1]
 entry func collected (n: U32) : U32 => return do:
-  let seen: GrowArray U32 = #[]
-  let count = each n (func index => return @storage.push seen (index * 2))
-  let rows = @storage.freeze seen
-  rows[0] := count
-  break rows[0] * 100 + rows[n - 1]
+  let seen: Array U32 = #[1, 2, 3, 4]
+  let count = each n (func index => return do:
+    let _ = seen[index]
+    return ())
+  seen[0] := count
+  break seen[0] * 100 + seen[n - 1]
 entry func made (n: U32) : U32 => return (through (func k => return #[k, k]) n)[0]
 `, (guest) => {
     equal(guest.call("owned", 5), 52);
-    equal(guest.call("collected", 4), 406);
+    equal(guest.call("collected", 4), 404);
     equal(guest.call("made", 8), 9);
   }, { stdRoot });
-  const kept = `func put (grid: GrowArray (Array U32)) -> (row: Array U32) : U32 => return do:
+  const lentPush = `func put (grid: Array (Array U32)) -> (row: Array U32) : U32 => return do:
   @storage.push grid row
   break 0
 entry func run (n: U32) : U32 => return do:
-  let grid: GrowArray (Array U32) = #[#[n], #[2]]
+  let grid: Array (Array U32) = #[#[n], #[2]]
   break put grid #[3] + grid[0][0]
 `;
-  const start = kept.indexOf("@storage.push grid row");
-  await compileExpectedFailure(kept, "kept_value", undefined, { span: [start, kept.indexOf("\n", start)] });
+  const start = lentPush.indexOf("@storage.push grid row");
+  await compileExpectedFailure(lentPush, "aliased_update", undefined, { span: [start, lentPush.indexOf("\n", start)] });
+  const sharedReturn = `func put (grid: own Array (Array U32)) -> (row: Array U32) : Array (Array U32) => return do:
+  @storage.push grid row
+  break grid
+entry func run (n: U32) : U32 => return do:
+  let grid: Array (Array U32) = #[#[n], #[2]]
+  let next = put grid #[3]
+  break next[0][0]
+`;
+  await compileExpectedFailure(sharedReturn, "result_not_owned");
 });
 
 Deno.test("taking a value nothing else holds apart gives each part to its name", async () => {
@@ -494,7 +504,7 @@ func slice (rows: Array Row): &[Row] => return &rows[0..rows.length]
   }
   await compileAndRun(declarations + `entry func test () => return do:
   let fixed = #[$Row {value: 1}]
-  let resized: ResizeArray Row = #[$Row {value: 2}]
+  let resized: Array Row = #[$Row {value: 2}]
   let fixed_state = change {rows: fixed}
   let resized_state = change {rows: resized}
   return fixed_state.rows[0].value + resized_state.rows[0].value
@@ -514,7 +524,7 @@ Deno.test("references, views, links, and shared handles reject writes (Phase 5)"
       ],
       [
         `entry func bad (): U32 =>
-  let pool: GrowArray #[U32] = #[#[1, 2]]
+  let pool: Array #[U32] = #[#[1, 2]]
   let lk: ^#[U32] = ^pool[0]
   lk[0] := 9
   return 0`,
@@ -537,7 +547,7 @@ Deno.test("references, views, links, and shared handles reject writes (Phase 5)"
       ],
       [
         `entry func bad (): U32 =>
-  let pool: GrowArray { x: U32, y: U32 } = #[{ x: 1, y: 2 }]
+  let pool: Array { x: U32, y: U32 } = #[{ x: 1, y: 2 }]
   let lk: ^{ x: U32, y: U32 } = ^pool[0]
   lk.x := 9
   return 0`,
@@ -552,7 +562,7 @@ Deno.test("references, views, links, and shared handles reject writes (Phase 5)"
       ],
       [
         `entry func bad (): U32 =>
-  let rows: GrowArray U32 = #[1, 2]
+  let rows: Array U32 = #[1, 2]
   let view = &rows[0..2]
   @storage.push view 3
   return 0`,
@@ -560,7 +570,7 @@ Deno.test("references, views, links, and shared handles reject writes (Phase 5)"
       ],
       [
         `entry func bad (): U32 =>
-  let rows: GrowArray U32 = #[1, 2]
+  let rows: Array U32 = #[1, 2]
   let s = freeze rows
   @storage.push s 3
   return 0`,
@@ -572,7 +582,7 @@ Deno.test("references, views, links, and shared handles reject writes (Phase 5)"
   }
 });
 
-Deno.test("@simd.store and @storage.freeze enforce unique ownership (Phase 5)", async () => {
+Deno.test("@simd.store and @storage.push/truncate/pop/share enforce unique ownership (Phase 5)", async () => {
   await compileAndRun(
     `
 func step_move (p: own #[U32]) -> (v: U32): #[U32] =>
@@ -587,19 +597,14 @@ func step_inplace (p: own #[U32]) -> (v: U32): #[U32] =>
 
 type ViewAccess is data = $ViewAccess { view: &[U32], count: U32 }
 
-func push_check (checks: GrowArray U32) -> (v: U32): Unit =>
+func push_check (checks: own #[U32]) -> (v: U32): #[U32] =>
   @storage.push checks v
-  return ()
+  return checks
 
-func with_val (v: U32) -> (consume: U32 -> Unit): Unit =>
-  return consume (v + 1)
-
-func inspect_access (access: own ViewAccess) -> (v: U32) -> (checks: GrowArray U32): ViewAccess =>
-  push_check checks v
-  with_val v (func n =>
-    @storage.push checks n
-    return ())
-  return access
+func inspect_access (access: own ViewAccess) -> (v: U32) -> (checks: own #[U32]): (ViewAccess, #[U32]) =>
+  checks := push_check self v
+  checks := push_check self (v + 1)
+  return (access, checks)
 
 entry func ok (v: U32): U32 =>
   let a = @simd.store #[0, 0, 0, 0] 0 (v, 1, 2, 3)
@@ -607,13 +612,13 @@ entry func ok (v: U32): U32 =>
   let c = step_inplace b (v + 20)
   let rec = { lanes: #[0, 0, 0, 0], tag: 1 }
   let _ = @simd.store rec.lanes 0 (1, 2, 3, 4)
-  let g: GrowArray U32 = #[v]
-  let frozen = @storage.freeze g
+  let g: #[U32] = #[v]
+  let frozen = freeze g
   let seed: #[U32] = #[10, 20]
   let access = $ViewAccess { view: @storage.view seed 0 2, count: 0 }
-  let checks: GrowArray U32 = #[]
-  access := inspect_access access v checks
-  let frozen_checks = @storage.freeze checks
+  let checks: #[U32] = #[]
+  let (access, checks) = inspect_access access v checks
+  let frozen_checks = freeze checks
   return c[0] + c[3] + rec.lanes[2] + frozen[0] + access.view[0] + frozen_checks[0] + frozen_checks[1]
 `,
     (guest) => {
@@ -679,41 +684,96 @@ entry func bad (): U32 =>
   return xs[0]`,
     ],
     [
-      "@storage.freeze on borrowed GrowArray parameter",
-      `func sneak (xs: GrowArray U32): U32 =>
-  let fixed = @storage.freeze xs
-  return fixed[0]
+      "@storage.push on borrowed parameter",
+      `func sneak (xs: #[U32]): U32 =>
+  @storage.push xs 2
+  return xs[0]
 entry func bad (): U32 =>
-  let items: GrowArray U32 = #[1]
+  let items: #[U32] = #[1]
   return sneak items`,
     ],
     [
-      "@storage.freeze on aliased GrowArray local",
+      "@storage.push on module const",
+      `const table: #[U32] = #[1]
+entry func bad (): U32 =>
+  @storage.push table 2
+  return table[0]`,
+    ],
+    [
+      "@storage.push on aliased local",
       `entry func bad (): U32 =>
-  let items: GrowArray U32 = #[1]
+  let items: #[U32] = #[1]
   let alias = items
-  let fixed = @storage.freeze items
-  return alias[0] + fixed[0]`,
+  @storage.push items 2
+  return alias[0] + items[1]`,
     ],
     [
-      "@storage.freeze on local alias of borrowed GrowArray parameter",
-      `func sneak (xs: GrowArray U32): U32 =>
+      "@storage.push on local alias of borrowed parameter",
+      `func sneak (xs: #[U32]): U32 =>
   let alias = xs
-  let fixed = @storage.freeze alias
-  return fixed[0]
+  @storage.push alias 2
+  return alias[0]
 entry func bad (): U32 =>
-  let items: GrowArray U32 = #[1]
+  let items: #[U32] = #[1]
   return sneak items`,
     ],
     [
-      "@storage.freeze on borrowed GrowArray field beside owned sibling field",
-      `func sneak (xs: GrowArray U32): U32 =>
+      "@storage.push on borrowed field beside owned sibling field",
+      `func sneak (xs: #[U32]): U32 =>
   let r = { g: xs, other: #[1] }
-  let fixed = @storage.freeze r.g
-  return fixed[0] + r.other[0]
+  @storage.push r.g 2
+  return r.g[0] + r.other[0]
 entry func bad (): U32 =>
-  let items: GrowArray U32 = #[1]
+  let items: #[U32] = #[1]
   return sneak items`,
+    ],
+    [
+      "@storage.push on outer local captured by closure",
+      `func run (f: U32 -> U32): U32 => return f 0
+entry func bad (): U32 =>
+  let xs: #[U32] = #[1, 2]
+  let _ = run (func i => return do:
+    @storage.push xs 3
+    break xs[0])
+  return xs[2]`,
+    ],
+    [
+      "@storage.push on indexed shell array element",
+      `entry func bad (): U32 =>
+  let left = #[1]
+  let rows = #[left, #[2]]
+  @storage.push rows[0] 9
+  return left[0]`,
+    ],
+    [
+      "@storage.push on indexed shared array inside owned box",
+      `type Box is data = $Box { s: *#[#[U32]] }
+func touch (b: own Box): U32 =>
+  @storage.push b.s[0] 9
+  return b.s[0][0]
+entry func bad (): U32 =>
+  return touch ($Box { s: freeze #[#[1]] })`,
+    ],
+    [
+      "@storage.push overlapping mutation inside value expression",
+      `entry func bad (): U32 =>
+  let xs = #[1, 2]
+  @storage.push xs (do:
+    @storage.truncate xs 0
+    break 3)
+  return xs[0]`,
+    ],
+    [
+      "@storage.truncate on borrowed parameter",
+      `func trim (xs: #[U32]): U32 =>
+  @storage.truncate xs 0
+  return xs.length
+entry func bad (): U32 => return trim #[1, 2]`,
+    ],
+    [
+      "@storage.pop on borrowed parameter",
+      `func drop_last (xs: #[U32]): U32 => return @storage.pop xs
+entry func bad (): U32 => return drop_last #[1, 2]`,
     ],
     // Council regression laws (Opus 5.5 + Neon):
     [
@@ -781,105 +841,104 @@ entry func bad (): U32 =>
   return shared[0]`,
     ],
     [
-      "@storage.freeze inside closure cannot leave outer GrowArray pushable",
-      `func run (f: U32 -> U32): U32 => return f 0
-entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1, 2]
-  let _ = run (func i => return do:
-    let f = @storage.freeze xs
-    break f[0])
-  @storage.push xs 3
-  return xs[2]`,
+      "@storage.push in loop aliased by later keep := xs",
+      `entry func bad (): U32 =>
+  let xs = #[0]
+  let keep = #[0]
+  let seen = 0
+  for i in 0..2:
+    @storage.push xs i
+    seen := keep[0]
+    keep := xs
+  return seen`,
     ],
     [
-      "wildcard let _ = @storage.freeze permanently consumes growth capability",
+      "@storage.push rejects aliased record escape",
       `entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1, 2]
-  let _ = @storage.freeze xs
-  @storage.push xs 3
-  return xs[2]`,
-    ],
-    [
-      "@storage.freeze does not restore growth capability after frozen alias last read",
-      `entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1, 2]
-  let frozen = @storage.freeze xs
-  let y = frozen[0]
-  @storage.push xs 3
-  return y + xs[2]`,
-    ],
-    [
-      "@storage.freeze on record field permanently consumes that field's growth capability",
-      `entry func bad (): U32 =>
-  let g: GrowArray U32 = #[1, 2]
-  let rec = { g: g, tag: 0 }
-  let _ = @storage.freeze rec.g
-  @storage.push rec.g 3
-  return rec.g[2]`,
-    ],
-    [
-      "@storage.freeze rejects GrowArray escaped into a record",
-      `entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
+  let xs = #[1]
   let box = { g: xs }
-  let f = @storage.freeze xs
-  @storage.push box.g 2
-  return f[0]`,
+  @storage.push xs 2
+  return box.g[0]`,
     ],
     [
-      "@storage.freeze rejects GrowArray escaped through a two-hop alias",
+      "@storage.push rejects aliased two-hop local",
       `entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
+  let xs = #[1]
   let a = xs
   let b = a
-  let f = @storage.freeze xs
-  @storage.push b 2
-  return f[0]`,
+  @storage.push xs 2
+  return b[0]`,
     ],
     [
-      "@storage.freeze rejects GrowArray escaped through a call returning &GrowArray",
-      `func hide_ref (xs: GrowArray U32): &(GrowArray U32) => return &xs
+      "@storage.push rejects live &xs borrow",
+      `func hide_ref (xs: #[U32]): &(#[U32]) => return &xs
 entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
+  let xs = #[1]
   let r = hide_ref xs
-  let f = @storage.freeze xs
-  @storage.push (@storage.load r) 2
-  return f[0]`,
+  @storage.push xs 2
+  return (@storage.load r)[0]`,
     ],
     [
-      "@storage.freeze rejects GrowArray escaped through a call returning a closure",
-      `func hide_cb (xs: GrowArray U32): Unit -> Unit => return func () => @storage.push xs 2
-entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
-  let cb = hide_cb xs
-  let f = @storage.freeze xs
-  cb ()
-  return f[0]`,
-    ],
-    [
-      "@storage.freeze rejects GrowArray captured by partially applied push method",
-      `entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
-  let push_xs = xs.push
-  let f = @storage.freeze xs
-  push_xs 2
-  return f[0]`,
-    ],
-    [
-      "@storage.freeze rejects GrowArray returned through a polymorphic reader helper",
+      "@storage.push rejects aliased polymorphic reader return",
       `func id_poly x => return x
 entry func bad (): U32 =>
-  let xs: GrowArray U32 = #[1]
-  let alias: GrowArray U32 = #[0]
+  let xs = #[1]
+  let alias = #[0]
   alias := id_poly xs
-  let f = @storage.freeze xs
-  @storage.push alias 2
-  return f[0]`,
+  @storage.push xs 2
+  return alias[0]`,
     ],
   ];
   for (const [name, source] of rejected) {
     try {
       await compileExpectedFailure(source + "\n", "aliased_update");
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
+
+  for (
+    const [name, source, code] of [
+      [
+        "freeze consumes ownership (spent on push)",
+        `entry func bad (): U32 =>
+  let xs = #[1, 2]
+  let _ = freeze xs
+  @storage.push xs 3
+  return xs[2]`,
+        "spent_value",
+      ],
+      [
+        "freeze on record field consumes that field",
+        `entry func bad (): U32 =>
+  let g = #[1, 2]
+  let rec = { g: g, tag: 0 }
+  let _ = freeze rec.g
+  @storage.push rec.g 3
+  return rec.g[2]`,
+        "spent_value",
+      ],
+      [
+        "freeze on borrowed parameter rejected",
+        `func sneak (xs: #[U32]): *#[U32] => return freeze xs
+entry func bad (): U32 =>
+  let s = sneak #[1]
+  return s[0]`,
+        "own_argument",
+      ],
+      [
+        "freeze on aliased local rejected",
+        `entry func bad (): U32 =>
+  let xs = #[1]
+  let alias = xs
+  let s = freeze xs
+  return alias[0] + s[0]`,
+        "own_argument",
+      ],
+    ] as [string, string, string][]
+  ) {
+    try {
+      await compileExpectedFailure(source + "\n", code);
     } catch (error) {
       throw new Error(`${name}: ${error}`);
     }

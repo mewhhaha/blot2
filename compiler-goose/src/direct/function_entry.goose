@@ -489,7 +489,7 @@ fn abiKind(g: const Generator&, ty: Ty) -> Abi, bool {
         u32_ => { return Abi.u32_, true; },
         boolean => { return Abi.bool_, true; },
         f32_ => { return Abi.f32_, true; },
-        array, grow, resize => {
+        array => {
             let element = g.types.node(n.a).tag;
             if element == blot_direct_types::Tag.u32_ { return Abi.array_u32, true; }
             if element == blot_direct_types::Tag.f32_ { return Abi.array_f32, true; }

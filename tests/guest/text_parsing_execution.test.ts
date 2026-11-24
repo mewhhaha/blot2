@@ -14,12 +14,12 @@ entry func parse (source: Text): Array U32 => return case text.parse_u32 source 
 entry func whitespace (value: U32): Bool => return text.is_whitespace value
 
 func encode_tokens tokens: Array U32 => do:
-  let result: GrowArray U32 = #[]
+  let result: Array U32 = #[]
   for token in tokens:
-    result.push token.length
+    @storage.push result token.length
     for ch in token:
-      result.push ch
-  return @storage.freeze result
+      @storage.push result ch
+  return result
 
 entry func words (source: Text): Array U32 => return
   encode_tokens (text.split_whitespace source)
@@ -28,12 +28,12 @@ entry func lines (source: Text): Array U32 => return
   encode_tokens (text.lines source)
 
 entry func numbers (source: Text): Array U32 => do:
-  let result: GrowArray U32 = #[]
+  let result: Array U32 = #[]
   for token in text.split_whitespace source:
     let $Some value = text.parse_u32 token else:
       return #[]
-    result.push value
-  return @storage.freeze result
+    @storage.push result value
+  return result
 
 entry func independent (source: Text): Array U32 => do:
   let cursor = text.split_whitespace source

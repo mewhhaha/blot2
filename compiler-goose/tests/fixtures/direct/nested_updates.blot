@@ -1,5 +1,5 @@
 type Brick is data = $Brick { from: U32, to: U32 }
-type Access = { bricks: GrowArray Brick, count: Array U32 }
+type Access = { bricks: Array Brick, count: Array U32 }
 func shift (access: own Access) -> (by: U32): Access => return do:
   for index in 0 .. access.bricks.length:
     let brick = access.bricks[index]
@@ -8,7 +8,7 @@ func shift (access: own Access) -> (by: U32): Access => return do:
   access.count[0] := 7
   return access
 entry func run (n: U32): U32 => return do:
-  let bricks: GrowArray Brick = #[$Brick { from: 1, to: 2 }]
+  let bricks: Array Brick = #[$Brick { from: 1, to: 2 }]
   let access = { bricks, count: #[0] }
   access := shift access n
   let $Brick { from, to } = access.bricks[0]

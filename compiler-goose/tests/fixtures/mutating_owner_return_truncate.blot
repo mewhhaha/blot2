@@ -1,9 +1,6 @@
-const touch = func (rows: ResizeArray U32): Ref U32 => return do:
-  let saved = @storage.at rows 0
-  @storage.push rows 1
-  return saved
+const touch = func (rows: Array U32): Ref U32 => return @storage.at rows 0
 entry const answer = func (): U32 => return do:
-  let rows: ResizeArray U32 = #[7,8]
+  let rows: Array U32 = #[7,8]
   let saved = touch rows
   @storage.truncate rows 0
   return @storage.load saved

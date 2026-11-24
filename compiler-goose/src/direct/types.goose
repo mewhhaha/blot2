@@ -28,12 +28,12 @@ type U64Map = blot_direct_map::U64Map;
 // failure is not an error value here.
 enum Error { none, unsupported, diverged }
 
-enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, grow, resize, ref, view, link, provider, state_provider, cell }
+enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, ref, view, link, provider, state_provider, cell }
 fn tagCode(tag: Tag) -> u32 {
     match tag {
         unit => { return 0; }, boolean => { return 1; }, u32_ => { return 2; }, f32_ => { return 3; }, never => { return 4; },
         tuple => { return 5; }, record => { return 6; }, nominal => { return 7; }, function => { return 8; }, array => { return 9; },
-        grow => { return 10; }, resize => { return 11; }, ref => { return 12; },
+        ref => { return 12; },
         view => { return 13; }, link => { return 14; }, provider => { return 15; }, state_provider => { return 16; }, cell => { return 17; },
     }
 }
@@ -42,7 +42,7 @@ fn tagName(tag: Tag) -> Text {
     match tag {
         unit => { return "unit"; }, boolean => { return "boolean"; }, u32_ => { return "u32"; }, f32_ => { return "f32"; }, never => { return "never"; },
         tuple => { return "tuple"; }, record => { return "record"; }, nominal => { return "nominal"; }, function => { return "function"; }, array => { return "array"; },
-        grow => { return "grow"; }, resize => { return "resize"; }, ref => { return "ref"; },
+        ref => { return "ref"; },
         view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, cell => { return "cell"; },
     }
 }
@@ -303,7 +303,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var arity: i64 = -1;
     match tag {
         function => { arity = 2; },
-        array, grow, resize, ref, view, link, provider, cell => { arity = 1; },
+        array, ref, view, link, provider, cell => { arity = 1; },
         state_provider => { arity = 3; },
         _ => {},
     }
@@ -326,7 +326,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         record => { value = Node { tag, start, (payload.len / 2) as u32 }; },
         nominal => { value = Node { tag, start, (payload.len - 2) as u32 }; },
         function => { value = Node { tag, first, payload[payload.len - 1] }; },
-        array, grow, resize, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
+        array, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
     }
     let id = self_.nodes.len as Ty;
     let span = Span { self_.encodings.len as u32, (payload.len + 1) as u32 };
@@ -535,10 +535,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     if arguments.len != 2 { return 0, fail(self_, m, ty, "storage type arity"); }
                     let element, error = lowerInner(self_, m, arguments[1], env, child_open, depth + 1);
                     if error != Error.none { return 0, error; }
-                    var tag = Tag.array;
-                    if kind.value == blot_check_storage_types::sized_grow { tag = Tag.grow; }
-                    else if kind.value == blot_check_storage_types::sized_resize { tag = Tag.resize; }
-                    let made, error = intern(self_, tag, [element]);
+                    let made, error = intern(self_, Tag.array, [element]);
                     if error != Error.none { return 0, error; }
                     result = made;
                 } else {
@@ -546,9 +543,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     let element, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
                     if error != Error.none { return 0, error; }
                     var tag = Tag.link;
-                    if kind.value == blot_check_storage_types::grow { tag = Tag.grow; }
-                    else if kind.value == blot_check_storage_types::resize { tag = Tag.resize; }
-                    else if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
+                    if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
                     else if kind.value == blot_check_storage_types::view { tag = Tag.view; }
                     let made, error = intern(self_, tag, [element]);
                     if error != Error.none { return 0, error; }
@@ -645,10 +640,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                         let resolved_harg, herr = lowerInner(self_, self_.units[unit_idx], harg_ids[pi], match_env, dummy_open, depth + 1);
                         if herr != Error.none { matches = false; break; }
                         if resolved_harg != proj_args[pi] {
-                            let pn = self_.node(proj_args[pi]);
-                            let rn = self_.node(resolved_harg);
-                            let array_lift = (pn.tag == Tag.grow || pn.tag == Tag.resize) && rn.tag == Tag.array && pn.a == rn.a;
-                            if !array_lift { matches = false; break; }
+                            matches = false; break;
                         }
                     }
                     if !matches { continue; }
@@ -780,7 +772,7 @@ recursive fn concrete(self_: const Types&, ty: Ty, depth: i64) -> bool {
         never => { return false; },
         unit, boolean, u32_, f32_ => { return true; },
         function => { return concrete(self_, n.a, depth + 1) && concrete(self_, n.b, depth + 1); },
-        array, grow, resize, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
+        array, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
         tuple, state_provider => {
             for at in 0..(n.b as i64) { if !concrete(self_, self_.words[n.a + at], depth + 1) { return false; } }
             return true;
@@ -1016,7 +1008,7 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
         },
         // Owner handles: (slot, generation); views add (start, length),
         // element references and links add an index.
-        array, grow, resize => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
+        array => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
         view => { for at in 0..4 { self_.pushScratchLayout(i32w); } },
         ref, link => { for at in 0..3 { self_.pushScratchLayout(i32w); } },
         cell => { self_.pushScratchLayout(i32w); },
@@ -1029,7 +1021,7 @@ fn pushSlot(self_: Types&, slot: Slot) {
 
 fn isContainer(tag: Tag) -> bool {
     match tag {
-        array, grow, resize, ref, view, link => { return true; },
+        array, ref, view, link => { return true; },
         _ => { return false; },
     }
 }

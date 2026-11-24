@@ -126,10 +126,7 @@ recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budge
                     return render(context, bytes, args[0], depth + 1, budget, stable);
                 }
                 if blot_check_storage_types::isSized(storage.value) && args.len == 2 {
-                    var prefix: const u8[:] = "#[";
-                    if storage.value == blot_check_storage_types::sized_grow { prefix = "#[+"; }
-                    else if storage.value == blot_check_storage_types::sized_resize { prefix = "#[~"; }
-                    { let propagated_error = text(context, bytes, prefix); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    { let propagated_error = text(context, bytes, "#["); if propagated_error != blot_error::Error.none { return propagated_error; } }
                     { let propagated_error = render(context, bytes, args[0], depth + 1, budget, stable); if propagated_error != blot_error::Error.none { return propagated_error; } }
                     { let propagated_error = text(context, bytes, "; "); if propagated_error != blot_error::Error.none { return propagated_error; } }
                     { let propagated_error = render(context, bytes, args[1], depth + 1, budget, stable); if propagated_error != blot_error::Error.none { return propagated_error; } }

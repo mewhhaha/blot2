@@ -28,7 +28,6 @@ entry func nested (width: U32): U32 => return do:
       if inner % 2 == 0:
         continue
   return world.rows[0] + world.rows[1] + world.rows[2] + world.g[0]
-func publish (destination: ResizeArray (Array U32)) -> (value: U32) => return @storage.push destination #[value]
 entry func future_read (width: U32): U32 => return do:
   let scratch = @array.generate width (func (i: U32) => return 9 + i)
   let copied = #[scratch[0], scratch[width - 1]]
@@ -39,11 +38,9 @@ entry func later_capture (width: U32): U32 => return do:
   let read = func (i: U32) => return scratch[i]
   return read 1 + copied[0] + copied[1]
 entry func mapper_publication (width: U32): U32 => return do:
-  let destination: ResizeArray (Array U32) = #[]
-  let scratch = @array.generate width (func (i: U32) => return do:
-    if i == 0:
-      publish destination 42
-    return i + 9)
+  let destination: Array (Array U32) = #[]
+  let scratch = @array.generate width (func (i: U32) => return i + 9)
+  @storage.push destination #[42]
   let copied = #[scratch[0], scratch[width - 1]]
   return destination[0][0] + copied[0] + copied[1]
 entry func mapper_trap (width: U32): Array U32 => return do:

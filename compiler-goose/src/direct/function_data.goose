@@ -88,7 +88,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
                 inner = loaded;
             }
             match tagOf(g, ty) {
-                array, grow, resize, view => {},
+                array, view => {},
                 _ => {
                     g.failOpen(m, id);
                     g.put("indexed update of a ");
@@ -841,9 +841,6 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
         return neverVal(), BindingRef { 0, 0 }, false, g.failClose();
     }
     var target, has_target = g.dispatchTarget(m, identity, projection.field, blot_check_types::Operator.none);
-    if !has_target && (tagOf(g, value.ty) == blot_direct_types::Tag.grow || tagOf(g, value.ty) == blot_direct_types::Tag.resize) {
-        target, has_target = g.dispatchTarget(m, blot_check_types::NominalIdentity { 0, 0xffffffff }, projection.field, blot_check_types::Operator.none);
-    }
     if !has_target {
         let want_spell = spelling.value;
         var found_trait = BindingRef { 0, 0 };
@@ -856,10 +853,7 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
                 let lowered, lerr = g.types.lower(unit, head_list[0], match_env);
                 if lerr != blot_direct_types::Error.none { continue; }
                 if lowered != value.ty {
-                    let pn = g.types.node(value.ty);
-                    let rn = g.types.node(lowered);
-                    let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
-                    if !array_lift { continue; }
+                    continue;
                 }
                 for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
                     if member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }

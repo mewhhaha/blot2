@@ -6,25 +6,26 @@ import { instantiateGuest } from "../../host/guest.ts";
 // captures an outer scalar that must survive every reused consumer call.
 const padding = 2000;
 function sourceFor(scalar: "U32" | "F32"): string {
-  return `const calculate = func (counter: GrowArray U32) -> (input: ${scalar}): ${scalar} => return do:
+  return `const calculate = func (counter: own Array U32) -> (input: ${scalar}): (Array U32, ${scalar}) => return do:
   @storage.push counter 1
-  return ${scalar === "U32" ? "@u32.add input 7" : "input"}
-const consume = func (destination: ResizeArray ${scalar}) -> (read: Unit -> ${scalar} ! {|e}): Unit => return do:
+  return (counter, ${scalar === "U32" ? "@u32.add input 7" : "input"})
+const consume = func (destination: own Array ${scalar}) -> (read: Unit -> ${scalar} ! {|e}): Array ${scalar} => return do:
   let total = read ()
 ${
     (scalar === "U32"
       ? "  total := @u32.add total 1\n"
       : "  total := @f32.neg total\n").repeat(padding)
   }  @storage.push destination total
-  return ()
-const exercise = func (value: ${scalar}) -> (destination: ResizeArray ${scalar}): Unit => return do:
+  return destination
+const exercise = func (value: ${scalar}) -> (destination: own Array ${scalar}): Array ${scalar} => return do:
   for index in 0 .. 3:
-    consume destination (func () => return value)
-  return ()
+    destination := consume self (func () => return value)
+  return destination
 entry const answer = func (input: ${scalar}) => return do:
-  let counter: GrowArray U32 = #[]
-  let destination: ResizeArray ${scalar} = #[]
-  exercise (calculate counter input) destination
+  let counter: Array U32 = #[]
+  let destination: Array ${scalar} = #[]
+  let (counter, computed) = calculate counter input
+  destination := exercise computed self
   return #[${
     scalar === "U32" ? "@storage.length counter" : "@u32.to_f32 (@storage.length counter)"
   }, destination[0], destination[1], destination[2]]
