@@ -1,0 +1,19 @@
+[package]
+name = "blot_readme_bench"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "blot_readme_bench"
+path = "rust_bench_main.rs"
+
+[dependencies]
+wasmtime = "49.0.3"
+bevy_ecs = "0.20.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

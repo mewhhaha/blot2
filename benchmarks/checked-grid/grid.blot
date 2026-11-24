@@ -5,7 +5,7 @@ type Direction is data = $Left | $Right | $Up | $Down
 const directions: Array Direction = #[$Left, $Right, $Up, $Down]
 
 func parse (source: Text): Grid => do:
-  let cells: GrowArray U32 = #[]
+  let cells: Array U32 = #[]
   let width = 0
   let height = 0
   for row in text.lines source:
@@ -16,11 +16,11 @@ func parse (source: Text): Grid => do:
     if row.length != width:
       @panic "grid must be rectangular"
     for ch in row:
-      cells.push ch
+      @storage.push cells ch
     height := self + 1
   if height == 0:
     @panic "empty grid"
-  return { width, height, cells: @storage.freeze cells }
+  return { width, height, cells }
 
 func neighbor (map: Grid) -> (index: U32) -> (direction: Direction): Maybe U32 => return case direction of
   $Left => if index % map.width > 0 then $Some (index - 1) else $Nothing

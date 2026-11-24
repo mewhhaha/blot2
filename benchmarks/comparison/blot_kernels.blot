@@ -1,0 +1,188 @@
+// Language compute, memory, sorting, and auto-SIMD benchmarks for Blot vs Rust.
+
+// 1. Tight integer recurrence (1,000,000 LCG steps).
+entry func lcg_recurrence (seed: U32): U32 =>
+  let state = seed | 1
+  let acc: U32 = 0
+  for _ in 0 .. 1000000:
+    state := self * 1664525 + 1013904223
+    acc := self ^ (state >> 16)
+  return acc
+
+// 2. Sieve of Eratosthenes up to 100,000 + seed % 256.
+entry func prime_sieve (seed: U32): U32 =>
+  let limit = 100000 + (seed % 256)
+  let flags = @array.fill limit true
+  if limit > 0:
+    flags[0] := false
+  if limit > 1:
+    flags[1] := false
+  let p: U32 = 2
+  for ever:
+    if p * p >= limit:
+      break
+    if flags[p]:
+      let m = p * p
+      for ever:
+        if m >= limit:
+          break
+        flags[m] := false
+        m := self + p
+    p := self + 1
+  let sum: U32 = 0
+  let count: U32 = 0
+  for i in 2 .. limit:
+    if flags[i]:
+      count := self + 1
+      sum := self + i
+  return sum ^ (count * 2654435761)
+
+// 3. Dense 64x64 F32 matrix multiply.
+entry func matmul_64 (seed: U32): U32 =>
+  let n: U32 = 64
+  let total = n * n
+  let a = @array.fill total 0.0
+  let b = @array.fill total 0.0
+  let c = @array.fill total 0.0
+  let s = seed | 1
+  for i in 0 .. total:
+    s := self * 1664525 + 1013904223
+    a[i] := U32.to_f32 (s & 1023) * 0.0009765625
+    s := self * 1664525 + 1013904223
+    b[i] := U32.to_f32 (s & 1023) * 0.0009765625
+  for row in 0 .. n:
+    let row_off = row * n
+    for k in 0 .. n:
+      let aik = a[row_off + k]
+      let k_off = k * n
+      for col in 0 .. n:
+        let dst = row_off + col
+        c[dst] := c[dst] + aik * b[k_off + col]
+  let sum = 0.0
+  for i in 0 .. total:
+    sum := self + c[i]
+  return F32.to_u32 (sum * 100.0)
+
+// 4. 256x256 F32 Mandelbrot escape-time sum (max 100 iterations).
+entry func mandelbrot_f32 (seed: U32): U32 =>
+  let size: U32 = 256
+  let inv = 1.0 / U32.to_f32 size
+  let bias = U32.to_f32 (seed & 7) * 0.001
+  let total: U32 = 0
+  for py in 0 .. size:
+    let ci = U32.to_f32 py * inv * 2.4 - 1.2 + bias
+    for px in 0 .. size:
+      let cr = U32.to_f32 px * inv * 3.0 - 2.0
+      let zr = 0.0
+      let zi = 0.0
+      let it: U32 = 0
+      for ever:
+        if it >= 100:
+          break
+        let zr2 = zr * zr
+        let zi2 = zi * zi
+        if zr2 + zi2 > 4.0:
+          break
+        let next_zi = 2.0 * zr * zi + ci
+        zr := zr2 - zi2 + cr
+        zi := next_zi
+        it := self + 1
+      total := self + it
+  return total
+
+// 5. 65,536-particle ballistic physics integration (auto-vectorized via spark -> Wasm v128 SIMD).
+func integrate_particles (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32] =>
+  let half_dt2 = 0.5 * dt * dt
+  return spark #[px[i] + vx[i] * dt + ax[i] * half_dt2 | i <- 0 .. px.length]
+
+entry func particle_spark_simd (seed: U32): U32 =>
+  let n: U32 = 65536
+  let px = @array.fill n 0.0
+  let vx = @array.fill n 0.0
+  let ax = @array.fill n 0.0
+  let base = U32.to_f32 (seed & 15)
+  for i in 0 .. n:
+    let fi = U32.to_f32 (i & 1023)
+    px[i] := base + fi * 0.01
+    vx[i] := fi * 0.02
+    ax[i] := 0.5 - fi * 0.001
+  let out = px
+  for _ in 0 .. 32:
+    out := integrate_particles out vx ax 0.016
+  let sum = 0.0
+  for i in 0 .. n:
+    sum := self + out[i]
+  return F32.to_u32 (sum * 10.0)
+
+// 6. Top-down merge sort over 100,000 U32 elements using owned ping-pong buffers.
+func merge_range (src: #[U32]) -> (dst: own #[U32]) -> (lo: U32) -> (mid: U32) -> (hi: U32): #[U32] =>
+  let i = lo
+  let j = mid
+  let k = lo
+  for ever:
+    if i >= mid or j >= hi:
+      break
+    if src[i] <= src[j]:
+      dst[k] := src[i]
+      i := self + 1
+    else:
+      dst[k] := src[j]
+      j := self + 1
+    k := self + 1
+  for ever:
+    if i >= mid:
+      break
+    dst[k] := src[i]
+    i := self + 1
+    k := self + 1
+  for ever:
+    if j >= hi:
+      break
+    dst[k] := src[j]
+    j := self + 1
+    k := self + 1
+  return dst
+
+func merge_pass (src: #[U32]) -> (dst: own #[U32]) -> (width: U32) -> (n: U32): #[U32] =>
+  let lo: U32 = 0
+  let step = width << 1
+  for ever:
+    if lo >= n:
+      break
+    let mid = lo + width
+    if mid > n:
+      mid := n
+    let hi = lo + step
+    if hi > n:
+      hi := n
+    dst := merge_range src self lo mid hi
+    lo := self + step
+  return dst
+
+entry func merge_sort (seed: U32): U32 =>
+  let n: U32 = 100000
+  let a = @array.fill n 0
+  let b = @array.fill n 0
+  let s = seed | 1
+  for i in 0 .. n:
+    s := self * 1664525 + 1013904223
+    a[i] := s
+  let width: U32 = 1
+  let in_b = false
+  for ever:
+    if width >= n:
+      break
+    b := merge_pass a self width n
+    width := self << 1
+    if width >= n:
+      in_b := true
+      break
+    a := merge_pass b self width n
+    width := self << 1
+  let sorted = if in_b then b else a
+  let hash: U32 = 0
+  for i in 0 .. n:
+    if i > 0 and sorted[i] < sorted[i - 1]:
+      return panic "not sorted"
+    hash := (self * 31) ^ sorted[i]
+  return hash

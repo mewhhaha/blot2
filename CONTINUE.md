@@ -51,10 +51,10 @@ qualified across `blot2`, `std/`, `../pen`, `../ink`, and `../gdev`:
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `7da11d2d`) | Phase 6 `purity.goose` retirement (`this commit`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`), Purity & session compile-speed optimization (`f650b6fb`), Council soundness hardening (`0fce6177`) |
-| `../pen` | `9f2b338` (local unified-array migration on `examples/bounce`) | HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
-| `../ink` | `18a1f5b` (local unified-array migration across `lib/`, `tests/`, `docs/`) | Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
-| `../gdev` | `566f33f` (local unified-array migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/`) | Pen 250-lane bindings, Moebius look default |
+| `blot2` | this commit (after `30899f4b`) | Consumer README & Rust/Bevy ECS comparison benchmarks (`this commit`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`), Purity & session compile-speed optimization (`f650b6fb`), Council soundness hardening (`0fce6177`) |
+| `../pen` | `08e1224` | Unified `#[T]` migration in `blot-host` + `kernels_law6_tests` (`08e1224`); HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
+| `../ink` | `fc7259e` | Unified `#[T]` migration across `lib/`, `tests/`, `docs/` (`fc7259e`); Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
+| `../gdev` | `017f8cd` | Unified `#[T]` migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/` + synced `pen/` bindings (`017f8cd`); Moebius look default |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra

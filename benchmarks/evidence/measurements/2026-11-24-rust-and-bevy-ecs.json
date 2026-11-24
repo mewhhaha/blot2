@@ -1,0 +1,125 @@
+{
+  "compile_speed_ms": {
+    "blot_6_kernels_ms": 13.983958,
+    "blot_ink_ecs_app_ms": 23.854057,
+    "blot_wasm_bytes": 11768,
+    "ink_ecs_wasm_bytes": 54686,
+    "rust_native_opt3_ms": 85.138873,
+    "rust_wasm32_opt3_ms": 98.602564,
+    "rust_wasm_bytes": 1503581
+  },
+  "ecs": [
+    {
+      "bevy_native_ms": 1.283183,
+      "checksum_bevy": 88466466,
+      "checksum_ink": 88466466,
+      "ink_cached_query_ms": 9.298462,
+      "ink_pool_direct_ms": 6.388648,
+      "ink_soa_spark_simd_ms": 0.646067,
+      "name": "dense_iter_10k_x100"
+    },
+    {
+      "bevy_native_ms": 0.06948,
+      "checksum_bevy": 71214832,
+      "checksum_ink": 71214832,
+      "ink_cached_query_ms": 0.422018,
+      "name": "sparse_filtered_iter_500_of_10k_x100"
+    },
+    {
+      "bevy_native_ms": 0.190079,
+      "checksum_bevy": 70292880,
+      "checksum_ink": 70292880,
+      "ink_ms": 0.7208559999999999,
+      "name": "batch_spawn_10k"
+    },
+    {
+      "bevy_native_ms": 0.08376,
+      "checksum_bevy": 36000,
+      "checksum_ink": 37000,
+      "ink_ms": 0.0346,
+      "name": "structural_churn_2000_tag_ops"
+    },
+    {
+      "bevy_native_world_rebuild_ms": 0.237129,
+      "checksum_bevy": 16384,
+      "checksum_ink": 49972,
+      "ink_ms": 0.01006,
+      "name": "world_snapshot_copy_10k"
+    }
+  ],
+  "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
+  "kernels": [
+    {
+      "blot_vs_rust_native": 2.6659157544403818,
+      "blot_vs_rust_wasm": 3.2243794241274966,
+      "blot_wasmtime_ms": 0.9419959999999999,
+      "checksum_blot": 54448,
+      "checksum_exact": true,
+      "checksum_rust_native": 54448,
+      "name": "lcg_recurrence",
+      "rust_native_ms": 0.353348,
+      "rust_wasmtime_ms": 0.292148
+    },
+    {
+      "blot_vs_rust_native": 4.994867217139032,
+      "blot_vs_rust_wasm": 4.021010032243119,
+      "blot_wasmtime_ms": 0.425258,
+      "checksum_blot": 1881015445,
+      "checksum_exact": true,
+      "checksum_rust_native": 1881015445,
+      "name": "prime_sieve",
+      "rust_native_ms": 0.08513899999999999,
+      "rust_wasmtime_ms": 0.105759
+    },
+    {
+      "blot_vs_rust_native": 58.379022403258666,
+      "blot_vs_rust_wasm": 39.37376373626374,
+      "blot_wasmtime_ms": 1.1465640000000001,
+      "checksum_blot": 6538500,
+      "checksum_exact": true,
+      "checksum_rust_native": 6538500,
+      "name": "matmul_64",
+      "rust_native_ms": 0.019639999999999998,
+      "rust_wasmtime_ms": 0.02912
+    },
+    {
+      "blot_vs_rust_native": 1.2581069037226627,
+      "blot_vs_rust_wasm": 1.440506879658382,
+      "blot_wasmtime_ms": 4.954815,
+      "checksum_blot": 1686408,
+      "checksum_exact": true,
+      "checksum_rust_native": 1686408,
+      "name": "mandelbrot_f32",
+      "rust_native_ms": 3.9383100000000004,
+      "rust_wasmtime_ms": 3.439633
+    },
+    {
+      "blot_vs_rust_native": 1.9482721112366,
+      "blot_vs_rust_wasm": 1.2147599484557654,
+      "blot_wasmtime_ms": 0.841825,
+      "checksum_blot": 13338354,
+      "checksum_exact": true,
+      "checksum_rust_native": 13338354,
+      "name": "particle_spark_simd",
+      "rust_native_ms": 0.432088,
+      "rust_wasmtime_ms": 0.692997
+    },
+    {
+      "blot_vs_rust_native": 2.9932301241900925,
+      "blot_vs_rust_wasm": 2.17317912985607,
+      "blot_wasmtime_ms": 14.563635999999999,
+      "checksum_blot": 2814210976,
+      "checksum_exact": true,
+      "checksum_rust_native": 2814210976,
+      "name": "merge_sort",
+      "rust_native_ms": 4.865525,
+      "rust_wasmtime_ms": 6.701535
+    }
+  ],
+  "toolchains": {
+    "bevy_ecs": "0.20.1",
+    "blot_commit": "30899f4b",
+    "rustc": "1.96.0-nightly",
+    "wasmtime": "49.0.7"
+  }
+}
