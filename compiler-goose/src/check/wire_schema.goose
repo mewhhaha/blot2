@@ -90,7 +90,6 @@ struct NonStagedReceipt {
     has_fork: bool = false,
     has_persistent_state: bool = false,
     exported_storage: bool = false,
-    deeply_immutable_digest: u64 = 0,
     kernel_count: u32 = 0,
     process_count: u32 = 0,
     kernel_staging_sites_count: u32 = 0,
@@ -102,7 +101,6 @@ fn sameNonStagedReceipt(a: NonStagedReceipt, b: NonStagedReceipt) -> bool {
     return a.has_fork == b.has_fork
         && a.has_persistent_state == b.has_persistent_state
         && a.exported_storage == b.exported_storage
-        && a.deeply_immutable_digest == b.deeply_immutable_digest
         && a.kernel_count == b.kernel_count
         && a.process_count == b.process_count
         && a.kernel_staging_sites_count == b.kernel_staging_sites_count
@@ -1508,7 +1506,7 @@ fn computeExportedStorage(units: const Module[:], entry: u32, info: const Progra
     return false;
 }
 
-fn computeNonStagedReceipt(units: const Module[:], entry: u32, info: const ProgramInfo&, deeply_immutable_digest: u64) -> NonStagedReceipt {
+fn computeNonStagedReceipt(units: const Module[:], entry: u32, info: const ProgramInfo&) -> NonStagedReceipt {
     var has_fork = false;
     var has_persistent = false;
     for u in units {
@@ -1551,7 +1549,6 @@ fn computeNonStagedReceipt(units: const Module[:], entry: u32, info: const Progr
         has_fork: has_fork,
         has_persistent_state: has_persistent,
         exported_storage: computeExportedStorage(units, entry, info),
-        deeply_immutable_digest: deeply_immutable_digest,
         kernel_count: info.kernels.len as u32,
         process_count: info.processes.len as u32,
         kernel_staging_sites_count: info.kernel_staging_sites_count,

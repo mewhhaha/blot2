@@ -645,7 +645,8 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
     "aliased_update",
   );
 
-  // (i) shallow array copy inside copied composite leaves nested inner array unowned
+  // (i) shallow array copy inside copied composite leaves nested inner array unowned,
+  // whereas copying a flat-element composite produces an independent owned array usable in spark.
   await compileExpectedFailure(
     `type Holder is data = $Holder { arr: #[#[U32]] }
 func body (sw: *Holder) -> (x: U32): U32 =>
@@ -657,6 +658,20 @@ entry func bad (xs: #[U32]): #[U32] =>
   return spark #[body sw x | x <- xs]
 `,
     "aliased_update",
+  );
+  await compileAndRun(
+    `type Holder is data = $Holder { arr: #[U32] }
+func body (sw: *Holder) -> (x: U32): U32 =>
+  let r: Holder = copy sw
+  let _ = @simd.store r.arr 0 (@u32.add x 10, 0, 0, 0)
+  return @u32.add r.arr[0] sw.arr[0]
+entry func good (xs: #[U32]): #[U32] =>
+  let sw: *Holder = freeze ($Holder { arr: #[1, 2, 3, 4] })
+  return spark #[body sw x | x <- xs]
+`,
+    (guest) => {
+      equal(String(guest.call("good", Uint32Array.of(5, 7))), "16,18");
+    },
   );
 
   // (i2) Op.ref (`&pool`) + `@storage.load` cannot be mutated

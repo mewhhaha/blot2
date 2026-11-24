@@ -277,10 +277,8 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
 // Emit a memoized helper `persist_rec(old_ptr: i32) -> new_ptr: i32` that copies a
 // recursive nominal node into the persistent bump region and recursively persists
 // all nested owners and recursive pointers, recording deeply-immutable boxes in `static_blocks`.
-recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bool) -> u32, Error {
-    var flag: u32 = 0;
-    if is_imm { flag = 1; }
-    let key = blot_direct_emit::key64(ty, flag);
+recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Error {
+    let key = blot_direct_emit::key64(ty, 1);
     let existing, found = g.s.persist_rec_helpers.get(key);
     if found { return existing, blot_direct_types::Error.none; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
@@ -313,7 +311,7 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bo
     callf(g, rt.alloc_persistent);
     lset(g, new_ptr);
     memoryCopy(g, new_ptr, 0, old_ptr, bbytes);
-    if is_imm && rt.has_persistent_state {
+    if rt.has_persistent_state {
         lget(g, new_ptr);
         i32Const(g, bbytes);
         i32Const(g, ty);
@@ -326,7 +324,7 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bo
         return 0, cerr;
     }
     if cases.len == 1 {
-        let perr = persistFlatAt(g, nf, new_ptr, 0, g.types.variant_payloads[cases.payloads], is_imm, 0, 0);
+        let perr = persistFlatAt(g, nf, new_ptr, 0, g.types.variant_payloads[cases.payloads], 0, 0);
         if perr != blot_direct_types::Error.none {
             blot_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
@@ -350,7 +348,7 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bo
             i32Const(g, g.types.variant_tags[cases.tags + ci]);
             op(g, OP_i32_eq);
             let cif = open(g, nf, OP_if_);
-            let perr = persistFlatAt(g, nf, new_ptr, 4, pty, is_imm, 0, 0);
+            let perr = persistFlatAt(g, nf, new_ptr, 4, pty, 0, 0);
             if perr != blot_direct_types::Error.none {
                 blot_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
@@ -372,7 +370,8 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty, is_imm: bo
 }
 
 // Recursively persists nested owned arrays and recursive boxes stored flat at `base + offset`.
-recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty, is_imm: bool, id: u32, depth: i64) -> Error {
+// All module const pools are deeply immutable, so nested pools always use mode = 2 (static_pool_flag | live_flag).
+recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty, id: u32, depth: i64) -> Error {
     if depth > 32 { return blot_direct_types::Error.none; }
     let holds, herr = g.contentsHoldMemory(ty);
     if herr != blot_direct_types::Error.none { return herr; }
@@ -380,7 +379,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
     let is_rec, rerr = g.types.isRecursive(ty);
     if rerr != blot_direct_types::Error.none { return rerr; }
     if is_rec {
-        let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, ty, is_imm);
+        let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, ty);
         if aerr != blot_direct_types::Error.none { return aerr; }
         let old_p = local32(g, f);
         lget(g, base);
@@ -408,12 +407,10 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             let elem_ty = n.a;
             let elem_step, serr = stride(g, f, elem_ty, id);
             if serr != blot_direct_types::Error.none { return serr; }
-            var mode: u32 = 0;
-            if is_imm { mode = 2; }
             lget(g, c_slot);
             lget(g, c_gen);
             i32Const(g, elem_step);
-            i32Const(g, mode);
+            i32Const(g, 2);
             callf(g, g.runtime_().persist);
             lset(g, p_gen);
             lset(g, p_slot);
@@ -426,7 +423,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
             if eherr != blot_direct_types::Error.none { return eherr; }
             if elem_holds {
-                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, is_imm, id, depth + 1);
+                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, id, depth + 1);
                 if perr != blot_direct_types::Error.none { return perr; }
             }
             return blot_direct_types::Error.none;
@@ -465,7 +462,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
             if eherr != blot_direct_types::Error.none { return eherr; }
             if elem_holds {
-                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, true, id, depth + 1);
+                let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, id, depth + 1);
                 if perr != blot_direct_types::Error.none { return perr; }
             }
             close(g, f);
@@ -475,7 +472,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             var off = offset;
             for at in 0..(n.b as i64) {
                 let item_ty = g.types.words[n.a + at];
-                let perr = persistFlatAt(g, f, base, off, item_ty, is_imm, id, depth + 1);
+                let perr = persistFlatAt(g, f, base, off, item_ty, id, depth + 1);
                 if perr != blot_direct_types::Error.none { return perr; }
                 let fb, ferr = flatBytes(g, f, item_ty, id);
                 if ferr != blot_direct_types::Error.none { return ferr; }
@@ -487,7 +484,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             var off = offset;
             for idx in 0..(n.b as i64) {
                 let field_ty = g.types.recordField(ty, idx).ty;
-                let perr = persistFlatAt(g, f, base, off, field_ty, is_imm, id, depth + 1);
+                let perr = persistFlatAt(g, f, base, off, field_ty, id, depth + 1);
                 if perr != blot_direct_types::Error.none { return perr; }
                 let fb, ferr = flatBytes(g, f, field_ty, id);
                 if ferr != blot_direct_types::Error.none { return ferr; }
@@ -499,7 +496,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             let cases, cerr = g.types.variants(ty);
             if cerr != blot_direct_types::Error.none { return cerr; }
             if cases.len == 1 {
-                return persistFlatAt(g, f, base, offset, g.types.variant_payloads[cases.payloads], is_imm, id, depth + 1);
+                return persistFlatAt(g, f, base, offset, g.types.variant_payloads[cases.payloads], id, depth + 1);
             }
             if cases.len > 1 {
                 let tag_loc = local32(g, f);
@@ -515,7 +512,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
                     i32Const(g, g.types.variant_tags[cases.tags + ci]);
                     op(g, OP_i32_eq);
                     let cif = open(g, f, OP_if_);
-                    let perr = persistFlatAt(g, f, base, offset + 4, pty, is_imm, id, depth + 1);
+                    let perr = persistFlatAt(g, f, base, offset + 4, pty, id, depth + 1);
                     if perr != blot_direct_types::Error.none { return perr; }
                     close(g, f);
                 }
@@ -526,7 +523,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
     }
 }
 
-recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32, elem_ty: Ty, elem_step: u32, is_imm: bool, id: u32, depth: i64) -> Error {
+recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32, elem_ty: Ty, elem_step: u32, id: u32, depth: i64) -> Error {
     let rt = g.runtime_();
     let entry = local32(g, f);
     let arr_base = local32(g, f);
@@ -556,7 +553,7 @@ recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32
     op(g, OP_i32_mul);
     op(g, OP_i32_add);
     lset(g, elem_addr);
-    let perr = persistFlatAt(g, f, elem_addr, 0, elem_ty, is_imm, id, depth);
+    let perr = persistFlatAt(g, f, elem_addr, 0, elem_ty, id, depth);
     if perr != blot_direct_types::Error.none { return perr; }
     lget(g, idx);
     i32Const(g, 1);
@@ -578,7 +575,6 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let rt = g.runtime_();
     let persist = rt.persist;
     let key = g.s.instances[instance_id].key;
-    let _, is_imm = g.s.deeply_immutable_pools.get(blot_direct_emit::key64(key.unit, key.id));
     gget(g, state_global);
     i32Const(g, 1);
     op(g, OP_i32_ne);
@@ -605,9 +601,8 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let step, error = stride(g, f, element, 0);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     i32Const(g, step);
-    var mode: u32 = 0;
-    if is_imm { mode = 2; }
-    i32Const(g, mode);
+    // All module const pools are deeply immutable: always emit mode = 2 (static_pool_flag | live_flag).
+    i32Const(g, 2);
     callf(g, persist);
     let p_slot = local32(g, f);
     let p_gen = local32(g, f);
@@ -616,7 +611,7 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let elem_holds, eherr = g.contentsHoldMemory(element);
     if eherr != blot_direct_types::Error.none { return neverVal(), eherr; }
     if elem_holds {
-        let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, is_imm, 0, 0);
+        let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, 0, 0);
         if perr != blot_direct_types::Error.none { return neverVal(), perr; }
     }
     lget(g, p_slot);

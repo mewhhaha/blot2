@@ -238,7 +238,6 @@ root struct State {
     dep_frame_mark: i64 = 0,
     dep_match: bool = true,
     inlined_callees: U64Map = U64Map {},
-    deeply_immutable_pools: U64Map = U64Map {},
     persist_rec_helpers: U64Map = U64Map {},
     kernels: blot_check_wire_schema::KernelInfo[>..] = [],
     processes: blot_check_wire_schema::ProcessInfo[>..] = [],

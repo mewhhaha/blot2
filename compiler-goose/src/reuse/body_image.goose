@@ -912,7 +912,7 @@ fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emissi
     let built=blot_direct::compileTracked(rooted_units,prepared.entry,replay.types,replay.module,replay.state,bytes,message,build_inputs);
     return finishTracked(prepared,replay,built,bytes[..],message[..]);
 }
-fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const blot_check_wire_schema::ProgramInfo&,imm_pools:const u64[:],build_inputs:i64)->Emission,blot_error::Error {
+fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const blot_check_wire_schema::ProgramInfo&,build_inputs:i64)->Emission,blot_error::Error {
     assert(!replay.used);
     replay.used=true;
     replay.valid=false;
@@ -920,6 +920,6 @@ fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const b
     replay.types.units=rooted_units;
     var bytes:u8[>..<]=[];
     var message:u8[>..<]=[];
-    let built=blot_direct::compileTrackedWithAnalysis(rooted_units,prepared.entry,replay.types,replay.module,replay.state,pinfo,imm_pools,bytes,message,build_inputs);
+    let built=blot_direct::compileTrackedWithAnalysis(rooted_units,prepared.entry,replay.types,replay.module,replay.state,pinfo,bytes,message,build_inputs);
     return finishTracked(prepared,replay,built,bytes[..],message[..]);
 }

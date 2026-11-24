@@ -120,6 +120,15 @@ for all 109 fixtures (migrating legacy grow/resize/freeze fixtures to `Array`
 and `own`-threaded helpers; `global_call_freeze.blot` now exits 1 with
 `aliased_update` on mutating an aliased module `const` array).
 
+Unified Dynamic Arrays Phase 6 (24 November 2026) retired `check/purity.goose`
+and its diagnostic codes (`spark_mutates_capture`, `kernel_mutates_context`,
+`process_mutates_global`, `purity_limit`) since ownership now guarantees all
+module `const` pools are deeply immutable, unconditionally emitting `mode = 2`
+(`static_pool_flag | live_flag`) for every module `const` pool. Re-recorded
+`expected.json`: 100 of 109 fixtures stayed byte-identical and the 9 fixtures
+with module `const` pools changed only `wasm_sha256` (same byte sizes, exit
+codes, and records).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

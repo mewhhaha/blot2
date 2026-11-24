@@ -92,15 +92,14 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             let track=(retainable || reused) && (!assets || !assets.tracks_inputs);
             var current_non_staged=blot_check_wire_schema::NonStagedReceipt{};
             var pinfo=blot_check_wire_schema::ProgramInfo{};
-            var imm_pools:u64[>..]=[];
             var has_analysis=false;
             let skip_unchanged = track && all_cached && opened.image.receipt.valid && opened.image.bytes.len!=0 && (opened.image.receipt.non_staged.kernel_staging_sites_count==0 || opened.image.receipt.staged_dep_units_valid);
             if skip_unchanged {
                 current_non_staged=opened.image.receipt.non_staged;
             } else {
-                // Validate wire schemas, concurrency purity, and full non-staged LayoutReceipt
-                // once before any retained/cached fast path (§4.1 item 3), and pass `(pinfo, imm_pools)`
-                // straight into emission so neither pass ever runs twice.
+                // Validate wire schemas and full non-staged LayoutReceipt
+                // once before any retained/cached fast path (§4.1 item 3), and pass `pinfo`
+                // straight into emission so the pass never runs twice.
                 blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
                 if pinfo.issue.failed {
                     timing.exit();
@@ -112,18 +111,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     }
                     return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pinfo.issue.span.start,end:pinfo.issue.span.end,message:pinfo.issue.message,..});
                 }
-                let pres=blot_check_purity::analyzeInto(payload.value.units,payload.value.entry,imm_pools);
-                if pres.issue.failed {
-                    timing.exit();
-                    if reused { if replay.used { replay.valid=false; replay.needs_reset=true; } retry=true; return false,blot_error::Error.none; }
-                    var code:const u8[:]=default<const u8[:]>();
-                    match pres.issue.code { const for <N,V> in variants<blot_check_diagnostic_code::Code> { V=>{code=N;}, } }
-                    if pres.issue.unit!=0 && pres.issue.unit<=payload.value.paths.len {
-                        return false,reject(writer,id,opened.revisions,Diagnostic{filename:payload.value.paths[pres.issue.unit-1],stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
-                    }
-                    return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
-                }
-                current_non_staged=blot_check_wire_schema::computeNonStagedReceipt(payload.value.units,payload.value.entry,pinfo,pres.deeply_immutable_digest);
+                current_non_staged=blot_check_wire_schema::computeNonStagedReceipt(payload.value.units,payload.value.entry,pinfo);
                 has_analysis=true;
             }
             var bytes=default<u8[:]>();
@@ -145,16 +133,15 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             } else {
                 if !has_analysis {
                     blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
-                    let _ = blot_check_purity::analyzeInto(payload.value.units,payload.value.entry,imm_pools);
                 }
                 if track { blot_direct_relocations::begin(); }
                 var emitted=Emission{};
                 var error=blot_error::Error.none;
                 if track && !replay.used {
-                    emitted,error=blot_reuse_body_image::emitTrackedWithAnalysis(payload.value,replay,pinfo,imm_pools[..],inputs);
+                    emitted,error=blot_reuse_body_image::emitTrackedWithAnalysis(payload.value,replay,pinfo,inputs);
                 } else {
                     if replay.used { replay.valid=false; replay.needs_reset=true; }
-                    emitted,error=payload.value.emitWithAnalysis(pinfo,imm_pools[..],inputs);
+                    emitted,error=payload.value.emitWithAnalysis(pinfo,inputs);
                 }
                 if track { pending=blot_direct_relocations::finish(); }
                 if error!=blot_error::Error.none { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();timing.exit();return false,error; }

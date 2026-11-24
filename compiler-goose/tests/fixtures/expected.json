@@ -1681,7 +1681,7 @@
     }
    ],
    "wasm_bytes": 5198,
-   "wasm_sha256": "e652266dd0d5d2bbdd7020d8757f4238c3b17f33e5c870271cf0586d7805b810"
+   "wasm_sha256": "e5a9f36beacc9db4e6e145aef5cad0556305544bc724ec832d350874ab88dda2"
   },
   "direct/providers.blot": {
    "exit": 0,
@@ -2161,7 +2161,7 @@
     }
    ],
    "wasm_bytes": 5559,
-   "wasm_sha256": "1e7ef6bb745c6b8f343362b4a26b3c1e21e0dfb989273f81533da75f21ebd537"
+   "wasm_sha256": "98279b733fdf034a882a0d0ada53709aad9dd2259d8fddc30cccfc88bf206625"
   },
   "discard-fixtures/deferred-alias.blot": {
    "exit": 0,
@@ -2835,7 +2835,7 @@
     }
    ],
    "wasm_bytes": 4542,
-   "wasm_sha256": "f8121af9e6cdfb71983a28a0c2914e3dab6fd76cb880aed4194b4bf95dc5f0d3"
+   "wasm_sha256": "fb401189336f4c9fb6a26466558be114a2f36ae5077ce2341e3611661d605448"
   },
   "global_call_conditional.blot": {
    "exit": 0,
@@ -2875,7 +2875,7 @@
     }
    ],
    "wasm_bytes": 4567,
-   "wasm_sha256": "d2a29aff6e0e123b65d3909623d62b6ef59da0f60c42d2284b502e1a408c6b87"
+   "wasm_sha256": "9d70fa8a66061198bf27caf2ad491d2791ed63fca5f63fa7bd020efba4f1da86"
   },
   "global_call_freeze.blot": {
    "exit": 1,
@@ -2962,7 +2962,7 @@
     }
    ],
    "wasm_bytes": 6046,
-   "wasm_sha256": "13d3ef987d74879ef54a793c1f753ac2d443b8d9b3c964dfca08e465379499ab"
+   "wasm_sha256": "b8122765dccbba1daa6447f148713ce6a40217b168f8f46b8ede1e0464d125b6"
   },
   "global_call_mutation.blot": {
    "exit": 0,
@@ -3002,7 +3002,7 @@
     }
    ],
    "wasm_bytes": 6251,
-   "wasm_sha256": "ccdac1c51495ac3d8ef12b991669a4add80d7662a8c45caf0fd4a2b2c2d3c543"
+   "wasm_sha256": "8334f83f11734be371dc9bce0d909f0d20e3269dec3c853b1a59e1d69cbc8257"
   },
   "global_call_read.blot": {
    "exit": 0,
@@ -3042,7 +3042,7 @@
     }
    ],
    "wasm_bytes": 5316,
-   "wasm_sha256": "ec512a7761584223927ff79e0db9faca2e4655c37a83ffb444c865626543dfaf"
+   "wasm_sha256": "87081cabe6c4b6f04ebf33c5aaac3644acfd0d35acf4ba8f72c24ba3675e750f"
   },
   "identity_join.blot": {
    "exit": 0,
@@ -4100,7 +4100,7 @@
     }
    ],
    "wasm_bytes": 13327,
-   "wasm_sha256": "599a125d46e621ea6d6fdf843c362aa05c236150ba3c8d307f636203545260d5"
+   "wasm_sha256": "20bf72466de1dffd76457bb7fb1379f642698d2b2aef573306cf194c73be3064"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
@@ -4340,7 +4340,7 @@
     }
    ],
    "wasm_bytes": 9965,
-   "wasm_sha256": "28eb04f891d54144b3d9bcd580c7bf3abfcd489330d12cd05aa32a3cd3a0ddad"
+   "wasm_sha256": "92e17e84bfc9766cceb8073eebcac6bcc98063183e504ba18523957cd6aeb25c"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,

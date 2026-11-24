@@ -1,62 +1,60 @@
 # Working on Blot and Gdev
 
-## Current frontier: Purity Analyzer & Session Compile-Speed Optimization (24 November 2026)
+## Current frontier: Unified Dynamic Arrays & Purity Analyzer Retirement (24 November 2026)
 
-All five phases of Memory Model A ([tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md)),
-the post-Phase-5 multi-harness council review fixes (`0fce6177`), and the
-concurrency purity / session compile-speed optimization pass are complete and
-verified across `blot2`, `std`, `../ink`, and `../gdev`:
+All six phases of the unified dynamic-array (`#[T]` replacing `#[+T]`/`#[~T]`),
+owned length-mutation, and `purity.goose` retirement plan are complete and
+qualified across `blot2`, `std/`, `../pen`, `../ink`, and `../gdev`:
 
-- **Purity Analyzer & Session Fast-Path Optimization (this commit, after `0fce6177`):**
-  - Eliminated the 6.5 s purity bottleneck that had regressed cold Gdev compiles
-    to `6.96 s` and warm no-op/trivia builds to `3.31 s`, returning Gdev to
-    subsecond cold builds (`391.7 ms` / `403.5 ms` median `-O2`, beating even
-    the `432 ms` PGO target in [tasks/FAST_COMPILE.md](tasks/FAST_COMPILE.md))
-    with **byte-identical** Wasm output:
-  - **Concurrency-root-only seeding & lazy unit registration (`purity.goose`):**
-    Replaced eager whole-program `registerAllCallables` across all 306 units and
-    422k Core nodes with lazy per-unit registration (`ensureUnitRegistered` /
-    `lookupBodyFn`). Removed whole-game `exported_ctxs` (`main`) seeding in
-    `analyzeInto`; after Memory Model Phases 1–5 (no `=`, no `lent`, unique `:=`
-    and `@simd.store`), non-growable `const` globals cannot be mutated after
-    startup unless they retain a handle/view to a growable global. A fast
-    body-header scan collects growable globals and seeds immutable-typed pool
-    initializers only when a mutable global exists (transitively flagging any
-    const view/alias to a growable global).
-  - **Asymptotic graph & dispatch indexing (`purity.goose`):** Added per-`(ctx, src)`
-    indexed adjacency lists (`ctx_src_base_edges`, `ctx_src_written_edges`,
-    `EdgeNode.next_src`) turning `stepLabelHead` / `reachHead` / `evalUpdate`
-    from `O(E)` / `O(V·E)` to `O(out-degree)` / `O(V+E)`; O(1) hash-set
-    summary dedup & comparison in `publishSummary`; per-function context lists
-    (`fn_ctx_head` / `FnCtx.next_same_fn`); lazy O(1) associated-method and
-    contract-implementation indexes (`assoc_by_name`, `impl_by_name`,
-    `impl_by_contract`); O(1) `field_name_map`; memoized `isPureScalarCached`
-    that skips dead fresh allocations/edges for pure-scalar `product`/`record`/
-    `construct` nodes; and `usage`/`forall` unwrapping on scalar `associated` ops.
-  - **Single-pass analysis & 0-change warm fast path (`direct.goose`,
-    `compile.goose`, `reuse/{body_image,dependency_consumer,partial_dependency,zig_project_server_build}.goose`):**
-    Passed precomputed `(ProgramInfo, imm_pools)` from `buildPrepared` into
-    `emitTrackedWithAnalysis` / `emitWithAnalysis` (removing the duplicate
-    `wire_schema::analyze` + `purity::analyzeInto` run on every cold and
-    non-relocated build), and added a 0-changed-module fast path before
-    re-running wire-schema/purity validation on unchanged cached revisions.
-  - Added mutable-global view-alias regression coverage in
-    `tests/guest/concurrency_purity_phase1.test.ts` and synced
-    `tests/guest/owned_render_copy_fixture.ts` with `../ink` `3df2bff`
-    (`ribbons`, `haptics` on `render.FrameAccess`).
-- **Council Soundness Hardening (`0fce6177`) & Memory Model Phase 5 (`2de831a6`):**
-  - Fixed all 5 verified `HIGH` findings from Opus 5.5 + Neon (loop outer-local
-    weakening in `uniqueness.goose`, deferred polymorphic closure captures in
-    `direct/function*.goose`, strict `in_same_fn` `ownedInPlace`, permanent
-    freeze invalidation & zero-fallback `Op.freeze` with `non_escaping_params`).
+- **Phase 6 — Retire `check/purity.goose` & unconditional `mode = 2` const pools (this commit, after `7da11d2d`):**
+  - Deleted `compiler-goose/src/check/purity.goose` (3,100+ lines) and its
+    diagnostic codes (`spark_mutates_capture`, `kernel_mutates_context`,
+    `process_mutates_global`, `purity_limit`) plus all `imm_pools` /
+    `deeply_immutable_digest` plumbing across `direct/`, `compile.goose`,
+    `wire_schema.goose`, and `reuse/`.
+  - Because Phase 5 uniqueness bans all mutations of module `const` globals,
+    every module `const` pool (and recursive box persisted inside one) is
+    unconditionally deeply immutable and emits `mode = 2`
+    (`static_pool_flag | live_flag`) in `direct/function_calls.goose`.
+  - Regenerated adapters (`structural_adapters.goose`, `json_adapters.goose`)
+    and re-recorded `compiler-goose/tests/fixtures/expected.json`: 100 of 109
+    fixtures remained byte-identical; the 9 fixtures with module `const` pools
+    changed only `wasm_sha256` (identical byte sizes, exit codes, and records).
+  - Added positive `spark` deep-copy coverage for flat-element shared
+    composites (`copy sw` on `*Holder { arr: #[U32] }`) in
+    `tests/guest/concurrency_purity_phase1.test.ts`.
+  - Compiler binary shrank by ~409 KiB (`8,496,320` → `8,087,056` bytes),
+    release build dropped to `93.08 s`, `../ink` `pen test-blot` dropped from
+    `1.7 s` → `1.1 s`, and `../gdev` `pen test-blot` dropped from `72.5 s` →
+    `47.6 s` (34% faster).
+- **Phase 5 — Enforce owned length mutation & drop `GrowArray`/`ResizeArray`/`seal` (`7da11d2d`):**
+  - Removed `#[+T]`/`#[~T]`, `GrowArray`/`ResizeArray`, `seal`,
+    `@storage.freeze`, `@storage.reserve`, and `Runtime.freeze` across parser,
+    checker, core lowering, direct backend, `std/`, `host/derive.ts`, and tests.
+  - Enforced `ownedInPlacePath` on `@storage.push`, `@storage.pop`,
+    `@storage.truncate`, and `@simd.store` (supporting `deep` owned array-index
+    paths such as `rows[i].owner` and row-polymorphic record fields while
+    rejecting views, shared handles, `shell` elements, method dispatches,
+    captured locals, borrowed parameters, and module `const`s), locking target
+    base places across argument evaluation and weakening via `sharedIntoPlace`.
+  - Added uniqueness laws `o01..o07` (206 total) and re-recorded
+    `runtime.expected` (7707 bytes), `tests/uniqueness/expected.json`, and
+    `tests/fixtures/expected.json`.
+- **Phases 1–4 — Soundness fixes, backend hardening, & sibling migrations (`ebf2f026` + sibling checkouts):**
+  - Closed `@storage.copy` nested-container ownership and `entry kernel`/
+    `entry process` callable holes; hardened `Tag.array` backend invariants
+    (stack-to-heap promotion, `fork` journaling, checked-array invalidation,
+    `escape_min_slot` promotion); migrated `std/`, `../pen/examples/bounce`,
+    `../ink`, and `../gdev` to unified dynamic `Array T` (`#[T]`) and
+    `own`-threaded length mutation.
 
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `0fce6177`) | Purity & session compile-speed optimization (`6.96 s` → `0.40 s` cold Gdev), Council soundness hardening (`0fce6177`), Memory Model Phase 5 (`2de831a6`), Phase 4 (`9b589d5c`), Phase 3 (`1560e6a7`), Concurrency Phases 1–5 (`67fc95b8`) |
-| `../pen` | `77bf4e1` | HRTF/EQ/reverb/haptics/text/netplay (`77bf4e1`), GTAO/SSGI/ribbons (`6efa720`), Hi-Z occlusion (`be951ce`), Session-2 double-restore (`913d470`) |
-| `../ink` | `3df2bff` | Pen 250-lane bindings (`3df2bff`), 247-lane SSGI/ribbons (`84c79a2`), terrain/water/foliage (`e399ff7`) |
-| `../gdev` | `f94a42c` | Pen 250-lane bindings (`f94a42c`), 247-lane sync (`49703bc`), 245-lane sync (`889b336`) |
+| `blot2` | this commit (after `7da11d2d`) | Phase 6 `purity.goose` retirement (`this commit`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`), Purity & session compile-speed optimization (`f650b6fb`), Council soundness hardening (`0fce6177`) |
+| `../pen` | `9f2b338` (local unified-array migration on `examples/bounce`) | HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
+| `../ink` | `18a1f5b` (local unified-array migration across `lib/`, `tests/`, `docs/`) | Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
+| `../gdev` | `566f33f` (local unified-array migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/`) | Pen 250-lane bindings, Moebius look default |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra
@@ -75,52 +73,52 @@ verified across `blot2`, `std`, `../ink`, and `../gdev`:
   order, and immediate `restore_scene` with `app.hold_frame` on `restore_stash`.
 - **Canonical `0x7fc00000` quiet NaN** determinism across `function_spark`,
   `scalarOp`, `std/simd`, and `#run`.
-- **Single update operator `:=`, value restriction, and read-only references:**
-  Zero `=` store statements remain (`lent` and `=` shim removed in Phase 3);
-  local `let` generalizes only on syntactic `func` values (Phase 4); `&T`,
-  `&[T]`, `^T`, and `*T` are strictly read-only, `&local`/`&field` lower in the
-  direct backend, and `@simd.store` / `@storage.freeze` enforce ownership
-  (Phase 5).
+- **Unified dynamic arrays, single update `:=`, value restriction, and read-only references:**
+  `#[T]` (`Array T`) is the sole dynamic array type (`#[N; T]` for fixed-length);
+  `#[+T]`/`#[~T]`/`GrowArray`/`ResizeArray`/`seal`/`@storage.freeze`/`@storage.reserve`
+  and `=`/`lent`/`purity.goose` are retired; local `let` generalizes only on
+  syntactic `func` values; `&T`, `&[T]`, `^T`, and `*T` are strictly read-only;
+  `:=`, `@simd.store`, `@storage.push`, `@storage.pop`, and `@storage.truncate`
+  enforce unique ownership (`ownedInPlacePath`), guaranteeing all module `const`
+  pools are deeply immutable (`mode = 2`).
 
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `9a9de0aca6d5e43cb0152822c5ef1a4b5e21da311d832f0cccf697522777e444`
-    (source identity `c6d027bb69d573a6385479d501a8059f956c6f150c89f2778c97d8d9fe1c315c`, `8,496,320` bytes)
+    `a476a6da69d372c54756cfa158f060503827d806b2b012bcaba3c2e298780e8c`
+    (source identity `d5f8808e02900ec0c9672ac87e8f0181076a4f1cce7c1ad30316947218f8fbca`, `8,087,056` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `5a3fdd310a388e8ba08f3c61fec9ff5416485df4c78ab80b7acd8023fae6e7a8`
-    (`3,650,255` bytes)
+    `d20b59eb2ca3cbc63d2568e9f4b240c0438134ddbdd86b2b3566774bb6ca12c2`
+    (`3,513,022` bytes)
   - `std/prelude.blot` SHA-256:
-    `cc908f217d65f9adb519c0df21ed57006544eb2ea896b397747bdc32655242c9`
+    `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` SHA-256:
-    `1bcc42a008146034fdea1960e64d2487438a4b78f0fb912709cf66fa102c5acb`
-- **Gdev compile-time before/after (`../gdev` `f94a42c`, 306 modules, 2.98 MB, 5,059 funcs, byte-identical `3,842,468` B Wasm `8454653cde8ca19f...`):**
-  - Cold build: `6,963.7 ms` (`backend: 6,719.2 ms`) → **`391.7 ms`** (`backend: 152.9 ms`; 3-run median **`403.5 ms`**, **17.8× faster**)
-  - Warm no-op (`0/306`): `3,304.6 ms` (`backend: 3,289.8 ms`) → **`16.5 ms`** (`backend: 0.3 ms`, **200× faster**)
-  - Warm trivia (`1/305`): `3,311.3 ms` (`backend: 3,290.3 ms`) → **`45.3 ms`** (`backend: 25.3 ms`, **73× faster**; leaf trivia **`40.7 ms`**)
-  - Warm body edit (`1/305` `src/main.blot`): `6,697.5 ms` (`backend: 6,678.1 ms`) → **`170.3 ms`** (`backend: 151.2 ms`, **39× faster**, byte-identical `a49f17f91a74c05e...`)
+    `9ce17d3dd112c4cdbab4fea5061529fa112b690c0d44949bde923d4554b6aa29`
 - **Qualification gates:**
-  - `blot2` (this commit): `harness` **25/25**, `release-build` 85.74 s,
-    `reference-direct` **2/2**, `reference-uniqueness` **199/199**,
-    `reference-fixtures` **109/109**, `pack` OK, `guests` **1,096 passed,
-    0 failed, 76 ignored** (16.22 s); `deno fmt --check` (85 files),
-    `deno check`, `deno task test:editor` (**6/6**).
-  - `../ink` (`3df2bff`): `pen test-blot` exit 0 — **408 passed, 0 failed** in
-    95 Blot modules (1.1 s; `359/359` checks, `45/45` must-trap,
-    `4/4` must-not-compile) plus **237/237** native Rust tests.
-  - `../gdev` (`f94a42c`): `pen check` clean (`main.blot` **0.40 s** unchanged,
-    `saved.json`, `devtools/main.blot` 0.69 s, 562 assets);
-    `build_gdev.ts --timeout-ms 15000 --profile`: `wasmBytes: 3,842,468`,
-    `buildMs: 399.5 ms` (`total_us: 392.0 ms`, `backend: 153.8 ms`),
-    `freshModules: 306`, `emittedFunctions: 5,059`;
-    `run_pen.py --launch --hardware` (NVIDIA GeForce RTX 4080 SUPER Vulkan)
-    exit 0 (`success: true`, `screenshot_640x480: true`,
+  - `blot2` (this commit): `harness` **25/25** (2.48 s), `release-build` 93.08 s,
+    `reference-direct` **2/2** (`runtime` 7707 B, `writer` 352 B),
+    `reference-uniqueness` **206/206**, `reference-fixtures` **109/109**,
+    `pack` OK, `guests` **1,100 passed, 0 failed, 75 ignored** (19.69 s);
+    `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**).
+  - `../pen`: `cargo test -p blot-host` **40/40 passed** (29 unit + 5 concurrency
+    + 3 owned_storage + 3 processes), `examples/bounce` `pen check` clean (0.06 s).
+  - `../ink`: `pen test-blot` exit 0 — **425 passed, 0 failed** in 100 Blot
+    modules (1.1 s; `376/376` checks, `45/45` must-trap, `4/4` must-not-compile)
+    plus **244/244** `ink/tools/native` Rust tests.
+  - `../gdev`: `pen check` clean (`main.blot` **0.42 s**, `devtools/main.blot`
+    `2.95 s`, 563 assets); `pen test-blot` **1,398 passed** across all 219
+    modules in **47.6 s** (0 compile errors, `148/148` must-trap, `7/7`
+    must-not-compile; only the 4 pre-existing Moebius runtime checks in
+    `tests/lighting_look.blot` and `tests/tutorial.blot` from `566f33f`);
+    `build_gdev.ts --timeout-ms 15000 --profile`: `wasmBytes: 4,079,841`,
+    `buildMs: 549.4 ms` (`check: 247.6 ms`, `lower: 29.6 ms`, `backend: 174.0 ms`),
+    `freshModules: 307`, `sourceBytes: 3,088,471`, `emittedFunctions: 5,029`;
+    `run_pen.py --launch --hardware` (NVIDIA Vulkan) exit 0 (`success: true`,
+    `screenshot_640x480: true`, `complete_render: true`,
     `compiled_wasm_unchanged: true`, visually inspected
-    `build/storage-integration/gdev-one-frame/attempt-uh6es9_w/frame.png`,
-    SHA-256 `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`).
-  - `../pen` (historical `913d470` / `f50b644` / `53a89f3`): `pen-runtime`
-    **173/173**, `pen-codegen` **10/10**, `blot-host --test concurrency_phase4`
-    **5/5**, `pen-plugins --test blot` **8/8**, `pen kernels` **4/4**.
+    `build/storage-integration/gdev-one-frame/attempt-dtmi5j3o/frame.png`,
+    SHA-256 `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`,
+    bit-for-bit identical to the prior hardware Vulkan baseline).
 
 ## Remaining work
 

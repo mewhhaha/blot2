@@ -20,7 +20,6 @@ import reuse.frozen_dependency;
 import reuse.editor_completion;
 import backend.native_assets;
 import check.wire_schema;
-import check.purity;
 import check.diagnostic_code;
 import execution_policy;
 import parse.ast;
