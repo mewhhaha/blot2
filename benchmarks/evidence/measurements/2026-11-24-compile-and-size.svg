@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="326" viewBox="0 0 920 326" role="img" aria-label="Compile speed and WebAssembly output size: Blot vs Rust">
+  <title>Compile speed and WebAssembly output size: Blot vs Rust</title>
+  <rect x="0.5" y="0.5" width="919" height="325" rx="12" fill="#fafaf8" stroke="#e2e8f0"/>
+  <text x="28.0" y="38.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a" text-anchor="start">Compile speed &amp; WebAssembly output size</text>
+  <text x="28.0" y="60.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#475569" text-anchor="start">Cold builds on AMD Ryzen 7 7800X3D (median of 9 runs, lower is better)</text>
+  <rect x="28" y="80" width="422" height="196" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="44.0" y="106.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="start">Cold compile time (ms)</text>
+  <rect x="247.2" y="91.0" width="188.8" height="20.0" rx="10" fill="#dcfce7"/>
+  <text x="341.6" y="105.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">7.0× faster vs rustc wasm32</text>
+  <text x="44.0" y="155.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Blot · 6 kernels</text>
+  <rect x="188.0" y="142.0" width="182.0" height="18" rx="4" fill="#f1f5f9"/>
+  <rect x="188.0" y="142.0" width="25.8" height="18" rx="4" fill="#0f766e"/>
+  <text x="221.8" y="155.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">14.0 ms</text>
+  <text x="44.0" y="188.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Blot · 9-mod Ink ECS</text>
+  <rect x="188.0" y="175.0" width="182.0" height="18" rx="4" fill="#f1f5f9"/>
+  <rect x="188.0" y="175.0" width="44.0" height="18" rx="4" fill="#14b8a6"/>
+  <text x="240.0" y="188.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">23.9 ms</text>
+  <text x="44.0" y="221.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust -O3 · native rlib</text>
+  <rect x="188.0" y="208.0" width="182.0" height="18" rx="4" fill="#f1f5f9"/>
+  <rect x="188.0" y="208.0" width="157.1" height="18" rx="4" fill="#c2592b"/>
+  <text x="353.1" y="221.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">85.1 ms</text>
+  <text x="44.0" y="254.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust -O3 · wasm32</text>
+  <rect x="188.0" y="241.0" width="182.0" height="18" rx="4" fill="#f1f5f9"/>
+  <rect x="188.0" y="241.0" width="182.0" height="18" rx="4" fill="#3b607e"/>
+  <text x="378.0" y="254.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">98.6 ms</text>
+  <rect x="470" y="80" width="422" height="196" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="486.0" y="106.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="start">Output .wasm size (KiB)</text>
+  <rect x="708.4" y="91.0" width="169.6" height="20.0" rx="10" fill="#dcfce7"/>
+  <text x="793.2" y="105.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">128× smaller (6 kernels)</text>
+  <text x="486.0" y="162.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Blot · 6 kernels</text>
+  <rect x="626.0" y="148.0" width="174.0" height="20" rx="4" fill="#f1f5f9"/>
+  <rect x="626.0" y="148.0" width="4.0" height="20" rx="4" fill="#0f766e"/>
+  <text x="638.0" y="162.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">11.5 KiB</text>
+  <text x="486.0" y="202.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Blot · 9-mod Ink ECS</text>
+  <rect x="626.0" y="188.0" width="174.0" height="20" rx="4" fill="#f1f5f9"/>
+  <rect x="626.0" y="188.0" width="6.3" height="20" rx="4" fill="#14b8a6"/>
+  <text x="640.3" y="202.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">53.4 KiB</text>
+  <text x="486.0" y="242.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust -O3 · 6 kernels</text>
+  <rect x="626.0" y="228.0" width="174.0" height="20" rx="4" fill="#f1f5f9"/>
+  <rect x="626.0" y="228.0" width="174.0" height="20" rx="4" fill="#3b607e"/>
+  <text x="808.0" y="242.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">1,468 KiB</text>
+  <text x="28.0" y="304.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="400" fill="#64748b" text-anchor="start">Production scale: Gdev (307-module / 3.09 MB 3D game, 5,029 functions) compiles cold in 549.4 ms to 4.08 MB Wasm (pen check: 0.42 s).</text>
+</svg>

@@ -19,6 +19,8 @@ Reproducible cross-language benchmark suite backing the numbers in the root
   `wasmtime 49.0.7` engine (`OptLevel::Speed`, `wasm_simd(true)`), native Rust
   `-O3` kernels, and `bevy_ecs 0.20.1` native worlds with bit-exact checksum
   verification on every matching workload.
+- [plot_benchmarks.py](plot_benchmarks.py): Generates the SVG graphs embedded in
+  [README.md](../../README.md) directly from the recorded JSON evidence.
 
 ## Running
 

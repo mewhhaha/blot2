@@ -100,23 +100,11 @@ Every kernel reports the median of 15 timed runs after warmup and verified **bit
 
 ### Compile Time & Output Size
 
-| Project | Blot (`blotc-goose`) | Rust `-O3` (`wasm32`) | Rust `-O3` (native `rlib`) |
-| --- | ---: | ---: | ---: |
-| **6-kernel benchmark suite** (cold build) | **14.0 ms** | 98.6 ms *(7.0× slower)* | 85.1 ms *(6.1× slower)* |
-| **6-kernel `.wasm` binary size** | **11.5 KiB** | 1,468 KiB *(128× larger)* | — |
-| **9-module Ink ECS app** (`ink/ecs` + `query`, cold) | **23.9 ms** (**53.4 KiB**) | — | — |
-| **307-module 3D game (`gdev`, 3.09 MB source, 5,029 fns)** | **549.4 ms** (**4.08 MB** Wasm) | — | — |
+![Compile speed and WebAssembly output size: Blot vs Rust](benchmarks/evidence/measurements/2026-11-24-compile-and-size.svg)
 
 ### Runtime: Compute, Memory & Auto-SIMD
 
-| Benchmark | Blot (Wasmtime) | Rust `-O3` (Wasmtime) | Rust `-O3` (Native x86_64) | Blot vs Rust Wasm | Blot vs Rust Native |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| **`particle_spark_simd`** *(65k particles × 32, `spark` `v128`)* | **0.84 ms** | 0.69 ms | 0.43 ms | **1.21×** | **1.95×** |
-| **`mandelbrot_f32`** *(256×256 scalar FP, 100 max iter)* | **4.95 ms** | 3.44 ms | 3.94 ms | **1.44×** | **1.26×** |
-| **`merge_sort`** *(100k `U32`, owned ping-pong buffers)* | **14.56 ms** | 6.70 ms | 4.87 ms | **2.17×** | **2.99×** |
-| **`lcg_recurrence`** *(1,000,000 tight integer steps)* | **0.94 ms** | 0.29 ms | 0.35 ms | **3.22×** | **2.67×** |
-| **`prime_sieve`** *(100k flags, bounds-checked writes)* | **0.43 ms** | 0.11 ms | 0.09 ms | **4.02×** | **4.99×** |
-| **`matmul_64`** *(64×64 `F32` scalar triple loop)* | **1.15 ms** | 0.029 ms | 0.020 ms | **39.4×** | **58.4×** |
+![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-24-blot-vs-rust-kernels.svg)
 
 **Reading these numbers honestly:**
 - Where Blot uses **`spark` SIMD** (`particle_spark_simd`) or scalar FP compute (`mandelbrot_f32`), it runs within **1.21×–1.44×** of LLVM `-O3` Wasm and **1.26×–1.95×** of native x86_64 Rust — even while enforcing canonical quiet NaN determinism and full array bounds checks.
@@ -128,15 +116,7 @@ Every kernel reports the median of 15 timed runs after warmup and verified **bit
 
 We benchmarked **Ink ECS** (`ink/ecs` + `ink/ecs/query`, written in pure Blot and compiled to a **53.4 KiB** Wasm module running on Wasmtime `49.0.7`) against **Bevy ECS `0.20.1`** (native x86_64 Rust `-O3` + thin LTO) on identical 10,000-entity worlds (`Pos { x, y, z }`, `Vel { vx, vy, vz }`, 10% `Active`, 5% `Frozen`) with **bit-exact checksum parity** on all matching workloads ([ink_ecs_bench.blot](benchmarks/comparison/ink_ecs_bench.blot), [rust_bench_main.rs](benchmarks/comparison/rust_bench_main.rs)):
 
-| Workload (10,000 entities) | Ink ECS (Blot → Wasmtime) | Bevy ECS `0.20.1` (Native Rust `-O3`) | Winner / Note |
-| --- | ---: | ---: | --- |
-| **Dense iteration** (`Pos += Vel`, 10k × 100 ticks) — `ink/ecs` `Pool` scan | 6.39 ms | **1.28 ms** | Bevy **5.0×** faster |
-| **Dense iteration** (`Pos += Vel`, 10k × 100 ticks) — `ink/ecs/query` cached | 9.30 ms | **1.28 ms** | Bevy **7.2×** faster |
-| **Dense iteration** (`Pos += Vel`, 10k × 100 ticks) — **Blot SoA + `spark` SIMD** | **0.65 ms** | 1.28 ms *(AoS `Pos`/`Vel`)* | **Blot `spark` 2.0× faster** |
-| **Sparse filtered iteration** (`With Active, Without Frozen`, 500/10k × 100) | 0.42 ms | **0.069 ms** | Bevy **6.1×** faster |
-| **Batch spawn** (10,000 entities: `Pos` + `Vel` + 10% `Active`) | 0.72 ms | **0.19 ms** | Bevy **3.8×** faster |
-| **Structural tag churn** (2,000 `Active` insert/remove ops on 10k world) | **0.035 ms** *(35 µs)* | 0.084 ms *(84 µs)* | **Ink 2.4× faster** |
-| **Full-world snapshot copy** (all 10,000 entities & 5 pools/components) | **0.010 ms** *(10 µs)* | 0.237 ms *(237 µs)* | **Ink 23.6× faster** |
+![Ink ECS vs Bevy ECS 0.20.1 performance comparison](benchmarks/evidence/measurements/2026-11-24-ink-vs-bevy-ecs.svg)
 
 **Why the two architectures trade wins:**
 - **Bevy ECS excels at archetype-table queries:** Grouping matching component bundles into dense untagged native Rust slices avoids `Maybe` tag checks, ID indirection, and Wasm bounds checks — giving Bevy a clear **3.8×–7.2×** edge on AoS component iteration and batch spawns.
