@@ -18,7 +18,7 @@ Most languages force an uncomfortable trade-off for interactive and simulation s
 Blot occupies the space in between:
 
 1. **Zero-GC memory safety without lifetime annotations.** Values are immutable by default, dynamic arrays (`#[T]`) mutate in place when uniquely owned, and the compiler infers local borrows (`&T`, `&[T]`) and ownership transfers (`own`) statically — no garbage collector and no `'a` lifetime parameters.
-2. **Subsecond iteration and tiny Wasm binaries.** Blot's native compiler (`blotc-goose`) emits WebAssembly directly without LLVM. A 6-kernel module compiles cold in **14 ms** (**11.5 KiB** Wasm); a 9-module ECS app builds in **24 ms** (**53.4 KiB**); a **307-module / 3.09 MB** 3D game builds cold in **0.55 s** (`pen check` in **0.42 s**).
+2. **Subsecond iteration and tiny Wasm binaries.** Blot's native compiler (`blotc-goose`) emits WebAssembly directly without LLVM. A 6-kernel module compiles cold in **13.3 ms** (**10.7 KiB** Wasm); a 9-module ECS app builds in **24.2 ms** (**52.7 KiB**); a **307-module / 3.09 MB** 3D game builds cold in **0.55–0.70 s** (`pen check` in **0.42 s**).
 3. **Determinism and sandboxing by construction.** Functions are pure by default, I/O and state are tracked as explicit algebraic effects, floating-point operations normalize to canonical IEEE 754 quiet NaN (`0x7fc00000`) across scalar, SIMD, and compile-time `#run`, and guests execute inside a memory-safe WebAssembly ABI 8 sandbox.
 4. **Built-in data-oriented parallelism.** Write array kernels with `spark #[...]` for automatic 4-wide Wasm `v128` SIMD, fan out across host worker pools with `entry kernel`, and isolate long-lived state machines in persistent `entry process` actors.
 
@@ -93,7 +93,7 @@ Curried functions (`->`), exhaustive algebraic data types (`$Some`, `$Nothing`),
 
 All benchmarks below were measured on an **AMD Ryzen 7 7800X3D (8C / 16T)** running Linux, comparing:
 
-- **Blot (`blotc-goose` `30899f4b`)** running on **Wasmtime `49.0.7`** (`OptLevel::Speed`, `wasm_simd(true)`).
+- **Blot (`blotc-goose`)** running on **Wasmtime `49.0.7`** (`OptLevel::Speed`, `wasm_simd(true)`).
 - **Rust (`rustc 1.96.0-nightly`, `-C opt-level=3`)** compiled both to **`wasm32-unknown-unknown +simd128` (`panic=abort`)** on the exact same Wasmtime `49.0.7` engine and to **native `x86_64`** (`-O3`, thin LTO, `codegen-units = 1`).
 
 Every kernel reports the median of 15 timed runs after warmup and verified **bit-exact checksum parity** across all three targets. Source and runner live in [benchmarks/comparison/](benchmarks/comparison/README.md); raw JSON measurements are recorded in [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json).
@@ -107,20 +107,20 @@ Every kernel reports the median of 15 timed runs after warmup and verified **bit
 ![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-24-blot-vs-rust-kernels.svg)
 
 **Reading these numbers honestly:**
-- Where Blot uses **`spark` SIMD** (`particle_spark_simd`) or scalar FP compute (`mandelbrot_f32`), it runs within **1.21×–1.44×** of LLVM `-O3` Wasm and **1.26×–1.95×** of native x86_64 Rust — even while enforcing canonical quiet NaN determinism and full array bounds checks.
-- On tight scalar loops (`lcg_recurrence`, `prime_sieve`, `matmul_64`), LLVM's optimizer unrolls loops, hoists bounds checks, and auto-vectorizes ordinary `for` loops into AVX2/SIMD FMA. Blot's direct Wasm emitter prioritizes **14 ms** compiles over LLVM-grade scalar loop optimization; hot numerical passes should use `spark` comprehensions or SoA layouts.
+- With **`spark` SIMD** (`particle_spark_simd`), Blot matches LLVM `-O3` Wasm (**0.75 ms vs 0.73 ms, 1.02×**). On **`merge_sort`** (100k elements) and **`mandelbrot_f32`**, Blot runs within **1.18×–1.36×** of LLVM `-O3` Wasm (**1.34×–1.52×** of native x86_64 Rust) while enforcing canonical quiet NaN determinism and full bounds safety.
+- On tight scalar loops (`lcg_recurrence`, `prime_sieve`, `matmul_64`), LLVM's optimizer algebraically unrolls recurrences and auto-vectorizes ordinary `for` loops into 16-register SIMD. Blot's direct Wasm emitter prioritizes **13 ms** compiles over LLVM-grade scalar loop optimization; hot numerical passes should use `spark` comprehensions or SoA layouts.
 
 ---
 
 ## Ink ECS vs Bevy ECS
 
-We benchmarked **Ink ECS** (`ink/ecs` + `ink/ecs/query`, written in pure Blot and compiled to a **53.4 KiB** Wasm module running on Wasmtime `49.0.7`) against **Bevy ECS `0.20.1`** (native x86_64 Rust `-O3` + thin LTO) on identical 10,000-entity worlds (`Pos { x, y, z }`, `Vel { vx, vy, vz }`, 10% `Active`, 5% `Frozen`) with **bit-exact checksum parity** on all matching workloads ([ink_ecs_bench.blot](benchmarks/comparison/ink_ecs_bench.blot), [rust_bench_main.rs](benchmarks/comparison/rust_bench_main.rs)):
+We benchmarked **Ink ECS** (`ink/ecs` + `ink/ecs/query`, written in pure Blot and compiled to a **52.7 KiB** Wasm module running on Wasmtime `49.0.7`) against **Bevy ECS `0.20.1`** (native x86_64 Rust `-O3` + thin LTO) on identical 10,000-entity worlds (`Pos { x, y, z }`, `Vel { vx, vy, vz }`, 10% `Active`, 5% `Frozen`) with **bit-exact checksum parity** on all matching workloads ([ink_ecs_bench.blot](benchmarks/comparison/ink_ecs_bench.blot), [rust_bench_main.rs](benchmarks/comparison/rust_bench_main.rs)):
 
 ![Ink ECS vs Bevy ECS 0.20.1 performance comparison](benchmarks/evidence/measurements/2026-11-24-ink-vs-bevy-ecs.svg)
 
 **Why the two architectures trade wins:**
-- **Bevy ECS excels at archetype-table queries:** Grouping matching component bundles into dense untagged native Rust slices avoids `Maybe` tag checks, ID indirection, and Wasm bounds checks — giving Bevy a clear **3.8×–7.2×** edge on AoS component iteration and batch spawns.
-- **Ink ECS excels at structural edits, snapshots, and flat SIMD columns:** Ink stores each component in an entity-indexed owned column (`ecs.Pool T`) with zero compiler ECS magic. Adding or removing a tag (`Active`) flips one slot without copying `Pos`/`Vel` between archetypes (**2.4× faster**), snapshotting the entire 10k-entity world for rollback netcode or rewind is five contiguous `@storage.copy` memcpys (**10 µs**, **23.6× faster** than rebuilding a `bevy_ecs::World`), and splitting hot physics columns into flat SoA + `spark` SIMD hits **0.65 ms** from inside a Wasm sandbox (**2.0× faster** than native Bevy AoS — though native Rust/Bevy could likewise adopt SoA columns or multi-threaded queries).
+- **Bevy ECS excels at archetype-table queries:** Grouping matching component bundles into dense untagged native Rust slices avoids `Maybe` tag checks and Wasm bounds checks — giving native Bevy a **1.6×–1.8×** lead over Ink's pure-Wasm `Pool`/cached queries (**1.28 ms vs 2.31 ms** dense; **0.085 ms vs 0.138 ms** sparse) and a **3.8×** edge on batch spawn.
+- **Ink ECS excels at structural edits, snapshots, and flat SIMD columns:** Ink stores each component in an entity-indexed owned column (`ecs.Pool T`) with zero compiler ECS magic. Adding or removing a tag (`Active`) flips one slot without copying `Pos`/`Vel` between archetypes (**2.4× faster**), snapshotting the entire 10k-entity world for rollback netcode or rewind is five contiguous `@storage.copy` memcpys (**10 µs**, **21× faster** than rebuilding a `bevy_ecs::World`), and splitting hot physics columns into flat SoA + `spark` SIMD hits **0.64 ms** from inside a Wasm sandbox (**2.0× faster** than native Bevy AoS — though native Rust/Bevy could likewise adopt SoA columns or multi-threaded queries).
 
 Additional compiler, incremental-edit, multi-worker kernel, and Goose comparisons live under [benchmarks/](benchmarks/comparison/README.md) (including [multi-worker Gdev route batches](benchmarks/evidence/measurements/2026-11-19-spark-spawn.json) and [incremental capacity edits at 35.0 ms](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)).
 

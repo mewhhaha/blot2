@@ -88,7 +88,8 @@ def build_compile_and_size(data: dict) -> str:
     lx, ly, lw, lh = 28, 80, 422, 196
     els.append(f'  <rect x="{lx}" y="{ly}" width="{lw}" height="{lh}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(lx + 16, ly + 26, "Cold compile time (ms)", size=13.5, weight="700"))
-    els.append(pill(lx + lw - 14, ly + 25, "7.0× faster vs rustc wasm32", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    compile_ratio = c["rust_wasm32_opt3_ms"] / c["blot_6_kernels_ms"]
+    els.append(pill(lx + lw - 14, ly + 25, f"{compile_ratio:.1f}× faster vs rustc wasm32", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
     compile_rows = [
         ("Blot · 6 kernels", c["blot_6_kernels_ms"], C_BLOT),
@@ -111,12 +112,16 @@ def build_compile_and_size(data: dict) -> str:
     rx, ry0, rw, rh = 470, 80, 422, 196
     els.append(f'  <rect x="{rx}" y="{ry0}" width="{rw}" height="{rh}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(rx + 16, ry0 + 26, "Output .wasm size (KiB)", size=13.5, weight="700"))
-    els.append(pill(rx + rw - 14, ry0 + 25, "128× smaller (6 kernels)", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    size_ratio = c["rust_wasm_bytes"] / c["blot_wasm_bytes"]
+    els.append(pill(rx + rw - 14, ry0 + 25, f"{size_ratio:.0f}× smaller (6 kernels)", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
+    blot_kib = c["blot_wasm_bytes"] / 1024.0
+    ink_kib = c["ink_ecs_wasm_bytes"] / 1024.0
+    rust_kib = c["rust_wasm_bytes"] / 1024.0
     size_rows = [
-        ("Blot · 6 kernels", c["blot_wasm_bytes"] / 1024.0, C_BLOT, "11.5 KiB"),
-        ("Blot · 9-mod Ink ECS", c["ink_ecs_wasm_bytes"] / 1024.0, C_BLOT_ALT, "53.4 KiB"),
-        ("Rust -O3 · 6 kernels", c["rust_wasm_bytes"] / 1024.0, C_RUST_WASM, "1,468 KiB"),
+        ("Blot · 6 kernels", blot_kib, C_BLOT, f"{blot_kib:.1f} KiB"),
+        ("Blot · 9-mod Ink ECS", ink_kib, C_BLOT_ALT, f"{ink_kib:.1f} KiB"),
+        ("Rust -O3 · 6 kernels", rust_kib, C_RUST_WASM, f"{rust_kib:,.0f} KiB"),
     ]
     max_s = max(v for _, v, _, _ in size_rows)
     sbar_x = rx + 156
@@ -243,9 +248,10 @@ def build_ecs_chart(data: dict) -> str:
 
     # Legend
     lx = 28.0
+    ink_kib = data["compile_speed_ms"]["ink_ecs_wasm_bytes"] / 1024.0
     for color, label in [
         (C_SPARK, "Blot SoA + spark SIMD (Wasmtime)"),
-        (C_BLOT, "Ink ECS (53.4 KiB Wasm, Wasmtime 49.0.7)"),
+        (C_BLOT, f"Ink ECS ({ink_kib:.1f} KiB Wasm, Wasmtime 49.0.7)"),
         (C_RUST_NAT, "Bevy ECS 0.20.1 (Native x86_64 Rust -O3)"),
     ]:
         snippet, lx = legend_item(lx, 86, color, label)

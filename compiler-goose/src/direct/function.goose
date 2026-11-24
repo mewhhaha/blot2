@@ -74,6 +74,14 @@ struct CheckedView {
     base: u32 = 0,
     depth: u32 = 0
 }
+struct CheckedElem {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    index: u32 = 0,
+    step: u32 = 0,
+    address: u32 = 0,
+    depth: u32 = 0
+}
 struct ConstTag { local: u32 = 0, tag: u32 = 0, depth: u32 = 0 }
 struct CheckedRange {
     slot: u32 = 0xffffffff,
@@ -105,6 +113,8 @@ struct Fn {
     checked_grows_len: i64 = 0,
     checked_views: CheckedView[8] = [CheckedView {}; 8],
     checked_views_len: i64 = 0,
+    checked_elems: CheckedElem[8] = [CheckedElem {}; 8],
+    checked_elems_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -203,6 +213,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth > max_depth {
         f.checked_views_len -= 1;
     }
+    while f.checked_elems_len > 0 && f.checked_elems[f.checked_elems_len - 1].depth > max_depth {
+        f.checked_elems_len -= 1;
+    }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth > max_depth {
         f.const_tags_len -= 1;
     }
@@ -216,6 +229,9 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth >= depth {
         f.checked_views_len -= 1;
+    }
+    while f.checked_elems_len > 0 && f.checked_elems[f.checked_elems_len - 1].depth >= depth {
+        f.checked_elems_len -= 1;
     }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth >= depth {
         f.const_tags_len -= 1;
@@ -280,9 +296,25 @@ fn recordCheckedView(f: Fn&, slot: u32, generation: u32, start: u32, length: u32
     f.checked_views[f.checked_views_len] = CheckedView { slot: slot, generation: generation, start: start, length: length, base: base, depth: f.depth };
     f.checked_views_len += 1;
 }
+fn findCheckedElem(f: const Fn&, slot: u32, generation: u32, index: u32, step: u32) -> i64 {
+    var i = f.checked_elems_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_elems[i];
+        if entry.slot == slot && entry.generation == generation && entry.index == index && entry.step == step { return i; }
+    }
+    return -1;
+}
+fn recordCheckedElem(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, address: u32) {
+    if findCheckedElem(f, slot, generation, index, step) >= 0 { return; }
+    if f.checked_elems_len >= 8 { return; }
+    f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, depth: f.depth };
+    f.checked_elems_len += 1;
+}
 fn invalidateCheckedContainers(f: Fn&) {
     f.checked_arrays_len = 0;
     f.checked_views_len = 0;
+    f.checked_elems_len = 0;
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
@@ -342,6 +374,25 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             }
         }
         f.checked_views_len = out;
+    }
+    if f.checked_elems_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_elems_len {
+            let entry = f.checked_elems[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.slot || local_id == entry.generation || local_id == entry.index || local_id == entry.address {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_elems[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_elems_len = out;
     }
     if f.const_tags_len != 0 {
         var out: i64 = 0;

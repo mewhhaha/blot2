@@ -524,10 +524,18 @@ fn main() {
         "checksum_bevy": bevy_snap_chk,
     }));
 
+    let blot_commit = Command::new("git")
+        .args(["-C", blot_root.to_str().unwrap(), "rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".to_string());
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
-            "blot_commit": "30899f4b",
+            "blot_commit": blot_commit,
             "wasmtime": "49.0.7",
             "bevy_ecs": "0.20.1",
             "rustc": "1.96.0-nightly",

@@ -1,12 +1,40 @@
 # Working on Blot and Gdev
 
-## Current frontier: Unified Dynamic Arrays & Purity Analyzer Retirement (24 November 2026)
+## Current frontier: Direct-Backend Tier 1 Runtime Optimizations & Unified Dynamic Arrays (24 November 2026)
 
-All six phases of the unified dynamic-array (`#[T]` replacing `#[+T]`/`#[~T]`),
-owned length-mutation, and `purity.goose` retirement plan are complete and
-qualified across `blot2`, `std/`, `../pen`, `../ink`, and `../gdev`:
+Tier 1 direct-backend runtime optimizations (loop-invariant array-check hoisting,
+scoped element-address reuse, and zero-allocation loop release elision) are
+complete and qualified on top of the six-phase unified dynamic-array (`#[T]`)
+and `purity.goose` retirement milestones:
 
-- **Phase 6 — Retire `check/purity.goose` & unconditional `mode = 2` const pools (this commit, after `7da11d2d`):**
+- **Tier 1 direct-backend runtime optimizations (this commit, after `9de59b4c`):**
+  - Extended `noStorageResize` in `direct/function_control.goose` to walk
+    `Tag.match_`, `Tag.loop_`, and `Tag.pattern_bind` (budget 512) and pre-hoist
+    loop-invariant `Tag.array` `ensureCheckedArray` calls once before `OP_loop`
+    (skipping non-in-place array carries).
+  - Reused pre-RHS element addresses in `direct/function_data.goose:indexedUpdate`
+    whenever `noStorageResize` proves `info.value` cannot resize storage, and
+    added a scoped `CheckedElem` cache (`function.goose`, `function_storage.goose`)
+    gated exclusively to immutable user expression index sites (`readElement` /
+    `indexedUpdate`) and invalidated alongside `CheckedArray`.
+  - Added conservative `bodyNoAlloc` in `direct/function_control.goose` to skip
+    per-iteration `markInto` and `escape_min_slot` global save/merge churn on
+    non-allocating `for ever:` / `for` loops.
+  - Regenerated `structural_adapters.goose` & `json_adapters.goose`, added
+    executed-Wasm edge-case regression laws in `tests/guest/loop_hoist_execution.test.ts`,
+    and re-recorded `compiler-goose/tests/fixtures/expected.json` (18 of 109
+    fixtures changed, every one strictly smaller in `wasm_bytes`).
+  - Measured climb on AMD Ryzen 7 7800X3D (bit-exact checksum parity,
+    [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json)):
+    Ink ECS cached query `9.30 → 2.31 ms` (**4.02×**), Pool direct
+    `6.39 → 2.31 ms` (**2.76×**, `1.80×` of native Bevy `1.28 ms`), sparse
+    filtered `0.422 → 0.138 ms` (**3.06×**, `1.62×` of native Bevy `0.085 ms`),
+    `matmul_64` `1.15 → 0.289 ms` (**3.97×**), `merge_sort` `14.56 → 7.27 ms`
+    (**2.00×**, `1.18×` of Rust `-O3` Wasm), `prime_sieve` `0.425 → 0.223 ms`
+    (**1.91×**), and `particle_spark_simd` `0.842 → 0.745 ms` (**1.02×** of
+    Rust `-O3` Wasm `0.729 ms`), while cold 6-kernel compile dropped to `13.3 ms`
+    and Wasm shrank to `10,931` bytes (**138×** smaller than `rustc -O3`).
+- **Phase 6 — Retire `check/purity.goose` & unconditional `mode = 2` const pools (`30899f4b`):**
   - Deleted `compiler-goose/src/check/purity.goose` (3,100+ lines) and its
     diagnostic codes (`spark_mutates_capture`, `kernel_mutates_context`,
     `process_mutates_global`, `purity_limit`) plus all `imm_pools` /
@@ -51,7 +79,7 @@ qualified across `blot2`, `std/`, `../pen`, `../ink`, and `../gdev`:
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `30899f4b`) | Consumer README & Rust/Bevy ECS comparison benchmarks (`this commit`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`), Purity & session compile-speed optimization (`f650b6fb`), Council soundness hardening (`0fce6177`) |
+| `blot2` | this commit (after `9de59b4c`) | Tier 1 direct-backend runtime optimizations & refreshed charts (`this commit`), README SVG benchmark charts (`9de59b4c`), Consumer README & Rust/Bevy ECS comparison benchmarks (`7d87b31a`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`) |
 | `../pen` | `08e1224` | Unified `#[T]` migration in `blot-host` + `kernels_law6_tests` (`08e1224`); HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
 | `../ink` | `fc7259e` | Unified `#[T]` migration across `lib/`, `tests/`, `docs/` (`fc7259e`); Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
 | `../gdev` | `017f8cd` | Unified `#[T]` migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/` + synced `pen/` bindings (`017f8cd`); Moebius look default |
@@ -85,40 +113,33 @@ qualified across `blot2`, `std/`, `../pen`, `../ink`, and `../gdev`:
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `a476a6da69d372c54756cfa158f060503827d806b2b012bcaba3c2e298780e8c`
-    (source identity `d5f8808e02900ec0c9672ac87e8f0181076a4f1cce7c1ad30316947218f8fbca`, `8,087,056` bytes)
+    `9c3a57e59d66b0a8ca756a201ad7760249f6a82f004f4e36a6dd90762d12d2e8`
+    (`8,099,608` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `d20b59eb2ca3cbc63d2568e9f4b240c0438134ddbdd86b2b3566774bb6ca12c2`
-    (`3,513,022` bytes)
+    `c4787490772e6b474fcfe6075bbe868249983773e120e4e872d9613d0cf1a5a1`
+    (`3,520,255` bytes)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` SHA-256:
-    `9ce17d3dd112c4cdbab4fea5061529fa112b690c0d44949bde923d4554b6aa29`
+    `268d82af8ed6d858288df6f94cb4d37c7ab193f7ddf64fd27a1995f2a1e0a003`
 - **Qualification gates:**
-  - `blot2` (this commit): `harness` **25/25** (2.48 s), `release-build` 93.08 s,
-    `reference-direct` **2/2** (`runtime` 7707 B, `writer` 352 B),
-    `reference-uniqueness` **206/206**, `reference-fixtures` **109/109**,
-    `pack` OK, `guests` **1,100 passed, 0 failed, 75 ignored** (19.69 s);
-    `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**).
+  - `blot2` (this commit): `deno task test:compiler` exit 0 — `harness` (3.24 s),
+    `release-build` (117.07 s), `reference-direct` **2/2** (`runtime` 7707 B,
+    `writer` 352 B), `reference-uniqueness` **206/206**, `reference-fixtures`
+    **109/109**, `pack` OK, `guests` **1,101 passed, 0 failed, 75 ignored**
+    (26.02 s); `deno fmt --check` (85 files), `deno check`,
+    `deno task test:editor` (**6/6**).
   - `../pen`: `cargo test -p blot-host` **40/40 passed** (29 unit + 5 concurrency
     + 3 owned_storage + 3 processes), `examples/bounce` `pen check` clean (0.06 s).
-  - `../ink`: `pen test-blot` exit 0 — **425 passed, 0 failed** in 100 Blot
-    modules (1.1 s; `376/376` checks, `45/45` must-trap, `4/4` must-not-compile)
-    plus **244/244** `ink/tools/native` Rust tests.
-  - `../gdev`: `pen check` clean (`main.blot` **0.42 s**, `devtools/main.blot`
-    `2.95 s`, 563 assets); `pen test-blot` **1,398 passed** across all 219
-    modules in **47.6 s** (0 compile errors, `148/148` must-trap, `7/7`
-    must-not-compile; only the 4 pre-existing Moebius runtime checks in
-    `tests/lighting_look.blot` and `tests/tutorial.blot` from `566f33f`);
-    `build_gdev.ts --timeout-ms 15000 --profile`: `wasmBytes: 4,079,841`,
-    `buildMs: 549.4 ms` (`check: 247.6 ms`, `lower: 29.6 ms`, `backend: 174.0 ms`),
-    `freshModules: 307`, `sourceBytes: 3,088,471`, `emittedFunctions: 5,029`;
-    `run_pen.py --launch --hardware` (NVIDIA Vulkan) exit 0 (`success: true`,
+  - `../ink`: `pen test-blot` exit 0 against new `blotc-goose` — all Blot
+    modules plus **245/245** native f64-reference tests passed (0 failed).
+  - `../gdev`: `build_gdev.ts --timeout-ms 15000 --profile` exit 0
+    (`success: true`, `wasmBytes: 4,093,381`, `buildMs: 704.7 ms`);
+    `run_pen.py --launch --hardware` exit 0 (`success: true`,
     `screenshot_640x480: true`, `complete_render: true`,
     `compiled_wasm_unchanged: true`, visually inspected
-    `build/storage-integration/gdev-one-frame/attempt-dtmi5j3o/frame.png`,
-    SHA-256 `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`,
-    bit-for-bit identical to the prior hardware Vulkan baseline).
+    `build/storage-integration/gdev-one-frame/attempt-n6pdnv2o/frame.png`,
+    SHA-256 `e9cd29bf2f844cc5fc5f0b285591ea4d5f908bde1a46fde254e510d540d6a931`).
 
 ## Remaining work
 

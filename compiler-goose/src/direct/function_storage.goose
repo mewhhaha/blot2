@@ -403,7 +403,7 @@ fn recordBeforeWrite(g: Generator&, f: Fn&, slot_local: u32, address: u32, offse
 }
 // The checked address of element `index` (a local) of a container or view;
 // views check their own range first.
-fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0) -> u32, Error {
+fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0, cache_elem: bool = false) -> u32, Error {
     let address_function = g.runtime_().address;
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return 0, error; }
@@ -413,6 +413,12 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
     if tagOf(g, container.ty) == blot_direct_types::Tag.array {
         let slot = w(g, container, 0);
         let gen = w(g, container, 1);
+        if cache_elem {
+            let cached_elem = findCheckedElem(f, slot, gen, index, step);
+            if cached_elem >= 0 {
+                return f.checked_elems[cached_elem].address, blot_direct_types::Error.none;
+            }
+        }
         let base, len = ensureCheckedArray(g, f, container);
         var in_bounds = false;
         if index == range.index && !range.is_view {
@@ -433,7 +439,9 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
             op(g, OP_i32_ge_u);
             trap(g, f);
         }
-        return emitOffsetAddress(g, f, base, index, step), blot_direct_types::Error.none;
+        let addr = emitOffsetAddress(g, f, base, index, step);
+        if cache_elem { recordCheckedElem(f, slot, gen, index, step, addr); }
+        return addr, blot_direct_types::Error.none;
     }
     if tagOf(g, container.ty) == blot_direct_types::Tag.view &&
         range.is_view && range.slot != 0xffffffff && index == range.index &&
@@ -499,8 +507,8 @@ fn scalarLocal(g: Generator&, f: const Fn&, value: Val, id: u32) -> u32, Error {
     if value.len != 1 { return 0, g.fail(g.units[f.unit - 1], id, "expected a scalar"); }
     return w(g, value, 0), blot_direct_types::Error.none;
 }
-fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0) -> Val, Error {
-    let address, error = elementAddress(g, f, container, index, id, container_core_ty);
+fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0, cache_elem: bool = true) -> Val, Error {
+    let address, error = elementAddress(g, f, container, index, id, container_core_ty, cache_elem);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }

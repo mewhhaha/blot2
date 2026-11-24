@@ -67,7 +67,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     var container_core_ty = selectors[at].source_type;
     if at == 0 { container_core_ty = m.typeOf(info.root); }
-    let address, error = elementAddress(g, f, container, index, id, container_core_ty);
+    let address, error = elementAddress(g, f, container, index, id, container_core_ty, true);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     var ty, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -143,11 +143,14 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), replacement);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-    // Only compile-time fixed-length `SizedArray` (`#[N; T]`) is guaranteed
-    // never to reallocate or shrink during `info.value`; dynamic `#[T]` and
-    // growable/resizable owners recompute the element address after RHS.
+    // Only when `info.value` cannot resize storage (compile-time fixed-length
+    // `#[N; T]` or proved `noStorageResize` RHS) can we reuse the element
+    // address computed before `info.value`.
     var target = address;
-    if tagOf(g, container.ty) != blot_direct_types::Tag.array || coreSizedLength(m, container_core_ty) == 0 {
+    var rhs_budget: i64 = 128;
+    let rhs_safe = tagOf(g, container.ty) == blot_direct_types::Tag.array &&
+        (coreSizedLength(m, container_core_ty) != 0 || noStorageResize(g, m, info.value, rhs_budget));
+    if !rhs_safe {
         let recomputed, error = elementAddress(g, f, container, index, id, container_core_ty);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         target = recomputed;

@@ -1315,6 +1315,24 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
                 noStorageResize(g, m, n.b, left) &&
                 noStorageResize(g, m, n.c, left);
         },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !noStorageResize(g, m, inp, left) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !noStorageResize(g, m, arm.guard_, left) || !noStorageResize(g, m, arm.body, left) { return false; }
+            }
+            return true;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            return noStorageResize(g, m, linfo.first, left) &&
+                noStorageResize(g, m, linfo.end, left) &&
+                noStorageResize(g, m, linfo.body, left);
+        },
+        pattern_bind => {
+            return noStorageResize(g, m, n.b, left) && noStorageResize(g, m, n.c, left);
+        },
         update => {
             let change = m.updateInfo(id);
             if !noStorageResize(g, m, change.root, left) || !noStorageResize(g, m, change.value, left) { return false; }
@@ -1988,6 +2006,262 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
     return true, blot_direct_types::Error.none;
 }
 
+// Conservative pre-check: true only when `ty_id` lowers to an unboxed type
+// (never allocates scope memory on construct/load/carry).
+fn coreTypeUnboxed(g: Generator&, f: const Fn&, m: const Module&, tid: TId) -> bool {
+    if tid == 0 { return false; }
+    let ty, err = g.types.lower(m, tid, f.env);
+    if err != blot_direct_types::Error.none { return false; }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != blot_direct_types::Error.none || boxed { return false; }
+    return true;
+}
+
+// Conservative pre-check: true only when evaluating `id` cannot allocate any
+// scope memory or owners (allows skipping per-iteration release marks and
+// `escape_min_slot` churn on non-allocating loops).
+recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32, left: i64&) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, reference, panic => { return true; },
+        suite, block_ => {
+            for child in m.children(id) {
+                if !bodyNoAlloc(g, f, m, child, left) { return false; }
+            }
+            return true;
+        },
+        bind => { return bodyNoAlloc(g, f, m, n.b, left); },
+        return_ => { return bodyNoAlloc(g, f, m, n.a, left); },
+        break_ => {
+            for child in m.children(id) {
+                if !bodyNoAlloc(g, f, m, child, left) { return false; }
+            }
+            return true;
+        },
+        if_value, if_stmt => {
+            return bodyNoAlloc(g, f, m, n.a, left) &&
+                bodyNoAlloc(g, f, m, n.b, left) &&
+                bodyNoAlloc(g, f, m, n.c, left);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !bodyNoAlloc(g, f, m, inp, left) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !bodyNoAlloc(g, f, m, arm.guard_, left) || !bodyNoAlloc(g, f, m, arm.body, left) { return false; }
+            }
+            return true;
+        },
+        pattern_bind => {
+            return bodyNoAlloc(g, f, m, n.b, left) && bodyNoAlloc(g, f, m, n.c, left);
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            if linfo.kind == blot_check_core::LoopKind.array {
+                // Element loads of a copiedBox array allocate a fresh block.
+                let src_ty_id = m.typeOf(linfo.first);
+                if src_ty_id == 0 { return false; }
+                let src_ty, serr = g.types.lower(m, src_ty_id, f.env);
+                if serr != blot_direct_types::Error.none { return false; }
+                match tagOf(g, src_ty) {
+                    array, view => {
+                        let elem_boxed, eberr = g.types.boxed(g.types.node(src_ty).a);
+                        if eberr != blot_direct_types::Error.none || elem_boxed { return false; }
+                    },
+                    _ => { return false; },
+                }
+            }
+            for carry in m.loopCarries(id) {
+                let cty = m.binding(carry.incoming).ty;
+                if !coreTypeUnboxed(g, f, m, cty) { return false; }
+            }
+            return bodyNoAlloc(g, f, m, linfo.first, left) &&
+                bodyNoAlloc(g, f, m, linfo.end, left) &&
+                bodyNoAlloc(g, f, m, linfo.body, left);
+        },
+        construct => {
+            return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.b, left);
+        },
+        product, record => {
+            if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
+            for child in m.children(id) {
+                if !bodyNoAlloc(g, f, m, child, left) { return false; }
+            }
+            return true;
+        },
+        update => {
+            let change = m.updateInfo(id);
+            let sels = m.updateSelectors(id);
+            if sels.len == 0 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+            if !coreTypeUnboxed(g, f, m, m.typeOf(change.value)) { return false; }
+            if !bodyNoAlloc(g, f, m, change.root, left) || !bodyNoAlloc(g, f, m, change.value, left) { return false; }
+            for sel in sels {
+                if sel.kind == blot_check_core::UpdateKind.index && !bodyNoAlloc(g, f, m, sel.index, left) { return false; }
+            }
+            return true;
+        },
+        project => {
+            let proj = m.projection(n.b);
+            let variants = m.projectionVariants(n.b);
+            if variants.len != 0 { return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.a, left); }
+            let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
+            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+                return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.a, left);
+            }
+            let receiver_local = localRef(m, n.a);
+            if receiver_local != 0 {
+                let spelling = m.fieldSpelling(proj.field);
+                if spelling.present && spelling.value == "length" { return true; }
+            }
+            return false;
+        },
+        scalar, associated, logical => {
+            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            return bodyNoAlloc(g, f, m, n.a, left) && bodyNoAlloc(g, f, m, n.b, left);
+        },
+        call => {
+            let call = m.call(id);
+            if !scratchScalarCallee(g, m, call) { return false; }
+            for arg in call.arguments {
+                if !bodyNoAlloc(g, f, m, arg, left) { return false; }
+            }
+            return true;
+        },
+        array_op => {
+            match m.arrayOperation(id) {
+                length => {
+                    for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                get => {
+                    if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
+                    for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok != blot_error::Error.none { return false; }
+            match op_kind {
+                length => {
+                    for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                read => {
+                    if !coreTypeUnboxed(g, f, m, m.typeOf(id)) { return false; }
+                    for child in m.children(id) {
+                        if !bodyNoAlloc(g, f, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        _ => { return false; },
+    }
+}
+
+// Collect local array bindings accessed inside `id` (following nested in-place
+// loop carries back to their outer incoming binding) so `loop_` can pre-hoist
+// their `ensureCheckedArray` checks once before `OP_loop`.
+fn addHoistCandidate(out: u32[8]&, len: i64&, b: u32) {
+    if b == 0 || len >= 8 { return; }
+    for i in 0..len { if out[i] == b { return; } }
+    out[len] = b;
+    len += 1;
+}
+recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: i64&, left: i64&) {
+    if id == 0 || left <= 0 || len >= 8 { return; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_, product, record, array, break_ => {
+            for child in m.children(id) { collectLoopArrayUses(m, child, out, len, left); }
+        },
+        construct, bind => { collectLoopArrayUses(m, n.b, out, len, left); },
+        return_, project => { collectLoopArrayUses(m, n.a, out, len, left); },
+        if_value, if_stmt => {
+            collectLoopArrayUses(m, n.a, out, len, left);
+            collectLoopArrayUses(m, n.b, out, len, left);
+            collectLoopArrayUses(m, n.c, out, len, left);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { collectLoopArrayUses(m, inp, out, len, left); }
+            for arm in m.matchArms(id) {
+                collectLoopArrayUses(m, arm.guard_, out, len, left);
+                collectLoopArrayUses(m, arm.body, out, len, left);
+            }
+        },
+        pattern_bind => {
+            collectLoopArrayUses(m, n.b, out, len, left);
+            collectLoopArrayUses(m, n.c, out, len, left);
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            collectLoopArrayUses(m, linfo.first, out, len, left);
+            collectLoopArrayUses(m, linfo.end, out, len, left);
+            for nc in m.loopCarries(id) { addHoistCandidate(out, len, nc.incoming); }
+            collectLoopArrayUses(m, linfo.body, out, len, left);
+        },
+        update => {
+            let change = m.updateInfo(id);
+            let sels = m.updateSelectors(id);
+            if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index {
+                addHoistCandidate(out, len, localRef(m, change.root));
+            }
+            collectLoopArrayUses(m, change.root, out, len, left);
+            collectLoopArrayUses(m, change.value, out, len, left);
+            for sel in sels {
+                if sel.kind == blot_check_core::UpdateKind.index {
+                    collectLoopArrayUses(m, sel.index, out, len, left);
+                }
+            }
+        },
+        array_op => {
+            let ch = m.children(id);
+            match m.arrayOperation(id) {
+                get, length => {
+                    if ch.len > 0 { addHoistCandidate(out, len, localRef(m, ch[0])); }
+                },
+                _ => {},
+            }
+            for child in ch { collectLoopArrayUses(m, child, out, len, left); }
+        },
+        storage => {
+            let ch = m.children(id);
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok == blot_error::Error.none {
+                match op_kind {
+                    read, length => {
+                        if ch.len > 0 { addHoistCandidate(out, len, localRef(m, ch[0])); }
+                    },
+                    _ => {},
+                }
+            }
+            for child in ch { collectLoopArrayUses(m, child, out, len, left); }
+        },
+        scalar, associated, logical => {
+            collectLoopArrayUses(m, n.a, out, len, left);
+            collectLoopArrayUses(m, n.b, out, len, left);
+        },
+        call => {
+            for arg in m.call(id).arguments { collectLoopArrayUses(m, arg, out, len, left); }
+        },
+        _ => {},
+    }
+}
+
 fn localKindForScalar(g: const Generator&, ty: Ty) -> ValType {
     if tagOf(g, ty) == blot_direct_types::Tag.f32_ { return VT_f32; }
     return VT_i32;
@@ -2003,6 +2277,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var iteration = Vals {};
     var outgoing = Vals {};
     var slots = Words {};
+    var carry_in_place: bool[64] = [false; 64];
     {
         let m .= g.units[f.unit - 1];
         let carries = m.loopCarries(id);
@@ -2030,6 +2305,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
             }
             if in_place {
+                if at < 64 { carry_in_place[at] = true; }
                 g.s.vals[iteration.start + at] = value;
                 g.s.vals[outgoing.start + at] = value;
                 continue;
@@ -2071,7 +2347,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var source = neverVal();
     var source_view_base: u32 = 0xffffffff;
     var range = CheckedRange {};
-    var body_no_resize_budget: i64 = 256;
+    var body_no_resize_budget: i64 = 512;
     let body_no_resize = noStorageResize(g, m, info.body, body_no_resize_budget);
     if !body_no_resize { invalidateCheckedContainers(f); }
     match info.kind {
@@ -2167,8 +2443,31 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         },
     }
+    if body_no_resize && f.checked_arrays_len < 14 {
+        var hoist_ids: u32[8] = [0; 8];
+        var hoist_len: i64 = 0;
+        var hoist_budget: i64 = 512;
+        collectLoopArrayUses(m, info.body, hoist_ids, hoist_len, hoist_budget);
+        for hi in 0..hoist_len {
+            if f.checked_arrays_len >= 14 { break; }
+            let b = hoist_ids[hi];
+            var mutating_carry = false;
+            for carry, ci in carries {
+                if carry.iteration == b && (ci >= 64 || !carry_in_place[ci]) {
+                    mutating_carry = true;
+                    break;
+                }
+            }
+            if mutating_carry { continue; }
+            let val, found = bindGet(g, f, b);
+            if !found || tagOf(g, val.ty) != blot_direct_types::Tag.array { continue; }
+            if findCheckedArray(f, w(g, val, 0), w(g, val, 1)) >= 0 { continue; }
+            let _, _ = ensureCheckedArray(g, f, val);
+        }
+    }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
+    f.checked_elems_len = 0;
     if has_index {
         lget(g, index);
         lget(g, w(g, end, 0));
@@ -2239,6 +2538,12 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let safe, error = ownerSlots(g, value.ty, value.start);
         if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); return neverVal(), error; }
         if !safe { release = false; }
+    }
+    if release {
+        var no_alloc_budget: i64 = 512;
+        if bodyNoAlloc(g, f, m, info.body, no_alloc_budget) {
+            release = false;
+        }
     }
     var unchanged: u32 = 0xffffffff;
     if release && boxed_carries { unchanged = local32(g, f); }
@@ -2747,6 +3052,7 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
+    f.checked_elems_len = 0;
     lget(g, index);
     lget(g, count);
     op(g, OP_i32_ge_u);
@@ -2768,7 +3074,7 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         lset(g, cur);
         item = valOf1(g, blot_direct_types::u32_, cur);
     } else {
-        let loaded, lerr = readElement(g, f, source_val, index, id, g.units[f.unit - 1].typeOf(info.source));
+        let loaded, lerr = readElement(g, f, source_val, index, id, g.units[f.unit - 1].typeOf(info.source), false);
         if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
         item = loaded;
     }
