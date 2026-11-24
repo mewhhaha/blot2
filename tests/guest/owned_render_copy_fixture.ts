@@ -7,11 +7,14 @@ const frame = `  let settings: Array render.Settings = #[render.defaults]
   let fields: ResizeArray render.Field = #[]
   let lights: ResizeArray render.PointLight = #[]
   let poses: ResizeArray render.Pose = #[]
+  let bone_matrices: ResizeArray render.BoneMatrix = #[]
+  let morph_weights: ResizeArray render.MorphWeight = #[]
+  let motions: ResizeArray render.Motion = #[]
   let emitters: ResizeArray render.Emitter = #[]
   let extensions: ResizeArray render.Extension = #[]
   let updates: ResizeArray render.Instance = #[]
   let removed: ResizeArray U32 = #[]
-  let access = $render.FrameAccess {settings, draws, solids, decals, sprites, insets, fields, lights, poses, emitters, extensions, updates, removed}
+  let access = $render.FrameAccess {settings, draws, solids, decals, sprites, insets, fields, lights, poses, bone_matrices, morph_weights, motions, emitters, extensions, updates, removed}
 `;
 const packing =
   `const pack = func (vectors: ResizeArray math.Vec4) -> (draws: ResizeArray render.Draw) -> (prefix: &[math.Vec4]) => return do:

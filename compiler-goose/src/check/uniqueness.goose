@@ -37,6 +37,7 @@ import check.typed_staging;
 import std;
 import dictionary;
 import check.core;
+import check.effects;
 import check.types;
 import check.storage_types;
 import check.storage_ops;
@@ -68,6 +69,7 @@ struct Entry { field: u32, fact: Fact }
 // A record's facts by field symbol, sorted; unlisted fields have `default_`.
 struct Record { default_: Fact, start: u32, len: u32 }
 struct Change { binding: u32, old: Fact }
+struct LoopOuter { binding: u32, fact: Fact }
 // `holder` borrows from `source`: all of it, or the field `field`. `fact`
 // is what the local, or that field, was before; `kills` how often the
 // local had been taken for good by then.
@@ -79,8 +81,9 @@ struct Captured { binding: u32, fact: Fact, stamp: u32 }
 // storage it may alias. `exits` means control only leaves the function.
 struct Value { fact: Fact = 0, origin: u32 = 0, exits: bool = false }
 // A loop being visited: its carries' continue facts, then their break facts,
-// at `start` in the shared `carried` stack.
-struct LoopFrame { id: u32, start: i64, len: i64 }
+// at `start` in the shared `carried` stack, plus the trail mark and outer-
+// weakening slice for non-carried locals aliased inside the loop body.
+struct LoopFrame { id: u32, start: i64, len: i64, trail_mark: i64 = 0, outer_start: i64 = 0 }
 struct BlockFrame { id: u32, fact: Fact = 0xffffffff, broken: bool = false }
 struct Rejection { node: u32, span: blot_check_core::Span, code: blot_check_core::Code = blot_check_core::Code.aliased_update }
 // A nominal being expanded, with whether each type argument holds storage.
@@ -228,7 +231,10 @@ root struct Analyzer {
     non_freezable: bool[>..] = [],
     ever_owned: bool[>..] = [],
     borrows_owned: bool[>..] = [],
+    loop_outer: LoopOuter[>..<] = [],
     length_mut_params: u32[>..] = [],
+    non_escaping_params: u32[>..] = [],
+    non_escaping_arity: u8[>..] = [],
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
     lends_cache: u8[>..] = [],
     calls_cache: u8[>..] = [],
@@ -267,6 +273,8 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.ever_owned.resize(binding_count, false);
         analyzer.borrows_owned.resize(binding_count, false);
         analyzer.length_mut_params.resize(binding_count, 0);
+        analyzer.non_escaping_params.resize(binding_count, 0);
+        analyzer.non_escaping_arity.resize(binding_count, 0);
         for binding, index in module.bindings {
             if index != 0 { analyzer.binding_index.insert(((binding.target.unit as u64) << 32) | binding.target.binding, index as! u32); }
         }
@@ -285,6 +293,10 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
                 let sp = module.fieldSpelling(method.member);
                 if sp.present && (sp.value == "push" || sp.value == "truncate" || sp.value == "pop") {
                     analyzer.length_mut_params[index] |= 1;
+                }
+                if sp.present && (sp.value == "push" || sp.value == "truncate") {
+                    analyzer.non_escaping_params[index] |= 1;
+                    analyzer.non_escaping_arity[index] = 2;
                 }
             }
         }
@@ -330,6 +342,31 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     analyzer.owns_cache.resize(type_count, 0);
     analyzer.lends_cache.resize(type_count, 0);
     analyzer.calls_cache.resize(type_count, 0);
+    // Least-fixed-point scan of local function parameters that are only used
+    // in place (e.g. @storage.push/.push/.truncate, proven non-escaping local
+    // callees, or pure downward closures returning scalars/Unit) and never
+    // escape into the return value or any alias.
+    for _ in 0..8 {
+        var changed = false;
+        for body, bi in module.bodies {
+            if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
+            let params = module.bodyParameters(body);
+            if params.len == 0 || params.len > 32 { continue; }
+            analyzer.non_escaping_arity[body.binding] = params.len as! u8;
+            var next_mask: u32 = 0;
+            for p, pos in params {
+                if pos >= 32 { break; }
+                if paramNonEscaping(analyzer, module, body.root, p.binding, 0) {
+                    next_mask |= (1 as u32) << (pos as! u32);
+                }
+            }
+            if next_mask != analyzer.non_escaping_params[body.binding] {
+                analyzer.non_escaping_params[body.binding] = next_mask;
+                changed = true;
+            }
+        }
+        if !changed { break; }
+    }
     for merge in module.merges {
         if merge.then_binding < analyzer.flows.len { analyzer.flows[merge.then_binding] = true; }
         if merge.else_binding < analyzer.flows.len { analyzer.flows[merge.else_binding] = true; }
@@ -404,7 +441,6 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.touch[binding] += 1;
     if !self_.dry && fact != none && fact != spent && fact != top { self_.ever_owned[binding] = true; }
 }
-// A spent version stays spent: nothing gives its storage back.
 fn kill(self_: Analyzer&, binding: u32) {
     if !local(self_, binding) { return; }
     // Something else holds it now, for good. If the name borrowed its
@@ -924,7 +960,7 @@ fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: con
 }
 recursive fn partsInMemo(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
     if !tracking(memo, depth) { return partsInNode(self_, m, ty, want, variables, arguments, depth, memo); }
-    let key = WalkNode { ty, memo.scope, depth };
+    let key = WalkNode { ty, (memo.scope << 2) | (want as u64), depth };
     let cached .= memo.answers.get(key);
     if cached { let answer: bool = cached; return answer; }
     let answer = partsInNode(self_, m, ty, want, variables, arguments, depth, memo);
@@ -934,7 +970,8 @@ recursive fn partsInMemo(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
 recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
     if ty == blot_check_types::unit || ty == blot_check_types::boolean || ty == blot_check_types::u32_type || ty == blot_check_types::f32_type || ty == blot_check_types::never { return false; }
     let want_owned = want == 0;
-    if depth > 64 || ty >= m.types.nodes.len { return want == 1; }
+    let conservative = want == 1;
+    if depth > 64 || ty >= m.types.nodes.len { return conservative; }
     for variable, at in variables { if variable == ty { return arguments[at]; } }
     let n = m.types.node(ty);
     if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
@@ -957,7 +994,7 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
         }
         return false;
     }
-    if n.tag != blot_check_types::Tag.nominal { return want == 1; }
+    if n.tag != blot_check_types::Tag.nominal { return conservative; }
     // A GrowArray and a ResizeArray own their storage as an array does. A
     // view, a reference and a link borrow.
     if blot_check_storage_types::isLengthLiteral(n.a, n.b) { return false; }
@@ -975,22 +1012,22 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
         for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
         return false;
     }
-    if n.a == 0xffffffff { return want == 1; }
+    if n.a == 0xffffffff { return conservative; }
     let index, found = nominalIndex(self_, m, n.a, n.b);
-    if !found { return want == 1; }
+    if !found { return conservative; }
     let nominal = m.nominal(index);
-    if nominal.is_opaque { return want == 1; }
+    if nominal.is_opaque { return conservative; }
     let own = m.types.list(nominal.variables);
     let given = m.types.nominalArguments(n);
-    if own.len != given.len || own.len > 16 { return want == 1; }
+    if own.len != given.len || own.len > 16 { return conservative; }
     var bits: bool[16] = [false; 16];
     for argument, at in given { bits[at] = partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo); }
     // A recursive occurrence at the same arguments adds nothing its first
     // expansion lacks; one at other arguments might.
     for outer in self_.expanding {
         if outer.unit == n.a && outer.decl == n.b {
-            if outer.len != own.len { return want == 1; }
-            for at in 0..own.len { if outer.arguments[at] != bits[at] { return want == 1; } }
+            if outer.len != own.len { return conservative; }
+            for at in 0..own.len { if outer.arguments[at] != bits[at] { return conservative; } }
             return false;
         }
     }
@@ -1576,7 +1613,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false, brief, lends_to); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
     if tag == blot_check_core::Tag.call && m.call(id).own != 0 {
-        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, lends_to, brief);
+        var call_binding: u32 = 0;
+        let target = m.call(id).target;
+        let found_cb .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+        if found_cb { let idx: u32 = found_cb; call_binding = idx; }
+        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, call_binding, lends_to, brief);
         // Every return of the callee gave a value nothing else holds.
         return Value { fact: deep, exits: exits, .. };
     }
@@ -1626,7 +1667,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 let held = visit(self_, m, callee);
                 exits = held.exits;
             }
-            exits = ownArguments(self_, m, arguments[..count], mask, n.ty, lends_to, brief) || exits;
+            let call_binding = calleeBinding(self_, m, callee);
+            exits = ownArguments(self_, m, arguments[..count], mask, n.ty, call_binding, lends_to, brief) || exits;
             // Every return of the callee gave a value nothing else holds.
             return Value { fact: deep, exits: exits, .. };
         }
@@ -1758,6 +1800,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             // of the result that borrows (a function, when arguments are
             // still missing) may hold them, so then they are shared.
             let holder = lends(self_, m, n.ty) || (unresolved && openType(m, n.ty, 0)) || (returns_lent && (holds(self_, m, n.ty) || openType(m, n.ty, 0)));
+            var non_esc: u32 = 0;
+            if !unresolved && binding != 0 && binding < self_.non_escaping_params.len && self_.non_escaping_arity[binding] != 0 && count >= (self_.non_escaping_arity[binding] as i64) {
+                non_esc = self_.non_escaping_params[binding];
+            }
             var exits = false;
             let base = self_.captured.len;
             let ends = self_.briefs.len;
@@ -1770,7 +1816,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
                         checkLengthMutation(self_, m, child, id);
                     }
-                    let value = lend(self_, m, child, holder, lends_to, brief);
+                    let arg_holder = holder && !(pos < 32 && ((non_esc >> (pos as! u32)) & 1) != 0);
+                    let value = lend(self_, m, child, arg_holder, lends_to, brief);
                     exits = exits || value.exits;
                 }
             } else {
@@ -1797,7 +1844,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 var callee = Value { .. };
                 if head_tag == blot_check_core::Tag.project {
                     if (lmut & 1) != 0 { checkLengthMutation(self_, m, m.node(head).a, id); }
-                    callee = lend(self_, m, m.node(head).a, holder, lends_to, brief);
+                    let recv_holder = holder && (non_esc & 1) == 0;
+                    callee = lend(self_, m, m.node(head).a, recv_holder, lends_to, brief);
                 } else {
                     callee = lend(self_, m, head, holder, lends_to, brief);
                 }
@@ -1810,7 +1858,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     if lmut != 0 && pos < 32 && ((lmut >> (pos as! u32)) & 1) != 0 {
                         checkLengthMutation(self_, m, arg_node, id);
                     }
-                    let value = lend(self_, m, arg_node, holder, lends_to, brief);
+                    let arg_holder = holder && !(pos < 32 && ((non_esc >> (pos as! u32)) & 1) != 0);
+                    let value = lend(self_, m, arg_node, arg_holder, lends_to, brief);
                     exits = exits || value.exits;
                 }
             }
@@ -1966,6 +2015,164 @@ recursive fn scanLengthMutParams(self_: const Analyzer&, m: const Module&, id: u
     }
     return mask;
 }
+fn isExactParamRef(m: const Module&, node: u32, param_binding: u32) -> bool {
+    if node == 0 || node >= m.nodes.len || m.node(node).tag != blot_check_core::Tag.reference { return false; }
+    let target = m.reference(node);
+    return (target.unit == 0 || target.unit == m.unit) && target.binding == param_binding;
+}
+fn arrowsHaveNoConcreteEffects(m: const Module&, fn_ty: u32, count: i64) -> bool {
+    var cur = fn_ty;
+    for _ in 0..count {
+        var steps: i64 = 0;
+        while steps < 8 && cur != 0 && cur < m.types.nodes.len && m.types.node(cur).tag == blot_check_types::Tag.usage {
+            cur = m.types.node(cur).a;
+            steps += 1;
+        }
+        if cur == 0 || cur >= m.types.nodes.len { return false; }
+        let tn = m.types.node(cur);
+        if tn.tag != blot_check_types::Tag.function { return false; }
+        if tn.c != 0 {
+            if tn.c >= m.types.effects.rows.len { return false; }
+            if m.types.effects.rows[tn.c].labels.len != 0 { return false; }
+        }
+        cur = tn.b;
+    }
+    return true;
+}
+fn callDownwardSafe(self_: Analyzer&, m: const Module&, call_id: u32, callee: u32, fn_ty: u32, recv: u32, args: const u32[:]) -> bool {
+    if callee == 0 || callee >= m.bindings.len { return false; }
+    let ckind = m.bindings[callee].kind;
+    if ckind != blot_reuse_principal_interface::Kind.global && ckind != blot_reuse_principal_interface::Kind.external { return false; }
+    let res_ty = m.typeOf(call_id);
+    if holds(self_, m, res_ty) || lends(self_, m, res_ty) || openType(m, res_ty, 0) { return false; }
+    var arity = args.len;
+    if recv != 0 { arity += 1; }
+    if !arrowsHaveNoConcreteEffects(m, fn_ty, arity) { return false; }
+    if recv != 0 && m.node(recv).tag != blot_check_core::Tag.closure {
+        let rty = m.typeOf(recv);
+        if owns(self_, m, rty) || calls(self_, m, rty) || openType(m, rty, 0) { return false; }
+    }
+    for arg in args {
+        if m.node(arg).tag == blot_check_core::Tag.closure { continue; }
+        let aty = m.typeOf(arg);
+        if owns(self_, m, aty) || calls(self_, m, aty) || openType(m, aty, 0) { return false; }
+    }
+    return true;
+}
+// Whether every occurrence of `param_binding` inside `id` is strictly in-place
+// (growable push/truncate/length, a proven non-escaping callee parameter, or a
+// pure downward closure whose call returns a scalar/Unit with no mutable or
+// callable sibling arguments). Any bare reference or escaping capture returns false.
+recursive fn paramNonEscaping(self_: Analyzer&, m: const Module&, id: u32, param_binding: u32, depth: i64) -> bool {
+    if id == 0 || id >= m.nodes.len { return true; }
+    if depth > 64 { return false; }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.reference {
+        return !isExactParamRef(m, id, param_binding);
+    }
+    if n.tag == blot_check_core::Tag.fork_ || n.tag == blot_check_core::Tag.operation_value || n.tag == blot_check_core::Tag.handle || n.tag == blot_check_core::Tag.with_handle { return false; }
+    if n.tag == blot_check_core::Tag.closure {
+        for cap in m.closureCaptures(id) {
+            if cap == param_binding { return false; }
+        }
+        return true;
+    }
+    if n.tag == blot_check_core::Tag.storage {
+        let op, err = blot_check_storage_ops::opFromCode(n.c);
+        let safe_first = err == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || op == blot_check_storage_ops::Op.truncate || op == blot_check_storage_ops::Op.length);
+        for child, at in m.children(id) {
+            if at == 0 && safe_first && isExactParamRef(m, child, param_binding) { continue; }
+            if !paramNonEscaping(self_, m, child, param_binding, depth + 1) { return false; }
+        }
+        return true;
+    }
+    if n.tag == blot_check_core::Tag.call {
+        let target = m.call(id).target;
+        let args = m.call(id).arguments;
+        var callee: u32 = 0;
+        var mask: u32 = 0;
+        let found .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+        if found {
+            let idx: u32 = found;
+            callee = idx;
+            if idx < self_.non_escaping_params.len && self_.non_escaping_arity[idx] != 0 && args.len >= (self_.non_escaping_arity[idx] as i64) {
+                mask = self_.non_escaping_params[idx];
+            }
+        }
+        var has_closure = false;
+        for arg in args { if m.node(arg).tag == blot_check_core::Tag.closure { has_closure = true; break; } }
+        let downward = has_closure && callDownwardSafe(self_, m, id, callee, m.call(id).callee_type, 0, args);
+        for arg, pos in args {
+            if pos < 32 && ((mask >> (pos as! u32)) & 1) != 0 && isExactParamRef(m, arg, param_binding) { continue; }
+            if downward && m.node(arg).tag == blot_check_core::Tag.closure {
+                if !paramNonEscaping(self_, m, m.closure(arg).body, param_binding, depth + 1) { return false; }
+                continue;
+            }
+            if !paramNonEscaping(self_, m, arg, param_binding, depth + 1) { return false; }
+        }
+        return true;
+    }
+    if n.tag == blot_check_core::Tag.apply {
+        var rev: u32[32] = [0; 32];
+        var given: i64 = 0;
+        var head = id;
+        while given < 32 && m.node(head).tag == blot_check_core::Tag.apply {
+            rev[given] = m.node(head).b;
+            given += 1;
+            head = m.node(head).a;
+        }
+        if m.node(head).tag == blot_check_core::Tag.apply { return false; }
+        var args: u32[32] = [0; 32];
+        for at in 0..given { args[at] = rev[given - 1 - at]; }
+        let head_tag = m.node(head).tag;
+        let callee = calleeBinding(self_, m, head);
+        var recv: u32 = 0;
+        var offset: i64 = 0;
+        if head_tag == blot_check_core::Tag.project {
+            recv = m.node(head).a;
+            offset = 1;
+        }
+        var mask: u32 = 0;
+        if callee != 0 && callee < self_.non_escaping_params.len && self_.non_escaping_arity[callee] != 0 && (given + offset) >= (self_.non_escaping_arity[callee] as i64) {
+            mask = self_.non_escaping_params[callee];
+        }
+        if head_tag == blot_check_core::Tag.project {
+            if !((mask & 1) != 0 && isExactParamRef(m, recv, param_binding)) {
+                if !paramNonEscaping(self_, m, recv, param_binding, depth + 1) { return false; }
+            }
+        } else {
+            if !paramNonEscaping(self_, m, head, param_binding, depth + 1) { return false; }
+        }
+        var has_closure = false;
+        for at in 0..given { if m.node(args[at]).tag == blot_check_core::Tag.closure { has_closure = true; break; } }
+        let downward = has_closure && head_tag != blot_check_core::Tag.operation_value && callDownwardSafe(self_, m, id, callee, calleeType(m, head), recv, args[..given]);
+        for at in 0..given {
+            let arg = args[at];
+            let pos = offset + at;
+            if pos < 32 && ((mask >> (pos as! u32)) & 1) != 0 && isExactParamRef(m, arg, param_binding) { continue; }
+            if downward && m.node(arg).tag == blot_check_core::Tag.closure {
+                if !paramNonEscaping(self_, m, m.closure(arg).body, param_binding, depth + 1) { return false; }
+                continue;
+            }
+            if !paramNonEscaping(self_, m, arg, param_binding, depth + 1) { return false; }
+        }
+        return true;
+    }
+    let start = self_.children.len;
+    appendChildren(self_.children, m, id);
+    let end = self_.children.len;
+    var at = start;
+    while at < end {
+        let child = self_.children[at];
+        at += 1;
+        if !paramNonEscaping(self_, m, child, param_binding, depth + 1) {
+            self_.children.resize(start);
+            return false;
+        }
+    }
+    self_.children.resize(start);
+    return true;
+}
 fn placesOverlap(a: Place, b: Place) -> bool {
     if a.binding != b.binding { return false; }
     var shared = a.len;
@@ -1988,19 +2195,7 @@ fn containerOwned(self_: Analyzer&, m: const Module&, node: u32) -> bool {
 fn ownedInPlace(self_: Analyzer&, m: const Module&, node: u32, origin: u32) -> bool {
     let target, found = place(self_, m, node);
     if !found || !local(self_, target.binding) || origin != target.binding { return false; }
-    let in_same_fn = self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1];
-    if !in_same_fn {
-        if self_.in_fork != 0 { return false; }
-        for entry in self_.captured {
-            if entry.binding != target.binding { continue; }
-            var part = entry.fact;
-            if target.len != 0 { part = partFact(self_, entry.fact, target.fields[..target.len]); }
-            if unique(part) || (part >= first_record && part < spent && ownedAs(self_, m, part, m.typeOf(node), 0)) {
-                return true;
-            }
-        }
-        return false;
-    }
+    if self_.function_roots.len == 0 || self_.home[target.binding] != self_.function_roots[self_.function_roots.len - 1] { return false; }
     for held in self_.argument_places {
         if placesOverlap(held, target) { return false; }
     }
@@ -2040,9 +2235,9 @@ fn checkLengthMutation(self_: Analyzer&, m: const Module&, container_node: u32, 
                 return;
             }
         }
-        if !containerOwned(self_, m, container_node) {
-            reject(self_, m, site_id, blot_check_core::Code.aliased_update);
-        }
+    }
+    if tracked && !containerOwned(self_, m, container_node) {
+        reject(self_, m, site_id, blot_check_core::Code.aliased_update);
     }
 }
 // The identity the backend's dispatch gives a receiver of type `ty`.
@@ -2561,9 +2756,13 @@ fn typeTaking(m: const Module&, ty: u32) -> u64 {
 // The other arguments are lent as in any call. While the call's arguments
 // are read, what a lent one names counts as shared, so the same value
 // cannot be lent and given in one call; it has its fact back after the call.
-recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u32[:], mask: u32, result: u32, lends_to: u32, brief: bool) -> bool {
+recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u32[:], mask: u32, result: u32, callee_binding: u32, lends_to: u32, brief: bool) -> bool {
     var exits = false;
     let holder = lends(self_, m, result);
+    var non_esc: u32 = 0;
+    if callee_binding != 0 && callee_binding < self_.non_escaping_params.len && self_.non_escaping_arity[callee_binding] != 0 && arguments.len >= (self_.non_escaping_arity[callee_binding] as i64) {
+        non_esc = self_.non_escaping_params[callee_binding];
+    }
     let base = self_.captured.len;
     let ends = self_.briefs.len;
     let held_base = self_.arguments_held.len;
@@ -2589,9 +2788,10 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
         let lent = position >= 32 || (mask >> (position as! u32)) & 1 == 0 || (!holds(self_, m, ty) && !open);
         if lent != (phase == 0) { continue; }
         if lent {
-            let value = lend(self_, m, child, holder, lends_to, brief);
+            let arg_holder = holder && !(position < 32 && ((non_esc >> (position as! u32)) & 1) != 0);
+            let value = lend(self_, m, child, arg_holder, lends_to, brief);
             exits = exits || value.exits;
-            if !holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
+            if !arg_holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
                 var path = Place { .. };
                 let target, found = source(self_, m, child);
                 if found && target.binding == value.origin { path = target; }
@@ -2604,7 +2804,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
                 guard_len[guards] = path.len;
                 for at in 0..path.len { guard_fields[guards * 8 + at] = path.fields[at]; }
                 guards += 1;
-            } else if !holder {
+            } else if !arg_holder {
                 escape(self_, value);
             }
             continue;
@@ -3145,21 +3345,6 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             if global_ref { return Value { fact: none, exits: container.exits, .. }; }
             if !ownedInPlace(self_, m, children[0], container.origin) {
-                // Freezing a whole local owner born in this function whose uniqueness
-                // was conservatively dropped by an earlier borrowing call (with no
-                // active lexical borrow loan) stays safe as a non-unique read-only
-                // Array (cannot be updated with `:=` or returned as owned).
-                let target, found = place(self_, m, children[0]);
-                var local_born_unloaned = found && target.len == 0 && local(self_, target.binding) && container.origin == target.binding && self_.ever_owned[target.binding] && self_.function_roots.len != 0 && self_.home[target.binding] == self_.function_roots[self_.function_roots.len - 1] && wholeLoan(self_, target.binding) < 0;
-                if local_born_unloaned {
-                    for held in self_.argument_places {
-                        if placesOverlap(held, target) { local_born_unloaned = false; break; }
-                    }
-                }
-                if local_born_unloaned {
-                    escape(self_, container);
-                    return Value { fact: none, exits: container.exits, .. };
-                }
                 reject(self_, m, id, blot_check_core::Code.aliased_update);
                 escape(self_, container);
                 return Value { exits: container.exits, .. };
@@ -3170,7 +3355,16 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 kill(self_, container.origin);
                 return Value { fact: fact, exits: container.exits, .. };
             }
-            return Value { origin: container.origin, exits: container.exits, .. };
+            // Freezing permanently sets frozen_flag on the runtime slot: never
+            // treat a non-moved freeze as a reversible borrow loan.
+            let target, found = place(self_, m, children[0]);
+            if found && target.len != 0 && local(self_, target.binding) {
+                let frozen_rec = replace(self_, self_.facts[target.binding], target.fields[..target.len], none);
+                set(self_, target.binding, frozen_rec);
+            } else {
+                kill(self_, container.origin);
+            }
+            return Value { fact: none, exits: container.exits, .. };
         }
     }
     // References, views and links alias the storage they name.
@@ -3357,13 +3551,22 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     for at in 0..count * 2 { self_.loop_facts.push(none); }
     if self_.probing != 0 {
         // Inside a probe: one optimistic pass approximates the carries.
-        loopPass(self_, m, id, carries, assumed);
+        let outer_start = self_.loop_outer.len;
+        loopPass(self_, m, id, carries, assumed, outer_start);
+        self_.loop_outer.resize(outer_start);
     } else {
         self_.probing += 1;
         let mark = self_.trail.len;
-        loopPass(self_, m, id, carries, assumed);
+        let probe_outer_start = self_.loop_outer.len;
+        loopPass(self_, m, id, carries, assumed, probe_outer_start);
         undo(self_, mark);
         self_.probing -= 1;
+        for at in probe_outer_start..self_.loop_outer.len {
+            let entry = self_.loop_outer[at];
+            let met = meet(self_, self_.facts[entry.binding], entry.fact);
+            if !same(self_, met, self_.facts[entry.binding]) { set(self_, entry.binding, met); }
+        }
+        self_.loop_outer.resize(probe_outer_start);
         for at in 0..count {
             let met = meet(self_, self_.loop_facts[incoming + at], self_.loop_facts[result + at]);
             self_.loop_facts[assumed + at] = met;
@@ -3372,7 +3575,8 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         loop {
             let checked = self_.trail.len;
             let rejected = self_.rejections.len;
-            loopPass(self_, m, id, carries, assumed);
+            let check_outer_start = self_.loop_outer.len;
+            loopPass(self_, m, id, carries, assumed, check_outer_start);
             var stable = true;
             for at in 0..count {
                 let fact = self_.loop_facts[assumed + at];
@@ -3383,10 +3587,38 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 if attempt >= 2 && stored != spent { stored = none; }
                 self_.loop_facts[assumed + at] = stored;
             }
-            if stable { break; }
-            // A probe that underestimated the carries: check again.
+            var outer_changed = false;
+            for at in check_outer_start..self_.loop_outer.len {
+                let entry = self_.loop_outer[at];
+                // Compare against pre-pass state recorded in the trail, if any.
+                var before = self_.facts[entry.binding];
+                for t in checked..self_.trail.len {
+                    if self_.trail[t].binding == entry.binding {
+                        before = self_.trail[t].old;
+                        break;
+                    }
+                }
+                let met = meet(self_, before, entry.fact);
+                if !same(self_, met, before) {
+                    outer_changed = true;
+                    stable = false;
+                }
+            }
+            if stable {
+                self_.loop_outer.resize(check_outer_start);
+                break;
+            }
+            // A probe that underestimated the carries or outer weakenings: check again.
             undo(self_, checked);
             self_.rejections.resize(rejected);
+            if outer_changed {
+                for at in check_outer_start..self_.loop_outer.len {
+                    let entry = self_.loop_outer[at];
+                    let met = meet(self_, self_.facts[entry.binding], entry.fact);
+                    if !same(self_, met, self_.facts[entry.binding]) { set(self_, entry.binding, met); }
+                }
+            }
+            self_.loop_outer.resize(check_outer_start);
             attempt += 1;
         }
     }
@@ -3413,15 +3645,38 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     endBriefs(self_, ends);
     return Value { exits: exits || (info.kind == blot_check_core::LoopKind.forever && !info.can_exit), .. };
 }
+// Records every outer (non-loop-born) local whose fact changed since
+// `frame.trail_mark` onto `self_.loop_outer[frame.outer_start..]`.
+fn recordLoopOuter(self_: Analyzer&, frame: LoopFrame) {
+    for t in frame.trail_mark..self_.trail.len {
+        let b = self_.trail[t].binding;
+        if !local(self_, b) || self_.born[b] == frame.id { continue; }
+        let cur_fact = self_.facts[b];
+        var found = false;
+        for k in frame.outer_start..self_.loop_outer.len {
+            if self_.loop_outer[k].binding == b {
+                let met = meet(self_, self_.loop_outer[k].fact, cur_fact);
+                self_.loop_outer[k].fact = met;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self_.loop_outer.push(LoopOuter { binding: b, fact: cur_fact });
+        }
+    }
+}
 // One pass over a loop body with its carries at `loop_facts[assumed..]`. The
 // run after it receives the facts reaching the next iteration, and the run
 // after that those carried out by breaks.
-recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64) {
+recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64, outer_start: i64) {
     let info = m.loopInfo(id);
     let count = carries.len;
     let start = self_.carried.len;
     for at in 0..count * 2 { self_.carried.push(top); }
-    self_.loops.push(LoopFrame { id: id, start: start, len: count });
+    let trail_mark = self_.trail.len;
+    let frame = LoopFrame { id: id, start: start, len: count, trail_mark: trail_mark, outer_start: outer_start };
+    self_.loops.push(frame);
     // Defined inside the frame: each iteration has its own version.
     for carry, at in carries {
         define(self_, carry.iteration, self_.loop_facts[assumed + at]);
@@ -3431,6 +3686,7 @@ recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: cons
         }
     }
     let body = visit(self_, m, info.body);
+    if !body.exits { recordLoopOuter(self_, frame); }
     self_.loops.resize(self_.loops.len - 1);
     for carry, at in carries {
         var backedge: Fact = none;
@@ -3475,6 +3731,7 @@ recursive fn breakNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let met = meet(self_, self_.carried[slot], fact);
         self_.carried[slot] = met;
     }
+    if found && n.op == blot_check_core::Op.continue_ { recordLoopOuter(self_, frame); }
     return Value { .. };
 }
 

@@ -295,9 +295,15 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         let captured = m.closureCaptures(key.id);
         for binding, at in captured {
             let cap_val = g.s.vals[captures.start + at];
-            bindPut(g, f, binding, cap_val);
-            if tagOf(g, cap_val.ty) == blot_direct_types::Tag.cell {
-                blot_support_zigmap::put(g.s.map_pool, f.with_cells, binding, g.types.node(cap_val.ty).a);
+            let init_node, is_poly = g.s.polymorphic.get(polyCaptureKey(id, binding));
+            if is_poly {
+                let rerr = restorePolyCapture(g, f, id, binding, init_node, cap_val, 0);
+                if rerr != blot_direct_types::Error.none { return rerr; }
+            } else {
+                bindPut(g, f, binding, cap_val);
+                if tagOf(g, cap_val.ty) == blot_direct_types::Tag.cell {
+                    blot_support_zigmap::put(g.s.map_pool, f.with_cells, binding, g.types.node(cap_val.ty).a);
+                }
             }
         }
         bindPut(g, f, info.parameter.binding, g.s.vals[inputs.start]);

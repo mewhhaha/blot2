@@ -255,7 +255,7 @@ entry const bad = func (n: U32) => return do:
     name: "freeze",
     expected: (n) => n,
     mode: "GrowArray",
-    body: `  let fixed = @storage.freeze values
+    body: `  let fixed = @storage.freeze (@storage.copy values)
   if @u32.lt 0 n:
     values := walk own values (@u32.sub n 1)`,
   },

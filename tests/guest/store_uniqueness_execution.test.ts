@@ -585,6 +585,22 @@ func step_inplace (p: own #[U32]) -> (v: U32): #[U32] =>
     @simd.store p i (v, v + 1, v + 2, v + 3)
   return p
 
+type ViewAccess is data = $ViewAccess { view: &[U32], count: U32 }
+
+func push_check (checks: GrowArray U32) -> (v: U32): Unit =>
+  @storage.push checks v
+  return ()
+
+func with_val (v: U32) -> (consume: U32 -> Unit): Unit =>
+  return consume (v + 1)
+
+func inspect_access (access: own ViewAccess) -> (v: U32) -> (checks: GrowArray U32): ViewAccess =>
+  push_check checks v
+  with_val v (func n =>
+    @storage.push checks n
+    return ())
+  return access
+
 entry func ok (v: U32): U32 =>
   let a = @simd.store #[0, 0, 0, 0] 0 (v, 1, 2, 3)
   let b = step_move a (v + 10)
@@ -593,10 +609,15 @@ entry func ok (v: U32): U32 =>
   let _ = @simd.store rec.lanes 0 (1, 2, 3, 4)
   let g: GrowArray U32 = #[v]
   let frozen = @storage.freeze g
-  return c[0] + c[3] + rec.lanes[2] + frozen[0]
+  let seed: #[U32] = #[10, 20]
+  let access = $ViewAccess { view: @storage.view seed 0 2, count: 0 }
+  let checks: GrowArray U32 = #[]
+  access := inspect_access access v checks
+  let frozen_checks = @storage.freeze checks
+  return c[0] + c[3] + rec.lanes[2] + frozen[0] + access.view[0] + frozen_checks[0] + frozen_checks[1]
 `,
     (guest) => {
-      equal(guest.call("ok", 5), 25 + 28 + 3 + 5);
+      equal(guest.call("ok", 5), 25 + 28 + 3 + 5 + 10 + 5 + 6);
     },
   );
 
@@ -693,6 +714,167 @@ entry func bad (): U32 =>
 entry func bad (): U32 =>
   let items: GrowArray U32 = #[1]
   return sneak items`,
+    ],
+    // Council regression laws (Opus 5.5 + Neon):
+    [
+      "@simd.store in loop aliased by later keep := xs",
+      `entry func bad (): U32 =>
+  let xs = #[0, 0, 0, 0]
+  let keep = #[0, 0, 0, 0]
+  let seen = 0
+  for i in 0..2:
+    let _ = @simd.store xs 0 (@u32.add i 10, 0, 0, 0)
+    seen := keep[0]
+    keep := xs
+  return seen`,
+    ],
+    [
+      "@simd.store in loop aliased by later r := &xs",
+      `entry func bad (): U32 =>
+  let xs = #[0, 0, 0, 0]
+  let seed = #[0, 0, 0, 0]
+  let r = &seed
+  let seen = 0
+  for i in 0..2:
+    let _ = @simd.store xs 0 (@u32.add i 10, 0, 0, 0)
+    seen := (@storage.load r)[0]
+    r := &xs
+  return seen`,
+    ],
+    [
+      "@simd.store in loop aliased before continue",
+      `entry func bad (): U32 =>
+  let xs = #[0, 0, 0, 0]
+  let keep = #[0, 0, 0, 0]
+  let seen = 0
+  for i in 0..2:
+    let _ = @simd.store xs 0 (@u32.add i 10, 0, 0, 0)
+    seen := keep[0]
+    if i == 0:
+      keep := xs
+      continue
+  return seen`,
+    ],
+    [
+      "@simd.store inside closure overlapping sibling borrowed argument",
+      `func call_with (a: #[U32]) -> (f: U32 -> U32): U32 =>
+  let before = a[0]
+  let _ = f 0
+  let after = a[0]
+  return before * 100 + after
+entry func bad (): U32 =>
+  let xs = #[1, 2, 3, 4]
+  return call_with xs (func i => return do:
+    let _ = @simd.store xs 0 (9, 0, 0, 0)
+    break 0)`,
+    ],
+    [
+      "@simd.store inside closure cannot smuggle shared nested lane past capture restore",
+      `func run (f: U32 -> U32): U32 => return f 0
+entry func bad (): U32 =>
+  let grid = #[#[1], #[2], #[3], #[4]]
+  let shared = #[9]
+  let _ = run (func i => return do:
+    let _ = @simd.store grid 0 (shared, #[5], #[6], #[7])
+    break 0)
+  grid[0][0] := 99
+  return shared[0]`,
+    ],
+    [
+      "@storage.freeze inside closure cannot leave outer GrowArray pushable",
+      `func run (f: U32 -> U32): U32 => return f 0
+entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1, 2]
+  let _ = run (func i => return do:
+    let f = @storage.freeze xs
+    break f[0])
+  @storage.push xs 3
+  return xs[2]`,
+    ],
+    [
+      "wildcard let _ = @storage.freeze permanently consumes growth capability",
+      `entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1, 2]
+  let _ = @storage.freeze xs
+  @storage.push xs 3
+  return xs[2]`,
+    ],
+    [
+      "@storage.freeze does not restore growth capability after frozen alias last read",
+      `entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1, 2]
+  let frozen = @storage.freeze xs
+  let y = frozen[0]
+  @storage.push xs 3
+  return y + xs[2]`,
+    ],
+    [
+      "@storage.freeze on record field permanently consumes that field's growth capability",
+      `entry func bad (): U32 =>
+  let g: GrowArray U32 = #[1, 2]
+  let rec = { g: g, tag: 0 }
+  let _ = @storage.freeze rec.g
+  @storage.push rec.g 3
+  return rec.g[2]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray escaped into a record",
+      `entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let box = { g: xs }
+  let f = @storage.freeze xs
+  @storage.push box.g 2
+  return f[0]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray escaped through a two-hop alias",
+      `entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let a = xs
+  let b = a
+  let f = @storage.freeze xs
+  @storage.push b 2
+  return f[0]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray escaped through a call returning &GrowArray",
+      `func hide_ref (xs: GrowArray U32): &(GrowArray U32) => return &xs
+entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let r = hide_ref xs
+  let f = @storage.freeze xs
+  @storage.push (@storage.load r) 2
+  return f[0]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray escaped through a call returning a closure",
+      `func hide_cb (xs: GrowArray U32): Unit -> Unit => return func () => @storage.push xs 2
+entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let cb = hide_cb xs
+  let f = @storage.freeze xs
+  cb ()
+  return f[0]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray captured by partially applied push method",
+      `entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let push_xs = xs.push
+  let f = @storage.freeze xs
+  push_xs 2
+  return f[0]`,
+    ],
+    [
+      "@storage.freeze rejects GrowArray returned through a polymorphic reader helper",
+      `func id_poly x => return x
+entry func bad (): U32 =>
+  let xs: GrowArray U32 = #[1]
+  let alias: GrowArray U32 = #[0]
+  alias := id_poly xs
+  let f = @storage.freeze xs
+  @storage.push alias 2
+  return f[0]`,
     ],
   ];
   for (const [name, source] of rejected) {

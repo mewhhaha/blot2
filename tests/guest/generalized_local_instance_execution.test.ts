@@ -513,3 +513,43 @@ entry const main = func (x: U32) => return do:
   break r + boxed.length - 2
 `);
 });
+
+Deno.test("nested polymorphic local captures instantiate cleanly at every inner closure layout (Council Neon #1)", async () => {
+  await compileAndRun(`
+entry func zero_captures (seed: U32): U32 =>
+  let k = func x => return x
+  let a = k 1
+  let g = func (n: U32) =>
+    let h = func y => return k y
+    let u = h 4
+    let f = h 2.5
+    return u + n + (if f > 2.0 then 10 else 0)
+  return a + g seed
+
+entry func one_capture (offset: U32): U32 =>
+  let k = func x => return (x, offset)
+  let (a, _) = k 1
+  let g = func (n: U32) =>
+    let h = func y => return k y
+    let (u, o1) = h 3
+    let (f, o2) = h 2.5
+    return u + o1 + o2 + n + (if f > 2.0 then 100 else 0)
+  return a + g 5
+
+entry func multi_and_chained_captures (c1: U32): U32 =>
+  let c2 = c1 + 2
+  let k1 = func x => return (x, c1, c2)
+  let k2 = func y => return k1 y
+  let (a, _, _) = k2 2
+  let g = func (n: U32) =>
+    let h = func z => return k2 z
+    let (u, x1, x2) = h 7
+    let (f, y1, y2) = h 1.5
+    return u + x1 + x2 + y1 + y2 + n + (if f > 1.0 then 1000 else 0)
+  return a + g 3
+`, (guest) => {
+    equal(guest.call("zero_captures", 5), 1 + 4 + 5 + 10);
+    equal(guest.call("one_capture", 10), 1 + 3 + 10 + 10 + 5 + 100);
+    equal(guest.call("multi_and_chained_captures", 4), 2 + 7 + 4 + 6 + 4 + 6 + 3 + 1000);
+  });
+});

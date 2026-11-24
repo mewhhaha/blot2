@@ -1230,6 +1230,15 @@ recursive fn closureNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, ty, f.instance_id, f.evidence_context };
     var instance, present = g.find(key);
     if !present {
+        let next_instance = g.s.instances.len as u32;
+        for binding in capture_ids {
+            let _, bound_here = bindGet(g, f, binding);
+            if bound_here { continue; }
+            let init_node, is_poly = g.s.polymorphic.get(polyKey(f, binding));
+            if is_poly && m.node(init_node).tag == blot_check_core::Tag.closure {
+                recordPolyCapture(g, f, next_instance, binding, init_node, 0);
+            }
+        }
         let capture_types = Tys { g.s.tys.len as u32, captures.len };
         for at in 0..(captures.len as i64) { g.s.tys.push(g.s.vals[captures.start + at].ty); }
         let parameters = g.saveTys([arrow.a]);
@@ -1259,6 +1268,15 @@ recursive fn inferredClosure(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, marker, f.instance_id, f.evidence_context };
     var instance, present = g.find(key);
     if !present {
+        let next_instance = g.s.instances.len as u32;
+        for binding in capture_ids {
+            let _, bound_here = bindGet(g, f, binding);
+            if bound_here { continue; }
+            let init_node, is_poly = g.s.polymorphic.get(polyKey(f, binding));
+            if is_poly && m.node(init_node).tag == blot_check_core::Tag.closure {
+                recordPolyCapture(g, f, next_instance, binding, init_node, 0);
+            }
+        }
         let capture_types = Tys { g.s.tys.len as u32, captures.len };
         for at in 0..(captures.len as i64) { g.s.tys.push(g.s.vals[captures.start + at].ty); }
         let parameters = g.saveTys([parameter]);
