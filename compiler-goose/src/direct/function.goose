@@ -82,6 +82,11 @@ struct CheckedElem {
     address: u32 = 0,
     depth: u32 = 0
 }
+struct CheckedBound {
+    index: u32 = 0,
+    bound: u32 = 0,
+    depth: u32 = 0
+}
 struct ConstTag { local: u32 = 0, tag: u32 = 0, depth: u32 = 0 }
 struct CheckedRange {
     slot: u32 = 0xffffffff,
@@ -115,6 +120,8 @@ struct Fn {
     checked_views_len: i64 = 0,
     checked_elems: CheckedElem[8] = [CheckedElem {}; 8],
     checked_elems_len: i64 = 0,
+    checked_bounds: CheckedBound[8] = [CheckedBound {}; 8],
+    checked_bounds_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -122,6 +129,11 @@ struct Fn {
     scratch_cut: ScratchCut = ScratchCut {},
     // Uniquely-owned boxed bindings eligible for FBIP same-shape reuse.
     unique_boxed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    // Uniquely-owned local/own-param array/container bindings eligible for in-place spark reuse.
+    unique_owned: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    owned_uses_computed: bool = false,
+    owned_uses: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    owned_flows: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     reuse_node: u32 = 0,
     reuse_block: u32 = 0,
     reuse_ty: Ty = 0,
@@ -169,6 +181,9 @@ struct Fn {
     // Direct child Core node eligible to elide F32 NaN canonicalization because
     // its immediate parent is itself a canonicalizing consumer.
     elide_f32_nan_node: u32 = 0,
+    // Lazily computed per-body map of local F32 bindings whose NaN payload may be observed.
+    nan_elide_computed: bool = false,
+    nan_observed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
 }
 
 fn op(g: Generator&, value: u8) { g.s.code.push(value); }
@@ -216,6 +231,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_elems_len > 0 && f.checked_elems[f.checked_elems_len - 1].depth > max_depth {
         f.checked_elems_len -= 1;
     }
+    while f.checked_bounds_len > 0 && f.checked_bounds[f.checked_bounds_len - 1].depth > max_depth {
+        f.checked_bounds_len -= 1;
+    }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth > max_depth {
         f.const_tags_len -= 1;
     }
@@ -232,6 +250,9 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.checked_elems_len > 0 && f.checked_elems[f.checked_elems_len - 1].depth >= depth {
         f.checked_elems_len -= 1;
+    }
+    while f.checked_bounds_len > 0 && f.checked_bounds[f.checked_bounds_len - 1].depth >= depth {
+        f.checked_bounds_len -= 1;
     }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth >= depth {
         f.const_tags_len -= 1;
@@ -311,10 +332,26 @@ fn recordCheckedElem(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, 
     f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, depth: f.depth };
     f.checked_elems_len += 1;
 }
+fn findCheckedBound(f: const Fn&, index: u32, bound: u32) -> i64 {
+    var i = f.checked_bounds_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_bounds[i];
+        if entry.index == index && entry.bound == bound { return i; }
+    }
+    return -1;
+}
+fn recordCheckedBound(f: Fn&, index: u32, bound: u32) {
+    if findCheckedBound(f, index, bound) >= 0 { return; }
+    if f.checked_bounds_len >= 8 { return; }
+    f.checked_bounds[f.checked_bounds_len] = CheckedBound { index: index, bound: bound, depth: f.depth };
+    f.checked_bounds_len += 1;
+}
 fn invalidateCheckedContainers(f: Fn&) {
     f.checked_arrays_len = 0;
     f.checked_views_len = 0;
     f.checked_elems_len = 0;
+    f.checked_bounds_len = 0;
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
@@ -393,6 +430,25 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             }
         }
         f.checked_elems_len = out;
+    }
+    if f.checked_bounds_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_bounds_len {
+            let entry = f.checked_bounds[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.index || local_id == entry.bound {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_bounds[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_bounds_len = out;
     }
     if f.const_tags_len != 0 {
         var out: i64 = 0;
@@ -706,7 +762,11 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             // Nothing reads an unused local, so its open types are Unit.
             if uses(g, f, n.a) == 0 { defaultUnused(g, f, m.binding(n.a).ty, 0); }
         }
+        if n.c < 2 && m.types.node(m.binding(n.a).ty).tag == blot_check_types::Tag.floating32 && bindingIgnoresNanPayload(g, f, n.a) {
+            f.elide_f32_nan_node = n.b;
+        }
         let evaluated, eval_err = stmt(g, f, n.b);
+        f.elide_f32_nan_node = 0;
         if eval_err != blot_direct_types::Error.none { return evaluated, eval_err; }
         value = evaluated;
     }
@@ -727,6 +787,9 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         refine(g, f, m.binding(n.a).ty, value.ty);
         if isFreshBoxedRhs(g, f, m, n.b, value.ty) {
             blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, 1);
+        }
+        if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, 1);
         }
     }
     bindPut(g, f, n.a, value);
@@ -753,6 +816,418 @@ fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
 fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
     return present && val != 0;
+}
+fn isUniqueOwned(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+    let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_owned, binding);
+    return present && val != 0;
+}
+fn incOwnedMap(g: Generator&, map: blot_support_zigmap::Map&, b: u32) {
+    if b == 0 { return; }
+    let prev, ok = blot_support_zigmap::get(g.s.map_pool, map, b);
+    var next: u32 = 1;
+    if ok { next = prev + 1; }
+    blot_support_zigmap::put(g.s.map_pool, map, b, next);
+}
+recursive fn scanOwnedUses(
+    g: Generator&,
+    f: Fn&,
+    m: const Module&,
+    id: u32,
+    length_only: bool,
+    overflow: bool&,
+    left: i64&,
+) {
+    if id == 0 || overflow { return; }
+    if left <= 0 { overflow = true; return; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, panic => {},
+        reference => {
+            if !length_only {
+                let b = localRef(m, id);
+                if b != 0 { incOwnedMap(g, f.owned_uses, b); }
+            }
+        },
+        suite, block_, product, record, array => {
+            for child in m.children(id) { scanOwnedUses(g, f, m, child, false, overflow, left); }
+        },
+        bind => {
+            if n.c >= 2 {
+                incOwnedMap(g, f.owned_flows, n.a);
+                incOwnedMap(g, f.owned_flows, n.c - 2);
+            }
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+        },
+        pattern_bind => {
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+            scanOwnedUses(g, f, m, n.c, false, overflow, left);
+        },
+        if_stmt, if_value => {
+            scanOwnedUses(g, f, m, n.a, false, overflow, left);
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+            scanOwnedUses(g, f, m, n.c, false, overflow, left);
+            for merge in m.branchMerges(id) {
+                incOwnedMap(g, f.owned_flows, merge.then_binding);
+                incOwnedMap(g, f.owned_flows, merge.else_binding);
+            }
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { scanOwnedUses(g, f, m, inp, false, overflow, left); }
+            for arm in m.matchArms(id) {
+                scanOwnedUses(g, f, m, arm.guard_, false, overflow, left);
+                scanOwnedUses(g, f, m, arm.body, false, overflow, left);
+            }
+            for merge in m.branchMerges(id) {
+                incOwnedMap(g, f.owned_flows, merge.then_binding);
+                incOwnedMap(g, f.owned_flows, merge.else_binding);
+            }
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            scanOwnedUses(g, f, m, linfo.first, false, overflow, left);
+            scanOwnedUses(g, f, m, linfo.end, false, overflow, left);
+            for carry in m.loopCarries(id) {
+                incOwnedMap(g, f.owned_flows, carry.incoming);
+                incOwnedMap(g, f.owned_flows, carry.backedge);
+            }
+            scanOwnedUses(g, f, m, linfo.body, false, overflow, left);
+        },
+        break_ => {
+            for child in m.breakValues(id) { scanOwnedUses(g, f, m, child, false, overflow, left); }
+        },
+        return_, result_associated, fork_ => {
+            scanOwnedUses(g, f, m, n.a, false, overflow, left);
+        },
+        project => {
+            let proj = m.projection(n.b);
+            var is_len = false;
+            if m.projectionVariants(n.b).len == 0 && proj.field != 0 {
+                let sp = m.fieldSpelling(proj.field);
+                is_len = sp.present && sp.value == "length";
+            }
+            scanOwnedUses(g, f, m, n.a, is_len, overflow, left);
+        },
+        construct => {
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+        },
+        array_op => {
+            let ch = m.children(id);
+            let is_len = m.arrayOperation(id) == blot_backend_collection_ops::Op.length && ch.len == 1;
+            for child in ch { scanOwnedUses(g, f, m, child, is_len, overflow, left); }
+        },
+        storage => {
+            let ch = m.children(id);
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            let is_len = ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.length && ch.len == 1;
+            for child in ch { scanOwnedUses(g, f, m, child, is_len, overflow, left); }
+        },
+        update => {
+            let change = m.updateInfo(id);
+            scanOwnedUses(g, f, m, change.root, false, overflow, left);
+            scanOwnedUses(g, f, m, change.value, false, overflow, left);
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index {
+                    scanOwnedUses(g, f, m, sel.index, false, overflow, left);
+                }
+            }
+        },
+        scalar, logical, apply => {
+            scanOwnedUses(g, f, m, n.a, false, overflow, left);
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+        },
+        associated => {
+            var is_len = false;
+            if n.b == 0 && n.c != 0 {
+                let sp = m.fieldSpelling(n.c);
+                is_len = sp.present && sp.value == "length";
+            }
+            scanOwnedUses(g, f, m, n.a, is_len, overflow, left);
+            scanOwnedUses(g, f, m, n.b, false, overflow, left);
+        },
+        call => {
+            for arg in m.call(id).arguments { scanOwnedUses(g, f, m, arg, false, overflow, left); }
+        },
+        closure => {
+            for cap in m.closureCaptures(id) { incOwnedMap(g, f.owned_flows, cap); }
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            scanOwnedUses(g, f, m, sinfo.source, false, overflow, left);
+            scanOwnedUses(g, f, m, sinfo.end, false, overflow, left);
+            scanOwnedUses(g, f, m, sinfo.body, false, overflow, left);
+        },
+        _ => { overflow = true; },
+    }
+}
+fn ensureOwnedUses(g: Generator&, f: Fn&) -> bool {
+    if !f.owned_uses_computed {
+        f.owned_uses_computed = true;
+        let m .= g.units[f.unit - 1];
+        let body .= enclosingBody(g, f);
+        if !body {
+            blot_support_zigmap::put(g.s.map_pool, f.owned_flows, 0xffffffff, 1);
+            return false;
+        }
+        var overflow = false;
+        var budget: i64 = 2048;
+        scanOwnedUses(g, f, m, body.root, false, overflow, budget);
+        if overflow {
+            blot_support_zigmap::put(g.s.map_pool, f.owned_flows, 0xffffffff, 1);
+            return false;
+        }
+    }
+    let bad, present = blot_support_zigmap::get(g.s.map_pool, f.owned_flows, 0xffffffff);
+    return !(present && bad != 0);
+}
+fn ownedRefUses(g: Generator&, f: Fn&, binding: u32) -> u32 {
+    if !ensureOwnedUses(g, f) { return 0xffffffff; }
+    let v, ok = blot_support_zigmap::get(g.s.map_pool, f.owned_uses, binding);
+    if ok { return v; }
+    return 0;
+}
+fn ownedFlowUses(g: Generator&, f: Fn&, binding: u32) -> u32 {
+    if !ensureOwnedUses(g, f) { return 0xffffffff; }
+    let v, ok = blot_support_zigmap::get(g.s.map_pool, f.owned_flows, binding);
+    if ok { return v; }
+    return 0;
+}
+fn ownedTotalUses(g: Generator&, f: Fn&, binding: u32) -> u32 {
+    let r = ownedRefUses(g, f, binding);
+    let fl = ownedFlowUses(g, f, binding);
+    if r == 0xffffffff || fl == 0xffffffff { return 0xffffffff; }
+    return r + fl;
+}
+fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
+    if id == 0 || tagOf(g, ty) != blot_direct_types::Tag.array { return false; }
+    let n = m.node(id);
+    match n.tag {
+        array, spark => { return true; },
+        array_op => {
+            match m.arrayOperation(id) {
+                fill, generate, slice, append, prepend, concat, flatten => { return true; },
+                _ => { return false; },
+            }
+        },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            return ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.copy;
+        },
+        reference => {
+            let local_id = localRef(m, id);
+            return local_id != 0 && isUniqueOwned(g, f, local_id) && ownedTotalUses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
+        },
+        _ => { return false; },
+    }
+}
+
+// Conservative per-body analysis: marks every local F32 binding whose NaN
+// payload could ever be observed (outside canonical F32 consumers or pure
+// register propagation). Bindings NOT marked observed can elide per-op NaN
+// canonicalization while preserving bit-exact 0x7fc00000 semantics everywhere.
+fn markNanObserved(g: Generator&, f: Fn&, b: u32) {
+    if b != 0 { blot_support_zigmap::put(g.s.map_pool, f.nan_observed, b, 1); }
+}
+fn isNanObserved(g: const Generator&, f: const Fn&, b: u32) -> bool {
+    let v, ok = blot_support_zigmap::get(g.s.map_pool, f.nan_observed, b);
+    return ok && v != 0;
+}
+fn addNanEdge(src_arr: u32[256]&, dst_arr: u32[256]&, len: i64&, src: u32, dst: u32) -> bool {
+    if src == 0 || dst == 0 || src == dst { return true; }
+    if len >= 256 { return false; }
+    src_arr[len] = src;
+    dst_arr[len] = dst;
+    len += 1;
+    return true;
+}
+recursive fn scanNanUses(
+    g: Generator&,
+    f: Fn&,
+    m: const Module&,
+    id: u32,
+    safe_ref: bool,
+    edge_src: u32[256]&,
+    edge_dst: u32[256]&,
+    edge_len: i64&,
+    overflow: bool&,
+    left: i64&,
+) {
+    if id == 0 || overflow { return; }
+    if left <= 0 { overflow = true; return; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, panic => {},
+        reference => {
+            let b = localRef(m, id);
+            if b != 0 && !safe_ref { markNanObserved(g, f, b); }
+        },
+        scalar => {
+            let consumer = isCanonicalF32Consumer(n.op) && m.types.node(m.typeOf(n.a)).tag == blot_check_types::Tag.floating32;
+            scanNanUses(g, f, m, n.a, consumer, edge_src, edge_dst, edge_len, overflow, left);
+            if n.b != 0 { scanNanUses(g, f, m, n.b, consumer, edge_src, edge_dst, edge_len, overflow, left); }
+        },
+        bind => {
+            if n.c >= 2 {
+                markNanObserved(g, f, n.a);
+                scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+            } else {
+                let rhs_b = localRef(m, n.b);
+                if rhs_b != 0 {
+                    if !addNanEdge(edge_src, edge_dst, edge_len, rhs_b, n.a) { overflow = true; }
+                } else {
+                    scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+                }
+            }
+        },
+        suite, block_ => {
+            for child in m.children(id) {
+                scanNanUses(g, f, m, child, false, edge_src, edge_dst, edge_len, overflow, left);
+            }
+        },
+        if_stmt, if_value => {
+            scanNanUses(g, f, m, n.a, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, n.c, false, edge_src, edge_dst, edge_len, overflow, left);
+            for merge in m.branchMerges(id) {
+                if !addNanEdge(edge_src, edge_dst, edge_len, merge.then_binding, merge.result) { overflow = true; }
+                if !addNanEdge(edge_src, edge_dst, edge_len, merge.else_binding, merge.result) { overflow = true; }
+            }
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                scanNanUses(g, f, m, inp, false, edge_src, edge_dst, edge_len, overflow, left);
+            }
+            for arm in m.matchArms(id) {
+                scanNanUses(g, f, m, arm.guard_, false, edge_src, edge_dst, edge_len, overflow, left);
+                scanNanUses(g, f, m, arm.body, false, edge_src, edge_dst, edge_len, overflow, left);
+            }
+            for merge in m.branchMerges(id) {
+                if !addNanEdge(edge_src, edge_dst, edge_len, merge.then_binding, merge.result) { overflow = true; }
+                if !addNanEdge(edge_src, edge_dst, edge_len, merge.else_binding, merge.result) { overflow = true; }
+            }
+        },
+        pattern_bind => {
+            scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, n.c, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            scanNanUses(g, f, m, linfo.first, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, linfo.end, false, edge_src, edge_dst, edge_len, overflow, left);
+            for carry in m.loopCarries(id) {
+                if !addNanEdge(edge_src, edge_dst, edge_len, carry.incoming, carry.iteration) { overflow = true; }
+                if !addNanEdge(edge_src, edge_dst, edge_len, carry.incoming, carry.outgoing) { overflow = true; }
+                if !addNanEdge(edge_src, edge_dst, edge_len, carry.backedge, carry.iteration) { overflow = true; }
+                if !addNanEdge(edge_src, edge_dst, edge_len, carry.iteration, carry.outgoing) { overflow = true; }
+            }
+            scanNanUses(g, f, m, linfo.body, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        break_ => {
+            let vals = m.breakValues(id);
+            if n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.loop_ {
+                let carries = m.loopCarries(n.a);
+                for child, ci in vals {
+                    let vb = localRef(m, child);
+                    if vb != 0 && ci < carries.len {
+                        if n.op == blot_check_core::Op.continue_ {
+                            if !addNanEdge(edge_src, edge_dst, edge_len, vb, carries[ci].iteration) { overflow = true; }
+                        } else {
+                            if !addNanEdge(edge_src, edge_dst, edge_len, vb, carries[ci].outgoing) { overflow = true; }
+                        }
+                    } else {
+                        scanNanUses(g, f, m, child, false, edge_src, edge_dst, edge_len, overflow, left);
+                    }
+                }
+            } else {
+                for child in vals {
+                    scanNanUses(g, f, m, child, false, edge_src, edge_dst, edge_len, overflow, left);
+                }
+            }
+        },
+        return_, project, result_associated, fork_ => {
+            scanNanUses(g, f, m, n.a, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        construct => {
+            scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        product, record, array, array_op, storage => {
+            for child in m.children(id) {
+                scanNanUses(g, f, m, child, false, edge_src, edge_dst, edge_len, overflow, left);
+            }
+        },
+        update => {
+            let change = m.updateInfo(id);
+            scanNanUses(g, f, m, change.root, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, change.value, false, edge_src, edge_dst, edge_len, overflow, left);
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index {
+                    scanNanUses(g, f, m, sel.index, false, edge_src, edge_dst, edge_len, overflow, left);
+                }
+            }
+        },
+        associated, logical, apply => {
+            scanNanUses(g, f, m, n.a, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, n.b, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        call => {
+            for arg in m.call(id).arguments {
+                scanNanUses(g, f, m, arg, false, edge_src, edge_dst, edge_len, overflow, left);
+            }
+        },
+        closure => {
+            for cap in m.closureCaptures(id) { markNanObserved(g, f, cap); }
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            scanNanUses(g, f, m, sinfo.source, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, sinfo.end, false, edge_src, edge_dst, edge_len, overflow, left);
+            scanNanUses(g, f, m, sinfo.body, false, edge_src, edge_dst, edge_len, overflow, left);
+        },
+        _ => { overflow = true; },
+    }
+}
+fn bindingIgnoresNanPayload(g: Generator&, f: Fn&, binding: u32) -> bool {
+    if binding == 0 || bindingCaptured(g, f, binding) { return false; }
+    if !f.nan_elide_computed {
+        f.nan_elide_computed = true;
+        let m .= g.units[f.unit - 1];
+        let body .= enclosingBody(g, f);
+        if !body {
+            // Sentinel 0xffffffff marks analysis unavailable (conservative).
+            markNanObserved(g, f, 0xffffffff);
+            return false;
+        }
+        var edge_src: u32[256] = [0; 256];
+        var edge_dst: u32[256] = [0; 256];
+        var edge_len: i64 = 0;
+        var overflow = false;
+        var budget: i64 = 2048;
+        scanNanUses(g, f, m, body.root, false, edge_src, edge_dst, edge_len, overflow, budget);
+        if overflow {
+            markNanObserved(g, f, 0xffffffff);
+            return false;
+        }
+        // Backwards fixed-point propagation along binding/carry/merge edges.
+        var changed = true;
+        var pass: i64 = 0;
+        while changed && pass < 16 {
+            changed = false;
+            pass += 1;
+            for ei in 0..edge_len {
+                if isNanObserved(g, f, edge_dst[ei]) && !isNanObserved(g, f, edge_src[ei]) {
+                    markNanObserved(g, f, edge_src[ei]);
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            markNanObserved(g, f, 0xffffffff);
+            return false;
+        }
+    }
+    if isNanObserved(g, f, 0xffffffff) { return false; }
+    return !isNanObserved(g, f, binding);
 }
 fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
     if id == 0 { return false; }

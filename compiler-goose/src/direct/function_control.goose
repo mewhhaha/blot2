@@ -21,7 +21,8 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let opened = open(g, f, OP_if_);
     let then, error = stmt(g, f, n.b);
     if error != blot_direct_types::Error.none { return then, error; }
-    var falls = then.ty != blot_direct_types::never;
+    let then_diverges = then.ty == blot_direct_types::never;
+    var falls = !then_diverges;
     if falls {
         if n.tag == blot_check_core::Tag.if_value {
             let delivered = deliver(g, f, then, result, id);
@@ -37,10 +38,12 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     popCheckedArraysAt(f, opened);
     op(g, OP_else_);
+    var else_falls = false;
     if n.c != 0 {
         let otherwise, error = stmt(g, f, n.c);
         if error != blot_direct_types::Error.none { return otherwise, error; }
         if otherwise.ty != blot_direct_types::never {
+            else_falls = true;
             falls = true;
             if n.tag == blot_check_core::Tag.if_value {
                 let delivered = deliver(g, f, otherwise, result, id);
@@ -55,6 +58,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
     } else {
+        else_falls = true;
         falls = true;
         for merge, at in merges {
             let value, present = bindGet(g, f, merge.else_binding);
@@ -65,10 +69,64 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     close(g, f);
+    if n.tag == blot_check_core::Tag.if_stmt && n.c == 0 && then_diverges {
+        let pm .= g.units[f.unit - 1];
+        let cond = pm.node(n.a);
+        if cond.tag == blot_check_core::Tag.scalar &&
+            (cond.op == blot_check_core::Op.greater_equal || cond.op == blot_check_core::Op.less_equal) {
+            var idx_node = cond.a;
+            var bnd_node = cond.b;
+            if cond.op == blot_check_core::Op.less_equal {
+                idx_node = cond.b;
+                bnd_node = cond.a;
+            }
+            let idx_b = localRef(pm, idx_node);
+            let bnd_b = localRef(pm, bnd_node);
+            if idx_b != 0 && bnd_b != 0 {
+                let _, ic = withCellType(g, f, idx_b);
+                let _, bc = withCellType(g, f, bnd_b);
+                if !ic && !bc {
+                    let iv, iok = bindGet(g, f, idx_b);
+                    let bv, bok = bindGet(g, f, bnd_b);
+                    if iok && bok && tagOf(g, iv.ty) == blot_direct_types::Tag.u32_ && tagOf(g, bv.ty) == blot_direct_types::Tag.u32_ {
+                        recordCheckedBound(f, w(g, iv, 0), w(g, bv, 0));
+                    }
+                }
+            }
+        }
+    }
     for merge, at in merges {
         let slot = g.s.slots[merged + at];
         if slot.present {
             bindPut(g, f, merge.result, slot.value);
+            if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array {
+                var ca_t: i64 = -1;
+                var ca_e: i64 = -1;
+                if !then_diverges {
+                    let tv, tok = bindGet(g, f, merge.then_binding);
+                    if tok && tagOf(g, tv.ty) == blot_direct_types::Tag.array {
+                        ca_t = findCheckedArray(f, w(g, tv, 0), w(g, tv, 1));
+                    }
+                }
+                if else_falls {
+                    let ev, eok = bindGet(g, f, merge.else_binding);
+                    if eok && tagOf(g, ev.ty) == blot_direct_types::Tag.array {
+                        ca_e = findCheckedArray(f, w(g, ev, 0), w(g, ev, 1));
+                    }
+                }
+                var ca_match: i64 = -1;
+                if !then_diverges && else_falls {
+                    if ca_t >= 0 && ca_t == ca_e { ca_match = ca_t; }
+                } else if !then_diverges {
+                    ca_match = ca_t;
+                } else if else_falls {
+                    ca_match = ca_e;
+                }
+                if ca_match >= 0 {
+                    let ca = f.checked_arrays[ca_match];
+                    recordCheckedArray(f, w(g, slot.value, 0), w(g, slot.value, 1), ca.base, ca.length);
+                }
+            }
             let ct1, ok1 = withCellType(g, f, merge.then_binding);
             if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
             else {
@@ -2267,6 +2325,141 @@ fn localKindForScalar(g: const Generator&, ty: Ty) -> ValType {
     return VT_i32;
 }
 
+fn isFreshOwnedArrayNode(m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        array, spark => { return true; },
+        array_op => {
+            match m.arrayOperation(id) {
+                fill, generate, slice, append, prepend, concat, flatten => { return true; },
+                _ => { return false; },
+            }
+        },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            return ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.copy;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn scanCarryUniqueOwned(
+    g: Generator&,
+    f: Fn&,
+    m: const Module&,
+    loop_id: u32,
+    carry_at: i64,
+    id: u32,
+    owned: u32[64]&,
+    owned_len: i64&,
+    budget: i64&,
+) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for child in m.children(id) {
+                if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, child, owned, owned_len, budget) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.b, owned, owned_len, budget) { return false; }
+            if n.c < 2 && (isFreshOwnedArrayNode(m, n.b) || exprPreservesHandle(m, n.b, owned, owned_len, 0)) {
+                addBindingSet(owned, owned_len, n.a);
+            }
+            return true;
+        },
+        if_stmt, if_value => {
+            if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.a, owned, owned_len, budget) ||
+                !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.b, owned, owned_len, budget) ||
+                !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.c, owned, owned_len, budget) { return false; }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(owned, owned_len, merge.then_binding) && inBindingSet(owned, owned_len, merge.else_binding) {
+                    addBindingSet(owned, owned_len, merge.result);
+                }
+            }
+            return true;
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, inp, owned, owned_len, budget) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, arm.guard_, owned, owned_len, budget) ||
+                    !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, arm.body, owned, owned_len, budget) { return false; }
+            }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(owned, owned_len, merge.then_binding) && inBindingSet(owned, owned_len, merge.else_binding) {
+                    addBindingSet(owned, owned_len, merge.result);
+                }
+            }
+            return true;
+        },
+        loop_ => {
+            let ninfo = m.loopInfo(id);
+            if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, ninfo.first, owned, owned_len, budget) ||
+                !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, ninfo.end, owned, owned_len, budget) { return false; }
+            for nc, nc_at in m.loopCarries(id) {
+                if inBindingSet(owned, owned_len, nc.incoming) &&
+                    ownedRefUses(g, f, nc.incoming) == 0 && ownedFlowUses(g, f, nc.incoming) == 1 &&
+                    carryBackedgeIsUniqueOwned(g, f, m, id, nc_at, nc.iteration, nc.backedge, budget) {
+                    addBindingSet(owned, owned_len, nc.outgoing);
+                }
+            }
+            return scanCarryUniqueOwned(g, f, m, loop_id, carry_at, ninfo.body, owned, owned_len, budget);
+        },
+        break_ => {
+            let vals = m.breakValues(id);
+            for child in vals {
+                if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, child, owned, owned_len, budget) { return false; }
+            }
+            if n.a == loop_id && n.op == blot_check_core::Op.continue_ {
+                if carry_at >= vals.len { return false; }
+                let cv = vals[carry_at];
+                if !isFreshOwnedArrayNode(m, cv) {
+                    let cb = localRef(m, cv);
+                    if cb == 0 || !inBindingSet(owned, owned_len, cb) || ownedTotalUses(g, f, cb) != 1 { return false; }
+                }
+            }
+            return true;
+        },
+        pattern_bind => {
+            return scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.b, owned, owned_len, budget) &&
+                scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.c, owned, owned_len, budget);
+        },
+        constant, reference, panic, spark, array, array_op, storage, scalar, associated, logical, call, apply, update, product, record, construct, project, return_, result_associated, closure => {
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn carryBackedgeIsUniqueOwned(
+    g: Generator&,
+    f: Fn&,
+    m: const Module&,
+    loop_id: u32,
+    carry_at: i64,
+    iter_binding: u32,
+    backedge_binding: u32,
+    budget: i64&,
+) -> bool {
+    var owned: u32[64] = [0; 64];
+    var owned_len: i64 = 0;
+    addBindingSet(owned, owned_len, iter_binding);
+    if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, m.loopInfo(loop_id).body, owned, owned_len, budget) { return false; }
+    if backedge_binding == 0 { return true; }
+    if !inBindingSet(owned, owned_len, backedge_binding) { return false; }
+    if backedge_binding != iter_binding {
+        if ownedRefUses(g, f, backedge_binding) != 0 || ownedFlowUses(g, f, backedge_binding) != 1 || bindingCaptured(g, f, backedge_binding) {
+            return false;
+        }
+    }
+    return true;
+}
+
 recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let info = g.units[f.unit - 1].loopInfo(id);
     if info.kind == blot_check_core::LoopKind.array && info.carries.len == 0 {
@@ -2331,6 +2524,16 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming) {
                 blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
             }
+            if tagOf(g, g.s.vals[iteration.start + at].ty) == blot_direct_types::Tag.array &&
+                isUniqueOwned(g, f, carry.incoming) &&
+                ownedRefUses(g, f, carry.incoming) == 0 &&
+                ownedFlowUses(g, f, carry.incoming) == 1 &&
+                !bindingCaptured(g, f, carry.incoming) {
+                var ubudget: i64 = 256;
+                if carryBackedgeIsUniqueOwned(g, f, m, id, at, carry.iteration, carry.backedge, ubudget) {
+                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.iteration, 1);
+                }
+            }
         }
     }
     if info.kind == blot_check_core::LoopKind.array {
@@ -2390,13 +2593,32 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 range.is_view = true;
                 range.view_start = vstart;
             } else {
-                let limit, error = fresh(g, f, blot_direct_types::u32_, id);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
-                end = limit;
                 let last, error = expr(g, f, info.end);
                 if error != blot_direct_types::Error.none { return last, error; }
-                let copied = copy(g, f, last, end, id);
-                if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                let end_ref = localRef(m, info.end);
+                var reuse_end = false;
+                if end_ref != 0 {
+                    let _, is_cell = withCellType(g, f, end_ref);
+                    if !is_cell {
+                        reuse_end = true;
+                        for carry in carries {
+                            if carry.incoming == end_ref || carry.iteration == end_ref {
+                                reuse_end = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if reuse_end {
+                    end = last;
+                    range.end_local = w(g, last, 0);
+                } else {
+                    let limit, error = fresh(g, f, blot_direct_types::u32_, id);
+                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    end = limit;
+                    let copied = copy(g, f, last, end, id);
+                    if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                }
             }
             range.length_ty = rangeSizedLength(g, f, info);
         },
@@ -2464,6 +2686,10 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if findCheckedArray(f, w(g, val, 0), w(g, val, 1)) >= 0 { continue; }
             let _, _ = ensureCheckedArray(g, f, val);
         }
+    }
+    if body_no_resize && info.kind == blot_check_core::LoopKind.range {
+        let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
+        if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
     }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
@@ -2964,6 +3190,31 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return neverVal(), g.fail(m, id, "break outside its loop");
 }
 
+recursive fn collectOwnedPatternBindings(m: const Module&, pattern_id: u32, out: u32[32]&, len: i64&) -> bool {
+    if pattern_id == 0 { return true; }
+    let pat = m.pattern(pattern_id);
+    match pat.tag {
+        wildcard => { return true; },
+        bind => {
+            if len >= 32 { return false; }
+            for i in 0..len { if out[i] == pat.a { return false; } }
+            out[len] = pat.a;
+            len += 1;
+            return true;
+        },
+        product => {
+            for child in m.patternChildren(pattern_id) {
+                if !collectOwnedPatternBindings(m, child, out, len) { return false; }
+            }
+            return true;
+        },
+        constructor, record_payload => {
+            return collectOwnedPatternBindings(m, pat.b, out, len);
+        },
+        _ => { return false; },
+    }
+}
+
 recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = g.units[f.unit - 1].node(id);
     let value, error = expr(g, f, n.b);
@@ -2971,6 +3222,17 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if n.c == 0 {
         let tested = test_(g, f, n.a, value, false, 0, id);
         if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+        let pm .= g.units[f.unit - 1];
+        let src_b = localRef(pm, n.b);
+        if src_b != 0 && isUniqueOwned(g, f, src_b) && ownedTotalUses(g, f, src_b) == 1 && !bindingCaptured(g, f, src_b) {
+            var bound_ids: u32[32] = [0; 32];
+            var bound_len: i64 = 0;
+            if collectOwnedPatternBindings(pm, n.a, bound_ids, bound_len) {
+                for bi in 0..bound_len {
+                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, bound_ids[bi], 1);
+                }
+            }
+        }
         return unitVal(), blot_direct_types::Error.none;
     }
     let ok = open(g, f, OP_block);
@@ -2984,6 +3246,168 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     op(g, OP_unreachable_);
     close(g, f);
     return unitVal(), blot_direct_types::Error.none;
+}
+
+recursive fn collectSparkCandReads(m: const Module&, id: u32, iter_b: u32, out: u32[8]&, len: i64&, left: i64&) {
+    if id == 0 || left <= 0 || len >= 8 { return; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        array_op => {
+            let ch = m.children(id);
+            if m.arrayOperation(id) == blot_backend_collection_ops::Op.get && ch.len == 2 {
+                if localRef(m, ch[1]) == iter_b { addHoistCandidate(out, len, localRef(m, ch[0])); }
+            }
+            for child in ch { collectSparkCandReads(m, child, iter_b, out, len, left); }
+        },
+        storage => {
+            let ch = m.children(id);
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 {
+                if localRef(m, ch[1]) == iter_b { addHoistCandidate(out, len, localRef(m, ch[0])); }
+            }
+            for child in ch { collectSparkCandReads(m, child, iter_b, out, len, left); }
+        },
+        suite, block_, product, record, array => {
+            for child in m.children(id) { collectSparkCandReads(m, child, iter_b, out, len, left); }
+        },
+        bind, construct => { collectSparkCandReads(m, n.b, iter_b, out, len, left); },
+        return_, project, result_associated => { collectSparkCandReads(m, n.a, iter_b, out, len, left); },
+        scalar, associated, logical, apply => {
+            collectSparkCandReads(m, n.a, iter_b, out, len, left);
+            collectSparkCandReads(m, n.b, iter_b, out, len, left);
+        },
+        if_value, if_stmt => {
+            collectSparkCandReads(m, n.a, iter_b, out, len, left);
+            collectSparkCandReads(m, n.b, iter_b, out, len, left);
+            collectSparkCandReads(m, n.c, iter_b, out, len, left);
+        },
+        call => {
+            for arg in m.call(id).arguments { collectSparkCandReads(m, arg, iter_b, out, len, left); }
+        },
+        _ => {},
+    }
+}
+recursive fn countSparkCandRefs(
+    m: const Module&,
+    id: u32,
+    cand_b: u32,
+    iter_b: u32,
+    valid: u32&,
+    other: u32&,
+    left: i64&,
+) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, panic => { return true; },
+        reference => {
+            if localRef(m, id) == cand_b { other += 1; }
+            return true;
+        },
+        array_op => {
+            let ch = m.children(id);
+            let op_k = m.arrayOperation(id);
+            if op_k == blot_backend_collection_ops::Op.get && ch.len == 2 &&
+                localRef(m, ch[0]) == cand_b && localRef(m, ch[1]) == iter_b {
+                valid += 1;
+                return true;
+            }
+            if op_k == blot_backend_collection_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
+                return true;
+            }
+            for child in ch { if !countSparkCandRefs(m, child, cand_b, iter_b, valid, other, left) { return false; } }
+            return true;
+        },
+        storage => {
+            let ch = m.children(id);
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 &&
+                localRef(m, ch[0]) == cand_b && localRef(m, ch[1]) == iter_b {
+                valid += 1;
+                return true;
+            }
+            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
+                return true;
+            }
+            for child in ch { if !countSparkCandRefs(m, child, cand_b, iter_b, valid, other, left) { return false; } }
+            return true;
+        },
+        project => {
+            let proj = m.projection(n.b);
+            if m.projectionVariants(n.b).len == 0 && proj.field != 0 {
+                let sp = m.fieldSpelling(proj.field);
+                if sp.present && sp.value == "length" && localRef(m, n.a) == cand_b { return true; }
+            }
+            return countSparkCandRefs(m, n.a, cand_b, iter_b, valid, other, left);
+        },
+        suite, block_, product, record, array => {
+            for child in m.children(id) { if !countSparkCandRefs(m, child, cand_b, iter_b, valid, other, left) { return false; } }
+            return true;
+        },
+        bind, construct => { return countSparkCandRefs(m, n.b, cand_b, iter_b, valid, other, left); },
+        pattern_bind => {
+            return countSparkCandRefs(m, n.b, cand_b, iter_b, valid, other, left) &&
+                countSparkCandRefs(m, n.c, cand_b, iter_b, valid, other, left);
+        },
+        return_, result_associated => { return countSparkCandRefs(m, n.a, cand_b, iter_b, valid, other, left); },
+        scalar, associated, logical, apply => {
+            return countSparkCandRefs(m, n.a, cand_b, iter_b, valid, other, left) &&
+                countSparkCandRefs(m, n.b, cand_b, iter_b, valid, other, left);
+        },
+        if_value, if_stmt => {
+            return countSparkCandRefs(m, n.a, cand_b, iter_b, valid, other, left) &&
+                countSparkCandRefs(m, n.b, cand_b, iter_b, valid, other, left) &&
+                countSparkCandRefs(m, n.c, cand_b, iter_b, valid, other, left);
+        },
+        call => {
+            for arg in m.call(id).arguments {
+                if !countSparkCandRefs(m, arg, cand_b, iter_b, valid, other, left) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+fn findSparkReuseCandidate(g: Generator&, f: Fn&, m: const Module&, info: blot_check_core::SparkInfo, out_ty: Ty, elem_ty: Ty) -> u32 {
+    if g.runtime_().has_fork { return 0; }
+    if tagOf(g, out_ty) != blot_direct_types::Tag.array || !isScalarTag(tagOf(g, elem_ty)) { return 0; }
+    if !info.is_range {
+        let cand_b = localRef(m, info.source);
+        if cand_b == 0 || !isUniqueOwned(g, f, cand_b) || bindingCaptured(g, f, cand_b) { return 0; }
+        if ownedRefUses(g, f, cand_b) != 1 || ownedFlowUses(g, f, cand_b) != 0 { return 0; }
+        let _, is_cell = withCellType(g, f, cand_b);
+        if is_cell { return 0; }
+        let val, ok = bindGet(g, f, cand_b);
+        if ok && val.ty == out_ty { return cand_b; }
+        return 0;
+    }
+    if info.pattern == 0 || m.pattern(info.pattern).tag != blot_check_core::PatternTag.bind { return 0; }
+    let iter_b = m.pattern(info.pattern).a;
+    var cands: u32[8] = [0; 8];
+    var cands_len: i64 = 0;
+    var cbudget: i64 = 256;
+    collectSparkCandReads(m, info.body, iter_b, cands, cands_len, cbudget);
+    for ci in 0..cands_len {
+        let cand_b = cands[ci];
+        if !isUniqueOwned(g, f, cand_b) || bindingCaptured(g, f, cand_b) { continue; }
+        if ownedFlowUses(g, f, cand_b) != 0 { continue; }
+        let total_refs = ownedRefUses(g, f, cand_b);
+        if total_refs == 0 || total_refs == 0xffffffff { continue; }
+        let _, is_cell = withCellType(g, f, cand_b);
+        if is_cell { continue; }
+        let val, ok = bindGet(g, f, cand_b);
+        if !ok || val.ty != out_ty { continue; }
+        var valid: u32 = 0;
+        var other: u32 = 0;
+        var rbudget: i64 = 256;
+        if countSparkCandRefs(m, info.body, cand_b, iter_b, valid, other, rbudget) && other == 0 && valid == total_refs {
+            return cand_b;
+        }
+    }
+    return 0;
 }
 
 // Synchronous ordered data-parallel array map `spark #[body | pat <- source]`.
@@ -3037,8 +3461,47 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         count = len_loc;
     }
 
-    let handle, base, alloc_err = createUninit(g, f, out_ty, count, id);
-    if alloc_err != blot_direct_types::Error.none { return handle, alloc_err; }
+    let reuse_cand = findSparkReuseCandidate(g, f, m, info, out_ty, elem_ty);
+    var handle = neverVal();
+    var base: u32 = 0;
+    if reuse_cand != 0 && !info.is_range {
+        let src_base, _ = ensureCheckedArray(g, f, source_val);
+        handle = source_val;
+        base = src_base;
+    } else if reuse_cand != 0 && info.is_range {
+        let cand_val, _ = bindGet(g, f, reuse_cand);
+        let cand_base, cand_len = ensureCheckedArray(g, f, cand_val);
+        let made_handle, herr = fresh(g, f, out_ty, id);
+        if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+        let made_base = local32(g, f);
+        lget(g, start_local);
+        op(g, OP_i32_eqz);
+        lget(g, count);
+        lget(g, cand_len);
+        op(g, OP_i32_eq);
+        op(g, OP_i32_and);
+        let reuse_if = open(g, f, OP_if_);
+        let cp1_err = copy(g, f, cand_val, made_handle, id);
+        if cp1_err != blot_direct_types::Error.none { return neverVal(), cp1_err; }
+        lget(g, cand_base);
+        lset(g, made_base);
+        popCheckedArraysAt(f, reuse_if);
+        op(g, OP_else_);
+        let alloc_handle, alloc_base, aerr = createUninit(g, f, out_ty, count, id);
+        if aerr != blot_direct_types::Error.none { return alloc_handle, aerr; }
+        let cp2_err = copy(g, f, alloc_handle, made_handle, id);
+        if cp2_err != blot_direct_types::Error.none { return neverVal(), cp2_err; }
+        lget(g, alloc_base);
+        lset(g, made_base);
+        close(g, f);
+        handle = made_handle;
+        base = made_base;
+    } else {
+        let alloc_handle, alloc_base, alloc_err = createUninit(g, f, out_ty, count, id);
+        if alloc_err != blot_direct_types::Error.none { return alloc_handle, alloc_err; }
+        handle = alloc_handle;
+        base = alloc_base;
+    }
 
     let vectorized, vec_index, vec_err = tryEmitVectorSpark(g, f, id, out_ty, elem_ty, start_local, source_val, count, base);
     if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
@@ -3091,7 +3554,7 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 
     if val.ty != blot_direct_types::never {
         let dst_addr = emitOffsetAddress(g, f, base, index, step);
-        let written = writeFlat(g, f, dst_addr, 0, val, id);
+        let written = writeElement(g, f, dst_addr, 0, val, id);
         if written != blot_direct_types::Error.none { return neverVal(), written; }
         // Escape-safe per-iteration scratch release: only release when output
         // elements cannot hold scope memory and no store escaped past owner_mark.

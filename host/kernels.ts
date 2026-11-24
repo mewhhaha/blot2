@@ -2548,15 +2548,6 @@ export class KernelPool {
       }
     };
 
-    const triggerFatalAbort = (err: KernelError) => {
-      if (fatalAbort === null) fatalAbort = err;
-      heap.clear();
-      for (const w of batchSubprocesses) {
-        w.fenced = true;
-        w.closeTransport({ kind: "fenced" });
-      }
-    };
-
     // Single-owner serialized copy_grant_fixed queue.
     interface ReadyFixedEntry {
       readonly worker: KernelSubprocess;
@@ -2572,6 +2563,16 @@ export class KernelPool {
       while (fixedCopyQueue.length > 0) {
         const entry = fixedCopyQueue.shift()!;
         entry.doneResolve(fatalAbort !== null ? "abort" : "discard");
+      }
+    };
+
+    const triggerFatalAbort = (err: KernelError) => {
+      if (fatalAbort === null) fatalAbort = err;
+      heap.clear();
+      convertQueueToDiscard();
+      for (const w of batchSubprocesses) {
+        w.fenced = true;
+        w.closeTransport({ kind: "fenced" });
       }
     };
 

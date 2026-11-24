@@ -125,9 +125,10 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         if boxed { return neverVal(), g.fail(m, id, "update of a boxed field inside an element"); }
     }
+    let whole_element = selectors.len == at + 1;
     if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
         var old = neverVal();
-        if offset == 0 {
+        if whole_element {
             let loaded, error = loadElement(g, f, address, 0, ty, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             old = loaded;
@@ -156,11 +157,22 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         target = recomputed;
     }
     if g.runtime_().has_fork {
-        let bytes, berr = flatBytes(g, f, replacement.ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        var bytes: u32 = 0;
+        if whole_element && tagOf(g, replacement.ty) == blot_direct_types::Tag.boolean {
+            bytes = 1;
+        } else {
+            let fb, berr = flatBytes(g, f, replacement.ty, id);
+            if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+            bytes = fb;
+        }
         recordBeforeWrite(g, f, w(g, container, 0), target, offset, bytes);
     }
-    let written = writeFlat(g, f, target, offset, replacement, id);
+    var written = blot_direct_types::Error.none;
+    if whole_element {
+        written = writeElement(g, f, target, 0, replacement, id);
+    } else {
+        written = writeFlat(g, f, target, offset, replacement, id);
+    }
     if written != blot_direct_types::Error.none { return neverVal(), written; }
     return container, blot_direct_types::Error.none;
 }

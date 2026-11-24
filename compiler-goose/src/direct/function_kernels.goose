@@ -286,7 +286,7 @@ recursive fn emitPackFlatNumeric(
             op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
             lset(g, src_base);
             let etag = tagOf(g, elem_ty);
-            if etag == blot_direct_types::Tag.u32_ || etag == blot_direct_types::Tag.f32_ || etag == blot_direct_types::Tag.boolean {
+            if etag == blot_direct_types::Tag.u32_ || etag == blot_direct_types::Tag.f32_ {
                 lget(g, dst_cursor);
                 lget(g, src_base);
                 i32Const(g, k * 4);
@@ -297,7 +297,7 @@ recursive fn emitPackFlatNumeric(
                 lset(g, dst_cursor);
                 return blot_direct_types::Error.none;
             }
-            // General physical-stride element loop (handles #[3; Big20Word], #[2; #[3; U32]], tuples, records).
+            // General physical-stride element loop (handles #[K; Bool], #[3; Big20Word], #[2; #[3; U32]], tuples, records).
             let idx = constLocal(g, f, 0);
             let elem_addr = local32(g, f);
             let exit = open(g, f, OP_block);
@@ -312,7 +312,7 @@ recursive fn emitPackFlatNumeric(
             op(g, OP_i32_mul);
             op(g, OP_i32_add);
             lset(g, elem_addr);
-            let elem_val, rerr = readFlat(g, f, elem_addr, 0, elem_ty, id);
+            let elem_val, rerr = loadElement(g, f, elem_addr, 0, elem_ty, id);
             if rerr != blot_direct_types::Error.none { return rerr; }
             let perr = emitPackFlatNumeric(g, f, cu, sinfo.value.element, elem_ty, elem_val, dst_cursor, subst, id, depth + 1);
             if perr != blot_direct_types::Error.none { return perr; }
@@ -577,7 +577,7 @@ recursive fn emitUnpackFlatNumeric(
             op(g, OP_i32_mul);
             op(g, OP_i32_add);
             lset(g, dst_addr);
-            let werr = writeFlat(g, f, dst_addr, 0, elem_val, id);
+            let werr = writeElement(g, f, dst_addr, 0, elem_val, id);
             if werr != blot_direct_types::Error.none { return neverVal(), werr; }
             lget(g, idx);
             i32Const(g, 1);

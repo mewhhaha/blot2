@@ -645,6 +645,57 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
     let info = m.call(id);
     let target = g.resolve(m, info.target);
     let arguments = info.arguments;
+    // Fast path: intercept 2-arg forwarding wrappers around `@array.generate`
+    // (such as `std/array.generate`) when given a direct closure literal so we
+    // never construct a closure or emit per-element `call_indirect`.
+    var gen_wrap = false;
+    var gen_arg0: u32 = 0;
+    var gen_arg1: u32 = 0;
+    var gen_out_ty: Ty = 0;
+    var gen_resolved = BindingRef { 0, 0 };
+    if arguments.len == 2 && m.node(arguments[1]).tag == blot_check_core::Tag.closure && g.hasUnit(target.unit) {
+        let resolved_g = followAliasTarget(g, target);
+        if g.hasUnit(resolved_g.unit) {
+            let tm .= g.units[resolved_g.unit - 1];
+            let tbody .= tm.body(resolved_g.binding);
+            if tbody && tbody.is_function {
+                let tparams = tm.bodyParameters(tbody);
+                if tparams.len == 2 {
+                    let inner = unwrapSingleBody(tm, tbody.root);
+                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.array_op && tm.arrayOperation(inner) == blot_backend_collection_ops::Op.generate {
+                        let ch = tm.children(inner);
+                        if ch.len == 2 && localRef(tm, ch[0]) == tparams[0].binding && localRef(tm, ch[1]) == tparams[1].binding {
+                            let out_ty, ok_out = lowerInEnv(g, m, m.typeOf(id), f.env);
+                            if ok_out && tagOf(g, out_ty) == blot_direct_types::Tag.array {
+                                gen_wrap = true;
+                                gen_arg0 = arguments[0];
+                                gen_arg1 = arguments[1];
+                                gen_out_ty = out_ty;
+                                gen_resolved = resolved_g;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if gen_wrap {
+        let counted, cerr = expr(g, f, gen_arg0);
+        if cerr != blot_direct_types::Error.none { return counted, cerr; }
+        let count_loc, clerr = scalarLocal(g, f, counted, id);
+        if clerr != blot_direct_types::Error.none { return neverVal(), clerr; }
+        let inlined, did_inline, ierr = tryEmitGenerateInlineClosure(g, f, count_loc, gen_arg1, gen_out_ty, id);
+        if ierr != blot_direct_types::Error.none { return inlined, ierr; }
+        if did_inline {
+            g.recordInlined(gen_resolved.unit, gen_resolved.binding);
+            return inlined, blot_direct_types::Error.none;
+        }
+        // Fallback: count already evaluated; build closure and run generate.
+        let src_val, serr = expr(g, f, gen_arg1);
+        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        g.recordInlined(gen_resolved.unit, gen_resolved.binding);
+        return emitFillOrGenerate(g, f, false, count_loc, src_val, gen_out_ty, id);
+    }
     var elide_args = false;
     if arguments.len >= 1 && arguments.len <= 2 && g.hasUnit(target.unit) {
         let resolved_prim = followAliasTarget(g, target);
@@ -855,11 +906,9 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     let noted = noteStoreToSlot(g, f, w(g, list, 0), value);
     if noted != blot_direct_types::Error.none { return neverVal(), false, noted; }
     if g.runtime_().has_fork {
-        let bytes, berr = flatBytes(g, f, value.ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), false, berr; }
-        recordBeforeWrite(g, f, w(g, list, 0), address, 0, bytes);
+        recordBeforeWrite(g, f, w(g, list, 0), address, 0, step);
     }
-    let written = writeFlat(g, f, address, 0, value, id);
+    let written = writeElement(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), false, written; }
     invalidateCheckedContainers(f);
     return list, true, blot_direct_types::Error.none;
@@ -1565,6 +1614,12 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_bindings = f.bindings;
     let saved_with_cells = f.with_cells;
     let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_owned = f.unique_owned;
+    let saved_owned_computed = f.owned_uses_computed;
+    let saved_owned_uses = f.owned_uses;
+    let saved_owned_flows = f.owned_flows;
+    let saved_nan_computed = f.nan_elide_computed;
+    let saved_nan_observed = f.nan_observed;
     let saved_labels_base = f.labels_base;
     let saved_scratch_body = f.scratch_body;
     let saved_scratch_cut = f.scratch_cut;
@@ -1591,6 +1646,12 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.bindings = blot_support_zigmap::Map {};
     f.with_cells = blot_support_zigmap::Map {};
     f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_owned = blot_support_zigmap::Map {};
+    f.owned_uses_computed = false;
+    f.owned_uses = blot_support_zigmap::Map {};
+    f.owned_flows = blot_support_zigmap::Map {};
+    f.nan_elide_computed = false;
+    f.nan_observed = blot_support_zigmap::Map {};
     f.labels_base = labels_mark;
     f.scratch_body = 0;
     f.scratch_cut = ScratchCut {};
@@ -1619,6 +1680,12 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.bindings = saved_bindings;
     f.with_cells = saved_with_cells;
     f.unique_boxed = saved_unique_boxed;
+    f.unique_owned = saved_unique_owned;
+    f.owned_uses_computed = saved_owned_computed;
+    f.owned_uses = saved_owned_uses;
+    f.owned_flows = saved_owned_flows;
+    f.nan_elide_computed = saved_nan_computed;
+    f.nan_observed = saved_nan_observed;
     f.labels_base = saved_labels_base;
     f.scratch_body = saved_scratch_body;
     f.scratch_cut = saved_scratch_cut;

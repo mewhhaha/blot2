@@ -1,39 +1,68 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 1 Runtime Optimizations & Unified Dynamic Arrays (24 November 2026)
+## Current frontier: Direct-Backend Tier 2 Runtime Optimizations (2A–2F) & Unified Dynamic Arrays (24 November 2026)
 
-Tier 1 direct-backend runtime optimizations (loop-invariant array-check hoisting,
-scoped element-address reuse, and zero-allocation loop release elision) are
-complete and qualified on top of the six-phase unified dynamic-array (`#[T]`)
-and `purity.goose` retirement milestones:
+Tier 2 direct-backend runtime optimizations (2A–2F: closure inlining in
+`@array.generate`/`std/array.generate`, local F32 canonical-NaN elision, `spark`
+SIMD pre-splatting & in-place destination reuse, guard-derived bounds & `ifNode`
+check preservation, byte-packed `#[Bool]` arrays, and auto-vectorized in-place
+range `for` loops) are complete and qualified on top of Tier 1 (`58adc750`) and
+the six-phase unified dynamic-array (`#[T]`) milestones:
 
-- **Tier 1 direct-backend runtime optimizations (this commit, after `9de59b4c`):**
-  - Extended `noStorageResize` in `direct/function_control.goose` to walk
-    `Tag.match_`, `Tag.loop_`, and `Tag.pattern_bind` (budget 512) and pre-hoist
-    loop-invariant `Tag.array` `ensureCheckedArray` calls once before `OP_loop`
-    (skipping non-in-place array carries).
-  - Reused pre-RHS element addresses in `direct/function_data.goose:indexedUpdate`
-    whenever `noStorageResize` proves `info.value` cannot resize storage, and
-    added a scoped `CheckedElem` cache (`function.goose`, `function_storage.goose`)
-    gated exclusively to immutable user expression index sites (`readElement` /
-    `indexedUpdate`) and invalidated alongside `CheckedArray`.
-  - Added conservative `bodyNoAlloc` in `direct/function_control.goose` to skip
-    per-iteration `markInto` and `escape_min_slot` global save/merge churn on
-    non-allocating `for ever:` / `for` loops.
+- **Tier 2 direct-backend runtime optimizations (this commit, after `58adc750`):**
+  - **2A (Generate closure inlining):** Inlined direct syntactic closures
+    `(func i => body)` in `@array.generate` and 2-arg wrappers like
+    `std/array.generate` (`direct/function_storage.goose`,
+    `direct/function_calls.goose`), eliminating `call_indirect` in
+    `ecs_spawn_batch` (0 `call_indirect` in the 9-module Ink ECS Wasm).
+  - **2B (Local F32 NaN-canonicalization elision):** Added `scanNanUses` /
+    `bindingIgnoresNanPayload` (`direct/function.goose`) to omit per-`let`
+    `0x7fc00000` NaN normalization on register-only `F32` locals whose uses are
+    strictly `isCanonicalF32Consumer`, while preserving exact `0x7fc00000`
+    canonicalization at every return, bitcast, store, call, or join boundary.
+  - **2C (`spark` SIMD polish & in-place buffer reuse):** Hoisted loop-invariant
+    outer scalar splats and `0x7fc00000` NaN vector outside `OP_loop`, dropped
+    dead `iter_vlocal` when unused, and added uniquely-owned destination reuse
+    (`unique_owned` + `scanOwnedUses` + runtime `start == 0 && count == cand_len`
+    fast path in `direct/function_spark.goose` & `direct/function_control.goose`).
+  - **2D (Guard-derived bounds & `ifNode` check preservation):** Recorded
+    `CheckedBound` after early-exit guards (`if m >= limit: break`), preserved
+    `range.end_local` on local `U32` loop ends, and preserved surviving pre-`if`
+    `CheckedArray` entries across `ifNode` branch merges.
+  - **2E (Byte-packed `#[Bool]` arrays):** Lowered bare `#[Bool]` elements to
+    1-byte stride (`i32.load8_u` / `i32.store8`, single `memory.fill`, 4-wide
+    `v128` SIMD load/store via `v128.load32_zero` + `extend_low_*_u` and
+    `narrow_*_u` + `v128.store32_lane`, ABI 8 4-byte packet conversion in
+    `fromPacket`/`toPacket`, and `FlatNumeric` loops in `function_kernels.goose`)
+    while preserving `flatBytes(Tag.boolean) == 4` inside records/tuples/variants.
+  - **2F (In-place range `for`-loop auto-SIMD):** Added `tryEmitVectorForLoop`
+    in `direct/function_spark.goose` to vectorize simple in-place range `for`
+    loops (`dst[dst_off + col] := vec_expr(...)`) into 4-wide `v128` SIMD with
+    runtime bounds, non-wrapping, and strict alias/disjointness guards feeding
+    into the scalar tail loop.
+  - **Host deadlock fix:** Fixed `runFixed`'s `triggerFatalAbort` in
+    `host/kernels.ts` to drain `fixedCopyQueue` (`convertQueueToDiscard()`),
+    eliminating an intermittent deadlock in `Law #4(b)-(f)` (`byobFaultPool`).
   - Regenerated `structural_adapters.goose` & `json_adapters.goose`, added
-    executed-Wasm edge-case regression laws in `tests/guest/loop_hoist_execution.test.ts`,
-    and re-recorded `compiler-goose/tests/fixtures/expected.json` (18 of 109
-    fixtures changed, every one strictly smaller in `wasm_bytes`).
+    executed-Wasm regression laws in `tests/guest/tier2_opt_execution.test.ts`,
+    and re-recorded `compiler-goose/tests/fixtures/expected.json` (24 of 109
+    fixtures changed, every one strictly smaller or fewer functions).
   - Measured climb on AMD Ryzen 7 7800X3D (bit-exact checksum parity,
     [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json)):
-    Ink ECS cached query `9.30 → 2.31 ms` (**4.02×**), Pool direct
-    `6.39 → 2.31 ms` (**2.76×**, `1.80×` of native Bevy `1.28 ms`), sparse
-    filtered `0.422 → 0.138 ms` (**3.06×**, `1.62×` of native Bevy `0.085 ms`),
-    `matmul_64` `1.15 → 0.289 ms` (**3.97×**), `merge_sort` `14.56 → 7.27 ms`
-    (**2.00×**, `1.18×` of Rust `-O3` Wasm), `prime_sieve` `0.425 → 0.223 ms`
-    (**1.91×**), and `particle_spark_simd` `0.842 → 0.745 ms` (**1.02×** of
-    Rust `-O3` Wasm `0.729 ms`), while cold 6-kernel compile dropped to `13.3 ms`
-    and Wasm shrank to `10,931` bytes (**138×** smaller than `rustc -O3`).
+    `matmul_64` `0.289 → 0.053 ms` (**5.4× over Tier 1; 21.7× over baseline; 1.66× of Rust `-O3` Wasm**),
+    `mandelbrot_f32` `4.88 → 3.20 ms` (**1.53×; 0.98× of Rust `-O3` Wasm `3.24 ms`, 0.77× of native `4.13 ms`**),
+    `particle_spark_simd` `0.740 ms` (**0.95× of Rust `-O3` Wasm `0.775 ms`**),
+    `prime_sieve` `0.223 → 0.170 ms` (**1.31×; 1.45× of Rust `-O3` Wasm**),
+    `merge_sort` `7.11 ms` (**1.20× of Rust `-O3` Wasm**),
+    Ink SoA + `spark` SIMD `0.638 → 0.428 ms` (**1.49×; 2.9× faster than native Bevy AoS `1.25 ms`**),
+    Ink Pool direct `2.31 → 2.07 ms`, Ink cached query `2.31 → 2.11 ms`,
+    full-world snapshot `9.1 µs` (**24× faster than Bevy**), structural churn
+    `34.5 µs` (**2.4× faster**); Wasm shrank further to `10,879` B (6 kernels,
+    **138×** smaller than Rust `-O3`) and `53,231` B (9-module Ink ECS).
+- **Tier 1 direct-backend runtime optimizations (`58adc750`):**
+  - Extended `noStorageResize`, pre-hoisted loop-invariant `ensureCheckedArray`
+    checks, reused pre-RHS element addresses via scoped `CheckedElem`, and added
+    `bodyNoAlloc` loop mark/release elision (`tests/guest/loop_hoist_execution.test.ts`).
 - **Phase 6 — Retire `check/purity.goose` & unconditional `mode = 2` const pools (`30899f4b`):**
   - Deleted `compiler-goose/src/check/purity.goose` (3,100+ lines) and its
     diagnostic codes (`spark_mutates_capture`, `kernel_mutates_context`,
@@ -79,7 +108,7 @@ and `purity.goose` retirement milestones:
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `9de59b4c`) | Tier 1 direct-backend runtime optimizations & refreshed charts (`this commit`), README SVG benchmark charts (`9de59b4c`), Consumer README & Rust/Bevy ECS comparison benchmarks (`7d87b31a`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`), Phases 1–2 soundness & backend hardening (`ebf2f026`) |
+| `blot2` | this commit (after `58adc750`) | Tier 2 direct-backend runtime optimizations 2A–2F & `runFixed` abort fix (`this commit`), Tier 1 loop-hoist runtime optimizations (`58adc750`), README SVG benchmark charts (`9de59b4c`), Consumer README & Rust/Bevy ECS comparison benchmarks (`7d87b31a`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`) |
 | `../pen` | `08e1224` | Unified `#[T]` migration in `blot-host` + `kernels_law6_tests` (`08e1224`); HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
 | `../ink` | `fc7259e` | Unified `#[T]` migration across `lib/`, `tests/`, `docs/` (`fc7259e`); Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
 | `../gdev` | `017f8cd` | Unified `#[T]` migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/` + synced `pen/` bindings (`017f8cd`); Moebius look default |
@@ -113,33 +142,33 @@ and `purity.goose` retirement milestones:
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `9c3a57e59d66b0a8ca756a201ad7760249f6a82f004f4e36a6dd90762d12d2e8`
-    (`8,099,608` bytes)
+    `0e46193013871d19b01147176f92e5b902c7c95dae0373ef5e900c6947a3a77f`
+    (`8,191,328` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `c4787490772e6b474fcfe6075bbe868249983773e120e4e872d9613d0cf1a5a1`
-    (`3,520,255` bytes)
+    `88313e73b2e5b42eefc776c396cac82f4b05f4296a778e9a1d8bf643e1f8e050`
+    (`3,556,553` bytes)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` SHA-256:
     `268d82af8ed6d858288df6f94cb4d37c7ab193f7ddf64fd27a1995f2a1e0a003`
 - **Qualification gates:**
-  - `blot2` (this commit): `deno task test:compiler` exit 0 — `harness` (3.24 s),
-    `release-build` (117.07 s), `reference-direct` **2/2** (`runtime` 7707 B,
+  - `blot2` (this commit): `deno task test:compiler` exit 0 — `harness` (2.46 s),
+    `release-build` (87.97 s), `reference-direct` **2/2** (`runtime` 7707 B,
     `writer` 352 B), `reference-uniqueness` **206/206**, `reference-fixtures`
-    **109/109**, `pack` OK, `guests` **1,101 passed, 0 failed, 75 ignored**
-    (26.02 s); `deno fmt --check` (85 files), `deno check`,
+    **109/109**, `pack` OK, `guests` **1,104 passed, 0 failed, 75 ignored**
+    (16.20 s); `deno fmt --check` (85 files), `deno check`,
     `deno task test:editor` (**6/6**).
   - `../pen`: `cargo test -p blot-host` **40/40 passed** (29 unit + 5 concurrency
     + 3 owned_storage + 3 processes), `examples/bounce` `pen check` clean (0.06 s).
   - `../ink`: `pen test-blot` exit 0 against new `blotc-goose` — all Blot
     modules plus **245/245** native f64-reference tests passed (0 failed).
-  - `../gdev`: `build_gdev.ts --timeout-ms 15000 --profile` exit 0
-    (`success: true`, `wasmBytes: 4,093,381`, `buildMs: 704.7 ms`);
-    `run_pen.py --launch --hardware` exit 0 (`success: true`,
-    `screenshot_640x480: true`, `complete_render: true`,
-    `compiled_wasm_unchanged: true`, visually inspected
-    `build/storage-integration/gdev-one-frame/attempt-n6pdnv2o/frame.png`,
-    SHA-256 `e9cd29bf2f844cc5fc5f0b285591ea4d5f908bde1a46fde254e510d540d6a931`).
+  - `../gdev`: working tree had active uncommitted user edits across 175 files
+    (including `src/effects/shader_styles.blot` failing `function_return_required`,
+    preserved untouched); Tier 1 (`58adc750`) hardware frame checkpoint on clean
+    `017f8cd` remains `build/storage-integration/gdev-one-frame/attempt-n6pdnv2o/frame.png`
+    (SHA-256 `e9cd29bf2f844cc5fc5f0b285591ea4d5f908bde1a46fde254e510d540d6a931`). Re-run
+    `build_gdev.ts` + `run_pen.py --launch --hardware` once `../gdev`'s active
+    `shader_styles.blot` edits compile cleanly.
 
 ## Remaining work
 

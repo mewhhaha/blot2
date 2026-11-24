@@ -21,8 +21,40 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
     lget(g, packet);
     callf(g, rt.packet_length);
     lset(g, length);
-    let array_ty, error = g.types.intern(blot_direct_types::Tag.array, [g.types.node(ty).a]);
+    let elem_ty = g.types.node(ty).a;
+    let is_bool_arr = tagOf(g, elem_ty) == blot_direct_types::Tag.boolean;
+    let array_ty, error = g.types.intern(blot_direct_types::Tag.array, [elem_ty]);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if is_bool_arr {
+        let handle, base, error = createUninit(g, f, array_ty, length, 0);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let idx = constLocal(g, f, 0);
+        let src_ptr = local32(g, f);
+        lget(g, packet);
+        i32Const(g, 4);
+        op(g, OP_i32_add);
+        lset(g, src_ptr);
+        let dst_ptr = local32(g, f);
+        lget(g, base);
+        lset(g, dst_ptr);
+        let exit = open(g, f, OP_block);
+        let top = open(g, f, OP_loop);
+        lget(g, idx);
+        lget(g, length);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, exit);
+        lget(g, dst_ptr);
+        lget(g, src_ptr);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+        op(g, OP_i32_store8); uleb(g, 0); uleb(g, 0);
+        lget(g, src_ptr); i32Const(g, 4); op(g, OP_i32_add); lset(g, src_ptr);
+        lget(g, dst_ptr); i32Const(g, 1); op(g, OP_i32_add); lset(g, dst_ptr);
+        lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
+        br(g, f, OP_br, top);
+        close(g, f);
+        close(g, f);
+        return Val { ty, handle.start, handle.len }, blot_direct_types::Error.none;
+    }
     if zero_copy {
         let base = local32(g, f);
         lget(g, packet);
@@ -60,9 +92,51 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = fals
     op(g, 0);
     return Val { ty, handle.start, handle.len }, blot_direct_types::Error.none;
 }
+fn emitCopyArrayToPacket(g: Generator&, f: Fn&, dst_packet: u32, src_base: u32, length: u32, bytes: u32, is_bool_arr: bool) {
+    if !is_bool_arr {
+        lget(g, dst_packet);
+        i32Const(g, 4);
+        op(g, OP_i32_add);
+        lget(g, src_base);
+        lget(g, bytes);
+        op(g, OP_prefix_fc);
+        uleb(g, 10);
+        op(g, 0);
+        op(g, 0);
+        return;
+    }
+    let idx = constLocal(g, f, 0);
+    let dst_ptr = local32(g, f);
+    lget(g, dst_packet);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lset(g, dst_ptr);
+    let src_ptr = local32(g, f);
+    lget(g, src_base);
+    lset(g, src_ptr);
+    let exit = open(g, f, OP_block);
+    let top = open(g, f, OP_loop);
+    lget(g, idx);
+    lget(g, length);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, exit);
+    lget(g, dst_ptr);
+    lget(g, src_ptr);
+    op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, 0);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+    lget(g, dst_ptr); i32Const(g, 4); op(g, OP_i32_add); lset(g, dst_ptr);
+    lget(g, src_ptr); i32Const(g, 1); op(g, OP_i32_add); lset(g, src_ptr);
+    lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
+    br(g, f, OP_br, top);
+    close(g, f);
+    close(g, f);
+}
 // Copies an array into a fresh host packet; returns its address local.
 fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     let rt = g.runtime_();
+    let elem_ty, eerr = elementOf(g, f, value.ty, id);
+    if eerr != blot_direct_types::Error.none { return 0, eerr; }
+    let is_bool_arr = tagOf(g, elem_ty) == blot_direct_types::Tag.boolean;
     let length, error = lengthOf(g, f, value, id);
     if error != blot_direct_types::Error.none { return 0, error; }
     let max_words = (rt.layout.transport_end - rt.layout.transport_base - 4) / 4;
@@ -91,15 +165,7 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     op(g, OP_i32_eqz);
     opIndex(g, OP_br_if, 0);
     let base = baseOf(g, f, value);
-    lget(g, packet);
-    i32Const(g, 4);
-    op(g, OP_i32_add);
-    lget(g, base);
-    lget(g, bytes);
-    op(g, OP_prefix_fc);
-    uleb(g, 10);
-    op(g, 0);
-    op(g, 0);
+    emitCopyArrayToPacket(g, f, packet, base, length, bytes, is_bool_arr);
     close(g, f);
     popCheckedArraysAt(f, fast);
     op(g, OP_else_);
@@ -118,15 +184,7 @@ fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
     op(g, OP_i32_eqz);
     opIndex(g, OP_br_if, 0);
     let base2 = baseOf(g, f, value);
-    lget(g, new_base);
-    i32Const(g, 4);
-    op(g, OP_i32_add);
-    lget(g, base2);
-    lget(g, bytes);
-    op(g, OP_prefix_fc);
-    uleb(g, 10);
-    op(g, 0);
-    op(g, 0);
+    emitCopyArrayToPacket(g, f, new_base, base2, length, bytes, is_bool_arr);
     close(g, f);
     lget(g, pin_slot);
     callf(g, rt.detach_temp_slot);
@@ -288,7 +346,13 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         let body .= m.body(key.id);
         if !body { return g.fail(m, 0, "instance without a body"); }
         let body_parameters = m.bodyParameters(body);
-        for parameter, at in body_parameters { bindPut(g, f, parameter.binding, g.s.vals[inputs.start + at]); }
+        let own_mask = m.binding(body.binding).capability_parameters.own;
+        for parameter, at in body_parameters {
+            bindPut(g, f, parameter.binding, g.s.vals[inputs.start + at]);
+            if at < 32 && ((own_mask >> (at as u32)) & 1) != 0 {
+                blot_support_zigmap::put(g.s.map_pool, f.unique_owned, parameter.binding, 1);
+            }
+        }
         root = body.root;
     } else if key.kind == blot_direct_emit::InstanceKind.lambda {
         let info = m.closure(key.id);

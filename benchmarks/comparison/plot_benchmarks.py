@@ -163,8 +163,8 @@ def build_kernels_chart(data: dict) -> str:
         ("mandelbrot_f32", "256×256 scalar FP · 100 max iter"),
         ("merge_sort", "100k U32 · owned ping-pong buffers"),
         ("lcg_recurrence", "1,000,000 tight integer steps"),
-        ("prime_sieve", "100k flags · bounds-checked writes"),
-        ("matmul_64", "64×64 F32 · scalar triple loop"),
+        ("prime_sieve", "100k Bool flags · byte-packed"),
+        ("matmul_64", "64×64 F32 · auto-SIMD inner loop"),
     ]
 
     w, h = 920, 492
@@ -223,8 +223,8 @@ def build_kernels_chart(data: dict) -> str:
         text(
             28,
             h - 16,
-            "Each subplot uses its own linear 0..max scale. Blot enforces canonical 0x7fc00000 quiet NaN and bounds checks; use spark #[...] for SIMD.",
-            size=11.0,
+            "Each subplot uses its own linear 0..max scale. Blot enforces canonical 0x7fc00000 NaN semantics & bounds safety; spark and simple range loops emit v128 SIMD.",
+            size=10.6,
             fill=TEXT_MUTED,
         )
     )
