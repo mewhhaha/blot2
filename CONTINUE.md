@@ -1,54 +1,62 @@
 # Working on Blot and Gdev
 
-## Current frontier: Memory Model Phases 1–5 Complete & Council Soundness Hardening (24 November 2026)
+## Current frontier: Purity Analyzer & Session Compile-Speed Optimization (24 November 2026)
 
-All five phases of Memory Model A ([tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md))
-and the post-Phase-5 multi-harness council review fixes are complete and verified
-across `blot2`, `std`, `../ink`, and `../gdev`:
+All five phases of Memory Model A ([tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md)),
+the post-Phase-5 multi-harness council review fixes (`0fce6177`), and the
+concurrency purity / session compile-speed optimization pass are complete and
+verified across `blot2`, `std`, `../ink`, and `../gdev`:
 
-- **Phase 5 (`2de831a6`) — Read-only `&local`/`&field` (A4), purity & ownership:**
-  - Lowered `Op.ref` to a 1-element stack owner with persistent `const`-pool
-    support (`persistFlatAt`), fixed `purity.goose` `Op.ref` points-to edges,
-    enforced ownership on `@simd.store` and `@storage.freeze`, unified `Op.link`
-    borrow-return tracking, and stopped wildcard `let _ = ...` from spuriously
-    killing owned values.
-- **Council Review & Soundness Hardening (this commit, after `2de831a6`):**
-  - Reviewed `71cf5629..2de831a6` with Claude Code (Opus 5.5: 1 verified `HIGH`)
-    and Antigravity (Neon: 4 verified `HIGH`); Codex (Sol 6 Daybreak) was blocked
-    by hardware-key session authentication. Every verified finding was fixed with
-    regression tests:
-  - **Loop outer-local weakening (`uniqueness.goose`, Opus 5.5):** Added
-    `LoopOuter` / `recordLoopOuter` so non-carried outer locals aliased inside a
-    loop body (e.g. `keep := xs`, `r := &xs`, or before `continue`) propagate
-    across probe rollback and fixpoint retries for non-rebinding `@simd.store`.
-  - **Deferred polymorphic closure captures (`direct/function*.goose`, Neon #1):**
-    `captureValue` no longer prematurely monomorphizes polymorphic local
-    `Tag.closure` captures at the outer closure creation site; it packs only
-    their concrete captures (`packPolyCaptures`) and forwards their polymorphic
-    entries via `polyCaptureKey`/`recordPolyCapture`/`restorePolyCapture` so
-    nested polymorphic closures instantiate cleanly at every concrete layout.
-  - **Strict `in_same_fn` `ownedInPlace` (`uniqueness.goose`, Neon #2):**
-    Removed the `!in_same_fn` `self_.captured` bypass from `ownedInPlace`,
-    blocking `@simd.store` and `@storage.freeze` on outer locals inside closures.
-  - **Permanent freeze invalidation & zero-fallback `Op.freeze`
-    (`uniqueness.goose`, Neon #3 & #4):** Non-moved `@storage.freeze` now
-    permanently invalidates the frozen local or record field instead of returning
-    a reversible borrow loan, and `Op.freeze` strictly requires `ownedInPlace`
-    with zero fallback heuristics. Added a least-fixed-point `non_escaping_params`
-    / `non_escaping_arity` scan (for saturated growable `.push`/`.truncate`,
-    non-escaping local helpers, and pure effect-polymorphic downward closures)
-    so helper patterns that mutate a `GrowArray` without escaping it keep the
-    caller's `deep` uniqueness intact.
-  - Updated `tests/guest/owned_render_copy_fixture.ts` for `../ink` `71bb1a3`'s
-    new `render.FrameAccess` fields (`bone_matrices`, `morph_weights`, `motions`).
+- **Purity Analyzer & Session Fast-Path Optimization (this commit, after `0fce6177`):**
+  - Eliminated the 6.5 s purity bottleneck that had regressed cold Gdev compiles
+    to `6.96 s` and warm no-op/trivia builds to `3.31 s`, returning Gdev to
+    subsecond cold builds (`391.7 ms` / `403.5 ms` median `-O2`, beating even
+    the `432 ms` PGO target in [tasks/FAST_COMPILE.md](tasks/FAST_COMPILE.md))
+    with **byte-identical** Wasm output:
+  - **Concurrency-root-only seeding & lazy unit registration (`purity.goose`):**
+    Replaced eager whole-program `registerAllCallables` across all 306 units and
+    422k Core nodes with lazy per-unit registration (`ensureUnitRegistered` /
+    `lookupBodyFn`). Removed whole-game `exported_ctxs` (`main`) seeding in
+    `analyzeInto`; after Memory Model Phases 1–5 (no `=`, no `lent`, unique `:=`
+    and `@simd.store`), non-growable `const` globals cannot be mutated after
+    startup unless they retain a handle/view to a growable global. A fast
+    body-header scan collects growable globals and seeds immutable-typed pool
+    initializers only when a mutable global exists (transitively flagging any
+    const view/alias to a growable global).
+  - **Asymptotic graph & dispatch indexing (`purity.goose`):** Added per-`(ctx, src)`
+    indexed adjacency lists (`ctx_src_base_edges`, `ctx_src_written_edges`,
+    `EdgeNode.next_src`) turning `stepLabelHead` / `reachHead` / `evalUpdate`
+    from `O(E)` / `O(V·E)` to `O(out-degree)` / `O(V+E)`; O(1) hash-set
+    summary dedup & comparison in `publishSummary`; per-function context lists
+    (`fn_ctx_head` / `FnCtx.next_same_fn`); lazy O(1) associated-method and
+    contract-implementation indexes (`assoc_by_name`, `impl_by_name`,
+    `impl_by_contract`); O(1) `field_name_map`; memoized `isPureScalarCached`
+    that skips dead fresh allocations/edges for pure-scalar `product`/`record`/
+    `construct` nodes; and `usage`/`forall` unwrapping on scalar `associated` ops.
+  - **Single-pass analysis & 0-change warm fast path (`direct.goose`,
+    `compile.goose`, `reuse/{body_image,dependency_consumer,partial_dependency,zig_project_server_build}.goose`):**
+    Passed precomputed `(ProgramInfo, imm_pools)` from `buildPrepared` into
+    `emitTrackedWithAnalysis` / `emitWithAnalysis` (removing the duplicate
+    `wire_schema::analyze` + `purity::analyzeInto` run on every cold and
+    non-relocated build), and added a 0-changed-module fast path before
+    re-running wire-schema/purity validation on unchanged cached revisions.
+  - Added mutable-global view-alias regression coverage in
+    `tests/guest/concurrency_purity_phase1.test.ts` and synced
+    `tests/guest/owned_render_copy_fixture.ts` with `../ink` `3df2bff`
+    (`ribbons`, `haptics` on `render.FrameAccess`).
+- **Council Soundness Hardening (`0fce6177`) & Memory Model Phase 5 (`2de831a6`):**
+  - Fixed all 5 verified `HIGH` findings from Opus 5.5 + Neon (loop outer-local
+    weakening in `uniqueness.goose`, deferred polymorphic closure captures in
+    `direct/function*.goose`, strict `in_same_fn` `ownedInPlace`, permanent
+    freeze invalidation & zero-fallback `Op.freeze` with `non_escaping_params`).
 
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `2de831a6`) | Council soundness hardening (5 verified `HIGH` fixes), Memory Model Phase 5 (`2de831a6`), Phase 4 (`9b589d5c`), Phase 3 (`1560e6a7`), Concurrency Phases 1–5 (`67fc95b8`) |
-| `../pen` | `cef87ca` | TAA/motion blur/DoF protocol sync (`cef87ca`), standard surface lighting (`f58251f`), Session-2 double-restore (`913d470`), Law #6 owned migration (`53a89f3`) |
-| `../ink` | `71bb1a3` | Pen 245-lane protocol (`71bb1a3`), 237-lane `bone_matrices`/`morph_weights` (`771480b`), audio/UI/net/streaming (`9c3078e`) |
-| `../gdev` | `889b336` | Pen wire sync (`889b336`), shared lighting sync (`7d9f482`), volumetric fog (`e503911`) |
+| `blot2` | this commit (after `0fce6177`) | Purity & session compile-speed optimization (`6.96 s` → `0.40 s` cold Gdev), Council soundness hardening (`0fce6177`), Memory Model Phase 5 (`2de831a6`), Phase 4 (`9b589d5c`), Phase 3 (`1560e6a7`), Concurrency Phases 1–5 (`67fc95b8`) |
+| `../pen` | `77bf4e1` | HRTF/EQ/reverb/haptics/text/netplay (`77bf4e1`), GTAO/SSGI/ribbons (`6efa720`), Hi-Z occlusion (`be951ce`), Session-2 double-restore (`913d470`) |
+| `../ink` | `3df2bff` | Pen 250-lane bindings (`3df2bff`), 247-lane SSGI/ribbons (`84c79a2`), terrain/water/foliage (`e399ff7`) |
+| `../gdev` | `f94a42c` | Pen 250-lane bindings (`f94a42c`), 247-lane sync (`49703bc`), 245-lane sync (`889b336`) |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra
@@ -77,37 +85,39 @@ across `blot2`, `std`, `../ink`, and `../gdev`:
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `3602bc01d423b90533ae0a83e9f10cfefee7a89a9f3265dbf8f9deceba93fed0`
-    (source identity `214ec3e3b37afc905ebbf5b439122e78ce203dff78d407464163f711e3d68443`)
+    `9a9de0aca6d5e43cb0152822c5ef1a4b5e21da311d832f0cccf697522777e444`
+    (source identity `c6d027bb69d573a6385479d501a8059f956c6f150c89f2778c97d8d9fe1c315c`, `8,496,320` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `831906a6a5119fd5fd313778e59839b307d0b07df67a8001a5ab2f41436504c0`
-    (`3,623,375` bytes)
+    `5a3fdd310a388e8ba08f3c61fec9ff5416485df4c78ab80b7acd8023fae6e7a8`
+    (`3,650,255` bytes)
   - `std/prelude.blot` SHA-256:
     `cc908f217d65f9adb519c0df21ed57006544eb2ea896b397747bdc32655242c9`
   - `../pen/target/release/pen` SHA-256:
-    `8d2037f38d4132fd257fd50193a6b6e58c0315de46d66bce358ee5431b0dae3f`
+    `1bcc42a008146034fdea1960e64d2487438a4b78f0fb912709cf66fa102c5acb`
+- **Gdev compile-time before/after (`../gdev` `f94a42c`, 306 modules, 2.98 MB, 5,059 funcs, byte-identical `3,842,468` B Wasm `8454653cde8ca19f...`):**
+  - Cold build: `6,963.7 ms` (`backend: 6,719.2 ms`) → **`391.7 ms`** (`backend: 152.9 ms`; 3-run median **`403.5 ms`**, **17.8× faster**)
+  - Warm no-op (`0/306`): `3,304.6 ms` (`backend: 3,289.8 ms`) → **`16.5 ms`** (`backend: 0.3 ms`, **200× faster**)
+  - Warm trivia (`1/305`): `3,311.3 ms` (`backend: 3,290.3 ms`) → **`45.3 ms`** (`backend: 25.3 ms`, **73× faster**; leaf trivia **`40.7 ms`**)
+  - Warm body edit (`1/305` `src/main.blot`): `6,697.5 ms` (`backend: 6,678.1 ms`) → **`170.3 ms`** (`backend: 151.2 ms`, **39× faster**, byte-identical `a49f17f91a74c05e...`)
 - **Qualification gates:**
-  - `blot2` (this commit): `deno task test:compiler` exit 0 (`harness` **25/25**,
-    `release-build` 86.05 s, `reference-direct` **2/2**,
-    `reference-uniqueness` **199/199**, `reference-fixtures` **109/109**,
-    `pack` OK, `guests` **1,096 passed, 0 failed, 76 ignored**);
-    `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**).
-  - `../ink` (`71bb1a3`): `pen test-blot` exit 0 — **405 passed, 0 failed** in
-    94 Blot modules (`356/356` checks, `45/45` must-trap, `4/4` must-not-compile)
-    plus **234/234** native Rust tests.
-  - `../gdev` (`889b336`): `pen check` clean (`main.blot` 6.97 s, `saved.json`,
-    `devtools/main.blot` 0.72 s, 562 assets); `menu_focus.blot`,
-    `performance_semantics.blot`, and `pickup_visibility.blot` all compile cleanly
-    on release `blotc-goose` under strict `ownedInPlace` `@storage.freeze`;
-    `build_gdev.ts --timeout-ms 15000`: `wasmBytes: 3,830,232`, `buildMs: 6.95 s`,
-    `freshModules: 306`, `emittedFunctions: 5,053`; `run_pen.py --launch --hardware`
-    (NVIDIA GeForce RTX 4080 SUPER Vulkan) exit 0 (`success: true`,
-    `screenshot_640x480: true`, visually inspected
-    `build/storage-integration/gdev-one-frame/attempt-451z1ovf/frame.png`,
+  - `blot2` (this commit): `harness` **25/25**, `release-build` 85.74 s,
+    `reference-direct` **2/2**, `reference-uniqueness` **199/199**,
+    `reference-fixtures` **109/109**, `pack` OK, `guests` **1,096 passed,
+    0 failed, 76 ignored** (16.22 s); `deno fmt --check` (85 files),
+    `deno check`, `deno task test:editor` (**6/6**).
+  - `../ink` (`3df2bff`): `pen test-blot` exit 0 — **408 passed, 0 failed** in
+    95 Blot modules (1.1 s; `359/359` checks, `45/45` must-trap,
+    `4/4` must-not-compile) plus **237/237** native Rust tests.
+  - `../gdev` (`f94a42c`): `pen check` clean (`main.blot` **0.40 s** unchanged,
+    `saved.json`, `devtools/main.blot` 0.69 s, 562 assets);
+    `build_gdev.ts --timeout-ms 15000 --profile`: `wasmBytes: 3,842,468`,
+    `buildMs: 399.5 ms` (`total_us: 392.0 ms`, `backend: 153.8 ms`),
+    `freshModules: 306`, `emittedFunctions: 5,059`;
+    `run_pen.py --launch --hardware` (NVIDIA GeForce RTX 4080 SUPER Vulkan)
+    exit 0 (`success: true`, `screenshot_640x480: true`,
+    `compiled_wasm_unchanged: true`, visually inspected
+    `build/storage-integration/gdev-one-frame/attempt-uh6es9_w/frame.png`,
     SHA-256 `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`).
-    (Full `../gdev` `pen test-blot` **1,398/1,398** + **16/16** `gdev-tech` passed
-    on `2de831a6` prior to `../ink` `771480b`/`71bb1a3` adding `bone_matrices`/
-    `morph_weights`/`motions` ahead of `../gdev/tests/minor_support/owned.blot`.)
   - `../pen` (historical `913d470` / `f50b644` / `53a89f3`): `pen-runtime`
     **173/173**, `pen-codegen` **10/10**, `blot-host --test concurrency_phase4`
     **5/5**, `pen-plugins --test blot` **8/8**, `pen kernels` **4/4**.

@@ -46,15 +46,31 @@ fn compileWithStaged(units: const Module[:], entry: u32, bytes: u8[>..<]&, messa
     return res;
 }
 
+fn compileWithStagedAndAnalysis(units: const Module[:], entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&, imm_pools: const u64[:], bytes: u8[>..<]&, message: u8[>..<]&, staged_units: u32[>..<]&, build_inputs:i64 = -1) -> Result {
+    var types = blot_direct_types::Types { units: units, .. };
+    blot_direct_types::init(types);
+    var module = blot_direct_writer::Module { .. };
+    var state = blot_direct_emit::State { .. };
+    let res = compileWithAnalysis(units, entry, types, module, state, pinfo, imm_pools, bytes, message, build_inputs);
+    if !res.failed && state.staged_dep_units_valid {
+        staged_units.append(state.staged_dep_units[..]);
+    }
+    return res;
+}
+
 fn compileTracked(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
     blot_direct_types::init(types);
     state.track_deps = true;
     return compileWith(units, entry, types, module, state, bytes, message, build_inputs);
 }
 
-fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
-    var g = Generator { types: types, module: module, s: state, units: units, build_inputs:build_inputs };
-    let error = build(g, entry, bytes);
+fn compileTrackedWithAnalysis(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, pinfo: const blot_check_wire_schema::ProgramInfo&, imm_pools: const u64[:], bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    blot_direct_types::init(types);
+    state.track_deps = true;
+    return compileWithAnalysis(units, entry, types, module, state, pinfo, imm_pools, bytes, message, build_inputs);
+}
+
+fn finishCompile(entry: u32, module: const blot_direct_writer::Module&, state: const blot_direct_emit::State&, error: Error, message: u8[>..<]&) -> Result {
     if error != blot_direct_types::Error.none {
         if !state.has_failure {
             message.append("Direct backend: unsupported program");
@@ -65,6 +81,18 @@ fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Typ
         return Result { failed: true, unit: failure.unit, span: failure.span, code: failure.code };
     }
     return Result { emitted_functions: module.functions.len, sparks_vectorized: state.sparks_vectorized, sparks_scalar_fallback: state.sparks_scalar_fallback, staged_dep_units_valid: state.staged_dep_units_valid, staged_value_digest: state.staged_value_digest };
+}
+
+fn compileWith(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    var g = Generator { types: types, module: module, s: state, units: units, build_inputs:build_inputs };
+    let error = build(g, entry, bytes);
+    return finishCompile(entry, module, state, error, message);
+}
+
+fn compileWithAnalysis(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, pinfo: const blot_check_wire_schema::ProgramInfo&, imm_pools: const u64[:], bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    var g = Generator { types: types, module: module, s: state, units: units, build_inputs:build_inputs };
+    let error = buildWithAnalysis(g, entry, pinfo, imm_pools, bytes);
+    return finishCompile(entry, module, state, error, message);
 }
 
 // Whether pool instance `left` initializes before `right`.
@@ -85,9 +113,6 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
         if !g.hasUnit(err_unit) { err_unit = entry; }
         return g.failSpanCode(err_unit, pinfo.issue.span, pinfo.issue.code, pinfo.issue.message);
     }
-    g.s.kernels.append(pinfo.kernels[..]);
-    g.s.processes.append(pinfo.processes[..]);
-    g.s.wire_word_tags.append(pinfo.word_tags[..]);
     var imm_pools: u64[>..] = [];
     let pres = blot_check_purity::analyzeInto(g.units, entry, imm_pools);
     if pres.issue.failed {
@@ -95,6 +120,14 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
         if !g.hasUnit(err_unit) { err_unit = entry; }
         return g.failSpanCode(err_unit, pres.issue.span, pres.issue.code, pres.issue.message);
     }
+    return buildWithAnalysis(g, entry, pinfo, imm_pools[..], bytes);
+}
+
+fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&, imm_pools: const u64[:], bytes: u8[>..<]&) -> Error {
+    if !g.hasUnit(entry) { return blot_direct_types::Error.unsupported; }
+    g.s.kernels.append(pinfo.kernels[..]);
+    g.s.processes.append(pinfo.processes[..]);
+    g.s.wire_word_tags.append(pinfo.word_tags[..]);
     for ik in imm_pools { g.s.deeply_immutable_pools.put(ik, 1); }
     let m .= g.units[entry - 1];
     var entries: u8[>..<] = [];

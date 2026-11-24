@@ -686,6 +686,24 @@ entry kernel func read_table (x: U32): U32 => return @u32.add x table[0]
 `,
     "kernel_mutates_context",
   );
+
+  // Immutable-typed const pool aliasing a mutable global via view -> NOT deeply immutable -> kernel read rejected,
+  // while an unrelated pure const pool in the same module remains accepted.
+  await compileExpectedFailure(
+    `const mut_table: #[+U32] = #[1, 2, 3]
+const view_table: #[&[U32]] = #[&mut_table[0..1]]
+entry kernel func read_view (x: U32): U32 => return @u32.add x view_table[0][0]
+`,
+    "kernel_mutates_context",
+  );
+  await compileAndRun(
+    `const mut_table: #[+U32] = #[1, 2, 3]
+const pure_table: #[U32] = #[10, 20, 30]
+entry kernel func read_pure (x: U32): U32 => return @u32.add x pure_table[1]
+entry func ok (): U32 => return @u32.add mut_table[0] pure_table[1]
+`,
+    (guest) => equal(guest.call("ok", null), 21),
+  );
 });
 
 Deno.test("Law #3 (j): 20-level binary diamond scalability & 17-call-site widening soundness", async () => {

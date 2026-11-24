@@ -16,6 +16,7 @@ import reuse.dispatch_explanation;
 import check.core;
 import check.check;
 import check.core_builder;
+import check.wire_schema;
 import parse.ast;
 import parse.syntax_diagnostics;
 import phase_profile;
@@ -66,6 +67,12 @@ fn cachedCount(self_:const Prepared&)->i64 {var count:i64=0;for borrowed in self
 // the new result.
 fn emit(self_:const Prepared&,build_inputs:i64 = -1)->Result,Error {
  let compiled,error=blot_reuse_dependency_consumer::compileUnits(self_.units,self_.entry,build_inputs);if error!=blot_error::Error.none {return Result{},error;}
+ var result=Result{result:ConsumerResult{compiled:compiled,stats:self_.stats, ..},source_bytes:self_.source_bytes,fresh_modules:self_.units.len-self_.cachedCount(),cached_modules:self_.cachedCount()};
+ if compiled.failed {let unit=compiled.diagnostic.unit;if unit==0 || unit>self_.paths.len {result.deinit();return Result{},blot_error::Error.invalid_unit;}result.diagnostic_filename=blot_support::some(copyResultBytes(self_.paths[unit-1]));}
+ return result,blot_error::Error.none;
+}
+fn emitWithAnalysis(self_:const Prepared&,pinfo:const blot_check_wire_schema::ProgramInfo&,imm_pools:const u64[:],build_inputs:i64 = -1)->Result,Error {
+ let compiled,error=blot_reuse_dependency_consumer::compileUnitsWithAnalysis(self_.units,self_.entry,pinfo,imm_pools,build_inputs);if error!=blot_error::Error.none {return Result{},error;}
  var result=Result{result:ConsumerResult{compiled:compiled,stats:self_.stats, ..},source_bytes:self_.source_bytes,fresh_modules:self_.units.len-self_.cachedCount(),cached_modules:self_.cachedCount()};
  if compiled.failed {let unit=compiled.diagnostic.unit;if unit==0 || unit>self_.paths.len {result.deinit();return Result{},blot_error::Error.invalid_unit;}result.diagnostic_filename=blot_support::some(copyResultBytes(self_.paths[unit-1]));}
  return result,blot_error::Error.none;

@@ -72,11 +72,35 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
         ready payload=>{
             let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);
-            // Validate wire schemas, concurrency purity, and full non-staged LayoutReceipt
-            // before ANY retained/cached fast path (§4.1 item 3).
+            // 0-changed-module fast path: every Core unit is borrowed unchanged
+            // from the already-validated previous revision, so wire schemas,
+            // purity, and NonStagedReceipt are identical without re-running.
+            var inputs:i64=-1;
+            let all_cached = reused && payload.value.cachedCount()==payload.value.units.len;
+            if assets {
+                inputs=assets.allocation_index;
+                let previous .= opened.assets.value.last;
+                if previous && all_cached && previous.cached_receipt_valid && assets.reuseStagedWasm(previous) {
+                    timing.exit();
+                    let cached_receipt = previous.cached_receipt;
+                    let result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:blot_reuse_dependency_consumer::Compiled{bytes:blot_reuse_dependency_consumer::ownBytes(previous.cached_wasm),emitted_functions:previous.cached_functions,..},stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,cached_modules:payload.value.units.len,..};
+                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,cached_receipt);var owned=result;owned.deinit();return committed,error;
+                }
+            }
+            // The asset evaluator owns its file read set. Projects declaring
+            // compile-time inputs use its normal evaluation and publication.
+            let track=(retainable || reused) && (!assets || !assets.tracks_inputs);
             var current_non_staged=blot_check_wire_schema::NonStagedReceipt{};
-            {
-                var pinfo=blot_check_wire_schema::ProgramInfo{};
+            var pinfo=blot_check_wire_schema::ProgramInfo{};
+            var imm_pools:u64[>..]=[];
+            var has_analysis=false;
+            let skip_unchanged = track && all_cached && opened.image.receipt.valid && opened.image.bytes.len!=0 && (opened.image.receipt.non_staged.kernel_staging_sites_count==0 || opened.image.receipt.staged_dep_units_valid);
+            if skip_unchanged {
+                current_non_staged=opened.image.receipt.non_staged;
+            } else {
+                // Validate wire schemas, concurrency purity, and full non-staged LayoutReceipt
+                // once before any retained/cached fast path (§4.1 item 3), and pass `(pinfo, imm_pools)`
+                // straight into emission so neither pass ever runs twice.
                 blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
                 if pinfo.issue.failed {
                     timing.exit();
@@ -88,7 +112,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     }
                     return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pinfo.issue.span.start,end:pinfo.issue.span.end,message:pinfo.issue.message,..});
                 }
-                let pres=blot_check_purity::analyze(payload.value.units,payload.value.entry);
+                let pres=blot_check_purity::analyzeInto(payload.value.units,payload.value.entry,imm_pools);
                 if pres.issue.failed {
                     timing.exit();
                     if reused { if replay.used { replay.valid=false; replay.needs_reset=true; } retry=true; return false,blot_error::Error.none; }
@@ -100,20 +124,8 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pres.issue.span.start,end:pres.issue.span.end,message:pres.issue.message,..});
                 }
                 current_non_staged=blot_check_wire_schema::computeNonStagedReceipt(payload.value.units,payload.value.entry,pinfo,pres.deeply_immutable_digest);
+                has_analysis=true;
             }
-            var inputs:i64=-1;
-            if assets {
-                inputs=assets.allocation_index;
-                let previous .= opened.assets.value.last;
-                if previous && reused && payload.value.cachedCount()==payload.value.units.len && previous.cached_receipt_valid && blot_check_wire_schema::sameNonStagedReceipt(current_non_staged,previous.cached_receipt) && assets.reuseStagedWasm(previous) {
-                    timing.exit();
-                    let result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:blot_reuse_dependency_consumer::Compiled{bytes:blot_reuse_dependency_consumer::ownBytes(previous.cached_wasm),emitted_functions:previous.cached_functions,..},stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,cached_modules:payload.value.units.len,..};
-                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,current_non_staged);var owned=result;owned.deinit();return committed,error;
-                }
-            }
-            // The asset evaluator owns its file read set. Projects declaring
-            // compile-time inputs use its normal evaluation and publication.
-            let track=(retainable || reused) && (!assets || !assets.tracks_inputs);
             var bytes=default<u8[:]>();
             var operands:i64=-1;
             var replayed=false;
@@ -131,14 +143,18 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                 let cached=payload.value.cachedCount();
                 result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:compiled,stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,fresh_modules:payload.value.units.len-cached,cached_modules:cached,..};
             } else {
+                if !has_analysis {
+                    blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
+                    let _ = blot_check_purity::analyzeInto(payload.value.units,payload.value.entry,imm_pools);
+                }
                 if track { blot_direct_relocations::begin(); }
                 var emitted=Emission{};
                 var error=blot_error::Error.none;
                 if track && !replay.used {
-                    emitted,error=blot_reuse_body_image::emitTracked(payload.value,replay,inputs);
+                    emitted,error=blot_reuse_body_image::emitTrackedWithAnalysis(payload.value,replay,pinfo,imm_pools[..],inputs);
                 } else {
                     if replay.used { replay.valid=false; replay.needs_reset=true; }
-                    emitted,error=payload.value.emit(inputs);
+                    emitted,error=payload.value.emitWithAnalysis(pinfo,imm_pools[..],inputs);
                 }
                 if track { pending=blot_direct_relocations::finish(); }
                 if error!=blot_error::Error.none { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();timing.exit();return false,error; }

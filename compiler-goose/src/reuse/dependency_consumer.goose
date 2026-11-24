@@ -14,6 +14,7 @@ import check.types;
 import check.core;
 import check.core_builder;
 import check.frozen_types;
+import check.wire_schema;
 import reuse.frozen_dependency;
 import reuse.principal_interface;
 import reuse.dependency_payload;
@@ -199,6 +200,11 @@ fn deinit(self_:Result&) {freeBytes(self_.compiled.bytes);freeBytes(self_.compil
 // Runs the backend and takes ownership of what it produced.
 fn compileUnits(units:const Core[:],entry:u32,build_inputs:i64 = -1)->Compiled,Error {
  var bytes:u8[>..<]=[];var message:u8[>..<]=[];var staged_units:u32[>..<]=[];let outcome=blot_compile::compileWithStaged(units,entry,bytes,message,staged_units,build_inputs);
+ if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;}
+ return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback,staged_dep_units_valid:outcome.staged_dep_units_valid,staged_dep_units:ownU32s(staged_units[..]),staged_value_digest:outcome.staged_value_digest, ..},blot_error::Error.none;
+}
+fn compileUnitsWithAnalysis(units:const Core[:],entry:u32,pinfo:const blot_check_wire_schema::ProgramInfo&,imm_pools:const u64[:],build_inputs:i64 = -1)->Compiled,Error {
+ var bytes:u8[>..<]=[];var message:u8[>..<]=[];var staged_units:u32[>..<]=[];let outcome=blot_compile::compileWithStagedAndAnalysis(units,entry,pinfo,imm_pools,bytes,message,staged_units,build_inputs);
  if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback, ..},blot_error::Error.none;}
  return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions,sparks_vectorized:outcome.sparks_vectorized,sparks_scalar_fallback:outcome.sparks_scalar_fallback,staged_dep_units_valid:outcome.staged_dep_units_valid,staged_dep_units:ownU32s(staged_units[..]),staged_value_digest:outcome.staged_value_digest, ..},blot_error::Error.none;
 }

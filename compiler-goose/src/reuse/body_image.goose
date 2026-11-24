@@ -867,26 +867,18 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     return true;
 }
 
-fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emission,blot_error::Error {
-    assert(!replay.used);
-    replay.used=true;
-    replay.valid=false;
-    let rooted_units=prepared.catalog_owner.mutable(prepared.units);
-    replay.types.units=rooted_units;
-    var bytes:u8[>..<]=[];
-    var message:u8[>..<]=[];
-    let built=blot_direct::compileTracked(rooted_units,prepared.entry,replay.types,replay.module,replay.state,bytes,message,build_inputs);
+fn finishTracked(prepared:const Prepared&,replay:Replay&,built:blot_direct::Result,bytes:const u8[:],message:const u8[:])->Emission,blot_error::Error {
     var compiled=blot_reuse_dependency_consumer::Compiled{};
     if built.failed {
         compiled=blot_reuse_dependency_consumer::Compiled{
             failed:true,
             diagnostic:blot_compile::Diagnostic{unit:built.unit,span:built.span,code:built.code},
-            message:blot_reuse_dependency_consumer::ownBytes(message[..]),
+            message:blot_reuse_dependency_consumer::ownBytes(message),
             emitted_functions:built.emitted_functions,..
         };
     } else {
         compiled=blot_reuse_dependency_consumer::Compiled{
-            bytes:blot_reuse_dependency_consumer::ownBytes(bytes[..]),
+            bytes:blot_reuse_dependency_consumer::ownBytes(bytes),
             emitted_functions:built.emitted_functions,
             sparks_vectorized:built.sparks_vectorized,
             sparks_scalar_fallback:built.sparks_scalar_fallback,
@@ -908,4 +900,26 @@ fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emissi
         result.diagnostic_filename=blot_support::some(blot_reuse_partial_dependency::copyResultBytes(prepared.paths[unit-1]));
     }
     return result,blot_error::Error.none;
+}
+fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emission,blot_error::Error {
+    assert(!replay.used);
+    replay.used=true;
+    replay.valid=false;
+    let rooted_units=prepared.catalog_owner.mutable(prepared.units);
+    replay.types.units=rooted_units;
+    var bytes:u8[>..<]=[];
+    var message:u8[>..<]=[];
+    let built=blot_direct::compileTracked(rooted_units,prepared.entry,replay.types,replay.module,replay.state,bytes,message,build_inputs);
+    return finishTracked(prepared,replay,built,bytes[..],message[..]);
+}
+fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const blot_check_wire_schema::ProgramInfo&,imm_pools:const u64[:],build_inputs:i64)->Emission,blot_error::Error {
+    assert(!replay.used);
+    replay.used=true;
+    replay.valid=false;
+    let rooted_units=prepared.catalog_owner.mutable(prepared.units);
+    replay.types.units=rooted_units;
+    var bytes:u8[>..<]=[];
+    var message:u8[>..<]=[];
+    let built=blot_direct::compileTrackedWithAnalysis(rooted_units,prepared.entry,replay.types,replay.module,replay.state,pinfo,imm_pools,bytes,message,build_inputs);
+    return finishTracked(prepared,replay,built,bytes[..],message[..]);
 }

@@ -11,10 +11,12 @@ const frame = `  let settings: Array render.Settings = #[render.defaults]
   let morph_weights: ResizeArray render.MorphWeight = #[]
   let motions: ResizeArray render.Motion = #[]
   let emitters: ResizeArray render.Emitter = #[]
+  let ribbons: ResizeArray render.RibbonPoint = #[]
+  let haptics: ResizeArray render.Haptic = #[]
   let extensions: ResizeArray render.Extension = #[]
   let updates: ResizeArray render.Instance = #[]
   let removed: ResizeArray U32 = #[]
-  let access = $render.FrameAccess {settings, draws, solids, decals, sprites, insets, fields, lights, poses, bone_matrices, morph_weights, motions, emitters, extensions, updates, removed}
+  let access = $render.FrameAccess {settings, draws, solids, decals, sprites, insets, fields, lights, poses, bone_matrices, morph_weights, motions, emitters, ribbons, haptics, extensions, updates, removed}
 `;
 const packing =
   `const pack = func (vectors: ResizeArray math.Vec4) -> (draws: ResizeArray render.Draw) -> (prefix: &[math.Vec4]) => return do:

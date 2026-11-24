@@ -153,8 +153,26 @@ struct WithEntry {
 
 // Flat linked-list pool nodes (index 0 is sentinel / empty).
 struct U32Node { val: u32 = 0, next: u32 = 0 }
-struct EdgeNode { edge: Edge = Edge {}, next: u32 = 0 }
+struct EdgeNode { edge: Edge = Edge {}, next: u32 = 0, next_src: u32 = 0 }
 struct CallerNode { caller_ctx: u32 = 0, call_site: u32 = 0, next: u32 = 0 }
+
+struct AssocEntry {
+    identity: Identity = Identity { 0, 0 },
+    op: blot_check_types::Operator = blot_check_types::Operator.none,
+    target: BindingRef = BindingRef { 0, 0 },
+    next: u32 = 0,
+}
+
+struct ImplMemEntry {
+    contract: Identity = Identity { 0, 0 },
+    has_head_id: bool = false,
+    is_prim_head: bool = false,
+    head_id: Identity = Identity { 0, 0 },
+    name_lbl: u32 = 0,
+    target: BindingRef = BindingRef { 0, 0 },
+    next_by_name: u32 = 0,
+    next_by_contract: u32 = 0,
+}
 
 // Callable definitions across all units.
 let FN_BODY: u8 = 0;
@@ -246,6 +264,7 @@ struct FnCtx {
     error_msg: Chars = "",
     dirty: bool = true,
     analyzed: bool = false,
+    next_same_fn: u32 = 0,
 }
 
 struct Issue {
@@ -287,6 +306,8 @@ root struct Analyzer {
     ctx_site_paths: dictionary<u64, u32> = dictionary<u64, u32>{},
     ctx_base_edge_set: dictionary<CtxEdgeKey, bool> = dictionary<CtxEdgeKey, bool>{},
     ctx_written_edge_set: dictionary<CtxEdgeKey, bool> = dictionary<CtxEdgeKey, bool>{},
+    ctx_src_base_edges: dictionary<u64, u32> = dictionary<u64, u32>{},
+    ctx_src_written_edges: dictionary<u64, u32> = dictionary<u64, u32>{},
     // Interned symbols.
     syms: SymKey[>..] = [],
     sym_map: dictionary<SymKey, u32> = dictionary<SymKey, u32>{},
@@ -301,6 +322,9 @@ root struct Analyzer {
     path_map: dictionary<PathKey, u32> = dictionary<PathKey, u32>{},
     // Interned field spellings (UTF-8).
     field_names: Chars[>..] = [],
+    field_name_map: dictionary<const u8[:], u32> = dictionary<const u8[:], u32>{},
+    // Memoized pure-scalar type predicate keyed by `(unit << 32) | tid`.
+    pure_scalar_cache: dictionary<u64, bool> = dictionary<u64, bool>{},
     // Interned effect op keys.
     op_keys: OpKeyData[>..] = [],
     op_key_map: dictionary<OpKeyData, u32> = dictionary<OpKeyData, u32>{},
@@ -309,9 +333,18 @@ root struct Analyzer {
     body_fn_map: dictionary<BindingRef, u32> = dictionary<BindingRef, u32>{},
     closure_fn_map: dictionary<u64, u32> = dictionary<u64, u32>{},
     spark_fn_map: dictionary<u64, u32> = dictionary<u64, u32>{},
+    // Lazy whole-program index of associated methods & contract implementations.
+    assoc_index_built: bool = false,
+    assoc_entries: AssocEntry[>..] = [],
+    assoc_by_name: dictionary<u32, u32> = dictionary<u32, u32>{},
+    assoc_op_head: u32 = 0,
+    impl_entries: ImplMemEntry[>..] = [],
+    impl_by_name: dictionary<u32, u32> = dictionary<u32, u32>{},
+    impl_by_contract: dictionary<u64, u32> = dictionary<u64, u32>{},
     // Contexts & worklist.
     ctxs: FnCtx[>..] = [],
     contexts_per_fn: u32[>..] = [],
+    fn_ctx_head: u32[>..] = [],
     worklist: u32[>..] = [],
     // Tracked spark checks.
     spark_checks: SparkCheck[>..] = [],
@@ -523,12 +556,13 @@ fn extendPath(st: Analyzer&, call_site: u32, path_id: u32) -> u32 {
 }
 
 fn internFieldLabel(st: Analyzer&, name: Chars) -> u32 {
-    for i in 0..st.field_names.len {
-        if st.field_names[i] == name { return LBL_FIELD_BASE + (i as u32); }
-    }
+    let found .= st.field_name_map.get(name);
+    if found { let lbl: u32 = found; return lbl; }
     let idx = st.field_names.len as u32;
+    let lbl = LBL_FIELD_BASE + idx;
     st.field_names.push(name);
-    return LBL_FIELD_BASE + idx;
+    st.field_name_map.insert(name, lbl);
+    return lbl;
 }
 
 fn internOpKey(st: Analyzer&, op_val: blot_check_core::OperationValue) -> u32 {
@@ -602,6 +636,15 @@ recursive fn isPureScalarValueType(units: const Module[:], unit: u32, tid: TId, 
     }
 }
 
+fn isPureScalarCached(st: Analyzer&, units: const Module[:], unit: u32, tid: TId) -> bool {
+    let key = ((unit as u64) << 32) | (tid as u64);
+    let found .= st.pure_scalar_cache.get(key);
+    if found { let v: bool = found; return v; }
+    let v = isPureScalarValueType(units, unit, tid, 0);
+    st.pure_scalar_cache.insert(key, v);
+    return v;
+}
+
 recursive fn typeHasMutableArray(units: const Module[:], unit: u32, tid: TId, depth: i64) -> bool {
     if depth > 64 || !hasUnit(units, unit) { return false; }
     let m .= units[unit - 1];
@@ -656,18 +699,28 @@ fn addBaseEdge(st: Analyzer&, ctx_id: u32, src: u32, lbl: u32, dst: u32) {
     let key = CtxEdgeKey { ctx_id: ctx_id, src: src, lbl: lbl, dst: dst };
     if st.ctx_base_edge_set.contains(key) { return; }
     st.ctx_base_edge_set.insert(key, true);
+    let skey = ctxKey(ctx_id, src);
+    var prev_src: u32 = 0;
+    let sopt .= st.ctx_src_base_edges.get(skey);
+    if sopt { let h: u32 = sopt; prev_src = h; }
     let idx = st.edge_nodes.len as u32;
-    st.edge_nodes.push(EdgeNode { edge: Edge { src: src, lbl: lbl, dst: dst }, next: st.ctxs[ctx_id].base_edges_head });
+    st.edge_nodes.push(EdgeNode { edge: Edge { src: src, lbl: lbl, dst: dst }, next: st.ctxs[ctx_id].base_edges_head, next_src: prev_src });
     st.ctxs[ctx_id].base_edges_head = idx;
+    st.ctx_src_base_edges.insert(skey, idx);
 }
 
 fn addWrittenEdge(st: Analyzer&, ctx_id: u32, src: u32, lbl: u32, dst: u32) -> bool {
     let key = CtxEdgeKey { ctx_id: ctx_id, src: src, lbl: lbl, dst: dst };
     if st.ctx_written_edge_set.contains(key) { return false; }
     st.ctx_written_edge_set.insert(key, true);
+    let skey = ctxKey(ctx_id, src);
+    var prev_src: u32 = 0;
+    let sopt .= st.ctx_src_written_edges.get(skey);
+    if sopt { let h: u32 = sopt; prev_src = h; }
     let idx = st.edge_nodes.len as u32;
-    st.edge_nodes.push(EdgeNode { edge: Edge { src: src, lbl: lbl, dst: dst }, next: st.ctxs[ctx_id].written_edges_head });
+    st.edge_nodes.push(EdgeNode { edge: Edge { src: src, lbl: lbl, dst: dst }, next: st.ctxs[ctx_id].written_edges_head, next_src: prev_src });
     st.ctxs[ctx_id].written_edges_head = idx;
+    st.ctx_src_written_edges.insert(skey, idx);
     return true;
 }
 
@@ -728,21 +781,34 @@ fn registerPreExistingRoot(st: Analyzer&, ctx_id: u32, root: u32, add_child: boo
 fn stepLabelHead(st: Analyzer&, ctx_id: u32, seeds_head: u32, want_lbl: u32) -> u32 {
     if seeds_head == 0 { return 0; }
     var out: u32 = 0;
-    var ec = st.ctxs[ctx_id].base_edges_head;
-    while ec != 0 {
-        let en = st.edge_nodes[ec];
-        if (en.edge.lbl == want_lbl || en.edge.lbl == LBL_ANY) && listHas(st, seeds_head, en.edge.src) {
-            let _ = listAdd(st, out, en.edge.dst);
+    var sc = seeds_head;
+    while sc != 0 {
+        let src = st.u32_nodes[sc].val;
+        let sn = st.u32_nodes[sc].next;
+        let skey = ctxKey(ctx_id, src);
+        let bopt .= st.ctx_src_base_edges.get(skey);
+        if bopt {
+            var ec: u32 = bopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                if en.edge.lbl == want_lbl || en.edge.lbl == LBL_ANY {
+                    let _ = listAdd(st, out, en.edge.dst);
+                }
+                ec = en.next_src;
+            }
         }
-        ec = en.next;
-    }
-    ec = st.ctxs[ctx_id].written_edges_head;
-    while ec != 0 {
-        let en = st.edge_nodes[ec];
-        if (en.edge.lbl == want_lbl || en.edge.lbl == LBL_ANY) && listHas(st, seeds_head, en.edge.src) {
-            let _ = listAdd(st, out, en.edge.dst);
+        let wopt .= st.ctx_src_written_edges.get(skey);
+        if wopt {
+            var ec: u32 = wopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                if en.edge.lbl == want_lbl || en.edge.lbl == LBL_ANY {
+                    let _ = listAdd(st, out, en.edge.dst);
+                }
+                ec = en.next_src;
+            }
         }
-        ec = en.next;
+        sc = sn;
     }
     return out;
 }
@@ -782,10 +848,8 @@ fn stepTupleHead(st: Analyzer&, ctx_id: u32, seeds_head: u32, slot: u32) -> u32 
 }
 
 // Reflexive-transitive closure over BOTH `contains` (all labels) AND `FnVal(_, env_node) -> env_node` (§2.5).
-fn reachHead(st: Analyzer&, ctx_id: u32, seeds_head: u32) -> u32 {
-    if seeds_head == 0 { return 0; }
-    var visited: u32[>..] = [];
-    var seen: dictionary<u32, bool> = dictionary<u32, bool>{};
+fn reachIntoSet(st: const Analyzer&, ctx_id: u32, seeds_head: u32, seen: dictionary<u32, bool>&, visited: u32[>..]& ) {
+    if seeds_head == 0 { return; }
     var sc = seeds_head;
     while sc != 0 {
         let s = st.u32_nodes[sc].val;
@@ -801,21 +865,39 @@ fn reachHead(st: Analyzer&, ctx_id: u32, seeds_head: u32) -> u32 {
             let env = sk.b;
             if !seen.contains(env) { seen.insert(env, true); visited.push(env); }
         }
-        var ec = st.ctxs[ctx_id].base_edges_head;
-        while ec != 0 {
-            let en = st.edge_nodes[ec];
-            if en.edge.src == cur && !seen.contains(en.edge.dst) { seen.insert(en.edge.dst, true); visited.push(en.edge.dst); }
-            ec = en.next;
+        let skey = ctxKey(ctx_id, cur);
+        let bopt .= st.ctx_src_base_edges.get(skey);
+        if bopt {
+            var ec: u32 = bopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                if !seen.contains(en.edge.dst) { seen.insert(en.edge.dst, true); visited.push(en.edge.dst); }
+                ec = en.next_src;
+            }
         }
-        ec = st.ctxs[ctx_id].written_edges_head;
-        while ec != 0 {
-            let en = st.edge_nodes[ec];
-            if en.edge.src == cur && !seen.contains(en.edge.dst) { seen.insert(en.edge.dst, true); visited.push(en.edge.dst); }
-            ec = en.next;
+        let wopt .= st.ctx_src_written_edges.get(skey);
+        if wopt {
+            var ec: u32 = wopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                if !seen.contains(en.edge.dst) { seen.insert(en.edge.dst, true); visited.push(en.edge.dst); }
+                ec = en.next_src;
+            }
         }
     }
+}
+
+fn reachHead(st: Analyzer&, ctx_id: u32, seeds_head: u32) -> u32 {
+    if seeds_head == 0 { return 0; }
+    var visited: u32[>..] = [];
+    var seen: dictionary<u32, bool> = dictionary<u32, bool>{};
+    reachIntoSet(st, ctx_id, seeds_head, seen, visited);
     var out: u32 = 0;
-    for v in visited { let _ = listAdd(st, out, v); }
+    for v in visited {
+        let idx = st.u32_nodes.len as u32;
+        st.u32_nodes.push(U32Node { val: v, next: out });
+        out = idx;
+    }
     return out;
 }
 
@@ -829,105 +911,127 @@ fn reachStrictHead(st: Analyzer&, ctx_id: u32, seeds_head: u32) -> u32 {
         let sn = st.u32_nodes[sc].next;
         let sk = st.syms[cur];
         if sk.kind == SYM_FN_VAL { let _ = listAdd(st, direct, sk.b); }
-        var ec = st.ctxs[ctx_id].base_edges_head;
-        while ec != 0 {
-            let en = st.edge_nodes[ec];
-            if en.edge.src == cur { let _ = listAdd(st, direct, en.edge.dst); }
-            ec = en.next;
+        let skey = ctxKey(ctx_id, cur);
+        let bopt .= st.ctx_src_base_edges.get(skey);
+        if bopt {
+            var ec: u32 = bopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                let _ = listAdd(st, direct, en.edge.dst);
+                ec = en.next_src;
+            }
         }
-        ec = st.ctxs[ctx_id].written_edges_head;
-        while ec != 0 {
-            let en = st.edge_nodes[ec];
-            if en.edge.src == cur { let _ = listAdd(st, direct, en.edge.dst); }
-            ec = en.next;
+        let wopt .= st.ctx_src_written_edges.get(skey);
+        if wopt {
+            var ec: u32 = wopt;
+            while ec != 0 {
+                let en = st.edge_nodes[ec];
+                let _ = listAdd(st, direct, en.edge.dst);
+                ec = en.next_src;
+            }
         }
         sc = sn;
     }
     return reachHead(st, ctx_id, direct);
 }
 
-// ---- Registration of All Callables (Bodies, Closures, Sparks) ----
+// ---- Lazy Per-Unit Registration of Callables (Bodies, Closures, Sparks) ----
 
-fn registerAllCallables(st: Analyzer&, units: const Module[:]) {
+fn initAnalyzerSentinels(st: Analyzer&) {
     st.u32_nodes.push(U32Node {});
     st.edge_nodes.push(EdgeNode {});
     st.caller_nodes.push(CallerNode {});
+    st.assoc_entries.push(AssocEntry {});
+    st.impl_entries.push(ImplMemEntry {});
     let _ = symEmptyEnv(st);
     let _ = internPath(st, PathKey { len: 0 });
     let _ = internPath(st, PathKey { len: 0xff });
-    for u_idx in 0..units.len {
-        let m .= units[u_idx];
-        let unit = m.unit;
-        for bi in 1..m.bodies.len {
-            let body = m.bodies[bi];
+}
+
+fn ensureUnitRegistered(st: Analyzer&, units: const Module[:], unit: u32) {
+    if !hasUnit(units, unit) { return; }
+    let sentinel = BindingRef { unit: unit, binding: 0 };
+    if st.body_fn_map.contains(sentinel) { return; }
+    st.body_fn_map.insert(sentinel, 0);
+    let m .= units[unit - 1];
+    for bi in 1..m.bodies.len {
+        let body = m.bodies[bi];
+        let fn_id = st.fn_defs.len as u32;
+        let pstart = st.fn_bindings.len as u32;
+        for p in m.bodyParameters(body) { st.fn_bindings.push(p.binding); }
+        let plen = (st.fn_bindings.len as u32) - pstart;
+        st.fn_defs.push(FnDef {
+            kind: FN_BODY,
+            unit: unit,
+            binding: body.binding,
+            node_id: bi as u32,
+            root: body.root,
+            is_function: body.is_function,
+            param_start: pstart,
+            param_len: plen,
+            span: body.span,
+        });
+        st.contexts_per_fn.push(0);
+        st.fn_ctx_head.push(0);
+        st.body_fn_map.insert(BindingRef { unit: unit, binding: body.binding }, fn_id);
+    }
+    for nid in 1..m.nodes.len {
+        let n = m.nodes[nid];
+        if n.tag == blot_check_core::Tag.closure {
+            let cl = m.closure(nid as u32);
             let fn_id = st.fn_defs.len as u32;
             let pstart = st.fn_bindings.len as u32;
-            for p in m.bodyParameters(body) { st.fn_bindings.push(p.binding); }
-            let plen = (st.fn_bindings.len as u32) - pstart;
+            st.fn_bindings.push(cl.parameter.binding);
+            let cstart = st.fn_bindings.len as u32;
+            for cb in m.closureCaptures(nid as u32) { st.fn_bindings.push(cb); }
+            let clen = (st.fn_bindings.len as u32) - cstart;
             st.fn_defs.push(FnDef {
-                kind: FN_BODY,
+                kind: FN_CLOSURE,
                 unit: unit,
-                binding: body.binding,
-                node_id: bi as u32,
-                root: body.root,
-                is_function: body.is_function,
+                node_id: nid as u32,
+                root: cl.body,
+                is_function: true,
                 param_start: pstart,
-                param_len: plen,
-                span: body.span,
+                param_len: 1,
+                capture_start: cstart,
+                capture_len: clen,
+                span: m.span(nid as u32),
             });
             st.contexts_per_fn.push(0);
-            st.body_fn_map.insert(BindingRef { unit: unit, binding: body.binding }, fn_id);
-            if !body.is_function && (body.binding as i64) < m.bindings.len && isPoolType(m, m.binding(body.binding).ty) {
-                st.pool_globals.push(BindingRef { unit: unit, binding: body.binding });
-            }
-        }
-        for nid in 1..m.nodes.len {
-            let n = m.nodes[nid];
-            if n.tag == blot_check_core::Tag.closure {
-                let cl = m.closure(nid as u32);
-                let fn_id = st.fn_defs.len as u32;
-                let pstart = st.fn_bindings.len as u32;
-                st.fn_bindings.push(cl.parameter.binding);
-                let cstart = st.fn_bindings.len as u32;
-                for cb in m.closureCaptures(nid as u32) { st.fn_bindings.push(cb); }
-                let clen = (st.fn_bindings.len as u32) - cstart;
-                st.fn_defs.push(FnDef {
-                    kind: FN_CLOSURE,
-                    unit: unit,
-                    node_id: nid as u32,
-                    root: cl.body,
-                    is_function: true,
-                    param_start: pstart,
-                    param_len: 1,
-                    capture_start: cstart,
-                    capture_len: clen,
-                    span: m.span(nid as u32),
-                });
-                st.contexts_per_fn.push(0);
-                let key = ((unit as u64) << 32) | (nid as u64);
-                st.closure_fn_map.insert(key, fn_id);
-            } else if n.tag == blot_check_core::Tag.spark {
-                let si = m.sparkInfo(nid as u32);
-                let fn_id = st.fn_defs.len as u32;
-                let cstart = st.fn_bindings.len as u32;
-                for cb in m.sparkCaptures(nid as u32) { st.fn_bindings.push(cb); }
-                let clen = (st.fn_bindings.len as u32) - cstart;
-                st.fn_defs.push(FnDef {
-                    kind: FN_SPARK,
-                    unit: unit,
-                    node_id: nid as u32,
-                    root: si.body,
-                    is_function: false,
-                    capture_start: cstart,
-                    capture_len: clen,
-                    span: m.span(nid as u32),
-                });
-                st.contexts_per_fn.push(0);
-                let key = ((unit as u64) << 32) | (nid as u64);
-                st.spark_fn_map.insert(key, fn_id);
-            }
+            st.fn_ctx_head.push(0);
+            let key = ((unit as u64) << 32) | (nid as u64);
+            st.closure_fn_map.insert(key, fn_id);
+        } else if n.tag == blot_check_core::Tag.spark {
+            let si = m.sparkInfo(nid as u32);
+            let fn_id = st.fn_defs.len as u32;
+            let cstart = st.fn_bindings.len as u32;
+            for cb in m.sparkCaptures(nid as u32) { st.fn_bindings.push(cb); }
+            let clen = (st.fn_bindings.len as u32) - cstart;
+            st.fn_defs.push(FnDef {
+                kind: FN_SPARK,
+                unit: unit,
+                node_id: nid as u32,
+                root: si.body,
+                is_function: false,
+                capture_start: cstart,
+                capture_len: clen,
+                span: m.span(nid as u32),
+            });
+            st.contexts_per_fn.push(0);
+            st.fn_ctx_head.push(0);
+            let key = ((unit as u64) << 32) | (nid as u64);
+            st.spark_fn_map.insert(key, fn_id);
         }
     }
+}
+
+fn lookupBodyFn(st: Analyzer&, units: const Module[:], target: BindingRef) -> u32, bool {
+    if target.binding == 0 { return 0, false; }
+    ensureUnitRegistered(st, units, target.unit);
+    let opt .= st.body_fn_map.get(target);
+    if !opt { return 0, false; }
+    let fid: u32 = opt;
+    return fid, true;
 }
 
 fn specsEqual(a: const CallableSpec[:], b: const CallableSpec[:]) -> bool {
@@ -1008,13 +1112,15 @@ fn getOrCreateCtx(
         }
         return 0, false;
     }
-    for ci in 0..st.ctxs.len {
+    var cur_ci = st.fn_ctx_head[fn_id];
+    while cur_ci != 0 {
+        let ci = cur_ci - 1;
         let c = st.ctxs[ci];
-        if c.fn_id == fn_id &&
-           specsEqual(st.ctx_cspecs[c.cspec_start..c.cspec_start + c.cspec_len], cspecs) &&
+        if specsEqual(st.ctx_cspecs[c.cspec_start..c.cspec_start + c.cspec_len], cspecs) &&
            handlersEqual(st.ctx_hspecs[c.hspec_start..c.hspec_start + c.hspec_len], hspecs) {
-            return ci as u32, true;
+            return ci, true;
         }
+        cur_ci = c.next_same_fn;
     }
     if (st.contexts_per_fn[fn_id] as i64) >= MAX_CONTEXTS_PER_FN {
         if !st.fatal_issue.failed {
@@ -1028,6 +1134,7 @@ fn getOrCreateCtx(
     for cs in cspecs { st.ctx_cspecs.push(cs); }
     let hstart = st.ctx_hspecs.len as u32;
     for hs in hspecs { st.ctx_hspecs.push(hs); }
+    let prev_fn_ctx = st.fn_ctx_head[fn_id];
     st.ctxs.push(FnCtx {
         fn_id: fn_id,
         cspec_start: cstart,
@@ -1035,7 +1142,9 @@ fn getOrCreateCtx(
         hspec_start: hstart,
         hspec_len: hspecs.len as u32,
         dirty: true,
+        next_same_fn: prev_fn_ctx,
     });
+    st.fn_ctx_head[fn_id] = ctx_id + 1;
     let def = st.fn_defs[fn_id];
     for pi in 0..(def.param_len as i64) {
         let pb = st.fn_bindings[(def.param_start as i64) + pi];
@@ -1191,6 +1300,7 @@ fn remapCallerForWidenedSite(st: Analyzer&, caller_ctx: u32, call_site: u32, ori
         for ei in emark..st.edge_stack.len {
             let e = st.edge_stack[ei];
             st.ctx_written_edge_set.remove(CtxEdgeKey { ctx_id: caller_ctx, src: e.src, lbl: e.lbl, dst: e.dst });
+            st.ctx_src_written_edges.remove(ctxKey(caller_ctx, e.src));
         }
         st.ctxs[caller_ctx].written_edges_head = 0;
         for ei in emark..st.edge_stack.len {
@@ -1288,7 +1398,9 @@ fn publishSummary(st: Analyzer&, ctx_id: u32, force_notify: bool) -> bool {
         let cb = st.fn_bindings[(def.capture_start as i64) + ci];
         let _ = listUnionHead(st, seeds, getBindingHead(st, ctx_id, cb));
     }
-    let escaped_head = reachHead(st, ctx_id, seeds);
+    var escaped_set: dictionary<u32, bool> = dictionary<u32, bool>{};
+    var escaped_vec: u32[>..] = [];
+    reachIntoSet(st, ctx_id, seeds, escaped_set, escaped_vec);
 
     // Pass 1: detect any newly triggered widening latches.
     var rc = st.ctxs[ctx_id].ret_pts_head;
@@ -1308,7 +1420,7 @@ fn publishSummary(st: Analyzer&, ctx_id: u32, force_notify: bool) -> bool {
     while ec != 0 {
         let e = st.edge_nodes[ec].edge;
         let enext = st.edge_nodes[ec].next;
-        if listHas(st, escaped_head, e.src) {
+        if escaped_set.contains(e.src) {
             let pu = piStatic(st, ctx_id, e.src);
             let pv = piStatic(st, ctx_id, e.dst);
             if checkWideningLatch(st, ctx_id, pu) {
@@ -1335,13 +1447,17 @@ fn publishSummary(st: Analyzer&, ctx_id: u32, force_notify: bool) -> bool {
         rc = rn;
     }
     var new_edges: u32 = 0;
+    var new_edge_set: dictionary<Edge, bool> = dictionary<Edge, bool>{};
+    var new_edge_count: i64 = 0;
     ec = st.ctxs[ctx_id].written_edges_head;
     while ec != 0 {
         let e = st.edge_nodes[ec].edge;
         let enext = st.edge_nodes[ec].next;
-        if listHas(st, escaped_head, e.src) {
+        if escaped_set.contains(e.src) {
             let pe = Edge { src: piStatic(st, ctx_id, e.src), lbl: e.lbl, dst: piStatic(st, ctx_id, e.dst) };
-            if !edgeListHas(st, new_edges, pe) {
+            if !new_edge_set.contains(pe) {
+                new_edge_set.insert(pe, true);
+                new_edge_count += 1;
                 let idx = st.edge_nodes.len as u32;
                 st.edge_nodes.push(EdgeNode { edge: pe, next: new_edges });
                 new_edges = idx;
@@ -1362,8 +1478,18 @@ fn publishSummary(st: Analyzer&, ctx_id: u32, force_notify: bool) -> bool {
 
     var changed = newly_widened != 0;
     if !changed {
-        if !listEqual(st, new_ret, st.ctxs[ctx_id].sum_ret_head) ||
-           !edgeListEqual(st, new_edges, st.ctxs[ctx_id].sum_edges_head) ||
+        var edges_same = true;
+        var old_edge_count: i64 = 0;
+        var oec = st.ctxs[ctx_id].sum_edges_head;
+        while oec != 0 {
+            let oen = st.edge_nodes[oec];
+            old_edge_count += 1;
+            if !new_edge_set.contains(oen.edge) { edges_same = false; break; }
+            oec = oen.next;
+        }
+        if edges_same && old_edge_count != new_edge_count { edges_same = false; }
+        if !edges_same ||
+           !listEqual(st, new_ret, st.ctxs[ctx_id].sum_ret_head) ||
            !listEqual(st, new_mut, st.ctxs[ctx_id].sum_mut_head) ||
            !listEqual(st, new_reads, st.ctxs[ctx_id].sum_reads_head) {
             changed = true;
@@ -1714,7 +1840,7 @@ recursive fn bindPattern(st: Analyzer&, units: const Module[:], env: EvalEnv&, p
             let _ = evalNode(st, units, env, pat.a, depth + 1);
         },
         bind => {
-            if val_head != 0 && !isPureScalarValueType(units, env.unit, pat.ty, 0) {
+            if val_head != 0 && !isPureScalarCached(st, units, env.unit, pat.ty) {
                 bindLocal(st, env, pat.a, val_head);
             }
         },
@@ -1889,8 +2015,91 @@ fn isDataFieldProjection(units: const Module[:], m: const Module&, recv_ty: TId,
     return false;
 }
 
+fn ensureAssocIndex(st: Analyzer&, units: const Module[:]) {
+    if st.assoc_index_built { return; }
+    st.assoc_index_built = true;
+    for u_idx in 0..units.len {
+        let um .= units[u_idx];
+        for assoc in um.associated {
+            let res = blot_check_wire_schema::resolveBindingTarget(units, um.unit, assoc.target);
+            if res.unit == 0 || res.binding == 0 { continue; }
+            if assoc.operator != blot_check_types::Operator.none {
+                let idx = st.assoc_entries.len as u32;
+                st.assoc_entries.push(AssocEntry { identity: assoc.identity, op: assoc.operator, target: res, next: st.assoc_op_head });
+                st.assoc_op_head = idx;
+            }
+            let sp = um.fieldSpelling(assoc.member);
+            if sp.present {
+                let lbl = internFieldLabel(st, sp.value);
+                var prev: u32 = 0;
+                let opt .= st.assoc_by_name.get(lbl);
+                if opt { let h: u32 = opt; prev = h; }
+                let idx = st.assoc_entries.len as u32;
+                st.assoc_entries.push(AssocEntry { identity: assoc.identity, op: blot_check_types::Operator.none, target: res, next: prev });
+                st.assoc_by_name.insert(lbl, idx);
+            }
+        }
+        for impl_ in um.implementations {
+            var has_head_id = false;
+            var is_prim_head = false;
+            var head_id = Identity { 0, 0 };
+            let head_list = um.types.list(impl_.head);
+            if head_list.len != 0 {
+                var hcur = head_list[0];
+                for _ in 0..8 {
+                    if (hcur as i64) >= um.types.nodes.len { break; }
+                    let hn = um.types.node(hcur);
+                    if hn.tag == blot_check_types::Tag.usage || hn.tag == blot_check_types::Tag.forall { hcur = hn.a; continue; }
+                    break;
+                }
+                if (hcur as i64) < um.types.nodes.len {
+                    let hn = um.types.node(hcur);
+                    if hn.tag == blot_check_types::Tag.nominal {
+                        has_head_id = true;
+                        head_id = Identity { hn.a, hn.b };
+                    } else if blot_check_storage_types::isArray(um.types, hcur) {
+                        has_head_id = true;
+                        head_id = Identity { 0, 0xffffffff };
+                    } else if hn.tag == blot_check_types::Tag.unsigned32 || hn.tag == blot_check_types::Tag.floating32 || hn.tag == blot_check_types::Tag.boolean {
+                        is_prim_head = true;
+                    }
+                }
+            }
+            let ckey = ((impl_.contract.unit as u64) << 32) | (impl_.contract.decl as u64);
+            for mem in um.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
+                if mem.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                let msp = um.fieldSpelling(mem.name);
+                if !msp.present { continue; }
+                let res = blot_check_wire_schema::resolveBindingTarget(units, um.unit, BindingRef { unit: mem.target.unit, binding: mem.target.binding });
+                if res.unit == 0 || res.binding == 0 { continue; }
+                let lbl = internFieldLabel(st, msp.value);
+                var prev_n: u32 = 0;
+                let nopt .= st.impl_by_name.get(lbl);
+                if nopt { let h: u32 = nopt; prev_n = h; }
+                var prev_c: u32 = 0;
+                let copt .= st.impl_by_contract.get(ckey);
+                if copt { let h: u32 = copt; prev_c = h; }
+                let idx = st.impl_entries.len as u32;
+                st.impl_entries.push(ImplMemEntry {
+                    contract: impl_.contract,
+                    has_head_id: has_head_id,
+                    is_prim_head: is_prim_head,
+                    head_id: head_id,
+                    name_lbl: lbl,
+                    target: res,
+                    next_by_name: prev_n,
+                    next_by_contract: prev_c,
+                });
+                st.impl_by_name.insert(lbl, idx);
+                st.impl_by_contract.insert(ckey, idx);
+            }
+        }
+    }
+}
+
 // Push matching associated/trait method targets onto `st.target_stack`; returns Range.
 fn pushAssociatedMethodTargets(st: Analyzer&, units: const Module[:], m: const Module&, recv_ty: TId, field_name: Chars, op: blot_check_types::Operator) -> Range {
+    ensureAssocIndex(st, units);
     let tmark = st.target_stack.len;
     var cur = recv_ty;
     for _ in 0..8 {
@@ -1918,66 +2127,50 @@ fn pushAssociatedMethodTargets(st: Analyzer&, units: const Module[:], m: const M
         has_id = true;
         ident = Identity { 0, 0xffffffff };
     }
-    for u_idx in 0..units.len {
-        let um .= units[u_idx];
-        for assoc in um.associated {
-            var match_name = false;
-            if op != blot_check_types::Operator.none {
-                match_name = assoc.operator == op;
-            } else {
-                let sp = um.fieldSpelling(assoc.member);
-                match_name = sp.present && sp.value == field_name;
+    if op != blot_check_types::Operator.none {
+        var ac = st.assoc_op_head;
+        while ac != 0 {
+            let e = st.assoc_entries[ac];
+            if e.op == op && (!has_id || e.identity == ident || (has_alt && e.identity == alt_ident)) {
+                var dup = false;
+                for pi in tmark..st.target_stack.len { if st.target_stack[pi] == e.target { dup = true; break; } }
+                if !dup { st.target_stack.push(e.target); }
             }
-            if !match_name { continue; }
-            if !has_id || assoc.identity == ident || (has_alt && assoc.identity == alt_ident) {
-                let res = blot_check_wire_schema::resolveBindingTarget(units, um.unit, assoc.target);
-                if res.unit != 0 && res.binding != 0 {
-                    var dup = false;
-                    for pi in tmark..st.target_stack.len { if st.target_stack[pi] == res { dup = true; break; } }
-                    if !dup { st.target_stack.push(res); }
-                }
+            ac = e.next;
+        }
+        return Range { start: tmark, len: st.target_stack.len - tmark };
+    }
+    let lbl = internFieldLabel(st, field_name);
+    let aopt .= st.assoc_by_name.get(lbl);
+    if aopt {
+        var ac: u32 = aopt;
+        while ac != 0 {
+            let e = st.assoc_entries[ac];
+            if !has_id || e.identity == ident || (has_alt && e.identity == alt_ident) {
+                var dup = false;
+                for pi in tmark..st.target_stack.len { if st.target_stack[pi] == e.target { dup = true; break; } }
+                if !dup { st.target_stack.push(e.target); }
             }
+            ac = e.next;
         }
     }
-    if op == blot_check_types::Operator.none && st.target_stack.len == tmark {
-        for u_idx in 0..units.len {
-            let um .= units[u_idx];
-            for impl_ in um.implementations {
+    if st.target_stack.len == tmark {
+        let iopt .= st.impl_by_name.get(lbl);
+        if iopt {
+            var ic: u32 = iopt;
+            while ic != 0 {
+                let e = st.impl_entries[ic];
+                var ok = true;
                 if has_id {
-                    let head_list = um.types.list(impl_.head);
-                    if head_list.len != 0 {
-                        var hcur = head_list[0];
-                        for _ in 0..8 {
-                            if (hcur as i64) >= um.types.nodes.len { break; }
-                            let hn = um.types.node(hcur);
-                            if hn.tag == blot_check_types::Tag.usage || hn.tag == blot_check_types::Tag.forall { hcur = hn.a; continue; }
-                            break;
-                        }
-                        if (hcur as i64) < um.types.nodes.len {
-                            let hn = um.types.node(hcur);
-                            if hn.tag == blot_check_types::Tag.nominal {
-                                let hid = Identity { hn.a, hn.b };
-                                if hid != ident && (!has_alt || hid != alt_ident) { continue; }
-                            } else if blot_check_storage_types::isArray(um.types, hcur) {
-                                let arr_id = Identity { 0, 0xffffffff };
-                                if arr_id != ident && (!has_alt || arr_id != alt_ident) { continue; }
-                            } else if hn.tag == blot_check_types::Tag.unsigned32 || hn.tag == blot_check_types::Tag.floating32 || hn.tag == blot_check_types::Tag.boolean {
-                                continue;
-                            }
-                        }
-                    }
+                    if e.is_prim_head { ok = false; }
+                    else if e.has_head_id && e.head_id != ident && (!has_alt || e.head_id != alt_ident) { ok = false; }
                 }
-                for mem in um.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
-                    if mem.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
-                    let msp = um.fieldSpelling(mem.name);
-                    if !msp.present || msp.value != field_name { continue; }
-                    let res = blot_check_wire_schema::resolveBindingTarget(units, um.unit, BindingRef { unit: mem.target.unit, binding: mem.target.binding });
-                    if res.unit != 0 && res.binding != 0 {
-                        var dup = false;
-                        for pi in tmark..st.target_stack.len { if st.target_stack[pi] == res { dup = true; break; } }
-                        if !dup { st.target_stack.push(res); }
-                    }
+                if ok {
+                    var dup = false;
+                    for pi in tmark..st.target_stack.len { if st.target_stack[pi] == e.target { dup = true; break; } }
+                    if !dup { st.target_stack.push(e.target); }
                 }
+                ic = e.next_by_name;
             }
         }
     }
@@ -2229,17 +2422,29 @@ recursive fn evalUpdate(st: Analyzer&, units: const Module[:], env: EvalEnv&, id
             var next_head: u32 = rhs_head;
             if k + 1 < step_len { next_head = listSingle(st, st.head_stack[omark + k + 1]); }
             let emark = st.edge_stack.len;
-            var ec = st.ctxs[env.ctx_id].base_edges_head;
-            while ec != 0 {
-                let en = st.edge_nodes[ec];
-                if en.edge.lbl != LBL_CTOR_PAYLOAD && listHas(st, in_k, en.edge.src) { st.edge_stack.push(en.edge); }
-                ec = en.next;
-            }
-            ec = st.ctxs[env.ctx_id].written_edges_head;
-            while ec != 0 {
-                let en = st.edge_nodes[ec];
-                if en.edge.lbl != LBL_CTOR_PAYLOAD && listHas(st, in_k, en.edge.src) { st.edge_stack.push(en.edge); }
-                ec = en.next;
+            var sc = in_k;
+            while sc != 0 {
+                let s = st.u32_nodes[sc].val;
+                let skey = ctxKey(env.ctx_id, s);
+                let bopt .= st.ctx_src_base_edges.get(skey);
+                if bopt {
+                    var ec: u32 = bopt;
+                    while ec != 0 {
+                        let en = st.edge_nodes[ec];
+                        if en.edge.lbl != LBL_CTOR_PAYLOAD { st.edge_stack.push(en.edge); }
+                        ec = en.next_src;
+                    }
+                }
+                let wopt .= st.ctx_src_written_edges.get(skey);
+                if wopt {
+                    var ec: u32 = wopt;
+                    while ec != 0 {
+                        let en = st.edge_nodes[ec];
+                        if en.edge.lbl != LBL_CTOR_PAYLOAD { st.edge_stack.push(en.edge); }
+                        ec = en.next_src;
+                    }
+                }
+                sc = st.u32_nodes[sc].next;
             }
             for ei in emark..st.edge_stack.len {
                 let e = st.edge_stack[ei];
@@ -2251,17 +2456,29 @@ recursive fn evalUpdate(st: Analyzer&, units: const Module[:], env: EvalEnv&, id
             if payload_in != 0 {
                 let out_pay = symFresh(st, env.unit, id, 500 + (k as u32));
                 let pmark = st.edge_stack.len;
-                var pec = st.ctxs[env.ctx_id].base_edges_head;
-                while pec != 0 {
-                    let en = st.edge_nodes[pec];
-                    if listHas(st, payload_in, en.edge.src) { st.edge_stack.push(en.edge); }
-                    pec = en.next;
-                }
-                pec = st.ctxs[env.ctx_id].written_edges_head;
-                while pec != 0 {
-                    let en = st.edge_nodes[pec];
-                    if listHas(st, payload_in, en.edge.src) { st.edge_stack.push(en.edge); }
-                    pec = en.next;
+                var psc = payload_in;
+                while psc != 0 {
+                    let s = st.u32_nodes[psc].val;
+                    let skey = ctxKey(env.ctx_id, s);
+                    let bopt .= st.ctx_src_base_edges.get(skey);
+                    if bopt {
+                        var pec: u32 = bopt;
+                        while pec != 0 {
+                            let en = st.edge_nodes[pec];
+                            st.edge_stack.push(en.edge);
+                            pec = en.next_src;
+                        }
+                    }
+                    let wopt .= st.ctx_src_written_edges.get(skey);
+                    if wopt {
+                        var pec: u32 = wopt;
+                        while pec != 0 {
+                            let en = st.edge_nodes[pec];
+                            st.edge_stack.push(en.edge);
+                            pec = en.next_src;
+                        }
+                    }
+                    psc = st.u32_nodes[psc].next;
                 }
                 for ei in pmark..st.edge_stack.len {
                     let e = st.edge_stack[ei];
@@ -2318,7 +2535,7 @@ recursive fn evalNode(st: Analyzer&, units: const Module[:], env: EvalEnv&, id: 
     let m .= units[env.unit - 1];
     if (id as i64) >= m.nodes.len { return 0; }
     let res = evalNodeRaw(st, units, env, id, depth);
-    if res != 0 && isPureScalarValueType(units, env.unit, m.node(id).ty, 0) { return 0; }
+    if res != 0 && isPureScalarCached(st, units, env.unit, m.node(id).ty) { return 0; }
     return res;
 }
 
@@ -2366,9 +2583,8 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             let tm .= units[target.unit - 1];
             let body .= tm.body(target.binding);
             if !body { return 0; }
-            let fn_opt .= st.body_fn_map.get(target);
-            if !fn_opt { return 0; }
-            let target_fn: u32 = fn_opt;
+            let target_fn, found_fn = lookupBodyFn(st, units, target);
+            if !found_fn { return 0; }
             if body.is_function {
                 return listSingle(st, symFnVal(st, target_fn, symEmptyEnv(st), 0));
             }
@@ -2426,13 +2642,12 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
                 recordUnresolved(st, env, env.unit, m.span(id), blot_check_diagnostic_code::Code.purity_limit, "unresolved call target in purity analysis");
                 return 0;
             }
-            let fn_opt .= st.body_fn_map.get(target);
-            if !fn_opt {
+            let target_fn, found_fn = lookupBodyFn(st, units, target);
+            if !found_fn {
                 st.head_stack.resize(hmark);
                 recordUnresolved(st, env, env.unit, m.span(id), blot_check_diagnostic_code::Code.purity_limit, "call target has no body in purity analysis");
                 return 0;
             }
-            let target_fn: u32 = fn_opt;
             let tdef = st.fn_defs[target_fn];
             var ret: u32 = 0;
             if ar.len < (tdef.param_len as i64) {
@@ -2455,6 +2670,10 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
         },
         product => {
             let kids = m.children(id);
+            if isPureScalarCached(st, units, env.unit, n.ty) {
+                for i in 0..kids.len { let _ = evalNode(st, units, env, kids[i], depth + 1); }
+                return 0;
+            }
             let fresh = symFresh(st, env.unit, id, 0);
             for i in 0..kids.len {
                 let kh = evalNode(st, units, env, kids[i], depth + 1);
@@ -2464,6 +2683,10 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
         },
         record => {
             let kids = m.children(id);
+            if isPureScalarCached(st, units, env.unit, n.ty) {
+                for i in 0..kids.len { let _ = evalNode(st, units, env, kids[i], depth + 1); }
+                return 0;
+            }
             let dests = m.recordDestinations(id);
             let fresh = symFresh(st, env.unit, id, 0);
             var rty_id = n.ty;
@@ -2491,12 +2714,18 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             return listSingle(st, fresh);
         },
         construct => {
+            let pure_scalar = isPureScalarCached(st, units, env.unit, n.ty);
             if n.b == 0 {
+                if pure_scalar { return 0; }
                 return evalConstructValue(st, units, env, id, env.unit, n.a, 0, n.c != 0, false, Range { 0, 0 });
             }
             let bn = m.node(n.b);
             if n.c != 0 && bn.tag == blot_check_core::Tag.product {
                 let kids = m.children(n.b);
+                if pure_scalar {
+                    for i in 0..kids.len { let _ = evalNode(st, units, env, kids[i], depth + 1); }
+                    return 0;
+                }
                 let hmark = st.head_stack.len;
                 let p_fresh = symFresh(st, env.unit, n.b, 0);
                 for i in 0..kids.len {
@@ -2510,6 +2739,7 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
                 return ret;
             }
             let payload_head = evalNode(st, units, env, n.b, depth + 1);
+            if pure_scalar { return 0; }
             return evalConstructValue(st, units, env, id, env.unit, n.a, payload_head, n.c != 0, false, Range { 0, 0 });
         },
         project => {
@@ -2547,9 +2777,8 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             let ar = Range { start: hmark, len: 1 };
             var out: u32 = 0;
             for ti in 0..tr.len {
-                let fn_opt .= st.body_fn_map.get(st.target_stack[tr.start + ti]);
-                if !fn_opt { continue; }
-                let tfn: u32 = fn_opt;
+                let tfn, found_fn = lookupBodyFn(st, units, st.target_stack[tr.start + ti]);
+                if !found_fn { continue; }
                 if (st.fn_defs[tfn].param_len as i64) > 1 {
                     let penv = symFresh(st, env.unit, id, 2100 + (ti as u32));
                     if addWrittenEdgesSingleSrc(st, env.ctx_id, penv, LBL_CAPTURE_BASE, recv_head) { env.changed = true; }
@@ -2581,9 +2810,8 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             let ar = Range { start: hmark, len: 1 };
             var out: u32 = 0;
             for ti in 0..tr.len {
-                let fn_opt .= st.body_fn_map.get(st.target_stack[tr.start + ti]);
-                if !fn_opt { continue; }
-                let tfn: u32 = fn_opt;
+                let tfn, found_fn = lookupBodyFn(st, units, st.target_stack[tr.start + ti]);
+                if !found_fn { continue; }
                 let cs_id = internCallSite(st, st.ctxs[env.ctx_id].fn_id, env.unit, id, ti as u32);
                 let r = invokeSummary(st, env.ctx_id, tfn, cs_id, ar, Range { 0, 0 }, cur_hrange, env.unit, m.span(id), env.changed);
                 let _ = listUnionHead(st, out, r);
@@ -2595,8 +2823,22 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
         associated => {
             let lhead = evalNode(st, units, env, n.a, depth + 1);
             let rhead = evalNode(st, units, env, n.b, depth + 1);
-            let lt = m.types.node(m.typeOf(n.a)).tag;
-            let rt = m.types.node(m.typeOf(n.b)).tag;
+            var ltid = m.typeOf(n.a);
+            for _ in 0..8 {
+                if (ltid as i64) >= m.types.nodes.len { break; }
+                let ln = m.types.node(ltid);
+                if ln.tag == blot_check_types::Tag.usage || ln.tag == blot_check_types::Tag.forall { ltid = ln.a; continue; }
+                break;
+            }
+            var rtid = m.typeOf(n.b);
+            for _ in 0..8 {
+                if (rtid as i64) >= m.types.nodes.len { break; }
+                let rn = m.types.node(rtid);
+                if rn.tag == blot_check_types::Tag.usage || rn.tag == blot_check_types::Tag.forall { rtid = rn.a; continue; }
+                break;
+            }
+            let lt = m.types.node(ltid).tag;
+            let rt = m.types.node(rtid).tag;
             if (lt == blot_check_types::Tag.unsigned32 || lt == blot_check_types::Tag.floating32 || lt == blot_check_types::Tag.boolean) && lt == rt {
                 return 0;
             }
@@ -2611,9 +2853,8 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             let ar = Range { start: hmark, len: 2 };
             var out: u32 = 0;
             for ti in 0..tr.len {
-                let fn_opt .= st.body_fn_map.get(st.target_stack[tr.start + ti]);
-                if !fn_opt { continue; }
-                let tfn: u32 = fn_opt;
+                let tfn, found_fn = lookupBodyFn(st, units, st.target_stack[tr.start + ti]);
+                if !found_fn { continue; }
                 let cs_id = internCallSite(st, st.ctxs[env.ctx_id].fn_id, env.unit, id, ti as u32);
                 let r = invokeSummary(st, env.ctx_id, tfn, cs_id, ar, Range { 0, 0 }, cur_hrange, env.unit, m.span(id), env.changed);
                 let _ = listUnionHead(st, out, r);
@@ -2633,26 +2874,26 @@ recursive fn evalNodeRaw(st: Analyzer&, units: const Module[:], env: EvalEnv&, i
             let tmpl = m.member_templates[n.a];
             let sp = m.fieldSpelling(tmpl.name);
             if !sp.present { st.head_stack.resize(hmark); return 0; }
+            ensureAssocIndex(st, units);
+            let want_lbl = internFieldLabel(st, sp.value);
+            let ckey = ((tmpl.contract.unit as u64) << 32) | (tmpl.contract.decl as u64);
             var out: u32 = 0;
             var sub_i: u32 = 0;
-            for u_idx in 0..units.len {
-                let um .= units[u_idx];
-                for impl_ in um.implementations {
-                    if impl_.contract != tmpl.contract { continue; }
-                    for mem in um.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
-                        if mem.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
-                        let msp = um.fieldSpelling(mem.name);
-                        if !msp.present || msp.value != sp.value { continue; }
-                        let res = blot_check_wire_schema::resolveBindingTarget(units, um.unit, BindingRef { unit: mem.target.unit, binding: mem.target.binding });
-                        let fn_opt .= st.body_fn_map.get(res);
-                        if !fn_opt { continue; }
-                        let tfn: u32 = fn_opt;
-                        if (st.fn_defs[tfn].param_len as i64) != ar.len { continue; }
-                        let cs_id = internCallSite(st, st.ctxs[env.ctx_id].fn_id, env.unit, id, sub_i);
-                        sub_i += 1;
-                        let r = invokeSummary(st, env.ctx_id, tfn, cs_id, ar, Range { 0, 0 }, cur_hrange, env.unit, m.span(id), env.changed);
-                        let _ = listUnionHead(st, out, r);
+            let copt .= st.impl_by_contract.get(ckey);
+            if copt {
+                var ic: u32 = copt;
+                while ic != 0 {
+                    let e = st.impl_entries[ic];
+                    if e.name_lbl == want_lbl {
+                        let tfn, found_fn = lookupBodyFn(st, units, e.target);
+                        if found_fn && (st.fn_defs[tfn].param_len as i64) == ar.len {
+                            let cs_id = internCallSite(st, st.ctxs[env.ctx_id].fn_id, env.unit, id, sub_i);
+                            sub_i += 1;
+                            let r = invokeSummary(st, env.ctx_id, tfn, cs_id, ar, Range { 0, 0 }, cur_hrange, env.unit, m.span(id), env.changed);
+                            let _ = listUnionHead(st, out, r);
+                        }
                     }
+                    ic = e.next_by_contract;
                 }
             }
             st.head_stack.resize(hmark);
@@ -3207,29 +3448,48 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
     if !hasAnyConcurrencyFeature(units, entry) { return res; }
 
     var st = Analyzer { entry: entry };
-    registerAllCallables(st, units);
+    initAnalyzerSentinels(st);
     let empty_cs: CallableSpec[0] = [];
     let empty_hs: HandlerSpec[0] = [];
     let em .= units[entry - 1];
 
-    // 1. Seed all start-time pool initializers, exported entries, kernels, processes, and spark-containing bodies.
-    var pool_ctxs: u32[>..] = [];
-    for pg in st.pool_globals {
-        let fn_opt .= st.body_fn_map.get(pg);
-        if !fn_opt { continue; }
-        let fid: u32 = fn_opt;
-        let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], pg.unit, st.fn_defs[fid].span);
-        if ok { pool_ctxs.push(cid); }
+    // Fast body-header scan (no AST node walk): collect module-level pool
+    // globals and any module global whose type contains a mutable GrowArray /
+    // ResizeArray. After Memory Model Phases 1–5 (no `=`, no `lent`, unique
+    // `:=` and `@simd.store`), non-growable globals cannot be mutated after
+    // startup unless they retain a handle/view to a growable global.
+    var mutable_globals: BindingRef[>..] = [];
+    for u_idx in 0..units.len {
+        let m .= units[u_idx];
+        let unit = m.unit;
+        for bi in 1..m.bodies.len {
+            let body = m.bodies[bi];
+            if body.is_function || (body.binding as i64) >= m.bindings.len { continue; }
+            let ty = m.binding(body.binding).ty;
+            let gref = BindingRef { unit: unit, binding: body.binding };
+            if isPoolType(m, ty) { st.pool_globals.push(gref); }
+            if typeHasMutableArray(units, unit, ty, 0) { mutable_globals.push(gref); }
+        }
     }
+    let has_mutable_global = mutable_globals.len != 0;
 
-    var exported_ctxs: u32[>..] = [];
-    for bi in 1..em.bodies.len {
-        if !em.bodies[bi].exported { continue; }
-        let fn_opt .= st.body_fn_map.get(BindingRef { unit: entry, binding: em.bodies[bi].binding });
-        if !fn_opt { continue; }
-        let fid: u32 = fn_opt;
-        let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], entry, em.bodies[bi].span);
-        if ok { exported_ctxs.push(cid); }
+    // 1. Seed ONLY concurrency roots (kernels, processes, spark bodies), plus
+    // immutable-typed pool initializers only when a mutable global exists in
+    // the program (to detect views/aliases to mutable globals).
+    var pool_ctxs: u32[>..] = [];
+    var pool_ctx_globals: BindingRef[>..] = [];
+    if has_mutable_global {
+        for pg in st.pool_globals {
+            let pm .= units[pg.unit - 1];
+            if typeHasMutableArray(units, pg.unit, pm.binding(pg.binding).ty, 0) { continue; }
+            let fid, found_fn = lookupBodyFn(st, units, pg);
+            if !found_fn { continue; }
+            let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], pg.unit, st.fn_defs[fid].span);
+            if ok {
+                pool_ctxs.push(cid);
+                pool_ctx_globals.push(pg);
+            }
+        }
     }
 
     var kernel_prep_ctxs: u32[>..] = [];
@@ -3239,9 +3499,8 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
         var prep_cid: u32 = 0xffffffff;
         if kd.has_context {
             let pt = blot_check_wire_schema::resolveBindingTarget(units, entry, kd.prepare_target);
-            let pfn .= st.body_fn_map.get(pt);
-            if pfn {
-                let fid: u32 = pfn;
+            let fid, found_fn = lookupBodyFn(st, units, pt);
+            if found_fn {
                 let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], entry, kd.span);
                 if ok { prep_cid = cid; }
             }
@@ -3249,9 +3508,8 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
         kernel_prep_ctxs.push(prep_cid);
         var run_cid: u32 = 0xffffffff;
         let rt = blot_check_wire_schema::resolveBindingTarget(units, entry, kd.run_target);
-        let rfn .= st.body_fn_map.get(rt);
-        if rfn {
-            let fid: u32 = rfn;
+        let fid, found_fn = lookupBodyFn(st, units, rt);
+        if found_fn {
             let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], entry, kd.span);
             if ok { run_cid = cid; }
         }
@@ -3264,19 +3522,17 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
         let pd = em.processes[pi];
         var init_cid: u32 = 0xffffffff;
         let it = blot_check_wire_schema::resolveBindingTarget(units, entry, pd.init_target);
-        let ifn .= st.body_fn_map.get(it);
-        if ifn {
-            let fid: u32 = ifn;
+        let fid, found_fn = lookupBodyFn(st, units, it);
+        if found_fn {
             let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], entry, pd.span);
             if ok { init_cid = cid; }
         }
         proc_init_ctxs.push(init_cid);
         var step_cid: u32 = 0xffffffff;
         let stt = blot_check_wire_schema::resolveBindingTarget(units, entry, pd.step_target);
-        let sfn .= st.body_fn_map.get(stt);
-        if sfn {
-            let fid: u32 = sfn;
-            let cid, ok = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], entry, pd.span);
+        let sfid, sfound = lookupBodyFn(st, units, stt);
+        if sfound {
+            let cid, ok = getOrCreateCtx(st, sfid, empty_cs[..], empty_hs[..], entry, pd.span);
             if ok { step_cid = cid; }
         }
         proc_step_ctxs.push(step_cid);
@@ -3286,9 +3542,8 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
         let um .= units[u_idx];
         if um.sparks.len == 0 { continue; }
         for bi in 1..um.bodies.len {
-            let fn_opt .= st.body_fn_map.get(BindingRef { unit: um.unit, binding: um.bodies[bi].binding });
-            if !fn_opt { continue; }
-            let fid: u32 = fn_opt;
+            let fid, found_fn = lookupBodyFn(st, units, BindingRef { unit: um.unit, binding: um.bodies[bi].binding });
+            if !found_fn { continue; }
             let _, _ = getOrCreateCtx(st, fid, empty_cs[..], empty_hs[..], um.unit, um.bodies[bi].span);
         }
     }
@@ -3302,9 +3557,12 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
 
     // 3. Compute start-time pool global-containment & `mutated_after_start` (§2.5).
     var mutated_after_start: dictionary<u32, bool> = dictionary<u32, bool>{};
+    for mg in mutable_globals {
+        mutated_after_start.insert(symGlobal(st, mg.unit, mg.binding), true);
+    }
     for pi in 0..pool_ctxs.len {
         let cid = pool_ctxs[pi];
-        let pg = st.pool_globals[pi];
+        let pg = pool_ctx_globals[pi];
         let gsym = symGlobal(st, pg.unit, pg.binding);
         let r_init = reachHead(st, cid, st.ctxs[cid].ret_pts_head);
         var hhead: u32 = 0;
@@ -3327,7 +3585,6 @@ fn analyzeInto(units: const Module[:], entry: u32, out_deeply_immutable: u64[>..
     }
 
     var all_runtime_ctxs: u32[>..] = [];
-    for cid in exported_ctxs { all_runtime_ctxs.push(cid); }
     for cid in kernel_prep_ctxs { if cid != 0xffffffff { all_runtime_ctxs.push(cid); } }
     for cid in kernel_run_ctxs { if cid != 0xffffffff { all_runtime_ctxs.push(cid); } }
     for cid in proc_init_ctxs { if cid != 0xffffffff { all_runtime_ctxs.push(cid); } }
