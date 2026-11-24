@@ -1573,7 +1573,7 @@ fn verifyNamedFunctionArity(units: const Module[:], from_unit: u32, ref_: Bindin
     if !hasUnit(units, resolved.unit) || resolved.binding == 0 { return false; }
     let tm .= units[resolved.unit - 1];
     let body .= tm.body(resolved.binding);
-    if !body || !body.is_function { return false; }
+    if !body || !body.is_function || body.exported || body.runtime { return false; }
     return (body.parameters.len as i64) == expected_arity;
 }
 

@@ -103,12 +103,22 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
             same(result, kind.value.element, n.ty); },
         length => { if !element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, blot_check_types::u32_type, n.ty); },
         read => { if !element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, element.value, n.ty); same(result, blot_check_types::u32_type, m.typeOf(args[1])); },
-        push, reserve => { if !kind.present || !blot_check_storage_types::isGrowable(kind.value.kind) { return Contract {..}, blot_error::Error.invalid_artifact; }
-            if op == blot_check_storage_ops::Op.push { same(result, kind.value.element, m.typeOf(args[1])); }
+        push, reserve => {
+            let is_plain_array = op == blot_check_storage_ops::Op.push && m.types.node(input).tag == blot_check_types::Tag.array;
+            if !is_plain_array && (!kind.present || !blot_check_storage_types::isGrowable(kind.value.kind)) { return Contract {..}, blot_error::Error.invalid_artifact; }
+            if op == blot_check_storage_ops::Op.push {
+                var elem_ty = m.types.node(input).a;
+                if !is_plain_array { elem_ty = kind.value.element; }
+                same(result, elem_ty, m.typeOf(args[1]));
+            }
             else { let count = m.node(args[1]); if count.tag != blot_check_core::Tag.constant || count.b != 0 || count.c != 0 || m.types.node(count.ty).tag != blot_check_types::Tag.unsigned32 { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, blot_check_types::u32_type, m.typeOf(args[1])); }
             same(result, blot_check_types::unit, n.ty); },
-        pop, truncate => { if !kind.present || !blot_check_storage_types::isResizable(kind.value.kind) { return Contract {..}, blot_error::Error.invalid_artifact; }
-            if op == blot_check_storage_ops::Op.pop { same(result, kind.value.element, n.ty); } else { same(result, blot_check_types::u32_type, m.typeOf(args[1])); same(result, blot_check_types::unit, n.ty); } },
+        pop, truncate => {
+            let is_plain_array = m.types.node(input).tag == blot_check_types::Tag.array;
+            if !is_plain_array && (!kind.present || !blot_check_storage_types::isResizable(kind.value.kind)) { return Contract {..}, blot_error::Error.invalid_artifact; }
+            var elem_ty = m.types.node(input).a;
+            if !is_plain_array { elem_ty = kind.value.element; }
+            if op == blot_check_storage_ops::Op.pop { same(result, elem_ty, n.ty); } else { same(result, blot_check_types::u32_type, m.typeOf(args[1])); same(result, blot_check_types::unit, n.ty); } },
         freeze => {
             if !kind.present || !blot_check_storage_types::isGrowable(kind.value.kind) { return Contract {..}, blot_error::Error.invalid_artifact; }
             let out = m.types.node(n.ty);

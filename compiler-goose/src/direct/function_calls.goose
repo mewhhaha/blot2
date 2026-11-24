@@ -869,6 +869,7 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     }
     let written = writeFlat(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), false, written; }
+    invalidateCheckedContainers(f);
     return list, true, blot_direct_types::Error.none;
 }
 // The value a closure captures for `binding`. Deferred polymorphic local
@@ -1477,7 +1478,7 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
             if ok != blot_error::Error.none { return false; }
-            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read { return false; }
+            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate { return false; }
             for child in tm.children(id) {
                 if !canInlineBody(g, tm, child, target, budget) { return false; }
             }

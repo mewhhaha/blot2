@@ -1191,9 +1191,9 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
     if require_immutable {
         lget(g, entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-        i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::frozen_flag);
+        i32Const(g, blot_direct_runtime::static_pool_flag | blot_direct_runtime::frozen_flag);
         op(g, OP_i32_and);
-        i32Const(g, blot_direct_runtime::heap_flag);
+        i32Const(g, 0);
         op(g, OP_i32_ne);
         op(g, OP_i32_and);
     }
@@ -1410,6 +1410,13 @@ fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -
         var budget: i64 = 256;
         if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
         return handle, true;
+    }
+    var receiver_node: u32 = info.end;
+    if n.tag == blot_check_core::Tag.project { receiver_node = n.a; }
+    else { receiver_node = m.children(info.end)[0]; }
+    if coreSizedLength(m, m.typeOf(receiver_node)) == 0 {
+        var budget: i64 = 256;
+        if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
     }
     return handle, false;
 }
@@ -1648,12 +1655,12 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
         } else {
             return false, blot_direct_types::Error.none;
         }
-        if dest_binding == 0 || dest_binding == item_binding { return false, blot_direct_types::Error.none; }
+        if dest_binding == 0 || dest_binding == item_binding || dest_binding == localRef(m, info.first) { return false, blot_direct_types::Error.none; }
         let found_dest, has_dest = bindGet(g, f, dest_binding);
         if !has_dest { return false, blot_direct_types::Error.none; }
         dest = found_dest;
         let dtag = tagOf(g, dest.ty);
-        if dtag != blot_direct_types::Tag.grow && dtag != blot_direct_types::Tag.resize {
+        if dtag != blot_direct_types::Tag.array && dtag != blot_direct_types::Tag.grow && dtag != blot_direct_types::Tag.resize {
             return false, blot_direct_types::Error.none;
         }
         let elem, elem_err = elementOf(g, f, dest.ty, id);
@@ -1690,7 +1697,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lget(g, entry);
     op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
     ltee(g, cap);
-    i32Const(g, blot_direct_runtime::frozen_flag);
+    i32Const(g, blot_direct_runtime::frozen_flag | blot_direct_runtime::static_pool_flag);
     op(g, OP_i32_and);
     trap(g, f);
     let old_len = local32(g, f);
@@ -1769,6 +1776,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     close(g, f);
 
     // Resolve source base address after any growth of `dest`.
+    invalidateCheckedContainers(f);
     var src_base: u32 = 0;
     if stag == blot_direct_types::Tag.array {
         let base, _ = ensureCheckedArray(g, f, source);
@@ -2063,6 +2071,9 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var source = neverVal();
     var source_view_base: u32 = 0xffffffff;
     var range = CheckedRange {};
+    var body_no_resize_budget: i64 = 256;
+    let body_no_resize = noStorageResize(g, m, info.body, body_no_resize_budget);
+    if !body_no_resize { invalidateCheckedContainers(f); }
     match info.kind {
         forever => {},
         range => {

@@ -280,6 +280,10 @@ fn recordCheckedView(f: Fn&, slot: u32, generation: u32, start: u32, length: u32
     f.checked_views[f.checked_views_len] = CheckedView { slot: slot, generation: generation, start: start, length: length, base: base, depth: f.depth };
     f.checked_views_len += 1;
 }
+fn invalidateCheckedContainers(f: Fn&) {
+    f.checked_arrays_len = 0;
+    f.checked_views_len = 0;
+}
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
     if f.checked_arrays_len != 0 {

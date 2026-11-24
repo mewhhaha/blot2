@@ -776,8 +776,10 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let noted = noteStoreToSlot(g, f, w(g, container, 0), lanes_value);
             if noted != blot_direct_types::Error.none { return neverVal(), noted; }
             var store_addr = address;
-            if tagOf(g, container.ty) != blot_direct_types::Tag.array {
-                let recomputed, rerr = elementAddress(g, f, container, index, id);
+            if tagOf(g, container.ty) != blot_direct_types::Tag.array || coreSizedLength(m, m.typeOf(children[0])) == 0 {
+                let _, lerr = elementAddress(g, f, container, last, id, m.typeOf(children[0]));
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                let recomputed, rerr = elementAddress(g, f, container, index, id, m.typeOf(children[0]));
                 if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
                 store_addr = recomputed;
             }
@@ -998,7 +1000,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let address = local32(g, f);
     let ctag = tagOf(g, container.ty);
-    if !g.runtime_().has_fork && step > 0 && step <= 65536 && (ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
+    if !g.runtime_().has_fork && step > 0 && step <= 65536 && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
         let entry = ensureCheckedGrow(g, f, container);
         let len = local32(g, f);
         let next_len = local32(g, f);
@@ -1058,6 +1060,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     }
     let written = writeFlat(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), written; }
+    invalidateCheckedContainers(f);
     return unitVal(), blot_direct_types::Error.none;
 }
 fn emitStorageViewVal(g: Generator&, f: Fn&, container: Val, start: u32, end: u32, ty: Ty, id: u32) -> Val, Error {
@@ -1228,6 +1231,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             i32Const(g, step);
             callf(g, g.runtime_().pop);
             lset(g, address);
+            invalidateCheckedContainers(f);
             return loadElement(g, f, address, 0, ty, id);
         },
         truncate => {
@@ -1241,6 +1245,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lget(g, w(g, container, 1));
             lget(g, count);
             callf(g, g.runtime_().truncate);
+            invalidateCheckedContainers(f);
             return unitVal(), blot_direct_types::Error.none;
         },
         freeze => {

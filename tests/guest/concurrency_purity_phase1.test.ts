@@ -146,6 +146,56 @@ entry kernel k: Kernel [U32, U32, U32] = { prepare: not_a_func, run: r }
     "kernel_callable",
   );
 
+  // Reject `entry func` / `export` callables as kernel prepare/run or process init/step
+  // (host entries are exempt from `ownedResult` and could otherwise leak a static global into `own State`).
+  await compileExpectedFailure(
+    `const pool: #[U32] = #[10, 20, 30]
+entry func p_init (_: U32): #[U32] => return pool
+func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
+  s[0] := cmd
+  return (s, s[0])
+entry process p: Process [U32, U32, U32] = { init: p_init, step: p_step }
+`,
+    "kernel_callable",
+  );
+  await compileExpectedFailure(
+    `entry func prep (w: U32): U32 => return w
+func r (c: U32) -> (x: U32): U32 => return @u32.add c x
+entry kernel k: Kernel [U32, U32, U32] = { prepare: prep, run: r }
+`,
+    "kernel_callable",
+  );
+
+  // Reject shallow `@storage.copy` mutating nested inner arrays on composites or shared nested arrays
+  await compileExpectedFailure(
+    `const nested: #[#[U32]] = #[#[1, 2]]
+entry func bad (): U32 =>
+  let c = copy { box: nested }
+  c.box[0][0] := 99
+  return nested[0][0]
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `entry func bad (): U32 =>
+  let s: *#[#[U32]] = freeze #[#[1, 2]]
+  let c: #[#[U32]] = copy s
+  c[0][0] := 99
+  return s[0][0]
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `type Boxed is data = $Boxed { rows: #[#[U32]] }
+const nested: #[#[U32]] = #[#[1, 2]]
+entry func bad (): U32 =>
+  let c = copy ($Boxed { rows: nested })
+  c.rows[0][0] := 99
+  return nested[0][0]
+`,
+    "aliased_update",
+  );
+
   // Reject @flat.* outside std/
   await compileExpectedFailure(
     `entry kernel func k (x: U32): U32 => return x

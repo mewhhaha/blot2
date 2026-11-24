@@ -143,10 +143,11 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), replacement);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-    // A fixed array never moves or shrinks; only growable/resizable owners
-    // can reallocate during `info.value` and need a fresh address lookup.
+    // Only compile-time fixed-length `SizedArray` (`#[N; T]`) is guaranteed
+    // never to reallocate or shrink during `info.value`; dynamic `#[T]` and
+    // growable/resizable owners recompute the element address after RHS.
     var target = address;
-    if tagOf(g, container.ty) != blot_direct_types::Tag.array {
+    if tagOf(g, container.ty) != blot_direct_types::Tag.array || coreSizedLength(m, container_core_ty) == 0 {
         let recomputed, error = elementAddress(g, f, container, index, id, container_core_ty);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         target = recomputed;
