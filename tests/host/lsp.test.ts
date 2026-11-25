@@ -525,3 +525,75 @@ Deno.test("LSP resolves manifest generators and completes fields from a live ass
     await item.cleanup();
   }
 });
+
+Deno.test("LSP suppresses spurious no_entry on library modules while reporting real errors and quick-fixes", async () => {
+  const directory = await Deno.makeTempDir();
+  const output = new Bytes();
+  const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
+  const prelude = fileURLToPath(
+    new URL("../../std/prelude.blot", import.meta.url),
+  );
+  const bridge = new CompletionBridge(new LspWriter(output), {
+    executable,
+    prelude,
+    stdRoot,
+  });
+  const entry = directory + "/lib.blot";
+  const uri = pathToFileURL(entry).href;
+  const send = (method: string, params: unknown = {}, id?: number) => {
+    const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
+    if (id !== undefined) message.id = id;
+    return bridge.handle(message);
+  };
+  try {
+    await send("initialize", { rootUri: pathToFileURL(directory).href }, 1);
+    await output.messages();
+    await send("initialized");
+
+    // Valid library file without #entry must produce 0 diagnostics
+    await send("textDocument/didOpen", {
+      textDocument: {
+        uri,
+        languageId: "blot",
+        text: "func double (x: U32): U32 => return x + x\n",
+        version: 1,
+      },
+    });
+    await send("textDocument/diagnostic", { textDocument: { uri } }, 20);
+    let rows = await output.messages();
+    equal(rows[0].result.kind, "full");
+    equal(rows[0].result.items, []);
+
+    // Real uniqueness error in library file still produces diagnostic + quick-fix
+    const badLib = [
+      "func mutator (xs: #[(U32, U32)]): #[(U32, U32)] =>",
+      "  xs[0] := (1, 2)",
+      "  return xs",
+      "",
+    ].join("\n");
+    await send("textDocument/didChange", {
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: badLib }],
+    });
+    await send("textDocument/diagnostic", { textDocument: { uri } }, 21);
+    rows = await output.messages();
+    equal(rows[0].result.kind, "full");
+    ok(rows[0].result.items.length >= 1);
+    const aliased = rows[0].result.items.find((d: { code: string }) =>
+      d.code === "ALIASED_UPDATE"
+    );
+    ok(aliased, JSON.stringify(rows[0].result.items));
+    await send("textDocument/codeAction", {
+      textDocument: { uri },
+      range: aliased.range,
+      context: { diagnostics: [aliased] },
+    }, 22);
+    rows = await output.messages();
+    equal(rows[0].result.length, 1);
+    equal(rows[0].result[0].title, "Mark parameter `xs` as `own`");
+    equal(rows[0].result[0].edit.changes[uri][0].newText, "own ");
+  } finally {
+    await bridge.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

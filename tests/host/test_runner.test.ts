@@ -1,6 +1,7 @@
 import {
   deepStrictEqual as equal,
   match,
+  ok,
   rejects,
   throws,
 } from "node:assert/strict";
@@ -8,17 +9,24 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "../../host/cli.ts";
 import {
+  createCompiler,
   decodeTestReport,
   discoverTestModules,
   encodeText,
+  formatGuestTrap,
   formatTestRunReport,
+  GuestError,
+  guestTrapOf,
+  instantiateGuest,
   readTestMetadata,
+  readTrapMetadata,
   resolveProject,
   runBlotTests,
   TEST_REPORT_MAGIC,
   TEST_REPORT_VERSION,
   type TestFailure,
   type TestRunReport,
+  TRAP_SITE_OFFSET,
 } from "../../mod.ts";
 
 const executable = Deno.args.at(0) ??
@@ -360,7 +368,9 @@ ${unit}
       byName.trap_returns.message!,
       /Expected test to trap, but it returned normally/,
     );
-    match(byName.test_traps.message!, /unreachable/);
+    equal(byName.test_traps.message, 'panic: "check failed"');
+    equal(byName.test_traps.trap?.kind, "panic");
+    equal(byName.test_traps.trap?.message, "check failed");
     const text = await formatTestRunReport(report);
     match(text, /arithmetic \/ addition \/ integer sum: values differ/);
     match(text, /expected: 42\s+actual: 41/);
@@ -667,3 +677,300 @@ Deno.test("CLI rejects invalid test flags", async () => {
     equal(await runCli(executable, ["test", ...flags]), 2);
   }
 });
+
+function u32le(value: number): number[] {
+  return [
+    value & 0xff,
+    (value >>> 8) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 24) & 0xff,
+  ];
+}
+
+function wasmWithTraps(...payloads: number[][]): Uint8Array<ArrayBuffer> {
+  return Uint8Array.of(
+    0,
+    97,
+    115,
+    109,
+    1,
+    0,
+    0,
+    0,
+    ...payloads.flatMap((payload) => {
+      const data = [...utf8("blot:traps"), ...payload];
+      return [0, ...leb(data.length), ...data];
+    }),
+  );
+}
+
+Deno.test("blot:traps v1 decodes panic, bounds, and unreachable metadata and rejects malformed sections", () => {
+  equal(TRAP_SITE_OFFSET, 772);
+  equal(readTrapMetadata(wasmWithTraps()), undefined);
+  equal(readTrapMetadata(wasmWithTraps([1, ...u32le(0)])), []);
+  const utf8Msg = new TextEncoder().encode("audit: lost receipt 🧾");
+  const boundsMsg = new TextEncoder().encode("index out of bounds");
+  const bytes = wasmWithTraps([
+    1,
+    ...u32le(3),
+    1,
+    ...u32le(1),
+    ...u32le(10),
+    ...u32le(42),
+    ...u32le(utf8Msg.length),
+    ...utf8Msg,
+    2,
+    ...u32le(2),
+    ...u32le(50),
+    ...u32le(55),
+    ...u32le(boundsMsg.length),
+    ...boundsMsg,
+    3,
+    ...u32le(3),
+    ...u32le(0),
+    ...u32le(0),
+    ...u32le(0),
+  ]);
+  const entries = readTrapMetadata(new WebAssembly.Module(bytes));
+  equal(entries, [
+    {
+      kind: "panic",
+      unit: 1,
+      start: 10,
+      end: 42,
+      message: "audit: lost receipt 🧾",
+    },
+    {
+      kind: "bounds",
+      unit: 2,
+      start: 50,
+      end: 55,
+      message: "index out of bounds",
+    },
+    {
+      kind: "unreachable",
+      unit: 3,
+      start: 0,
+      end: 0,
+      message: "",
+    },
+  ]);
+  equal(formatGuestTrap(entries![0]), 'panic: "audit: lost receipt 🧾"');
+  equal(
+    formatGuestTrap({ kind: "panic", unit: 0, start: 0, end: 0, message: "" }),
+    "panic",
+  );
+  equal(formatGuestTrap(entries![1]), "index out of bounds");
+  equal(
+    formatGuestTrap({ kind: "bounds", unit: 0, start: 0, end: 0, message: "" }),
+    "index out of bounds",
+  );
+  equal(formatGuestTrap(entries![2]), "unreachable");
+  equal(
+    formatGuestTrap({
+      kind: "unreachable",
+      unit: 0,
+      start: 0,
+      end: 0,
+      message: "impossible branch",
+    }),
+    "unreachable: impossible branch",
+  );
+
+  const expectInvalidAbi = (pattern: RegExp) => (error: unknown) => {
+    ok(error instanceof GuestError, String(error));
+    equal(error.code, "invalid_abi");
+    match(error.message, pattern);
+    return true;
+  };
+  for (
+    const [payload, pattern] of [
+      [[], /Truncated/],
+      [[1, 0, 0], /Truncated/],
+      [[2, ...u32le(0)], /version/],
+      [[1, ...u32le(1)], /Truncated/],
+      [[1, ...u32le(1), 1, ...u32le(1), ...u32le(0)], /Truncated/],
+      [
+        [1, ...u32le(1), 0, ...u32le(1), ...u32le(0), ...u32le(0), ...u32le(0)],
+        /kind/,
+      ],
+      [
+        [1, ...u32le(1), 4, ...u32le(1), ...u32le(0), ...u32le(0), ...u32le(0)],
+        /kind/,
+      ],
+      [
+        [
+          1,
+          ...u32le(1),
+          1,
+          ...u32le(1),
+          ...u32le(0),
+          ...u32le(0),
+          ...u32le(4),
+          65,
+          66,
+        ],
+        /Truncated/,
+      ],
+      [
+        [
+          1,
+          ...u32le(1),
+          1,
+          ...u32le(1),
+          ...u32le(0),
+          ...u32le(0),
+          ...u32le(1),
+          0xff,
+        ],
+        /Invalid UTF-8/,
+      ],
+      [[1, ...u32le(0), 0], /Trailing/],
+    ] as const
+  ) {
+    throws(
+      () => readTrapMetadata(wasmWithTraps([...payload])),
+      expectInvalidAbi(pattern),
+    );
+  }
+  throws(
+    () => readTrapMetadata(wasmWithTraps([1, ...u32le(0)], [1, ...u32le(0)])),
+    expectInvalidAbi(/Duplicate/),
+  );
+});
+
+Deno.test("blot test reports decoded panic and bounds traps with source line/col and keeps expect_trap passing", () =>
+  temporary(async (root) => {
+    const scalarPanicPath = await write(
+      root,
+      "scalar_panic.blot",
+      `test "panics":
+  @panic "audit: lost receipt"
+`,
+    );
+    const mixedPath = await write(
+      root,
+      "traps_provenance.blot",
+      `import * as test from "std/test"
+
+test "out of bounds":
+  let xs = #[10, 20, 30]
+  let _ = xs[5]
+
+test expect_trap "expected panic" => @panic "expected"
+
+@[test.suite]
+test "btst assertion location":
+  use test.eq "expected sum" 42 41
+`,
+    );
+    const report = await runBlotTests({
+      executable,
+      paths: [scalarPanicPath, mixedPath],
+      jobs: 1,
+    });
+    equal(report.success, false);
+    equal(report.testsPassed, 1, JSON.stringify(report));
+    equal(report.testsFailed, 3, JSON.stringify(report));
+    const byPath = Object.fromEntries(
+      report.modules.map((mod) => [mod.path, mod]),
+    );
+    const panicTest = byPath[scalarPanicPath].tests[0];
+    equal(panicTest.displayName, "panics");
+    equal(panicTest.status, "failed");
+    equal(panicTest.message, 'panic: "audit: lost receipt"');
+    equal(panicTest.trap?.kind, "panic");
+    equal(panicTest.trap?.message, "audit: lost receipt");
+    equal(panicTest.trap?.filename, scalarPanicPath);
+    equal(panicTest.trap?.line, 2);
+    equal(panicTest.trap?.col, 3);
+
+    const byDisplay = Object.fromEntries(
+      byPath[mixedPath].tests.map((test) => [test.displayName, test]),
+    );
+    equal(byDisplay["expected panic"].status, "passed");
+
+    const boundsTest = byDisplay["out of bounds"];
+    equal(boundsTest.status, "failed");
+    equal(boundsTest.message, "index out of bounds");
+    equal(boundsTest.trap?.kind, "bounds");
+    equal(boundsTest.trap?.filename, mixedPath);
+    equal(boundsTest.trap?.line, 5);
+    equal(boundsTest.trap?.col, 11);
+
+    const formatted = await formatTestRunReport(report);
+    match(
+      formatted,
+      /panic: "audit: lost receipt"\n    at .*scalar_panic\.blot:2:3/,
+    );
+    match(
+      formatted,
+      /index out of bounds\n    at .*traps_provenance\.blot:5:11/,
+    );
+    match(
+      formatted,
+      /expected sum: expected equal values\n      at .*traps_provenance\.blot:11\n      expected: 42\n      actual: 41/,
+    );
+  }));
+
+Deno.test("repeated calls on the same guest after a trap never leak a stale trap ID", () =>
+  temporary(async (root) => {
+    const entry = await write(
+      root,
+      "trap_reuse.blot",
+      `#entry func first_panic (): U32 => return @panic "first panic"
+#entry func second_panic (): U32 => return @panic "second panic"
+#entry func div_zero (): U32 => return @u32.div 1 0
+#entry func ok_value (): U32 => return 42
+`,
+    );
+    const compiler = await createCompiler({ executable, entry });
+    try {
+      const built = await compiler.build();
+      ok(built.success, JSON.stringify(built));
+      const guest = await instantiateGuest(built.bytes);
+      try {
+        throws(
+          () => guest.call("first_panic", null),
+          (error: unknown) => {
+            ok(error instanceof WebAssembly.RuntimeError, String(error));
+            match(error.message, /^panic: "first panic" \(/);
+            const trap = guestTrapOf(error);
+            ok(trap);
+            equal(trap.kind, "panic");
+            equal(trap.message, "first panic");
+            equal(
+              (error as WebAssembly.RuntimeError & { blotTrap?: unknown })
+                .blotTrap,
+              trap,
+            );
+            ok(error.cause instanceof WebAssembly.RuntimeError);
+            return true;
+          },
+        );
+        // Unrecorded trap immediately after a recorded panic must not inherit the prior trap ID.
+        throws(
+          () => guest.call("div_zero", null),
+          (error: unknown) => {
+            ok(error instanceof WebAssembly.RuntimeError, String(error));
+            equal(guestTrapOf(error), undefined);
+            ok(!error.message.includes("first panic"), error.message);
+            return true;
+          },
+        );
+        equal(guest.call("ok_value", null), 42);
+        throws(
+          () => guest.call("second_panic", null),
+          (error: unknown) => {
+            ok(error instanceof WebAssembly.RuntimeError, String(error));
+            equal(guestTrapOf(error)?.message, "second panic");
+            return true;
+          },
+        );
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await compiler.dispose();
+    }
+  }));

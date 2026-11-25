@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  enrichDiagnostics,
   formatDiagnosticCodeList,
   formatDiagnosticReport,
   formatExplanation,
@@ -150,6 +151,15 @@ async function runTestCli(
   return report.success ? 0 : 1;
 }
 
+function isNoEntryDiagnostic(
+  diag: { code?: string; message?: string },
+): boolean {
+  return diag.code === "no_entry" ||
+    (diag.code === "storage_unsupported" &&
+      typeof diag.message === "string" &&
+      diag.message.includes("exports nothing"));
+}
+
 async function runGeneratorProject(
   executable: string | URL | undefined,
   entry: string,
@@ -218,7 +228,12 @@ async function runGeneratorProject(
   const compiler = await createCompiler({ ...config, executable, assets });
   try {
     const result = await compiler.build();
-    const diagnostics = result.success
+    const noEntryOnly = command === "check" &&
+      !result.success &&
+      result.diagnostics.length > 0 &&
+      result.diagnostics.every((diag) => isNoEntryDiagnostic(diag));
+    const succeeded = result.success || noEntryOnly;
+    const diagnostics = succeeded
       ? []
       : result.diagnostics.map((diagnostic) => ({
         kind: "diagnostic" as const,
@@ -228,35 +243,50 @@ async function runGeneratorProject(
       await Deno.writeFile(destination, result.bytes);
     }
     if (json) {
-      const records = [...diagnostics, {
-        ...(result.success
-          ? {
-            ...result.stats,
-            wasm_bytes: command === "build" ? result.bytes.length : 0,
-          }
-          : {}),
-        kind: "compilation",
-        filename: entry,
-        stage: command === "check" ? "check-project" : "build-project",
-        success: result.success,
-      }];
+      const enriched = diagnostics.length > 0
+        ? await enrichDiagnostics(diagnostics as RawDiagnosticRecord[])
+        : [];
+      const compilation = result.success
+        ? {
+          ...result.stats,
+          wasm_bytes: command === "build" ? result.bytes.length : 0,
+          kind: "compilation",
+          filename: entry,
+          stage: command === "check" ? "check-project" : "build-project",
+          success: true,
+        }
+        : noEntryOnly
+        ? {
+          kind: "compilation",
+          filename: entry,
+          stage: "check-project",
+          success: true,
+          wasm_bytes: 0,
+        }
+        : {
+          kind: "compilation",
+          filename: entry,
+          stage: command === "check" ? "check-project" : "build-project",
+          success: false,
+        };
+      const records = [...enriched, compilation];
       await Deno.stdout.write(
         new TextEncoder().encode(
           records.map((record) => JSON.stringify(record)).join("\n") + "\n",
         ),
       );
-    } else if (!result.success) {
+    } else if (!succeeded) {
       console.error(
         await formatDiagnosticReport(diagnostics as RawDiagnosticRecord[]),
       );
     } else {
       console.log(
-        destination
+        destination && result.success
           ? `${destination}: ${result.bytes.length} bytes`
           : `${entry}: checked`,
       );
     }
-    return result.success ? 0 : 1;
+    return succeeded ? 0 : 1;
   } finally {
     await compiler.dispose();
   }
@@ -453,8 +483,38 @@ export async function runCli(
     ).output();
     const stdout = new TextDecoder().decode(result.stdout);
     const stderr = new TextDecoder().decode(result.stderr);
-    if (json) await Deno.stdout.write(result.stdout);
-    else {
+    if (json) {
+      const parsed: Array<
+        { rawLine: string; record?: Record<string, unknown> }
+      > = [];
+      const rawDiagnostics: RawDiagnosticRecord[] = [];
+      for (const rawLine of stdout.split("\n")) {
+        if (!rawLine.trim()) continue;
+        try {
+          const record = JSON.parse(rawLine) as Record<string, unknown>;
+          parsed.push({ rawLine, record });
+          if (record.kind === "diagnostic") {
+            rawDiagnostics.push(record as unknown as RawDiagnosticRecord);
+          }
+        } catch {
+          parsed.push({ rawLine });
+        }
+      }
+      const enriched = rawDiagnostics.length > 0
+        ? await enrichDiagnostics(rawDiagnostics)
+        : [];
+      let diagIndex = 0;
+      const outLines = parsed.map((entry) =>
+        entry.record?.kind === "diagnostic"
+          ? JSON.stringify(enriched[diagIndex++])
+          : entry.rawLine
+      );
+      if (outLines.length > 0) {
+        await Deno.stdout.write(
+          new TextEncoder().encode(outLines.join("\n") + "\n"),
+        );
+      }
+    } else {
       const diagnostics: RawDiagnosticRecord[] = [];
       for (const line of stdout.trim().split("\n").filter(Boolean)) {
         const record = JSON.parse(line);

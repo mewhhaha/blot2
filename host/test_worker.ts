@@ -1,4 +1,4 @@
-import { instantiateGuest } from "./guest.ts";
+import { type GuestTrapInfo, guestTrapOf, instantiateGuest } from "./guest.ts";
 import type { TestCaseResult, TestMetadata } from "./test_runner.ts";
 
 export interface TestWorkerRequest {
@@ -14,6 +14,7 @@ export interface TestWorkerResponse extends
     "status" | "assertionsPassed" | "assertionsFailed" | "message"
   > {
   packet?: Uint32Array;
+  trap?: GuestTrapInfo;
 }
 
 function failed(message: string, assertionsFailed = 0): TestWorkerResponse {
@@ -61,10 +62,18 @@ async function execute(
       if (test.kind === "trap" && error instanceof WebAssembly.RuntimeError) {
         return passed;
       }
-      return failed(
-        error instanceof Error ? error.message : String(error),
-        test.kind === "check" ? 1 : 0,
-      );
+      const trap = guestTrapOf(error);
+      return {
+        status: "failed",
+        assertionsPassed: 0,
+        assertionsFailed: test.kind === "check" ? 1 : 0,
+        message: trap
+          ? trap.formatted
+          : error instanceof Error
+          ? error.message
+          : String(error),
+        ...(trap && { trap }),
+      };
     }
     if (test.kind === "trap") {
       return failed("Expected test to trap, but it returned normally", 1);

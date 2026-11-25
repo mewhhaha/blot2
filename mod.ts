@@ -24,8 +24,10 @@ import {
 export { createZigProjectCompiler } from "./host/zig_project_client.ts";
 export { jsonAssetParser } from "./host/assets.ts";
 export {
+  BlotGeneratorError,
   type BlotGeneratorInputMode,
   type BlotGeneratorOptions,
+  type BlotGeneratorPhase,
   type BlotGeneratorReference,
   type BlotGeneratorRule,
   createBlotGenerator,
@@ -36,6 +38,7 @@ export type {
   AssetBuildStats,
   AssetContext,
   AssetDependency,
+  AssetDiagnostic,
   AssetImport,
   AssetImports,
   AssetModule,
@@ -44,6 +47,7 @@ export type {
   AssetReference,
   AssetType,
   CompiledAsset,
+  Stage0Provenance,
 } from "./host/assets.ts";
 export type {
   NativeAssetImport,
@@ -63,12 +67,23 @@ export type {
   ZigProjectDiagnostic,
   ZigProjectSourceLocation,
 } from "./host/zig_project_client.ts";
-export { GuestError, instantiateGuest, readGuestAbi } from "./host/guest.ts";
+export {
+  formatGuestTrap,
+  GuestError,
+  guestTrapOf,
+  instantiateGuest,
+  readGuestAbi,
+  readTrapMetadata,
+  TRAP_SITE_OFFSET,
+} from "./host/guest.ts";
 export type {
   AsyncHostCallback,
   Guest,
   GuestAbi,
+  GuestTrapInfo,
   HostCallback,
+  TrapKind,
+  TrapMetadataEntry,
 } from "./host/guest.ts";
 
 export const blotStdRoot: URL = new URL("./std/", import.meta.url);

@@ -63,8 +63,10 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
     const result = await compiler.build({
       sources: {
         [entry]: `
-const change = func (candidate: Result [U32, Array U32]) : Result [U32, Array U32] => return Result.map (func value => return value + 1) candidate
-#entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change ($Ok value))
+const change = func (candidate: Result [U32, e]) : Result [U32, e] => return Result.map (func (value: U32) => return value + 1) candidate
+#entry const scalar = func (value: U32) => return do:
+  let candidate: Result [U32, Array U32] = $Ok value
+  break Result.unwrap_or 42 (change candidate)
 #entry const alias = func (value: U32) => return do:
   let child = #[value, value + 1]
   let candidate = $Err child

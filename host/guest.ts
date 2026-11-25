@@ -29,6 +29,23 @@ export const KERNEL_FLAG_HAS_CONTEXT = 1 << 0;
 export const KERNEL_FLAG_VARIABLE_OUTPUT = 1 << 1;
 /** Page-0 byte offset of the zero-export `arena_oom_flag` (`u32`). */
 export const ARENA_OOM_OFFSET = 640;
+/** Page-0 byte offset of the 1-based `trap_site_id` (`u32 LE`) for `blot:traps`. */
+export const TRAP_SITE_OFFSET = 772;
+
+export type TrapKind = "panic" | "bounds" | "unreachable";
+
+export interface TrapMetadataEntry {
+  readonly kind: TrapKind;
+  readonly unit: number;
+  readonly start: number;
+  readonly end: number;
+  readonly message: string;
+}
+
+export interface GuestTrapInfo extends TrapMetadataEntry {
+  readonly id: number;
+  readonly formatted: string;
+}
 
 // Captured intrinsics for side-effect-free private byte copying.
 const TypedArrayProto = Object.getPrototypeOf(Uint8Array.prototype);
@@ -299,6 +316,146 @@ export class GuestError extends Error {
     super(message, options);
     this.name = "GuestError";
   }
+}
+
+const guestTrapMap = new WeakMap<object, GuestTrapInfo>();
+
+export function formatGuestTrap(entry: TrapMetadataEntry): string {
+  switch (entry.kind) {
+    case "panic":
+      return entry.message ? `panic: "${entry.message}"` : "panic";
+    case "bounds":
+      return entry.message || "index out of bounds";
+    case "unreachable":
+      return entry.message ? `unreachable: ${entry.message}` : "unreachable";
+  }
+}
+
+export function guestTrapOf(error: unknown): GuestTrapInfo | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  return guestTrapMap.get(error);
+}
+
+/** Decode the optional `blot:traps` v1 custom section. */
+export function readTrapMetadata(
+  wasm: WebAssembly.Module | Uint8Array<ArrayBuffer>,
+): readonly TrapMetadataEntry[] | undefined {
+  const module = wasm instanceof WebAssembly.Module
+    ? wasm
+    : new WebAssembly.Module(wasm);
+  const sections = WebAssembly.Module.customSections(module, "blot:traps");
+  if (sections.length === 0) return undefined;
+  if (sections.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate blot:traps section");
+  }
+  const bytes = new Uint8Array(sections[0]);
+  if (bytes.length < 5) {
+    throw new GuestError("invalid_abi", "Truncated blot:traps section");
+  }
+  const version = bytes[0];
+  if (version !== 1) {
+    throw new GuestError(
+      "invalid_abi",
+      `Unsupported blot:traps version ${version}`,
+    );
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const count = view.getUint32(1, true);
+  let offset = 5;
+  if (count > Math.floor((bytes.length - offset) / 17)) {
+    throw new GuestError("invalid_abi", "Truncated blot:traps entries");
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  const entries: TrapMetadataEntry[] = [];
+  for (let i = 0; i < count; i++) {
+    if (bytes.length - offset < 17) {
+      throw new GuestError("invalid_abi", "Truncated blot:traps entry");
+    }
+    const kindByte = bytes[offset++];
+    let kind: TrapKind;
+    if (kindByte === 1) kind = "panic";
+    else if (kindByte === 2) kind = "bounds";
+    else if (kindByte === 3) kind = "unreachable";
+    else {
+      throw new GuestError(
+        "invalid_abi",
+        `Invalid blot:traps kind ${kindByte}`,
+      );
+    }
+    const unit = view.getUint32(offset, true);
+    offset += 4;
+    const start = view.getUint32(offset, true);
+    offset += 4;
+    const end = view.getUint32(offset, true);
+    offset += 4;
+    const messageLen = view.getUint32(offset, true);
+    offset += 4;
+    if (messageLen > bytes.length - offset) {
+      throw new GuestError("invalid_abi", "Truncated blot:traps message");
+    }
+    const messageBytes = bytes.subarray(offset, offset + messageLen);
+    offset += messageLen;
+    let message: string;
+    try {
+      message = decoder.decode(messageBytes);
+    } catch (cause) {
+      throw new GuestError("invalid_abi", "Invalid UTF-8 in blot:traps", {
+        cause,
+      });
+    }
+    entries.push(Object.freeze({ kind, unit, start, end, message }));
+  }
+  if (offset !== bytes.length) {
+    throw new GuestError("invalid_abi", "Trailing bytes in blot:traps section");
+  }
+  return Object.freeze(entries);
+}
+
+function enrichGuestTrap(
+  error: unknown,
+  trapTable: readonly TrapMetadataEntry[] | undefined,
+  memory: WebAssembly.ExportValue | undefined,
+): unknown {
+  if (
+    !(error instanceof WebAssembly.RuntimeError) ||
+    !trapTable || trapTable.length === 0 ||
+    !(memory instanceof WebAssembly.Memory) ||
+    memory.buffer.byteLength < TRAP_SITE_OFFSET + 4
+  ) {
+    return error;
+  }
+  const trapId = new DataView(memory.buffer).getUint32(TRAP_SITE_OFFSET, true);
+  if (trapId < 1 || trapId > trapTable.length) return error;
+  const entry = trapTable[trapId - 1];
+  const info: GuestTrapInfo = Object.freeze({
+    ...entry,
+    id: trapId,
+    formatted: formatGuestTrap(entry),
+  });
+  const enriched = new WebAssembly.RuntimeError(
+    `${info.formatted} (${error.message})`,
+  );
+  Object.defineProperty(enriched, "cause", {
+    value: error,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  if (error.stack !== undefined) {
+    try {
+      enriched.stack = error.stack;
+    } catch {
+      // Preserve default stack if non-writable.
+    }
+  }
+  Object.defineProperty(enriched, "blotTrap", {
+    value: info,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  guestTrapMap.set(enriched, info);
+  return enriched;
 }
 
 class AbiReader {
@@ -1847,6 +2004,7 @@ export async function instantiateGuest(
     ? bytes
     : await WebAssembly.compile(bytes);
   const abi = readGuestAbi(module);
+  const trapTable = readTrapMetadata(module);
   const dataSchemas = abiDataSchemas.get(abi);
   const functions = new Map(abi.functions.map((fn) => [fn.name, fn]));
   const constants = new Map(
@@ -2490,8 +2648,7 @@ export async function instantiateGuest(
   const profiling =
     WebAssembly.Module.customSections(module, "blot:memory-profile").length ===
       1;
-  const hasTraps =
-    WebAssembly.Module.customSections(module, "blot:traps").length === 1;
+  const hasTraps = trapTable !== undefined;
   if (
     memory !== undefined &&
     (allocate !== undefined || reset !== undefined ||
@@ -2963,6 +3120,15 @@ export async function instantiateGuest(
     if (failed && !priorFailure) throw failure;
   }
 
+  function clearTrapSite(): void {
+    if (
+      memory instanceof WebAssembly.Memory &&
+      memory.buffer.byteLength >= TRAP_SITE_OFFSET + 4
+    ) {
+      new DataView(memory.buffer).setUint32(TRAP_SITE_OFFSET, 0, true);
+    }
+  }
+
   return {
     abi,
     lastReclaimedOwners: () => reclaimedOwners,
@@ -3093,7 +3259,13 @@ export async function instantiateGuest(
             : (argument as Uint32Array).length + (batch.prefix?.length ?? 0);
           batch.observeCopy("guestUnpack", length * 4);
         }
-        const raw = exported(value);
+        clearTrapSite();
+        let raw: unknown;
+        try {
+          raw = exported(value);
+        } catch (error) {
+          throw enrichGuestTrap(error, trapTable, memory);
+        }
         let result: GuestValue | GuestOwner;
         if (batch) {
           result = arrayFromWasm(arena!, fn.result as ArrayType, raw, batch);
@@ -3119,10 +3291,14 @@ export async function instantiateGuest(
       const { fn, value, exported } = begin(name, argument, true);
       let outcome = 1;
       try {
-        const result = publicResult(
-          fn.result,
-          await integration.promising(exported)(value),
-        );
+        clearTrapSite();
+        let raw: unknown;
+        try {
+          raw = await integration.promising(exported)(value);
+        } catch (error) {
+          throw enrichGuestTrap(error, trapTable, memory);
+        }
+        const result = publicResult(fn.result, raw);
         outcome = 0;
         return result;
       } finally {

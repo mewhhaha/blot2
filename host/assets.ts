@@ -10,7 +10,25 @@ import type {
   ZigProjectBuildOptions,
   ZigProjectBuildResult,
   ZigProjectCompiler,
+  ZigProjectDiagnostic,
 } from "./zig_project_client.ts";
+
+export interface Stage0Provenance {
+  readonly stage: "stage0";
+  readonly phase: "compile" | "execute" | "result" | "generated_source";
+  readonly module: string;
+  readonly input: string;
+  readonly generator?: string;
+}
+
+export interface AssetDiagnostic extends ZigProjectDiagnostic {
+  readonly provenance?: Stage0Provenance;
+  readonly virtual_source?: string;
+}
+
+export interface AssetParserMetadata {
+  readonly generator?: string;
+}
 
 export type AssetType =
   | "Unit"
@@ -54,6 +72,41 @@ export interface AssetContext {
 export type AssetParser = (
   context: AssetContext,
 ) => AssetModule | Promise<AssetModule>;
+
+const parserMetadata = new WeakMap<AssetParser, AssetParserMetadata>();
+const stage0ErrorPhases = new WeakMap<object, Stage0Provenance["phase"]>();
+
+/** Attach Stage-0 provenance metadata (such as generator path) to a parser function. */
+export function tagAssetParser(
+  parser: AssetParser,
+  metadata: AssetParserMetadata,
+): AssetParser {
+  parserMetadata.set(parser, Object.freeze({ ...metadata }));
+  return parser;
+}
+
+/** Read Stage-0 provenance metadata attached to a parser function, if any. */
+export function assetParserMetadata(
+  parser: AssetParser,
+): AssetParserMetadata | undefined {
+  return parserMetadata.get(parser);
+}
+
+/** Tag an error with the Stage-0 phase in which it occurred. */
+export function tagStage0Error(
+  error: object,
+  phase: Stage0Provenance["phase"],
+): void {
+  stage0ErrorPhases.set(error, phase);
+}
+
+/** Read the Stage-0 phase attached to an error, if any. */
+export function stage0ErrorPhase(
+  error: unknown,
+): Stage0Provenance["phase"] | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  return stage0ErrorPhases.get(error);
+}
 export interface AssetImport {
   /** Relative to the entry module, or an absolute local path. */
   readonly path: string | URL;
@@ -567,10 +620,16 @@ export async function withAssetImports(
       generatedBytes: 0,
     };
     let current = entry;
+    let currentModule: string | undefined;
+    let currentGenerator: string | undefined;
+    let currentPhase: Stage0Provenance["phase"] = "execute";
     let nativeStarted = false;
     try {
       for (const definition of definitions) {
         current = definition.input;
+        currentModule = definition.module;
+        currentGenerator = assetParserMetadata(definition.parser)?.generator;
+        currentPhase = "execute";
         const previous = cache.get(definition.module);
         let reusable = !!previous;
         if (previous) {
@@ -644,6 +703,7 @@ export async function withAssetImports(
           },
         });
         options.signal?.throwIfAborted();
+        currentPhase = "result";
         candidate.set(definition.module, {
           path: input,
           reads: dependencies,
@@ -651,6 +711,8 @@ export async function withAssetImports(
         });
         stats.parsed++;
       }
+      currentModule = undefined;
+      currentGenerator = undefined;
       const resources = new Map<string, Resource>();
       for (const module of candidate.values()) {
         for (const [key, resource] of module.resources) {
@@ -671,11 +733,30 @@ export async function withAssetImports(
         }
         sources[raw] = contents;
       }
+      const generatedSources = new Map<
+        string,
+        { source: string; input: string; generator?: string }
+      >();
+      const definitionsByModule = new Map(
+        definitions.map((definition) => [definition.module, definition]),
+      );
       for (const [path, module] of candidate) {
+        const definition = definitionsByModule.get(path);
+        const input = definition?.input ?? module.path;
+        const generator = definition
+          ? assetParserMetadata(definition.parser)?.generator
+          : undefined;
+        current = input;
+        currentModule = path;
+        currentGenerator = generator;
+        currentPhase = "result";
         const source = module.source(ids);
         sources[path] = source;
         stats.generatedBytes += encoder.encode(source).length;
+        generatedSources.set(path, { source, input, generator });
       }
+      currentModule = undefined;
+      currentGenerator = undefined;
       if (stats.generatedBytes > totalLimit) {
         throw new RangeError("Generated asset sources exceed 64 MiB");
       }
@@ -711,7 +792,29 @@ export async function withAssetImports(
       }));
       nativeStarted = true;
       const built = await compiler.build({ signal: options.signal, sources });
-      if (!built.success) return built;
+      if (!built.success) {
+        return {
+          ...built,
+          diagnostics: built.diagnostics.map((diag): AssetDiagnostic => {
+            const generated = generatedSources.get(diag.filename);
+            if (!generated) return diag;
+            const provenance: Stage0Provenance = {
+              stage: "stage0",
+              phase: "generated_source",
+              module: diag.filename,
+              input: generated.input,
+              ...(generated.generator !== undefined
+                ? { generator: generated.generator }
+                : {}),
+            };
+            return {
+              ...diag,
+              provenance,
+              virtual_source: generated.source,
+            };
+          }),
+        };
+      }
       cache = candidate;
       revision = built.revision;
       stats.inputBytes = inputBytes;
@@ -748,18 +851,33 @@ export async function withAssetImports(
           }],
         };
       }
+      const phase = stage0ErrorPhase(error) ?? currentPhase;
+      const diagnostic: AssetDiagnostic = {
+        filename: current,
+        stage: "asset",
+        code: "asset_import",
+        start: 0,
+        end: 0,
+        message: error instanceof Error ? error.message : String(error),
+        offset_encoding: "utf8_bytes",
+        ...(currentModule !== undefined
+          ? {
+            provenance: {
+              stage: "stage0",
+              phase,
+              module: currentModule,
+              input: current,
+              ...(currentGenerator !== undefined
+                ? { generator: currentGenerator }
+                : {}),
+            },
+          }
+          : {}),
+      };
       return {
         success: false,
         revision,
-        diagnostics: [{
-          filename: current,
-          stage: "asset",
-          code: "asset_import",
-          start: 0,
-          end: 0,
-          message: error instanceof Error ? error.message : String(error),
-          offset_encoding: "utf8_bytes",
-        }],
+        diagnostics: [diagnostic],
       };
     }
   }

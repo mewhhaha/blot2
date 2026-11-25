@@ -226,7 +226,7 @@ func generate_declarations (tokens: #[Text]): Result [Text, Text] =>
           out := text.append generated self
           i := next
         $Err message => do:
-          return $Err message
+          return $Err (copy message)
     else:
       if is_token tokens i "{":
         nesting := self + 1
@@ -243,4 +243,4 @@ func generate_declarations (tokens: #[Text]): Result [Text, Text] =>
 #entry func generate (source: Text): Result [Text, Text] =>
   return case tokenize source of
     $Ok tokens => generate_declarations tokens
-    $Err message => $Err message
+    $Err message => $Err (copy message)

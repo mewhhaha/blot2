@@ -58,7 +58,7 @@ func quote (value: Text): Text =>
     let fields = case read_row line of
       $Ok fields => fields
       $Err message => do:
-        return $Err message
+        return $Err (copy message)
     if fields.length != 3:
       return $Err "Expected three CSV columns"
     if not header:

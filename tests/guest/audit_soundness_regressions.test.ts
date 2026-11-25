@@ -761,3 +761,49 @@ type Pair = { a: U32, b: U32 }
     "unsupported",
   );
 });
+
+Deno.test("audit: multi-parameter nominal types [k, v] preserve ownership facts across own calls and loops", async () => {
+  await compileAndRun(
+    `
+type Entry [k, v] is data = $Entry { key: k, val: v }
+type Map [k, v] is data = $Map { rows: #[Entry [k, v]], count: #[U32] }
+type Set k = Map [k, Unit]
+
+func push_key (key: k) -> (table: own Set k): Set k =>
+  @storage.push table.rows ($Entry { key, val: () })
+  table.count[0] := table.rows.length
+  return table
+
+func build_set (values: #[k]) -> (table: own Set k): Set k =>
+  if values.length == 0:
+    return table
+  table := push_key values[0] table
+  for i in 1..values.length:
+    table := push_key values[i] table
+  return table
+
+#entry func main (): U32 =>
+  let init: Set U32 = $Map { rows: #[], count: #[0] }
+  let out = build_set #[10, 20, 30] init
+  out.count[0] := out.count[0] + 100
+  return out.count[0] * 10 + out.rows.length
+`,
+    (guest) => {
+      equal(guest.call("main", null), 1033);
+    },
+  );
+
+  await compileExpectedFailure(
+    `
+func leak (candidate: Result [U32, #[U32]]): Result [U32, #[U32]] =>
+  return Result.map (func value => return value + 1) candidate
+#entry func main (x: U32): U32 =>
+  let child = #[x, x + 1]
+  let mapped = leak ($Err child)
+  return case mapped of
+    $Ok v => v
+    $Err a => a[0]
+`,
+    "result_not_owned",
+  );
+});

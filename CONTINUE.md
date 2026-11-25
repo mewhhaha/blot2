@@ -1,47 +1,50 @@
 # Working on Blot and Gdev
 
-## Current frontier: Extended `#for` Comptime Reflection, Stage-0 Blot Virtual Module Generators & Generic Comptime Decoders (25 November 2026)
+## Current frontier: Language Soundness, SIMD/Staging Fixes, Formatter/Stdlib Hardening, Solid-2 Agent Diagnostics & `blot:traps` v1 Provenance (Waves 1–4, 25 November 2026)
 
-Extended `#for` reflection, Stage-0 Blot-written virtual module generators,
-generic comptime decoders in Ink, local toolchain reinstall, and fresh live
-NVIDIA Vulkan Gdev hardware frame qualification are complete and verified at
-`blotc-goose` SHA-256
-`34193f6a25d67ea4c603cb32410ef0bd0aaecf0d5874691b85534f8d931a87e1`
-(`9,548,536` B; `generated/compiler/blotc.gz` SHA-256
-`fd641bde68fe939b9e18f9e1a57d9cbfe3b814cf62e28ea3512dcef54ec7f981`,
-`4,061,310` B):
+All four audit waves (Waves 1–3 at `c5109160`; Wave 4 + multi-parameter nominal
+`[k, v]` ownership fix in this commit; Pen runtime trap provenance in `../pen`
+`f2047ec`), local toolchain reinstall, and fresh live NVIDIA Vulkan Gdev
+hardware frame qualification are complete and verified at `blotc-goose` SHA-256
+`466e8006c16dfcf65b56c1873cf99d61153d1fc77372ff1c9fe67514bd90affa`
+(`9,867,480` B; `generated/compiler/blotc.gz` SHA-256
+`320abaf8c0ba767bddae7e82c9d820668511a2a651aefd0a006c71df70f5dbf2`,
+`4,175,148` B):
 
-- **Extended `#for` comptime reflection (`a24fc85c`):**
-  - Added comptime field write `val.(field) := expr` (with `UpdateKind.comptime_field`, wire code `2`) supporting `self` shorthand, heterogeneous trait dispatch, nested field/index paths, flat and boxed records, read-only rejection (`*T`/`&T`), and full uniqueness checking (`aliased_update` / `spent_value`).
-  - Added expression-position comptime record builder `#for field in #fields T:` constructing structural and single-constructor nominal `data` types (including generic `t`) field-by-field via `break value`, carrying mutable locals across `#if` and runtime branches, and preserving early function `return`.
-  - Added `field.index` (declared order on nominal types, canonical order on structural records) and cross-module `field.default` (resolving defaults in the defining module, including after retained edits).
-  - Covered in [vnext_with_traits_comptime.test.ts](tests/guest/vnext_with_traits_comptime.test.ts).
+- **Wave 1 — Compiler Type, Trait, Opaque, Ownership, Uniqueness & FBIP Soundness (`c5109160` + this commit):**
+  - Enforced trait associated output `type_eq`, full-parameter & nested `traitIsReadOnly`, `is opaque` reflection (`#fields`, `#variants`, `.(field)`, builders), indirect `fork`+`with` `Foreign` rejection, `@simd.store` uniqueness/cache invalidation, duplicate `with` rejection, single `ambiguous_member` on dot-calls, `test` return validation, `#[N; T]` `#entry` rejection, and comptime closure checks.
+  - Closed uniqueness & FBIP soundness gaps: loan-ended undo trails, generic `#for` builders/updates, non-unique storage `own`/`fork`, generic `freeze`, recursive deep copy for nested arrays/ADTs, `with` record/cell/fork soundness with rebinding-slot tracking, FBIP/`linearAppend` aliasing across loops/merges/no-op updates/statement `case`/loop carries, `runtime.create` overflow guard, `static_pool_flag` write checks, and multi-parameter bracket nominal (`Map [k, v]`, `Result [a, e]`) `matchNominalArgs` ownership matching in [uniqueness.goose](compiler-goose/src/check/uniqueness.goose).
+  - Permanent executed-Wasm regressions in [audit_soundness_regressions.test.ts](tests/guest/audit_soundness_regressions.test.ts) (16 tests, incl. negative `Result [U32, #[U32]]` `result_not_owned`).
 
-- **Stage-0 Blot-written virtual module generators (`a24fc85c`):**
-  - Extended `AssetModule` in [host/assets.ts](host/assets.ts) with raw Blot `source?: string` (composable with structured exports and host `CompiledAsset` references) and added [host/generators.ts](host/generators.ts) (`createBlotGenerator`, `expandGeneratorRules`).
-  - Generators are plain `.blot` modules exporting `#entry func generate` (supporting `#[U32]`/`Text` or `{ path, bytes/text }` inputs and `Text` or `Result [Text, Text]` outputs), compiled once to sandboxed Wasm with two-level SHA-256 caching (unchanged builds reuse generated modules; input edits reuse compiled generator Wasm; generator/helper edits recompile Stage 0 automatically).
-  - Wired `"generators"` manifest rules (explicit `module`/`input` and `match` globs) into `blot.json` ([host/packages.ts](host/packages.ts)), `blot check` / `blot build` ([host/cli.ts](host/cli.ts)), `blot test` ([host/test_runner.ts](host/test_runner.ts)), and LSP completion on unsaved assets ([host/lsp.ts](host/lsp.ts)), exported from [mod.ts](mod.ts), and documented in [docs/host/assets.md](docs/host/assets.md).
-  - Shipped pure-Blot [wgsl_gen.blot](examples/generators/wgsl_gen.blot) and [csv_gen.blot](examples/generators/csv_gen.blot) examples with full host and LSP tests in [generators.test.ts](tests/host/generators.test.ts) and [lsp.test.ts](tests/host/lsp.test.ts).
+- **Wave 2 — Incremental SIMD Relocations, Staging Determinism & Control Flow (`c5109160`):**
+  - Added `unpatchableOperand` across all 5 SIMD vectorizers + `emitVec3F32Expr`, tightened `defer_f32_nan` NaN canonicalization, fixed `#run`/`#if` associated `eq`/`ne` and IEEE-754 F32 equality (`-0.0 == 0.0`, `NaN != NaN`), fixed `let ... else:` / `#for` RHS carries, generic `field.default`, `spark #[p.(f) + i]`, and `--relaxed-simd` help accuracy.
 
-- **Generic comptime decoders in Ink (`../ink` `f7486d3`):**
-  - Added `codec.decode_lanes` and `codec.decode_record` in `../ink/lib/codec.blot` using `#for field in #fields t:` record builders and `field.default`, collapsed the 20-line handwritten decoder in `../ink/tests/comptime_codec.blot` to a single call, and updated `../ink/docs/blot.md`.
+- **Wave 3 — Formatter, Tree-sitter, Stdlib, Examples & Docs (`c5109160` + this commit):**
+  - Extended Baba grammar & [host/format.ts](host/format.ts) for expression `fork`/`#for`/`#if`, reflected updates `val.(f) :=`, fixed arrays, trailing-comma tuples, and strict 80-char idempotency across all 33 shipped `.blot` files; extended Tree-sitter grammar & corpus ([reflected_members.txt](editor/tree-sitter-blot2/test/corpus/reflected_members.txt)).
+  - Hardened `std/text` (`from_f32`, `from_f32_fixed`), `std/test` (`near_array`), `std/vector` (`normalized`), [wgsl_gen.blot](examples/generators/wgsl_gen.blot), [csv_gen.blot](examples/generators/csv_gen.blot), [ecs.blot](examples/ecs.blot), [CHEATSHEET.md](CHEATSHEET.md), [docs/language/guide.md](docs/language/guide.md), and [README.md](README.md).
 
-- **Preceding 25 November 2026 milestones (full details in `git show b6462804:CONTINUE.md`):**
-  - `goosew` fast dev/check wiring (`9df8c3ab`, `check_source.py` `2.76 s`, dev emit `~4.5 s`), per-declaration single-file reuse (`9df8c3ab`, `robots.blot` `117 → 1` elabs/lowers, `check` `25.0 → 5.6 ms`, compiler total `57.2 → 34.1 ms`, byte-exact Wasm), `#entry`/`#kernel`/`#process` modifiers (`c482fccb`), first-class `test "..."` + `std/test` + unified `pen test-blot` (`7b1468cb`, `91a06cbe`, `../pen` `eb8f575`), and 16 migrated flat lane encoders (`../ink` `d0611db`, `../gdev` `b35ce22`).
+- **Wave 4 — Solid-2 Agent Diagnostics, Skills & `blot:traps` v1 Provenance in Deno & Pen (this commit + `../pen` `f2047ec`):**
+  - Honest `blot check` (runs lowering/uniqueness by default; generator-backed libraries without `#entry` succeed cleanly on `Code.no_entry` only; LSP filters spurious `no_entry` on library files).
+  - Unified v1 enriched diagnostic JSON schema (`schemaVersion: 1`) across CLI text, `--json`, LSP, and test runners; repaired all broken quick-fixes with a 12-case compile-replay CI test; expanded `DIAGNOSTIC_CATALOG` / `blot explain` to 35 canonical entries synced 1-to-1 with [skills/blot-diagnostics/SKILL.md](skills/blot-diagnostics/SKILL.md) covering 100% of all 232 compiler diagnostic codes + `asset_import` + `Io`; added [skills/agent-loops/SKILL.md](skills/agent-loops/SKILL.md) and exported it in [deno.json](deno.json).
+  - Emitted optional `"blot:traps"` v1 custom section + Page-0 offset `772` trap-site ID (exporting `"blot:memory"` on trapping scalar-only modules) and decoded typed panic/bounds/unreachable provenance + source locations in both Deno ([host/guest.ts](host/guest.ts), [host/test_runner.ts](host/test_runner.ts), [host/generators.ts](host/generators.ts) with Stage-0 `provenance` & `virtual_source`) and Pen (`../pen` `f2047ec`: `pen-runtime`, `blot-host` Wasmtime/native/`wtime-aot`, and `pen test-blot`).
+
+- **Preceding 25 November 2026 milestones (full details in `git show 08f35702:CONTINUE.md` and `git show b6462804:CONTINUE.md`):**
+  - Extended `#for` comptime reflection (`val.(field) :=`, `#for field in #fields T:`, `field.index`, `field.default`), Stage-0 Blot virtual module generators (`a24fc85c`), generic comptime decoders in Ink (`../ink` `f7486d3`), `goosew` fast dev/check & per-declaration reuse (`9df8c3ab`), `#entry`/`#kernel`/`#process` (`c482fccb`), and first-class `test "..."` + `std/test` + unified `pen test-blot` (`7b1468cb`, `91a06cbe`).
 
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `a24fc85c`) | Extended `#for` reflection & Stage-0 Blot generators (`a24fc85c`), `goosew` dev/check & per-declaration reuse (`9df8c3ab`), `#entry`/`#kernel`/`#process` (`c482fccb`), first-class `test "..."` & `std/test` (`91a06cbe`, `7b1468cb`) |
-| `../pen` | `082f314` | Unified `pen test-blot` on `test "..."` & `blot:tests` v1 (`eb8f575`), `wtime-aot v0.1.5` (`b31666d`), `#entry`/`#kernel`/`#process` (`ff7beed`) |
-| `../ink` | `f7486d3` | Generic comptime `decode_lanes` & `decode_record` (`f7486d3`), comptime `#for` codecs & `LaneDecode` (`d0611db`), `#entry`/`#kernel`/`#process` (`7edbfcc`) |
-| `../gdev` | `642ad53` | >8192 rad trig NaN fix & physical brick counts (`642ad53`), 11 flat lane encoders migrated to `codec.encode_lanes` (`b35ce22`), `#entry`/`#kernel`/`#process` (`9e569e7`) |
+| `blot2` | this commit (after `c5109160`) | Wave 4 Solid-2 agent diagnostics, `blot:traps` v1 runtime provenance & multi-param nominal `matchNominalArgs` (this commit); Waves 1–3 soundness, SIMD relocations, formatter, stdlib & trap metadata (`c5109160`); `#for` reflection & Stage-0 generators (`a24fc85c`) |
+| `../pen` | `f2047ec` | `blot:traps` v1 runtime trap provenance in `pen-runtime`, `blot-host`, and `pen test-blot` (`f2047ec`); meshlet/DAG prep (`8589dcc`); unified `pen test-blot` (`eb8f575`) |
+| `../ink` | `46111bd` | Current checkout (`46111bd`, preserves local uncommitted edits); generic comptime decoders (`f7486d3`) |
+| `../gdev` | `4e891d2` | Current checkout (`4e891d2`); >8192 rad trig NaN fix & physical brick counts (`642ad53`) |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra
-  runtime exports; Page-0 offset `640` carries `arena_oom_flag`; optional
-  `blot:finish_invocation` / `blot:kernels` / `blot:processes`; optional
-  `blot:tests` v1 custom section in `--test` builds only).
+  runtime exports; Page-0 offset `640` carries `arena_oom_flag`, offset `772`
+  carries optional trap-site ID; optional `blot:finish_invocation` /
+  `blot:kernels` / `blot:processes` / `blot:traps` v1; optional `blot:tests` v1
+  custom section in `--test` builds only).
 - **Session Protocol 2:** `Operation 0..=6` unchanged; `service::KERNEL = 15`
   uses unambiguous `request == 0` host→guest provenance (`CAP`, `CTL`,
   `BATCH_ERR`, `BATCH_OK`), strips live-only unrecorded `CAP` before `Recorded`,
@@ -65,55 +68,62 @@ NVIDIA Vulkan Gdev hardware frame qualification are complete and verified at
 ### Verified Identities & Qualification Evidence
 - **Compiler, CLI & host identities:**
   - `compiler-goose/build/blotc-goose` & `~/.local/bin/blotc` SHA-256:
-    `34193f6a25d67ea4c603cb32410ef0bd0aaecf0d5874691b85534f8d931a87e1`
-    (`9,548,536` bytes)
+    `466e8006c16dfcf65b56c1873cf99d61153d1fc77372ff1c9fe67514bd90affa`
+    (`9,867,480` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `fd641bde68fe939b9e18f9e1a57d9cbfe3b814cf62e28ea3512dcef54ec7f981`
-    (`4,061,310` bytes; decompressed byte-identical to `blotc-goose`)
+    `320abaf8c0ba767bddae7e82c9d820668511a2a651aefd0a006c71df70f5dbf2`
+    (`4,175,148` bytes; decompressed byte-identical to `blotc-goose`)
   - `~/.local/bin/blot` SHA-256:
-    `ac8a2fc9da5b7b1a8a9982d1368cde28f8303be768f92bfacdb21c16c5f1e09c`
-    (`144,821,200` bytes; embeds `blotc.gz`, parser Wasm, `std/`, `guide.md`,
+    `3088e66cce1a36402acd6300a14031e6f9612c63918438ad192342fffa7be629`
+    (`145,097,680` bytes; embeds `blotc.gz`, parser Wasm, `std/`, `guide.md`,
     `CHEATSHEET.md`, `host/generators.ts`, and `host/test_worker.ts`)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
-  - `../pen/target/release/pen` SHA-256:
-    `9367939bf125c19eea0dc52082ccf19055cd45e986db3f236a9fd75ba2ac27dd`
+  - `../pen/target/release/pen` & `~/.local/lib/pen-runtime/pen` SHA-256:
+    `6eb6fd13cedb9a8b3666b0f3894f4c0850b6e47ff3a691c9b3c893ee377765da`
 - **Qualification gates:**
-  - `blot2` (`a24fc85c`): `deno task check && deno task check:editor` exit 0
-    (`run-b1477857773037ae`) — `fmt --check` (92 files), `deno check`,
-    `test:editor` (**6/6**), `harness` (`3.12 s`), `release-build` (`104.18 s`),
-    `reference-direct` (**2/2**), `reference-uniqueness` (**206/206**),
-    `reference-fixtures` (**109/109**), `pack` OK, `guests` exit 0 (`19.07 s`,
-    incl. extended `#for` comptime tests, Stage-0 generator suite, and LSP
-    generator completion), `test:std` (**6 modules, 17 tests, 115 assertions, 0
-    failed**, `93.1 ms`), `check:editor` (**10/10** corpus + **19/19**
-    highlight suites). External `/tmp` verification passed `blot check` on
-    `wgsl_gen.blot`/`csv_gen.blot` and `blot test tests/std` (**17/17**, `133.4 ms`).
-  - `../ink` (`f7486d3`): `pen test-blot --project ../ink` exit 0 — **486
-    passed, 0 failed** in 106 Blot modules (`1.6 s`, `429` checks, `53`
+  - `blot2` (this commit): `deno fmt --check` (92 files), `deno check`,
+    `test:editor` (**6/6**), `harness` (`4.05 s`), `release-build` (`138.67 s`,
+    `run-469b37a4bceb9c69`), `reference-direct` (**2/2**, `runtime.expected`
+    `7,765` B, `writer` `352` B), `reference-uniqueness` (**206/206**),
+    `reference-fixtures` (**109/109**), `pack` OK, `test:guest` exit 0
+    (`run-fd332201cacf971d`, **1,210 passed, 0 failed**, `23.28 s`, incl.
+    `audit_soundness_regressions`, `diagnostics_agent`, `test_runner`, `lsp`,
+    and `generators`), `test:std` (**7 modules, 18 tests, 146 assertions, 0
+    failed**, `146.1 ms`), `check:editor` (**11/11** corpus + **19/19**
+    highlight suites). External `/tmp` verification passed `blot explain --list`,
+    `blot explain SPENT_VALUE`, `blot check wgsl_gen.blot`, and
+    `blot test tests/std` (**18/18, 146 assertions**, `148.5 ms`).
+  - `../pen` (`f2047ec`): `pen-runtime` (**218 passed, 0 failed**), `blot-host`
+    (**33 unit + 11 integration passed, 0 failed**), `pen blot_test` (**17/17
+    passed**, incl. `runs_real_trap_provenance_tests`,
+    `reports_trap_provenance_and_source_locations`, and
+    `runs_the_checkouts_pilot`).
+  - `../ink` (`46111bd` + local edits): `pen test-blot --project ../ink` exit 0
+    — **493 passed, 0 failed** in 108 Blot modules (`1.7 s`, `436` checks, `53`
     must-trap, `4` must-not-compile) + **257 passed, 0 failed** native
-    f64-reference Rust tests (`8.35 s`); `pen tool ink -- fmt --check` OK.
-  - `../gdev` (`642ad53`) live NVIDIA Vulkan hardware frame:
+    f64-reference Rust tests (`9.43 s`).
+  - `../gdev` (`4e891d2`) live NVIDIA Vulkan hardware frame:
     - Compiled via `scripts/integration/build_gdev.ts --frontend-workers 8 --profile`
-      (`build/gdev-first-frame/main-a8c0d39e80c89854/main.wasm`, `6,237,227` B,
-      SHA-256 `70e11fcfce8544579cea7ea860c43da634b882f9aa40e70897b9e03a7e149216`,
-      `319` modules / `4,539` functions, **`433.7 ms`** build,
+      (`build/gdev-first-frame/main-337aad2680dbae15/main.wasm`, `6,530,935` B,
+      SHA-256 `a51952caafaba76540c566b834e1af736a2d66734a494a4dfd59760ae4ce4d63`,
+      `320` modules / `4,555` functions, **`885.1 ms`** build,
       `parallel_retries=0`, `parallel_batches=1`).
     - Executed on **`NVIDIA GeForce RTX 4080 SUPER (Vulkan)`** via
       `LD_LIBRARY_PATH="$HOME/.local/lib/pen-runtime"
       VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json python3
       scripts/integration/run_pen.py --launch --hardware` →
-      `build/storage-integration/gdev-one-frame/attempt-_1xxm8ie/frame.png`
+      `build/storage-integration/gdev-one-frame/attempt-i_35rf4f/frame.png`
       (inspected `640×480` PNG, SHA-256
       `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`,
-      `frames.trace`: `0 7062536994385978 eaf61059c134506c`, `guest 9.345 ms`,
-      `render 0.499 ms`, `total 12.239 ms`, all 6 runner checks `true`,
-      `compiled_wasm_unchanged: true`).
+      bit-identical to prior baseline; `frames.trace`: `0 7062536994385978
+      f1af2247052533db`, `guest 9.577 ms`, `render 0.614 ms`, `total 12.497 ms`,
+      all 6 runner checks `true`, `compiled_wasm_unchanged: true`).
 
 ## Remaining work
 
-All planned frontier tracks are complete, installed, and green across `blot2`,
-`../pen`, `../ink`, and `../gdev`. Optional future directions:
+All planned frontier tracks (Waves 1–4) are complete, installed, and green
+across `blot2`, `../pen`, `../ink`, and `../gdev`. Optional future directions:
 
 1. **Wire Stage-0 Blot generators into `../pen` (`pen.json`):** Extend
    `pen-plugins` / `plugins/blot` to discover and run Stage-0 `.blot`
@@ -131,6 +141,7 @@ All planned frontier tracks are complete, installed, and green across `blot2`,
 Superseded checkpoint narratives are preserved in pinned Git history and in
 their dedicated task and measurement records:
 
+- Extended `#for` reflection & Stage-0 generators: `git show 08f35702:CONTINUE.md`
 - `#entry`/`#kernel`/`#process`, `std/test`, `goosew` & Track 5 reuse: `git show b6462804:CONTINUE.md`
 - Structural edit localization (`fresh=1`), FBIP reuse & `wtime-aot 0.1.3`: `git show c482fccb:CONTINUE.md`
 - Retained-edit fast paths & timeline rewind determinism: `git show 7c06d4e6:CONTINUE.md`

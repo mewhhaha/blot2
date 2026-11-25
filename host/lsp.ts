@@ -67,6 +67,7 @@ function toLspDiagnostic(
   sourceText: string | undefined,
   uri: string,
 ): LspDiagnostic {
+  const extended = diag as ZigProjectDiagnostic & Partial<RawDiagnosticRecord>;
   const raw: RawDiagnosticRecord = {
     filename: diag.filename,
     stage: diag.stage,
@@ -83,16 +84,29 @@ function toLspDiagnostic(
     subject_end: diag.blame?.subjectEnd,
     holder_start: diag.blame?.holderStart,
     holder_end: diag.blame?.holderEnd,
+    explanation: diag.explanation,
+    contexts: diag.contexts,
+    related: diag.related,
+    provenance: extended.provenance,
+    virtual_source: extended.virtual_source,
   };
-  const analyzed = analyzeDiagnostic(raw, sourceText);
-  const range = sourceText !== undefined
+  const effectiveSource = sourceText ?? extended.virtual_source;
+  const analyzed = analyzeDiagnostic(raw, effectiveSource);
+  const range = effectiveSource !== undefined
     ? utf16Range(
-      sourceText,
+      effectiveSource,
       analyzed.primarySpan.startByte,
       analyzed.primarySpan.endByte,
     )
     : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
   const lines = [analyzed.headline];
+  if (extended.provenance) {
+    lines.push(
+      extended.provenance.generator
+        ? `from ${extended.provenance.input} via ${extended.provenance.generator} (stage0 ${extended.provenance.phase})`
+        : `from ${extended.provenance.input} (stage0 ${extended.provenance.phase})`,
+    );
+  }
   if (analyzed.fix) lines.push(`fix: ${analyzed.fix}`);
   lines.push(`doc: ${analyzed.docRef}`);
   const item: LspDiagnostic = {
@@ -102,13 +116,13 @@ function toLspDiagnostic(
     source: "blot",
     message: lines.join("\n"),
   };
-  if (analyzed.secondarySpan && sourceText !== undefined) {
+  if (analyzed.secondarySpan && effectiveSource !== undefined) {
     item.relatedInformation = [
       {
         location: {
           uri,
           range: utf16Range(
-            sourceText,
+            effectiveSource,
             analyzed.secondarySpan.startByte,
             analyzed.secondarySpan.endByte,
           ),
@@ -117,9 +131,12 @@ function toLspDiagnostic(
       },
     ];
   }
-  if (analyzed.quickFixes.length > 0 && sourceText !== undefined) {
+  const safeQuickFixes = analyzed.quickFixes.filter(
+    (qf) => qf.complete !== false,
+  );
+  if (safeQuickFixes.length > 0 && sourceText !== undefined) {
     item.data = {
-      blotQuickFixes: analyzed.quickFixes.map((qf) => ({
+      blotQuickFixes: safeQuickFixes.map((qf) => ({
         title: qf.title,
         range: utf16Range(sourceText, qf.startByte, qf.endByte),
         newText: qf.newText,
@@ -448,6 +465,12 @@ export class CompletionBridge {
         const items: LspDiagnostic[] = [];
         if (!result.success) {
           for (const diag of result.diagnostics) {
+            if (
+              diag.code === "no_entry" ||
+              diag.message.includes("exports nothing")
+            ) {
+              continue;
+            }
             if (diag.filename !== file) continue;
             items.push(
               toLspDiagnostic(diag, document.text, pathToFileURL(file).href),

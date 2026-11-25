@@ -6,6 +6,7 @@ import {
 } from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import {
+  type AssetDiagnostic,
   blotStdRoot,
   createBlotGenerator,
   createCompiler,
@@ -486,7 +487,7 @@ Deno.test("generator Err, trap, compile failure, missing export and unsupported 
           ],
           [
             '#entry func generate (x: Text): Text => return @panic "oh no"',
-            /generator generate trapped.*unreachable/,
+            /generator generate trapped.*panic: "oh no"/,
           ],
           [
             "#entry func generate (x: Text): Text => return nonexistent",
@@ -729,6 +730,113 @@ Deno.test("raw asset source validates Unicode, NUL and the combined structured s
         /well-formed Blot text without NUL/,
       );
       checkAssetError(await build(3), input, /exceeds 16 MiB/);
+    } finally {
+      await compiler.dispose();
+    }
+  }));
+
+Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile failures, and virtual generated_source diagnostics", () =>
+  workspace(async (root) => {
+    const entry = root + "/main.blot";
+    const generator = root + "/gen.blot";
+    const input = root + "/shader.wgsl";
+    const virtualModule = root + "/shader.wgsl.blot";
+    const compiler = await createCompiler({
+      executable,
+      entry,
+      assets: {
+        "./shader.wgsl": {
+          path: input,
+          parser: createBlotGenerator({ executable, generator }),
+        },
+      },
+    });
+    const build = () =>
+      compiler.build({
+        sources: {
+          [entry]:
+            'import { answer } from "./shader.wgsl"\n#entry func run (): U32 => return answer\n',
+        },
+        assetSources: { [input]: "header" },
+      });
+    try {
+      // 1. Generator @panic surfaces decoded panic payload + provenance.phase === "execute".
+      await Deno.writeTextFile(
+        generator,
+        '#entry func generate (x: Text): Text => return @panic "bad input"\n',
+      );
+      const panicked = await build();
+      ok(!panicked.success);
+      const panicDiag = panicked.diagnostics[0] as AssetDiagnostic;
+      match(
+        panicDiag.message,
+        /Blot generator generate trapped for .*shader\.wgsl: panic: "bad input"/,
+      );
+      equal(panicDiag.provenance, {
+        stage: "stage0",
+        phase: "execute",
+        module: virtualModule,
+        input,
+        generator,
+      });
+
+      // 2. Generator $Err surfaces provenance.phase === "result".
+      await Deno.writeTextFile(
+        generator,
+        '#entry func generate (x: Text): Result [Text, Text] => return $Err "bad header"\n',
+      );
+      const erred = await build();
+      ok(!erred.success);
+      const errDiag = erred.diagnostics[0] as AssetDiagnostic;
+      equal(errDiag.message, "bad header");
+      equal(errDiag.provenance, {
+        stage: "stage0",
+        phase: "result",
+        module: virtualModule,
+        input,
+        generator,
+      });
+
+      // 3. Generator compile failure surfaces provenance.phase === "compile".
+      await Deno.writeTextFile(
+        generator,
+        "#entry func generate (x: Text): Text => return missing_symbol\n",
+      );
+      const badGen = await build();
+      ok(!badGen.success);
+      const compileDiag = badGen.diagnostics[0] as AssetDiagnostic;
+      match(compileDiag.message, /Could not compile generator/);
+      equal(compileDiag.provenance, {
+        stage: "stage0",
+        phase: "compile",
+        module: virtualModule,
+        input,
+        generator,
+      });
+
+      // 4. Generator emitting invalid Blot source preserves virtual_source + provenance.phase === "generated_source".
+      const emitted = "const answer: U32 = true\n";
+      await Deno.writeTextFile(
+        generator,
+        `#entry func generate (x: Text): Text => return ${
+          JSON.stringify(emitted)
+        }\n`,
+      );
+      const stage1Failed = await build();
+      ok(!stage1Failed.success);
+      const genDiag = stage1Failed.diagnostics.find((diag) =>
+        diag.filename === virtualModule
+      ) as AssetDiagnostic | undefined;
+      ok(genDiag, JSON.stringify(stage1Failed.diagnostics));
+      equal(genDiag.code, "type_mismatch");
+      equal(genDiag.virtual_source, emitted);
+      equal(genDiag.provenance, {
+        stage: "stage0",
+        phase: "generated_source",
+        module: virtualModule,
+        input,
+        generator,
+      });
     } finally {
       await compiler.dispose();
     }

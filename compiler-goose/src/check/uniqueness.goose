@@ -1108,6 +1108,76 @@ recursive fn holdsInMemo(self_: Analyzer&, m: const Module&, ty: u32, variables:
     memo.answers.insert(key, answer);
     return answer;
 }
+recursive fn matchParamShape(m: const Module&, own: const u32[:], pat: u32, actual: u32, out: u32[16]&, bound: bool[16]&, depth: i64) -> bool {
+    if depth > 16 || pat == 0 || actual == 0 || pat >= m.types.nodes.len || actual >= m.types.nodes.len { return false; }
+    for v, idx in own {
+        if v == pat {
+            out[idx] = actual;
+            bound[idx] = true;
+            return true;
+        }
+    }
+    let pn = m.types.node(pat);
+    let an = m.types.node(actual);
+    if pn.tag == blot_check_types::Tag.usage { return matchParamShape(m, own, pn.a, actual, out, bound, depth + 1); }
+    if an.tag == blot_check_types::Tag.usage { return matchParamShape(m, own, pat, an.a, out, bound, depth + 1); }
+    if pn.tag == blot_check_types::Tag.product && an.tag == blot_check_types::Tag.product && pn.b == an.b {
+        let pl = m.types.list(blot_check_types::List { start: pn.a, len: pn.b });
+        let al = m.types.list(blot_check_types::List { start: an.a, len: an.b });
+        for i in 0..pl.len {
+            if !matchParamShape(m, own, pl[i], al[i], out, bound, depth + 1) { return false; }
+        }
+        return true;
+    }
+    if pn.tag == blot_check_types::Tag.array && an.tag == blot_check_types::Tag.array {
+        return matchParamShape(m, own, pn.a, an.a, out, bound, depth + 1);
+    }
+    if pn.tag == blot_check_types::Tag.record && an.tag == blot_check_types::Tag.record && pn.b == an.b {
+        for i in 0..pn.b {
+            let pf = m.types.recordField(pn, i);
+            let af = m.types.recordField(an, i);
+            if pf.name != af.name || !matchParamShape(m, own, pf.ty, af.ty, out, bound, depth + 1) { return false; }
+        }
+        return true;
+    }
+    if pn.tag == blot_check_types::Tag.nominal && an.tag == blot_check_types::Tag.nominal && pn.a == an.a && pn.b == an.b {
+        let pl = m.types.nominalArguments(pn);
+        let al = m.types.nominalArguments(an);
+        if pl.len != al.len { return false; }
+        for i in 0..pl.len {
+            if !matchParamShape(m, own, pl[i], al[i], out, bound, depth + 1) { return false; }
+        }
+        return true;
+    }
+    return pn.tag == an.tag;
+}
+fn matchNominalArgs(m: const Module&, nominal: const blot_check_core::Nominal&, given: const u32[:], out: u32[16]&) -> bool {
+    let own = m.types.list(nominal.variables);
+    if own.len > 16 { return false; }
+    if own.len == 0 { return true; }
+    let params = m.types.list(nominal.parameters);
+    if params.len == given.len && params.len != 0 {
+        var bound: bool[16] = [false; 16];
+        for i in 0..params.len {
+            if !matchParamShape(m, own, params[i], given[i], out, bound, 0) { return false; }
+        }
+        for i in 0..own.len { if !bound[i] { return false; } }
+        return true;
+    }
+    if own.len == given.len {
+        for i in 0..own.len { out[i] = given[i]; }
+        return true;
+    }
+    if given.len == 1 && given[0] < m.types.nodes.len && m.types.node(given[0]).tag == blot_check_types::Tag.product {
+        let pn = m.types.node(given[0]);
+        let items = m.types.list(blot_check_types::List { start: pn.a, len: pn.b });
+        if items.len == own.len {
+            for i in 0..own.len { out[i] = items[i]; }
+            return true;
+        }
+    }
+    return false;
+}
 recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
     if ty == blot_check_types::unit || ty == blot_check_types::boolean || ty == blot_check_types::u32_type || ty == blot_check_types::f32_type || ty == blot_check_types::never { return false; }
     if depth > 64 || ty >= m.types.nodes.len { return true; }
@@ -1147,9 +1217,10 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
     if nominal.is_opaque { return true; }
     let own = m.types.list(nominal.variables);
     let given = m.types.nominalArguments(n);
-    if own.len != given.len || own.len > 16 { return true; }
+    var matched: u32[16] = [0; 16];
+    if !matchNominalArgs(m, nominal, given, matched) { return true; }
     var bits: bool[16] = [false; 16];
-    for argument, at in given { bits[at] = holdsInMemo(self_, m, argument, variables, arguments, depth + 1, memo); }
+    for at in 0..own.len { bits[at] = holdsInMemo(self_, m, matched[at], variables, arguments, depth + 1, memo); }
     // A recursive occurrence at the same arguments adds no storage its
     // first expansion lacks; one at other arguments might.
     for outer in self_.expanding {
@@ -1282,9 +1353,10 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
     if nominal.is_opaque { return conservative; }
     let own = m.types.list(nominal.variables);
     let given = m.types.nominalArguments(n);
-    if own.len != given.len || own.len > 16 { return conservative; }
+    var matched: u32[16] = [0; 16];
+    if !matchNominalArgs(m, nominal, given, matched) { return conservative; }
     var bits: bool[16] = [false; 16];
-    for argument, at in given { bits[at] = partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo); }
+    for at in 0..own.len { bits[at] = partsInMemo(self_, m, matched[at], want, variables, arguments, depth + 1, memo); }
     // A recursive occurrence at the same arguments adds nothing its first
     // expansion lacks; one at other arguments might.
     for outer in self_.expanding {
@@ -1383,9 +1455,10 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
             if nom.is_opaque { return true; }
             let own = m.types.list(nom.variables);
             let given = m.types.nominalArguments(n);
-            if own.len != given.len { return true; }
-            for arg in given {
-                if copyHasUncopiedInner(self_, m, arg, variables, arguments, depth + 1) { return true; }
+            var matched: u32[16] = [0; 16];
+            if !matchNominalArgs(m, nom, given, matched) { return true; }
+            for at in 0..own.len {
+                if copyHasUncopiedInner(self_, m, matched[at], variables, arguments, depth + 1) { return true; }
             }
             for outer in self_.expanding {
                 if outer.unit == n.a && outer.decl == n.b { return false; }
@@ -1394,7 +1467,7 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
             var result = false;
             for constructor in m.nominalConstructors(index) {
                 let payload = m.constructor(constructor).payload;
-                if payload != 0 && copyHasUncopiedInner(self_, m, payload, own, given, depth + 1) { result = true; break; }
+                if payload != 0 && copyHasUncopiedInner(self_, m, payload, own, matched[..own.len], depth + 1) { result = true; break; }
             }
             self_.expanding.resize(self_.expanding.len - 1);
             return result;

@@ -1,15 +1,38 @@
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type {
-  AssetContext,
-  AssetImport,
-  AssetImports,
-  AssetParser,
+import {
+  type AssetContext,
+  type AssetImport,
+  type AssetImports,
+  type AssetParser,
+  tagAssetParser,
+  tagStage0Error,
 } from "./assets.ts";
-import { instantiateGuest, readGuestAbi } from "./guest.ts";
+import {
+  type GuestTrapInfo,
+  guestTrapOf,
+  instantiateGuest,
+  readGuestAbi,
+} from "./guest.ts";
 import { findCheckoutCompiler } from "./packaged_native.ts";
 import { decodeText, encodeText } from "./text.ts";
 import type { ZigProjectDiagnostic } from "./zig_project_client.ts";
+
+export type BlotGeneratorPhase = "compile" | "execute" | "result";
+
+export class BlotGeneratorError extends Error {
+  readonly trap?: GuestTrapInfo;
+  constructor(
+    readonly phase: BlotGeneratorPhase,
+    message: string,
+    options?: ErrorOptions & { readonly trap?: GuestTrapInfo },
+  ) {
+    super(message, options);
+    this.name = "BlotGeneratorError";
+    if (options?.trap !== undefined) this.trap = options.trap;
+    tagStage0Error(this, phase);
+  }
+}
 
 export type BlotGeneratorInputMode = "bytes" | "text";
 
@@ -495,14 +518,18 @@ async function compile(
     const abi = readGuestAbi(module);
     const fn = abi.functions.find((fn) => fn.name === name);
     if (!fn) {
-      throw new Error(`Missing #entry function ${name} in generator ${entry}`);
+      throw new BlotGeneratorError(
+        "compile",
+        `Missing #entry function ${name} in generator ${entry}`,
+      );
     }
     if (
       abi.version !== 8 || fn.parameter !== "Array U32" ||
       fn.result !== "Array U32"
     ) return;
     if (WebAssembly.Module.imports(module).length) {
-      throw new Error(
+      throw new BlotGeneratorError(
+        "compile",
         `Generator ${entry} requires Wasm host imports; Stage 0 grants no capabilities`,
       );
     }
@@ -513,13 +540,14 @@ async function compile(
     if (initial.success) {
       const direct = validate(initial.bytes, name, false, false);
       if (direct) return direct;
-      throw new Error(unsupported);
+      throw new BlotGeneratorError("compile", unsupported);
     }
     if (
       !initial.diagnostics.length ||
       initial.diagnostics.some(({ code }) => code !== "entry_type")
     ) {
-      throw new Error(
+      throw new BlotGeneratorError(
+        "compile",
         `Could not compile generator ${entry}:\n${
           diagnostics(initial.diagnostics)
         }`,
@@ -538,7 +566,10 @@ async function compile(
           : tokens[i + 3]?.text) === name
     );
     if (marker === -1) {
-      throw new Error(`Missing #entry function ${name} in generator ${entry}`);
+      throw new BlotGeneratorError(
+        "compile",
+        `Missing #entry function ${name} in generator ${entry}`,
+      );
     }
     // Keep the declaration at column one after stripping the entry marker.
     const start = tokens[marker].start;
@@ -551,6 +582,7 @@ async function compile(
     const recordFirst = initial.diagnostics[0].message.includes(
       "parameters of type record",
     );
+    let loweringFailure: readonly ZigProjectDiagnostic[] | undefined;
     // Try the likely ABI adaptation first, with the checker deciding the
     // signature. The diagnostic wording is only an ordering hint.
     for (const record of recordFirst ? [true, false] : [false, true]) {
@@ -583,10 +615,29 @@ async function compile(
         if (built.success) {
           const adapted = validate(built.bytes, adapter, record, result);
           if (adapted) return adapted;
+        } else if (
+          !loweringFailure &&
+          built.diagnostics.length > 0 &&
+          built.diagnostics.every(({ stage }) =>
+            stage !== "parse" && stage !== "check"
+          )
+        ) {
+          loweringFailure = built.diagnostics;
         }
       }
     }
-    throw new Error(`${unsupported}\n${diagnostics(initial.diagnostics)}`);
+    if (loweringFailure) {
+      throw new BlotGeneratorError(
+        "compile",
+        `Could not compile generator ${entry}:\n${
+          diagnostics(loweringFailure)
+        }`,
+      );
+    }
+    throw new BlotGeneratorError(
+      "compile",
+      `${unsupported}\n${diagnostics(initial.diagnostics)}`,
+    );
   } finally {
     await compiler.dispose();
   }
@@ -637,13 +688,14 @@ export function createBlotGenerator(
     graph: Snapshot["graph"];
     compiled: Promise<ExecutableGenerator>;
   } | undefined;
-  return async (context) => {
+  const parser: AssetParser = async (context) => {
     let data: Uint32Array;
     if (inputMode === "text") {
       try {
         data = encodeText(decoder.decode(context.bytes));
       } catch (cause) {
-        throw new Error(
+        throw new BlotGeneratorError(
+          "execute",
           `Expected UTF-8 text for generator input ${context.path}`,
           { cause },
         );
@@ -651,13 +703,25 @@ export function createBlotGenerator(
     } else {
       data = Uint32Array.from(context.bytes);
     }
-    const state = await snapshot(
-      context,
-      generator,
-      prelude,
-      aliases,
-      cached?.graph,
-    );
+    let state: Snapshot;
+    try {
+      state = await snapshot(
+        context,
+        generator,
+        prelude,
+        aliases,
+        cached?.graph,
+      );
+    } catch (cause) {
+      if (cause instanceof BlotGeneratorError || context.signal?.aborted) {
+        throw cause;
+      }
+      throw new BlotGeneratorError(
+        "compile",
+        cause instanceof Error ? cause.message : String(cause),
+        { cause },
+      );
+    }
     context.signal?.throwIfAborted();
     if (cached?.key !== state.key) {
       const candidate = {
@@ -685,27 +749,50 @@ export function createBlotGenerator(
     try {
       output = guest.call(compiled.name, argument);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const trap = guestTrapOf(cause);
+      const message = trap
+        ? trap.formatted
+        : cause instanceof Error
+        ? cause.message
+        : String(cause);
       const detail = cause instanceof WebAssembly.RuntimeError
         ? "trapped"
         : "failed";
-      throw new Error(
+      throw new BlotGeneratorError(
+        "execute",
         `Blot generator ${
           exportName ?? "generate"
         } ${detail} for ${context.path}: ${message}`,
-        { cause },
+        { cause, ...(trap && { trap }) },
       );
     } finally {
       guest.dispose();
     }
     if (!(output instanceof Uint32Array)) {
-      throw new Error("Generator returned an invalid Text value");
+      throw new BlotGeneratorError(
+        "result",
+        "Generator returned an invalid Text value",
+      );
     }
     if (compiled.result && output[0] !== 0 && output[0] !== 1) {
-      throw new Error("Generator returned an invalid Result tag");
+      throw new BlotGeneratorError(
+        "result",
+        "Generator returned an invalid Result tag",
+      );
     }
-    const source = decodeText(compiled.result ? output.subarray(1) : output);
-    if (compiled.result && output[0] === 1) throw new Error(source);
+    let source: string;
+    try {
+      source = decodeText(compiled.result ? output.subarray(1) : output);
+    } catch (cause) {
+      throw new BlotGeneratorError(
+        "result",
+        cause instanceof Error ? cause.message : String(cause),
+        { cause },
+      );
+    }
+    if (compiled.result && output[0] === 1) {
+      throw new BlotGeneratorError("result", source);
+    }
     if (!reference) return { source };
     const ref = await context.reference(undefined, reference.mediaType);
     return {
@@ -715,4 +802,5 @@ export function createBlotGenerator(
       },
     };
   };
+  return tagAssetParser(parser, { generator });
 }

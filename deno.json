@@ -65,6 +65,7 @@
       "CHEATSHEET.md",
       "skills/blot/SKILL.md",
       "skills/blot-diagnostics/SKILL.md",
+      "skills/agent-loops/SKILL.md",
       "mod.ts",
       "host/cli.ts",
       "host/test_runner.ts",

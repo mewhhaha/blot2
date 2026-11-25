@@ -5,7 +5,7 @@ description: Write, check, optimize, and debug Blot vNext code cleanly on the fi
 
 # Writing Blot vNext Code
 
-Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax table, and [skills/blot-diagnostics/SKILL.md](../blot-diagnostics/SKILL.md) whenever `blot check` or `blot build` reports a diagnostic `[CODE]`.
+Read [CHEATSHEET.md](../../CHEATSHEET.md) for the condensed one-page syntax table, [skills/blot-diagnostics/SKILL.md](../blot-diagnostics/SKILL.md) whenever `blot check` or `blot build` reports a diagnostic `[CODE]`, and [skills/agent-loops/SKILL.md](../agent-loops/SKILL.md) for the structured `--json` / quick-fix / trap / Stage-0 agent verification workflow.
 
 ## Core Mental Model
 

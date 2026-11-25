@@ -5,7 +5,7 @@ import {
   type RawDiagnosticRecord,
 } from "./diagnostics.ts";
 import { expandGeneratorRules } from "./generators.ts";
-import { readGuestAbi } from "./guest.ts";
+import { type GuestTrapInfo, readGuestAbi } from "./guest.ts";
 import { resolveProject } from "./packages.ts";
 import {
   extractNativeCompiler,
@@ -214,6 +214,7 @@ export interface TestCaseResult {
   assertionsFailed: number;
   failures?: TestFailure[];
   message?: string;
+  trap?: GuestTrapInfo & { filename?: string; line?: number; col?: number };
   diagnostics?: RawDiagnosticRecord[];
 }
 
@@ -350,6 +351,82 @@ const defaultJobs = () =>
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+const utf8Decoder = new TextDecoder();
+
+function utf8ByteToLineCol(
+  bytes: Uint8Array,
+  byteOffset: number,
+): { line: number; col: number; lineStart: number; lineEnd: number } {
+  let line = 1;
+  let lineStart = 0;
+  for (let i = 0; i < byteOffset && i < bytes.length; i++) {
+    if (bytes[i] === 0x0a) {
+      line++;
+      lineStart = i + 1;
+    }
+  }
+  let lineEnd = byteOffset;
+  while (lineEnd < bytes.length && bytes[lineEnd] !== 0x0a) {
+    lineEnd++;
+  }
+  const prefix = utf8Decoder.decode(bytes.subarray(lineStart, byteOffset));
+  const col = [...prefix].length + 1;
+  return { line, col, lineStart, lineEnd };
+}
+
+function enrichTrapLocation(
+  trap: GuestTrapInfo,
+  sourceBytes: Uint8Array,
+  filename: string,
+): GuestTrapInfo & { filename?: string; line?: number; col?: number } {
+  if (trap.end <= trap.start || trap.end > sourceBytes.length) {
+    return trap;
+  }
+  const slice = utf8Decoder.decode(sourceBytes.subarray(trap.start, trap.end));
+  const { line, col, lineStart, lineEnd } = utf8ByteToLineCol(
+    sourceBytes,
+    trap.start,
+  );
+  const lineText = utf8Decoder.decode(sourceBytes.subarray(lineStart, lineEnd));
+  const plausible = (trap.kind === "panic" &&
+    (slice.includes("panic") || lineText.includes("panic") ||
+      (trap.message.length > 0 &&
+        (slice.includes(trap.message) || lineText.includes(trap.message))))) ||
+    (trap.kind === "bounds" &&
+      (slice.includes("[") || lineText.includes("[")));
+  if (!plausible) return trap;
+  return { ...trap, filename, line, col };
+}
+
+const topLevelDeclaration =
+  /^(?:@\[|#|func\b|const\b|let\b|type\b|effect\b|impl\b|contract\b|test\b|import\b|export\b|private\b)/;
+
+function findUniqueAssertionLine(
+  sourceLines: readonly string[],
+  testLine: number,
+  label: string,
+): number | undefined {
+  if (!label || testLine < 1 || testLine > sourceLines.length) return undefined;
+  const startIdx = testLine - 1;
+  let endIdx = sourceLines.length;
+  for (let i = startIdx + 1; i < sourceLines.length; i++) {
+    const line = sourceLines[i];
+    if (line.length > 0 && topLevelDeclaration.test(line)) {
+      endIdx = i;
+      break;
+    }
+  }
+  const quoted = JSON.stringify(label);
+  let matched: number | undefined;
+  for (let i = startIdx; i < endIdx; i++) {
+    if (sourceLines[i].includes(quoted)) {
+      if (matched !== undefined) return undefined;
+      matched = i + 1;
+    }
+  }
+  return matched;
 }
 
 // V8 can keep executing a non-yielding Wasm loop after Worker.terminate().
@@ -903,7 +980,28 @@ export async function runBlotTests(
             )
           ),
         );
-        return results.filter((test) => test !== undefined);
+        const completed = results.filter((test) => test !== undefined);
+        if (
+          completed.some((test) =>
+            test.trap !== undefined && test.trap.end > test.trap.start
+          )
+        ) {
+          const sourceBytes = await Deno.readFile(module.path).catch(
+            () => undefined,
+          );
+          if (sourceBytes) {
+            for (const test of completed) {
+              if (test.trap && test.trap.end > test.trap.start) {
+                test.trap = enrichTrapLocation(
+                  test.trap,
+                  sourceBytes,
+                  module.path,
+                );
+              }
+            }
+          }
+        }
+        return completed;
       } catch (error) {
         return [
           moduleResult("module", "failed", elapsed(), errorMessage(error)),
@@ -966,13 +1064,27 @@ export async function formatTestRunReport(
         module.elapsedMs.toFixed(1)
       } ms)`,
     );
+    let sourceLines: string[] | undefined;
+    let sourceLoaded = false;
+    const readModuleLines = async (): Promise<string[] | undefined> => {
+      if (!sourceLoaded) {
+        sourceLoaded = true;
+        const text = await Deno.readTextFile(module.path).catch(() =>
+          undefined
+        );
+        sourceLines = text?.split(/\r?\n/);
+      }
+      return sourceLines;
+    };
     for (const test of module.tests) {
       if (test.status === "passed") continue;
       const name = test.displayName || test.exportName || test.kind;
-      const location = test.filename
+      const location = test.filename && test.line
         ? ` (${test.filename}:${test.line})`
         : test.line
         ? ` (${module.path}:${test.line})`
+        : test.filename
+        ? ` (${test.filename})`
         : "";
       lines.push(
         `  ${
@@ -982,15 +1094,37 @@ export async function formatTestRunReport(
       if (test.message) {
         lines.push(`    ${test.message.replaceAll("\n", "\n    ")}`);
       }
-      for (const failure of test.failures ?? []) {
-        const label = [failure.group, failure.label].filter(Boolean).join(
-          " / ",
-        );
+      if (test.trap?.line !== undefined) {
         lines.push(
-          `    ${[label, failure.message].filter(Boolean).join(": ")}`,
+          `    at ${test.trap.filename ?? module.path}:${test.trap.line}:${
+            test.trap.col ?? 1
+          }`,
         );
-        if (failure.expected) lines.push(`      expected: ${failure.expected}`);
-        if (failure.actual) lines.push(`      actual: ${failure.actual}`);
+      }
+      if (test.failures?.length) {
+        const moduleLines = test.line !== undefined
+          ? await readModuleLines()
+          : undefined;
+        for (const failure of test.failures) {
+          const label = [failure.group, failure.label].filter(Boolean).join(
+            " / ",
+          );
+          lines.push(
+            `    ${[label, failure.message].filter(Boolean).join(": ")}`,
+          );
+          const assertionLine = moduleLines && test.line !== undefined
+            ? findUniqueAssertionLine(moduleLines, test.line, failure.label)
+            : undefined;
+          if (assertionLine !== undefined) {
+            lines.push(`      at ${module.path}:${assertionLine}`);
+          } else if (!location && test.line !== undefined) {
+            lines.push(`      at ${module.path}:${test.line}`);
+          }
+          if (failure.expected) {
+            lines.push(`      expected: ${failure.expected}`);
+          }
+          if (failure.actual) lines.push(`      actual: ${failure.actual}`);
+        }
       }
       if (test.diagnostics?.length) {
         const rendered = await formatDiagnosticReport(test.diagnostics);
