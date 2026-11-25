@@ -1,6 +1,7 @@
 // Encode and bound the complete response before the revision commits.
 namespace blot_reuse_zig_project_server;
 import .zig_project_server;
+import direct.writer;
 struct AssetRange {id:u32,path:const u8[:],mediaType:const u8[:],sha256:const u8[:],start:u32,length:u32}
 struct AssetDependency {path:const u8[:],sha256:Text}
 struct DefinitionRead {filename:const u8[:],start:u32,end:u32}
@@ -89,7 +90,8 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             }
             // The asset evaluator owns its file read set. Projects declaring
             // compile-time inputs use its normal evaluation and publication.
-            let track=(retainable || reused) && (!assets || !assets.tracks_inputs);
+            // Relocation cannot update the test export list or its custom section.
+            let track=(retainable || reused) && (!assets || !assets.tracks_inputs) && !blot_direct_writer::testModeEnabled();
             var current_non_staged=blot_check_wire_schema::NonStagedReceipt{};
             var pinfo=blot_check_wire_schema::ProgramInfo{};
             var has_analysis=false;

@@ -2103,6 +2103,21 @@
           "is_kernel",
           "bool",
           "is_kernel"
+        ],
+        [
+          "test_kind",
+          "u8",
+          "test_kind"
+        ],
+        [
+          "test_name",
+          "check.core.Name",
+          "test_name"
+        ],
+        [
+          "test_line",
+          "u32",
+          "test_line"
         ]
       ],
       "unwired": []

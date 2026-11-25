@@ -147,6 +147,8 @@ export interface ZigProjectCompilerOptions {
   tailCalls?: boolean;
   /** Shorthand enabling both relaxedSimd and tailCalls. */
   wasm3?: boolean;
+  /** Emit first-class `test "..."` declarations and the `blot:tests` custom section. */
+  testMode?: boolean;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -572,6 +574,7 @@ class ProjectProcess implements ZigProjectCompiler {
     relaxedSimd?: boolean,
     tailCalls?: boolean,
     wasm3?: boolean,
+    testMode?: boolean,
   ) {
     const args = ["serve-project"];
     if (frontendWorkers !== undefined) {
@@ -589,6 +592,7 @@ class ProjectProcess implements ZigProjectCompiler {
       if (relaxedSimd) args.push("--relaxed-simd");
       if (tailCalls) args.push("--tail-calls");
     }
+    if (testMode) args.push("--test");
     this.#child = new Deno.Command(executable, {
       args,
       clearEnv: true,
@@ -1476,6 +1480,7 @@ export async function createZigProjectCompiler(
     "relaxedSimd",
     "tailCalls",
     "wasm3",
+    "testMode",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -1598,6 +1603,7 @@ export async function createZigProjectCompiler(
     options.relaxedSimd,
     options.tailCalls,
     options.wasm3,
+    options.testMode,
   );
   await process.initialize(open, timeout, identity);
   if (assets !== undefined) {

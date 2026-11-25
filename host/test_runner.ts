@@ -243,7 +243,7 @@ const ignoredDirectories = new Set([
   "generated",
 ]);
 const testDeclaration =
-  /^\s*(?:entry[ \t]+(?:func|const)[ \t]+(?:test_|trap_)\w*|test[ \t]+(?:expect_trap[ \t]+)?")/m;
+  /^[ \t]*(?:@\[[^\r\n]*\][ \t]*)?(?:entry[ \t]+(?:func|const)[ \t]+(?:test_|trap_)\w*|test[ \t]+(?:expect_trap[ \t]+)?")/m;
 
 function compare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -321,7 +321,7 @@ export async function discoverTestModules(
       ? "traps"
       : "checks";
     if (
-      !explicitFile && directories.includes("tests") && kind !== "rejected" &&
+      !explicitFile && kind !== "rejected" &&
       !testDeclaration.test(source)
     ) continue;
     const filter = options.filter;
@@ -618,6 +618,7 @@ async function compileModule(
       if (compiler.relaxedSimd) args.push("--relaxed-simd");
       if (compiler.tailCalls) args.push("--tail-calls");
     }
+    if (compiler.testMode) args.push("--test");
     if (tier !== undefined) args.push("--codegen-tier", tier);
     const built = await command(compiler.executable, [
       "build",
@@ -662,7 +663,10 @@ async function findTests(
   return metadata !== undefined ? [...metadata, ...conventional] : conventional;
 }
 
-async function supportsCodegenTier(executable: string | URL): Promise<boolean> {
+async function compilerAdvertises(
+  executable: string | URL,
+  flag: RegExp,
+): Promise<boolean> {
   const help = await new Deno.Command(executable, {
     args: ["--help"],
     stdout: "piped",
@@ -670,8 +674,16 @@ async function supportsCodegenTier(executable: string | URL): Promise<boolean> {
   }).output();
   const decoder = new TextDecoder();
   return [help.stdout, help.stderr].some((bytes) =>
-    /--codegen-tier\b/.test(decoder.decode(bytes))
+    flag.test(decoder.decode(bytes))
   );
+}
+
+function supportsCodegenTier(executable: string | URL): Promise<boolean> {
+  return compilerAdvertises(executable, /--codegen-tier\b/);
+}
+
+function supportsTestMode(executable: string | URL): Promise<boolean> {
+  return compilerAdvertises(executable, /--test\b/);
 }
 
 async function checkoutCompiler(): Promise<URL | undefined> {
@@ -738,8 +750,15 @@ export async function runBlotTests(
     }
     const executable = options.executable ?? await checkoutCompiler() ??
       (native = await extractNativeCompiler()).path;
-    const tier = discovered.some((module) => module.kind !== "rejected") &&
-        await supportsCodegenTier(executable)
+    const [codegenTier, testMode] = discovered.some((module) =>
+        module.kind !== "rejected"
+      )
+      ? await Promise.all([
+        supportsCodegenTier(executable),
+        supportsTestMode(executable),
+      ])
+      : [false, false];
+    const tier = codegenTier
       ? options.release ? "optimized" : "development"
       : undefined;
 
@@ -793,6 +812,7 @@ export async function runBlotTests(
           wasm3: options.wasm3,
           relaxedSimd: options.relaxedSimd,
           tailCalls: options.tailCalls,
+          testMode,
         };
         if (module.kind === "rejected") {
           const expected = module.expectedRejection!;

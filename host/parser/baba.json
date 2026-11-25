@@ -76,6 +76,12 @@
         }
       },
       {
+        "rule": "test_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "named_function",
         "boundary": {
           "kind": "root"

@@ -1,6 +1,47 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "../../host/format.ts";
 
+Deno.test("formatter preserves first-class test bodies and attributes", async () => {
+  const source = `import * as test from "std/test"
+const test=1
+const expect_trap=2
+test "basic math" :
+  let x=2+2
+  return x==4
+test "shortcut"=>2+2==4
+test expect_trap "div zero" :
+  let _=1/0
+test expect_trap "inline return"=>return 1/0
+test expect_trap "arrow suite"=>
+  let _=1/0
+@[test.suite]
+test "effectful" :
+  use test.eq "ok" 4 (2+2)
+@[test.suite]   test "inline tag":
+  use test.holds "yes" true
+`;
+  const expected = `import * as test from "std/test"
+const test = 1
+const expect_trap = 2
+test "basic math":
+  let x = 2 + 2
+  return x == 4
+test "shortcut" => 2 + 2 == 4
+test expect_trap "div zero":
+  let _ = 1 / 0
+test expect_trap "inline return" => return 1 / 0
+test expect_trap "arrow suite" =>
+  let _ = 1 / 0
+@[test.suite]
+test "effectful":
+  use test.eq "ok" 4 (2 + 2)
+@[test.suite] test "inline tag":
+  use test.holds "yes" true
+`;
+  equal(await formatSource(source), expected);
+  equal(await formatSource(expected), expected);
+});
+
 Deno.test("formatter preserves named private entry tagged and local curried functions", async () => {
   const source = `func add (left:U32)->(right:U32):U32=> return left+right
 private func hidden_keep value=> return value

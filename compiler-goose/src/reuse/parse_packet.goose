@@ -24,6 +24,7 @@ fn write_tree(tree: const Tree&, packet: u8[>..<]&) {
     to_bytes(tree.roots.items,packet);
     to_bytes(tree.runtime_names.items,packet);
     to_bytes(tree.constant_names.items,packet);
+    to_bytes(tree.test_meta.items,packet);
     to_bytes(tree.declaration_traits.items,packet);
     to_bytes(tree.declaration_nodes.items,packet);
     to_bytes(tree.operator_origins.items,packet);
@@ -132,6 +133,7 @@ fn read_tree(packet: const u8[:], at:i64&, tree: Tree&) -> bool {
         read_table_u32(packet,at,tree.roots) &&
         read_table(packet,at,tree.runtime_names,default<blot_parse_ast::RuntimeName>()) &&
         read_table(packet,at,tree.constant_names,default<blot_parse_ast::RuntimeName>()) &&
+        read_table(packet,at,tree.test_meta,default<blot_parse_ast::TestMeta>()) &&
         read_table(packet,at,tree.declaration_traits,default<blot_parse_ast::DeclarationTraits>()) &&
         read_table(packet,at,tree.declaration_nodes,default<blot_parse_ast::DeclarationNodes>()) &&
         read_table(packet,at,tree.operator_origins,default<blot_parse_ast::OperatorOrigin>()) &&
@@ -176,6 +178,7 @@ fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
             _ => {if node.tag>blot_parse_ast::tag_entry_process_decl {return false;}},
         }
     }
+    for &meta in tree.test_meta.items {if !relocate(prefix,names,meta.display_name) {return false;}}
     for &origin in tree.operator_origins.items {if !relocate(prefix,names,origin.member) {return false;}}
     return true;
 }

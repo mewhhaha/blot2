@@ -2,6 +2,7 @@
 namespace blot_parse_ast;
 import support.pooled_buffer;
 import support.error;
+import support.option;
 import support.native;
 import .token;
 import .symbols;
@@ -168,6 +169,7 @@ struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node
 struct ImportDecl { path: blot_parse_symbols::Symbol, namespace_: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
 struct ImportBinding { name: blot_parse_symbols::Symbol, alias: blot_parse_symbols::Symbol }
 struct DeclarationTraits { declaration: Id, private: bool = false, is_opaque: bool = false }
+struct TestMeta { declaration: Id, display_name: blot_parse_symbols::Symbol, line: u32, is_trap: bool = false }
 struct RuntimeName { declaration: Id, point: u32 }
 struct DeclarationNodes { root: Id, first: Id, end: Id }
 struct OperatorOrigin { node: Id, span: Span, member: blot_parse_symbols::Symbol = 0, member_point: u32 = 0 }
@@ -223,6 +225,13 @@ fn resize(self_: TraitsBuffer&, length: i64) { blot_support_pooled_buffer::resiz
 fn resize(self_: TraitsBuffer&, length: i64, value: DeclarationTraits) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: TraitsBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: TraitsBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_TraitsBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct TestBuffer { storage: TestMeta[:]=default<TestMeta[:]>(), items: TestMeta[:]=default<TestMeta[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+reusable[] var tree_TestBuffer_runs: TestMeta[>..]=[];
+var inactive_TestBuffer: TestBuffer=TestBuffer {..};
+fn ensure(self_: TestBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_TestBuffer_runs); return self_.failure; }
+fn push(self_: TestBuffer&, value: TestMeta) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_TestBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: TestBuffer&, values: const TestMeta[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_TestBuffer_runs); self_.len=self_.items.len; }
+fn deinit(self_: TestBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_TestBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
 struct DeclarationBuffer { storage: DeclarationNodes[:]=default<DeclarationNodes[:]>(), items: DeclarationNodes[:]=default<DeclarationNodes[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_DeclarationBuffer_runs: DeclarationNodes[>..]=[];
 var inactive_DeclarationBuffer: DeclarationBuffer=DeclarationBuffer {..};
@@ -271,6 +280,7 @@ struct TreeState {
     roots: WordBuffer=WordBuffer {..},
     runtime_names: NameBuffer=NameBuffer {..},
     constant_names: NameBuffer=NameBuffer {..},
+    test_meta: TestBuffer=TestBuffer {..},
     declaration_traits: TraitsBuffer=TraitsBuffer {..},
     declaration_nodes: DeclarationBuffer=DeclarationBuffer {..},
     diagnostics: DiagnosticBuffer=DiagnosticBuffer {..},
@@ -287,6 +297,7 @@ struct Tree {
     roots: WordBuffer& =inactive_WordBuffer,
     runtime_names: NameBuffer& =inactive_NameBuffer,
     constant_names: NameBuffer& =inactive_NameBuffer,
+    test_meta: TestBuffer& =inactive_TestBuffer,
     declaration_traits: TraitsBuffer& =inactive_TraitsBuffer,
     declaration_nodes: DeclarationBuffer& =inactive_DeclarationBuffer,
     diagnostics: DiagnosticBuffer& =inactive_DiagnosticBuffer,
@@ -296,9 +307,9 @@ struct Tree {
 fn valid(self_: const Tree&) -> bool { return self_.lease!=0 && self_.owner_id!=0 && self_.lease-1<tree_states.len && tree_states[self_.lease-1].owner_id==self_.owner_id && tree_states[self_.lease-1].generation==self_.generation; }
 // Reattach a live pooled header without copying or retaining syntax storage.
 fn canonical(self_:const Tree&)->Tree {
- if self_.lease==0 {assert(self_.owner_id==0 && self_.generation==0);assert(self_.nodes .== inactive_NodeBuffer && self_.spans .== inactive_SpanBuffer && self_.extra .== inactive_WordBuffer && self_.roots .== inactive_WordBuffer && self_.runtime_names .== inactive_NameBuffer && self_.constant_names .== inactive_NameBuffer && self_.declaration_traits .== inactive_TraitsBuffer && self_.declaration_nodes .== inactive_DeclarationBuffer && self_.diagnostics .== inactive_DiagnosticBuffer && self_.operator_origins .== inactive_OperatorBuffer && self_.type_conversion_origins .== inactive_ConversionBuffer);return Tree{has_typed_staging:self_.has_typed_staging,..};}
- assert(valid(self_));let state:TreeState& =tree_states[self_.lease-1];assert(self_.nodes .== state.nodes && self_.spans .== state.spans && self_.extra .== state.extra && self_.roots .== state.roots && self_.runtime_names .== state.runtime_names && self_.constant_names .== state.constant_names && self_.declaration_traits .== state.declaration_traits && self_.declaration_nodes .== state.declaration_nodes && self_.diagnostics .== state.diagnostics && self_.operator_origins .== state.operator_origins && self_.type_conversion_origins .== state.type_conversion_origins);
- return Tree{owner_id:self_.owner_id,lease:self_.lease,generation:self_.generation,has_typed_staging:self_.has_typed_staging,nodes:state.nodes,spans:state.spans,extra:state.extra,roots:state.roots,runtime_names:state.runtime_names,constant_names:state.constant_names,declaration_traits:state.declaration_traits,declaration_nodes:state.declaration_nodes,diagnostics:state.diagnostics,operator_origins:state.operator_origins,type_conversion_origins:state.type_conversion_origins};
+ if self_.lease==0 {assert(self_.owner_id==0 && self_.generation==0);assert(self_.nodes .== inactive_NodeBuffer && self_.spans .== inactive_SpanBuffer && self_.extra .== inactive_WordBuffer && self_.roots .== inactive_WordBuffer && self_.runtime_names .== inactive_NameBuffer && self_.constant_names .== inactive_NameBuffer && self_.test_meta .== inactive_TestBuffer && self_.declaration_traits .== inactive_TraitsBuffer && self_.declaration_nodes .== inactive_DeclarationBuffer && self_.diagnostics .== inactive_DiagnosticBuffer && self_.operator_origins .== inactive_OperatorBuffer && self_.type_conversion_origins .== inactive_ConversionBuffer);return Tree{has_typed_staging:self_.has_typed_staging,..};}
+ assert(valid(self_));let state:TreeState& =tree_states[self_.lease-1];assert(self_.nodes .== state.nodes && self_.spans .== state.spans && self_.extra .== state.extra && self_.roots .== state.roots && self_.runtime_names .== state.runtime_names && self_.constant_names .== state.constant_names && self_.test_meta .== state.test_meta && self_.declaration_traits .== state.declaration_traits && self_.declaration_nodes .== state.declaration_nodes && self_.diagnostics .== state.diagnostics && self_.operator_origins .== state.operator_origins && self_.type_conversion_origins .== state.type_conversion_origins);
+ return Tree{owner_id:self_.owner_id,lease:self_.lease,generation:self_.generation,has_typed_staging:self_.has_typed_staging,nodes:state.nodes,spans:state.spans,extra:state.extra,roots:state.roots,runtime_names:state.runtime_names,constant_names:state.constant_names,test_meta:state.test_meta,declaration_traits:state.declaration_traits,declaration_nodes:state.declaration_nodes,diagnostics:state.diagnostics,operator_origins:state.operator_origins,type_conversion_origins:state.type_conversion_origins};
 }
 fn initPooled() -> Tree,TreeError {
     if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},blot_error::Error.out_of_memory; }
@@ -312,6 +323,7 @@ fn initPooled() -> Tree,TreeError {
         roots:state.roots,
         runtime_names:state.runtime_names,
         constant_names:state.constant_names,
+        test_meta:state.test_meta,
         declaration_traits:state.declaration_traits,
         declaration_nodes:state.declaration_nodes,
         diagnostics:state.diagnostics,
@@ -334,6 +346,7 @@ fn copyParsed(self_:Tree&,previous:const Tree&)->TreeError {
     self_.roots.append(previous.roots.items);
     self_.runtime_names.append(previous.runtime_names.items);
     self_.constant_names.append(previous.constant_names.items);
+    self_.test_meta.append(previous.test_meta.items);
     self_.declaration_traits.append(previous.declaration_traits.items);
     self_.declaration_nodes.append(previous.declaration_nodes.items);
     self_.operator_origins.append(previous.operator_origins.items);
@@ -349,6 +362,7 @@ fn failure(self_: const Tree&) -> TreeError {
     if self_.roots.failure!=blot_error::Error.none { return self_.roots.failure; }
     if self_.runtime_names.failure!=blot_error::Error.none { return self_.runtime_names.failure; }
     if self_.constant_names.failure!=blot_error::Error.none { return self_.constant_names.failure; }
+    if self_.test_meta.failure!=blot_error::Error.none { return self_.test_meta.failure; }
     if self_.declaration_traits.failure!=blot_error::Error.none { return self_.declaration_traits.failure; }
     if self_.declaration_nodes.failure!=blot_error::Error.none { return self_.declaration_nodes.failure; }
     if self_.diagnostics.failure!=blot_error::Error.none { return self_.diagnostics.failure; }
@@ -377,6 +391,7 @@ fn deinit(self_: Tree&) {
     self_.roots.deinit();
     self_.runtime_names.deinit();
     self_.constant_names.deinit();
+    self_.test_meta.deinit();
     self_.declaration_traits.deinit();
     self_.declaration_nodes.deinit();
     self_.diagnostics.deinit();
@@ -393,6 +408,18 @@ fn declaration_nodes(tree: const Tree&, root: Id) -> List, bool {
   return List {owner.first, owner.end-owner.first, ..}, true;
  }
  return List {..}, false;
+}
+fn testMeta(tree: const Tree&, id: Id) -> blot_support::Option<TestMeta> {
+    var lo = 0;
+    var hi = tree.test_meta.len;
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let meta = tree.test_meta.items[mid];
+        if meta.declaration < id { lo = mid + 1; }
+        else if meta.declaration > id { hi = mid; }
+        else { return blot_support::some(meta); }
+    }
+    return blot_support::none<TestMeta>();
 }
 fn declaration_traits(tree: const Tree&, id: Id) -> DeclarationTraits {
  var lo = 0; var hi = tree.declaration_traits.len;

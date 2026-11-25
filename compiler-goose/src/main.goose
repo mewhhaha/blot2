@@ -15,7 +15,8 @@ fn refreshIdentity() {
  let limit=blot_inference_limits::configured();
  let relaxed=blot_direct_writer::relaxedSimdEnabled();
  let tails=blot_direct_writer::tailCallsEnabled();
- if limit==blot_source_identity::inference_budget && !relaxed && !tails {
+ let test_mode=blot_direct_writer::testModeEnabled();
+ if limit==blot_source_identity::inference_budget && !relaxed && !tails && !test_mode {
   configured_identity=blot_source_identity::digest;
   return;
  }
@@ -34,6 +35,7 @@ fn refreshIdentity() {
   if tails {flags[0]|=2;}
   hash.update(flags);
  }
+ if test_mode {hash.update("test-mode");}
  configured_identity=hash.final();
 }
 fn configureInferenceBudget(limit:u64)->Error {
@@ -43,6 +45,10 @@ fn configureInferenceBudget(limit:u64)->Error {
 }
 fn configureWasmFeatures(relaxed_simd:bool,tail_calls:bool) {
  blot_direct_writer::setWasmFeatures(relaxed_simd,tail_calls);
+ refreshIdentity();
+}
+fn configureTestMode(enabled:bool) {
+ blot_direct_writer::setTestMode(enabled);
  refreshIdentity();
 }
 export "blot_goose_main" fn mainEntry()->i32 {

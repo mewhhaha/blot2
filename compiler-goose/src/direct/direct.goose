@@ -118,6 +118,28 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     return buildWithAnalysis(g, entry, pinfo, bytes);
 }
 
+fn isEmittedBody(body: const Body&) -> bool {
+    return body.exported || (blot_direct_writer::testModeEnabled() && body.test_kind != 0);
+}
+fn emitTestMetadata(module: blot_direct_writer::Module&, m: const Module&) {
+    var count: u32 = 0;
+    for body in m.bodies {
+        if body.test_kind != 0 { count++; }
+    }
+    if count == 0 { return; }
+    var section: u8[>..<] = [];
+    section.push(1);
+    blot_direct_writer::uleb(section, count);
+    for body in m.bodies {
+        if body.test_kind == 0 { continue; }
+        section.push(body.test_kind - 1);
+        blot_direct_writer::name(section, m.name(body.declaration_name));
+        blot_direct_writer::name(section, m.name(body.test_name));
+        blot_direct_writer::name(section, "");
+        blot_direct_writer::uleb(section, body.test_line);
+    }
+    module.custom("blot:tests", section[..]);
+}
 fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&, bytes: u8[>..<]&) -> Error {
     if !g.hasUnit(entry) { return blot_direct_types::Error.unsupported; }
     g.s.rt_flags_known = true;
@@ -133,7 +155,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     var count: u32 = 0;
     // Host callback imports precede every defined function.
     for at in 0..m.bodies.len {
-        if !m.bodies[at].exported { continue; }
+        if !isEmittedBody(m.bodies[at]) { continue; }
         let parameter, has_parameter, error = exportedParameter(g, m, m.bodies[at]);
         if error != blot_direct_types::Error.none { return error; }
         if !has_parameter { continue; }
@@ -142,7 +164,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     }
     let r_exp = blot_phase_profile::region("direct.exports", entry, 0, 0);
     for at in 0..m.bodies.len {
-        if !m.bodies[at].exported { continue; }
+        if !isEmittedBody(m.bodies[at]) { continue; }
         let parameter, has_parameter, error = exportedParameter(g, m, m.bodies[at]);
         if error != blot_direct_types::Error.none { r_exp.exit(); return error; }
         if !has_parameter { continue; }
@@ -151,7 +173,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
         count += 1;
     }
     for at in 0..m.bodies.len {
-        if !m.bodies[at].exported { continue; }
+        if !isEmittedBody(m.bodies[at]) { continue; }
         let parameter, has_parameter, error = exportedParameter(g, m, m.bodies[at]);
         if error != blot_direct_types::Error.none { r_exp.exit(); return error; }
         if has_parameter { continue; }
@@ -208,6 +230,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     blot_direct_writer::uleb(abi, inits.len as! u64);
     blot_direct_writer::raw(abi, constants[..]);
     g.module.custom("blot:abi", abi[..]);
+    if blot_direct_writer::testModeEnabled() { emitTestMetadata(g.module, m); }
     if count != 0 { blot_direct_function::emitInvocationFinish(g, m); }
     for si in 1..g.s.staged_dep_units.len {
         let key = g.s.staged_dep_units[si];

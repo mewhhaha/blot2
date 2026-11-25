@@ -17,7 +17,7 @@ import {
 const usage =
   `Usage: blot guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
        blot check ENTRY [project options]
-       blot build ENTRY [OUTPUT.wasm] [project options]
+       blot build ENTRY [OUTPUT.wasm] [--test] [project options]
        blot dependencies ENTRY OUTPUT.blotdep [project options]
        blot test [PATHS...] [--filter TEXT] [--jobs N] [--bail] [--release]
                  [--deadline SEC] [--json] [project options]
@@ -231,7 +231,7 @@ export async function runCli(
       }
       if (
         command === "build" &&
-        ["--relaxed-simd", "--tail-calls", "--wasm3"].includes(value)
+        ["--relaxed-simd", "--tail-calls", "--wasm3", "--test"].includes(value)
       ) {
         options.push(value);
         continue;

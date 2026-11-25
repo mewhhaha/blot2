@@ -22,7 +22,8 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | entry_concurrency_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | test_declaration | entry_concurrency_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+test_declaration = ("tesT" trap:"expect_trap"? name:STRING (":" body:suite | "=>" ("return" body:expression | body:suite | body:expression))) ;
 entry_concurrency_declaration = ("entrY" (entry_kernel_declaration | entry_process_declaration)) ;
 entry_kernel_declaration = ("kernel" (value:named_function | name:source_identifier ":" annotation:type_expression "=" body:kernel_body)) ;
 kernel_body = ("{" LAYOUT_NEWLINE? ("prepare" ":" prepare:callable_path "," LAYOUT_NEWLINE? "run" ":" run:callable_path | "run" ":" run:callable_path "," LAYOUT_NEWLINE? "prepare" ":" prepare:callable_path) ","? LAYOUT_NEWLINE? "}") ;
@@ -179,10 +180,10 @@ collection_if = ("if" condition:collection_infix "then" consequence:collection_e
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
 collection_infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
-source_identifier = (IDENT | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
+source_identifier = (IDENT | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 
 quantified_type = (kind:("forall" | "exists") "[" binders:quantified_binder ("," binders:quantified_binder)* "]" where:quantified_where? "=>" body:type_expression) ;
-quantified_binder = (sort:("row" | "region")? name:(IDENT | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
+quantified_binder = (sort:("row" | "region")? name:(IDENT | "expect_trap" | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
 quantified_where = (("where" | "wherE") body:constraint_body) ;
 package_pack = ("pack" "[" witnesses:type_expression ("," witnesses:type_expression)* "]" value:expression "as" annotation:type_expression) ;
 package_unpack = ("unpack" package:expression "as" "[" binders:quantified_binder ("," binders:quantified_binder)* "]" name:source_identifier "in" body:expression) ;

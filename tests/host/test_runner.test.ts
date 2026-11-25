@@ -5,6 +5,7 @@ import {
   throws,
 } from "node:assert/strict";
 import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runCli } from "../../host/cli.ts";
 import {
   decodeTestReport,
@@ -20,7 +21,7 @@ import {
   type TestRunReport,
 } from "../../mod.ts";
 
-const executable = Deno.args[0] ??
+const executable = Deno.args.at(0) ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 
 function packet(passed: number, failures: TestFailure[]) {
@@ -192,6 +193,127 @@ const infiniteLoop = `entry func test_a_loop (): Unit =>
     continue
   return ()
 `;
+
+Deno.test("directory discovery selects first-class tests and rejection fixtures", () =>
+  temporary(async (root) => {
+    const plain = await write(root, "src/plain.blot", 'test "check" => true\n');
+    const trap = await write(
+      root,
+      "src/trap.blot",
+      'test expect_trap "trap" => 1 / 0\n',
+    );
+    const tagged = await write(
+      root,
+      "src/tagged.blot",
+      '@[test.suite]\ntest "tagged" => true\n',
+    );
+    const inline = await write(
+      root,
+      "src/inline.blot",
+      '@[test.suite] test expect_trap "inline" => 1 / 0\n',
+    );
+    const rejected = await write(
+      root,
+      "src/reject.blot",
+      "// rejects: unknown_value\nconst value = missing\n",
+    );
+    const helper = await write(
+      root,
+      "src/helper.blot",
+      'const test = "helper"\n// test "comment" => true\n',
+    );
+    equal(await discoverTestModules({ root, paths: ["src"] }), [
+      { path: inline, kind: "checks" },
+      { path: plain, kind: "checks" },
+      { path: rejected, kind: "rejected", expectedRejection: "unknown_value" },
+      { path: tagged, kind: "checks" },
+      { path: trap, kind: "checks" },
+    ]);
+    equal(await discoverTestModules({ root, paths: [helper] }), [
+      { path: helper, kind: "checks" },
+    ]);
+  }));
+
+Deno.test({
+  name: "test mode follows compiler help for session and direct builds",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    temporary(async (root) => {
+      const paths = await Promise.all([
+        write(root, "first.blot", unit),
+        write(root, "second.blot", unit),
+      ]);
+      const log = join(root, "calls");
+      const native = executable instanceof URL
+        ? fileURLToPath(executable)
+        : executable;
+      const quote = (value: string) =>
+        "'" + value.replaceAll("'", "'\\''") + "'";
+      for (const supported of [true, false]) {
+        // Record the flag and delegate without it so the fixture also runs
+        // against an older compiler. Exercise help emitted on stderr.
+        const wrapper = await write(
+          root,
+          "compiler",
+          `#!/bin/sh
+if [ "$1" = --help ]; then
+  printf '%s\\n' ${supported ? "--test" : "--testing"} >&2
+  exit 0
+fi
+mode=off
+for arg do
+  shift
+  if [ "$arg" = --test ]; then
+    mode=on
+  else
+    set -- "$@" "$arg"
+  fi
+done
+printf '%s %s\\n' "$1" "$mode" >> ${quote(log)}
+exec ${quote(native)} "$@"
+`,
+        );
+        await Deno.chmod(wrapper, 0o755);
+        for (
+          const [inputMode, command] of [
+            ["project", "serve-project"],
+            ["source", "build"],
+          ] as const
+        ) {
+          await Deno.writeTextFile(log, "");
+          const report = await runBlotTests({
+            executable: wrapper,
+            root,
+            paths,
+            inputMode,
+            jobs: 1,
+          });
+          equal(
+            [report.success, report.testsPassed],
+            [true, 2],
+            JSON.stringify(report),
+          );
+          equal(
+            (await Deno.readTextFile(log)).trim().split("\n"),
+            paths.map(() => `${command} ${supported ? "on" : "off"}`),
+          );
+        }
+        if (supported) {
+          await Deno.writeTextFile(log, "");
+          equal(
+            await runCli(wrapper, [
+              "build",
+              paths[0],
+              join(root, "build.wasm"),
+              "--test",
+            ]),
+            0,
+          );
+          equal(await Deno.readTextFile(log), "build on\n");
+        }
+      }
+    }),
+});
 
 Deno.test("runner executes Unit, Bool and BTST checks and expected traps", () =>
   temporary(async (root) => {

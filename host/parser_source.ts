@@ -74,10 +74,20 @@ export function parserSource(
     // Declaration words remain ordinary names outside a top-level header.
     // Same-width markers preserve original CST text and source offsets.
     const topLevel = delimiters === 0 && indentation === 0;
-    if (topLevel && declarationStart) {
-      if (["privatE", "exporT", "impL", "entrY"].includes(token.text)) {
+    const next = prepared.tokens[index + 1];
+    // Keep the header open across attribute prefixes, including line breaks.
+    const attributeOpener = (token.text === "@" && next?.text === "[") ||
+      (token.text === "[" && prepared.tokens[index - 1]?.text === "@");
+    if (
+      topLevel && declarationStart && !attributeOpener &&
+      token.text !== "\uE000"
+    ) {
+      if (["privatE", "exporT", "impL", "entrY", "tesT"].includes(token.text)) {
         throw reservedMarker(token);
       }
+      const testName = next?.text === "expect_trap"
+        ? prepared.tokens[index + 2]
+        : next;
       if (token.text === "private") {
         sawPrivate = true;
         replace(token.span.end - 1, token.span.end, "E");
@@ -96,6 +106,11 @@ export function parserSource(
             prepared.tokens[index + 1]?.text === "process")
         ) {
           replace(token.span.end - 1, token.span.end, "Y");
+        } else if (
+          !sawPrivate && token.text === "test" &&
+          testName?.type === "named" && testName.kind === "STRING"
+        ) {
+          replace(token.span.end - 1, token.span.end, "T");
         } else if (token.text === "import") moduleDeclaration = true;
       }
     }
@@ -107,8 +122,8 @@ export function parserSource(
       }
     }
     if (token.text === "\uE000" && topLevel) {
+      if (!declarationStart) sawPrivate = false;
       declarationStart = true;
-      sawPrivate = false;
       moduleDeclaration = false;
     }
     if (["(", "[", "{"].includes(token.text)) delimiters++;

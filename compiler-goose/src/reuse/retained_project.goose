@@ -547,6 +547,14 @@ fn sameSymbolPrefix(old:const blot_parse_symbols::Pool&,next:const blot_parse_sy
  return true;
 }
 
+fn sameTests(old: const Tree&, next: const Tree&) -> bool {
+ if old.test_meta.len!=next.test_meta.len {return false;}
+ for a,i in old.test_meta.items {
+  let b=next.test_meta.items[i];
+  if a.declaration!=b.declaration || a.display_name!=b.display_name || a.line!=b.line || a.is_trap!=b.is_trap {return false;}
+ }
+ return true;
+}
 fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const blot_parse_symbols::Pool&,next_syms:const blot_parse_symbols::Pool&)->bool {
  let ot:const Tree& =old.tree;
  let nt:const Tree& =next.tree;
@@ -715,7 +723,7 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   }
   var literal:u32=0;
   var bits:u32=0;
-  if changed[index] && !inherited && !affected[index] {
+  if changed[index] && !inherited && !affected[index] && sameTests(previous.source.unit(unit).tree,engine.source.unit(unit).tree) {
    if sameTriviaSyntax(previous.source.unit(unit),engine.source.unit(unit),previous.source.symbols,engine.source.symbols) {
     changed[index]=false;
    } else {

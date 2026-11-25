@@ -92,6 +92,9 @@ fn same_check_core_Body(a:blot_check_core::Body,b:blot_check_core::Body)->bool {
     if a.runtime!=b.runtime { return false; }
     if a.is_function!=b.is_function { return false; }
     if a.is_kernel!=b.is_kernel { return false; }
+    if a.test_kind!=b.test_kind { return false; }
+    if a.test_name!=b.test_name { return false; }
+    if a.test_line!=b.test_line { return false; }
     return true;
 }
 fn same___check_core_Body(a:blot_check_core::Body[:],b:blot_check_core::Body[:])->bool {

@@ -2,6 +2,91 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "../../host/syntax.ts";
 const syntaxChildren = (children: readonly Cst[]) => children;
 
+Deno.test("first-class tests retain names, trap modifiers, tags, and bodies", async () => {
+  const frontend = await createFrontend();
+  const source = `test "basic math":
+  let x = 2 + 2
+  return x == 4
+test expect_trap "div zero":
+  let _ = 1 / 0
+test "shortcut" => 2 + 2 == 4
+test expect_trap "inline return" => return 1 / 0
+@[test.suite]
+test "effectful" =>
+  use test.eq "ok" 4 (2 + 2)
+@[test.suite] test "inline tag":
+  use test.holds "yes" true
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    equal(rows.filter(({ kind }) => kind === "test_declaration").length, 6);
+    equal(
+      rows.filter(({ kind }) => kind === "declaration_attribute").length,
+      2,
+    );
+    equal(
+      rows.filter(({ field, kind }) => field === "name" && kind === "STRING")
+        .map(({ text }) => text),
+      [
+        '"basic math"',
+        '"div zero"',
+        '"shortcut"',
+        '"inline return"',
+        '"effectful"',
+        '"inline tag"',
+      ],
+    );
+    equal(
+      rows.filter(({ field }) => field === "trap").map(({ text }) => text),
+      ["expect_trap", "expect_trap"],
+    );
+    equal(
+      rows.filter(({ field }) => field === "body").filter(({ kind }) =>
+        kind === "expression" || kind === "suite"
+      ).map(({ kind }) => kind),
+      ["suite", "suite", "expression", "expression", "suite", "suite"],
+    );
+  } finally {
+    frontend.dispose();
+  }
+});
+
+Deno.test("test headers are contextual and reject the reserved marker", async () => {
+  const frontend = await createFrontend();
+  const source = `import * as test from "std/test"
+const test = 1
+const expect_trap = 2
+func test x => x
+func example () =>
+  let expect_trap = true
+  return test "ordinary argument"
+type Contextual = forall [expect_trap] => expect_trap
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    equal(rows.filter(({ kind }) => kind === "test_declaration").length, 0);
+    for (const prefix of ["", "@[test.suite] ", "@[test.suite]\n"]) {
+      throws(
+        () => frontend.parse(`${prefix}tesT "reserved" => true\n`),
+        (error) => {
+          ok(error instanceof SourceError);
+          equal(error.code, "reserved_declaration_marker");
+          equal(error.start, prefix.length);
+          return true;
+        },
+      );
+    }
+    for (const prefix of ["", "@[test.suite] ", "@[test.suite]\n"]) {
+      throws(
+        () => frontend.parse(`private ${prefix}test "private" => true\n`),
+        SourceError,
+      );
+    }
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("named functions retain declaration names parameters and local boundaries", async () => {
   const frontend = await createFrontend();
   const source =

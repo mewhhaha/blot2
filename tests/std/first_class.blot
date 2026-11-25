@@ -1,0 +1,25 @@
+import * as test from "std/test"
+
+private func double (value: U32): U32 => value * 2
+private func scale_pair (a: U32) -> (b: U32): { x: U32, y: U32 } => { x: double a, y: double b }
+
+@[test.suite]
+test "private helpers work inside first-class test blocks":
+  use test.eq "doubled" 10 (double 5)
+  use test.eq_struct "scaled record" { x: 6, y: 14 } (scale_pair 3 7)
+  use test.group "nested" (func () =>
+    use test.holds "positive" (double 1 > 0)
+    return ())
+
+test "boolean expression shorthand" => double 21 == 42
+
+test "unit block falls through cleanly":
+  let total = double 4 + double 6
+  if total != 20:
+    panic "unexpected total"
+
+test expect_trap "bare panic traps" => panic "expected failure"
+
+test expect_trap "division by zero traps":
+  let zero = #[0]
+  let _ = 1 / zero[0]

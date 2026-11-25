@@ -131,9 +131,13 @@ export type LiteralKind =
   | ","
   | "}"
   | "privatE"
+  | "tesT"
+  | "expect_trap"
+  | ":"
+  | "=>"
+  | "return"
   | "entrY"
   | "kernel"
-  | ":"
   | "="
   | "prepare"
   | "run"
@@ -142,7 +146,6 @@ export type LiteralKind =
   | "step"
   | "."
   | "type"
-  | "=>"
   | "is"
   | "opaquE"
   | "impL"
@@ -153,7 +156,6 @@ export type LiteralKind =
   | "let"
   | "func"
   | "->"
-  | "return"
   | "effect"
   | "data"
   | "|"
@@ -283,6 +285,7 @@ export type RuleName =
   | "named_import"
   | "import_binding"
   | "declaration"
+  | "test_declaration"
   | "entry_concurrency_declaration"
   | "entry_kernel_declaration"
   | "kernel_body"
@@ -507,8 +510,16 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | EntryConcurrencyDeclarationCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | EntryConcurrencyDeclarationCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TestDeclarationCursor | TypeAliasCursor | ValueDeclarationCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface TestDeclarationCursor extends RuleCursorBase<"test_declaration"> {
+  field(name: "body"): ExpressionCursor | SuiteCursor;
+  field(name: "name"): TokenCursor<"named", "STRING">;
+  field(name: "trap"): TokenCursor<"literal", "expect_trap"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1523,7 +1534,7 @@ export interface QuantifiedTypeCursor extends RuleCursorBase<"quantified_type"> 
 }
 
 export interface QuantifiedBinderCursor extends RuleCursorBase<"quantified_binder"> {
-  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "init"> | TokenCursor<"literal", "kernel"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "prepare"> | TokenCursor<"literal", "process"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "step"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
+  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "expect_trap"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "init"> | TokenCursor<"literal", "kernel"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "prepare"> | TokenCursor<"literal", "process"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "step"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
   field(name: "sort"): TokenCursor<"literal", "region"> | TokenCursor<"literal", "row"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1562,6 +1573,7 @@ export type AnyRuleCursor =
   | NamedImportCursor
   | ImportBindingCursor
   | DeclarationCursor
+  | TestDeclarationCursor
   | EntryConcurrencyDeclarationCursor
   | EntryKernelDeclarationCursor
   | KernelBodyCursor

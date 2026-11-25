@@ -108,7 +108,10 @@ struct Body {
     exported: bool = false,
     runtime: bool = false,
     is_function: bool = false,
-    is_kernel: bool = false
+    is_kernel: bool = false,
+    test_kind: u8 = 0,
+    test_name: Name = Name {..},
+    test_line: u32 = 0
 }
 struct CallInfo {
     target: BindingRef,

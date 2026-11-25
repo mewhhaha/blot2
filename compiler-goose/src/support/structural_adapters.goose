@@ -1135,6 +1135,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::Span)->bool {
 fn blot_parse_ast::blotStructuralHash<StructuralSink>(value:blot_parse_ast::Span,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::SpanBuffer)->bool {return equalFields(left,right);}
 fn blot_parse_ast::blotStructuralHash<StructuralSink>(value:blot_parse_ast::SpanBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::TestBuffer)->bool {return equalFields(left,right);}
+fn blot_parse_ast::blotStructuralHash<StructuralSink>(value:blot_parse_ast::TestBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::TestMeta)->bool {return equalFields(left,right);}
+fn blot_parse_ast::blotStructuralHash<StructuralSink>(value:blot_parse_ast::TestMeta,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::TraitsBuffer)->bool {return equalFields(left,right);}
 fn blot_parse_ast::blotStructuralHash<StructuralSink>(value:blot_parse_ast::TraitsBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_ast::Tree)->bool {return equalFields(left,right);}

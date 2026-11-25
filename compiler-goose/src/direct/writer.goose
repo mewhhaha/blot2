@@ -33,6 +33,10 @@ let OP_call_indirect: Op = 0x11;
 let OP_return_call: Op = 0x12;
 let OP_return_call_indirect: Op = 0x13;
 
+var opt_test_mode: bool = false;
+fn testModeEnabled() -> bool { return opt_test_mode; }
+fn setTestMode(enabled: bool) { opt_test_mode = enabled; }
+
 // Opt-in Wasm 3.0 backend feature toggles (default false: strict deterministic V8 + wtime-aot x64 subset).
 var opt_relaxed_simd: bool = false;
 var opt_tail_calls: bool = false;

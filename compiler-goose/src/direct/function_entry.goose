@@ -740,7 +740,9 @@ fn emitConstantExport(g: Generator&, m: const Module&, body: const blot_check_co
     releaseEntry(g);
     op(g, OP_end);
     finish(g, function, f);
-    let name = m.name(body.export_name);
+    var export_name = body.export_name;
+    if export_name.len == 0 { export_name = body.declaration_name; }
+    let name = m.name(export_name);
     g.module.exportItem(name, blot_direct_writer::EXPORT_global, global);
     blot_direct_writer::name(abi, name);
     abi.push(abiCode(kind));
@@ -881,7 +883,9 @@ fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body
 }
 // Exports `function` under the body's name and writes its ABI entry.
 fn exportEntry(g: Generator&, m: const Module&, body: const blot_check_core::Body&, abi: u8[>..<]&, function: u32, has_callback: bool, first: Abi, second: Abi, parameter_abi: Abi, result_abi: Abi, packets: bool) {
-    let name = m.name(body.export_name);
+    var export_name = body.export_name;
+    if export_name.len == 0 { export_name = body.declaration_name; }
+    let name = m.name(export_name);
     g.module.exportItem(name, blot_direct_writer::EXPORT_function, function);
     blot_direct_writer::name(abi, name);
     if has_callback {
