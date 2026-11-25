@@ -29,11 +29,40 @@ struct LayoutReceipt {
     non_staged:blot_check_wire_schema::NonStagedReceipt=blot_check_wire_schema::NonStagedReceipt{},
     staged_dep_units_valid:bool=false,
     staged_dep_units:u32[:]=default<u32[:]>(),
-    staged_value_digest:u64=0
+    staged_value_digest:u64=0,
+    kernel_dep_units:u32[:]=default<u32[:]>(),
 }
 fn deinitLayoutReceipt(receipt:LayoutReceipt&) {
     blot_reuse_dependency_consumer::freeU32s(receipt.staged_dep_units);
+    blot_reuse_dependency_consumer::freeU32s(receipt.kernel_dep_units);
     receipt=LayoutReceipt{};
+}
+fn canSkipWireSchema(prev_receipt:const LayoutReceipt&,prev_core:const Prepared&,next:const Prepared&)->bool {
+    if !prev_receipt.valid || prev_core.entry!=next.entry || prev_core.units.len!=next.units.len { return false; }
+    if !next.borrowed[next.entry-1] { return false; }
+    for u in prev_receipt.kernel_dep_units {
+        if u==0 || (u as i64)>next.borrowed.len || !next.borrowed[u-1] { return false; }
+    }
+    for i in 0..next.units.len {
+        if next.borrowed[i] { continue; }
+        let nu .= next.units[i];
+        let ou .= prev_core.units[i];
+        if nu.kernels.len!=0 || nu.processes.len!=0 { return false; }
+        if i>=next.unit_has_fork.len || i>=prev_core.unit_has_fork.len { return false; }
+        if next.unit_has_fork[i]==0 || prev_core.unit_has_fork[i]==0 { return false; }
+        if next.unit_has_fork[i]!=prev_core.unit_has_fork[i] { return false; }
+        if prev_receipt.non_staged.kernel_count!=0 || prev_receipt.non_staged.process_count!=0 {
+            if nu.associated.len!=ou.associated.len { return false; }
+            for ai in 0..nu.associated.len {
+                if nu.associated[ai].target!=ou.associated[ai].target { return false; }
+                let nsp=nu.fieldSpelling(nu.associated[ai].member);
+                let osp=ou.fieldSpelling(ou.associated[ai].member);
+                if nsp.present!=osp.present { return false; }
+                if nsp.present && nsp.value!=osp.value { return false; }
+            }
+        }
+    }
+    return true;
 }
 fn canReuseReceipt(prev:const LayoutReceipt&,cur:blot_check_wire_schema::NonStagedReceipt,next:const Prepared&)->bool {
     if !prev.valid { return false; }
@@ -430,7 +459,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         product,array,construct=>{
             if na.tag==blot_check_core::Tag.construct {
-                if na.a!=nb.a { return false; }
+                if na.a!=nb.a || na.c!=nb.c { return false; }
                 return sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
             }
             let ca=a.children(ia);
@@ -508,7 +537,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             }
             return true;
         },
-        panic=>{ return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1); },
+        panic=>{ return a.panicMessage(ia)==b.panicMessage(ib); },
         spark=>{
             let sa=a.sparkInfo(ia);
             let sb=b.sparkInfo(ib);

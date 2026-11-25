@@ -1,18 +1,67 @@
 # Working on Blot and Gdev
 
-## Current frontier: Wasm 3.0 Extensions, Generalized BCE/AoS SIMD, & LSP/Pen Agent Diagnostics (25 November 2026)
+## Current frontier: Profile-Guided Compile-Speed Optimizations, Wasm 3.0 Extensions, Generalized BCE/AoS SIMD, & LSP/Pen Agent Diagnostics (25 November 2026)
 
-Track 2 (`--wasm3` extensions + `wtime-aot v0.1.2` qualification) and Track 4
-(`#[n; T]` dependent equal-length BCE, generalized AoS `Vec2`/`Vec4` auto-SIMD,
-and multi-core `entry kernel` / persistent `entry process` benchmarks) are
-complete and qualified (`blotc-goose` SHA-256
-`90e5b2bd9b0deaba2f231059017b2007631b3d0860ff227a07fb1c4fab286bc6`, `9,025,968` B;
+All four tracks are complete, qualified, and pushed to `main`. Track 3
+(profile-guided compile-speed optimizations + incremental `wire_schema` skip +
+`Tag.panic` structural-replay fix) is qualified at `blotc-goose` SHA-256
+`cfa6850d9fe17b6c6e73391d07d4f9f0eed4eef082b094eaef6c4078246452e5` (`9,244,064` B;
 `generated/compiler/blotc.gz` SHA-256
-`ae1f28d47c41de0685d4fdbb5466b073411bacc0e4fe1b6a7c7666a61a228310`, `3,855,063` B),
-building on top of Track 1 (`b54f4c03` + `../pen` `6d15e26`) and Solid-2 CLI
-agent diagnostics (`b254444b`):
+`977dbb7c14df4420bb676fedee742148a03c32171e0c8746aac2f83f27a19dd5`, `3,922,108` B),
+building on top of Track 2 & Track 4 (`68e5b886`), Track 1 (`b54f4c03` + `../pen`
+`6d15e26`), and Solid-2 CLI agent diagnostics (`b254444b`):
 
-- **Track 2 & Track 4 — `--wasm3` extensions, `#[n; T]` BCE, AoS `Vec2`/`Vec4` auto-SIMD & multi-core showcase (this commit, after `b54f4c03`):**
+- **Track 3 — Profile-guided compile-speed optimizations & incremental `wire_schema` skip (this commit, after `68e5b886`):**
+  - **Hashing, maps, checker & parser hot paths (`support/wyhash.goose`, `support/zigmap.goose`, `check/effects.goose`, `check/types.goose`, `parse/source_operators.goose`, `direct/map.goose`):**
+    Added exact 2-multiply `wyhash::hashU32` (bit-identical to 4-byte `wyhash`)
+    for `zigmap::hashKey`, chunked zero fills in `zigmap::allocate` and
+    `direct/map::U64Map::grow` + 1-multiply SplitMix64 mixing, O(1)
+    `rowWithList`, inline `composites.entries.len != 0` guard in `resolveRoot`
+    (`-115k` probes), leaf fast-exit in `openCovariant`, and cached pool lookup
+    in `source_operators::local`.
+  - **Direct backend type/emission & zero-copy Wasm writer (`direct/types.goose`, `direct/emit.goose`, `direct/function.goose`, `direct/function_calls.goose`, `direct/function_data.goose`, `direct/function_storage.goose`, `direct/function_control.goose`, `direct/function_entry.goose`, `direct/writer.goose`):**
+    Pre-seeded canonical layout slices and eagerly populated `boxed` / `layout` /
+    `flatBytes` in `intern()`; replaced recursive `concrete()` with O(1)
+    `concrete_depth`; added O(1) prefix-sum `recordFieldByteOffset` &
+    `recordFieldWordSlice`, `record_field_index` for `>= 12`-field records,
+    `no_vars_vals` fast exits in `matchInner`/`refine`/`mentions`/`within`,
+    256-slot `fieldNameOf` cache, fast 64-bit `InstanceKey` hash, `done`
+    bitmasks in `propagateObligations`/`solveObligations`, 3-bit memoized
+    `canInlineTarget`, lazy per-unit `local_refs` index in `usesType`,
+    per-projection `cachedProjectionFieldName` cache, and zero-copy Section 10
+    streaming in `writer::assemble` + `function_entry::finishWith` (eliminating
+    double-copying 6 MB of bytecode).
+  - **Wire-schema indexing, `canSkipWireSchema` & `Tag.panic` replay fix (`check/wire_schema.goose`, `direct/direct.goose`, `reuse/partial_dependency.goose`, `reuse/persistent_unit.goose`, `reuse/persistent_project.goose`, `reuse/retained_project.goose`, `reuse/body_image.goose`, `reuse/zig_project_server_build.goose`):**
+    Moved `unit_has_fork` scanning into parallel check workers (retained across
+    edits); added O(1) reverse-linked `assoc_index` + spelling dedup in
+    `ImplHashCtx::enqueueAssociatedBySpelling`; tracked kernel/process
+    `dep_units` on `LayoutReceipt` so retained edits off the kernel dependency
+    cone skip `wire_schema` (`~9.8 ms → skipped`); added zero-overhead
+    `direct.*` phase trace regions; fixed a latent out-of-bounds crash in
+    `body_image::sameCoreExpr` on `Tag.panic` (comparing `m.panicMessage(id)`
+    instead of indexing `m.nodes[na.a]`) and checked `Tag.construct`'s `.c`.
+  - **Gdev 312-module / 3.34 MB / 4,468-function measurements (`frontendWorkers=8`, Wasm `6,065,088` B, SHA-256 `b1bdb53a820f...`):**
+    - Cold `backend`: `215.0 ms` baseline → `164.5–179.8 ms` (`direct.emit_all`
+      `151.8 ms`, `direct.assemble` `2.64 ms`, `direct.wire_schema` `8.67 ms`;
+      `-24.8%` `direct.*` CPU samples at 4 kHz `ITIMER_PROF`; `check` requested
+      bytes `84.3 MiB` → `54.3–70.6 MiB`).
+    - Warm-session incremental edits on `116 KB` `src/actors/robots.blot`:
+      `no-op` backend `0.5 ms` (`wire=skipped`, `total 16.9 ms`);
+      `robots-const-patch` (`reloc=1`, `fresh=1`) backend **`0.9 ms`**
+      (`wire=skipped`, down from `9.9 ms` — **~11× faster**, `total 49.7 ms`);
+      `robots-comment` (`fresh=1`, containing `@panic`) backend **`4.3 ms`**
+      (`wire=skipped`, down from `12.4 ms` — **~3× faster**, `total 53.4 ms`);
+      `robots-restore` bit-exact SHA-256 match.
+  - **Qualification:** Added warm-session `@panic` replay & `canSkipWireSchema`
+    regression test in [retained_project_execution.test.ts](tests/guest/retained_project_execution.test.ts);
+    passed `deno task test:compiler` (`25/25` harness, `2/2` direct, `206/206`
+    uniqueness, `109/109` fixtures, `pack`), `deno task test:guest` (`1140 passed
+    | 0 failed | 75 ignored`), `deno task test:editor` (`6/6`), `../pen`
+    (`cargo test -p blot-host` `40/40` + `examples/bounce` `pen check` `0.06 s`),
+    and `../ink` (`pen test-blot`: `442 passed, 0 failed` across 103 modules in
+    `1.6 s` + `249 passed, 0 failed` Rust cross-checks).
+
+- **Track 2 & Track 4 — `--wasm3` extensions, `#[n; T]` BCE, AoS `Vec2`/`Vec4` auto-SIMD & multi-core showcase (`68e5b886`, after `b54f4c03`):**
   - **Wasm 3.0 extensions (`direct/writer.goose`, `direct/function_ops.goose`, `direct/function_control.goose`, `direct/function_calls.goose`, `direct/function_spark.goose`):**
     Extended `--tail-calls` / `--wasm3` to emit `OP_return_call_indirect` (`0x13`)
     on indirect closure tail calls (`applyClosure`, method-call & field-callable

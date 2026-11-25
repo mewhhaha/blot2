@@ -705,9 +705,18 @@ fn polyKey(f: const Fn&, binding: u32) -> u64 { return blot_direct_emit::key64(f
 fn fresh(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Val, Error {
     let words, error = g.types.layout(ty);
     if error != blot_direct_types::Error.none { return Val {}, g.typeFailure(g.units[f.unit - 1], id); }
+    let n = words.len;
+    if n == 0 { return Val { ty, 0, 0 }, blot_direct_types::Error.none; }
     let start = g.s.words.len as u32;
-    for kind in words { let slot = local(g, f, kind); g.s.words.push(slot); }
-    return Val { ty, start, words.len as u32 }, blot_direct_types::Error.none;
+    let base_local = (g.s.locals.len - f.locals_base) as u32;
+    if n == 1 {
+        g.s.locals.push(words[0]);
+        g.s.words.push(base_local);
+        return Val { ty, start, 1 }, blot_direct_types::Error.none;
+    }
+    g.s.locals.append(words);
+    for i in 0..n { g.s.words.push(base_local + (i as u32)); }
+    return Val { ty, start, n as u32 }, blot_direct_types::Error.none;
 }
 fn lower(g: Generator&, f: Fn&, ty: TId, id: u32) -> Ty, Error {
     let m .= g.units[f.unit - 1];
@@ -822,7 +831,7 @@ recursive fn stmt(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 // Binds the variables of Core type `ty` that `actual` determines.
 fn refine(g: Generator&, f: Fn&, ty: TId, actual: Ty) {
     if ty <= blot_check_types::never { return; }
-    if g.types.isClosed(f.unit, ty) { return; }
+    if g.types.isNoVars(f.unit, ty) { return; }
     g.types.match_(g.units[f.unit - 1], ty, actual, f.env);
 }
 recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -1004,7 +1013,7 @@ fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
     if base == 0xffffffff {
         base = g.s.captured_vals.len as u32;
         g.s.captured_base[uid] = base;
-        for at in 0..m.bindings.len { g.s.captured_vals.push(0); }
+        blot_direct_emit::growZerosU8(g.s.captured_vals, m.bindings.len);
         for closure in m.closures {
             for captured in m.extra[closure.captures.start..closure.captures.start + closure.captures.len] {
                 if (captured as i64) < m.bindings.len { g.s.captured_vals[(base as i64) + (captured as i64)] = 1; }

@@ -122,13 +122,9 @@ fn loadElement(g: Generator&, f: Fn&, address: u32, offset: u32, ty: Ty, id: u32
 }
 // Byte offset of record field `index` in flat form.
 fn fieldOffset(g: Generator&, f: const Fn&, ty: Ty, index: i64, id: u32) -> u32, Error {
-    var offset: u32 = 0;
-    for before in 0..index {
-        let bytes, error = flatBytes(g, f, g.types.recordField(ty, before).ty, id);
-        if error != blot_direct_types::Error.none { return 0, error; }
-        offset += bytes;
-    }
-    return offset, blot_direct_types::Error.none;
+    let off, error = g.types.recordFieldByteOffset(ty, index);
+    if error != blot_direct_types::Error.none { return 0, g.typeFailure(g.units[f.unit - 1], id); }
+    return off, blot_direct_types::Error.none;
 }
 fn itemOffset(g: Generator&, f: const Fn&, ty: Ty, index: i64, id: u32) -> u32, Error {
     var offset: u32 = 0;

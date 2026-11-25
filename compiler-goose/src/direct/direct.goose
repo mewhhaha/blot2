@@ -8,6 +8,7 @@
 // buffers.
 namespace blot_direct;
 import std;
+import phase_profile;
 import check.core;
 import check.types;
 import check.diagnostic_code;
@@ -64,7 +65,9 @@ fn compileTracked(units: const Module[:], entry: u32, types: blot_direct_types::
 }
 
 fn compileTrackedWithAnalysis(units: const Module[:], entry: u32, types: blot_direct_types::Types&, module: blot_direct_writer::Module&, state: blot_direct_emit::State&, pinfo: const blot_check_wire_schema::ProgramInfo&, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    let r_ti = blot_phase_profile::region("direct.types_init", entry, 0, 0);
     blot_direct_types::init(types);
+    r_ti.exit();
     state.track_deps = true;
     return compileWithAnalysis(units, entry, types, module, state, pinfo, bytes, message, build_inputs);
 }
@@ -117,6 +120,9 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
 
 fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&, bytes: u8[>..<]&) -> Error {
     if !g.hasUnit(entry) { return blot_direct_types::Error.unsupported; }
+    g.s.rt_flags_known = true;
+    g.s.rt_has_fork = pinfo.has_fork;
+    g.s.rt_has_persistent = pinfo.has_persistent_state;
     g.s.kernels.append(pinfo.kernels[..]);
     g.s.processes.append(pinfo.processes[..]);
     g.s.wire_word_tags.append(pinfo.word_tags[..]);
@@ -134,32 +140,36 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
         let first, second, is_callback = blot_direct_function::callbackAbi(g, parameter);
         if is_callback { let import_id = blot_direct_function::hostImport(g, first, second); }
     }
+    let r_exp = blot_phase_profile::region("direct.exports", entry, 0, 0);
     for at in 0..m.bodies.len {
         if !m.bodies[at].exported { continue; }
         let parameter, has_parameter, error = exportedParameter(g, m, m.bodies[at]);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != blot_direct_types::Error.none { r_exp.exit(); return error; }
         if !has_parameter { continue; }
         let emitted = blot_direct_function::emitExport(g, m, m.bodies[at], entries);
-        if emitted != blot_direct_types::Error.none { return emitted; }
+        if emitted != blot_direct_types::Error.none { r_exp.exit(); return emitted; }
         count += 1;
     }
     for at in 0..m.bodies.len {
         if !m.bodies[at].exported { continue; }
         let parameter, has_parameter, error = exportedParameter(g, m, m.bodies[at]);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != blot_direct_types::Error.none { r_exp.exit(); return error; }
         if has_parameter { continue; }
         let init_function, error = blot_direct_function::emitConstantExport(g, m, m.bodies[at], constants);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != blot_direct_types::Error.none { r_exp.exit(); return error; }
         inits.push(init_function);
     }
     let kernel_exports, kerr = blot_direct_function::emitKernelExports(g, m, entries);
-    if kerr != blot_direct_types::Error.none { return kerr; }
+    if kerr != blot_direct_types::Error.none { r_exp.exit(); return kerr; }
     count += kernel_exports;
     let process_exports, perr = blot_direct_function::emitProcessExports(g, m, entries);
-    if perr != blot_direct_types::Error.none { return perr; }
+    if perr != blot_direct_types::Error.none { r_exp.exit(); return perr; }
     count += process_exports;
+    r_exp.exit();
     if count == 0 && inits.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
+    let r_emit = blot_phase_profile::region("direct.emit_all", entry, 0, 0);
     let emitted = g.emitAll();
+    r_emit.exitWithItems(0, g.module.functions.len);
     if emitted != blot_direct_types::Error.none { return emitted; }
     var starts: u32[>..<] = [];
     var pools: u32[>..<] = [];
@@ -209,7 +219,9 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
         g.s.staged_dep_units[sj] = key;
     }
     g.s.staged_dep_units_valid = true;
+    let r_asm = blot_phase_profile::region("direct.assemble", entry, 0, 0);
     blot_direct_writer::assemble(g.module, bytes);
+    r_asm.exitWithItems(g.module.functions.len, bytes.len);
     return blot_direct_types::Error.none;
 }
 

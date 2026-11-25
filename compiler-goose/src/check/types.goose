@@ -764,7 +764,7 @@ recursive fn resolveRoot(self_: Store&, root: Id, at: Cursor) -> Id, Error {
     if !self_.resolved.activate(self_.mutation_epoch as u32, self_.effects.mutation_epoch as u32) { return resolveDepth(self_, root, at, 0); }
     let cached = self_.resolved.get(root); if cached.present { return cached.value, blot_error::Error.none; }
     let composite = self_.use_composite_cache;
-    if composite { let cached = compositeResult(self_, root, at); if cached.present {
+    if composite && self_.composites.entries.len != 0 { let cached = compositeResult(self_, root, at); if cached.present {
         if cached.value != root || root < self_.resolved.high_water { let error = self_.resolved.put(root, cached.value); if error != blot_error::Error.none { return 0, error; } }
         return cached.value, blot_error::Error.none;
     } }
@@ -1925,7 +1925,7 @@ recursive fn closeCovariantNode(self_: Store&, root: Id, generalized: const u32[
             let token_rows, error = freeRowVariables(self_, value.a); if error != blot_error::Error.none { return 0, error; }
             match tail { variable v => { if has(generalized, v.value) && !has(protected, v.value) && !has(token_rows, v.value) {
                 if record_decisions && !has(decisions, v.value) { decisions.push(v.value); }
-                let next, error = self_.effects.row(rowLabels(self_, effect_row), blot_check_effects::Tail.closed); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
+                let next, error = self_.effects.rowWithList(self_.effects.node(effect_row).labels, blot_check_effects::Tail.closed); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
             } }, _ => {}, }
             if effect_row == value.c { return root, blot_error::Error.none; } return provider(self_, value.a, effect_row);
         },
@@ -1937,7 +1937,7 @@ recursive fn closeCovariantNode(self_: Store&, root: Id, generalized: const u32[
                 effect_row=value.c;let tail=self_.effects.node(effect_row).tail;
                 match tail {variable v=>{if has(generalized,v.value) && !has(protected,v.value) && !has(parameter_free,v.value) && !has(result_free,v.value) {
                     if record_decisions && !has(decisions,v.value) {decisions.push(v.value);}
-                    let next,error=self_.effects.row(rowLabels(self_,effect_row),blot_check_effects::Tail.closed);if error!=blot_error::Error.none {return 0,effectError(error);}effect_row=next;
+                    let next,error=self_.effects.rowWithList(self_.effects.node(effect_row).labels,blot_check_effects::Tail.closed);if error!=blot_error::Error.none {return 0,effectError(error);}effect_row=next;
                 }},_=>{},}
                 var gathered:u32[>..]=[];gathered.append(protected);let union=unionInto(self_,gathered,parameter_free);if union!=blot_error::Error.none {return 0,union;}
                 match self_.effects.node(effect_row).tail {variable v=>{let error=unionInto(self_,gathered,[v.value]);if error!=blot_error::Error.none {return 0,error;}},_=>{},}
@@ -1997,6 +1997,12 @@ recursive fn covariantInputsSeen(self_: Store&, root: Id, out: u32[>..]&, depth:
     return blot_error::Error.none;
 }
 fn openCovariant(self_: Store&, root: Id) -> Id, Error {
+    if !self_.has_projections {
+        match node(self_, root).tag {
+            function, provider, product, record, usage, array, list, cursor => {},
+            _ => { increment(self_.normalization.open_depth_entries); return root, blot_error::Error.none; },
+        }
+    }
     let attribution_start = self_.nodes.len; var memo = dictionary<CovariantInput, Id> {}; let result, error = openCovariantDepth(self_, root, memo, 0);
     saturatedAdd(self_.normalization.open_nodes_added, (self_.nodes.len - attribution_start) as u64); return result, error;
 }
@@ -2015,7 +2021,7 @@ recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<Covaria
         provider => {
             var effect_row = value.c; if self_.effects.node(effect_row).tail == blot_check_effects::Tail.closed {
                 let opened, oe = freshEffects(self_); if oe != blot_error::Error.none { return 0, oe; }
-                let next, error = self_.effects.row(rowLabels(self_, effect_row), self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
+                let next, error = self_.effects.rowWithList(self_.effects.node(effect_row).labels, self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
             }
             if effect_row == value.c { return root, blot_error::Error.none; } return provider(self_, value.a, effect_row);
         },
@@ -2023,7 +2029,7 @@ recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<Covaria
             let result, re = openCovariantDepth(self_, value.b, memo, depth + 1); if re != blot_error::Error.none { return 0, re; }
             var effect_row = value.c; if self_.effects.node(effect_row).tail == blot_check_effects::Tail.closed {
                 let opened, oe = freshEffects(self_); if oe != blot_error::Error.none { return 0, oe; }
-                let next, error = self_.effects.row(rowLabels(self_, effect_row), self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
+                let next, error = self_.effects.rowWithList(self_.effects.node(effect_row).labels, self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
             }
             if result == value.b && effect_row == value.c { return root, blot_error::Error.none; } return functionWithEffects(self_, value.a, result, effect_row);
         },

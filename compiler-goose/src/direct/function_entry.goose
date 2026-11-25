@@ -576,9 +576,12 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
         finish_body_scratch.push(OP_global_set);
         blot_direct_writer::uleb(finish_body_scratch, esc_global);
     }
-    blot_direct_relocations::finishBody(f.sites_base,(finish_body_scratch.len-mark)-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
-    blot_direct_writer::raw(finish_body_scratch, g.s.code[f.code_base..g.s.code.len]);
-    blot_direct_writer::setBody(g.module, function, finish_body_scratch[mark..]);
+    let body_start = g.module.text.len;
+    g.module.text.append(finish_body_scratch[mark..]);
+    let header_len = g.module.text.len - body_start;
+    blot_direct_relocations::finishBody(f.sites_base, header_len - f.code_base, (function - g.module.imports.len) as u32, body_start);
+    g.module.text.append(g.s.code[f.code_base..g.s.code.len]);
+    g.module.functions[function - g.module.imports.len].body = blot_direct_writer::Range { start: body_start, len: g.module.text.len - body_start };
     finish_body_scratch.resize(mark);
 }
 

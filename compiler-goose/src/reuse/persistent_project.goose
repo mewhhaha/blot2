@@ -185,7 +185,7 @@ fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&
  var norm=blot_work_counters::Normalization{};
  var work=blot_work_counters::Frontend{};
  var debit:i64=0;var candidates:i64=0;
- var check_cpu:u64=0;var freeze_cpu:u64=0;var lower_cpu:u64=0;
+ var check_cpu:u64=0;var freeze_cpu:u64=0;var lower_cpu:u64=0;var has_fork_byte:u8=0;
  blot_project_packet::get(reader,id);
  blot_project_packet::getExecutionCore(reader,core);
  blot_project_packet::get(reader,bodies);
@@ -197,8 +197,10 @@ fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&
  blot_project_packet::get(reader,check_cpu);
  blot_project_packet::get(reader,freeze_cpu);
  blot_project_packet::get(reader,lower_cpu);
+ blot_project_packet::get(reader,has_fork_byte);
  if reader.failure!=blot_error::Error.none || reader.at!=reader.bytes.len || unit!=id || core.unit!=unit || core.diagnostics.len!=0 || bodies<0 || schemes<0 || debit<0 || candidates<0 || debit>resolution || candidates>associated {return blot_error::Error.invalid_artifact;}
  ready.units[unit-1]=core;
+ ready.unit_has_fork[unit-1]=has_fork_byte;
  ready.stats.body_elaborations+=bodies;
  ready.stats.imported_schemes+=schemes;
  ready.stats.body_lowerings+=core.body_lowerings;

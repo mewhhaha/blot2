@@ -44,8 +44,8 @@ fn numeric_failure<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,cont
 fn local<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol) -> bool {
  var end=locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
  for item in locals.items[..end] { if item==symbol { return true; } }
- let text_count=pool.get(symbol).len;
- for index in 0..text_count {let c=pool.get(symbol)[index];if c=='.' { let root,found=pool.lookup(pool.get(symbol)[..index]); if found { for item in locals.items[..end] { if item==root { return true; } } } break; } }
+ let text=pool.get(symbol);
+ for index in 0..text.len {if text[index]=='.' { let root,found=pool.lookup(text[..index]); if found { for item in locals.items[..end] { if item==root { return true; } } } break; } }
  return false;
 }
 fn name<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,id: Id,point: u32) {

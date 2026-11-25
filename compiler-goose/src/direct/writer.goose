@@ -135,10 +135,20 @@ fn sleb(bytes: u8[>..<]&, value: i64) {
         byte(bytes, low | 128);
     }
 }
+fn ulebLen(value: u64) -> i64 {
+    if value < 128 { return 1; }
+    var rest = value >> 7;
+    var n: i64 = 1;
+    while rest != 0 { n += 1; rest >>= 7; }
+    return n;
+}
 fn name(bytes: u8[>..<]&, value: const u8[:]) { uleb(bytes, value.len as! u64); raw(bytes, value); }
 // The four bytes of a 32-bit value, least significant first.
 fn word(bytes: u8[>..<]&, value: u32) {
-    for index in 0..4 { byte(bytes, (value >> ((index * 8) as! u32)) as! u8); }
+    bytes.push(value as! u8);
+    bytes.push((value >> 8) as! u8);
+    bytes.push((value >> 16) as! u8);
+    bytes.push((value >> 24) as! u8);
 }
 
 // A run of `Module.text` or `Module.types`.
@@ -371,16 +381,21 @@ fn assemble(module: const Module&, out: u8[>..<]&) {
         for function in module.table { uleb(payload, function); }
         section(out, 9, payload);
     }
-    // 10: code
-    uleb(payload, module.functions.len as! u64);
+    // 10: code — stream bodies directly into `out` (avoids double-copying multi-MB code sections).
+    var code_size: i64 = ulebLen(module.functions.len as! u64);
     for function in module.functions {
-        uleb(payload, function.body.len as! u64);
-        blot_direct_relocations::linkBody(function.body.start,payload.len);
-        raw(payload, text(module, function.body));
+        code_size += ulebLen(function.body.len as! u64) + function.body.len;
     }
-    let code_size=payload.len;
-    section(out, 10, payload);
-    blot_direct_relocations::finishCode(out.len-code_size);
+    byte(out, 10);
+    uleb(out, code_size as! u64);
+    let code_start = out.len;
+    uleb(out, module.functions.len as! u64);
+    for function in module.functions {
+        uleb(out, function.body.len as! u64);
+        blot_direct_relocations::linkBody(function.body.start, out.len - code_start);
+        raw(out, text(module, function.body));
+    }
+    blot_direct_relocations::finishCode(code_start);
     // 11: data
     if module.data.len != 0 {
         uleb(payload, 1);

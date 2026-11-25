@@ -1197,18 +1197,43 @@ fn typeByUses(g: Generator&, f: Fn&, binding: u32, id: u32) -> Error {
 // The one concrete type the references to local `binding` agree on. A
 // reference that is the whole value of another generalized local
 // (`let c = b`) takes the type of that alias's uses.
+fn ensureLocalRefs(g: Generator&, m: const Module&) -> u32 {
+    let uid = (m.unit - 1) as i64;
+    while g.s.local_refs_base.len < g.units.len { g.s.local_refs_base.push(0xffffffff); }
+    var base = g.s.local_refs_base[uid];
+    if base == 0xffffffff {
+        base = g.s.local_refs_head.len as u32;
+        g.s.local_refs_base[uid] = base;
+        blot_direct_emit::growZerosU32(g.s.local_refs_head, m.bindings.len);
+        var idx = m.nodes.len;
+        while idx > 0 {
+            idx -= 1;
+            let node = m.nodes[idx];
+            if node.tag != blot_check_core::Tag.reference { continue; }
+            let target = m.references[node.a];
+            if target.unit != 0 && target.unit != m.unit { continue; }
+            let slot = (base as i64) + (target.binding as i64);
+            let prev = g.s.local_refs_head[slot];
+            let entry = (g.s.local_refs_node.len as u32) + 1;
+            g.s.local_refs_node.push(idx as u32);
+            g.s.local_refs_next.push(prev);
+            g.s.local_refs_head[slot] = entry;
+        }
+    }
+    return base;
+}
 recursive fn usesType(g: Generator&, f: Fn&, binding: u32, id: u32, depth: u32) -> Ty, bool, Error {
     let m .= g.units[f.unit - 1];
+    let base = ensureLocalRefs(g, m);
     var has_chosen = false;
     var chosen: Ty = 0;
-    for index in 0..m.nodes.len {
-        let node = m.nodes[index];
-        if node.tag != blot_check_core::Tag.reference { continue; }
-        let target = m.references[node.a];
-        if (target.unit != 0 && target.unit != m.unit) || target.binding != binding { continue; }
-        var ty, error = g.types.lower(m, m.typeOf(index as u32), f.env);
+    var cur = g.s.local_refs_head[(base as i64) + (binding as i64)];
+    while cur != 0 {
+        let index = g.s.local_refs_node[(cur - 1) as i64];
+        cur = g.s.local_refs_next[(cur - 1) as i64];
+        var ty, error = g.types.lower(m, m.typeOf(index), f.env);
         if error != blot_direct_types::Error.none {
-            let aliased, found, error = aliasType(g, f, index as u32, id, depth);
+            let aliased, found, error = aliasType(g, f, index, id, depth);
             if error != blot_direct_types::Error.none { return 0, false, error; }
             if !found { continue; }
             ty = aliased;
@@ -1276,9 +1301,9 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
     if base == 0xffffffff {
         base = g.s.use_count_vals.len as u32;
         g.s.use_count_base[uid] = base;
-        for at in 0..m.bindings.len { g.s.use_count_vals.push(0); }
+        blot_direct_emit::growZerosU32(g.s.use_count_vals, m.bindings.len);
         var is_exit: u8[>..<] = [];
-        for at in 0..m.nodes.len { is_exit.push(0); }
+        is_exit.resize(m.nodes.len, 0);
         for index in 0..m.nodes.len {
             if m.nodes[index].tag != blot_check_core::Tag.break_ { continue; }
             for child in m.children(index as u32) { is_exit[child] = 1; }
@@ -1678,6 +1703,43 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
     }
 }
 
+fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool {
+    let uid = (target.unit - 1) as i64;
+    while g.s.inline_ok_base.len < g.units.len { g.s.inline_ok_base.push(0xffffffff); }
+    var base = g.s.inline_ok_base[uid];
+    if base == 0xffffffff {
+        base = g.s.inline_ok_vals.len as u32;
+        g.s.inline_ok_base[uid] = base;
+        blot_direct_emit::growZerosU8(g.s.inline_ok_vals, g.units[uid].bindings.len);
+    }
+    let slot = (base as i64) + (target.binding as i64);
+    var mask = g.s.inline_ok_vals[slot];
+    if mask == 0 {
+        mask = 0x80;
+        let tm .= g.units[uid];
+        let body .= tm.body(target.binding);
+        if body && body.is_function && !body.exported {
+            var b168: i64 = 168;
+            if canInlineBody(g, tm, body.root, target, b168) {
+                mask |= 1;
+                var b152: i64 = 152;
+                if canInlineBody(g, tm, body.root, target, b152) {
+                    mask |= 2;
+                    var b32: i64 = 32;
+                    if canInlineBody(g, tm, body.root, target, b32) {
+                        mask |= 4;
+                    }
+                }
+            }
+        }
+        g.s.inline_ok_vals[slot] = mask;
+    }
+    var bit: u8 = 1;
+    if inline_depth == 1 { bit = 2; }
+    else if inline_depth >= 2 { bit = 4; }
+    return (mask & bit) != 0;
+}
+
 recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals, callee: Ty, after: Ty, id: u32) -> Val, bool, Error {
     if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
         return neverVal(), false, blot_direct_types::Error.none;
@@ -1686,6 +1748,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         return neverVal(), false, blot_direct_types::Error.none;
     }
     if !g.types.concrete(callee, 0) || !g.types.concrete(after, 0) {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    if !canInlineTarget(g, target, f.inline_depth) {
         return neverVal(), false, blot_direct_types::Error.none;
     }
     let boxed_ret, berr = g.types.boxed(after);
@@ -1702,12 +1767,6 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         let body .= tm.body(target.binding);
         if !body || !body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
         body_root = body.root;
-        var budget: i64 = 168;
-        if f.inline_depth == 1 { budget = 152; }
-        else if f.inline_depth >= 2 { budget = 32; }
-        if !canInlineBody(g, tm, body_root, target, budget) {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
         g.types.match_(tm, tm.binding(body.binding).ty, callee, env);
         obligations = body.scheme.obligations;
     }

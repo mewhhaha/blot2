@@ -50,13 +50,17 @@ fn deinit(self_:Result&) {self_.result.deinit();if self_.diagnostic_filename.pre
 // the unit vector, the paths and the flags; unit_owners owns each Core. A
 // cached Core is a copy of the admitted seed's (raw frozen input carries no
 // lifetime authority in this port); `borrowed` marks those positions.
-struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:CoreOwners[:]=default<CoreOwners[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
+struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),unit_has_fork:u8[:]=default<u8[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:CoreOwners[:]=default<CoreOwners[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
 // Re-publish the owned runs without retaining the temporary header.
 fn publishPrepared(value:Prepared)->Prepared {
  assert(value.catalog_owner.unique());
- let units=value.catalog_owner.mutable(value.units);let paths=value.catalog_owner.mutable(value.paths);let borrowed=value.catalog_owner.mutable(value.borrowed);
+ let units=value.catalog_owner.mutable(value.units);let paths=value.catalog_owner.mutable(value.paths);let borrowed=value.catalog_owner.mutable(value.borrowed);let unit_has_fork=value.catalog_owner.mutable(value.unit_has_fork);
  let unit_owners=core_owners.realloc_slice(value.unit_owners,value.unit_owners.len);assert(blot_support::same_slice_identity(unit_owners,value.unit_owners));
- return Prepared{units:units,paths:paths,borrowed:borrowed,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
+ return Prepared{units:units,paths:paths,borrowed:borrowed,unit_has_fork:unit_has_fork,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
+}
+fn scanUnitFork(m:const Core&)->u8 {
+ for node in m.nodes { if node.tag==blot_check_core::Tag.fork_ { return 2; } }
+ return 1;
 }
 fn deinit(self_:Prepared&) {
  for &owners in self_.unit_owners {owners.nodes.release();owners.tables.release();}if self_.unit_owners.len!=0 {core_owners.free_slice(self_.unit_owners);}
@@ -172,6 +176,7 @@ fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_sup
    ir.value.unit=id;ready.stats.body_lowerings+=ir.value.body_lowerings;ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
   }
   ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index].tables=ir.owner;
+  ready.unit_has_fork[index]=scanUnitFork(ready.units[index]);
   if ir.value.diagnostics.len!=0 {
    let issue=ir.value.diagnostics[0];
    var origins:blot_check_uniqueness::OriginInfo[>..<]=[];
@@ -198,6 +203,7 @@ fn allocateCatalog(ready:Prepared&,count:i64)->Error {
  let units,error=blot_reuse_dependency_payload::alloc<Core>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.units=units;for &unit in ready.units {unit=default<Core>();}
  ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=CoreOwners{};}
  let borrowed,error=blot_reuse_dependency_payload::alloc<bool>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.borrowed=borrowed;for &flag in ready.borrowed {flag=false;}
+ let unit_has_fork,error=blot_reuse_dependency_payload::alloc<u8>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.unit_has_fork=unit_has_fork;for &flag in ready.unit_has_fork {flag=0;}
  let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.paths=paths;for &path in ready.paths {path=default<const u8[:]>();}
  return blot_error::Error.none;
 }

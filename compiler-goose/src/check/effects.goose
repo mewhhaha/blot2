@@ -79,14 +79,12 @@ fn add(self_: Store&, value: Row) -> Id, Error {
     self_.rows.push(value);if self_.rows.failure!=blot_error::Error.none {return 0,self_.rows.failure;}
     return id, blot_error::Error.none;
 }
+fn rowWithList(self_: Store&, labels: List, tail: Tail) -> Id, Error {
+    if labels.len == 0 && tail == Tail.closed { return 0, blot_error::Error.none; }
+    return add(self_, Row { labels, tail , ..});
+}
 fn row(self_: Store&, labels: const Label[:], tail: Tail) -> Id, Error {
     if labels.len == 0 && tail == Tail.closed { return 0, blot_error::Error.none; }
-    if labels.len > 0 {
-        let start = self_.labels.index_of(labels[0]);
-        if start >= 0 && labels.len <= self_.labels.len - start {
-            return add(self_, Row { List { start as u32, labels.len as u32 }, tail , ..});
-        }
-    }
     if labels.len > none - self_.labels.len { return 0, blot_error::Error.effect_limit; }
     let start = self_.labels.len;
     self_.labels.append(labels);if self_.labels.failure!=blot_error::Error.none {return 0,self_.labels.failure;}

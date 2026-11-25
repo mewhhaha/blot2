@@ -599,3 +599,134 @@ Deno.test("an integer call argument can reuse a checked body across edits and re
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("retained structural replay handles panic nodes and skips wire_schema off the kernel dep cone", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const worker = dir + "/worker.blot";
+  const kernelDep = dir + "/kernel_dep.blot";
+  const baseWorker = [
+    "private func check_inner (n: U32): U32 => return do:",
+    "  if n == 0:",
+    '    return @panic "zero input"',
+    "  let acc: U32 = 0",
+    "  for i in 0..n:",
+    "    acc := @u32.add acc i",
+    "  return acc",
+    "func checked (n: U32): U32 => return check_inner n",
+    "private func step_bonus (n: U32): U32 => return do:",
+    "  let total: U32 = 0",
+    "  for i in 0..n:",
+    "    total := @u32.add total (@u32.add i 1)",
+    "  return total",
+    "func bonus (n: U32): U32 => return step_bonus n",
+    "",
+  ].join("\n");
+  const baseKernelDep =
+    "func scale (x: U32): U32 => return @u32.mul x 3\n";
+  const dummyImports: string[] = [];
+  for (let i = 0; i < 14; i++) {
+    await Deno.writeTextFile(dir + `/d${i}.blot`, "const marker: U32 = 1\n");
+    dummyImports.push(`import * as d${i} from "./d${i}"`);
+  }
+  const mainSource = [
+    ...dummyImports,
+    'import * as w from "./worker"',
+    'import * as k from "./kernel_dep"',
+    "entry kernel func kstep (x: U32): U32 => return k.scale x",
+    "entry func answer (n: U32): U32 => return @u32.add (w.checked n) (w.bonus n)",
+    "entry func run_k (x: U32): U32 => return k.scale x",
+    "",
+  ].join("\n");
+  await Deno.writeTextFile(worker, baseWorker);
+  await Deno.writeTextFile(kernelDep, baseKernelDep);
+  await Deno.writeTextFile(entry, mainSource);
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    frontendWorkers: 8,
+    profileBackend: true,
+    profileTrace: true,
+  };
+  const session = await createZigProjectCompiler(options);
+  try {
+    const runAndCheck = async (
+      sources: Record<string, string>,
+      wantAnswer: number,
+      wantKernel: number,
+      expectWireSkipped: boolean,
+    ) => {
+      const actual = await session.build({ sources });
+      assert(actual.success, JSON.stringify(actual));
+      const events = session.profileProgress?.events ?? [];
+      const latestBuild = events.reduce((m, e) => Math.max(m, e.build), 0);
+      const sawWire = events.some(
+        (e) =>
+          e.build === latestBuild &&
+          e.kind === "end" &&
+          e.stage === "direct.wire_schema",
+      );
+      assert.equal(sawWire, !expectWireSkipped);
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const oracle = await fresh.build({ sources });
+        assert(oracle.success, JSON.stringify(oracle));
+        assert.deepEqual(actual.bytes, oracle.bytes);
+      } finally {
+        await fresh.dispose();
+      }
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", 4), wantAnswer);
+        assert.equal(guest.call("run_k", 5), wantKernel);
+      } finally {
+        guest.dispose();
+      }
+    };
+    // Initial cold build: checked(4) = 0+1+2+3 = 6, bonus(4) = 1+2+3+4 = 10 -> 16; scale(5) = 15.
+    await runAndCheck({}, 16, 15, false);
+    // Structural edit in a module containing @panic, outside the kernel dep cone.
+    const editedWorker = baseWorker.replace(
+      "@u32.add i 1",
+      "@u32.add (@u32.mul i 2) 1",
+    );
+    // bonus(4) = 1+3+5+7 = 16 -> 6+16 = 22.
+    await runAndCheck({ [worker]: editedWorker }, 22, 15, true);
+    // Comment-only edit in the same @panic module.
+    await runAndCheck(
+      { [worker]: editedWorker + "// trailing comment\n" },
+      22,
+      15,
+      true,
+    );
+    // Changing the @panic message adds a new symbol / data bytes; fallback must still match oracle.
+    await runAndCheck(
+      { [worker]: editedWorker.replace("zero input", "must be nonzero") },
+      22,
+      15,
+      false,
+    );
+    // Editing a module INSIDE the kernel dep cone must update kernel output and match oracle.
+    await runAndCheck(
+      {
+        [worker]: baseWorker,
+        [kernelDep]: "func scale (x: U32): U32 => return @u32.mul x 7\n",
+      },
+      16,
+      35,
+      false,
+    );
+    // Restore original sources.
+    await runAndCheck(
+      { [worker]: baseWorker, [kernelDep]: baseKernelDep },
+      16,
+      15,
+      false,
+    );
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});

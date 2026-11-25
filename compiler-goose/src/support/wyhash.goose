@@ -98,6 +98,12 @@ fn final(source: Wyhash) -> u64 {
     }
     return final2(hash);
 }
+let initial_seed0: u64 = 0x1ff5c2923a788d2c;
+fn hashU32(key: u32) -> u64 {
+    let k64 = ((key as u64) << 32) | (key as u64);
+    let low, high = multiply(k64 ^ secret[1], k64 ^ initial_seed0);
+    return mix(low ^ secret[0] ^ 4, high ^ secret[1]);
+}
 fn hash(seed: u64, bytes: const u8[:]) -> u64 {
     var state = init(seed);
     update(state, bytes);

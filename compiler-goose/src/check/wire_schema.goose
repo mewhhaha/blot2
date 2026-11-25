@@ -80,10 +80,19 @@ root struct ProgramInfo {
     kernels: KernelInfo[>..] = [],
     processes: ProcessInfo[>..] = [],
     word_tags: u8[>..] = [],
+    has_fork: bool = false,
+    has_persistent_state: bool = false,
     kernel_staging_sites_count: u32 = 0,
     kernel_staging_sites_digest: u64 = FNV_OFFSET,
     process_closures_digest: u64 = FNV_OFFSET,
+    dep_units: u32[>..] = [],
     issue: Issue = Issue {},
+}
+
+fn noteDepUnit(deps: u32[>..]&, unit: u32) {
+    if unit == 0 { return; }
+    for existing in deps { if existing == unit { return; } }
+    deps.push(unit);
 }
 
 struct NonStagedReceipt {
@@ -259,6 +268,7 @@ root struct UnitIdCache {
     subst_pool: SubstEntry[>..] = [],
     i64_pool: i64[>..] = [],
     active_pool: ActiveNominal[>..] = [],
+    dep_units: u32[>..] = [],
 }
 
 fn initUnitIdCache(units: const Module[:], c: UnitIdCache&) {
@@ -327,6 +337,7 @@ recursive fn pushUnitIdStr(
         return true;
     }
     if !hasUnit(units, unit) { return false; }
+    noteDepUnit(cache.dep_units, unit);
     let idx = (unit - 1) as i64;
     if cache.computed[idx] {
         let s = cache.starts[idx] as i64;
@@ -641,6 +652,7 @@ recursive fn encodeTypeId(
                 return false;
             }
             if !hasUnit(units, node.a) { return false; }
+            noteDepUnit(cache.dep_units, node.a);
             let back = findActiveRange(cache.active_pool[..], active_base, node.a, node.b);
             if back >= 0 {
                 cache.out_buf.push(0x14);
@@ -841,6 +853,7 @@ recursive fn collectFlatNumeric(
             }
             if node.a == 0 || node.a == 0xffffffff { return false; }
             if !hasUnit(units, node.a) { return false; }
+            noteDepUnit(cache.dep_units, node.a);
             if findActiveRange(cache.active_pool[..], active_base, node.a, node.b) >= 0 { return false; }
             let dm .= units[node.a - 1];
             let nidx = findNominalInUnit(dm, Identity { unit: node.a, decl: node.b });
@@ -1048,6 +1061,7 @@ recursive fn checkPersistentSafe(
             }
             if node.a == 0 || node.a == 0xffffffff { return false; }
             if !hasUnit(units, node.a) { return false; }
+            noteDepUnit(cache.dep_units, node.a);
             if findActiveRange(cache.active_pool[..], active_base, node.a, node.b) >= 0 { return true; }
             let dm .= units[node.a - 1];
             let nidx = findNominalInUnit(dm, Identity { unit: node.a, decl: node.b });
@@ -1087,6 +1101,26 @@ recursive fn checkPersistentSafe(
     }
 }
 
+fn resolveBindingTargetTracked(units: const Module[:], from_unit: u32, ref_: BindingRef, deps: u32[>..]&) -> BindingRef {
+    var u = ref_.unit;
+    if u == 0 { u = from_unit; }
+    var b = ref_.binding;
+    for _ in 0..16 {
+        if !hasUnit(units, u) || b == 0 { return BindingRef { 0, 0 }; }
+        noteDepUnit(deps, u);
+        let m .= units[u - 1];
+        if (b as i64) >= m.bindings.len { return BindingRef { 0, 0 }; }
+        let info = m.binding(b);
+        if info.kind == blot_reuse_principal_interface::Kind.external && info.target.binding != 0 {
+            u = info.target.unit;
+            b = info.target.binding;
+            continue;
+        }
+        return BindingRef { u, b };
+    }
+    return BindingRef { 0, 0 };
+}
+
 fn resolveBindingTarget(units: const Module[:], from_unit: u32, ref_: BindingRef) -> BindingRef {
     var u = ref_.unit;
     if u == 0 { u = from_unit; }
@@ -1107,15 +1141,35 @@ fn resolveBindingTarget(units: const Module[:], from_unit: u32, ref_: BindingRef
 }
 
 // Transitive Core implementation hasher for `impl_hash` (§2.4 & §4.1 item 3).
+struct AssocIndexEntry {
+    unit: u32 = 0,
+    target: BindingRef = BindingRef { 0, 0 },
+    name: Chars = "",
+    next: u32 = 0,
+}
+
 root struct ImplHashCtx {
     h: Hasher = Hasher {},
     visited: dictionary<BindingRef, bool> = dictionary<BindingRef, bool>{},
     queue: BindingRef[>..] = [],
     staging_sites: u64[>..] = [],
+    dep_units: u32[>..] = [],
+    assoc_indexed: bool = false,
+    assoc_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
+    assoc_entries: AssocIndexEntry[>..] = [],
+    seen_assoc_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
+    seen_assoc_names: Chars[>..] = [],
+    seen_assoc_next: u32[>..] = [],
+}
+
+fn hashCharsFnv(s: Chars) -> u64 {
+    var h: u64 = FNV_OFFSET;
+    for b in s { h = (h ^ (b as u64)) * FNV_PRIME; }
+    return h;
 }
 
 fn enqueueBody(ctx: ImplHashCtx&, units: const Module[:], from_unit: u32, ref_: BindingRef) {
-    let resolved = resolveBindingTarget(units, from_unit, ref_);
+    let resolved = resolveBindingTargetTracked(units, from_unit, ref_, ctx.dep_units);
     if resolved.unit == 0 || resolved.binding == 0 { return; }
     if !ctx.visited.contains(resolved) {
         ctx.visited.insert(resolved, true);
@@ -1123,14 +1177,54 @@ fn enqueueBody(ctx: ImplHashCtx&, units: const Module[:], from_unit: u32, ref_: 
     }
 }
 
-fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, units: const Module[:], want: Chars) {
-    for u_mod in units {
-        for assoc in u_mod.associated {
+fn buildAssocIndex(ctx: ImplHashCtx&, units: const Module[:]) {
+    ctx.assoc_indexed = true;
+    // Traverse in reverse so linked-list prepends yield exact forward (unit, associated) order.
+    var ui = units.len;
+    while ui > 0 {
+        ui -= 1;
+        let u_mod .= units[ui];
+        var ai = u_mod.associated.len;
+        while ai > 0 {
+            ai -= 1;
+            let assoc = u_mod.associated[ai];
             let asp = u_mod.fieldSpelling(assoc.member);
-            if asp.present && asp.value == want {
-                enqueueBody(ctx, units, u_mod.unit, assoc.target);
-            }
+            if !asp.present { continue; }
+            let h = hashCharsFnv(asp.value);
+            var prev: u32 = 0;
+            let found = ctx.assoc_heads.get(h);
+            if found { prev = found; }
+            let idx = (ctx.assoc_entries.len as u32) + 1;
+            ctx.assoc_entries.push(AssocIndexEntry { unit: u_mod.unit, target: assoc.target, name: asp.value, next: prev });
+            ctx.assoc_heads.insert(h, idx);
         }
+    }
+}
+
+fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, units: const Module[:], want: Chars) {
+    let h = hashCharsFnv(want);
+    var cur: u32 = 0;
+    let sh = ctx.seen_assoc_heads.get(h);
+    if sh { cur = sh; }
+    var at = cur;
+    while at != 0 {
+        if ctx.seen_assoc_names[(at - 1) as i64] == want { return; }
+        at = ctx.seen_assoc_next[(at - 1) as i64];
+    }
+    let sid = (ctx.seen_assoc_names.len as u32) + 1;
+    ctx.seen_assoc_names.push(want);
+    ctx.seen_assoc_next.push(cur);
+    ctx.seen_assoc_heads.insert(h, sid);
+    if !ctx.assoc_indexed { buildAssocIndex(ctx, units); }
+    let head = ctx.assoc_heads.get(h);
+    if !head { return; }
+    var entry_idx: u32 = head;
+    while entry_idx != 0 {
+        let e = ctx.assoc_entries[(entry_idx - 1) as i64];
+        if e.name == want {
+            enqueueBody(ctx, units, e.unit, e.target);
+        }
+        entry_idx = e.next;
     }
 }
 
@@ -1407,7 +1501,7 @@ fn drainImplHashQueue(ctx: ImplHashCtx&, units: const Module[:]) {
     }
 }
 
-fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&) -> u64 {
+fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x03);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
@@ -1416,6 +1510,7 @@ fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::Ke
     }
     enqueueBody(ctx, units, entry, decl.run_target);
     drainImplHashQueue(ctx, units);
+    for u in ctx.dep_units { noteDepUnit(dep_units, u); }
     for site in ctx.staging_sites {
         var seen = false;
         for ex in all_staging_sites { if ex == site { seen = true; break; } }
@@ -1424,13 +1519,14 @@ fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::Ke
     return ctx.h.h;
 }
 
-fn computeProcessClosureHash(units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl) -> u64 {
+fn computeProcessClosureHash(units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x05);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
     enqueueBody(ctx, units, entry, decl.init_target);
     enqueueBody(ctx, units, entry, decl.step_target);
     drainImplHashQueue(ctx, units);
+    for u in ctx.dep_units { noteDepUnit(dep_units, u); }
     return ctx.h.h;
 }
 
@@ -1507,16 +1603,8 @@ fn computeExportedStorage(units: const Module[:], entry: u32, info: const Progra
 }
 
 fn computeNonStagedReceipt(units: const Module[:], entry: u32, info: const ProgramInfo&) -> NonStagedReceipt {
-    var has_fork = false;
-    var has_persistent = false;
-    for u in units {
-        if !has_persistent && (u.kernels.len != 0 || u.processes.len != 0) { has_persistent = true; }
-        if !has_fork {
-            for node in u.nodes {
-                if node.tag == blot_check_core::Tag.fork_ { has_fork = true; break; }
-            }
-        }
-    }
+    let has_fork = info.has_fork;
+    let has_persistent = info.has_persistent_state;
     var h = Hasher {};
     fnvByte(h, 0x10);
     if hasUnit(units, entry) {
@@ -1569,20 +1657,38 @@ fn verifyNamedFunctionArity(units: const Module[:], from_unit: u32, ref_: Bindin
 // Validate all `entry kernel` and `entry process` declarations in `entry` module and compute
 // canonical wire schemas and hashes.
 fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
+    analyzeWithForkFlags(units, entry, default<const u8[:]>(), info);
+}
+fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8[:], info: ProgramInfo&) {
     if !hasUnit(units, entry) { return; }
     // `entry kernel` and `entry process` are only valid in the entry module (§2.3).
-    for u in units {
-        if u.unit == entry { continue; }
-        if u.kernels.len != 0 {
-            info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel is only valid in the entry module" };
-            return;
+    // Scan `has_fork` in the same single pass (reusing precomputed worker/retained flags
+    // when available) so neither `computeNonStagedReceipt` nor `direct/emit::runtime_`
+    // has to re-walk every Core node of every module.
+    for u, ui in units {
+        if u.unit != entry {
+            if u.kernels.len != 0 {
+                info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel is only valid in the entry module" };
+                return;
+            }
+            if u.processes.len != 0 {
+                info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process is only valid in the entry module" };
+                return;
+            }
         }
-        if u.processes.len != 0 {
-            info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process is only valid in the entry module" };
-            return;
+        if !info.has_fork {
+            if ui < fork_flags.len && fork_flags[ui] != 0 {
+                if fork_flags[ui] == 2 { info.has_fork = true; }
+            } else {
+                for node in u.nodes {
+                    if node.tag == blot_check_core::Tag.fork_ { info.has_fork = true; break; }
+                }
+            }
         }
     }
     let m .= units[entry - 1];
+    info.has_persistent_state = m.kernels.len != 0 || m.processes.len != 0;
+    if !info.has_persistent_state { return; }
     var cache = UnitIdCache {};
     initUnitIdCache(units, cache);
     let empty_subst: SubstEntry[0] = [];
@@ -1650,7 +1756,7 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
         fnvByte(ioh, flags);
         kinfo.io_schema_hash = ioh.h;
         // impl_hash
-        kinfo.impl_hash = computeImplHash(units, entry, decl, all_kernel_staging_sites);
+        kinfo.impl_hash = computeImplHash(units, entry, decl, all_kernel_staging_sites, info.dep_units);
         // binding_hash = fnv1a64(0x04 || ctx_schema_hash_le || in_schema_hash_le || out_schema_hash_le || [flags] || impl_hash_le)
         var bh = Hasher {};
         fnvByte(bh, 0x04);
@@ -1709,8 +1815,10 @@ fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
         pinfo.config_schema = cfg_s;
         pinfo.cmd_schema = cmd_s;
         pinfo.reply_schema = rep_s;
-        fnvU64Le(pch, computeProcessClosureHash(units, entry, decl));
+        fnvU64Le(pch, computeProcessClosureHash(units, entry, decl, info.dep_units));
         info.processes.push(pinfo);
     }
     info.process_closures_digest = pch.h;
+    noteDepUnit(info.dep_units, entry);
+    for u in cache.dep_units { noteDepUnit(info.dep_units, u); }
 }

@@ -2705,9 +2705,9 @@ fn declaredTuple(g: Generator&, f: Fn&, storage: blot_check_types::Node, value: 
     var collected: u32[>..<] = [];
     for index in 0..(storage.b as i64) {
         let field = m.types.recordField(storage, index);
-        let spelling = m.fieldSpelling(field.name);
-        if !spelling.present { return neverVal(), g.fail(m, id, "record pattern field without a spelling"); }
-        let position = g.types.findField(value.ty, g.types.fieldName(spelling.value));
+        let fname, has_fname = g.types.fieldNameOf(m, field.name, true);
+        if !has_fname { return neverVal(), g.fail(m, id, "record pattern field without a spelling"); }
+        let position = g.types.findField(value.ty, fname);
         if position < 0 { return neverVal(), g.fail(m, id, "record pattern field missing"); }
         let part, error = recordField(g, f, value, position, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -2730,9 +2730,9 @@ recursive fn recordPattern(g: Generator&, f: Fn&, pattern_id: u32, single: bool,
         var child = pattern_id;
         if !single { child = m.patternChildren(pattern_id)[index]; }
         let field = m.types.recordField(storage, index);
-        let spelling = m.fieldSpelling(field.name);
-        if !spelling.present { return g.fail(m, id, "record pattern field without a spelling"); }
-        let position = g.types.findField(value.ty, g.types.fieldName(spelling.value));
+        let fname, has_fname = g.types.fieldNameOf(m, field.name, true);
+        if !has_fname { return g.fail(m, id, "record pattern field without a spelling"); }
+        let position = g.types.findField(value.ty, fname);
         if position < 0 { return g.fail(m, id, "record pattern field missing"); }
         let part, error = recordField(g, f, value, position, id);
         if error != blot_direct_types::Error.none { return error; }

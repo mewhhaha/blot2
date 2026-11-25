@@ -9,7 +9,10 @@ import std;
 // Growth appends a larger bucket region and relinks every node into it.
 struct U64Map { count: u32 = 0, base: u32 = 0, mask: u32 = 0, words: u32[>..] = [] }
 
-fn bucketOf(map: const U64Map&, key: u64) -> u32 { return map.base + ((::hash(key) as! u32) & map.mask); }
+fn bucketOf(map: const U64Map&, key: u64) -> u32 {
+    let x = (key ^ (key >> 30)) * 0xbf58476d1ce4e5b9;
+    return map.base + ((((x ^ (x >> 31)) as! u32)) & map.mask);
+}
 fn find(map: const U64Map&, key: u64) -> u32 {
     if map.count == 0 { return 0; }
     var at = map.words[bucketOf(map, key)];
@@ -32,12 +35,15 @@ fn clear(map: U64Map&) {
     map.count = 0;
 }
 fn contains(map: const U64Map&, key: u64) -> bool { return find(map, key) != 0; }
+let map_zeros: u32[64] = [0; 64];
 fn grow(map: U64Map&, buckets: u32) {
     let old_base = map.base;
     let old_count = map.mask + 1;
     let had = map.words.len != 0;
     let new_base = map.words.len as u32;
-    for at in 0..(buckets as i64) { map.words.push(0); }
+    var rem = buckets as i64;
+    while rem >= 64 { map.words.append(map_zeros[..]); rem -= 64; }
+    if rem > 0 { map.words.append(map_zeros[..rem]); }
     map.base = new_base;
     map.mask = buckets - 1;
     if !had { return; }

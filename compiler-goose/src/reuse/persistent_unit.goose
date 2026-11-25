@@ -210,6 +210,10 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
         return blot_error::Error.invalid_artifact;
     }
     core.value.unit=unit;
+    var has_fork_byte:u8=1;
+    for node in core.value.nodes {
+        if node.tag==blot_check_core::Tag.fork_ {has_fork_byte=2;break;}
+    }
     var packet:u8[>..<]=[];
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,unit);
@@ -223,6 +227,7 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     blot_project_packet::put(writer,check_cpu_us);
     blot_project_packet::put(writer,freeze_elapsed);
     blot_project_packet::put(writer,lower_elapsed);
+    blot_project_packet::put(writer,has_fork_byte);
     core.deinit();
     if writer.failure!=blot_error::Error.none {return writer.failure;}
     if !blot_native::persist_publish(shared,unit,2,packet[0],packet.len as u64) {return blot_error::Error.invalid_artifact;}

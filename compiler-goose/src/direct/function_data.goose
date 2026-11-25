@@ -101,9 +101,8 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
             return container, blot_direct_types::Error.none;
         }
         let projection = m.projection(step.projection);
-        let spelling = m.fieldSpelling(projection.field);
-        if !spelling.present { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
-        let name = g.types.fieldName(spelling.value);
+        let name, has_name = g.types.fieldNameOf(m, projection.field, true);
+        if !has_name { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
         var record = ty;
         if tagOf(g, ty) == blot_direct_types::Tag.nominal {
             let cases, error = g.types.variants(ty);
@@ -113,11 +112,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         }
         let position = g.types.findField(record, name);
         if position < 0 { return neverVal(), g.fail(m, id, "updated field missing"); }
-        for before in 0..position {
-            let bytes, error = byteWidth(g, f, g.types.recordField(record, before).ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            offset += bytes;
-        }
+        let foff, foff_err = fieldOffset(g, f, record, position, id);
+        if foff_err != blot_direct_types::Error.none { return neverVal(), foff_err; }
+        offset += foff;
         ty = g.types.recordField(record, position).ty;
     }
     if offset != 0 {
@@ -340,9 +337,8 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
     var projection_id: u32 = 0;
     if selectors.len != 0 { projection_id = selectors[at].projection; } else { projection_id = path[at]; }
     let projection = m.projection(projection_id);
-    let spelling = m.fieldSpelling(projection.field);
-    if !spelling.present { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
-    let name = g.types.fieldName(spelling.value);
+    let name, has_name = g.types.fieldNameOf(m, projection.field, true);
+    if !has_name { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
     let boxed, error = isBoxed(g, f, value.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if boxed { return updateBoxed(g, f, id, value, name, at); }
@@ -426,14 +422,8 @@ recursive fn updateField(g: Generator&, f: Fn&, id: u32, record: Val, name: u32,
 
 // Word offset and width of record field `index` of `ty`.
 fn fieldSlice(g: Generator&, f: const Fn&, ty: Ty, index: i64, id: u32) -> u32, u32, Error {
-    var start: u32 = 0;
-    for before in 0..index {
-        let width, error = layoutLen(g, f, g.types.recordField(ty, before).ty, id);
-        if error != blot_direct_types::Error.none { return 0, 0, error; }
-        start += width;
-    }
-    let width, error = layoutLen(g, f, g.types.recordField(ty, index).ty, id);
-    if error != blot_direct_types::Error.none { return 0, 0, error; }
+    let start, width, error = g.types.recordFieldWordSlice(ty, index);
+    if error != blot_direct_types::Error.none { return 0, 0, g.typeFailure(g.units[f.unit - 1], id); }
     return start, width, blot_direct_types::Error.none;
 }
 // A slot of `ordered` in product() that no field has filled.
@@ -491,9 +481,9 @@ recursive fn product(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 var destination = index;
                 if n.tag == blot_check_core::Tag.record { destination = m.recordDestinations(id)[index]; }
                 let field = m.types.recordField(source, destination);
-                let spelling = m.fieldSpelling(field.name);
-                if !spelling.present { return neverVal(), g.fail(m, id, "record field without a spelling"); }
-                let position = g.types.findField(ty, g.types.fieldName(spelling.value));
+                let fname, has_fname = g.types.fieldNameOf(m, field.name, true);
+                if !has_fname { return neverVal(), g.fail(m, id, "record field without a spelling"); }
+                let position = g.types.findField(ty, fname);
                 if position < 0 { return neverVal(), g.fail(m, id, "record field missing from its type"); }
                 g.s.vals[ordered.start + position] = g.s.vals[values.start + index];
             }
@@ -546,9 +536,9 @@ fn productType(g: Generator&, f: Fn&, id: u32, values: Vals) -> Ty, Error {
     var fields: blot_direct_types::Field[>..<] = [];
     let destinations = m.recordDestinations(id);
     for at in 0..(values.len as i64) {
-        let spelling = m.fieldSpelling(m.types.recordField(source, destinations[at]).name);
-        if !spelling.present { return 0, g.typeFailure(m, id); }
-        fields.push(blot_direct_types::Field { g.types.fieldName(spelling.value), g.s.vals[values.start + at].ty });
+        let fname, has_fname = g.types.fieldNameOf(m, m.types.recordField(source, destinations[at]).name, true);
+        if !has_fname { return 0, g.typeFailure(m, id); }
+        fields.push(blot_direct_types::Field { fname, g.s.vals[values.start + at].ty });
     }
     let ty, error = g.types.record(fields[..]);
     if error != blot_direct_types::Error.none { return 0, error; }
@@ -575,9 +565,8 @@ recursive fn construct(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             payload = value;
             if declared != 0 && m.types.node(declared).b == 1 {
                 let field_sym = m.types.recordField(m.types.node(declared), 0).name;
-                let spelling = m.fieldSpelling(field_sym);
-                if spelling.present {
-                    let fname = g.types.fieldName(spelling.value);
+                let fname, has_fname = g.types.fieldNameOf(m, field_sym, true);
+                if has_fname {
                     let already_wrapped = tagOf(g, payload.ty) == blot_direct_types::Tag.record && g.types.node(payload.ty).b == 1 && g.types.findField(payload.ty, fname) == 0;
                     if !already_wrapped {
                         var one_field: blot_direct_types::Field[1] = [blot_direct_types::Field { fname, payload.ty }];
@@ -613,9 +602,9 @@ recursive fn positionalRecord(g: Generator&, f: Fn&, id: u32, declared: TId) -> 
         let part, error = expr(g, f, child);
         if error != blot_direct_types::Error.none { return part, error; }
         g.s.vals[parts.start + index] = part;
-        let spelling = m.fieldSpelling(m.types.recordField(shape, index).name);
-        if !spelling.present { return neverVal(), g.fail(m, id, "record field without a spelling"); }
-        g.s.words[names.start + index] = g.types.fieldName(spelling.value);
+        let fname, has_fname = g.types.fieldNameOf(m, m.types.recordField(shape, index).name, true);
+        if !has_fname { return neverVal(), g.fail(m, id, "record field without a spelling"); }
+        g.s.words[names.start + index] = fname;
     }
     var record: Ty = 0;
     {
@@ -659,14 +648,18 @@ fn declaredRecord(g: Generator&, f: const Fn&, tm: const Module&, value: Val, re
         let next = g.s.words[offsets.start + index] + width;
         g.s.words.push(next);
     }
+    let decl_names = blot_direct_emit::Words { g.s.words.len as u32, shape.b };
+    for candidate in 0..(shape.b as i64) {
+        let fname, has_fname = g.types.fieldNameOf(tm, tm.types.recordField(shape, candidate).name, true);
+        if !has_fname { return neverVal(), g.fail(tm, 0, "record field without a spelling"); }
+        g.s.words.push(fname);
+    }
     let start = g.s.words.len as u32;
     for position in 0..(shape.b as i64) {
         let name = g.types.recordField(record, position).name;
         var index: i64 = -1;
         for candidate in 0..(shape.b as i64) {
-            let spelling = tm.fieldSpelling(tm.types.recordField(shape, candidate).name);
-            if !spelling.present { return neverVal(), g.fail(tm, 0, "record field without a spelling"); }
-            if g.types.fieldName(spelling.value) == name { index = candidate; break; }
+            if g.s.words[decl_names.start + candidate] == name { index = candidate; break; }
         }
         if index < 0 { return neverVal(), g.fail(tm, 0, "constructor field missing from its declaration"); }
         let from = g.s.words[offsets.start + index];
@@ -820,6 +813,21 @@ fn unwrapVariant(g: Generator&, f: const Fn&, value: Val, tag: u32, id: u32) -> 
 // a data field value (`is_method = false`) or the associated method target
 // (`is_method = true`) so callers like `apply` can emit a direct call without
 // allocating a partial-application closure.
+fn cachedProjectionFieldName(g: Generator&, m: const Module&, proj_idx: u32) -> u32 {
+    let uid = (m.unit - 1) as i64;
+    while g.s.proj_field_base.len < g.units.len { g.s.proj_field_base.push(0xffffffff); }
+    var base = g.s.proj_field_base[uid];
+    if base == 0xffffffff {
+        base = g.s.proj_field_vals.len as u32;
+        g.s.proj_field_base[uid] = base;
+        blot_direct_types::growFill(g.s.proj_field_vals, m.projections.len);
+    }
+    return g.s.proj_field_vals[(base as i64) + (proj_idx as i64)];
+}
+fn cacheProjectionFieldName(g: Generator&, m: const Module&, proj_idx: u32, name: u32) {
+    let base = g.s.proj_field_base[(m.unit - 1) as i64];
+    g.s.proj_field_vals[(base as i64) + (proj_idx as i64)] = name;
+}
 recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) -> Val, BindingRef, bool, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -832,26 +840,33 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
         return field_val, BindingRef { 0, 0 }, false, error;
     }
     let nominal_field = variants.len != 0 && projection.nominal.decl != 0;
-    if nominal_field {
-        var found = false;
-        for constructor in m.constructors {
-            let identity = m.nominal(constructor.nominal).identity;
-            if !sameNominal(identity, projection.nominal) || constructor.tag != variants[0].tag { continue; }
-            let payload = m.types.node(constructor.payload);
-            if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
-            name_symbol = m.types.recordField(payload, variants[0].field).name;
-            found = true;
-            break;
-        }
-        if !found { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected constructor missing from the catalog"); }
-        if variants.len > 1 {
-            let field_val, error = sharedField(g, f, value, n.b, name_symbol, id);
-            return field_val, BindingRef { 0, 0 }, false, error;
-        }
+    var name: u32 = 0xffffffff;
+    if !(nominal_field && variants.len > 1) {
+        name = cachedProjectionFieldName(g, m, n.b);
     }
-    let spelling = m.fieldSpelling(name_symbol);
-    if !spelling.present { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field without a spelling"); }
-    let name = g.types.fieldName(spelling.value);
+    if name == 0xffffffff {
+        if nominal_field {
+            var found = false;
+            for constructor in m.constructors {
+                let identity = m.nominal(constructor.nominal).identity;
+                if !sameNominal(identity, projection.nominal) || constructor.tag != variants[0].tag { continue; }
+                let payload = m.types.node(constructor.payload);
+                if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
+                name_symbol = m.types.recordField(payload, variants[0].field).name;
+                found = true;
+                break;
+            }
+            if !found { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected constructor missing from the catalog"); }
+            if variants.len > 1 {
+                let field_val, error = sharedField(g, f, value, n.b, name_symbol, id);
+                return field_val, BindingRef { 0, 0 }, false, error;
+            }
+        }
+        let resolved_name, has_name = g.types.fieldNameOf(m, name_symbol, true);
+        if !has_name { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field without a spelling"); }
+        name = resolved_name;
+        cacheProjectionFieldName(g, m, n.b, name);
+    }
     var record = value;
     if g.types.node(value.ty).tag == blot_direct_types::Tag.nominal {
         let cases, error = g.types.variants(value.ty);
@@ -882,6 +897,8 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
     }
     var target, has_target = g.dispatchTarget(m, identity, projection.field, blot_check_types::Operator.none);
     if !has_target {
+        let spelling = m.fieldSpelling(name_symbol);
+        if !spelling.present { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field without a spelling"); }
         let want_spell = spelling.value;
         var found_trait = BindingRef { 0, 0 };
         for unit in g.units {
@@ -911,9 +928,10 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
         }
     }
     if !has_target {
+        let spelling = m.fieldSpelling(name_symbol);
         g.failOpen(m, id);
         g.put("no member ");
-        g.put(spelling.value);
+        if spelling.present { g.put(spelling.value); }
         g.put(" for this receiver");
         return neverVal(), BindingRef { 0, 0 }, false, g.failClose();
     }

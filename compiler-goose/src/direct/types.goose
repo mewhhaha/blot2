@@ -100,6 +100,19 @@ root struct Types {
     spellings: Span[>..] = [],
     layout_words: ValType[>..] = [],
     layouts: Slot[>..] = [],
+    // Cached register layout (one pointer if boxed/recursive, else flat layout).
+    reg_layouts: Slot[>..] = [],
+    // 0 = unknown, 1 = unboxed, 2 = boxed.
+    boxed_vals: u8[>..] = [],
+    // Cached flat byte width (0xffffffff = uncomputed).
+    flat_bytes_vals: u32[>..] = [],
+    // Cached cumulative record field byte offsets and register word offsets (per Tag.record Ty).
+    field_byte_offs_slot: Slot[>..] = [],
+    field_byte_offs: u32[>..] = [],
+    field_word_offs_slot: Slot[>..] = [],
+    field_word_offs: u32[>..] = [],
+    // Direct `(record_ty, field_name) -> position` index for records with >= 12 fields.
+    record_field_index: U64Map = U64Map {},
     variant_tags: u32[>..] = [],
     variant_payloads: Ty[>..] = [],
     variant_cache: VariantSlot[>..] = [],
@@ -107,14 +120,21 @@ root struct Types {
     closed_base: u32[>..] = [],
     closed_len: u32[>..] = [],
     closed_vals: u32[>..] = [],
+    // Per-unit closed/no-vars marker for matchInner/refine: 0 = unknown, 2 = proven no variables.
+    no_vars_vals: u8[>..] = [],
     field_id_base: u32[>..] = [],
     field_id_len: u32[>..] = [],
     field_ids: u32[>..] = [],
+    // Direct-mapped cache for fieldNameOf: key64(unit, symbol) -> field_id.
+    fn_cache_keys: u64[256] = [0; 256],
+    fn_cache_vals: u32[256] = [0; 256],
     nominal_positions: U64Map = U64Map {},
     in_layout: bool[>..] = [],
     // Nominal types that contain themselves: always one pointer to an
     // immutable block, even inside other values; the slot is the block.
     recursive_: Slot[>..] = [],
+    // Max leaf depth (0..65) for concrete types, or 255 if any descendant is `never`.
+    concrete_depth: u8[>..] = [],
     // The Core type that last failed to lower, for diagnostics.
     has_failure: bool = false,
     failure: VarKey = VarKey {},
@@ -153,7 +173,23 @@ fn key64(unit_id: u32, id: u32) -> u64 { let high: u64 = unit_id; return (high <
 fn isClosed(self_: const Types&, unit_id: u32, ty: TId) -> bool {
     return self_.closed_vals[(self_.closed_base[unit_id - 1] as i64) + (ty as i64)] != 0xffffffff;
 }
+fn isNoVars(self_: const Types&, unit_id: u32, ty: TId) -> bool {
+    let idx = (self_.closed_base[unit_id - 1] as i64) + (ty as i64);
+    return self_.closed_vals[idx] != 0xffffffff || self_.no_vars_vals[idx] == 2;
+}
 
+let fill_ffffffff: u32[256] = [0xffffffff; 256];
+let fill_zeros_u8: u8[256] = [0; 256];
+fn growFill(buf: u32[>..]&, count: i64) {
+    var rem = count;
+    while rem >= 256 { buf.append(fill_ffffffff[..]); rem -= 256; }
+    if rem > 0 { buf.append(fill_ffffffff[..rem]); }
+}
+fn growZerosU8(buf: u8[>..]&, count: i64) {
+    var rem = count;
+    while rem >= 256 { buf.append(fill_zeros_u8[..]); rem -= 256; }
+    if rem > 0 { buf.append(fill_zeros_u8[..rem]); }
+}
 fn initUnitTables(self_: Types&) {
     var total_types: i64 = 0;
     var total_fields: i64 = 0;
@@ -165,8 +201,9 @@ fn initUnitTables(self_: Types&) {
         self_.field_id_len.push(m.field_names.len as u32);
         total_fields += m.field_names.len;
     }
-    while self_.closed_vals.len < total_types { self_.closed_vals.push(0xffffffff); }
-    while self_.field_ids.len < total_fields { self_.field_ids.push(0xffffffff); }
+    if self_.closed_vals.len < total_types { growFill(self_.closed_vals, total_types - self_.closed_vals.len); }
+    if self_.no_vars_vals.len < total_types { growZerosU8(self_.no_vars_vals, total_types - self_.no_vars_vals.len); }
+    if self_.field_ids.len < total_fields { growFill(self_.field_ids, total_fields - self_.field_ids.len); }
 }
 
 fn resetClosedUnit(self_: Types&, unit_id: u32) {
@@ -174,12 +211,16 @@ fn resetClosedUnit(self_: Types&, unit_id: u32) {
     let need = self_.units[idx].types.nodes.len;
     if need <= (self_.closed_len[idx] as i64) {
         let base = self_.closed_base[idx] as i64;
-        for at in base..base + need { self_.closed_vals[at] = 0xffffffff; }
+        for at in base..base + need {
+            self_.closed_vals[at] = 0xffffffff;
+            self_.no_vars_vals[at] = 0;
+        }
     } else {
         let base = self_.closed_vals.len as u32;
         self_.closed_base[idx] = base;
         self_.closed_len[idx] = need as u32;
-        for at in 0..need { self_.closed_vals.push(0xffffffff); }
+        growFill(self_.closed_vals, need);
+        growZerosU8(self_.no_vars_vals, need);
     }
     let fneed = self_.units[idx].field_names.len;
     if fneed <= (self_.field_id_len[idx] as i64) {
@@ -189,8 +230,9 @@ fn resetClosedUnit(self_: Types&, unit_id: u32) {
         let fbase = self_.field_ids.len as u32;
         self_.field_id_base[idx] = fbase;
         self_.field_id_len[idx] = fneed as u32;
-        for at in 0..fneed { self_.field_ids.push(0xffffffff); }
+        growFill(self_.field_ids, fneed);
     }
+    for ci in 0..256 { self_.fn_cache_keys[ci] = 0; }
 }
 
 fn resetClosed(self_: Types&) {
@@ -198,7 +240,15 @@ fn resetClosed(self_: Types&) {
 }
 
 fn init(self_: Types&) {
-    // Layout word 0 is the one pointer of a boxed or recursive value.
+    // Pre-seed canonical layout patterns:
+    // [0..1] = [VT_i32] (boxed ptr, boolean, u32_, cell)
+    // [1..2] = [VT_f32] (f32_)
+    // [2..6] = [VT_i32 x 4] ([2..4] fn/provider/array, [2..5] ref/link, [2..6] view)
+    self_.layout_words.push(blot_direct_writer::VT_i32);
+    self_.layout_words.push(blot_direct_writer::VT_f32);
+    self_.layout_words.push(blot_direct_writer::VT_i32);
+    self_.layout_words.push(blot_direct_writer::VT_i32);
+    self_.layout_words.push(blot_direct_writer::VT_i32);
     self_.layout_words.push(blot_direct_writer::VT_i32);
     // Environment node 0 ends every list.
     self_.env_nodes.push(EnvNode { 0, 0, 0, 0 });
@@ -328,18 +378,87 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         function => { value = Node { tag, first, payload[payload.len - 1] }; },
         array, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
     }
+    var cdepth: u8 = 0;
+    match tag {
+        never => { cdepth = 255; },
+        unit, boolean, u32_, f32_ => { cdepth = 0; },
+        function => {
+            var md = self_.concrete_depth[payload[0]];
+            let d1 = self_.concrete_depth[payload[1]];
+            if d1 > md { md = d1; }
+            if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
+        },
+        array, ref, view, link, provider, cell => {
+            let md = self_.concrete_depth[payload[0]];
+            if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
+        },
+        tuple, state_provider => {
+            if payload.len > 0 {
+                var md: u8 = 0;
+                for child in payload {
+                    let d = self_.concrete_depth[child];
+                    if d > md { md = d; }
+                }
+                if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
+            }
+        },
+        record => {
+            if payload.len > 0 {
+                var md: u8 = 0;
+                for idx in 0..(payload.len / 2) {
+                    let d = self_.concrete_depth[payload[idx * 2 + 1]];
+                    if d > md { md = d; }
+                }
+                if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
+            }
+        },
+        nominal => {
+            if payload.len > 2 {
+                var md: u8 = 0;
+                for idx in 2..payload.len {
+                    let d = self_.concrete_depth[payload[idx]];
+                    if d > md { md = d; }
+                }
+                if md == 255 { cdepth = 255; } else if md >= 65 { cdepth = 65; } else { cdepth = md + 1; }
+            }
+        },
+    }
+    var init_flat = Slot {};
+    var init_reg = Slot {};
+    var init_boxed: u8 = 0;
+    var init_fbytes: u32 = 0xffffffff;
+    match tag {
+        unit, never => { init_flat = Slot { true, 0, 0 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 0; },
+        boolean, u32_, cell => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
+        f32_ => { init_flat = Slot { true, 1, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
+        function, provider, array => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
+        ref, link => { init_flat = Slot { true, 2, 3 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 12; },
+        view => { init_flat = Slot { true, 2, 4 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 16; },
+        _ => {},
+    }
     let id = self_.nodes.len as Ty;
     let span = Span { self_.encodings.len as u32, (payload.len + 1) as u32 };
     self_.encodings.push(code);
     self_.encodings.append(payload);
     self_.nodes.push(value);
     self_.keys.push(span);
-    self_.layouts.push(Slot {});
+    self_.layouts.push(init_flat);
+    self_.reg_layouts.push(init_reg);
+    self_.boxed_vals.push(init_boxed);
+    self_.flat_bytes_vals.push(init_fbytes);
+    self_.field_byte_offs_slot.push(Slot {});
+    self_.field_word_offs_slot.push(Slot {});
     self_.variant_cache.push(VariantSlot {});
     self_.in_layout.push(false);
     self_.recursive_.push(Slot {});
+    self_.concrete_depth.push(cdepth);
     self_.index_next.push(head);
     self_.index.put(hashed, id + 1);
+    if tag == Tag.record && payload.len >= 24 {
+        for idx in 0..(payload.len / 2) {
+            self_.record_field_index.put(key64(id, payload[idx * 2]), idx as u32);
+        }
+    }
     return id, Error.none;
 }
 fn function(self_: Types&, parameter: Ty, result: Ty) -> Ty, Error { return intern(self_, Tag.function, [parameter, result]); }
@@ -397,6 +516,9 @@ fn fieldName(self_: Types&, text: Text) -> u32 {
     return id;
 }
 fn fieldNameOf(self_: Types&, m: const Module&, symbol: u32, intern_missing: bool) -> u32, bool {
+    let fkey = key64(m.unit, symbol);
+    let fslot = (((m.unit * 2654435761) ^ (symbol * 2246822507)) & 255) as i64;
+    if self_.fn_cache_keys[fslot] == fkey { return self_.fn_cache_vals[fslot], true; }
     var low: i64 = 0;
     var high = m.field_names.len;
     while low < high {
@@ -407,15 +529,26 @@ fn fieldNameOf(self_: Types&, m: const Module&, symbol: u32, intern_missing: boo
         else {
             let slot = (self_.field_id_base[m.unit - 1] as i64) + middle;
             let cached = self_.field_ids[slot];
-            if cached != 0xffffffff { return cached, true; }
+            if cached != 0xffffffff {
+                self_.fn_cache_keys[fslot] = fkey;
+                self_.fn_cache_vals[fslot] = cached;
+                return cached, true;
+            }
             let text = m.name(value.spelling);
             if intern_missing {
                 let id = fieldName(self_, text);
                 self_.field_ids[slot] = id;
+                self_.fn_cache_keys[fslot] = fkey;
+                self_.fn_cache_vals[fslot] = id;
                 return id, true;
             }
             let id, known = findName(self_, text);
-            if known { self_.field_ids[slot] = id; return id, true; }
+            if known {
+                self_.field_ids[slot] = id;
+                self_.fn_cache_keys[fslot] = fkey;
+                self_.fn_cache_vals[fslot] = id;
+                return id, true;
+            }
             return 0, false;
         }
     }
@@ -424,7 +557,16 @@ fn fieldNameOf(self_: Types&, m: const Module&, symbol: u32, intern_missing: boo
 fn findField(self_: const Types&, ty: Ty, name: u32) -> i64 {
     let n = self_.node(ty);
     if n.tag != Tag.record { return -1; }
-    for index in 0..(n.b as i64) { if self_.recordField(ty, index).name == name { return index; } }
+    if n.b >= 12 {
+        let pos, ok = self_.record_field_index.get(key64(ty, name));
+        if ok { return pos as i64; }
+        return -1;
+    }
+    var at = n.a as i64;
+    for index in 0..(n.b as i64) {
+        if self_.words[at] == name { return index; }
+        at += 2;
+    }
     return -1;
 }
 
@@ -635,7 +777,8 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     var match_env = Env {};
                     var matches = true;
                     for pi in 0..proj_len {
-                        matchInner(self_, self_.units[unit_idx], harg_ids[pi], proj_args[pi], match_env, 0);
+                        var dummy_match_open = false;
+                        matchInner(self_, self_.units[unit_idx], harg_ids[pi], proj_args[pi], match_env, dummy_match_open, 0);
                         var dummy_open = false;
                         let resolved_harg, herr = lowerInner(self_, self_.units[unit_idx], harg_ids[pi], match_env, dummy_open, depth + 1);
                         if herr != Error.none { matches = false; break; }
@@ -696,96 +839,92 @@ recursive fn operation(self_: Types&, m: const Module&, ty: TId, env: Env, open:
 }
 // Binds the variables of `pattern` (a Core type of `m`) so that it lowers to
 // `actual`. Already bound variables keep their binding.
-fn match_(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&) { matchInner(self_, m, pattern, actual, env, 0); }
-recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&, depth: i64) {
-    if pattern <= blot_check_types::never || depth > 256 { return; }
+fn match_(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&) {
+    var open = false;
+    matchInner(self_, m, pattern, actual, env, open, 0);
+}
+recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&, open: bool&, depth: i64) {
+    if pattern <= blot_check_types::never { return; }
+    if depth > 256 { open = true; return; }
+    let cidx = (self_.closed_base[m.unit - 1] as i64) + (pattern as i64);
+    if self_.closed_vals[cidx] != 0xffffffff || self_.no_vars_vals[cidx] == 2 { return; }
+    var sub_open = false;
     let n = m.types.node(pattern);
     let have = self_.node(actual);
     match n.tag {
         variable, bound => {
-            if actual == never { return; } // a hole in a partly known type
-            envBind(self_, env, m.unit, pattern, actual);
+            sub_open = true;
+            if actual != never { envBind(self_, env, m.unit, pattern, actual); }
         },
-        usage, forall => { matchInner(self_, m, n.a, actual, env, depth + 1); },
+        usage, forall => { matchInner(self_, m, n.a, actual, env, sub_open, depth + 1); },
         function => {
             if have.tag == Tag.function {
-                matchInner(self_, m, n.a, have.a, env, depth + 1);
-                matchInner(self_, m, n.b, have.b, env, depth + 1);
-            }
+                matchInner(self_, m, n.a, have.a, env, sub_open, depth + 1);
+                matchInner(self_, m, n.b, have.b, env, sub_open, depth + 1);
+            } else { sub_open = true; }
         },
         product => {
             if have.tag == Tag.tuple && have.b == n.b {
                 let children = m.types.list(blot_check_types::List { n.a, n.b });
-                for child, at in children { matchInner(self_, m, child, self_.words[have.a + at], env, depth + 1); }
-            }
+                for child, at in children { matchInner(self_, m, child, self_.words[have.a + at], env, sub_open, depth + 1); }
+            } else { sub_open = true; }
         },
         record => {
             if have.tag == Tag.record {
                 for index in 0..(n.b as i64) {
                     let source = m.types.recordField(n, index);
                     let name, known = fieldNameOf(self_, m, source.name, false);
-                    if !known { continue; }
+                    if !known { sub_open = true; continue; }
                     let position = self_.findField(actual, name);
-                    if position < 0 { continue; }
-                    matchInner(self_, m, source.ty, self_.recordField(actual, position).ty, env, depth + 1);
+                    if position < 0 { sub_open = true; continue; }
+                    matchInner(self_, m, source.ty, self_.recordField(actual, position).ty, env, sub_open, depth + 1);
                 }
-            }
+            } else { sub_open = true; }
         },
         nominal => {
             let arguments = m.types.nominalArguments(n);
             let skind = blot_check_storage_types::identity(n.a, n.b);
             if skind.present {
                 if skind.value == blot_check_storage_types::shared && arguments.len == 1 {
-                    matchInner(self_, m, arguments[0], actual, env, depth + 1);
+                    matchInner(self_, m, arguments[0], actual, env, sub_open, depth + 1);
                 } else if blot_check_storage_types::isSized(skind.value) && arguments.len == 2 {
-                    if isContainer(have.tag) { matchInner(self_, m, arguments[1], have.a, env, depth + 1); }
+                    if isContainer(have.tag) {
+                        // Length arg[0] might be a variable or literal; mark conservative if not length literal.
+                        let len_node = m.types.node(arguments[0]);
+                        if len_node.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(len_node.a, len_node.b) { sub_open = true; }
+                        matchInner(self_, m, arguments[1], have.a, env, sub_open, depth + 1);
+                    } else { sub_open = true; }
                 } else if arguments.len == 1 && isContainer(have.tag) {
-                    matchInner(self_, m, arguments[0], have.a, env, depth + 1);
-                }
+                    matchInner(self_, m, arguments[0], have.a, env, sub_open, depth + 1);
+                } else { sub_open = true; }
             } else if have.tag == Tag.nominal {
                 let identity = self_.nominalIdentity(actual);
-                if identity.unit != n.a || identity.decl != n.b { return; }
-                if have.b != arguments.len { return; }
-                for argument, at in arguments { matchInner(self_, m, argument, self_.words[have.a + 2 + at], env, depth + 1); }
-            }
+                if identity.unit != n.a || identity.decl != n.b || have.b != arguments.len {
+                    sub_open = true;
+                } else {
+                    for argument, at in arguments { matchInner(self_, m, argument, self_.words[have.a + 2 + at], env, sub_open, depth + 1); }
+                }
+            } else { sub_open = true; }
         },
-        array => { if isContainer(have.tag) { matchInner(self_, m, n.a, have.a, env, depth + 1); } },
-        provider => { if have.tag == Tag.provider { matchInner(self_, m, n.a, have.a, env, depth + 1); } },
+        array => { if isContainer(have.tag) { matchInner(self_, m, n.a, have.a, env, sub_open, depth + 1); } else { sub_open = true; } },
+        provider => { if have.tag == Tag.provider { matchInner(self_, m, n.a, have.a, env, sub_open, depth + 1); } else { sub_open = true; } },
         state_provider => {
             if have.tag == Tag.state_provider {
                 // Zig zips three children with the stored list (always three).
-                matchInner(self_, m, n.a, self_.words[have.a], env, depth + 1);
-                matchInner(self_, m, n.b, self_.words[have.a + 1], env, depth + 1);
-                matchInner(self_, m, n.c, self_.words[have.a + 2], env, depth + 1);
-            }
+                matchInner(self_, m, n.a, self_.words[have.a], env, sub_open, depth + 1);
+                matchInner(self_, m, n.b, self_.words[have.a + 1], env, sub_open, depth + 1);
+                matchInner(self_, m, n.c, self_.words[have.a + 2], env, sub_open, depth + 1);
+            } else { sub_open = true; }
         },
-        _ => {},
+        _ => { sub_open = true; },
     }
+    if sub_open { open = true; } else { self_.no_vars_vals[cidx] = 2; }
 }
 
 // Whether `ty` has no hole (`never`) anywhere, even under functions and
 // containers.
-recursive fn concrete(self_: const Types&, ty: Ty, depth: i64) -> bool {
-    if depth > 64 { return false; }
-    let n = self_.node(ty);
-    match n.tag {
-        never => { return false; },
-        unit, boolean, u32_, f32_ => { return true; },
-        function => { return concrete(self_, n.a, depth + 1) && concrete(self_, n.b, depth + 1); },
-        array, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
-        tuple, state_provider => {
-            for at in 0..(n.b as i64) { if !concrete(self_, self_.words[n.a + at], depth + 1) { return false; } }
-            return true;
-        },
-        record => {
-            for index in 0..(n.b as i64) { if !concrete(self_, self_.recordField(ty, index).ty, depth + 1) { return false; } }
-            return true;
-        },
-        nominal => {
-            for at in 0..(n.b as i64) { if !concrete(self_, self_.words[n.a + 2 + at], depth + 1) { return false; } }
-            return true;
-        },
-    }
+fn concrete(self_: const Types&, ty: Ty, depth: i64) -> bool {
+    return (self_.concrete_depth[ty] as i64) <= 64 - depth;
 }
 fn variantTags(self_: const Types&, value: Variants) -> const u32[:] { return self_.variant_tags[value.tags..value.tags + value.len]; }
 fn variantPayloads(self_: const Types&, value: Variants) -> const Ty[:] { return self_.variant_payloads[value.payloads..value.payloads + value.len]; }
@@ -858,16 +997,29 @@ fn layoutSlice(self_: const Types&, slot: Slot) -> const ValType[:] { return sel
 fn onePointer(self_: const Types&) -> const ValType[:] { return self_.layout_words[0..1]; }
 // Whether values of `ty` are boxed: a pointer to their flat words.
 fn boxed(self_: Types&, ty: Ty) -> bool, Error {
+    let cached = self_.boxed_vals[ty];
+    if cached != 0 { return cached == 2, Error.none; }
     let tag = self_.node(ty).tag;
-    if tag != Tag.tuple && tag != Tag.record && tag != Tag.nominal { return false, Error.none; }
-    let words, error = flat(self_, ty);
+    if tag != Tag.tuple && tag != Tag.record && tag != Tag.nominal {
+        self_.boxed_vals[ty] = 1;
+        return false, Error.none;
+    }
+    let slot, error = flatSlot(self_, ty);
     if error != Error.none { return false, error; }
-    return self_.recursive_[ty].present || words.len > box_words, Error.none;
+    let is_b = self_.recursive_[ty].present || (slot.len as i64) > box_words;
+    if is_b {
+        self_.boxed_vals[ty] = 2;
+        self_.reg_layouts[ty] = Slot { true, 0, 1 };
+    } else {
+        self_.boxed_vals[ty] = 1;
+        self_.reg_layouts[ty] = slot;
+    }
+    return is_b, Error.none;
 }
 // Whether `ty` contains itself and so is always held by pointer.
 fn isRecursive(self_: Types&, ty: Ty) -> bool, Error {
     if self_.node(ty).tag != Tag.nominal { return false, Error.none; }
-    let words, error = flat(self_, ty);
+    let _, error = flatSlot(self_, ty);
     if error != Error.none { return false, error; }
     return self_.recursive_[ty].present, Error.none;
 }
@@ -891,16 +1043,68 @@ fn blockBytes(self_: Types&, ty: Ty) -> u32, Error {
 }
 // A value's register words: its flat words, or one pointer if boxed.
 fn layout(self_: Types&, ty: Ty) -> const ValType[:], Error {
+    let rslot = self_.reg_layouts[ty];
+    if rslot.present { return layoutSlice(self_, rslot), Error.none; }
     let is_boxed, error = boxed(self_, ty);
     if error != Error.none { return self_.layout_words[0..0], error; }
     if is_boxed { return onePointer(self_), Error.none; }
-    return flat(self_, ty);
+    let fslot, ferr = flatSlot(self_, ty);
+    if ferr != Error.none { return self_.layout_words[0..0], ferr; }
+    self_.reg_layouts[ty] = fslot;
+    return layoutSlice(self_, fslot), Error.none;
 }
 // Bytes of a value's flat form in memory.
 fn flatBytes(self_: Types&, ty: Ty) -> u32, Error {
+    let cached = self_.flat_bytes_vals[ty];
+    if cached != 0xffffffff { return cached, Error.none; }
     let words, error = flat(self_, ty);
     if error != Error.none { return 0, error; }
-    return wordBytes(words), Error.none;
+    let bytes = wordBytes(words);
+    self_.flat_bytes_vals[ty] = bytes;
+    return bytes, Error.none;
+}
+// Cached byte offset of record field `index` in flat form.
+fn recordFieldByteOffset(self_: Types&, ty: Ty, index: i64) -> u32, Error {
+    let cached = self_.field_byte_offs_slot[ty];
+    if cached.present { return self_.field_byte_offs[(cached.start as i64) + index], Error.none; }
+    let n = self_.node(ty);
+    let count = n.b as i64;
+    var offs: u32[>..<] = [];
+    var off: u32 = 0;
+    for i in 0..count {
+        offs.push(off);
+        let fb, err = flatBytes(self_, self_.words[(n.a as i64) + i * 2 + 1]);
+        if err != Error.none { return 0, err; }
+        off += fb;
+    }
+    let start = self_.field_byte_offs.len as u32;
+    self_.field_byte_offs.append(offs[..]);
+    self_.field_byte_offs_slot[ty] = Slot { true, start, count as u32 };
+    return self_.field_byte_offs[(start as i64) + index], Error.none;
+}
+// Cached register word offset and width of record field `index`.
+fn recordFieldWordSlice(self_: Types&, ty: Ty, index: i64) -> u32, u32, Error {
+    var cached = self_.field_word_offs_slot[ty];
+    if !cached.present {
+        let n = self_.node(ty);
+        let count = n.b as i64;
+        var offs: u32[>..<] = [];
+        var woff: u32 = 0;
+        for i in 0..count {
+            offs.push(woff);
+            let fw, err = layout(self_, self_.words[(n.a as i64) + i * 2 + 1]);
+            if err != Error.none { return 0, 0, err; }
+            woff += fw.len as u32;
+        }
+        offs.push(woff);
+        let start = self_.field_word_offs.len as u32;
+        self_.field_word_offs.append(offs[..]);
+        cached = Slot { true, start, (count + 1) as u32 };
+        self_.field_word_offs_slot[ty] = cached;
+    }
+    let base = (cached.start as i64) + index;
+    let s = self_.field_word_offs[base];
+    return s, self_.field_word_offs[base + 1] - s, Error.none;
 }
 // The flattened machine words of a value of type `ty`: nested values inline,
 // as stored in memory.

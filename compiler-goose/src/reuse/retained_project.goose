@@ -374,6 +374,7 @@ fn lowerRetainedUnit(source:const Project&,checked:const blot_check_check::Check
  ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
  ready.units[id-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
  ready.unit_owners[id-1].tables=core.owner;
+ ready.unit_has_fork[id-1]=scanUnitFork(ready.units[id-1]);
  return blot_error::Error.none;
 }
 
@@ -406,6 +407,7 @@ fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&,literal:
   ready.unit_owners[index].nodes=owner;
  }
  ready.borrowed[index]=literal==0;
+ ready.unit_has_fork[index]=previous.unit_has_fork[index];
  return blot_error::Error.none;
 }
 

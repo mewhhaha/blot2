@@ -83,13 +83,15 @@ fn sameKey(left: InstanceKey, right: InstanceKey) -> bool {
     return left.kind == right.kind && left.unit == right.unit && left.id == right.id && left.ty == right.ty && left.parent == right.parent && left.evidence_context == right.evidence_context;
 }
 fn hashKey(key: InstanceKey) -> u64 {
-    var h = ::hash(kindCode(key.kind));
-    h = ::hash_combine(h, ::hash(key.unit));
-    h = ::hash_combine(h, ::hash(key.id));
-    h = ::hash_combine(h, ::hash(key.ty));
-    h = ::hash_combine(h, ::hash(key.parent));
-    if key.evidence_context == 0 { return h; }
-    return ::hash_combine(h, ::hash(key.evidence_context));
+    var h: u64 = ((kindCode(key.kind) as u64) << 32) | (key.unit as u64);
+    h = (h ^ (h >> 30)) * 0xbf58476d1ce4e5b9;
+    h ^= ((key.id as u64) << 32) | (key.ty as u64);
+    h = (h ^ (h >> 27)) * 0x94d049bb133111eb;
+    if key.parent != 0 || key.evidence_context != 0 {
+        h ^= ((key.parent as u64) << 32) | (key.evidence_context as u64);
+        h = (h ^ (h >> 27)) * 0x94d049bb133111eb;
+    }
+    return h ^ (h >> 31);
 }
 struct Instance {
     key: InstanceKey,
@@ -190,6 +192,9 @@ root struct State {
     failures: Recorded[>..] = [],
     // The storage runtime, emitted on first use.
     has_rt: bool = false,
+    rt_flags_known: bool = false,
+    rt_has_fork: bool = false,
+    rt_has_persistent: bool = false,
     rt: Runtime = Runtime { layout: blot_direct_runtime::Layout {} },
     // Host callback imports by (parameter, result) ABI kinds.
     host_imports: U64Map = U64Map {},
@@ -225,6 +230,19 @@ root struct State {
     // Whether a local binding is captured by a closure, per unit (built on demand).
     captured_base: u32[>..] = [],
     captured_vals: u8[>..] = [],
+    // Cached canInlineBody eligibility per (unit, binding):
+    // 0 = uncomputed; bit 0 = budget 168, bit 1 = budget 152, bit 2 = budget 32, bit 7 = computed.
+    inline_ok_base: u32[>..] = [],
+    inline_ok_vals: u8[>..] = [],
+    // Per-unit linked list of local Tag.reference node ids per binding (built on demand for usesType).
+    local_refs_base: u32[>..] = [],
+    local_refs_head: u32[>..] = [],
+    local_refs_node: u32[>..] = [],
+    local_refs_next: u32[>..] = [],
+    // Cached interned field name ID per (unit, projection_index):
+    // 0xffffffff = uncached, 0xfffffffe = uncached/error fallback.
+    proj_field_base: u32[>..] = [],
+    proj_field_vals: u32[>..] = [],
     serial: u32 = 0,
     scratch: u32[>..<] = [],
     scratch_bytes: u8[>..<] = [],
@@ -276,6 +294,9 @@ fn resetUnitCaches(s: State&, unit_id: u32) {
     if idx < s.use_count_base.len { s.use_count_base[idx] = 0xffffffff; }
     if idx < s.quantified_base.len { s.quantified_base[idx] = 0xffffffff; }
     if idx < s.captured_base.len { s.captured_base[idx] = 0xffffffff; }
+    if idx < s.inline_ok_base.len { s.inline_ok_base[idx] = 0xffffffff; }
+    if idx < s.local_refs_base.len { s.local_refs_base[idx] = 0xffffffff; }
+    if idx < s.proj_field_base.len { s.proj_field_base[idx] = 0xffffffff; }
     s.dispatch_cache.clear();
 }
 
@@ -283,6 +304,9 @@ fn resetAllCaches(s: State&) {
     for i in 0..s.use_count_base.len { s.use_count_base[i] = 0xffffffff; }
     for i in 0..s.quantified_base.len { s.quantified_base[i] = 0xffffffff; }
     for i in 0..s.captured_base.len { s.captured_base[i] = 0xffffffff; }
+    for i in 0..s.inline_ok_base.len { s.inline_ok_base[i] = 0xffffffff; }
+    for i in 0..s.local_refs_base.len { s.local_refs_base[i] = 0xffffffff; }
+    for i in 0..s.proj_field_base.len { s.proj_field_base[i] = 0xffffffff; }
     s.dispatch_cache.clear();
 }
 
@@ -303,6 +327,18 @@ fn val(g: const Generator&, values: Vals, at: i64) -> Val { return g.s.vals[valu
 fn tysOf(g: const Generator&, values: Tys) -> const Ty[:] { return g.s.tys[values.start..values.start + values.len]; }
 fn textOf(g: const Generator&, value: Text) -> Chars { return g.s.text[value.start..value.start + value.len]; }
 // `count` default values, to be filled in.
+let emit_zeros_u8: u8[256] = [0; 256];
+let emit_zeros_u32: u32[64] = [0; 64];
+fn growZerosU8(buf: u8[>..]&, count: i64) {
+    var rem = count;
+    while rem >= 256 { buf.append(emit_zeros_u8[..]); rem -= 256; }
+    if rem > 0 { buf.append(emit_zeros_u8[..rem]); }
+}
+fn growZerosU32(buf: u32[>..]&, count: i64) {
+    var rem = count;
+    while rem >= 64 { buf.append(emit_zeros_u32[..]); rem -= 64; }
+    if rem > 0 { buf.append(emit_zeros_u32[..rem]); }
+}
 fn reserveVals(g: Generator&, count: i64) -> Vals {
     let start = g.s.vals.len as u32;
     for at in 0..count { g.s.vals.push(Val {}); }
@@ -642,7 +678,13 @@ fn unitsHavePersistentState(units: const Module[:]) -> bool {
 }
 fn runtime_(g: Generator&) -> const Runtime& {
     if !g.s.has_rt {
-        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, blot_direct_runtime::Budgets {}, unitsHaveFork(g.units), unitsHavePersistentState(g.units));
+        var hf = g.s.rt_has_fork;
+        var hp = g.s.rt_has_persistent;
+        if !g.s.rt_flags_known {
+            hf = unitsHaveFork(g.units);
+            hp = unitsHavePersistentState(g.units);
+        }
+        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, blot_direct_runtime::Budgets {}, hf, hp);
         g.s.has_rt = true;
     }
     return g.s.rt;
@@ -655,7 +697,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
         let hit = g.s.contents_memory[ty];
         if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
     } else {
-        while g.s.contents_memory.len < g.types.nodes.len { g.s.contents_memory.push(0); }
+        growZerosU8(g.s.contents_memory, g.types.nodes.len - g.s.contents_memory.len);
     }
     // A recursive type's flat form is a pointer into scope memory.
     let is_recursive, recursive_error = g.types.isRecursive(ty);
@@ -704,7 +746,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
         let hit = g.s.holds_memory[ty];
         if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
     } else {
-        while g.s.holds_memory.len < g.types.nodes.len { g.s.holds_memory.push(0); }
+        growZerosU8(g.s.holds_memory, g.types.nodes.len - g.s.holds_memory.len);
     }
     // A boxed value is a pointer into scope memory.
     let is_boxed, boxed_error = g.types.boxed(ty);
@@ -781,12 +823,17 @@ fn operationId(g: Generator&, operation: Ty) -> u32 {
     return id;
 }
 recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: const blot_check_types::List[:], mark: i64, depth: i64) {
+    var total_obs: i64 = 0;
+    for span in obligations { total_obs += span.len as i64; }
+    if total_obs == 0 { return; }
     let s .= g.s;
+    var done: u64[2] = [0, 0];
     var grew = true;
     while grew {
         grew = false;
-        for span in obligations {
+        for span, si in obligations {
             for at in 0..(span.len as i64) {
+                if si < 2 && at < 64 && ((done[si] >> (at as u64)) & 1) != 0 { continue; }
                 let goal = m.obligations[span.start + at];
                 // Exactly what solveObligations can derive: a field,
                 // element, update, type equality, or shared callee use of a
@@ -799,14 +846,15 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                     if has_l { mentions(g, m, goal.other, mark, 0); }
                     if has_r { mentions(g, m, goal.ty, mark, 0); }
                     if s.scratch.len != before { grew = true; }
+                    if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
                     continue;
                 }
                 if goal.kind == blot_check_types::ObligationKind.callee_use {
                     if depth >= 16 { continue; }
                     let decl = goal.identity.decl;
-                    if decl == 0 || decl >= m.bindings.len { continue; }
+                    if decl == 0 || decl >= m.bindings.len { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
                     let pn = m.types.node(goal.ty);
-                    if pn.tag != blot_check_types::Tag.product { continue; }
+                    if pn.tag != blot_check_types::Tag.product { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
                     let cb = m.binding(decl);
                     var arg_ids: u32[64] = [0; 64];
                     var pvar_ids: u32[64] = [0; 64];
@@ -822,7 +870,7 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                             pvar_ids[pi] = pvars[pi];
                         }
                     }
-                    if count_p == 0 { continue; }
+                    if count_p == 0 { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
                     var known: bool[64] = [false; 64];
                     var any_known = false;
                     for pi in 0..count_p {
@@ -837,25 +885,37 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                     }
                     var cobs: blot_check_types::List[2] = [cb.scheme.obligations, blot_check_types::List {}];
                     let cbody .= m.body(decl);
-                    if cbody { cobs[1] = cbody.scheme.obligations; }
+                    if cbody && (cbody.scheme.obligations.start != cb.scheme.obligations.start || cbody.scheme.obligations.len != cb.scheme.obligations.len) {
+                        cobs[1] = cbody.scheme.obligations;
+                    }
                     propagateObligations(g, m, cobs[..], cmark, depth + 1);
                     var reached: bool[64] = [false; 64];
-                    for pi in 0..count_p { reached[pi] = within(g, m, pvar_ids[pi], cmark); }
+                    var all_reached = true;
+                    for pi in 0..count_p {
+                        let r = within(g, m, pvar_ids[pi], cmark);
+                        reached[pi] = r;
+                        if !r { all_reached = false; }
+                    }
                     s.scratch.resize(cmark);
                     let before = s.scratch.len;
                     for pi in 0..count_p {
                         if reached[pi] { mentions(g, m, arg_ids[pi], mark, 0); }
                     }
                     if s.scratch.len != before { grew = true; }
+                    if all_reached && si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
                     continue;
                 }
-                if goal.result == 0 || (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection && goal.kind != blot_check_types::ObligationKind.update) { continue; }
+                if goal.result == 0 || (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection && goal.kind != blot_check_types::ObligationKind.update) {
+                    if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
+                    continue;
+                }
                 if !within(g, m, goal.ty, mark) { continue; }
                 let before = s.scratch.len;
                 mentions(g, m, goal.result, mark, 0);
                 mentions(g, m, goal.other, mark, 0);
                 mentions(g, m, goal.signature, mark, 0);
                 if s.scratch.len != before { grew = true; }
+                if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
             }
         }
     }
@@ -872,20 +932,25 @@ fn isQuantified(g: Generator&, m: const Module&, ty: TId) -> bool {
     if base == 0xffffffff {
         base = g.s.quantified_vals.len as u32;
         g.s.quantified_base[uid] = base;
-        for at in 0..m.types.nodes.len { g.s.quantified_vals.push(0); }
+        growZerosU8(g.s.quantified_vals, m.types.nodes.len);
         let s .= g.s;
         let mark = s.scratch.len;
         for index in 0..m.bindings.len {
             let binding = m.bindings[index];
             let body .= m.body(index as u32);
+            if binding.scheme.variables.len == 0 && (!body || body.scheme.variables.len == 0) { continue; }
             s.scratch.resize(mark);
             mentions(g, m, binding.ty, mark, 0);
             var obligations: blot_check_types::List[2] = [binding.scheme.obligations, blot_check_types::List {}];
-            if body { obligations[1] = body.scheme.obligations; }
+            if body && (body.scheme.obligations.start != binding.scheme.obligations.start || body.scheme.obligations.len != binding.scheme.obligations.len) {
+                obligations[1] = body.scheme.obligations;
+            }
             // Obligations on reachable receivers reach their results.
             propagateObligations(g, m, obligations[..], mark, 0);
             var schemes: blot_check_types::List[2] = [binding.scheme.variables, blot_check_types::List {}];
-            if body { schemes[1] = body.scheme.variables; }
+            if body && (body.scheme.variables.start != binding.scheme.variables.start || body.scheme.variables.len != binding.scheme.variables.len) {
+                schemes[1] = body.scheme.variables;
+            }
             for span in schemes {
                 for variable in m.types.list(span) {
                     if inScratch(g, mark, s.scratch.len, variable) { g.s.quantified_vals[(base as i64) + (variable as i64)] = 1; }
@@ -904,6 +969,7 @@ fn inScratch(g: const Generator&, from: i64, to: i64, value: u32) -> bool {
 // stack and ends at its top.
 recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth: i64) {
     if ty <= blot_check_types::never || depth > 64 { return; }
+    if g.types.isNoVars(m.unit, ty) { return; }
     let n = m.types.node(ty);
     match n.tag {
         variable, bound => { if !inScratch(g, from, g.s.scratch.len, ty) { g.s.scratch.push(ty); } },
@@ -921,6 +987,7 @@ recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth
 // Whether every variable of `ty` is in the set at `reach` on the scratch
 // stack (the set ends where this call's own set begins).
 fn within(g: Generator&, m: const Module&, ty: TId, reach: i64) -> bool {
+    if ty <= blot_check_types::never || g.types.isNoVars(m.unit, ty) { return true; }
     let s .= g.s;
     let found = s.scratch.len;
     mentions(g, m, ty, found, 0);
@@ -1155,18 +1222,25 @@ recursive fn inferClosure(g: Generator&, key: InstanceKey, env: Env, parameters:
 // receivers the instance's parameters already fixed.
 recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_check_types::List, env: Env&) -> Error {
     let count = goals_span.len as i64;
+    if count == 0 { return blot_direct_types::Error.none; }
+    var done: u64 = 0;
     var pass: i64 = 0;
     while pass <= count {
         let before = env.count;
         for at in 0..count {
+            if at < 64 && ((done >> (at as u64)) & 1) != 0 { continue; }
             let goal = m.obligations[goals_span.start + at];
             if goal.kind == blot_check_types::ObligationKind.type_eq {
                 let left, lerr = g.types.lower(m, goal.ty, env);
                 if lerr == blot_direct_types::Error.none {
                     g.types.match_(m, goal.other, left, env);
+                    if at < 64 { done |= ((1 as u64) << (at as u64)); }
                 } else {
                     let right, rerr = g.types.lower(m, goal.other, env);
-                    if rerr == blot_direct_types::Error.none { g.types.match_(m, goal.ty, right, env); }
+                    if rerr == blot_direct_types::Error.none {
+                        g.types.match_(m, goal.ty, right, env);
+                        if at < 64 { done |= ((1 as u64) << (at as u64)); }
+                    }
                 }
                 continue;
             }
@@ -1302,7 +1376,10 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 }
                 continue;
             }
-            if goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection { continue; }
+            if goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection {
+                if at < 64 { done |= ((1 as u64) << (at as u64)); }
+                continue;
+            }
             let receiver, error = g.types.lower(m, goal.ty, env);
             if error != blot_direct_types::Error.none { continue; }
             let n = g.types.node(receiver);
@@ -1311,6 +1388,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                     array, view => { g.types.match_(m, goal.result, n.a, env); },
                     _ => {},
                 }
+                if at < 64 { done |= ((1 as u64) << (at as u64)); }
                 continue;
             }
             let name, has_name = g.types.fieldNameOf(m, goal.name, true);
@@ -1323,6 +1401,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let position = g.types.findField(record, name);
             if position >= 0 {
                 g.types.match_(m, goal.result, g.types.recordField(record, position).ty, env);
+                if at < 64 { done |= ((1 as u64) << (at as u64)); }
                 continue;
             }
             // A receiver member: its result at this receiver.
@@ -1339,9 +1418,13 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 return error;
             }
             let arrow = g.types.node(callee);
-            if arrow.tag == blot_direct_types::Tag.function { g.types.match_(m, goal.result, arrow.b, env); }
+            if arrow.tag == blot_direct_types::Tag.function {
+                g.types.match_(m, goal.result, arrow.b, env);
+                if at < 64 { done |= ((1 as u64) << (at as u64)); }
+            }
         }
         if env.count == before { return blot_direct_types::Error.none; }
+        if count <= 63 && done == (((1 as u64) << (count as u64)) - 1) { return blot_direct_types::Error.none; }
         pass += 1;
     }
     return blot_direct_types::Error.none;

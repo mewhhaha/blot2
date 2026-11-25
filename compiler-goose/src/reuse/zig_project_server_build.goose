@@ -94,14 +94,17 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
             var pinfo=blot_check_wire_schema::ProgramInfo{};
             var has_analysis=false;
             let skip_unchanged = track && all_cached && opened.image.receipt.valid && opened.image.bytes.len!=0 && (opened.image.receipt.non_staged.kernel_staging_sites_count==0 || opened.image.receipt.staged_dep_units_valid);
-            if skip_unchanged {
+            let skip_wire_schema = skip_unchanged || (track && reused && opened.image.bytes.len!=0 && blot_reuse_body_image::canSkipWireSchema(opened.image.receipt,opened.core,payload.value));
+            if skip_wire_schema {
                 current_non_staged=opened.image.receipt.non_staged;
             } else {
                 // Validate wire schemas and full non-staged LayoutReceipt
                 // once before any retained/cached fast path (§4.1 item 3), and pass `pinfo`
                 // straight into emission so the pass never runs twice.
-                blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
+                let r_ws = blot_phase_profile::region("direct.wire_schema", payload.value.entry, 0, 0);
+                blot_check_wire_schema::analyzeWithForkFlags(payload.value.units,payload.value.entry,payload.value.unit_has_fork,pinfo);
                 if pinfo.issue.failed {
+                    r_ws.exit();
                     timing.exit();
                     if reused { if replay.used { replay.valid=false; replay.needs_reset=true; } retry=true; return false,blot_error::Error.none; }
                     var code:const u8[:]=default<const u8[:]>();
@@ -112,6 +115,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     return false,reject(writer,id,opened.revisions,Diagnostic{filename:opened.entry,stage:"emit",code:code,start:pinfo.issue.span.start,end:pinfo.issue.span.end,message:pinfo.issue.message,..});
                 }
                 current_non_staged=blot_check_wire_schema::computeNonStagedReceipt(payload.value.units,payload.value.entry,pinfo);
+                r_ws.exit();
                 has_analysis=true;
             }
             var bytes=default<u8[:]>();
@@ -132,7 +136,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                 result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:compiled,stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,fresh_modules:payload.value.units.len-cached,cached_modules:cached,..};
             } else {
                 if !has_analysis {
-                    blot_check_wire_schema::analyze(payload.value.units,payload.value.entry,pinfo);
+                    blot_check_wire_schema::analyzeWithForkFlags(payload.value.units,payload.value.entry,payload.value.unit_has_fork,pinfo);
                 }
                 if track { blot_direct_relocations::begin(); }
                 var emitted=Emission{};
@@ -179,6 +183,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                             staged_dep_units_valid:result.result.compiled.staged_dep_units_valid,
                             staged_dep_units:result.result.compiled.staged_dep_units,
                             staged_value_digest:result.result.compiled.staged_value_digest,
+                            kernel_dep_units:blot_reuse_dependency_consumer::ownU32s(pinfo.dep_units[..]),
                         };
                         result.result.compiled.staged_dep_units=default<u32[:]>();
                     }
