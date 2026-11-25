@@ -1486,15 +1486,13 @@ recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
             return isFreshBoxedNode(m, items[items.len - 1], depth + 1);
         },
         block_ => {
-            if n.a == 0 { return false; }
-            var last = n.a;
-            if m.node(n.a).tag == blot_check_core::Tag.suite {
-                let items = m.children(n.a);
-                if items.len == 0 { return false; }
-                last = items[items.len - 1];
+            let items = m.children(id);
+            if items.len == 0 { return false; }
+            for i in 0..items.len - 1 {
+                if m.node(items[i]).tag != blot_check_core::Tag.bind { return false; }
             }
-            let ln = m.node(last);
-            return ln.tag == blot_check_core::Tag.break_ && ln.a == id && ln.b != 0 && isFreshBoxedNode(m, ln.b, depth + 1);
+            let ln = m.node(items[items.len - 1]);
+            return ln.tag == blot_check_core::Tag.return_ && ln.b == id && ln.a != 0 && isFreshBoxedNode(m, ln.a, depth + 1);
         },
         if_value => { return isFreshBoxedNode(m, n.b, depth + 1) && isFreshBoxedNode(m, n.c, depth + 1); },
         match_ => {
@@ -1539,16 +1537,11 @@ recursive fn collectTailConstructs(
             return collectTailConstructs(m, n.a, false, out, out_len, depth + 1);
         },
         block_ => {
-            if n.a == 0 { return true; }
-            var last = n.a;
-            if m.node(n.a).tag == blot_check_core::Tag.suite {
-                let items = m.children(n.a);
-                if items.len == 0 { return true; }
-                last = items[items.len - 1];
-            }
-            let ln = m.node(last);
-            if ln.tag == blot_check_core::Tag.break_ && ln.a == id && ln.b != 0 {
-                return collectTailConstructs(m, ln.b, false, out, out_len, depth + 1);
+            let items = m.children(id);
+            if items.len == 0 { return true; }
+            let ln = m.node(items[items.len - 1]);
+            if ln.tag == blot_check_core::Tag.return_ && ln.b == id && ln.a != 0 {
+                return collectTailConstructs(m, ln.a, false, out, out_len, depth + 1);
             }
             return true;
         },

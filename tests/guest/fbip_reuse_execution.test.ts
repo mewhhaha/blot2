@@ -52,6 +52,20 @@ entry func branch_return_fbip (iters: U32): U32 =>
     cur := step_branch cur (idx & 1)
   return sum_state cur
 
+// Expression-match with do: break (Tag.block_ -> Tag.return_) on a boxed value.
+entry func block_break_fbip (iters: U32): U32 =>
+  let cur = do:
+    let init = make_active 2 4 6 8
+    break init
+  for idx in 0..iters:
+    cur := case cur of
+      $Active { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r } => do:
+        let next_a = a + 1
+        break $Active { a: next_a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r }
+      $Paused { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r } => do:
+        break $Paused { a: a + 2, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r }
+  return sum_state cur
+
 // Aliasing soundness: when cur is referenced twice, FBIP must NOT fire.
 entry func alias_soundness (n: U32): U32 =>
   let cur = make_active n 2 3 4
@@ -118,6 +132,7 @@ Deno.test("FBIP reuses boxed blocks across statement matches, return tails, and 
     assert.equal(guest.call("loop_stmt_fbip", 100), expectedLoopSum(100));
     assert.equal(guest.call("loop_stmt_fbip", 50_000), expectedLoopSum(50_000));
     assert.equal(guest.call("branch_return_fbip", 100), expectedBranchSum(100));
+    assert.equal(guest.call("block_break_fbip", 100), 2 + 4 + 6 + 8 + 100 + tailConstSum);
     const sa = 7 + 2 + 3 + 4 + tailConstSum;
     assert.equal(guest.call("alias_soundness", 7), sa * 1000 + (sa + 100));
     // Warm steady-state: repeated 50k-iteration statement-match FBIP loops must not grow linear memory.
