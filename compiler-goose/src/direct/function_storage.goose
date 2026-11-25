@@ -693,7 +693,8 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 refine(g, f, m.typeOf(id), built);
                 ty_ = built;
             }
-            return emitFillOrGenerate(g, f, operation == blot_backend_collection_ops::Op.fill, count, source, ty_, id);
+            let skip_fill = operation == blot_backend_collection_ops::Op.fill && consumeSkipFillNode(f, id);
+            return emitFillOrGenerate(g, f, operation == blot_backend_collection_ops::Op.fill, count, source, ty_, id, skip_fill);
         },
         append, prepend, concat => {
             let first, error = expr(g, f, children[0]);
@@ -924,7 +925,7 @@ fn copyElements(g: Generator&, f: Fn&, source: Val, from: u32, target: Val, to: 
     return blot_direct_types::Error.none;
 }
 // A new fixed array: the elements of each part in order (a part is either a
-fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: Val, ty_: Ty, id: u32) -> Val, Error {
+fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: Val, ty_: Ty, id: u32, skip_fill: bool = false) -> Val, Error {
     let element, error = elementOf(g, f, ty_, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let step, error = stride(g, f, element, id);
@@ -932,6 +933,12 @@ fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: 
     let handle, base, error = createUninit(g, f, ty_, count, id);
     if error != blot_direct_types::Error.none { return handle, error; }
     let elem_tag = tagOf(g, element);
+    // 7B: Skip dead zero/constant memory.fill when an immediately following 0..count loop
+    // unconditionally initializes every element before any read.
+    if is_fill && skip_fill && source.len == 1 && (step == 1 || step == 4) &&
+        (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.f32_ || elem_tag == blot_direct_types::Tag.boolean) {
+        return handle, blot_direct_types::Error.none;
+    }
     if is_fill && step == 1 && source.len == 1 && elem_tag == blot_direct_types::Tag.boolean {
         lget(g, base);
         lget(g, w(g, source, 0));

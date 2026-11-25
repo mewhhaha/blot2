@@ -161,12 +161,12 @@ def fmt_ms(v: float) -> str:
 def build_kernels_chart(data: dict) -> str:
     by_name = {row["name"]: row for row in data["kernels"]}
     specs = [
-        ("particle_spark_simd", "65k × 32 · in-place spark SIMD"),
+        ("particle_spark_simd", "65k × 32 · multi-array + spark SIMD"),
         ("mandelbrot_f32", "256×256 FP · 8-pixel dual-v128 SIMD"),
-        ("merge_sort", "100k U32 · SIMD init + cmov + memcpy"),
+        ("merge_sort", "100k U32 · SIMD init + 2× ptr cmov"),
         ("lcg_recurrence", "1,000,000 U32 · 16-wide v128 LCG"),
         ("prime_sieve", "100k Bool · strided fill + v128 reduce"),
-        ("matmul_64", "64×64 F32 · 4×8 2×k-unroll + SIMD init"),
+        ("matmul_64", "64×64 F32 · 4×8 4×k-unroll + SIMD init"),
     ]
 
     w, h = 920, 492
@@ -379,7 +379,7 @@ def build_ecs_chart(data: dict) -> str:
         text(
             28,
             h - 18,
-            "Ink 4× coalesced v128 AoS queries beat native Bevy 2.2–2.6× on dense loops and lead on spawn, tag churn, snapshots & spark SoA.",
+            "Ink 4× coalesced v128 AoS queries & transposed reductions beat native Bevy across all 5/5 ECS workloads.",
             size=10.9,
             fill=TEXT_MUTED,
         )

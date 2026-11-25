@@ -6,25 +6,25 @@
   <rect x="28.0" y="76.0" width="13" height="13" rx="3" fill="#059669"/>
   <text x="47.0" y="87.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#475569">Blot SoA + spark SIMD (wtime-aot x64)</text>
   <rect x="320.6" y="76.0" width="13" height="13" rx="3" fill="#0f766e"/>
-  <text x="339.6" y="87.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#475569">Ink ECS (73.9 KiB Wasm, wtime-aot x64)</text>
+  <text x="339.6" y="87.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#475569">Ink ECS (75.9 KiB Wasm, wtime-aot x64)</text>
   <rect x="620.0" y="76.0" width="13" height="13" rx="3" fill="#c2592b"/>
   <text x="639.0" y="87.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#475569">Bevy ECS 0.20.1 (Native x86_64 Rust -O3)</text>
   <rect x="28" y="108" width="864" height="166" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="44.0" y="133.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a" text-anchor="start">Dense iteration: Pos += Vel (10,000 entities × 100 ticks)</text>
   <rect x="618.8" y="118.0" width="259.2" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="748.4" y="132.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink AoS 2.2× · SoA 3.7× faster vs Bevy</text>
+  <text x="748.4" y="132.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink AoS 2.2× · SoA 3.6× faster vs Bevy</text>
   <text x="44.0" y="165.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Blot SoA + spark SIMD</text>
   <rect x="224.0" y="152.0" width="570.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="224.0" y="152.0" width="153.1" height="18" rx="4" fill="#059669"/>
-  <text x="386.1" y="165.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.33 ms</text>
+  <rect x="224.0" y="152.0" width="159.5" height="18" rx="4" fill="#059669"/>
+  <text x="392.5" y="165.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.34 ms</text>
   <text x="44.0" y="193.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS (Pool direct)</text>
   <rect x="224.0" y="180.0" width="570.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="224.0" y="180.0" width="221.7" height="18" rx="4" fill="#0f766e"/>
-  <text x="454.7" y="193.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.47 ms</text>
+  <rect x="224.0" y="180.0" width="200.4" height="18" rx="4" fill="#0f766e"/>
+  <text x="433.4" y="193.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.43 ms</text>
   <text x="44.0" y="221.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS (cached query)</text>
   <rect x="224.0" y="208.0" width="570.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="224.0" y="208.0" width="258.7" height="18" rx="4" fill="#0f766e"/>
-  <text x="491.7" y="221.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.55 ms</text>
+  <rect x="224.0" y="208.0" width="258.0" height="18" rx="4" fill="#0f766e"/>
+  <text x="491.0" y="221.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="start">0.55 ms</text>
   <text x="44.0" y="249.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS (native AoS)</text>
   <rect x="224.0" y="236.0" width="570.0" height="18" rx="4" fill="#f1f5f9"/>
   <rect x="224.0" y="236.0" width="570.0" height="18" rx="4" fill="#c2592b"/>
@@ -33,53 +33,53 @@
   <text x="42.0" y="316.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.6" font-weight="700" fill="#0f172a" text-anchor="start">Structural tag churn (2,000 ops)</text>
   <text x="42.0" y="332.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">Insert/remove Active tag on 10k world</text>
   <rect x="327.0" y="301.0" width="112.0" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="383.0" y="315.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 5.3× faster</text>
+  <text x="383.0" y="315.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 5.6× faster</text>
   <text x="42.0" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS</text>
   <rect x="116.0" y="344.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="116.0" y="344.0" width="46.8" height="18" rx="4" fill="#0f766e"/>
-  <text x="170.8" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">15.7 µs</text>
+  <rect x="116.0" y="344.0" width="44.2" height="18" rx="4" fill="#0f766e"/>
+  <text x="168.2" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">15.5 µs</text>
   <text x="42.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS</text>
   <rect x="116.0" y="371.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
   <rect x="116.0" y="371.0" width="248.0" height="18" rx="4" fill="#c2592b"/>
-  <text x="372.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">83.5 µs</text>
+  <text x="372.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">86.9 µs</text>
   <rect x="469" y="292" width="423" height="114" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="483.0" y="316.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.6" font-weight="700" fill="#0f172a" text-anchor="start">Full-world snapshot (10k entities)</text>
   <text x="483.0" y="332.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">Clone all 5 pools / rebuild Bevy World</text>
   <rect x="761.6" y="301.0" width="118.4" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="820.8" y="315.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 24.6× faster</text>
+  <text x="820.8" y="315.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 24.0× faster</text>
   <text x="483.0" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS</text>
   <rect x="557.0" y="344.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="557.0" y="344.0" width="10.1" height="18" rx="4" fill="#0f766e"/>
-  <text x="575.1" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">16.5 µs</text>
+  <rect x="557.0" y="344.0" width="10.3" height="18" rx="4" fill="#0f766e"/>
+  <text x="575.3" y="357.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">16.8 µs</text>
   <text x="483.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS</text>
   <rect x="557.0" y="371.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
   <rect x="557.0" y="371.0" width="248.0" height="18" rx="4" fill="#c2592b"/>
-  <text x="813.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">405.4 µs</text>
+  <text x="813.0" y="384.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">404.1 µs</text>
   <rect x="28" y="424" width="423" height="114" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="42.0" y="448.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.6" font-weight="700" fill="#0f172a" text-anchor="start">Sparse filtered query (5% × 100)</text>
   <text x="42.0" y="464.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">With Active, Without Frozen (500 of 10k)</text>
-  <rect x="314.2" y="433.0" width="124.8" height="20.0" rx="10" fill="#ffedd5"/>
-  <text x="376.6" y="447.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#9a3412" text-anchor="middle">Bevy 1.14× faster</text>
-  <text x="42.0" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS</text>
+  <rect x="320.6" y="433.0" width="118.4" height="20.0" rx="10" fill="#dcfce7"/>
+  <text x="379.8" y="447.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 1.33× faster</text>
+  <text x="42.0" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS</text>
   <rect x="116.0" y="476.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="116.0" y="476.0" width="217.4" height="18" rx="4" fill="#c2592b"/>
-  <text x="341.4" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.069 ms</text>
-  <text x="42.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS</text>
+  <rect x="116.0" y="476.0" width="186.9" height="18" rx="4" fill="#0f766e"/>
+  <text x="310.9" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.063 ms</text>
+  <text x="42.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS</text>
   <rect x="116.0" y="503.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="116.0" y="503.0" width="248.0" height="18" rx="4" fill="#0f766e"/>
-  <text x="372.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.079 ms</text>
+  <rect x="116.0" y="503.0" width="248.0" height="18" rx="4" fill="#c2592b"/>
+  <text x="372.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.083 ms</text>
   <rect x="469" y="424" width="423" height="114" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="483.0" y="448.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.6" font-weight="700" fill="#0f172a" text-anchor="start">Batch spawn (10,000 entities)</text>
   <text x="483.0" y="464.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">Pos + Vel + 10% Active</text>
   <rect x="761.6" y="433.0" width="118.4" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="820.8" y="447.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 1.07× faster</text>
+  <text x="820.8" y="447.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#166534" text-anchor="middle">Ink 1.10× faster</text>
   <text x="483.0" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Ink ECS</text>
   <rect x="557.0" y="476.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
-  <rect x="557.0" y="476.0" width="231.5" height="18" rx="4" fill="#0f766e"/>
-  <text x="796.5" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.301 ms</text>
+  <rect x="557.0" y="476.0" width="226.0" height="18" rx="4" fill="#0f766e"/>
+  <text x="791.0" y="489.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.295 ms</text>
   <text x="483.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="500" fill="#0f172a" text-anchor="start">Bevy ECS</text>
   <rect x="557.0" y="503.0" width="248.0" height="18" rx="4" fill="#f1f5f9"/>
   <rect x="557.0" y="503.0" width="248.0" height="18" rx="4" fill="#c2592b"/>
-  <text x="813.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.322 ms</text>
-  <text x="28.0" y="562.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.9" font-weight="400" fill="#64748b" text-anchor="start">Ink 4× coalesced v128 AoS queries beat native Bevy 2.2–2.6× on dense loops and lead on spawn, tag churn, snapshots &amp; spark SoA.</text>
+  <text x="813.0" y="516.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.2" font-weight="600" fill="#0f172a" text-anchor="start">0.323 ms</text>
+  <text x="28.0" y="562.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.9" font-weight="400" fill="#64748b" text-anchor="start">Ink 4× coalesced v128 AoS queries &amp; transposed reductions beat native Bevy across all 5/5 ECS workloads.</text>
 </svg>

@@ -8,8 +8,10 @@ import direct.relocations;
 
 // WebAssembly 1.0 SIMD (0xfd prefix) sub-opcodes.
 let SIMD_v128_load: u32 = 0;
+let SIMD_v128_load32_splat: u32 = 9;
 let SIMD_v128_store: u32 = 11;
 let SIMD_v128_const: u32 = 12;
+let SIMD_i8x16_shuffle: u32 = 13;
 let SIMD_i32x4_splat: u32 = 17;
 let SIMD_f32x4_splat: u32 = 19;
 let SIMD_i32x4_extract_lane: u32 = 27;
@@ -91,6 +93,20 @@ fn simdLaneMemOp(g: Generator&, sub: u32, align: u32, offset: u32, lane: u8) {
     uleb(g, offset);
     op(g, lane);
 }
+fn emitShuffleLaneBytes(g: Generator&, lane: u32) {
+    let base_b = lane * 4;
+    op(g, base_b as u8);
+    op(g, (base_b + 1) as u8);
+    op(g, (base_b + 2) as u8);
+    op(g, (base_b + 3) as u8);
+}
+fn emitI32x4Shuffle(g: Generator&, l0: u32, l1: u32, l2: u32, l3: u32) {
+    simdOp(g, SIMD_i8x16_shuffle);
+    emitShuffleLaneBytes(g, l0);
+    emitShuffleLaneBytes(g, l1);
+    emitShuffleLaneBytes(g, l2);
+    emitShuffleLaneBytes(g, l3);
+}
 // Loads 4 byte-packed Bool elements [0|1] at ptr [+ idx] + mem_offset and widens to i32x4 masks [0|0xffffffff].
 fn emitLoadBool4Mask(g: Generator&, ptr_local: u32, idx_local: u32, mem_offset: u32 = 0) {
     lget(g, ptr_local);
@@ -151,6 +167,7 @@ struct SparkVecLocal {
     is_mask: bool = false,
     invariant: bool = false,
     scalar_local: u32 = 0xffffffff,
+    finite: bool = false,
 }
 
 // Range-affine contiguous stream `arr[i]` or `arr[offset + i]`.
@@ -1109,11 +1126,21 @@ fn matchVecF32Mul(g: Generator&, m: const Module&, env: const Env&, id: u32) -> 
     return true, n.a, n.b;
 }
 
-// Returns true when `id` is guaranteed to evaluate to a strictly finite (non-NaN, non-Inf) F32 in every SIMD lane.
-fn isFiniteVecF32(g: Generator&, m: const Module&, env: const Env&, id: u32) -> bool {
+// Returns true when `id` is guaranteed finite and bounded (|x| <= 2^33) in every SIMD lane.
+fn isBoundedLeafVecF32(g: Generator&, f: const Fn&, plan: const SparkVecPlan&, m: const Module&, env: const Env&, id: u32) -> bool {
     let n = m.node(id);
     if n.tag == blot_check_core::Tag.constant {
-        return (n.a & 0x7f800000) != 0x7f800000;
+        let exp = (n.a >> 23) & 0xff;
+        return exp < 157;
+    }
+    if n.tag == blot_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if b != 0 {
+            if hasFiniteF32(f, b) { return true; }
+            let lidx = findVecLocal(plan, m.unit, b);
+            if lidx >= 0 && plan.locals[lidx].finite { return true; }
+        }
+        return false;
     }
     if n.tag == blot_check_core::Tag.scalar || n.tag == blot_check_core::Tag.associated {
         let a_ty, _ = lowerInEnv(g, m, m.typeOf(n.a), env);
@@ -1132,6 +1159,26 @@ fn isFiniteVecF32(g: Generator&, m: const Module&, env: const Env&, id: u32) -> 
         if has_alias {
             let pop = tm.primitive(alias).op;
             return pop == blot_check_core::Op.convert_u32_f32 || pop == blot_check_core::Op.convert_i32_f32;
+        }
+    }
+    return false;
+}
+// Returns true when `id` is guaranteed to evaluate to a strictly finite (non-NaN, non-Inf) F32
+// small enough that combining two such values with add/sub (or two leaves with mul) cannot overflow.
+fn isFiniteVecF32(g: Generator&, f: const Fn&, plan: const SparkVecPlan&, m: const Module&, env: const Env&, id: u32, allow_compound: bool) -> bool {
+    if isBoundedLeafVecF32(g, f, plan, m, env, id) { return true; }
+    if !allow_compound { return false; }
+    let n = m.node(id);
+    if (n.tag == blot_check_core::Tag.scalar || n.tag == blot_check_core::Tag.associated) && n.b != 0 {
+        let a_ty, a_ok = lowerInEnv(g, m, m.typeOf(n.a), env);
+        if !a_ok || tagOf(g, a_ty) != blot_direct_types::Tag.f32_ { return false; }
+        let is_assoc = n.tag == blot_check_core::Tag.associated;
+        let use_disp = is_assoc || n.c == 1;
+        var member: u32 = 0;
+        if is_assoc { member = n.c; }
+        let machine, _, _ = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
+        if machine == blot_check_core::Op.mul || machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub {
+            return isBoundedLeafVecF32(g, f, plan, m, env, n.a) && isBoundedLeafVecF32(g, f, plan, m, env, n.b);
         }
     }
     return false;
@@ -1319,9 +1366,10 @@ recursive fn emitVecExpr(
                     if rerr != blot_direct_types::Error.none { return rerr; }
                 }
             }
+            let allow_comp = machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub;
             let finite_no_nan = a_tag == blot_direct_types::Tag.f32_ && n.b != 0 &&
-                (machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub || machine == blot_check_core::Op.mul) &&
-                isFiniteVecF32(g, m, env, n.a) && isFiniteVecF32(g, m, env, n.b);
+                (allow_comp || machine == blot_check_core::Op.mul) &&
+                isFiniteVecF32(g, f, plan, m, env, n.a, allow_comp) && isFiniteVecF32(g, f, plan, m, env, n.b, allow_comp);
             emitSimdMachineOp(g, f, machine, a_tag, elide_nan || finite_no_nan, plan.nan_vlocal);
             return blot_direct_types::Error.none;
         },
@@ -1900,11 +1948,12 @@ fn tryEmitVectorForLoop(
     }
 
     var iter_binding: u32 = 0;
-    var dst_b: u32 = 0;
-    var dst_val = neverVal();
-    var out_tag = blot_direct_types::Tag.unit;
-    var dst_off_id: u32 = 0;
-    var rhs_id: u32 = 0;
+    var dst_count: i64 = 0;
+    var dst_bs: u32[4] = [0; 4];
+    var dst_vals: Val[4] = [neverVal(); 4];
+    var dst_tags: blot_direct_types::Tag[4] = [blot_direct_types::Tag.unit; 4];
+    var dst_offs: u32[4] = [0; 4];
+    var rhs_ids: u32[4] = [0; 4];
     var lead_bind_ids: u32[8] = [0; 8];
     var lead_bind_exprs: u32[8] = [0; 8];
     var lead_bind_tags: blot_direct_types::Tag[8] = [blot_direct_types::Tag.unit; 8];
@@ -1940,38 +1989,55 @@ fn tryEmitVectorForLoop(
             stmts_len = 1;
         }
 
-        // Final statement must be an in-place indexed update (or `bind` wrapping one).
-        let last_id = stmts[stmts_len - 1];
-        let last_n = m.node(last_id);
-        var update_id: u32 = 0;
-        if last_n.tag == blot_check_core::Tag.update {
-            update_id = last_id;
-        } else if last_n.tag == blot_check_core::Tag.bind && last_n.c < 2 && m.node(last_n.b).tag == blot_check_core::Tag.update {
-            update_id = last_n.b;
-        } else {
-            return blot_direct_types::Error.none;
+        // Collect 1..4 trailing in-place indexed updates (7C-1: supports multi-array init/transform loops!).
+        var upd_ids_rev: u32[4] = [0; 4];
+        var first_upd_idx: i64 = stmts_len;
+        while first_upd_idx > 0 && dst_count < 4 {
+            let cand_id = stmts[first_upd_idx - 1];
+            let cand_n = m.node(cand_id);
+            var uid: u32 = 0;
+            if cand_n.tag == blot_check_core::Tag.update {
+                uid = cand_id;
+            } else if cand_n.tag == blot_check_core::Tag.bind && cand_n.c < 2 && m.node(cand_n.b).tag == blot_check_core::Tag.update {
+                uid = cand_n.b;
+            }
+            if uid == 0 { break; }
+            upd_ids_rev[dst_count] = uid;
+            dst_count += 1;
+            first_upd_idx -= 1;
         }
+        if dst_count == 0 { return blot_direct_types::Error.none; }
 
-        let uinfo = m.updateInfo(update_id);
-        let sels = m.updateSelectors(update_id);
-        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index {
-            return blot_direct_types::Error.none;
-        }
-        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 {
-            return blot_direct_types::Error.none;
-        }
-        dst_b = localRef(m, uinfo.root);
-        if dst_b == 0 { return blot_direct_types::Error.none; }
-        let _, dst_is_cell = withCellType(g, f, dst_b);
-        if dst_is_cell { return blot_direct_types::Error.none; }
-        let dv, dok = bindGet(g, f, dst_b);
-        if !dok || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
-            return blot_direct_types::Error.none;
-        }
-        dst_val = dv;
-        out_tag = tagOf(g, g.types.node(dst_val.ty).a);
-        if out_tag != blot_direct_types::Tag.f32_ && out_tag != blot_direct_types::Tag.u32_ {
-            return blot_direct_types::Error.none;
+        var upd_ids: u32[4] = [0; 4];
+        for u in 0..dst_count {
+            let uid = upd_ids_rev[dst_count - 1 - u];
+            upd_ids[u] = uid;
+            let uinfo = m.updateInfo(uid);
+            let sels = m.updateSelectors(uid);
+            if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index {
+                return blot_direct_types::Error.none;
+            }
+            if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 {
+                return blot_direct_types::Error.none;
+            }
+            let db = localRef(m, uinfo.root);
+            if db == 0 { return blot_direct_types::Error.none; }
+            for prev_u in 0..u {
+                if dst_bs[prev_u] == db { return blot_direct_types::Error.none; }
+            }
+            let _, dst_is_cell = withCellType(g, f, db);
+            if dst_is_cell { return blot_direct_types::Error.none; }
+            let dv, dok = bindGet(g, f, db);
+            if !dok || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
+                return blot_direct_types::Error.none;
+            }
+            let otag = tagOf(g, g.types.node(dv.ty).a);
+            if otag != blot_direct_types::Tag.f32_ && otag != blot_direct_types::Tag.u32_ {
+                return blot_direct_types::Error.none;
+            }
+            dst_bs[u] = db;
+            dst_vals[u] = dv;
+            dst_tags[u] = otag;
         }
 
         plan = SparkVecPlan {
@@ -1979,7 +2045,7 @@ fn tryEmitVectorForLoop(
             is_range: true,
             iter_binding: iter_binding,
             iter_tag: blot_direct_types::Tag.u32_,
-            out_tag: out_tag,
+            out_tag: dst_tags[0],
         };
         plan.locals[0] = SparkVecLocal {
             unit: m.unit,
@@ -1991,7 +2057,7 @@ fn tryEmitVectorForLoop(
         plan.locals_len = 1;
 
         // Analyze leading statements (affine index aliases or pure scalar bindings).
-        for si in 0..(stmts_len - 1) {
+        for si in 0..first_upd_idx {
             let cn = m.node(stmts[si]);
             if cn.tag != blot_check_core::Tag.bind || cn.c != 0 || m.binding(cn.a).scheme.variables.len != 0 {
                 return blot_direct_types::Error.none;
@@ -2015,12 +2081,14 @@ fn tryEmitVectorForLoop(
             }
             let btag = tagOf(g, bty);
             let inv = isInvariantScalarExpr(g, f, plan, m, f.env, cn.b, btag, 0);
+            let fin = btag == blot_direct_types::Tag.f32_ && isBoundedLeafVecF32(g, f, plan, m, f.env, cn.b);
             plan.locals[plan.locals_len] = SparkVecLocal {
                 unit: m.unit,
                 binding: cn.a,
                 tag: btag,
                 is_mask: btag == blot_direct_types::Tag.boolean,
                 invariant: inv,
+                finite: fin,
             };
             plan.locals_len += 1;
             lead_bind_ids[lead_bind_len] = cn.a;
@@ -2029,16 +2097,20 @@ fn tryEmitVectorForLoop(
             lead_bind_len += 1;
         }
 
-        let dst_ok, d_off = matchRangeAffineIndex(g, f, plan, m, f.env, sels[0].index);
-        if !dst_ok { return blot_direct_types::Error.none; }
-        dst_off_id = d_off;
+        for u in 0..dst_count {
+            let uinfo = m.updateInfo(upd_ids[u]);
+            let sels = m.updateSelectors(upd_ids[u]);
+            let dst_ok, d_off = matchRangeAffineIndex(g, f, plan, m, f.env, sels[0].index);
+            if !dst_ok { return blot_direct_types::Error.none; }
+            dst_offs[u] = d_off;
 
-        let rhs_ty, rok = lowerInEnv(g, m, m.typeOf(uinfo.value), f.env);
-        if !rok || tagOf(g, rhs_ty) != out_tag { return blot_direct_types::Error.none; }
-        if !checkVecExpr(g, f, plan, m, f.env, uinfo.value, 0, 0, false) {
-            return blot_direct_types::Error.none;
+            let rhs_ty, rok = lowerInEnv(g, m, m.typeOf(uinfo.value), f.env);
+            if !rok || tagOf(g, rhs_ty) != dst_tags[u] { return blot_direct_types::Error.none; }
+            if !checkVecExpr(g, f, plan, m, f.env, uinfo.value, 0, 0, false) {
+                return blot_direct_types::Error.none;
+            }
+            rhs_ids[u] = uinfo.value;
         }
-        rhs_id = uinfo.value;
         matched = true;
     }
 
@@ -2079,83 +2151,109 @@ fn tryEmitVectorForLoop(
     op(g, OP_i32_and);
     lset(g, simd_end);
 
-    // Destination bounds and byte extent [dst_ptr .. dst_byte_end).
-    let dst_base, dst_len = ensureCheckedArray(g, f, dst_val);
-    var dst_ptr: u32 = 0;
-    if start_is_zero && dst_off_id == 0 {
-        lget(g, count);
-        lget(g, dst_len);
-        op(g, OP_i32_gt_u);
-        let dst_guard = open(g, f, OP_if_);
-        i32Const(g, 0);
-        lset(g, simd_end);
-        close(g, f);
-        dst_ptr = dst_base;
-    } else {
-        var dst_off_local: u32 = 0;
-        if dst_off_id != 0 {
-            let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, dst_off_id);
-            if oerr != blot_direct_types::Error.none { return oerr; }
-            dst_off_local = off_loc;
+    // Destination bounds and byte extents [dst_ptrs[u] .. dst_byte_ends[u]).
+    var dst_ptrs: u32[4] = [0; 4];
+    var dst_byte_ends: u32[4] = [0xffffffff; 4];
+    for u in 0..dst_count {
+        let dst_base, dst_len = ensureCheckedArray(g, f, dst_vals[u]);
+        if start_is_zero && dst_offs[u] == 0 {
+            lget(g, count);
+            lget(g, dst_len);
+            op(g, OP_i32_gt_u);
+            let dst_guard = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, simd_end);
+            close(g, f);
+            dst_ptrs[u] = dst_base;
         } else {
-            dst_off_local = constLocal(g, f, 0);
-        }
+            var dst_off_local: u32 = 0;
+            if dst_offs[u] != 0 {
+                let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, dst_offs[u]);
+                if oerr != blot_direct_types::Error.none { return oerr; }
+                dst_off_local = off_loc;
+            } else {
+                dst_off_local = constLocal(g, f, 0);
+            }
 
-        var dst_base_idx: u32 = dst_off_local;
-        if !start_is_zero {
-            dst_base_idx = local32(g, f);
-            lget(g, dst_off_local);
-            lget(g, start_local);
-            op(g, OP_i32_add);
-            lset(g, dst_base_idx);
-        }
+            var dst_base_idx: u32 = dst_off_local;
+            if !start_is_zero {
+                dst_base_idx = local32(g, f);
+                lget(g, dst_off_local);
+                lget(g, start_local);
+                op(g, OP_i32_add);
+                lset(g, dst_base_idx);
+            }
 
-        let dst_end_idx = local32(g, f);
-        lget(g, dst_base_idx);
-        lget(g, count);
-        op(g, OP_i32_add);
-        lset(g, dst_end_idx);
-
-        if !start_is_zero {
+            let dst_end_idx = local32(g, f);
             lget(g, dst_base_idx);
-            lget(g, dst_off_local);
-            op(g, OP_i32_ge_u);
-        }
-        lget(g, dst_end_idx);
-        lget(g, dst_base_idx);
-        op(g, OP_i32_ge_u);
-        if !start_is_zero { op(g, OP_i32_and); }
-        lget(g, dst_end_idx);
-        lget(g, dst_len);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_and);
-        op(g, OP_i32_eqz);
-        let dst_guard = open(g, f, OP_if_);
-        i32Const(g, 0);
-        lset(g, simd_end);
-        close(g, f);
+            lget(g, count);
+            op(g, OP_i32_add);
+            lset(g, dst_end_idx);
 
-        dst_ptr = local32(g, f);
-        lget(g, dst_base);
-        lget(g, dst_base_idx);
-        i32Const(g, 2);
-        op(g, OP_i32_shl);
-        op(g, OP_i32_add);
-        lset(g, dst_ptr);
+            if !start_is_zero {
+                lget(g, dst_base_idx);
+                lget(g, dst_off_local);
+                op(g, OP_i32_ge_u);
+            }
+            lget(g, dst_end_idx);
+            lget(g, dst_base_idx);
+            op(g, OP_i32_ge_u);
+            if !start_is_zero { op(g, OP_i32_and); }
+            lget(g, dst_end_idx);
+            lget(g, dst_len);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+            op(g, OP_i32_eqz);
+            let dst_guard = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, simd_end);
+            close(g, f);
+
+            let dp = local32(g, f);
+            lget(g, dst_base);
+            lget(g, dst_base_idx);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            lset(g, dp);
+            dst_ptrs[u] = dp;
+        }
+        if dst_count > 1 {
+            let de = local32(g, f);
+            lget(g, dst_ptrs[u]);
+            lget(g, count);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            lset(g, de);
+            dst_byte_ends[u] = de;
+        }
+    }
+    // Pairwise disjointness across multiple destination arrays (guards against aliased views/owners).
+    if dst_count > 1 {
+        for u in 0..dst_count {
+            for v in (u + 1)..dst_count {
+                lget(g, dst_byte_ends[u]); lget(g, dst_ptrs[v]); op(g, OP_i32_le_u);
+                lget(g, dst_byte_ends[v]); lget(g, dst_ptrs[u]); op(g, OP_i32_le_u);
+                op(g, OP_i32_or);
+                op(g, OP_i32_eqz);
+                let pd_guard = open(g, f, OP_if_);
+                i32Const(g, 0);
+                lset(g, simd_end);
+                close(g, f);
+            }
+        }
     }
 
-    var dst_byte_end: u32 = 0xffffffff;
-
-    // Every source stream must satisfy bounds + non-wrapping + overlap safety:
-    //   either (stream_ptr == dst_ptr && non-Bool) OR disjoint byte ranges.
+    // Every source stream must satisfy bounds + non-wrapping + overlap safety.
     for si in 0..plan.streams_len {
         let st = plan.streams[si];
-        // Fast path 1: stream is identical to dst (e.g. `c[dst] := c[dst] + ...`)!
+        // Fast path 1 (single-dst): stream is identical to dst (e.g. `c[dst] := c[dst] + ...`)!
         {
             let pm .= g.units[f.unit - 1];
             let st_arr_b = localRef(pm, st.arr_id);
-            if st_arr_b != 0 && st_arr_b == dst_b && st.elem_tag == out_tag && sameOffsetExpr(pm, st.offset_id, dst_off_id) {
-                plan.streams[si].ptr_local = dst_ptr;
+            if dst_count == 1 && st_arr_b != 0 && st_arr_b == dst_bs[0] && st.elem_tag == dst_tags[0] && sameOffsetExpr(pm, st.offset_id, dst_offs[0]) {
+                plan.streams[si].ptr_local = dst_ptrs[0];
                 continue;
             }
             var dup_ptr: u32 = 0xffffffff;
@@ -2172,14 +2270,14 @@ fn tryEmitVectorForLoop(
                 continue;
             }
         }
-        if dst_byte_end == 0xffffffff {
-            dst_byte_end = local32(g, f);
-            lget(g, dst_ptr);
+        if dst_byte_ends[0] == 0xffffffff {
+            dst_byte_ends[0] = local32(g, f);
+            lget(g, dst_ptrs[0]);
             lget(g, count);
             i32Const(g, 2);
             op(g, OP_i32_shl);
             op(g, OP_i32_add);
-            lset(g, dst_byte_end);
+            lset(g, dst_byte_ends[0]);
         }
 
         let arr_val, aerr = expr(g, f, st.arr_id);
@@ -2266,21 +2364,23 @@ fn tryEmitVectorForLoop(
             op(g, OP_i32_and);
         }
 
-        // overlap_ok = (stream_byte_end <=_u dst_ptr) | (dst_byte_end <=_u stream_ptr) [| (stream_ptr == dst_ptr)]
-        lget(g, stream_byte_end);
-        lget(g, dst_ptr);
-        op(g, OP_i32_le_u);
-        lget(g, dst_byte_end);
-        lget(g, stream_ptr);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_or);
-        if st.elem_tag != blot_direct_types::Tag.boolean {
+        // overlap_ok against every destination array
+        for u in 0..dst_count {
+            lget(g, stream_byte_end);
+            lget(g, dst_ptrs[u]);
+            op(g, OP_i32_le_u);
+            lget(g, dst_byte_ends[u]);
             lget(g, stream_ptr);
-            lget(g, dst_ptr);
-            op(g, OP_i32_eq);
+            op(g, OP_i32_le_u);
             op(g, OP_i32_or);
+            if dst_count == 1 && st.elem_tag != blot_direct_types::Tag.boolean {
+                lget(g, stream_ptr);
+                lget(g, dst_ptrs[0]);
+                op(g, OP_i32_eq);
+                op(g, OP_i32_or);
+            }
+            op(g, OP_i32_and);
         }
-        op(g, OP_i32_and);
         op(g, OP_i32_eqz);
         let guard_if = open(g, f, OP_if_);
         i32Const(g, 0);
@@ -2321,9 +2421,13 @@ fn tryEmitVectorForLoop(
 
     let need_iter_vlocal = plan.iter_value_used;
     var iter_vlocal: u32 = 0;
+    var iter_base_v: u32 = 0;
     var v4_local: u32 = 0;
+    var v12_local: u32 = 0;
+    var v16_local: u32 = 0;
     if need_iter_vlocal {
         iter_vlocal = local(g, f, VT_v128);
+        iter_base_v = local(g, f, VT_v128);
         plan.locals[0].vlocal = iter_vlocal;
         if start_is_zero {
             v128ConstWords(g, 0, 1, 2, 3);
@@ -2337,9 +2441,15 @@ fn tryEmitVectorForLoop(
         v4_local = local(g, f, VT_v128);
         v128Const4(g, 4);
         lset(g, v4_local);
+        v12_local = local(g, f, VT_v128);
+        v128Const4(g, 12);
+        lset(g, v12_local);
+        v16_local = local(g, f, VT_v128);
+        v128Const4(g, 16);
+        lset(g, v16_local);
     }
 
-    // 4x unrolled 16-element SIMD loop (64-byte cache line per iteration) ahead of 4-element tail.
+    // 4x unrolled 16-element SIMD loop (64-byte cache line, ALWAYS descending 48,32,16,0 offsets!)
     if plan.streams_len <= 8 && plan.budget >= 80 {
         let simd16_end = local32(g, f);
         lget(g, simd_end);
@@ -2347,14 +2457,15 @@ fn tryEmitVectorForLoop(
         op(g, OP_i32_and);
         lset(g, simd16_end);
 
-        let cur_dst = local32(g, f);
+        var cur_dsts: u32[4] = [0; 4];
+        for u in 0..dst_count { cur_dsts[u] = local32(g, f); }
         var orig_ptrs: u32[8] = [0; 8];
         var cur_ptrs: u32[8] = [0; 8];
         for si in 0..plan.streams_len {
             orig_ptrs[si] = plan.streams[si].ptr_local;
             var reused: u32 = 0xffffffff;
-            if orig_ptrs[si] == dst_ptr && plan.streams[si].elem_tag != blot_direct_types::Tag.boolean {
-                reused = cur_dst;
+            if dst_count == 1 && orig_ptrs[si] == dst_ptrs[0] && plan.streams[si].elem_tag != blot_direct_types::Tag.boolean {
+                reused = cur_dsts[0];
             } else {
                 for sj in 0..si {
                     if orig_ptrs[sj] == orig_ptrs[si] && (plan.streams[sj].elem_tag == blot_direct_types::Tag.boolean) == (plan.streams[si].elem_tag == blot_direct_types::Tag.boolean) {
@@ -2373,13 +2484,15 @@ fn tryEmitVectorForLoop(
         op(g, OP_i32_ge_u);
         br(g, f, OP_br_if, u16_exit);
 
-        lget(g, dst_ptr);
-        lget(g, byte_off);
-        op(g, OP_i32_add);
-        lset(g, cur_dst);
+        for u in 0..dst_count {
+            lget(g, dst_ptrs[u]);
+            lget(g, byte_off);
+            op(g, OP_i32_add);
+            lset(g, cur_dsts[u]);
+        }
 
         for si in 0..plan.streams_len {
-            var is_dup = cur_ptrs[si] == cur_dst;
+            var is_dup = dst_count == 1 && cur_ptrs[si] == cur_dsts[0];
             if !is_dup {
                 for sj in 0..si {
                     if cur_ptrs[sj] == cur_ptrs[si] { is_dup = true; break; }
@@ -2396,9 +2509,16 @@ fn tryEmitVectorForLoop(
         plan.index_local = 0xffffffff;
         plan.byte_off_local = 0xffffffff;
 
+        if need_iter_vlocal {
+            lget(g, iter_vlocal);
+            ltee(g, iter_base_v);
+            lget(g, v12_local);
+            simdOp(g, SIMD_i32x4_add);
+            lset(g, iter_vlocal);
+        }
+
         for ustep in 0..4 {
-            var step = ustep;
-            if !need_iter_vlocal { step = 3 - ustep; }
+            let step = 3 - ustep;
             plan.unroll_step = step as u32;
             let m_step .= g.units[f.unit - 1];
             for li in 0..lead_bind_len {
@@ -2415,16 +2535,25 @@ fn tryEmitVectorForLoop(
                     plan.locals[lidx].scalar_local = sloc;
                 }
             }
-            lget(g, cur_dst);
-            let rhs_err = emitVecExpr(g, f, plan, m_step, f.env, rhs_id, false);
-            if rhs_err != blot_direct_types::Error.none { return rhs_err; }
-            simdMemOp(g, SIMD_v128_store, 2, (step as u32) * 16);
-            if need_iter_vlocal {
+            for u in 0..dst_count {
+                lget(g, cur_dsts[u]);
+                let rhs_err = emitVecExpr(g, f, plan, m_step, f.env, rhs_ids[u], false);
+                if rhs_err != blot_direct_types::Error.none { return rhs_err; }
+                simdMemOp(g, SIMD_v128_store, 2, (step as u32) * 16);
+            }
+            if need_iter_vlocal && ustep < 3 {
                 lget(g, iter_vlocal);
                 lget(g, v4_local);
-                simdOp(g, SIMD_i32x4_add);
+                simdOp(g, SIMD_i32x4_sub);
                 lset(g, iter_vlocal);
             }
+        }
+
+        if need_iter_vlocal {
+            lget(g, iter_base_v);
+            lget(g, v16_local);
+            simdOp(g, SIMD_i32x4_add);
+            lset(g, iter_vlocal);
         }
 
         for si in 0..plan.streams_len { plan.streams[si].ptr_local = orig_ptrs[si]; }
@@ -2471,15 +2600,17 @@ fn tryEmitVectorForLoop(
         }
     }
 
-    // Store address, compute 4-wide RHS vector, v128.store!
-    lget(g, dst_ptr);
-    lget(g, byte_off);
-    op(g, OP_i32_add);
+    // Store address, compute 4-wide RHS vector, v128.store for each destination!
+    for u in 0..dst_count {
+        lget(g, dst_ptrs[u]);
+        lget(g, byte_off);
+        op(g, OP_i32_add);
 
-    let rhs_err = emitVecExpr(g, f, plan, m_emit, f.env, rhs_id, false);
-    if rhs_err != blot_direct_types::Error.none { return rhs_err; }
+        let rhs_err = emitVecExpr(g, f, plan, m_emit, f.env, rhs_ids[u], false);
+        if rhs_err != blot_direct_types::Error.none { return rhs_err; }
 
-    simdMemOp(g, SIMD_v128_store, 2, 0);
+        simdMemOp(g, SIMD_v128_store, 2, 0);
+    }
 
     lget(g, k);
     i32Const(g, 4);
@@ -2535,6 +2666,7 @@ fn tryEmitVectorReductionLoop(
         return blot_direct_types::Error.none;
     }
     var is_masked = false;
+    var is_f32_sum = false;
     var arr_b: u32 = 0;
     var red_count: i64 = 0;
     var red_ci: i64[2] = [0; 2];
@@ -2558,7 +2690,16 @@ fn tryEmitVectorReductionLoop(
             if carry_in_place[ci] { continue; }
             if red_count >= 2 || carry.backedge == 0 { return blot_direct_types::Error.none; }
             let iv = g.s.vals[iteration.start + ci];
-            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            let itag = tagOf(g, iv.ty);
+            if iv.len != 1 { return blot_direct_types::Error.none; }
+            if itag == blot_direct_types::Tag.f32_ {
+                if red_count > 0 || is_f32_sum { return blot_direct_types::Error.none; }
+                is_f32_sum = true;
+            } else if itag == blot_direct_types::Tag.u32_ {
+                if is_f32_sum { return blot_direct_types::Error.none; }
+            } else {
+                return blot_direct_types::Error.none;
+            }
             red_ci[red_count] = ci;
             red_iter[red_count] = carry.iteration;
             red_back[red_count] = carry.backedge;
@@ -2570,7 +2711,7 @@ fn tryEmitVectorReductionLoop(
         if body_node == 0 { return blot_direct_types::Error.none; }
         let bn = m.node(body_node);
 
-        if bn.tag == blot_check_core::Tag.if_stmt && bn.c == 0 {
+        if !is_f32_sum && bn.tag == blot_check_core::Tag.if_stmt && bn.c == 0 {
             // Variant A: masked `if flags[i]: ...`
             let gok, fa_n, fi_n = matchArrayGet(m, bn.a);
             if !gok || localRef(m, fi_n) != iter_b { return blot_direct_types::Error.none; }
@@ -2654,10 +2795,13 @@ fn tryEmitVectorReductionLoop(
             is_masked = true;
             matched = true;
         } else if bn.tag == blot_check_core::Tag.bind && bn.c < 2 && red_count == 1 && bn.a == red_back[0] {
-            // Variant B: unmasked `acc := acc (+|^) arr[i]`
+            // Variant B: unmasked `acc := acc (+|^) arr[i]` (U32)
+            // Variant C (7C-2): unmasked exact left-to-right 8x unrolled `sum := sum + arr[i]` (F32)
             let en = m.node(bn.b);
             let is_op = en.tag == blot_check_core::Tag.scalar || (en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none);
-            if !is_op || (en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.bit_xor) {
+            if is_f32_sum {
+                if !is_op || en.op != blot_check_core::Op.add { return blot_direct_types::Error.none; }
+            } else if !is_op || (en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.bit_xor) {
                 return blot_direct_types::Error.none;
             }
             var rhs: u32 = 0;
@@ -2669,7 +2813,11 @@ fn tryEmitVectorReductionLoop(
             arr_b = localRef(m, aa_n);
             if arr_b == 0 { return blot_direct_types::Error.none; }
             let av, aok = bindGet(g, f, arr_b);
-            if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.u32_ {
+            if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { return blot_direct_types::Error.none; }
+            let etag = tagOf(g, g.types.node(av.ty).a);
+            if is_f32_sum {
+                if etag != blot_direct_types::Tag.f32_ { return blot_direct_types::Error.none; }
+            } else if etag != blot_direct_types::Tag.u32_ {
                 return blot_direct_types::Error.none;
             }
             red_is_xor[0] = en.op == blot_check_core::Op.bit_xor;
@@ -2705,7 +2853,7 @@ fn tryEmitVectorReductionLoop(
     lget(g, end_local);
     lget(g, index);
     op(g, OP_i32_sub);
-    i32Const(g, 0xfffffff0);
+    if is_f32_sum { i32Const(g, 0xfffffff8); } else { i32Const(g, 0xfffffff0); }
     op(g, OP_i32_and);
     lset(g, simd_n);
     popCheckedArraysAt(f, cnt_if);
@@ -2724,7 +2872,54 @@ fn tryEmitVectorReductionLoop(
     op(g, OP_i32_and);
     let guard_if = open(g, f, OP_if_);
 
-    if is_masked {
+    if is_f32_sum {
+        // Variant C (7C-2): 8x unrolled descending-offset exact left-to-right IEEE-754 F32 sum.
+        let ptr = local32(g, f);
+        lget(g, arr_base);
+        lget(g, index);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        op(g, OP_i32_add);
+        lset(g, ptr);
+
+        let rem = local32(g, f);
+        lget(g, simd_n);
+        lset(g, rem);
+
+        let cloc = w(g, g.s.vals[iteration.start + red_ci[0]], 0);
+        var fl: u32[8] = [0; 8];
+        for fi in 0..8 { fl[fi] = local(g, f, VT_f32); }
+
+        let r_exit = open(g, f, OP_block);
+        let r_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, r_exit);
+
+        // Descending f32.load 28,24,20,16,12,8,4,0 => 1 wtime bounds check per 8 floats!
+        for k in 0..8 {
+            let slot = 7 - k;
+            lget(g, ptr);
+            op(g, OP_f32_load); uleb(g, 2); uleb(g, (slot as u32) * 4);
+            lset(g, fl[slot]);
+        }
+        lget(g, cloc);
+        for slot in 0..8 {
+            lget(g, fl[slot]);
+            op(g, OP_f32_add);
+        }
+        lset(g, cloc);
+
+        lget(g, ptr); i32Const(g, 32); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 8); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, r_top);
+        close(g, f);
+        close(g, f);
+
+        if !f.defer_f32_nan {
+            lget(g, cloc);
+            canonicalizeF32Stack(g, f);
+            lset(g, cloc);
+        }
+    } else if is_masked {
         let ptr = local32(g, f);
         lget(g, arr_base);
         lget(g, index);
@@ -2880,6 +3075,368 @@ fn tryEmitVectorReductionLoop(
         }
         lset(g, cloc);
     }
+
+    lget(g, index);
+    lget(g, simd_n);
+    op(g, OP_i32_add);
+    lset(g, index);
+
+    popCheckedArraysAt(f, guard_if);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return blot_direct_types::Error.none;
+}
+
+// 7A: 4-wide branchless `v128` SIMD reduction for 16-byte `Maybe Vec3` read-only pool scans:
+//   for i in start .. end:
+//     if let $Some ($Pos { x, y, z }) = pos[i]:
+//       sum := sum (+|^) F32.to_{u32,i32} (f_expr(x, y, z))
+// Loads 4 consecutive 16-byte elements in descending order (48,32,16,0 => 1 wtime bounds check),
+// performs a 4x4 SoA transpose via 8 `i8x16.shuffle`s into [vtag, vx, vy, vz], evaluates `f_expr`
+// in exact IEEE-754 left-to-right `f32x4`, converts via `i32x4.trunc_sat_f32x4_{u,s}`, masks out
+// `$Nothing` lanes branchlessly with `i32x4.eq(vtag, 0)`, and accumulates into `vacc`.
+fn matchVec3F32ToInt(g: Generator&, m: const Module&, id: u32) -> bool, bool, u32 {
+    if id == 0 { return false, false, 0; }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
+        if n.op == blot_check_core::Op.convert_f32_u32 { return true, false, n.a; }
+        if n.op == blot_check_core::Op.convert_f32_i32 { return true, true, n.a; }
+    } else if n.tag == blot_check_core::Tag.call {
+        let info = m.call(id);
+        if info.arguments.len == 1 {
+            let target = recordAliasChain(g, g.resolve(m, info.target));
+            if g.hasUnit(target.unit) {
+                let tm .= g.units[target.unit - 1];
+                let alias, has_alias = primitiveAlias(tm, target.binding);
+                if has_alias {
+                    let pop = tm.primitive(alias).op;
+                    if pop == blot_check_core::Op.convert_f32_u32 { return true, false, info.arguments[0]; }
+                    if pop == blot_check_core::Op.convert_f32_i32 { return true, true, info.arguments[0]; }
+                }
+            }
+        }
+    }
+    return false, false, 0;
+}
+recursive fn checkVec3F32Expr(
+    g: Generator&,
+    f: const Fn&,
+    m: const Module&,
+    id: u32,
+    p_bs: const u32[3]&,
+    iter_b: u32,
+    sum_b: u32,
+    depth: i64,
+) -> bool {
+    if id == 0 || depth > 12 { return false; }
+    let ty, tok = lowerInEnv(g, m, m.typeOf(id), f.env);
+    if !tok || tagOf(g, ty) != blot_direct_types::Tag.f32_ { return false; }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.constant { return true; }
+    if n.tag == blot_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if b == 0 || b == iter_b || b == sum_b { return false; }
+        if b == p_bs[0] || b == p_bs[1] || b == p_bs[2] { return true; }
+        let _, is_cell = withCellType(g, f, b);
+        if is_cell { return false; }
+        let bv, bok = bindGet(g, f, b);
+        return bok && bv.len == 1 && tagOf(g, bv.ty) == blot_direct_types::Tag.f32_;
+    }
+    if n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
+        if n.b == 0 {
+            if n.op != blot_check_core::Op.neg && n.op != blot_check_core::Op.abs && n.op != blot_check_core::Op.sqrt {
+                return false;
+            }
+            return checkVec3F32Expr(g, f, m, n.a, p_bs, iter_b, sum_b, depth + 1);
+        }
+        if n.op != blot_check_core::Op.add && n.op != blot_check_core::Op.sub &&
+            n.op != blot_check_core::Op.mul && n.op != blot_check_core::Op.div {
+            return false;
+        }
+        return checkVec3F32Expr(g, f, m, n.a, p_bs, iter_b, sum_b, depth + 1) &&
+            checkVec3F32Expr(g, f, m, n.b, p_bs, iter_b, sum_b, depth + 1);
+    }
+    return false;
+}
+recursive fn emitVec3F32Expr(
+    g: Generator&,
+    f: const Fn&,
+    m: const Module&,
+    id: u32,
+    p_bs: const u32[3]&,
+    v_xyz: const u32[3]&,
+) {
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.constant {
+        v128Const4(g, n.a);
+        return;
+    }
+    if n.tag == blot_check_core::Tag.reference {
+        let b = localRef(m, id);
+        if b == p_bs[0] { lget(g, v_xyz[0]); return; }
+        if b == p_bs[1] { lget(g, v_xyz[1]); return; }
+        if b == p_bs[2] { lget(g, v_xyz[2]); return; }
+        let bv, _ = bindGet(g, f, b);
+        lget(g, w(g, bv, 0));
+        simdOp(g, SIMD_f32x4_splat);
+        return;
+    }
+    if n.b == 0 {
+        emitVec3F32Expr(g, f, m, n.a, p_bs, v_xyz);
+        if n.op == blot_check_core::Op.neg { simdOp(g, SIMD_f32x4_neg); }
+        else if n.op == blot_check_core::Op.abs { simdOp(g, SIMD_f32x4_abs); }
+        else { simdOp(g, SIMD_f32x4_sqrt); }
+        return;
+    }
+    if blot_direct_writer::relaxedSimdEnabled() && (n.op == blot_check_core::Op.add || n.op == blot_check_core::Op.sub) {
+        if n.op == blot_check_core::Op.add {
+            let lmul, lx, ly = matchVecF32Mul(g, m, f.env, n.a);
+            if lmul {
+                emitVec3F32Expr(g, f, m, lx, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, ly, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, n.b, p_bs, v_xyz);
+                simdOp(g, SIMD_f32x4_relaxed_madd);
+                return;
+            }
+            let rmul, rx, ry = matchVecF32Mul(g, m, f.env, n.b);
+            if rmul {
+                emitVec3F32Expr(g, f, m, rx, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, ry, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, n.a, p_bs, v_xyz);
+                simdOp(g, SIMD_f32x4_relaxed_madd);
+                return;
+            }
+        } else {
+            let rmul, rx, ry = matchVecF32Mul(g, m, f.env, n.b);
+            if rmul {
+                emitVec3F32Expr(g, f, m, rx, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, ry, p_bs, v_xyz);
+                emitVec3F32Expr(g, f, m, n.a, p_bs, v_xyz);
+                simdOp(g, SIMD_f32x4_relaxed_nmadd);
+                return;
+            }
+        }
+    }
+    emitVec3F32Expr(g, f, m, n.a, p_bs, v_xyz);
+    emitVec3F32Expr(g, f, m, n.b, p_bs, v_xyz);
+    if n.op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+    else if n.op == blot_check_core::Op.sub { simdOp(g, SIMD_f32x4_sub); }
+    else if n.op == blot_check_core::Op.mul { simdOp(g, SIMD_f32x4_mul); }
+    else { simdOp(g, SIMD_f32x4_div); }
+}
+fn tryEmitVec3MaybeReductionLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return blot_direct_types::Error.none;
+    }
+    var arr_b: u32 = 0;
+    var arr_inlined = BindingRef { 0, 0 };
+    var p_bs: u32[3] = [0; 3];
+    var f_expr_id: u32 = 0;
+    var sum_ci: i64 = -1;
+    var is_xor = false;
+    var is_signed_conv = false;
+    var matched = false;
+
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        let iter_b = pat.a;
+
+        let carries = m.loopCarries(loop_id);
+        if carries.len == 0 || carries.len > 64 { return blot_direct_types::Error.none; }
+        var sum_iter: u32 = 0;
+        var sum_back: u32 = 0;
+        for carry, ci in carries {
+            if carry_in_place[ci] { continue; }
+            if sum_ci >= 0 || carry.backedge == 0 { return blot_direct_types::Error.none; }
+            let iv = g.s.vals[iteration.start + ci];
+            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            sum_ci = ci;
+            sum_iter = carry.iteration;
+            sum_back = carry.backedge;
+        }
+        if sum_ci < 0 { return blot_direct_types::Error.none; }
+
+        let body_node = unwrapSingleBody(m, info.body);
+        if body_node == 0 || m.node(body_node).tag != blot_check_core::Tag.match_ { return blot_direct_types::Error.none; }
+        let minfo = m.matchInfo(body_node);
+        let minputs = m.matchInputs(body_node);
+        let marms = m.matchArms(body_node);
+        if !minfo.statement || minputs.len != 1 || marms.len != 2 || marms[0].guard_ != 0 || !isNoopWildcardArm(m, marms[1]) {
+            return blot_direct_types::Error.none;
+        }
+        let arr_n, idx_n, inl_ref, rok = resolveLazyVariantArrayRead(g, f, m, minputs[0]);
+        if !rok || localRef(m, idx_n) != iter_b { return blot_direct_types::Error.none; }
+        arr_b = localRef(m, arr_n);
+        if arr_b == 0 { return blot_direct_types::Error.none; }
+        let av, aok = bindGet(g, f, arr_b);
+        if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { return blot_direct_types::Error.none; }
+        let elem_ty, eierr = g.types.lower(m, m.typeOf(minputs[0]), f.env);
+        if eierr != blot_direct_types::Error.none { g.dropFailure(); return blot_direct_types::Error.none; }
+        if tagOf(g, elem_ty) != blot_direct_types::Tag.nominal { return blot_direct_types::Error.none; }
+        let boxed, berr = isBoxed(g, f, elem_ty, body_node);
+        let step, serr = stride(g, f, elem_ty, body_node);
+        if berr != blot_direct_types::Error.none || boxed || serr != blot_direct_types::Error.none || step != 16 {
+            return blot_direct_types::Error.none;
+        }
+        let cases, cerr = g.types.variants(elem_ty);
+        if cerr != blot_direct_types::Error.none || cases.len <= 1 { return blot_direct_types::Error.none; }
+        let vpos, vperr = variantPosition(g, f, cases, 0, body_node);
+        if vperr != blot_direct_types::Error.none { return blot_direct_types::Error.none; }
+        let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
+        let rows = m.armRows(marms[0]);
+        if rows.len != 1 || m.rowPatterns(rows[0]).len != 1 { return blot_direct_types::Error.none; }
+        let p_pat = m.pattern(m.rowPatterns(rows[0])[0]);
+        if p_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 {
+            return blot_direct_types::Error.none;
+        }
+        if !extract3F32PayloadPat(g, m, p_pat.b, payload_ty, p_bs) { return blot_direct_types::Error.none; }
+
+        let arm_stmt = unwrapSingleBody(m, marms[0].body);
+        if arm_stmt == 0 { return blot_direct_types::Error.none; }
+        let asn = m.node(arm_stmt);
+        if asn.tag != blot_check_core::Tag.bind || asn.c >= 2 { return blot_direct_types::Error.none; }
+        let merges = m.branchMerges(body_node);
+        if merges.len != 1 || merges[0].result != sum_back || merges[0].then_binding != asn.a || merges[0].else_binding != sum_iter {
+            return blot_direct_types::Error.none;
+        }
+        let en = m.node(asn.b);
+        let is_op = en.tag == blot_check_core::Tag.scalar || (en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none);
+        if !is_op || (en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.bit_xor) {
+            return blot_direct_types::Error.none;
+        }
+        var rhs: u32 = 0;
+        if localRef(m, en.a) == sum_iter { rhs = en.b; }
+        else if localRef(m, en.b) == sum_iter { rhs = en.a; }
+        else { return blot_direct_types::Error.none; }
+        let cok, csigned, farg = matchVec3F32ToInt(g, m, rhs);
+        if !cok || !checkVec3F32Expr(g, f, m, farg, p_bs, iter_b, sum_iter, 0) {
+            return blot_direct_types::Error.none;
+        }
+        arr_inlined = inl_ref;
+        f_expr_id = farg;
+        is_xor = en.op == blot_check_core::Op.bit_xor;
+        is_signed_conv = csigned;
+        matched = true;
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    if arr_inlined.binding != 0 { g.recordInlined(arr_inlined.unit, arr_inlined.binding); }
+    let av, _ = bindGet(g, f, arr_b);
+    let arr_base, arr_len = ensureCheckedArray(g, f, av);
+
+    let simd_n = local32(g, f);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_gt_u);
+    let cnt_if = open(g, f, OP_if_);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_sub);
+    i32Const(g, 0xfffffffc);
+    op(g, OP_i32_and);
+    lset(g, simd_n);
+    popCheckedArraysAt(f, cnt_if);
+    op(g, OP_else_);
+    i32Const(g, 0);
+    lset(g, simd_n);
+    close(g, f);
+
+    // Guard: simd_n > 0 && end_local <= arr_len (exact OOB trap order preserved in scalar tail!)
+    lget(g, simd_n);
+    i32Const(g, 0);
+    op(g, OP_i32_gt_u);
+    lget(g, end_local);
+    lget(g, arr_len);
+    op(g, OP_i32_le_u);
+    op(g, OP_i32_and);
+    let guard_if = open(g, f, OP_if_);
+
+    let ptr = local32(g, f);
+    lget(g, arr_base);
+    lget(g, index);
+    i32Const(g, 4);
+    op(g, OP_i32_shl);
+    op(g, OP_i32_add);
+    lset(g, ptr);
+
+    let rem = local32(g, f);
+    lget(g, simd_n);
+    lset(g, rem);
+
+    let vacc = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vacc);
+    let vzero = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vzero);
+    let v0 = local(g, f, VT_v128);
+    let v1 = local(g, f, VT_v128);
+    let v2 = local(g, f, VT_v128);
+    let v3 = local(g, f, VT_v128);
+    let t01 = local(g, f, VT_v128);
+    let t23 = local(g, f, VT_v128);
+    let vtag = local(g, f, VT_v128);
+    var v_xyz: u32[3] = [0; 3];
+    v_xyz[0] = local(g, f, VT_v128);
+    v_xyz[1] = local(g, f, VT_v128);
+    v_xyz[2] = local(g, f, VT_v128);
+
+    let r_exit = open(g, f, OP_block);
+    let r_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, r_exit);
+
+    // Descending 48,32,16,0 v128.load => 1 software bounds check per 4 entities (64 bytes)!
+    lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, v3);
+    lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, v2);
+    lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, v1);
+    lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, v0);
+
+    // 4x4 SoA transpose via 8 shuffles (peak <= 10 live XMMs -> zero spills!):
+    lget(g, v0); lget(g, v1); emitI32x4Shuffle(g, 0, 4, 1, 5); lset(g, t01);
+    lget(g, v2); lget(g, v3); emitI32x4Shuffle(g, 0, 4, 1, 5); lset(g, t23);
+    lget(g, t01); lget(g, t23); emitI32x4Shuffle(g, 0, 1, 4, 5); lset(g, vtag);
+    lget(g, t01); lget(g, t23); emitI32x4Shuffle(g, 2, 3, 6, 7); lset(g, v_xyz[0]);
+
+    lget(g, v0); lget(g, v1); emitI32x4Shuffle(g, 2, 6, 3, 7); lset(g, t01);
+    lget(g, v2); lget(g, v3); emitI32x4Shuffle(g, 2, 6, 3, 7); lset(g, t23);
+    lget(g, t01); lget(g, t23); emitI32x4Shuffle(g, 0, 1, 4, 5); lset(g, v_xyz[1]);
+    lget(g, t01); lget(g, t23); emitI32x4Shuffle(g, 2, 3, 6, 7); lset(g, v_xyz[2]);
+
+    // Evaluate F32 expression in exact AST order, convert to U32/I32, mask branchlessly by tag == 0!
+    lget(g, vacc);
+    emitVec3F32Expr(g, f, g.units[f.unit - 1], f_expr_id, p_bs, v_xyz);
+    if is_signed_conv { simdOp(g, SIMD_i32x4_trunc_sat_f32x4_s); }
+    else { simdOp(g, SIMD_i32x4_trunc_sat_f32x4_u); }
+    lget(g, vtag);
+    lget(g, vzero);
+    simdOp(g, SIMD_i32x4_eq);
+    simdOp(g, SIMD_v128_and);
+    if is_xor { simdOp(g, SIMD_v128_xor); } else { simdOp(g, SIMD_i32x4_add); }
+    lset(g, vacc);
+
+    lget(g, ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptr);
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, r_top);
+    close(g, f);
+    close(g, f);
+
+    let cloc = w(g, g.s.vals[iteration.start + sum_ci], 0);
+    var sop = OP_i32_add;
+    if is_xor { sop = OP_i32_xor; }
+    lget(g, cloc);
+    for lane in 0..4 {
+        lget(g, vacc);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8);
+        op(g, sop);
+    }
+    lset(g, cloc);
 
     lget(g, index);
     lget(g, simd_n);

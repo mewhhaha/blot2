@@ -11,99 +11,99 @@
   <text x="482.6" y="87.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#475569">Rust -O3 (Native x86_64)</text>
   <rect x="28" y="108" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="42.0" y="132.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">particle_spark_simd</text>
-  <text x="42.0" y="148.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">65k × 32 · in-place spark SIMD</text>
+  <text x="42.0" y="148.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">65k × 32 · multi-array + spark SIMD</text>
   <text x="42.0" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="112.0" y="162.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="112.0" y="162.0" width="62.3" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="180.3" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.40 ms</text>
+  <rect x="112.0" y="162.0" width="58.1" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="176.1" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.34 ms</text>
   <text x="42.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="112.0" y="187.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="112.0" y="187.0" width="114.0" height="16" rx="3.5" fill="#3b607e"/>
-  <text x="232.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.73 ms</text>
+  <rect x="112.0" y="187.0" width="106.3" height="16" rx="3.5" fill="#3b607e"/>
+  <text x="224.3" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.61 ms</text>
   <text x="42.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="112.0" y="212.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="112.0" y="212.0" width="107.5" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="225.5" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.69 ms</text>
-  <text x="42.0" y="258.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.55× Rust Wasm · 0.58× native</text>
+  <rect x="112.0" y="212.0" width="114.0" height="16" rx="3.5" fill="#c2592b"/>
+  <text x="232.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.66 ms</text>
+  <text x="42.0" y="258.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.55× Rust Wasm · 0.51× native</text>
   <rect x="322" y="108" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="336.0" y="132.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">mandelbrot_f32</text>
   <text x="336.0" y="148.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">256×256 FP · 8-pixel dual-v128 SIMD</text>
   <text x="336.0" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="406.0" y="162.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="406.0" y="162.0" width="20.2" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="432.2" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.61 ms</text>
+  <rect x="406.0" y="162.0" width="21.1" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="433.1" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.61 ms</text>
   <text x="336.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="406.0" y="187.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="406.0" y="187.0" width="103.1" height="16" rx="3.5" fill="#3b607e"/>
-  <text x="515.1" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.12 ms</text>
+  <rect x="406.0" y="187.0" width="105.9" height="16" rx="3.5" fill="#3b607e"/>
+  <text x="517.9" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.08 ms</text>
   <text x="336.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="406.0" y="212.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
   <rect x="406.0" y="212.0" width="114.0" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="526.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.45 ms</text>
+  <text x="526.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.31 ms</text>
   <text x="336.0" y="258.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.20× Rust Wasm · 0.18× native</text>
   <rect x="616" y="108" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="630.0" y="132.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">merge_sort</text>
-  <text x="630.0" y="148.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">100k U32 · SIMD init + cmov + memcpy</text>
+  <text x="630.0" y="148.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">100k U32 · SIMD init + 2× ptr cmov</text>
   <text x="630.0" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="700.0" y="162.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="700.0" y="162.0" width="79.4" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="785.4" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.97 ms</text>
+  <rect x="700.0" y="162.0" width="73.3" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="779.3" y="174.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">3.69 ms</text>
   <text x="630.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="700.0" y="187.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
   <rect x="700.0" y="187.0" width="114.0" height="16" rx="3.5" fill="#3b607e"/>
-  <text x="820.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">5.70 ms</text>
+  <text x="820.0" y="199.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">5.74 ms</text>
   <text x="630.0" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="700.0" y="212.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="700.0" y="212.0" width="99.6" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="805.6" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">4.98 ms</text>
-  <text x="630.0" y="258.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.70× Rust Wasm · 0.80× native</text>
+  <rect x="700.0" y="212.0" width="99.2" height="16" rx="3.5" fill="#c2592b"/>
+  <text x="805.2" y="224.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">4.99 ms</text>
+  <text x="630.0" y="258.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.64× Rust Wasm · 0.74× native</text>
   <rect x="28" y="288" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="42.0" y="312.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">lcg_recurrence</text>
   <text x="42.0" y="328.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">1,000,000 U32 · 16-wide v128 LCG</text>
   <text x="42.0" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="112.0" y="342.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="112.0" y="342.0" width="34.3" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="152.3" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.11 ms</text>
+  <rect x="112.0" y="342.0" width="30.9" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="148.9" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.098 ms</text>
   <text x="42.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="112.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
   <rect x="112.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#3b607e"/>
-  <text x="232.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.38 ms</text>
+  <text x="232.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.36 ms</text>
   <text x="42.0" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="112.0" y="392.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="112.0" y="392.0" width="100.4" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="218.4" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.34 ms</text>
-  <text x="42.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.30× Rust Wasm · 0.34× native</text>
+  <rect x="112.0" y="392.0" width="107.5" height="16" rx="3.5" fill="#c2592b"/>
+  <text x="225.5" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.34 ms</text>
+  <text x="42.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.27× Rust Wasm · 0.29× native</text>
   <rect x="322" y="288" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="336.0" y="312.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">prime_sieve</text>
   <text x="336.0" y="328.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">100k Bool · strided fill + v128 reduce</text>
   <text x="336.0" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="406.0" y="342.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="406.0" y="342.0" width="53.0" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="465.0" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.062 ms</text>
+  <rect x="406.0" y="342.0" width="55.6" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="467.6" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.064 ms</text>
   <text x="336.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="406.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
   <rect x="406.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#3b607e"/>
   <text x="526.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.13 ms</text>
   <text x="336.0" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="406.0" y="392.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="406.0" y="392.0" width="56.9" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="468.9" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.066 ms</text>
-  <text x="336.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.46× Rust Wasm · 0.93× native</text>
+  <rect x="406.0" y="392.0" width="60.7" height="16" rx="3.5" fill="#c2592b"/>
+  <text x="472.7" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.070 ms</text>
+  <text x="336.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.49× Rust Wasm · 0.92× native</text>
   <rect x="616" y="288" width="276" height="162" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="630.0" y="312.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">matmul_64</text>
-  <text x="630.0" y="328.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">64×64 F32 · 4×8 2×k-unroll + SIMD init</text>
+  <text x="630.0" y="328.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">64×64 F32 · 4×8 4×k-unroll + SIMD init</text>
   <text x="630.0" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Blot</text>
   <rect x="700.0" y="342.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="700.0" y="342.0" width="76.4" height="16" rx="3.5" fill="#0f766e"/>
-  <text x="782.4" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.020 ms</text>
+  <rect x="700.0" y="342.0" width="69.9" height="16" rx="3.5" fill="#0f766e"/>
+  <text x="775.9" y="354.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.018 ms</text>
   <text x="630.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Wasm</text>
   <rect x="700.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
   <rect x="700.0" y="367.0" width="114.0" height="16" rx="3.5" fill="#3b607e"/>
   <text x="820.0" y="379.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.030 ms</text>
   <text x="630.0" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#475569" text-anchor="start">Rust Nat.</text>
   <rect x="700.0" y="392.0" width="114.0" height="16" rx="3.5" fill="#f1f5f9"/>
-  <rect x="700.0" y="392.0" width="75.5" height="16" rx="3.5" fill="#c2592b"/>
-  <text x="781.5" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.020 ms</text>
-  <text x="630.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.67× Rust Wasm · 1.01× native</text>
+  <rect x="700.0" y="392.0" width="77.6" height="16" rx="3.5" fill="#c2592b"/>
+  <text x="783.6" y="404.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="600" fill="#0f172a" text-anchor="start">0.020 ms</text>
+  <text x="630.0" y="438.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="start">Blot: 0.61× Rust Wasm · 0.90× native</text>
   <text x="28.0" y="476.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#64748b" text-anchor="start">Linear 0..max scale per card. Executed via wtime-aot 0.1.1 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.</text>
 </svg>

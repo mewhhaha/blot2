@@ -1,129 +1,129 @@
 {
   "compile_speed_ms": {
-    "blot_6_kernels_ms": 12.25823,
-    "blot_ink_ecs_app_ms": 22.978377000000002,
-    "blot_wasm_bytes": 21355,
-    "ink_ecs_wasm_bytes": 75674,
-    "rust_native_opt3_ms": 80.733723,
-    "rust_wasm32_opt3_ms": 89.24731299999999,
+    "blot_6_kernels_ms": 12.519296,
+    "blot_ink_ecs_app_ms": 21.659992,
+    "blot_wasm_bytes": 23556,
+    "ink_ecs_wasm_bytes": 77677,
+    "rust_native_opt3_ms": 77.037746,
+    "rust_wasm32_opt3_ms": 85.897254,
     "rust_wasm_bytes": 1503581,
-    "wtime_aot_blot_kernels_ms": 4.1256770000000005,
-    "wtime_aot_ink_ecs_ms": 10.877057,
-    "wtime_aot_rust_kernels_ms": 4.721543
+    "wtime_aot_blot_kernels_ms": 4.270605,
+    "wtime_aot_ink_ecs_ms": 11.353143,
+    "wtime_aot_rust_kernels_ms": 4.561813
   },
   "ecs": [
     {
-      "bevy_native_ms": 1.219203,
+      "bevy_native_ms": 1.222293,
       "checksum_bevy": 88466466,
       "checksum_ink": 88466466,
-      "ink_cached_query_ms": 0.553307,
-      "ink_pool_direct_ms": 0.474147,
-      "ink_soa_spark_simd_ms": 0.327388,
+      "ink_cached_query_ms": 0.553297,
+      "ink_pool_direct_ms": 0.429677,
+      "ink_soa_spark_simd_ms": 0.342018,
       "name": "dense_iter_10k_x100"
     },
     {
-      "bevy_native_ms": 0.06941,
+      "bevy_native_ms": 0.0831,
       "checksum_bevy": 71214832,
       "checksum_ink": 71214832,
-      "ink_cached_query_ms": 0.07918,
+      "ink_cached_query_ms": 0.062629,
       "name": "sparse_filtered_iter_500_of_10k_x100"
     },
     {
-      "bevy_native_ms": 0.321998,
+      "bevy_native_ms": 0.323328,
       "checksum_bevy": 70292880,
       "checksum_ink": 70292880,
-      "ink_ms": 0.300578,
+      "ink_ms": 0.294659,
       "name": "batch_spawn_10k"
     },
     {
-      "bevy_native_ms": 0.083469,
+      "bevy_native_ms": 0.08689,
       "checksum_bevy": 36000,
       "checksum_ink": 37000,
-      "ink_ms": 0.015739999999999997,
+      "ink_ms": 0.0155,
       "name": "structural_churn_2000_tag_ops"
     },
     {
-      "bevy_native_world_rebuild_ms": 0.40539800000000004,
+      "bevy_native_world_rebuild_ms": 0.404097,
       "checksum_bevy": 16384,
       "checksum_ink": 49972,
-      "ink_ms": 0.0165,
+      "ink_ms": 0.01681,
       "name": "world_snapshot_copy_10k"
     }
   ],
   "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
   "kernels": [
     {
-      "blot_vs_rust_native": 0.3411301239728305,
-      "blot_vs_rust_wasm": 0.3005822835139999,
-      "blot_wtime_ms": 0.114909,
+      "blot_vs_rust_native": 0.2877232589039002,
+      "blot_vs_rust_wasm": 0.2712273954078664,
+      "blot_wtime_ms": 0.09788,
       "checksum_blot": 54448,
       "checksum_exact": true,
       "checksum_rust_native": 54448,
       "name": "lcg_recurrence",
-      "rust_native_ms": 0.336848,
-      "rust_wtime_ms": 0.382288
+      "rust_native_ms": 0.340188,
+      "rust_wtime_ms": 0.360878
     },
     {
-      "blot_vs_rust_native": 0.931267843925135,
-      "blot_vs_rust_wasm": 0.46499822747192243,
-      "blot_wtime_ms": 0.061649,
+      "blot_vs_rust_native": 0.9167860211973647,
+      "blot_vs_rust_wasm": 0.4879220056559621,
+      "blot_wtime_ms": 0.06401,
       "checksum_blot": 1881015445,
       "checksum_exact": true,
       "checksum_rust_native": 1881015445,
       "name": "prime_sieve",
-      "rust_native_ms": 0.066199,
-      "rust_wtime_ms": 0.132579
+      "rust_native_ms": 0.06982,
+      "rust_wtime_ms": 0.131189
     },
     {
-      "blot_vs_rust_native": 1.0112588516990169,
-      "blot_vs_rust_wasm": 0.6699517364744002,
-      "blot_wtime_ms": 0.019850000000000003,
+      "blot_vs_rust_native": 0.9008424182358772,
+      "blot_vs_rust_wasm": 0.6135335808302397,
+      "blot_wtime_ms": 0.018179,
       "checksum_blot": 6538500,
       "checksum_exact": true,
       "checksum_rust_native": 6538500,
       "name": "matmul_64",
-      "rust_native_ms": 0.019629,
-      "rust_wtime_ms": 0.029629
+      "rust_native_ms": 0.02018,
+      "rust_wtime_ms": 0.02963
     },
     {
-      "blot_vs_rust_native": 0.17727924486680097,
-      "blot_vs_rust_wasm": 0.19603277922424728,
-      "blot_wtime_ms": 0.610766,
+      "blot_vs_rust_native": 0.18473905762006063,
+      "blot_vs_rust_wasm": 0.19888753239715912,
+      "blot_wtime_ms": 0.612216,
       "checksum_blot": 1686408,
       "checksum_exact": true,
       "checksum_rust_native": 1686408,
       "name": "mandelbrot_f32",
-      "rust_native_ms": 3.44522,
-      "rust_wtime_ms": 3.115632
+      "rust_native_ms": 3.31395,
+      "rust_wtime_ms": 3.078202
     },
     {
-      "blot_vs_rust_native": 0.5792590316746279,
-      "blot_vs_rust_wasm": 0.5461951991429188,
-      "blot_wtime_ms": 0.399698,
+      "blot_vs_rust_native": 0.5099268991645619,
+      "blot_vs_rust_wasm": 0.5466337767826924,
+      "blot_wtime_ms": 0.335948,
       "checksum_blot": 13338354,
       "checksum_exact": true,
       "checksum_rust_native": 13338354,
       "name": "particle_spark_simd",
-      "rust_native_ms": 0.690016,
-      "rust_wtime_ms": 0.731786
+      "rust_native_ms": 0.658816,
+      "rust_wtime_ms": 0.614576
     },
     {
-      "blot_vs_rust_native": 0.7973141379572655,
-      "blot_vs_rust_wasm": 0.6968266016137745,
-      "blot_wtime_ms": 3.9724670000000004,
+      "blot_vs_rust_native": 0.738904406920842,
+      "blot_vs_rust_wasm": 0.6432975863368585,
+      "blot_wtime_ms": 3.690229,
       "checksum_blot": 2814210976,
       "checksum_exact": true,
       "checksum_rust_native": 2814210976,
       "name": "merge_sort",
-      "rust_native_ms": 4.982310999999999,
-      "rust_wtime_ms": 5.700797
+      "rust_native_ms": 4.99419,
+      "rust_wtime_ms": 5.736426
     }
   ],
   "toolchains": {
     "bevy_ecs": "0.20.1",
-    "blot_commit": "tier6-opt-6a-6c (after a6fe57b1)",
-    "blotc_sha256": "cc6640fc5c4eab7129fcfb1e20248bb804e7f8b91af98801254e869cf38af012",
+    "blot_commit": "tier7-opt-7a-7e (after cfdabee4)",
+    "blotc_sha256": "edf642183628f6cf3eadb5bd4dce210c6fbe4dc0ced6af8fd424f69f16a3f40e",
     "rustc": "1.96.0-nightly",
-    "wtime_aot": "0.1.1 (x64-v3, 1201395)"
+    "wtime_aot": "0.1.1 (x64-v3, ad175d5)"
   }
 }

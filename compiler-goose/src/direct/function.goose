@@ -222,6 +222,28 @@ struct Fn {
     tail_call_node: u32 = 0,
     tco_inhibit: u32 = 0,
     emitted_return_call: bool = false,
+    // 7B: `@array.fill` node IDs proved completely overwritten by an immediately following 0..n loop.
+    skip_fill_nodes: u32[8] = [0; 8],
+    skip_fill_len: i64 = 0,
+}
+
+fn recordSkipFillNode(f: Fn&, id: u32) {
+    if id == 0 || f.skip_fill_len >= 8 { return; }
+    for i in 0..f.skip_fill_len {
+        if f.skip_fill_nodes[i] == id { return; }
+    }
+    f.skip_fill_nodes[f.skip_fill_len] = id;
+    f.skip_fill_len += 1;
+}
+fn consumeSkipFillNode(f: Fn&, id: u32) -> bool {
+    if id == 0 || f.skip_fill_len == 0 { return false; }
+    for i in 0..f.skip_fill_len {
+        if f.skip_fill_nodes[i] == id {
+            f.skip_fill_nodes[i] = 0;
+            return true;
+        }
+    }
+    return false;
 }
 
 fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {
@@ -806,12 +828,16 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         comptime_if => { return comptimeIfNode(g, f, id); },
         comptime_meta => { return comptimeMetaNode(g, f, id); },
         suite => {
+            let children = m.children(id);
+            let saved_skip = f.skip_fill_len;
+            scanDeadFills(g, f, m, children);
             var last = unitVal();
-            for child in m.children(id) {
+            for child in children {
                 let value, error = stmt(g, f, child);
-                if error != blot_direct_types::Error.none { return value, error; }
+                if error != blot_direct_types::Error.none { f.skip_fill_len = saved_skip; return value, error; }
                 last = value;
             }
+            f.skip_fill_len = saved_skip;
             if last.ty == blot_direct_types::never { return last, blot_direct_types::Error.none; }
             return unitVal(), blot_direct_types::Error.none;
         },

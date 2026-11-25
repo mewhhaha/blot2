@@ -1,19 +1,69 @@
 # Working on Blot and Gdev
 
-## Current frontier: Default Self-TCO & Opt-In Wasm 3.0 Features (25 November 2026)
+## Current frontier: Direct-Backend Tier 7 Runtime Optimizations (7A–7E) (25 November 2026)
 
-Default MVP self-tail-call-to-loop TCO and opt-in Wasm 3.0 flags
-(`--tail-calls`, `--relaxed-simd`, `--wasm3`) are complete and qualified
+Tier 7 direct-backend runtime optimizations (7A–7E) are complete and qualified
 (`blotc-goose` SHA-256
-`5e61297b6be2aaf3515671538af8e38a87f3b23ed26953648db7f516940a9eb7`, `8,516,776` B;
+`edf642183628f6cf3eadb5bd4dce210c6fbe4dc0ced6af8fd424f69f16a3f40e`, `8,558,504` B;
 `generated/compiler/blotc.gz` SHA-256
-`bf2dad2e0e4f6c140599cf962d315f708b6bae1fcad3c7f1e5634191d24c86d4`, `3,679,802` B),
-keeping default compilation 100% deterministic (canonical `0x7fc00000` quiet NaN)
-and admitted by both V8/Deno and `wtime-aot --backend x64`, while unlocking Wasm
-3.0 general tail calls (`return_call`) and fused SIMD multiply-add
-(`f32x4.relaxed_madd` / `f32x4.relaxed_nmadd`) behind opt-in flags:
+`4db1d5bfd325fc198d3000d7ab060ec61471b449ba032dda3a2cda7da1f4ff7f`, `3,697,667` B),
+completing an **11 / 11 clean sweep** across both benchmark suites on
+`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`, `ad175d5`) — **6 / 6 vs Rust `-O3`
+Wasm (`0.42×` geomean — 2.37× faster)**, **6 / 6 vs native Rust `-O3` (`0.51×`
+geomean — 1.98× faster)**, and **5 / 5 Ink ECS vs native Bevy ECS `0.20.1`**:
 
-- **Default Self-TCO & Opt-In Wasm 3.0 Features (this commit, after `08c35720`):**
+- **Tier 7 direct-backend runtime optimizations (this commit, after `cfdabee4`):**
+  - **7A (`Maybe Vec3` 4-wide branchless 4×4-transposed `v128` SIMD reduction):**
+    Added `tryEmitVec3MaybeReductionLoop` (`direct/function_spark.goose`,
+    `direct/function_control.goose`) to vectorize read-only 16-byte `Maybe Vec3`
+    pool scans (`checksum_pos` in `world_step`) using descending `48,32,16,0`
+    `v128.load`s, 8 `i8x16.shuffle`s for 4×4 SoA transpose (`[vtag, vx, vy, vz]`),
+    exact IEEE-754 `f32x4` evaluation (honoring `--relaxed-simd` if enabled),
+    `i32x4.trunc_sat_f32x4_{u,s}`, and branchless `i32x4.eq(vtag, 0)` masking
+    (peak ≤ 10 live XMMs). Flips Ink ECS `sparse_filtered_iter` from `0.079 ms`
+    to **`0.063 ms` vs native Bevy `0.083 ms` (`1.33×` faster)** and cuts dense
+    Pool direct `0.474 → 0.430 ms` (**2.84× faster than Bevy**).
+  - **7B (Dead `@array.fill` zero/constant-init elision):**
+    Added `scanDeadFills` (`direct/function_control.goose`, `direct/function.goose`,
+    `direct/function_storage.goose`) to skip redundant `memory.fill` when a flat
+    scalar `@array.fill count val` is immediately followed by an unconditional
+    `0 .. count` overwriting loop (saving 768 KiB in `particle_spark_simd`, 400 KiB
+    in `merge_sort`, and 32 KiB in `matmul_64` while keeping conditional/self-reading
+    fills untouched).
+  - **7C (Multi-array descending-offset `for` auto-SIMD + 8× exact IEEE-754 F32 sum reduction):**
+    Generalized `tryEmitVectorForLoop` (`direct/function_spark.goose`) to 1–4
+    trailing independent scalar array updates with bounded-leaf finite-F32 NaN
+    elision and ALWAYS-descending `48,32,16,0` stores (even when the loop index
+    is used), plus Variant C in `tryEmitVectorReductionLoop` for 8×-unrolled
+    descending `28..0` exact left-to-right IEEE-754 F32 sum reductions with
+    post-loop `0x7fc00000` NaN canonicalization. Cuts `particle_spark_simd`
+    `0.400 → 0.336 ms` (**1.96× faster than native Rust**).
+  - **7D (Zero-shift 2×-unrolled byte-pointer branchless 2-way merge):**
+    Upgraded `tryEmitFastMergeLoop` (`direct/function_control.goose`) to emit a
+    disjointness-guarded 2×-unrolled byte-pointer branchless merge with descending
+    `[pk+4], [pk+0]` stores (halving store bounds checks and loop exits, eliminating
+    all per-element shifts/base-adds/carry-copies) plus 1× byte-pointer tail.
+    Cuts `merge_sort` `3.972 → 3.690 ms` (**1.35× faster than native Rust**,
+    **1.55× faster than Rust Wasm**).
+  - **7E (Zero-spill `4×k`-unrolled `4×8` matmul with `v128.load32_splat` + GP BCE pre-proofs):**
+    Upgraded `6B-1` (`direct/function_control.goose`) from 19 live XMMs (spilling)
+    to **11 live XMMs** (zero spills) using `4×k` unrolling, `v128.load32_splat`
+    (`0xfd 0x09`, also applied to `5C`/`4C`), and GP-register `i32.load(ac4[r], 12)`
+    pre-loads proving `ac4[r]+16` once per 4 `k`-steps for dominator BCE (`i32x4.splat`
+    on `ks == 3`). Drops `matmul_64` `19.85 → 18.18 µs` vs native Rust AVX2 `20.18 µs`
+    (**1.11× faster than native Rust AVX2** — 6/6 native Rust sweep!).
+  - **Qualification & charts:** Added [tier7_opt_execution.test.ts](tests/guest/tier7_opt_execution.test.ts),
+    passed `deno task test:compiler` (`1132 passed | 0 failed` guests, `109/109`
+    fixtures byte-identical, `206/206` uniqueness), `deno task test:editor` (`6/6`),
+    and `../pen` (`cargo test -p blot-host` `40/40` + `examples/bounce` `pen check`);
+    updated [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json),
+    README, and regenerated/inspected all 3 SVG charts.
+
+- **Default Self-TCO & Opt-In Wasm 3.0 Features (`cfdabee4`, after `08c35720`):**
+  Qualified at `blotc-goose` SHA-256
+  `5e61297b6be2aaf3515671538af8e38a87f3b23ed26953648db7f516940a9eb7` (`8,516,776` B;
+  `generated/compiler/blotc.gz` SHA-256
+  `bf2dad2e0e4f6c140599cf962d315f708b6bae1fcad3c7f1e5634191d24c86d4`, `3,679,802` B):
   - **Flag plumbing & compiler identity isolation (`direct/writer.goose`, `direct/function_ops.goose`, `main.goose`, `driver/cli.goose`, `host/cli.ts`, `host/zig_project_client.ts`):**
     Added `--relaxed-simd`, `--tail-calls`, and `--wasm3` (enabling both) to
     `blotc` (`build`, `build-project`, `serve-project`), `host/cli.ts`, and

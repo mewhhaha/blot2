@@ -806,6 +806,163 @@ fn markScratchPair(g: Generator&, f: Fn&, contents: const u32[:], at: i64) {
     f.scratch_cut = ScratchCut { target, owner, stack };
 }
 
+// 7B: Dead `@array.fill` zero/constant-init elision.
+// Detects `let arr = @array.fill count val` immediately followed (modulo pure non-reading scalar/fill
+// bindings) by a straight-line `for i in 0 .. count:` loop that unconditionally overwrites `arr[i]`
+// for every element without reading `arr` or calling arbitrary functions.
+recursive fn deadFillExprUsesOrCalls(g: Generator&, m: const Module&, id: u32, b1: u32, b2: u32, b3: u32, budget: i64&) -> bool {
+    if id == 0 { return false; }
+    if budget <= 0 { return true; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return false; },
+        reference => {
+            let b = localRef(m, id);
+            return b != 0 && (b == b1 || b == b2 || b == b3);
+        },
+        scalar, associated => {
+            return deadFillExprUsesOrCalls(g, m, n.a, b1, b2, b3, budget) ||
+                deadFillExprUsesOrCalls(g, m, n.b, b1, b2, b3, budget);
+        },
+        logical => {
+            return deadFillExprUsesOrCalls(g, m, n.a, b1, b2, b3, budget) ||
+                deadFillExprUsesOrCalls(g, m, n.b, b1, b2, b3, budget);
+        },
+        call => {
+            let info = m.call(id);
+            let target = recordAliasChain(g, g.resolve(m, info.target));
+            if !g.hasUnit(target.unit) { return true; }
+            let tm .= g.units[target.unit - 1];
+            let _, has_alias = primitiveAlias(tm, target.binding);
+            if !has_alias { return true; }
+            for arg in m.call(id).arguments {
+                if deadFillExprUsesOrCalls(g, m, arg, b1, b2, b3, budget) { return true; }
+            }
+            return false;
+        },
+        array_op => {
+            if m.arrayOperation(id) != blot_backend_collection_ops::Op.fill { return true; }
+            for ch in m.children(id) {
+                if deadFillExprUsesOrCalls(g, m, ch, b1, b2, b3, budget) { return true; }
+            }
+            return false;
+        },
+        _ => { return true; },
+    }
+}
+fn sameCountExpr(m: const Module&, a: u32, b: u32) -> bool {
+    if a == 0 || b == 0 { return false; }
+    let la = localRef(m, a);
+    let lb = localRef(m, b);
+    if la != 0 && la == lb { return true; }
+    let na = m.node(a);
+    let nb = m.node(b);
+    return na.tag == blot_check_core::Tag.constant && nb.tag == blot_check_core::Tag.constant && na.a == nb.a;
+}
+fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]) {
+    if g.runtime_().has_fork || f.tco_inhibit != 0 || children.len < 2 || f.skip_fill_len >= 8 { return; }
+    for k in 0..(children.len - 1) {
+        if f.skip_fill_len >= 8 { return; }
+        let cn = m.node(children[k]);
+        if cn.tag != blot_check_core::Tag.bind || cn.c >= 2 { continue; }
+        let fill_id = cn.b;
+        let fn_ = m.node(fill_id);
+        if fn_.tag != blot_check_core::Tag.array_op || m.arrayOperation(fill_id) != blot_backend_collection_ops::Op.fill {
+            continue;
+        }
+        let fch = m.children(fill_id);
+        if fch.len < 2 { continue; }
+        let fill_b = cn.a;
+        let count_node = fch[0];
+        let count_b = localRef(m, count_node);
+        let fill_ty = m.types.node(m.binding(fill_b).ty);
+        if fill_ty.tag != blot_check_types::Tag.array { continue; }
+        let etag = m.types.node(fill_ty.a).tag;
+        if etag != blot_check_types::Tag.unsigned32 &&
+            etag != blot_check_types::Tag.floating32 && etag != blot_check_types::Tag.boolean {
+            continue;
+        }
+        for j in (k + 1)..children.len {
+            let jn = m.node(children[j]);
+            if jn.tag == blot_check_core::Tag.loop_ {
+                let linfo = m.loopInfo(children[j]);
+                if linfo.kind != blot_check_core::LoopKind.range || linfo.pattern == 0 || linfo.body == 0 { break; }
+                let first_n = m.node(linfo.first);
+                if first_n.tag != blot_check_core::Tag.constant || first_n.a != 0 { break; }
+                if !sameCountExpr(m, count_node, linfo.end) { break; }
+                let pat = m.pattern(linfo.pattern);
+                if pat.tag != blot_check_core::PatternTag.bind { break; }
+                let iter_b = pat.a;
+                var iter_arr_b: u32 = 0;
+                for carry in m.loopCarries(children[j]) {
+                    if carry.incoming == fill_b { iter_arr_b = carry.iteration; break; }
+                }
+                if iter_arr_b == 0 { break; }
+                var stmts: u32[16] = [0; 16];
+                var stmts_len: i64 = 0;
+                let lbn = m.node(linfo.body);
+                if lbn.tag == blot_check_core::Tag.suite || lbn.tag == blot_check_core::Tag.block_ {
+                    let bch = m.children(linfo.body);
+                    if bch.len == 0 || bch.len > 16 { break; }
+                    for si in 0..bch.len { stmts[si] = bch[si]; }
+                    stmts_len = bch.len;
+                } else {
+                    stmts[0] = linfo.body;
+                    stmts_len = 1;
+                }
+                var wrote_full = false;
+                var safe = true;
+                var upd_res_b: u32 = 0;
+                var budget: i64 = 128;
+                for si in 0..stmts_len {
+                    let sn = m.node(stmts[si]);
+                    var upd_id: u32 = 0;
+                    var bind_out: u32 = 0;
+                    if sn.tag == blot_check_core::Tag.update {
+                        upd_id = stmts[si];
+                    } else if sn.tag == blot_check_core::Tag.bind && sn.c < 2 && m.node(sn.b).tag == blot_check_core::Tag.update {
+                        upd_id = sn.b;
+                        bind_out = sn.a;
+                    }
+                    if upd_id != 0 {
+                        let uinfo = m.updateInfo(upd_id);
+                        let sels = m.updateSelectors(upd_id);
+                        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { safe = false; break; }
+                        let root_b = localRef(m, uinfo.root);
+                        if root_b == iter_arr_b || root_b == fill_b || (upd_res_b != 0 && root_b == upd_res_b) {
+                            if localRef(m, sels[0].index) != iter_b { safe = false; break; }
+                            if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { safe = false; break; }
+                            if deadFillExprUsesOrCalls(g, m, uinfo.value, fill_b, iter_arr_b, upd_res_b, budget) { safe = false; break; }
+                            wrote_full = true;
+                            if bind_out != 0 { upd_res_b = bind_out; }
+                        } else {
+                            if deadFillExprUsesOrCalls(g, m, sels[0].index, fill_b, iter_arr_b, upd_res_b, budget) ||
+                                deadFillExprUsesOrCalls(g, m, uinfo.value, fill_b, iter_arr_b, upd_res_b, budget) {
+                                safe = false; break;
+                            }
+                        }
+                    } else if sn.tag == blot_check_core::Tag.bind && sn.c < 2 {
+                        if deadFillExprUsesOrCalls(g, m, sn.b, fill_b, iter_arr_b, upd_res_b, budget) { safe = false; break; }
+                    } else {
+                        safe = false; break;
+                    }
+                }
+                if safe && wrote_full {
+                    recordSkipFillNode(f, fill_id);
+                }
+                break;
+            }
+            if jn.tag == blot_check_core::Tag.bind && jn.c < 2 {
+                if count_b != 0 && jn.a == count_b { break; }
+                var budget: i64 = 64;
+                if deadFillExprUsesOrCalls(g, m, jn.b, fill_b, 0, 0, budget) { break; }
+                continue;
+            }
+            break;
+        }
+    }
+}
 recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let result = g.newSlot();
@@ -816,14 +973,17 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var last = unitVal();
     let children = m.children(id);
     let saved = f.scratch_cut;
+    let saved_skip = f.skip_fill_len;
+    scanDeadFills(g, f, m, children);
     for child, at in children {
         // Statements after one that always diverges are unreachable.
         if last.ty == blot_direct_types::never { break; }
         if id == f.scratch_body { markScratchPair(g, f, children, at); }
         let value, error = stmt(g, f, child);
-        if error != blot_direct_types::Error.none { f.scratch_cut = saved; s.labels.resize(mark); return value, error; }
+        if error != blot_direct_types::Error.none { f.skip_fill_len = saved_skip; f.scratch_cut = saved; s.labels.resize(mark); return value, error; }
         last = value;
     }
+    f.skip_fill_len = saved_skip;
     f.scratch_cut = saved;
     s.labels.resize(mark);
     close(g, f);
@@ -5648,6 +5808,11 @@ fn tryEmitFastMergeLoop(
     var hi_loc: u32 = 0;
     var src_len: u32 = 0;
     var dst_len: u32 = 0;
+    var src_base: u32 = 0;
+    var dst_base: u32 = 0;
+    var fast_ptr_merge = false;
+    var fast_merge_signed = false;
+    var fast_merge_op = blot_check_core::Op.less_equal;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
@@ -5734,6 +5899,98 @@ fn tryEmitFastMergeLoop(
         hi_loc = lim_locs[1];
         src_len = f.checked_arrays[sca].length;
         dst_len = f.checked_arrays[dca].length;
+        src_base = f.checked_arrays[sca].base;
+        dst_base = f.checked_arrays[dca].base;
+        // 7D: Also check if `ch[1]` is the classic 2-way 32-bit integer comparison merge
+        // (`if src[i] (<=|<|>=|>) src[j]: dst[k] := src[i]; i += 1 else: dst[k] := src[j]; j += 1`)
+        // so we can emit a zero-shift 2x-unrolled byte-pointer branchless loop!
+        if i_adv_t && j_adv_e &&
+            tagOf(g, g.types.node(sv.ty).a) == blot_direct_types::Tag.u32_ &&
+            tagOf(g, g.types.node(dv.ty).a) == blot_direct_types::Tag.u32_ {
+            let cond = m.node(s1.a);
+            let is_cmp = (cond.tag == blot_check_core::Tag.scalar || (cond.tag == blot_check_core::Tag.associated && cond.op != blot_check_core::Op.none)) &&
+                (cond.op == blot_check_core::Op.less || cond.op == blot_check_core::Op.less_equal ||
+                 cond.op == blot_check_core::Op.greater || cond.op == blot_check_core::Op.greater_equal);
+            let cmp_ty = m.types.node(m.typeOf(cond.a)).tag;
+            if is_cmp && cmp_ty == blot_check_types::Tag.unsigned32 {
+                let la_ok, la_a, la_i = matchArrayGet(m, cond.a);
+                let lb_ok, lb_a, lb_i = matchArrayGet(m, cond.b);
+                var cmp_valid = false;
+                var raw_op = cond.op;
+                if la_ok && lb_ok && localRef(m, la_a) == src_arrs[0] && localRef(m, lb_a) == src_arrs[0] {
+                    if localRef(m, la_i) == i_iter && localRef(m, lb_i) == j_iter {
+                        cmp_valid = true;
+                    } else if localRef(m, la_i) == j_iter && localRef(m, lb_i) == i_iter {
+                        cmp_valid = true;
+                        if raw_op == blot_check_core::Op.less { raw_op = blot_check_core::Op.greater; }
+                        else if raw_op == blot_check_core::Op.less_equal { raw_op = blot_check_core::Op.greater_equal; }
+                        else if raw_op == blot_check_core::Op.greater { raw_op = blot_check_core::Op.less; }
+                        else { raw_op = blot_check_core::Op.less_equal; }
+                    }
+                }
+                if cmp_valid {
+                    // Verify then writes src[i] to dst[k] and else writes src[j] to dst[k], with only 2 stmts each.
+                    var t_ok = false;
+                    var e_ok = false;
+                    let tbn = m.node(s1.b);
+                    let ebn = m.node(s1.c);
+                    if (tbn.tag == blot_check_core::Tag.suite || tbn.tag == blot_check_core::Tag.block_) &&
+                        (ebn.tag == blot_check_core::Tag.suite || ebn.tag == blot_check_core::Tag.block_) {
+                        let tch = m.children(s1.b);
+                        let ech = m.children(s1.c);
+                        if tch.len == 2 && ech.len == 2 {
+                            var t_wrote = false; var t_inc = false;
+                            for ts in tch {
+                                let tsn = m.node(ts);
+                                var uid: u32 = 0;
+                                if tsn.tag == blot_check_core::Tag.update { uid = ts; }
+                                else if tsn.tag == blot_check_core::Tag.bind && tsn.c < 2 && m.node(tsn.b).tag == blot_check_core::Tag.update { uid = tsn.b; }
+                                if uid != 0 {
+                                    let ui = m.updateInfo(uid);
+                                    let ss = m.updateSelectors(uid);
+                                    let vok, va, vi = matchArrayGet(m, ui.value);
+                                    if ss.len == 1 && ss[0].kind == blot_check_core::UpdateKind.index &&
+                                        localRef(m, ui.root) == dst_arrs[0] && localRef(m, ss[0].index) == k_iter &&
+                                        (ui.self_binding == 0 || uses(g, f, ui.self_binding) == 0) &&
+                                        vok && localRef(m, va) == src_arrs[0] && localRef(m, vi) == i_iter {
+                                        t_wrote = true;
+                                    }
+                                } else if tsn.tag == blot_check_core::Tag.bind && tsn.c < 2 && matchVarPlusConstOne(m, tsn.b, i_iter) {
+                                    t_inc = true;
+                                }
+                            }
+                            var e_wrote = false; var e_inc = false;
+                            for es in ech {
+                                let esn = m.node(es);
+                                var uid: u32 = 0;
+                                if esn.tag == blot_check_core::Tag.update { uid = es; }
+                                else if esn.tag == blot_check_core::Tag.bind && esn.c < 2 && m.node(esn.b).tag == blot_check_core::Tag.update { uid = esn.b; }
+                                if uid != 0 {
+                                    let ui = m.updateInfo(uid);
+                                    let ss = m.updateSelectors(uid);
+                                    let vok, va, vi = matchArrayGet(m, ui.value);
+                                    if ss.len == 1 && ss[0].kind == blot_check_core::UpdateKind.index &&
+                                        localRef(m, ui.root) == dst_arrs[0] && localRef(m, ss[0].index) == k_iter &&
+                                        (ui.self_binding == 0 || uses(g, f, ui.self_binding) == 0) &&
+                                        vok && localRef(m, va) == src_arrs[0] && localRef(m, vi) == j_iter {
+                                        e_wrote = true;
+                                    }
+                                } else if esn.tag == blot_check_core::Tag.bind && esn.c < 2 && matchVarPlusConstOne(m, esn.b, j_iter) {
+                                    e_inc = true;
+                                }
+                            }
+                            t_ok = t_wrote && t_inc;
+                            e_ok = e_wrote && e_inc;
+                        }
+                    }
+                    if t_ok && e_ok {
+                        fast_ptr_merge = true;
+                        fast_merge_signed = false;
+                        fast_merge_op = raw_op;
+                    }
+                }
+            }
+        }
         matched = true;
     }
     if !matched { return false, blot_direct_types::Error.none; }
@@ -5762,11 +6019,109 @@ fn tryEmitFastMergeLoop(
     let prev_spec = f.in_specialized_loop;
     f.in_specialized_loop = true;
     let spec_if = open(g, f, OP_if_);
-    recordCheckedLe(f, mid_loc, src_len);
-    recordCheckedLe(f, hi_loc, src_len);
-    recordCheckedBound(f, k_loc, dst_len);
-    let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
-    if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+    if fast_ptr_merge {
+        let src_end_b = local32(g, f);
+        lget(g, src_base); lget(g, src_len); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, src_end_b);
+        let dst_end_b = local32(g, f);
+        lget(g, dst_base); lget(g, dst_len); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, dst_end_b);
+        lget(g, dst_end_b); lget(g, src_base); op(g, OP_i32_le_u);
+        lget(g, src_end_b); lget(g, dst_base); op(g, OP_i32_le_u);
+        op(g, OP_i32_or);
+        lget(g, src_end_b); lget(g, src_base); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+        lget(g, dst_end_b); lget(g, dst_base); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+        let disj_if = open(g, f, OP_if_);
+        let pi = local32(g, f);
+        let pj = local32(g, f);
+        let pk = local32(g, f);
+        let p_mid = local32(g, f);
+        let p_hi = local32(g, f);
+        let vi = local32(g, f);
+        let vj = local32(g, f);
+        let cmp = local32(g, f);
+        let v0 = local32(g, f);
+        let v1 = local32(g, f);
+        lget(g, src_base); lget(g, i_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, pi);
+        lget(g, src_base); lget(g, j_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, pj);
+        lget(g, dst_base); lget(g, k_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, pk);
+        lget(g, src_base); lget(g, mid_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, p_mid);
+        lget(g, src_base); lget(g, hi_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, p_hi);
+        var cmp_wop: u8 = OP_i32_le_u;
+        if fast_merge_signed {
+            if fast_merge_op == blot_check_core::Op.less { cmp_wop = OP_i32_lt_s; }
+            else if fast_merge_op == blot_check_core::Op.less_equal { cmp_wop = OP_i32_le_s; }
+            else if fast_merge_op == blot_check_core::Op.greater { cmp_wop = OP_i32_gt_s; }
+            else { cmp_wop = OP_i32_ge_s; }
+        } else {
+            if fast_merge_op == blot_check_core::Op.less { cmp_wop = OP_i32_lt_u; }
+            else if fast_merge_op == blot_check_core::Op.less_equal { cmp_wop = OP_i32_le_u; }
+            else if fast_merge_op == blot_check_core::Op.greater { cmp_wop = OP_i32_gt_u; }
+            else { cmp_wop = OP_i32_ge_u; }
+        }
+        // 2x unrolled byte-pointer branchless loop (descending pk+4, pk+0 stores => 1 wtime store check / 2 elems!)
+        let m2_exit = open(g, f, OP_block);
+        let m2_top = open(g, f, OP_loop);
+        lget(g, p_mid); lget(g, pi); op(g, OP_i32_sub); i32Const(g, 8); op(g, OP_i32_lt_u);
+        lget(g, p_hi); lget(g, pj); op(g, OP_i32_sub); i32Const(g, 8); op(g, OP_i32_lt_u);
+        op(g, OP_i32_or);
+        br(g, f, OP_br_if, m2_exit);
+        // Step 0
+        lget(g, pi); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vi);
+        lget(g, pj); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vj);
+        op(g, cmp_wop); lset(g, cmp);
+        lget(g, vi); lget(g, vj); lget(g, cmp); op(g, OP_select); lset(g, v0);
+        lget(g, pi); i32Const(g, 4); op(g, OP_i32_add); lget(g, pi); lget(g, cmp); op(g, OP_select); lset(g, pi);
+        lget(g, pj); lget(g, pj); i32Const(g, 4); op(g, OP_i32_add); lget(g, cmp); op(g, OP_select); lset(g, pj);
+        // Step 1
+        lget(g, pi); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vi);
+        lget(g, pj); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vj);
+        op(g, cmp_wop); lset(g, cmp);
+        lget(g, vi); lget(g, vj); lget(g, cmp); op(g, OP_select); lset(g, v1);
+        lget(g, pi); i32Const(g, 4); op(g, OP_i32_add); lget(g, pi); lget(g, cmp); op(g, OP_select); lset(g, pi);
+        lget(g, pj); lget(g, pj); i32Const(g, 4); op(g, OP_i32_add); lget(g, cmp); op(g, OP_select); lset(g, pj);
+        // Descending stores +4, +0
+        lget(g, pk); lget(g, v1); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
+        lget(g, pk); lget(g, v0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+        lget(g, pk); i32Const(g, 8); op(g, OP_i32_add); lset(g, pk);
+        br(g, f, OP_br, m2_top);
+        close(g, f);
+        close(g, f);
+        // 1x byte-pointer tail loop
+        let m1_exit = open(g, f, OP_block);
+        let m1_top = open(g, f, OP_loop);
+        lget(g, pi); lget(g, p_mid); op(g, OP_i32_ge_u);
+        lget(g, pj); lget(g, p_hi); op(g, OP_i32_ge_u);
+        op(g, OP_i32_or);
+        br(g, f, OP_br_if, m1_exit);
+        lget(g, pi); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vi);
+        lget(g, pj); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); ltee(g, vj);
+        op(g, cmp_wop); lset(g, cmp);
+        lget(g, pk); lget(g, vi); lget(g, vj); lget(g, cmp); op(g, OP_select); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
+        lget(g, pi); i32Const(g, 4); op(g, OP_i32_add); lget(g, pi); lget(g, cmp); op(g, OP_select); lset(g, pi);
+        lget(g, pj); lget(g, pj); i32Const(g, 4); op(g, OP_i32_add); lget(g, cmp); op(g, OP_select); lset(g, pj);
+        lget(g, pk); i32Const(g, 4); op(g, OP_i32_add); lset(g, pk);
+        br(g, f, OP_br, m1_top);
+        close(g, f);
+        close(g, f);
+        lget(g, pi); lget(g, src_base); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shr_u); lset(g, i_loc);
+        lget(g, pj); lget(g, src_base); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shr_u); lset(g, j_loc);
+        lget(g, pk); lget(g, dst_base); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shr_u); lset(g, k_loc);
+        let aerr = assign(g, f, iteration, outgoing, id);
+        if aerr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, aerr; }
+        popCheckedArraysAt(f, disj_if);
+        op(g, OP_else_);
+        recordCheckedLe(f, mid_loc, src_len);
+        recordCheckedLe(f, hi_loc, src_len);
+        recordCheckedBound(f, k_loc, dst_len);
+        let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
+        if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+        close(g, f);
+    } else {
+        recordCheckedLe(f, mid_loc, src_len);
+        recordCheckedLe(f, hi_loc, src_len);
+        recordCheckedBound(f, k_loc, dst_len);
+        let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
+        if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+    }
     popCheckedArraysAt(f, spec_if);
     op(g, OP_else_);
     let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
@@ -6475,8 +6830,7 @@ fn tryEmitBlockedMatmulKLoop(
     let k_top = open(g, f, OP_loop);
     lget(g, k_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k_exit);
 
-    lget(g, a_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0);
-    simdOp(g, SIMD_f32x4_splat); lset(g, va);
+    lget(g, a_cur); simdMemOp(g, SIMD_v128_load32_splat, 2, 0); lset(g, va);
 
     // Descending offsets 48, 32, 16, 0 on b_cur => 1 software bounds check per k!
     emitMatmulLoadMulAdd(g, va, b_cur, 48, acc3);
@@ -6725,29 +7079,27 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, c_str_bytes); i32Const(g, 2); op(g, OP_i32_shl); lset(g, c_str4_bytes);
     let m_tile8 = local32(g, f);
     lget(g, m_loc); i32Const(g, 0xfffffff8); op(g, OP_i32_and); lset(g, m_tile8);
-    let n_even = local32(g, f);
-    lget(g, n_loc); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, n_even);
+    let n_q4 = local32(g, f);
+    lget(g, n_loc); i32Const(g, 0xfffffffc); op(g, OP_i32_and); lset(g, n_q4);
 
     let r4_i = constLocal(g, f, 0);
     var ar4: u32[4] = [0; 4];
     var cr4: u32[4] = [0; 4];
     var ac4: u32[4] = [0; 4];
     var ct4: u32[4] = [0; 4];
-    var ak0_4: u32[4] = [0; 4];
-    var ak1_4: u32[4] = [0; 4];
     var acc4_0: u32[4] = [0; 4];
     var acc4_1: u32[4] = [0; 4];
     var sc4: u32[4] = [0; 4];
+    var a3_bits: u32[4] = [0; 4];
     for r in 0..4 {
         ar4[r] = local32(g, f);
         cr4[r] = local32(g, f);
         ac4[r] = local32(g, f);
         ct4[r] = local32(g, f);
-        ak0_4[r] = local(g, f, VT_f32);
-        ak1_4[r] = local(g, f, VT_f32);
         acc4_0[r] = local(g, f, VT_v128);
         acc4_1[r] = local(g, f, VT_v128);
         sc4[r] = local(g, f, VT_f32);
+        a3_bits[r] = local32(g, f);
     }
     lget(g, a_base); lset(g, ar4[0]);
     lget(g, c_base); lset(g, cr4[0]);
@@ -6784,50 +7136,54 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, b_base); lget(g, col4_byte); op(g, OP_i32_add); lset(g, b4_cur);
     i32Const(g, 0); lset(g, k4_i);
 
-    // 2x unrolled k loop (descending a offsets 4,0 + descending b offsets 16,0)
+    // 7E: Zero-spill 4x-unrolled k loop (11 live XMMs <= 14 -> zero spills!).
+    // Pre-loading a[r, k+3] (+12) into GP i32 locals proves ac4[r]+16 once per 4 k-steps
+    // for dominator BCE, eliminating 75% of software bounds checks on `a` with zero XMM cost!
     let k4_exit = open(g, f, OP_block);
     let k4_top = open(g, f, OP_loop);
-    lget(g, k4_i); lget(g, n_even); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k4_exit);
+    lget(g, k4_i); lget(g, n_q4); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k4_exit);
 
     for r in 0..4 {
-        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 4); lset(g, ak1_4[r]);
-        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, ak0_4[r]);
+        lget(g, ac4[r]); op(g, OP_i32_load); uleb(g, 2); uleb(g, 12); lset(g, a3_bits[r]);
     }
-    // Step k
-    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
-    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
+    for ks in 0..4 {
+        lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
+        lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
+        for r in 0..4 {
+            if ks < 3 {
+                lget(g, ac4[r]); simdMemOp(g, SIMD_v128_load32_splat, 2, (ks as u32) * 4); lset(g, va4);
+            } else {
+                lget(g, a3_bits[r]); simdOp(g, SIMD_i32x4_splat); lset(g, va4);
+            }
+            emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
+            emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
+        }
+        lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
+    }
     for r in 0..4 {
-        lget(g, ak0_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
-        emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
-        emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
+        lget(g, ac4[r]); i32Const(g, 16); op(g, OP_i32_add); lset(g, ac4[r]);
     }
-    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
-    // Step k + 1
-    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
-    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
-    for r in 0..4 {
-        lget(g, ak1_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
-        emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
-        emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
-        lget(g, ac4[r]); i32Const(g, 8); op(g, OP_i32_add); lset(g, ac4[r]);
-    }
-    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
-    lget(g, k4_i); i32Const(g, 2); op(g, OP_i32_add); lset(g, k4_i);
+    lget(g, k4_i); i32Const(g, 4); op(g, OP_i32_add); lset(g, k4_i);
     br(g, f, OP_br, k4_top);
     close(g, f);
     close(g, f);
 
-    // Odd n single-k tail
-    lget(g, k4_i); lget(g, n_loc); op(g, OP_i32_lt_u);
-    let oddk_if = open(g, f, OP_if_);
+    // Remainder k tail (0..3 iterations)
+    let k4t_exit = open(g, f, OP_block);
+    let k4t_top = open(g, f, OP_loop);
+    lget(g, k4_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k4t_exit);
     lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
     lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
     for r in 0..4 {
-        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
+        lget(g, ac4[r]); simdMemOp(g, SIMD_v128_load32_splat, 2, 0); lset(g, va4);
         emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
         emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
+        lget(g, ac4[r]); i32Const(g, 4); op(g, OP_i32_add); lset(g, ac4[r]);
     }
-    popCheckedArraysAt(f, oddk_if);
+    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
+    lget(g, k4_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, k4_i);
+    br(g, f, OP_br, k4t_top);
+    close(g, f);
     close(g, f);
 
     // Store all 4 rows in descending offset order (16, 0) with canonical NaN check!
@@ -7007,8 +7363,8 @@ fn tryEmitBlockedMatmulRowLoop(
     let k_top = open(g, f, OP_loop);
     lget(g, k_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k_exit);
 
-    lget(g, a0_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va0);
-    lget(g, a1_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va1);
+    lget(g, a0_cur); simdMemOp(g, SIMD_v128_load32_splat, 2, 0); lset(g, va0);
+    lget(g, a1_cur); simdMemOp(g, SIMD_v128_load32_splat, 2, 0); lset(g, va1);
 
     // Load b[k, col+48..0] ONCE in descending order and update BOTH rows (8 v128 mul+adds)!
     lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, vb);
@@ -7598,6 +7954,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if ainit_err != blot_direct_types::Error.none { return neverVal(), ainit_err; }
         let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
         if red_err != blot_direct_types::Error.none { return neverVal(), red_err; }
+        let v3r_err = tryEmitVec3MaybeReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+        if v3r_err != blot_direct_types::Error.none { return neverVal(), v3r_err; }
         let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
         if esc_err != blot_direct_types::Error.none { return neverVal(), esc_err; }
         let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
