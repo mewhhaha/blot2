@@ -6599,8 +6599,8 @@ fn matchMatmulKLoop(
     }
     var c_read_node: u32 = 0;
     var mul_node: u32 = 0;
-    let ra_get, _, _ = matchArrayGet(m, rn.a);
-    let rb_get, _, _ = matchArrayGet(m, rn.b);
+    let ra_get, _ra1, _ra2 = matchArrayGet(m, rn.a);
+    let rb_get, _rb1, _rb2 = matchArrayGet(m, rn.b);
     if ra_get { c_read_node = rn.a; mul_node = rn.b; }
     else if rb_get { c_read_node = rn.b; mul_node = rn.a; }
     else { return false; }
@@ -7955,7 +7955,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             if f.checked_arrays_len >= 14 { continue; }
             if findCheckedArray(f, w(g, val, 0), w(g, val, 1)) >= 0 { continue; }
-            let _, _ = ensureCheckedArray(g, f, val);
+            let _ec1, _ec2 = ensureCheckedArray(g, f, val);
         }
     }
     if body_no_resize && info.kind == blot_check_core::LoopKind.range {

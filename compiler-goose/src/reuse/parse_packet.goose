@@ -149,14 +149,14 @@ fn relocate(prefix:u32, names:const u32[:], symbol: u32&) -> bool {
 fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
     for &node in tree.nodes.items {
         match node.tag {
-            // The second metadata word is the modifier, namespace or unpacked name.
+            // The second metadata word is the modifier or namespace.
             blot_parse_ast::tag_value_decl, blot_parse_ast::tag_import_decl,
-            blot_parse_ast::tag_export_decl, blot_parse_ast::tag_package_unpack => {
+            blot_parse_ast::tag_export_decl => {
                 let slot=node.c as i64+1;
                 if slot>=tree.extra.len || !relocate(prefix,names,tree.extra.items[slot]) {return false;}
-                if node.tag!=blot_parse_ast::tag_package_unpack && !relocate(prefix,names,node.a) {return false;}
+                if !relocate(prefix,names,node.a) {return false;}
             },
-            blot_parse_ast::tag_import_binding, blot_parse_ast::tag_fixity_decl, blot_parse_ast::tag_constraint => {
+            blot_parse_ast::tag_import_binding, blot_parse_ast::tag_constraint => {
                 if !relocate(prefix,names,node.a) || !relocate(prefix,names,node.b) {return false;}
             },
             blot_parse_ast::tag_field_access, blot_parse_ast::tag_comptime_project => {if !relocate(prefix,names,node.b) {return false;}},
@@ -171,7 +171,7 @@ fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
             blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind, blot_parse_ast::tag_pattern_name,
             blot_parse_ast::tag_pattern_constructor, blot_parse_ast::tag_pattern_field, blot_parse_ast::tag_pattern_value,
             blot_parse_ast::tag_type_name, blot_parse_ast::tag_type_field, blot_parse_ast::tag_type_binder,
-            blot_parse_ast::tag_quantified_binder, blot_parse_ast::tag_comptime_for,
+            blot_parse_ast::tag_comptime_for,
             blot_parse_ast::tag_entry_kernel_decl, blot_parse_ast::tag_entry_process_decl => {if !relocate(prefix,names,node.a) {return false;}},
             _ => {if node.tag>blot_parse_ast::tag_entry_process_decl {return false;}},
         }

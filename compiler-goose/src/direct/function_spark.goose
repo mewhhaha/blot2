@@ -1158,7 +1158,7 @@ fn matchRelaxedF32MinMax(g: Generator&, m: const Module&, env: const Env&, cond_
         let use_disp = is_assoc || cn.c == 1;
         var member: u32 = 0;
         if is_assoc { member = cn.c; }
-        let machine, _, _ = resolveSparkScalarOp(g, m, cn.op, member, use_disp, aty);
+        let machine, _s1, _s2 = resolveSparkScalarOp(g, m, cn.op, member, use_disp, aty);
         cmp_op = machine;
         cmp_a = cn.a;
         cmp_b = cn.b;
@@ -1204,7 +1204,7 @@ fn matchVecF32Mul(g: Generator&, m: const Module&, env: const Env&, id: u32) -> 
     let use_disp = is_assoc || n.c == 1;
     var member: u32 = 0;
     if is_assoc { member = n.c; }
-    let machine, _, _ = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
+    let machine, _s1, _s2 = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
     if machine != blot_check_core::Op.mul { return false, 0, 0; }
     return true, n.a, n.b;
 }
@@ -1231,7 +1231,7 @@ fn isBoundedLeafVecF32(g: Generator&, f: const Fn&, plan: const SparkVecPlan&, m
         let use_disp = is_assoc || n.c == 1;
         var member: u32 = 0;
         if is_assoc { member = n.c; }
-        let machine, _, _ = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
+        let machine, _s1, _s2 = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
         return machine == blot_check_core::Op.convert_u32_f32 || machine == blot_check_core::Op.convert_i32_f32;
     }
     if n.tag == blot_check_core::Tag.call {
@@ -1259,7 +1259,7 @@ fn isFiniteVecF32(g: Generator&, f: const Fn&, plan: const SparkVecPlan&, m: con
         let use_disp = is_assoc || n.c == 1;
         var member: u32 = 0;
         if is_assoc { member = n.c; }
-        let machine, _, _ = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
+        let machine, _s1, _s2 = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
         if machine == blot_check_core::Op.mul || machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub {
             return isBoundedLeafVecF32(g, f, plan, m, env, n.a) && isBoundedLeafVecF32(g, f, plan, m, env, n.b);
         }

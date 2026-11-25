@@ -23,7 +23,6 @@ let tag_contract_value_member: Tag = 9;
 let tag_implementation_decl: Tag = 10;
 let tag_effect_decl: Tag = 11;
 let tag_effect_type_decl: Tag = 12;
-let tag_fixity_decl: Tag = 13;
 let tag_attribute: Tag = 14;
 let tag_constraint: Tag = 15;
 let tag_where_clause: Tag = 16;
@@ -61,7 +60,6 @@ let tag_use_stmt: Tag = 48;
 let tag_iterator_bind: Tag = 49;
 let tag_function_return_stmt: Tag = 50;
 let tag_return_stmt: Tag = 51;
-let tag_yield_stmt: Tag = 52;
 let tag_break_stmt: Tag = 53;
 let tag_continue_stmt: Tag = 54;
 let tag_if_expr: Tag = 55;
@@ -73,8 +71,6 @@ let tag_forever_stmt: Tag = 60;
 let tag_case_expr: Tag = 61;
 let tag_case_arm: Tag = 62;
 let tag_pattern_row: Tag = 63;
-let tag_request_case: Tag = 64;
-let tag_request_arm: Tag = 65;
 let tag_pattern_name: Tag = 66;
 let tag_pattern_integer: Tag = 67;
 let tag_pattern_boolean: Tag = 68;
@@ -95,14 +91,6 @@ let tag_effect_row: Tag = 82;
 let tag_numeric_error: Tag = 83;
 let tag_type_binder: Tag = 84;
 let tag_type_usage: Tag = 85;
-let tag_type_forall: Tag = 86;
-let tag_type_exists: Tag = 87;
-let tag_quantified_binder: Tag = 88;
-let tag_package_pack: Tag = 89;
-let tag_package_unpack: Tag = 90;
-let tag_type_code: Tag = 91;
-let tag_type_descriptor: Tag = 92;
-let tag_task_region: Tag = 93;
 let tag_fork_expr: Tag = 94;
 let tag_with_stmt: Tag = 95;
 let tag_with_entry: Tag = 96;
@@ -137,12 +125,7 @@ let code_expected_expression: Code = 1;
 let code_expected_type: Code = 2;
 let code_expected_pattern: Code = 3;
 let code_unexpected_token: Code = 4;
-let code_task_receive_tuple: Code = 7;
 let code_invalid_literal: Code = 8;
-let code_operator_associativity: Code = 9;
-let code_fixity_order: Code = 10;
-let code_duplicate_fixity: Code = 11;
-let code_invalid_precedence: Code = 12;
 let code_nesting_limit: Code = 13;
 let code_table_limit: Code = 14;
 let code_private_marker: Code = 15;
@@ -168,12 +151,7 @@ fn message(value: Diagnostic) -> const u8[:] {
  if value.code == code_expected_type { return "Expected a type"; }
  if value.code == code_expected_pattern { return "Expected a pattern"; }
  if value.code == code_unexpected_token { return "Unexpected syntax token"; }
- if value.code == code_task_receive_tuple { return "Tuple receive is not available yet; join each handle explicitly"; }
  if value.code == code_invalid_literal { return "Invalid literal"; }
- if value.code == code_operator_associativity { return "Equal-precedence operators need compatible associativity or parentheses"; }
- if value.code == code_fixity_order { return "Fixity declarations must precede other declarations"; }
- if value.code == code_duplicate_fixity { return "An operator fixity was declared more than once"; }
- if value.code == code_invalid_precedence { return "Operator precedence must be between 0 and 255"; }
  if value.code == code_nesting_limit { return "Syntax nesting exceeds the parser limit"; }
  if value.code == code_table_limit { return "Syntax exceeds the 32-bit table limit"; }
  if value.code == code_private_marker { return "Private frontend markers are not source syntax"; }
@@ -189,7 +167,6 @@ struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bo
 struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node: Id, fallback: Id }
 struct ImportDecl { path: blot_parse_symbols::Symbol, namespace_: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
 struct ImportBinding { name: blot_parse_symbols::Symbol, alias: blot_parse_symbols::Symbol }
-struct Fixity { operator: blot_parse_symbols::Symbol, target: blot_parse_symbols::Symbol, precedence: u32, association: u32, named: bool, attributes: List = List {..}, literal_error: Id = 0 }
 struct DeclarationTraits { declaration: Id, private: bool = false, is_opaque: bool = false }
 struct RuntimeName { declaration: Id, point: u32 }
 struct DeclarationNodes { root: Id, first: Id, end: Id }
@@ -483,12 +460,6 @@ fn import_decl(tree: const Tree&, id: Id) -> ImportDecl {
  return ImportDecl {n.a,x[1],List {n.b,x[0], ..},Span {x[2],x[3], ..},Span {x[4],x[5], ..}, ..};
 }
 fn import_binding(tree: const Tree&, id: Id) -> ImportBinding { let n=node(tree,id); return ImportBinding {n.a,n.b, ..}; }
-fn fixity(tree: const Tree&, id: Id) -> Fixity {
- let n=node(tree,id); let x=tree.extra.items[n.c..n.c+3]; var attrs=List {..}; var literal: Id=0;
- if (x[2]&2)!=0 { attrs=List {tree.extra.items[n.c+3],tree.extra.items[n.c+4], ..}; }
- if (x[2]&4)!=0 { literal=tree.extra.items[n.c+5]; }
- return Fixity {n.a,n.b,x[0],x[1],(x[2]&1)!=0,attrs,literal, ..};
-}
 
 fn code_name(code: Code) -> const u8[:] {
  if code==code_expected_token { return "expected_token"; }
@@ -497,12 +468,7 @@ fn code_name(code: Code) -> const u8[:] {
  if code==code_expected_type { return "expected_type"; }
  if code==code_expected_pattern { return "expected_pattern"; }
  if code==code_unexpected_token { return "unexpected_token"; }
- if code==code_task_receive_tuple { return "task_receive_tuple"; }
  if code==code_invalid_literal { return "invalid_literal"; }
- if code==code_operator_associativity { return "operator_associativity"; }
- if code==code_fixity_order { return "fixity_order"; }
- if code==code_duplicate_fixity { return "duplicate_fixity"; }
- if code==code_invalid_precedence { return "invalid_precedence"; }
  if code==code_nesting_limit { return "nesting_limit"; }
  if code==code_table_limit { return "table_limit"; }
  if code==code_private_marker { return "private_marker"; }
