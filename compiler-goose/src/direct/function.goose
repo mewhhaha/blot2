@@ -209,6 +209,19 @@ struct Fn {
     in_specialized_loop: bool = false,
     // 6A: Local holding 1 iff the pre-scanned indirect index array is strictly increasing.
     indirect_bound_distinct_local: u32 = 0xffffffff,
+    // Tail-call optimization state:
+    // `fn_return_block`: outermost Core block of a named body (returns targeting it exit the fn).
+    // `self_tco_loop`: Wasm loop depth for MVP self-tail-call-to-loop lowering (0xffffffff if none).
+    // `self_tco_inputs`: parameter value slots rebound on each self-tail-call backedge.
+    // `tail_call_node`: exact Core `Tag.call` node currently being emitted in function tail position.
+    // `tco_inhibit`: > 0 inside `fork`, `inlineSmall`, etc. where tail jumps must not fire.
+    // `emitted_return_call`: true if Wasm 3.0 `return_call` fired (suppresses entry/exit release wrap).
+    fn_return_block: u32 = 0,
+    self_tco_loop: u32 = 0xffffffff,
+    self_tco_inputs: Vals = Vals {},
+    tail_call_node: u32 = 0,
+    tco_inhibit: u32 = 0,
+    emitted_return_call: bool = false,
 }
 
 fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {

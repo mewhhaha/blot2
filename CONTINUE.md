@@ -1,19 +1,71 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 6 Runtime Optimizations (6A–6C) (25 November 2026)
+## Current frontier: Default Self-TCO & Opt-In Wasm 3.0 Features (25 November 2026)
 
-Tier 6 direct-backend runtime optimizations (6A–6C) are complete and qualified
-(`blotc-goose` SHA-256 `cc6640fc5c4eab7129fcfb1e20248bb804e7f8b91af98801254e869cf38af012`,
-`8,504,056` B; `generated/compiler/blotc.gz` SHA-256
-`d2d340ba703eeddaa13af610b3f4f76a15ad15472a37a4052eb778ccc5def187`, `3,674,983` B),
-sweeping **6 / 6 kernels vs Rust `-O3` Wasm (`0.44×` geomean — 2.29× faster)**,
-beating **native Rust `-O3` on 5 / 6 kernels with a 1.1% dead heat on `matmul_64`
-(`0.54×` geomean — 1.85× faster)**, and pushing Ink ECS pure-Wasm AoS dense loops
-**2.20×–2.57× faster than native Bevy ECS `0.20.1`** (`0.47 ms` Pool direct /
-`0.55 ms` cached query vs `1.22 ms` Bevy) on **`wtime-aot 0.1.1` (`--backend x64`,
-`x64-v3`, `1201395`)**:
+Default MVP self-tail-call-to-loop TCO and opt-in Wasm 3.0 flags
+(`--tail-calls`, `--relaxed-simd`, `--wasm3`) are complete and qualified
+(`blotc-goose` SHA-256
+`5e61297b6be2aaf3515671538af8e38a87f3b23ed26953648db7f516940a9eb7`, `8,516,776` B;
+`generated/compiler/blotc.gz` SHA-256
+`bf2dad2e0e4f6c140599cf962d315f708b6bae1fcad3c7f1e5634191d24c86d4`, `3,679,802` B),
+keeping default compilation 100% deterministic (canonical `0x7fc00000` quiet NaN)
+and admitted by both V8/Deno and `wtime-aot --backend x64`, while unlocking Wasm
+3.0 general tail calls (`return_call`) and fused SIMD multiply-add
+(`f32x4.relaxed_madd` / `f32x4.relaxed_nmadd`) behind opt-in flags:
 
-- **Tier 6 direct-backend runtime optimizations (this commit, after `a6fe57b1`):**
+- **Default Self-TCO & Opt-In Wasm 3.0 Features (this commit, after `08c35720`):**
+  - **Flag plumbing & compiler identity isolation (`direct/writer.goose`, `direct/function_ops.goose`, `main.goose`, `driver/cli.goose`, `host/cli.ts`, `host/zig_project_client.ts`):**
+    Added `--relaxed-simd`, `--tail-calls`, and `--wasm3` (enabling both) to
+    `blotc` (`build`, `build-project`, `serve-project`), `host/cli.ts`, and
+    `ZigProjectCompilerOptions` (`relaxedSimd`, `tailCalls`, `wasm3`). When
+    non-default flags are active, `configureWasmFeatures` mixes `"wasm-features"`
+    into `configured_identity` via `blake3` to keep build/cache keys isolated
+    while keeping default output and default identity byte-identical.
+  - **Default MVP self-TCO loop + opt-in `return_call` (`direct/function.goose`, `direct/function_entry.goose`, `direct/function_control.goose`, `direct/function_calls.goose`):**
+    Lowered eligible self-tail calls by default into a parallel-swap-safe
+    `OP_loop` backedge (`push` args → reverse `lset` into `self_tco_inputs` →
+    clear caches → `br self_tco_loop`), guarded against `fork` rollback regions
+    (`tco_inhibit`), active handles, scratch cuts, and releasing loops. Under
+    `--tail-calls` / `--wasm3`, eligible non-self tail calls with matching result
+    shapes emit Wasm 3.0 `OP_return_call` (`0x12`), skipping `inlineSmall` on
+    call-bearing callees so mutual recursion stays in tail position and guarding
+    entry/exit `release` wrapping with `!f.emitted_return_call`.
+  - **Opt-in `--relaxed-simd` FMA lowering (`direct/function_control.goose`, `direct/function_spark.goose`):**
+    Added `f32x4.relaxed_madd` (`0xfd 0x105`) and `f32x4.relaxed_nmadd`
+    (`0xfd 0x106`) lowering across all three blocked/vectorized matmul paths
+    (`6B-1`, `5C`, `4C`), `spark`/`for` auto-SIMD (`x*y + z`, `z + x*y`,
+    `z - x*y`), and escape-time SIMD (`6C`, `5E`), preserving canonical
+    `0x7fc00000` NaN normalization where required.
+  - **Deno V8 FMA measurements & `wtime-aot x64` compatibility note:**
+    On AMD Ryzen 7 7800X3D (Deno V8, median of 15 runs, `blot_kernels.blot`
+    default `21,355` B vs `--relaxed-simd` `21,163` B with `64 × f32x4.relaxed_madd`):
+    `matmul_64` `0.0210 → 0.0184 ms` (**1.15× faster**, exact checksum `6538500`),
+    `particle_spark_simd` `0.4531 → 0.4263 ms` (**1.06× faster**, exact checksum
+    `13338354`), and `mandelbrot_f32` `0.7008 → 0.6733 ms` (**1.04× faster**,
+    checksum `1686413` vs `1686408` — 5 boundary pixels shifted by 1 iteration
+    from single-rounding FMA vs IEEE two-rounding `mul+add`, confirming why
+    `--relaxed-simd` must remain opt-in). Verified `wtime-aot 0.1.1 --backend x64`
+    cleanly admits default `blot_kernels.wasm` and default self-TCO modules;
+    `wtime-aot`'s `x64_validate_features()` currently rejects `tail_call` and
+    `relaxed_simd` (`ErrorKind::DisabledFeature`), so those opt-in flags target
+    V8/Deno and `wtime-runtime` today and are ready for `wtime-aot x64` once
+    enabled upstream.
+  - **Qualification:** `deno task test:compiler` (`1127 passed | 0 failed` guests
+    incl. new `tests/guest/wasm3_features_execution.test.ts`, `109/109` fixtures
+    byte-identical, `206/206` uniqueness), `deno task test:editor` (`6/6`),
+    `deno fmt --check` & `deno check`, and `../pen` (`cargo test -p blot-host`
+    `40/40` + `examples/bounce` `pen check`).
+
+- **Tier 6 direct-backend runtime optimizations (`08c35720`, after `a6fe57b1`):**
+  Qualified at `blotc-goose` SHA-256 `cc6640fc5c4eab7129fcfb1e20248bb804e7f8b91af98801254e869cf38af012`
+  (`8,504,056` B; `generated/compiler/blotc.gz` SHA-256
+  `d2d340ba703eeddaa13af610b3f4f76a15ad15472a37a4052eb778ccc5def187`, `3,674,983` B),
+  sweeping **6 / 6 kernels vs Rust `-O3` Wasm (`0.44×` geomean — 2.29× faster)**,
+  beating **native Rust `-O3` on 5 / 6 kernels with a 1.1% dead heat on `matmul_64`
+  (`0.54×` geomean — 1.85× faster)**, and pushing Ink ECS pure-Wasm AoS dense loops
+  **2.20×–2.57× faster than native Bevy ECS `0.20.1`** (`0.47 ms` Pool direct /
+  `0.55 ms` cached query vs `1.22 ms` Bevy) on **`wtime-aot 0.1.1` (`--backend x64`,
+  `x64-v3`, `1201395`)**:
   - **6A (4× coalesced `v128` loops for 16-byte `Maybe Vec3` + dynamic `ids` monotonicity classification):**
     Factored `Vec3MaybeMatch` / `matchVec3MaybeSimdUpdate` and added
     `tryEmitVec3MaybeLoop4x` (`direct/function_control.goose`,

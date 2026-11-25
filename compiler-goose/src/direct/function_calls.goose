@@ -642,6 +642,8 @@ recursive fn call(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Va
     return value, error;
 }
 recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
+    let tail_here = f.tail_call_node == id;
+    f.tail_call_node = 0;
     let m .= g.units[f.unit - 1];
     let info = m.call(id);
     let target = g.resolve(m, info.target);
@@ -799,7 +801,10 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
     refine(g, f, info.callee_type, callee);
     let rest, error = restType(g, f, callee, values.len, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    return callTarget(g, f, target, values, callee, rest, id, elide_nan);
+    if tail_here { f.tail_call_node = id; }
+    let res_v, res_err = callTarget(g, f, target, values, callee, rest, id, elide_nan);
+    f.tail_call_node = 0;
+    return res_v, res_err;
 }
 // Parameter `index` of `target` as fixed by the evaluated `values` (entries
 // typed never are not yet evaluated), with holes.
@@ -1322,6 +1327,42 @@ fn lowers(g: Generator&, f: const Fn&, ty: TId) -> bool {
     let lowered, error = g.types.lower(g.units[f.unit - 1], ty, f.env);
     return error == blot_direct_types::Error.none;
 }
+recursive fn bodyContainsCall(m: const Module&, id: u32, left: i64&) -> bool {
+    if id == 0 || left <= 0 { return true; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        call, apply, contract_method => { return true; },
+        suite, block_, product, record, array, array_op, storage => {
+            for child in m.children(id) {
+                if bodyContainsCall(m, child, left) { return true; }
+            }
+            return false;
+        },
+        if_stmt, if_value => {
+            return bodyContainsCall(m, n.a, left) || bodyContainsCall(m, n.b, left) || bodyContainsCall(m, n.c, left);
+        },
+        bind, construct => { return bodyContainsCall(m, n.b, left); },
+        pattern_bind => { return bodyContainsCall(m, n.b, left) || bodyContainsCall(m, n.c, left); },
+        return_, project => { return bodyContainsCall(m, n.a, left); },
+        scalar, logical, associated => { return bodyContainsCall(m, n.a, left) || bodyContainsCall(m, n.b, left); },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if bodyContainsCall(m, inp, left) { return true; }
+            }
+            for arm in m.matchArms(id) {
+                if bodyContainsCall(m, arm.guard_, left) || bodyContainsCall(m, arm.body, left) { return true; }
+            }
+            return false;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            return bodyContainsCall(m, linfo.first, left) || bodyContainsCall(m, linfo.end, left) || bodyContainsCall(m, linfo.body, left);
+        },
+        _ => { return false; },
+    }
+}
+
 // Applies a resolved module-level binding to evaluated arguments. `callee` is
 // its concrete (curried) function type at this site.
 recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool = false) -> Val, Error {
@@ -1330,6 +1371,8 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     if body && body.is_function {
         let parameters = tm.bodyParameters(body);
         let param_count = parameters.len;
+        let is_tail = f.tail_call_node == id && (arguments.len as i64) == param_count;
+        f.tail_call_node = 0;
         if arguments.len < param_count {
             let rest, error = restType(g, f, callee, arguments.len, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -1343,7 +1386,14 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         var value = neverVal();
         var has_value = false;
         let evidence_context = evidenceContext(g, f, target, id);
-        if f.forward_depth < 8 && evidence_context == 0 {
+        let self_tco_target = is_tail && f.self_tco_loop != 0xffffffff &&
+            target.unit == f.unit && target.binding == g.s.instances[f.instance_id].key.id;
+        var skip_inline_for_tco = self_tco_target;
+        if !skip_inline_for_tco && is_tail && blot_direct_writer::tailCallsEnabled() {
+            var cbud: i64 = 64;
+            if bodyContainsCall(tm, body.root, cbud) { skip_inline_for_tco = true; }
+        }
+        if !self_tco_target && f.forward_depth < 8 && evidence_context == 0 {
             f.forward_depth += 1;
             let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id);
             f.forward_depth -= 1;
@@ -1352,7 +1402,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             value = forwarded;
             has_value = was_forwarded;
         }
-        if !has_value && f.inline_depth < 3 && evidence_context == 0 {
+        if !has_value && !skip_inline_for_tco && f.inline_depth < 3 && evidence_context == 0 {
             let inlined, was_inlined, ierr = inlineSmall(g, f, target, direct, callee, after, id);
             if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
             if was_inlined {
@@ -1383,6 +1433,41 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                     g.put(" words");
                     return neverVal(), g.failClose();
                 }
+            }
+            if is_tail && f.self_tco_loop != 0xffffffff && instance == f.instance_id && direct.len == f.self_tco_inputs.len {
+                // Default MVP self-tail-call-to-loop: push all argument words onto the
+                // Wasm stack, pop in reverse into parameter locals (parallel-swap safe!),
+                // clear caches, and jump back to the function's TCO loop header.
+                for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
+                var at = direct.len as i64;
+                while at > 0 {
+                    at -= 1;
+                    let param_v = g.s.vals[f.self_tco_inputs.start + at];
+                    var wi = param_v.len as i64;
+                    while wi > 0 {
+                        wi -= 1;
+                        lset(g, w(g, param_v, wi));
+                    }
+                }
+                f.checked_arrays_len = 0;
+                f.checked_grows_len = 0;
+                f.checked_views_len = 0;
+                f.checked_elems_len = 0;
+                f.checked_bounds_len = 0;
+                f.checked_le_len = 0;
+                f.const_tags_len = 0;
+                br(g, f, OP_br, f.self_tco_loop);
+                return neverVal(), blot_direct_types::Error.none;
+            }
+            if is_tail && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+                g.s.instances[instance].result == g.s.instances[f.instance_id].result &&
+                g.s.instances[f.instance_id].result != blot_direct_types::never {
+                // Opt-in Wasm 3.0 `return_call` (0x12) for non-self / mutual tail calls.
+                for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
+                opIndex(g, OP_return_call, g.s.instances[instance].function);
+                f.emitted_return_call = true;
+                f.checked_elems_len = 0;
+                return neverVal(), blot_direct_types::Error.none;
             }
             for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
             callf(g, g.s.instances[instance].function);
@@ -1683,6 +1768,10 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_indirect_b = f.indirect_bound_binding;
     let saved_indirect_l = f.indirect_bound_len;
     let saved_indirect_d = f.indirect_bound_distinct_local;
+    let saved_fn_ret_block = f.fn_return_block;
+    let saved_self_tco_loop = f.self_tco_loop;
+    let saved_tail_call = f.tail_call_node;
+    let saved_tco_inhibit = f.tco_inhibit;
     let saved_owned_computed = f.owned_uses_computed;
     let saved_owned_uses = f.owned_uses;
     let saved_owned_flows = f.owned_flows;
@@ -1722,6 +1811,10 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.indirect_bound_binding = 0;
     f.indirect_bound_len = 0;
     f.indirect_bound_distinct_local = 0xffffffff;
+    f.fn_return_block = 0;
+    f.self_tco_loop = 0xffffffff;
+    f.tail_call_node = 0;
+    f.tco_inhibit = saved_tco_inhibit + 1;
     f.owned_uses_computed = false;
     f.owned_uses = blot_support_zigmap::Map {};
     f.owned_flows = blot_support_zigmap::Map {};
@@ -1765,6 +1858,10 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.indirect_bound_binding = saved_indirect_b;
     f.indirect_bound_len = saved_indirect_l;
     f.indirect_bound_distinct_local = saved_indirect_d;
+    f.fn_return_block = saved_fn_ret_block;
+    f.self_tco_loop = saved_self_tco_loop;
+    f.tail_call_node = saved_tail_call;
+    f.tco_inhibit = saved_tco_inhibit;
     f.owned_uses_computed = saved_owned_computed;
     f.owned_uses = saved_owned_uses;
     f.owned_flows = saved_owned_flows;

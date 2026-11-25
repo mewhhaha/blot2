@@ -29,7 +29,7 @@ type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
 enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed FMA (f32x4.relaxed_madd/nmadd).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -164,8 +164,11 @@ fn run(args:const Argument[:])->bool,Error {
   return accepted,blot_error::Error.none;
  }
  if args[1]=="serve-project" {
-  var policy=Policy{..};var at:i64=2;
+  var policy=Policy{..};var relaxed_simd=false;var tail_calls=false;var at:i64=2;
   while at<args.len {
+   if args[at]=="--relaxed-simd" {relaxed_simd=true;at+=1;continue;}
+   if args[at]=="--tail-calls" {tail_calls=true;at+=1;continue;}
+   if args[at]=="--wasm3" {relaxed_simd=true;tail_calls=true;at+=1;continue;}
    if at+1>=args.len {return false,blot_error::Error.invalid_serve_arguments;}let value=args[at+1];
    if args[at]=="--semantic-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.semantic_workers=workers;}
    else if args[at]=="--frontend-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.frontend_workers=workers;}
@@ -173,6 +176,7 @@ fn run(args:const Argument[:])->bool,Error {
    else {return false,blot_error::Error.invalid_serve_arguments;}
    at+=2;
   }
+  blot_main::configureWasmFeatures(relaxed_simd,tail_calls);
   let error=blot_reuse_zig_project_server::run(blot_io::Reader{0},stdout,blot_main::configured_identity,policy);return error==blot_error::Error.none,error;
  }
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
@@ -182,11 +186,14 @@ fn run(args:const Argument[:])->bool,Error {
  if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
  if project_command||first_option<args.len {
   if command==Command.lex {return false,blot_error::Error.none;}
-  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var policy=Policy{..};var at=first_option;
+  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var policy=Policy{..};var at=first_option;
   while at<args.len {
    let arg=args[at];
-   // The profiling flag takes no value.
+   // Boolean flags taking no value.
    if arg=="--profile" {if !isBuild(command) {return false,blot_error::Error.none;}profile=true;at+=1;continue;}
+   if arg=="--relaxed-simd" {if !isBuild(command) {return false,blot_error::Error.none;}relaxed_simd=true;at+=1;continue;}
+   if arg=="--tail-calls" {if !isBuild(command) {return false,blot_error::Error.none;}tail_calls=true;at+=1;continue;}
+   if arg=="--wasm3" {if !isBuild(command) {return false,blot_error::Error.none;}relaxed_simd=true;tail_calls=true;at+=1;continue;}
    if at+1>=args.len {return false,blot_error::Error.none;}let value=args[at+1];at+=2;
    if arg=="--semantic-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.semantic_workers=workers;semantic_workers=true;}
    else if arg=="--frontend-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.frontend_workers=workers;}
@@ -198,8 +205,9 @@ fn run(args:const Argument[:])->bool,Error {
    else if arg=="--dependencies" {if !isBuild(command)||dependency_path.present {return false,blot_error::Error.none;}dependency_path=blot_support::some<const u8[:]>(value);}
    else {return false,blot_error::Error.none;}
   }
+  blot_main::configureWasmFeatures(relaxed_simd,tail_calls);
   options.aliases=aliases[..];
-  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
+  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
   var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}

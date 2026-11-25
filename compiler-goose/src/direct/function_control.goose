@@ -848,7 +848,9 @@ recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     i32Const(g, 1);
     op(g, OP_i32_add);
     gset(g, rt.fork_depth);
+    f.tco_inhibit += 1;
     let result, error = block_(g, f, n.a);
+    f.tco_inhibit -= 1;
     if error != blot_direct_types::Error.none { return result, error; }
     gget(g, rt.fork_depth);
     i32Const(g, 1);
@@ -1152,7 +1154,36 @@ fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error
 recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
+    // Detect function-level tail call position when no handlers, fork, scratch-cut,
+    // or enclosing releasing loops require unwinding on exit.
+    var prev_tail = f.tail_call_node;
+    if f.tco_inhibit == 0 && f.handles_len == 0 && f.scratch_cut.target == 0 &&
+        n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.call &&
+        (f.self_tco_loop != 0xffffffff || blot_direct_writer::tailCallsEnabled()) {
+        var check_at = g.s.labels.len;
+        var found_fn_exit = false;
+        var has_rel_loop = false;
+        while check_at != f.labels_base {
+            check_at -= 1;
+            let lbl = g.s.labels[check_at];
+            if lbl.kind == blot_direct_emit::LabelKind.loop_ {
+                if lbl.has_release { has_rel_loop = true; }
+                continue;
+            }
+            if lbl.target == n.b || lbl.kind == blot_direct_emit::LabelKind.function {
+                if check_at == f.labels_base ||
+                    (check_at == f.labels_base + 1 && f.fn_return_block != 0 && lbl.target == f.fn_return_block) {
+                    found_fn_exit = true;
+                }
+                break;
+            }
+        }
+        if found_fn_exit && !has_rel_loop {
+            f.tail_call_node = n.a;
+        }
+    }
     let value, error = stmt(g, f, n.a);
+    f.tail_call_node = prev_tail;
     if error != blot_direct_types::Error.none { return value, error; }
     if value.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
     var at = g.s.labels.len;
@@ -6253,6 +6284,42 @@ fn matchMatmulKLoop(
     out.m_end_id = m_end_id;
     return true;
 }
+// Accumulates `acc += va * vb` using Wasm 3.0 `f32x4.relaxed_madd` under `--relaxed-simd`
+// or deterministic `f32x4.mul` + `f32x4.add` by default.
+fn emitMatmulMulAdd(g: Generator&, va_loc: u32, vb_loc: u32, acc_loc: u32) {
+    if blot_direct_writer::relaxedSimdEnabled() {
+        lget(g, va_loc);
+        lget(g, vb_loc);
+        lget(g, acc_loc);
+        simdOp(g, SIMD_f32x4_relaxed_madd);
+    } else {
+        lget(g, acc_loc);
+        lget(g, va_loc);
+        lget(g, vb_loc);
+        simdOp(g, SIMD_f32x4_mul);
+        simdOp(g, SIMD_f32x4_add);
+    }
+    lset(g, acc_loc);
+}
+
+fn emitMatmulLoadMulAdd(g: Generator&, va_loc: u32, b_ptr: u32, b_off: u32, acc_loc: u32) {
+    if blot_direct_writer::relaxedSimdEnabled() {
+        lget(g, va_loc);
+        lget(g, b_ptr);
+        simdMemOp(g, SIMD_v128_load, 2, b_off);
+        lget(g, acc_loc);
+        simdOp(g, SIMD_f32x4_relaxed_madd);
+    } else {
+        lget(g, acc_loc);
+        lget(g, va_loc);
+        lget(g, b_ptr);
+        simdMemOp(g, SIMD_v128_load, 2, b_off);
+        simdOp(g, SIMD_f32x4_mul);
+        simdOp(g, SIMD_f32x4_add);
+    }
+    lset(g, acc_loc);
+}
+
 fn tryEmitBlockedMatmulKLoop(
     g: Generator&,
     f: Fn&,
@@ -6412,17 +6479,10 @@ fn tryEmitBlockedMatmulKLoop(
     simdOp(g, SIMD_f32x4_splat); lset(g, va);
 
     // Descending offsets 48, 32, 16, 0 on b_cur => 1 software bounds check per k!
-    lget(g, acc3); lget(g, va); lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 48);
-    simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc3);
-
-    lget(g, acc2); lget(g, va); lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 32);
-    simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc2);
-
-    lget(g, acc1); lget(g, va); lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 16);
-    simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc1);
-
-    lget(g, acc0); lget(g, va); lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 0);
-    simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc0);
+    emitMatmulLoadMulAdd(g, va, b_cur, 48, acc3);
+    emitMatmulLoadMulAdd(g, va, b_cur, 32, acc2);
+    emitMatmulLoadMulAdd(g, va, b_cur, 16, acc1);
+    emitMatmulLoadMulAdd(g, va, b_cur, 0, acc0);
 
     lget(g, a_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a_cur);
     lget(g, b_cur); lget(g, stride_bytes); op(g, OP_i32_add); lset(g, b_cur);
@@ -6738,8 +6798,8 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
     for r in 0..4 {
         lget(g, ak0_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
-        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
-        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+        emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
+        emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
     }
     lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
     // Step k + 1
@@ -6747,8 +6807,8 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
     for r in 0..4 {
         lget(g, ak1_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
-        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
-        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+        emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
+        emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
         lget(g, ac4[r]); i32Const(g, 8); op(g, OP_i32_add); lset(g, ac4[r]);
     }
     lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
@@ -6764,8 +6824,8 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
     for r in 0..4 {
         lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
-        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
-        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+        emitMatmulMulAdd(g, va4, vb4_1, acc4_1[r]);
+        emitMatmulMulAdd(g, va4, vb4_0, acc4_0[r]);
     }
     popCheckedArraysAt(f, oddk_if);
     close(g, f);
@@ -6952,20 +7012,20 @@ fn tryEmitBlockedMatmulRowLoop(
 
     // Load b[k, col+48..0] ONCE in descending order and update BOTH rows (8 v128 mul+adds)!
     lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, vb);
-    lget(g, r0_3); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_3);
-    lget(g, r1_3); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_3);
+    emitMatmulMulAdd(g, va0, vb, r0_3);
+    emitMatmulMulAdd(g, va1, vb, r1_3);
 
     lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, vb);
-    lget(g, r0_2); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_2);
-    lget(g, r1_2); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_2);
+    emitMatmulMulAdd(g, va0, vb, r0_2);
+    emitMatmulMulAdd(g, va1, vb, r1_2);
 
     lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb);
-    lget(g, r0_1); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_1);
-    lget(g, r1_1); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_1);
+    emitMatmulMulAdd(g, va0, vb, r0_1);
+    emitMatmulMulAdd(g, va1, vb, r1_1);
 
     lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, vb);
-    lget(g, r0_0); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_0);
-    lget(g, r1_0); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_0);
+    emitMatmulMulAdd(g, va0, vb, r0_0);
+    emitMatmulMulAdd(g, va1, vb, r1_0);
 
     lget(g, a0_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a0_cur);
     lget(g, a1_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a1_cur);

@@ -64,6 +64,10 @@ let SIMD_i32x4_trunc_sat_f32x4_s: u32 = 248;
 let SIMD_i32x4_trunc_sat_f32x4_u: u32 = 249;
 let SIMD_f32x4_convert_i32x4_s: u32 = 250;
 let SIMD_f32x4_convert_i32x4_u: u32 = 251;
+// Opt-in Wasm 3.0 relaxed-simd FMA opcodes (0xfd 0x105 / 0x106):
+// relaxed_madd(a, b, c) = a * b + c; relaxed_nmadd(a, b, c) = -(a * b) + c = c - a * b.
+let SIMD_f32x4_relaxed_madd: u32 = 261;
+let SIMD_f32x4_relaxed_nmadd: u32 = 262;
 
 fn simdOp(g: Generator&, sub: u32) {
     op(g, OP_prefix_fd);
@@ -1088,6 +1092,23 @@ recursive fn emitVecCall(
     return err;
 }
 
+// Matches a pure vectorizable F32 multiplication `x * y` for `--relaxed-simd` FMA fusion.
+fn matchVecF32Mul(g: Generator&, m: const Module&, env: const Env&, id: u32) -> bool, u32, u32 {
+    if id == 0 { return false, 0, 0; }
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.scalar && n.tag != blot_check_core::Tag.associated { return false, 0, 0; }
+    if n.b == 0 { return false, 0, 0; }
+    let a_ty, a_ok = lowerInEnv(g, m, m.typeOf(n.a), env);
+    if !a_ok || tagOf(g, a_ty) != blot_direct_types::Tag.f32_ { return false, 0, 0; }
+    let is_assoc = n.tag == blot_check_core::Tag.associated;
+    let use_disp = is_assoc || n.c == 1;
+    var member: u32 = 0;
+    if is_assoc { member = n.c; }
+    let machine, _, _ = resolveSparkScalarOp(g, m, n.op, member, use_disp, a_ty);
+    if machine != blot_check_core::Op.mul { return false, 0, 0; }
+    return true, n.a, n.b;
+}
+
 // Returns true when `id` is guaranteed to evaluate to a strictly finite (non-NaN, non-Inf) F32 in every SIMD lane.
 fn isFiniteVecF32(g: Generator&, m: const Module&, env: const Env&, id: u32) -> bool {
     let n = m.node(id);
@@ -1206,6 +1227,50 @@ recursive fn emitVecExpr(
             }
             if disp_target.binding != 0 { g.recordInlined(disp_target.unit, disp_target.binding); }
             let child_elide = a_tag == blot_direct_types::Tag.f32_ && isCanonicalF32Consumer(machine);
+            // Opt-in Wasm 3.0 `--relaxed-simd` FMA fusion:
+            //   (x * y) + z | z + (x * y) => f32x4.relaxed_madd(x, y, z)
+            //   z - (x * y)               => f32x4.relaxed_nmadd(x, y, z)
+            if blot_direct_writer::relaxedSimdEnabled() && a_tag == blot_direct_types::Tag.f32_ && n.b != 0 {
+                if machine == blot_check_core::Op.add {
+                    let ok_a, mx, my = matchVecF32Mul(g, m, env, n.a);
+                    if ok_a {
+                        let e1 = emitVecExpr(g, f, plan, m, env, mx, true);
+                        if e1 != blot_direct_types::Error.none { return e1; }
+                        let e2 = emitVecExpr(g, f, plan, m, env, my, true);
+                        if e2 != blot_direct_types::Error.none { return e2; }
+                        let e3 = emitVecExpr(g, f, plan, m, env, n.b, true);
+                        if e3 != blot_direct_types::Error.none { return e3; }
+                        simdOp(g, SIMD_f32x4_relaxed_madd);
+                        if !elide_nan && !f.defer_f32_nan { canonicalizeF32x4(g, f, plan.nan_vlocal); }
+                        return blot_direct_types::Error.none;
+                    }
+                    let ok_b, rx, ry = matchVecF32Mul(g, m, env, n.b);
+                    if ok_b {
+                        let e1 = emitVecExpr(g, f, plan, m, env, rx, true);
+                        if e1 != blot_direct_types::Error.none { return e1; }
+                        let e2 = emitVecExpr(g, f, plan, m, env, ry, true);
+                        if e2 != blot_direct_types::Error.none { return e2; }
+                        let e3 = emitVecExpr(g, f, plan, m, env, n.a, true);
+                        if e3 != blot_direct_types::Error.none { return e3; }
+                        simdOp(g, SIMD_f32x4_relaxed_madd);
+                        if !elide_nan && !f.defer_f32_nan { canonicalizeF32x4(g, f, plan.nan_vlocal); }
+                        return blot_direct_types::Error.none;
+                    }
+                } else if machine == blot_check_core::Op.sub {
+                    let ok_b, rx, ry = matchVecF32Mul(g, m, env, n.b);
+                    if ok_b {
+                        let e1 = emitVecExpr(g, f, plan, m, env, rx, true);
+                        if e1 != blot_direct_types::Error.none { return e1; }
+                        let e2 = emitVecExpr(g, f, plan, m, env, ry, true);
+                        if e2 != blot_direct_types::Error.none { return e2; }
+                        let e3 = emitVecExpr(g, f, plan, m, env, n.a, true);
+                        if e3 != blot_direct_types::Error.none { return e3; }
+                        simdOp(g, SIMD_f32x4_relaxed_nmadd);
+                        if !elide_nan && !f.defer_f32_nan { canonicalizeF32x4(g, f, plan.nan_vlocal); }
+                        return blot_direct_types::Error.none;
+                    }
+                }
+            }
             // Exact IEEE-754 peephole: `2.0 * x` == `x + x` (avoids v128.const + uses addps).
             if machine == blot_check_core::Op.mul && a_tag == blot_direct_types::Tag.f32_ && n.b != 0 {
                 var doubled_id: u32 = 0;

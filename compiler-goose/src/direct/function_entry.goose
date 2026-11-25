@@ -314,6 +314,51 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     s.handle_cells_len = handle_cells_mark;
     return error;
 }
+// True when `id` contains at least one function-level tail call targeting `target`
+// with exact arity `param_count` outside `fork`/`handle`/`closure` scopes.
+recursive fn hasSelfTailCall(
+    g: const Generator&,
+    m: const Module&,
+    id: u32,
+    target: BindingRef,
+    param_count: i64,
+    fn_ret_block: u32,
+    depth: i64,
+) -> bool {
+    if id == 0 || depth >= 128 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        return_ => {
+            if n.a == 0 { return false; }
+            if (n.b == 0 || n.b == fn_ret_block) && m.node(n.a).tag == blot_check_core::Tag.call {
+                let info = m.call(n.a);
+                if g.resolve(m, info.target) == target && info.arguments.len == param_count { return true; }
+            }
+            return hasSelfTailCall(g, m, n.a, target, param_count, fn_ret_block, depth + 1);
+        },
+        suite, block_ => {
+            for child in m.children(id) {
+                if hasSelfTailCall(g, m, child, target, param_count, fn_ret_block, depth + 1) { return true; }
+            }
+            return false;
+        },
+        if_stmt, if_value => {
+            return hasSelfTailCall(g, m, n.b, target, param_count, fn_ret_block, depth + 1) ||
+                hasSelfTailCall(g, m, n.c, target, param_count, fn_ret_block, depth + 1);
+        },
+        match_ => {
+            for arm in m.matchArms(id) {
+                if hasSelfTailCall(g, m, arm.body, target, param_count, fn_ret_block, depth + 1) { return true; }
+            }
+            return false;
+        },
+        loop_ => {
+            return hasSelfTailCall(g, m, m.loopInfo(id).body, target, param_count, fn_ret_block, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+
 recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     let key = g.s.instances[id].key;
     var unit = key.unit;
@@ -381,6 +426,20 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     }
     let exit = open(g, f, OP_block);
     g.s.labels.push(blot_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+    var has_tco_loop = false;
+    if key.kind == blot_direct_emit::InstanceKind.named && !closure {
+        if root != 0 && m.node(root).tag == blot_check_core::Tag.block_ {
+            f.fn_return_block = root;
+        } else if root != 0 && m.node(root).tag == blot_check_core::Tag.return_ && m.node(root).a != 0 && m.node(m.node(root).a).tag == blot_check_core::Tag.block_ {
+            f.fn_return_block = m.node(root).a;
+        }
+        if !g.s.instances[id].inferring &&
+            hasSelfTailCall(g, m, root, BindingRef { unit, key.id }, parameters.len as i64, f.fn_return_block, 0) {
+            f.self_tco_loop = open(g, f, OP_loop);
+            f.self_tco_inputs = inputs;
+            has_tco_loop = true;
+        }
+    }
     var value = neverVal();
     match key.kind {
         named, lambda => {
@@ -438,6 +497,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     let delivered = deliver(g, f, value, slot, root);
     if delivered == blot_direct_types::Error.unsupported { g.recordFailure(m, root); }
     else if delivered != blot_direct_types::Error.none { return delivered; }
+    if has_tco_loop { close(g, f); }
     close(g, f);
     // An inferred result is the type of the first value the body delivers.
     var result = neverVal();
@@ -445,7 +505,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     if g.s.instances[id].inferring { g.s.instances[id].result = result.ty; }
     // Stored memory-holding values may now be reachable from older storage.
     var release = false;
-    if f.allocates {
+    if f.allocates && !f.emitted_return_call {
         let holds, error = g.holdsMemory(g.s.instances[id].result);
         if error != blot_direct_types::Error.none { return error; }
         release = !holds && f.memory_stores == 0;

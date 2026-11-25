@@ -130,6 +130,12 @@ export interface ZigProjectCompilerOptions {
   frontendWorkers?: number;
   /** Process-local inference limit, included in compiler identity. */
   inferenceBudget?: number;
+  /** Opt-in Wasm 3.0 relaxed FMA (f32x4.relaxed_madd / relaxed_nmadd). */
+  relaxedSimd?: boolean;
+  /** Opt-in Wasm 3.0 tail calls (return_call) for non-self tail calls. */
+  tailCalls?: boolean;
+  /** Shorthand enabling both relaxedSimd and tailCalls. */
+  wasm3?: boolean;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -516,6 +522,9 @@ class ProjectProcess implements ZigProjectCompiler {
     semanticWorkers?: number,
     inferenceBudget?: number,
     frontendWorkers?: number,
+    relaxedSimd?: boolean,
+    tailCalls?: boolean,
+    wasm3?: boolean,
   ) {
     const args = ["serve-project"];
     if (frontendWorkers !== undefined) {
@@ -526,6 +535,12 @@ class ProjectProcess implements ZigProjectCompiler {
     }
     if (inferenceBudget !== undefined) {
       args.push("--inference-budget", String(inferenceBudget));
+    }
+    if (wasm3) {
+      args.push("--wasm3");
+    } else {
+      if (relaxedSimd) args.push("--relaxed-simd");
+      if (tailCalls) args.push("--tail-calls");
     }
     this.#child = new Deno.Command(executable, {
       args,
@@ -1411,6 +1426,9 @@ export async function createZigProjectCompiler(
     "semanticWorkers",
     "frontendWorkers",
     "inferenceBudget",
+    "relaxedSimd",
+    "tailCalls",
+    "wasm3",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -1530,6 +1548,9 @@ export async function createZigProjectCompiler(
     options.semanticWorkers,
     options.inferenceBudget,
     options.frontendWorkers,
+    options.relaxedSimd,
+    options.tailCalls,
+    options.wasm3,
   );
   await process.initialize(open, timeout, identity);
   if (assets !== undefined) {

@@ -156,8 +156,11 @@ deno task build:compiler
 # Type-check a Blot entry file
 deno task blot check examples/syntax.blot
 
-# Compile to WebAssembly (ABI 8)
+# Compile to deterministic WebAssembly (ABI 8; default enables self-tail-call loops)
 deno task blot build examples/syntax.blot --out build/syntax.wasm
+
+# Optional Wasm 3.0 flags: --tail-calls (return_call), --relaxed-simd (FMA), or --wasm3 (both)
+deno task blot build examples/syntax.blot --out build/syntax.wasm --wasm3
 
 # Format Blot source files
 deno task blot fmt examples/syntax.blot

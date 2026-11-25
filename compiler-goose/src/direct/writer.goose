@@ -30,6 +30,17 @@ let OP_br_table: Op = 0x0e;
 let OP_return_: Op = 0x0f;
 let OP_call: Op = 0x10;
 let OP_call_indirect: Op = 0x11;
+let OP_return_call: Op = 0x12;
+
+// Opt-in Wasm 3.0 backend feature toggles (default false: strict deterministic V8 + wtime-aot x64 subset).
+var opt_relaxed_simd: bool = false;
+var opt_tail_calls: bool = false;
+fn relaxedSimdEnabled() -> bool { return opt_relaxed_simd; }
+fn tailCallsEnabled() -> bool { return opt_tail_calls; }
+fn setWasmFeatures(relaxed_simd: bool, tail_calls: bool) {
+    opt_relaxed_simd = relaxed_simd;
+    opt_tail_calls = tail_calls;
+}
 let OP_drop: Op = 0x1a;
 let OP_select: Op = 0x1b;
 let OP_local_get: Op = 0x20;
