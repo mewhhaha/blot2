@@ -163,6 +163,20 @@ Agent Diagnostics (25 November 2026) added secondary blame origin fields
 diagnostics (`global_call_freeze.blot` and `mutating_owner_return_truncate.blot`)
 gained the new blame span fields with zero exit-code, Wasm, or counter changes.
 
+Track 2 & Track 4A/4B (25 November 2026) extended `--wasm3` with indirect
+closure tail calls (`OP_return_call_indirect` `0x13`) and relaxed SIMD
+min/max/trunc (`f32x4.relaxed_min`, `f32x4.relaxed_max`,
+`i32x4.relaxed_trunc_f32x4_{s,u}`), added generalized `#[n; T]` dependent
+equal-length and post-trap bounds-check elimination (`CheckedBound.sized_len_ty`
+in `direct/function.goose`, `direct/function_control.goose`,
+`direct/function_storage.goose`), and added generalized AoS `#[Vec2]`/`#[Vec4]`
+record auto-SIMD (`tryEmitAosF32RecordLoop` in `direct/function_spark.goose`).
+Re-recorded `expected.json`: 106 of 109 fixtures stayed byte-identical; 3
+fixtures strictly shrank from redundant bounds-check removal
+(`fixed_scalar_spans.blot` 8726->8717 B, `primitive-aliases.blot`
+13165->13138 B, `scoped-loop-cleanup.blot` 9643->9634 B) with zero exit-code,
+diagnostic, function-count, or frontend work-counter changes.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

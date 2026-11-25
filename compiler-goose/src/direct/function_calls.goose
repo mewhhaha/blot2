@@ -154,7 +154,7 @@ recursive fn staticContractMethod(g: Generator&, f: Fn&, id: u32) -> Val, Error 
 let primitive_node_bit: u32 = 0x80000000;
 
 // Calls the closure `callee` with one argument.
-fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32) -> Val, Error {
+fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32, is_tail: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let arrow = g.types.node(callee.ty);
     if arrow.tag != blot_direct_types::Tag.function || callee.len != 2 { return neverVal(), g.fail(m, id, "application of a non-function value"); }
@@ -176,12 +176,23 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32) -> V
     lget(g, w(g, callee, 0));
     let signature, error = g.closureSignature(arrow.a, arrow.b);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_tail && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+        arrow.b == g.s.instances[f.instance_id].result &&
+        g.s.instances[f.instance_id].result != blot_direct_types::never {
+        opIndex(g, OP_return_call_indirect, signature);
+        uleb(g, 0);
+        f.emitted_return_call = true;
+        f.checked_elems_len = 0;
+        return neverVal(), blot_direct_types::Error.none;
+    }
     opIndex(g, OP_call_indirect, signature);
     uleb(g, 0);
     f.checked_elems_len = 0;
     return received(g, f, arrow.b, id);
 }
 recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let is_tail = f.tail_call_node == id;
+    f.tail_call_node = 0;
     let m .= g.units[f.unit - 1];
     // Unwind `receiver.method a1 ... aK` into a direct call without allocating
     // intermediate partial-application closures or using `call_indirect`.
@@ -212,14 +223,17 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let rest, error = restType(g, f, callee, all_args.len as i64, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            return callTarget(g, f, target, all_args, callee, rest, id);
+            if is_tail { f.tail_call_node = id; }
+            let res_v, res_err = callTarget(g, f, target, all_args, callee, rest, id);
+            f.tail_call_node = 0;
+            return res_v, res_err;
         }
         var current = field_val;
         for step in 0..chain_len {
             let arg_node = chain_args[chain_len - 1 - step];
             let arg_val, error = expr(g, f, arg_node);
             if error != blot_direct_types::Error.none { return arg_val, error; }
-            let applied, error = applyClosure(g, f, current, arg_val, id);
+            let applied, error = applyClosure(g, f, current, arg_val, id, is_tail && step + 1 == chain_len);
             if error != blot_direct_types::Error.none { return applied, error; }
             current = applied;
         }
@@ -238,7 +252,7 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let noted = noteStore(g, f, argument);
         if noted != blot_direct_types::Error.none { return neverVal(), noted; }
     }
-    return applyClosure(g, f, callee, argument, id);
+    return applyClosure(g, f, callee, argument, id, is_tail);
 }
 fn constructorFunction(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = g.units[f.unit - 1].node(id);
@@ -1371,7 +1385,8 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     if body && body.is_function {
         let parameters = tm.bodyParameters(body);
         let param_count = parameters.len;
-        let is_tail = f.tail_call_node == id && (arguments.len as i64) == param_count;
+        let tail_here = f.tail_call_node == id;
+        let is_tail = tail_here && (arguments.len as i64) == param_count;
         f.tail_call_node = 0;
         if arguments.len < param_count {
             let rest, error = restType(g, f, callee, arguments.len, id);
@@ -1477,18 +1492,22 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             value = returned;
         }
         for at in param_count..(arguments.len as i64) {
-            let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id);
+            let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id, tail_here && at + 1 == (arguments.len as i64));
             if error != blot_direct_types::Error.none { return applied, error; }
             value = applied;
         }
         return value, blot_direct_types::Error.none;
     }
+    let tail_const = f.tail_call_node == id;
+    f.tail_call_node = 0;
     if body && !body.is_function && tm.node(body.root).tag == blot_check_core::Tag.reference && f.forward_depth < 8 {
         let next = g.resolve(tm, tm.reference(body.root));
         if next != target {
             g.recordInlined(target.unit, target.binding);
             f.forward_depth += 1;
+            if tail_const { f.tail_call_node = id; }
             let forwarded, ferr = callTarget(g, f, next, arguments, callee, result, id, elide_nan);
+            f.tail_call_node = 0;
             f.forward_depth -= 1;
             return forwarded, ferr;
         }
@@ -1502,7 +1521,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     var value, error = namedValue(g, f, target, callee, id);
     if error != blot_direct_types::Error.none { return value, error; }
     for at in 0..(arguments.len as i64) {
-        let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id);
+        let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id, tail_const && at + 1 == (arguments.len as i64));
         if error != blot_direct_types::Error.none { return applied, error; }
         value = applied;
     }

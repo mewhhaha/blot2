@@ -31,6 +31,7 @@ let OP_return_: Op = 0x0f;
 let OP_call: Op = 0x10;
 let OP_call_indirect: Op = 0x11;
 let OP_return_call: Op = 0x12;
+let OP_return_call_indirect: Op = 0x13;
 
 // Opt-in Wasm 3.0 backend feature toggles (default false: strict deterministic V8 + wtime-aot x64 subset).
 var opt_relaxed_simd: bool = false;

@@ -15,6 +15,7 @@ let OP_return_: u8 = blot_direct_writer::OP_return_;
 let OP_call: u8 = blot_direct_writer::OP_call;
 let OP_call_indirect: u8 = blot_direct_writer::OP_call_indirect;
 let OP_return_call: u8 = blot_direct_writer::OP_return_call;
+let OP_return_call_indirect: u8 = blot_direct_writer::OP_return_call_indirect;
 let OP_drop: u8 = blot_direct_writer::OP_drop;
 let OP_select: u8 = blot_direct_writer::OP_select;
 let OP_local_get: u8 = blot_direct_writer::OP_local_get;

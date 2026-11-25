@@ -454,15 +454,19 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
             }
         }
         let base, len = ensureCheckedArray(g, f, container);
+        var arr_len_ty: TId = 0;
+        if container_core_ty != 0 {
+            arr_len_ty = coreSizedLength(g.units[f.unit - 1], container_core_ty);
+        }
         var in_bounds = false;
         if index == range.index && !range.is_view {
             if range.slot != 0xffffffff && slot == range.slot && gen == range.generation {
                 in_bounds = true;
             } else if range.end_local != 0xffffffff && (len == range.end_local || findCheckedLe(f, range.end_local, len) >= 0) {
                 in_bounds = true;
-            } else if range.length_ty != 0 && container_core_ty != 0 {
+            } else if range.length_ty != 0 && arr_len_ty != 0 {
                 let m .= g.units[f.unit - 1];
-                if sameSizedLength(m, range.length_ty, coreSizedLength(m, container_core_ty)) {
+                if sameSizedLength(m, range.length_ty, arr_len_ty) {
                     in_bounds = true;
                 }
             }
@@ -470,11 +474,15 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
         if !in_bounds && findCheckedBound(f, index, len) >= 0 {
             in_bounds = true;
         }
+        if !in_bounds && arr_len_ty != 0 && findCheckedSizedBound(g.units[f.unit - 1], f, index, arr_len_ty) {
+            in_bounds = true;
+        }
         if !in_bounds {
             lget(g, index);
             lget(g, len);
             op(g, OP_i32_ge_u);
             trap(g, f);
+            recordCheckedBoundSized(f, index, len, arr_len_ty);
         }
         let addr = emitOffsetAddress(g, f, base, index, step);
         if cache_elem { recordCheckedElem(f, slot, gen, index, step, addr); }
@@ -1417,7 +1425,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let index, error = scalarLocal(g, f, position, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             // Check now, so a reference never names a missing element.
-            let checked, error = elementAddress(g, f, container, index, id);
+            let checked, error = elementAddress(g, f, container, index, id, m.typeOf(children[0]));
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let result, error = fresh(g, f, ty, id);
             if error != blot_direct_types::Error.none { return result, error; }

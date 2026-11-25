@@ -96,6 +96,10 @@ struct WtimeAotModule {
     call_finish: FnCallFinish,
 }
 
+// Each `blot_aot_new` call allocates an independent guest instance + linear memory.
+unsafe impl Send for WtimeAotModule {}
+unsafe impl Sync for WtimeAotModule {}
+
 impl WtimeAotModule {
     fn compile_and_load(wtime_aot: &Path, wasm_path: &Path, so_path: &Path) -> (Self, f64) {
         let t0 = Instant::now();
@@ -187,6 +191,8 @@ struct WtimeAotGuest<'a> {
     module: &'a WtimeAotModule,
     handle: *mut c_void,
 }
+
+unsafe impl<'a> Send for WtimeAotGuest<'a> {}
 
 impl<'a> WtimeAotGuest<'a> {
     fn call_raw(&mut self, name: &str, arg: u32) -> u32 {
@@ -668,13 +674,270 @@ fn main() {
         "checksum_bevy": bevy_snap_chk,
     }));
 
+    // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot v0.1.2,
+    //    generalized AoS Vec2/Vec4 record auto-SIMD, multi-core isolated-guest scaling,
+    //    and persistent entry process throughput.
+    let blot_kernels_w3_wasm = Path::new("/tmp/blot_kernels_w3.wasm");
+    let blot_kernels_w3_so = Path::new("/tmp/blot_kernels_w3_wtime.so");
+    let st = Command::new(&blotc)
+        .args([
+            "build-project",
+            blot_kernels_src.to_str().unwrap(),
+            blot_kernels_w3_wasm.to_str().unwrap(),
+            "--std-root",
+            blot_root.join("std").to_str().unwrap(),
+            "--prelude",
+            blot_root.join("std/prelude.blot").to_str().unwrap(),
+            "--wasm3",
+        ])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .expect("compile blot_kernels --wasm3");
+    assert!(st.success(), "blot_kernels --wasm3 compile failed");
+    let (blot_w3_mod, blot_w3_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, blot_kernels_w3_wasm, blot_kernels_w3_so);
+    let mut blot_w3_guest = blot_w3_mod.instantiate();
+    let mut wasm3_kernel_rows = Vec::new();
+    for (idx, name) in [
+        "lcg_recurrence",
+        "prime_sieve",
+        "matmul_64",
+        "mandelbrot_f32",
+        "particle_spark_simd",
+        "merge_sort",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let (w3_ms, w3_chk) = time_ms(3, 15, || blot_w3_guest.call_u32(name, seed));
+        let def_ms = kernel_rows[idx]["blot_wtime_ms"].as_f64().unwrap();
+        let def_chk = kernel_rows[idx]["checksum_blot"].as_u64().unwrap() as u32;
+        wasm3_kernel_rows.push(serde_json::json!({
+            "name": name,
+            "default_wtime_ms": def_ms,
+            "wasm3_wtime_ms": w3_ms,
+            "speedup_vs_default": def_ms / w3_ms,
+            "checksum_default": def_chk,
+            "checksum_wasm3": w3_chk,
+        }));
+    }
+
+    // 4b. Generalized AoS #[Vec4] & #[Vec2] record auto-SIMD + multi-core scaling + entry process.
+    let mc_src = blot_root.join("benchmarks/comparison/multicore_aos_bench.blot");
+    let mc_def_wasm = Path::new("/tmp/multicore_aos_def.wasm");
+    let mc_w3_wasm = Path::new("/tmp/multicore_aos_w3.wasm");
+    let mc_def_so = Path::new("/tmp/multicore_aos_def_wtime.so");
+    let mc_w3_so = Path::new("/tmp/multicore_aos_w3_wtime.so");
+    for (out_wasm, extra) in [(mc_def_wasm, false), (mc_w3_wasm, true)] {
+        let mut cmd = Command::new(&blotc);
+        cmd.args([
+            "build-project",
+            mc_src.to_str().unwrap(),
+            out_wasm.to_str().unwrap(),
+            "--std-root",
+            blot_root.join("std").to_str().unwrap(),
+            "--prelude",
+            blot_root.join("std/prelude.blot").to_str().unwrap(),
+        ]);
+        if extra {
+            cmd.arg("--wasm3");
+        }
+        let st = cmd
+            .stdout(std::process::Stdio::null())
+            .status()
+            .expect("compile multicore_aos_bench");
+        assert!(st.success(), "multicore_aos_bench compile failed");
+    }
+    let (mc_def_mod, _) = WtimeAotModule::compile_and_load(&wtime_aot, mc_def_wasm, mc_def_so);
+    let (mc_w3_mod, _) = WtimeAotModule::compile_and_load(&wtime_aot, mc_w3_wasm, mc_w3_so);
+    let mut mc_def_guest = mc_def_mod.instantiate();
+    let mut mc_w3_guest = mc_w3_mod.instantiate();
+
+    #[derive(Clone, Copy)]
+    struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+    #[derive(Clone, Copy)]
+    struct Vec2 { x: f32, y: f32 }
+
+    let native_aos_vec4 = |s: u32| -> u32 {
+        let n = 65536usize;
+        let base = (s & 15) as f32;
+        let mut pos = vec![Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }; n];
+        let mut vel = vec![Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 }; n];
+        for i in 0..n {
+            let fi = (i & 1023) as f32;
+            pos[i] = Vec4 {
+                x: base + fi * 0.01,
+                y: base + fi * 0.02,
+                z: base + fi * 0.03,
+                w: 1.0 + fi * 0.001,
+            };
+            vel[i] = Vec4 {
+                x: 0.5 + fi * 0.002,
+                y: -0.25 + fi * 0.001,
+                z: 0.125 - fi * 0.0005,
+                w: 0.01,
+            };
+        }
+        let dt = 0.016f32;
+        for _ in 0..32 {
+            for i in 0..n {
+                pos[i].x += vel[i].x * dt;
+                pos[i].y += vel[i].y * dt;
+                pos[i].z += vel[i].z * dt;
+                pos[i].w += vel[i].w * dt;
+            }
+        }
+        let mut sum = 0.0f32;
+        for p in &pos {
+            sum = (((sum + p.x) + p.y) + p.z) + p.w;
+        }
+        (sum * 4.0) as u32
+    };
+    let native_aos_vec2 = |s: u32| -> u32 {
+        let n = 65536usize;
+        let base = (s & 15) as f32;
+        let mut pos = vec![Vec2 { x: 0.0, y: 0.0 }; n];
+        let mut vel = vec![Vec2 { x: 0.0, y: 0.0 }; n];
+        for i in 0..n {
+            let fi = (i & 1023) as f32;
+            pos[i] = Vec2 { x: base + fi * 0.01, y: base + fi * 0.02 };
+            vel[i] = Vec2 { x: 0.5 + fi * 0.002, y: -0.25 + fi * 0.001 };
+        }
+        let dt = 0.016f32;
+        for _ in 0..32 {
+            for i in 0..n {
+                pos[i].x += vel[i].x * dt;
+                pos[i].y += vel[i].y * dt;
+            }
+        }
+        let mut sum = 0.0f32;
+        for p in &pos {
+            sum = (sum + p.x) + p.y;
+        }
+        (sum * 8.0) as u32
+    };
+
+    let (v4_def_ms, v4_def_chk) = time_ms(3, 15, || mc_def_guest.call_u32("aos_vec4_euler", seed));
+    let (v4_w3_ms, v4_w3_chk) = time_ms(3, 15, || mc_w3_guest.call_u32("aos_vec4_euler", seed));
+    let (v4_nat_ms, v4_nat_chk) = time_ms(3, 15, || native_aos_vec4(black_box(seed)));
+    assert!(v4_def_chk.abs_diff(v4_nat_chk) <= 2, "aos_vec4 mismatch: blot={v4_def_chk} nat={v4_nat_chk}");
+
+    let (v2_def_ms, v2_def_chk) = time_ms(3, 15, || mc_def_guest.call_u32("aos_vec2_euler", seed));
+    let (v2_w3_ms, v2_w3_chk) = time_ms(3, 15, || mc_w3_guest.call_u32("aos_vec2_euler", seed));
+    let (v2_nat_ms, v2_nat_chk) = time_ms(3, 15, || native_aos_vec2(black_box(seed)));
+    assert!(v2_def_chk.abs_diff(v2_nat_chk) <= 2, "aos_vec2 mismatch: blot={v2_def_chk} nat={v2_nat_chk}");
+
+    let aos_rows = vec![
+        serde_json::json!({
+            "name": "aos_vec4_euler_65k_x32",
+            "blot_wtime_ms": v4_def_ms,
+            "blot_wasm3_wtime_ms": v4_w3_ms,
+            "rust_native_ms": v4_nat_ms,
+            "blot_vs_rust_native": v4_def_ms / v4_nat_ms,
+            "wasm3_vs_rust_native": v4_w3_ms / v4_nat_ms,
+            "checksum_blot": v4_def_chk,
+            "checksum_wasm3": v4_w3_chk,
+            "checksum_rust_native": v4_nat_chk,
+        }),
+        serde_json::json!({
+            "name": "aos_vec2_euler_65k_x32",
+            "blot_wtime_ms": v2_def_ms,
+            "blot_wasm3_wtime_ms": v2_w3_ms,
+            "rust_native_ms": v2_nat_ms,
+            "blot_vs_rust_native": v2_def_ms / v2_nat_ms,
+            "wasm3_vs_rust_native": v2_w3_ms / v2_nat_ms,
+            "checksum_blot": v2_def_chk,
+            "checksum_wasm3": v2_w3_chk,
+            "checksum_rust_native": v2_nat_chk,
+        }),
+    ];
+
+    // 4c. Multi-core isolated-guest scaling (8 x 256x256 Mandelbrot tiles across 1, 2, 4, 8 threads).
+    let mut multicore_rows = Vec::new();
+    let mut blot_1t_ms = 0.0f64;
+    let mut blot_mc_chk = 0u32;
+    for threads in [1usize, 2, 4, 8] {
+        let mut guests: Vec<WtimeAotGuest<'_>> = (0..threads).map(|_| mc_def_mod.instantiate()).collect();
+        let tiles_per_thread = 8 / threads;
+        let (blot_ms, bchk) = time_ms(2, 11, || {
+            std::thread::scope(|s| {
+                let mut handles = Vec::with_capacity(threads);
+                for (tid, g) in guests.iter_mut().enumerate() {
+                    let start = (tid * tiles_per_thread) as u32;
+                    let end = start + tiles_per_thread as u32;
+                    handles.push(s.spawn(move || {
+                        let mut acc = 0u32;
+                        for tile in start..end {
+                            acc = acc.wrapping_add(g.call_u32("mandelbrot_tile", tile));
+                        }
+                        acc
+                    }));
+                }
+                handles.into_iter().fold(0u32, |a, h| a.wrapping_add(h.join().unwrap()))
+            })
+        });
+        let (nat_ms, nchk) = time_ms(2, 11, || {
+            std::thread::scope(|s| {
+                let mut handles = Vec::with_capacity(threads);
+                for tid in 0..threads {
+                    let start = (tid * tiles_per_thread) as u32;
+                    let end = start + tiles_per_thread as u32;
+                    handles.push(s.spawn(move || {
+                        let mut acc = 0u32;
+                        for tile in start..end {
+                            acc = acc.wrapping_add(rust_kernels::mandelbrot_f32(black_box(tile)));
+                        }
+                        acc
+                    }));
+                }
+                handles.into_iter().fold(0u32, |a, h| a.wrapping_add(h.join().unwrap()))
+            })
+        });
+        assert_eq!(bchk, nchk, "multicore checksum mismatch at threads={threads}: blot={bchk} nat={nchk}");
+        if threads == 1 {
+            blot_1t_ms = blot_ms;
+            blot_mc_chk = bchk;
+        } else {
+            assert_eq!(bchk, blot_mc_chk);
+        }
+        multicore_rows.push(serde_json::json!({
+            "threads": threads,
+            "blot_wtime_ms": blot_ms,
+            "blot_scaling": blot_1t_ms / blot_ms,
+            "rust_native_ms": nat_ms,
+            "blot_vs_rust_native": blot_ms / nat_ms,
+            "checksum": bchk,
+        }));
+    }
+
+    // 4d. Persistent ABI 8 `entry process` zero-alloc step throughput on wtime-aot v0.1.2.
+    let (proc_noop_us, proc_phys_us) = {
+        let mut g = mc_def_mod.instantiate();
+        g.call_proc_init("particle_sim", 4096);
+        let (noop_batch_ms, _) = time_ms(2, 15, || {
+            let mut last = 0u32;
+            for _ in 0..10_000 {
+                last = g.call_proc_step("particle_sim", 0);
+            }
+            last
+        });
+        let (phys_batch_ms, _) = time_ms(2, 15, || {
+            let mut last = 0u32;
+            for _ in 0..200 {
+                last = g.call_proc_step("particle_sim", 1);
+            }
+            last
+        });
+        ((noop_batch_ms * 1000.0) / 10_000.0, (phys_batch_ms * 1000.0) / 200.0)
+    };
+
     let blot_commit = git_short_rev(blot_root);
     let wtime_commit = git_short_rev(&workspace_parent.join("wtime"));
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
             "blot_commit": blot_commit,
-            "wtime_aot": format!("0.1.1 (x64-v3, {wtime_commit})"),
+            "wtime_aot": format!("0.1.2 (x64-v3, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
             "rustc": "1.96.0-nightly",
         },
@@ -684,13 +947,23 @@ fn main() {
             "rust_wasm32_opt3_ms": rust_wasm_compile_ms,
             "rust_native_opt3_ms": rust_native_compile_ms,
             "wtime_aot_blot_kernels_ms": blot_aot_ms,
+            "wtime_aot_blot_kernels_wasm3_ms": blot_w3_aot_ms,
             "wtime_aot_ink_ecs_ms": ink_aot_ms,
             "wtime_aot_rust_kernels_ms": rust_aot_ms,
             "blot_wasm_bytes": std::fs::metadata(blot_kernels_wasm).unwrap().len(),
+            "blot_wasm3_bytes": std::fs::metadata(blot_kernels_w3_wasm).unwrap().len(),
             "rust_wasm_bytes": std::fs::metadata(rust_kernels_wasm).unwrap().len(),
             "ink_ecs_wasm_bytes": std::fs::metadata(ink_ecs_wasm).unwrap().len(),
         },
         "kernels": kernel_rows,
+        "wasm3_kernels": wasm3_kernel_rows,
+        "aos_record_simd": aos_rows,
+        "multicore_wtime_mandelbrot_8_tiles": multicore_rows,
+        "persistent_process_wtime_particle_sim_4096": {
+            "noop_commit_us_per_step": proc_noop_us,
+            "noop_steps_per_sec": 1_000_000.0 / proc_noop_us,
+            "aos_vec4_physics_us_per_step": proc_phys_us,
+        },
         "ecs": ecs_rows,
     });
     println!("{}", serde_json::to_string_pretty(&report).unwrap());

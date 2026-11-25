@@ -1,0 +1,158 @@
+// Track 4B & 4C showcase: generalized AoS Vec2/Vec4 record auto-SIMD,
+// multi-core entry kernel scaling, and zero-alloc persistent entry process throughput.
+
+type Vec2 = { x: F32, y: F32 }
+type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
+
+// 1. AoS #[Vec4] (16 B) ballistic Euler integration: 65,536 particles x 32 steps.
+entry func aos_vec4_euler (seed: U32): U32 =>
+  let n: U32 = 65536
+  let pos = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
+  let vel = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
+  let base = U32.to_f32 (seed & 15)
+  for i in 0 .. n:
+    let fi = U32.to_f32 (i & 1023)
+    pos[i] := $Vec4 {
+      x: base + fi * 0.01,
+      y: base + fi * 0.02,
+      z: base + fi * 0.03,
+      w: 1.0 + fi * 0.001,
+    }
+    vel[i] := $Vec4 {
+      x: 0.5 + fi * 0.002,
+      y: -0.25 + fi * 0.001,
+      z: 0.125 - fi * 0.0005,
+      w: 0.01,
+    }
+  let dt = 0.016
+  for _ in 0 .. 32:
+    for i in 0 .. n:
+      let $Vec4 { x: px, y: py, z: pz, w: pw } = pos[i]
+      let $Vec4 { x: vx, y: vy, z: vz, w: vw } = vel[i]
+      pos[i] := $Vec4 {
+        x: px + vx * dt,
+        y: py + vy * dt,
+        z: pz + vz * dt,
+        w: pw + vw * dt,
+      }
+  let sum = 0.0
+  for i in 0 .. n:
+    let $Vec4 { x, y, z, w } = pos[i]
+    sum := self + x + y + z + w
+  return F32.to_u32 (sum * 4.0)
+
+// 2. AoS #[Vec2] (8 B) structural Euler integration: 65,536 particles x 32 steps.
+entry func aos_vec2_euler (seed: U32): U32 =>
+  let n: U32 = 65536
+  let pos = @array.fill n { x: 0.0, y: 0.0 }
+  let vel = @array.fill n { x: 0.0, y: 0.0 }
+  let base = U32.to_f32 (seed & 15)
+  for i in 0 .. n:
+    let fi = U32.to_f32 (i & 1023)
+    pos[i] := { x: base + fi * 0.01, y: base + fi * 0.02 }
+    vel[i] := { x: 0.5 + fi * 0.002, y: -0.25 + fi * 0.001 }
+  let dt = 0.016
+  for _ in 0 .. 32:
+    for i in 0 .. n:
+      let p = pos[i]
+      let v = vel[i]
+      pos[i] := { x: p.x + v.x * dt, y: p.y + v.y * dt }
+  let sum = 0.0
+  for i in 0 .. n:
+    let p = pos[i]
+    sum := self + p.x + p.y
+  return F32.to_u32 (sum * 8.0)
+
+// 3. Stateless 256x256 Mandelbrot tile for multi-core wtime-aot worker scaling.
+entry func mandelbrot_tile (tile_id: U32): U32 =>
+  let size: U32 = 256
+  let inv = 1.0 / U32.to_f32 size
+  let bias = U32.to_f32 (tile_id & 7) * 0.001
+  let total: U32 = 0
+  for py in 0 .. size:
+    let ci = U32.to_f32 py * inv * 2.4 - 1.2 + bias
+    for px in 0 .. size:
+      let cr = U32.to_f32 px * inv * 3.0 - 2.0
+      let zr = 0.0
+      let zi = 0.0
+      let it: U32 = 0
+      for ever:
+        if it >= 100:
+          break
+        let zr2 = zr * zr
+        let zi2 = zi * zi
+        if zr2 + zi2 > 4.0:
+          break
+        let next_zi = 2.0 * zr * zi + ci
+        zr := zr2 - zi2 + cr
+        zi := next_zi
+        it := self + 1
+      total := self + it
+  return total
+
+// 4. Real ABI 8 `entry kernel` for Deno KernelPool multi-worker execution:
+// computes one row (512 pixels, max 500 iters) of a 512x512 Mandelbrot image.
+entry kernel func mandelbrot_row (py: U32): U32 =>
+  let size: U32 = 512
+  let inv = 1.0 / U32.to_f32 size
+  let ci = U32.to_f32 py * inv * 2.4 - 1.2
+  let total: U32 = 0
+  for px in 0 .. size:
+    let cr = U32.to_f32 px * inv * 3.0 - 2.0
+    let zr = 0.0
+    let zi = 0.0
+    let it: U32 = 0
+    for ever:
+      if it >= 500:
+        break
+      let zr2 = zr * zr
+      let zi2 = zi * zi
+      if zr2 + zi2 > 4.0:
+        break
+      let next_zi = 2.0 * zr * zi + ci
+      zr := zr2 - zi2 + cr
+      zi := next_zi
+      it := self + 1
+    total := self + it
+  return total
+
+// 5. Real ABI 8 persistent `entry process` for zero-alloc step throughput.
+type SimState is data = $SimState {
+  tick: U32,
+  pos: #[Vec4],
+  vel: #[Vec4],
+}
+
+func sim_init (n: U32): SimState =>
+  let pos = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 })
+  let vel = @array.fill n ($Vec4 { x: 0.25, y: -0.125, z: 0.0625, w: 0.0 })
+  for i in 0 .. n:
+    let fi = U32.to_f32 (i & 1023)
+    pos[i] := $Vec4 { x: fi * 0.1, y: fi * 0.2, z: fi * 0.3, w: 1.0 }
+  return $SimState { tick: 0, pos, vel }
+
+func sim_step (st: own SimState) -> (cmd: U32): (SimState, U32) =>
+  let $SimState { tick, pos, vel } = st
+  let dt = 0.016
+  if cmd == 0:
+    // Lightweight tick (measures pure ABI 8 persistent fast-commit overhead)
+    return ($SimState { tick: tick + 1, pos, vel }, tick + 1)
+  // Physics tick (AoS Vec4 auto-SIMD over persistent owned arrays)
+  let n = pos.length
+  for i in 0 .. n:
+    let $Vec4 { x: px, y: py, z: pz, w: pw } = pos[i]
+    let $Vec4 { x: vx, y: vy, z: vz, w: vw } = vel[i]
+    pos[i] := $Vec4 {
+      x: px + vx * dt,
+      y: py + vy * dt,
+      z: pz + vz * dt,
+      w: pw + vw * dt,
+    }
+  let $Vec4 { x, y, z, w } = pos[0]
+  let sample = F32.to_u32 ((x + y + z + w) * 16.0)
+  return ($SimState { tick: tick + 1, pos, vel }, sample)
+
+entry process particle_sim: Process [U32, U32, U32] = {
+  init: sim_init,
+  step: sim_step,
+}

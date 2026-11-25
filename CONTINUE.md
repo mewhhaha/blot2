@@ -1,16 +1,68 @@
 # Working on Blot and Gdev
 
-## Current frontier: Solid-2-Style Agent Diagnostics & Tier 7 Runtime Optimizations (25 November 2026)
+## Current frontier: Wasm 3.0 Extensions, Generalized BCE/AoS SIMD, & LSP/Pen Agent Diagnostics (25 November 2026)
 
-Solid-2-inspired agent-legible compiler diagnostics, `blot explain` /
-`blot guide --cheatsheet`, and in-repo agent skills are complete and qualified
-(`blotc-goose` SHA-256
-`b85485319f3f40d66d997e8b56e0fe5080c34d921f0d972619902ab503c1e7de`, `8,979,928` B;
+Track 2 (`--wasm3` extensions + `wtime-aot v0.1.2` qualification) and Track 4
+(`#[n; T]` dependent equal-length BCE, generalized AoS `Vec2`/`Vec4` auto-SIMD,
+and multi-core `entry kernel` / persistent `entry process` benchmarks) are
+complete and qualified (`blotc-goose` SHA-256
+`90e5b2bd9b0deaba2f231059017b2007631b3d0860ff227a07fb1c4fab286bc6`, `9,025,968` B;
 `generated/compiler/blotc.gz` SHA-256
-`b237d92017e034c58cb399ad0ac170989f26a8bbaa0d62d277136477a9810636`, `3,840,466` B),
-building directly on top of the Tier 7 11 / 11 benchmark sweep (`3ef81d12`):
+`ae1f28d47c41de0685d4fdbb5466b073411bacc0e4fe1b6a7c7666a61a228310`, `3,855,063` B),
+building on top of Track 1 (`b54f4c03` + `../pen` `6d15e26`) and Solid-2 CLI
+agent diagnostics (`b254444b`):
 
-- **Solid-2-style agent-legible diagnostics, blame spans & skills (this commit, after `3ef81d12`):**
+- **Track 2 & Track 4 — `--wasm3` extensions, `#[n; T]` BCE, AoS `Vec2`/`Vec4` auto-SIMD & multi-core showcase (this commit, after `b54f4c03`):**
+  - **Wasm 3.0 extensions (`direct/writer.goose`, `direct/function_ops.goose`, `direct/function_control.goose`, `direct/function_calls.goose`, `direct/function_spark.goose`):**
+    Extended `--tail-calls` / `--wasm3` to emit `OP_return_call_indirect` (`0x13`)
+    on indirect closure tail calls (`applyClosure`, method-call & field-callable
+    chains, curried extra args) — verified at 100,000 mutual indirect bounce
+    depth on both V8 and `wtime-aot v0.1.2`. Extended `--relaxed-simd` / `--wasm3`
+    with `f32x4.relaxed_min` (`269`), `f32x4.relaxed_max` (`270`), and
+    `i32x4.relaxed_trunc_f32x4_{s,u}` (`257`/`258`) across `emitSimdMachineOp`,
+    `if a < b then a else b` (`F32.min`/`F32.max`/`F32.clamp`/`saturate`), and
+    `Maybe Vec3` SIMD reductions.
+  - **Track 4A — Generalized `#[n; T]` dependent equal-length & post-trap BCE (`direct/function.goose`, `direct/function_control.goose`, `direct/function_storage.goose`):**
+    Added `CheckedBound.sized_len_ty` (`findCheckedSizedBound`,
+    `recordCheckedBoundSized`) so both `if idx < a.length` guards and post-trap
+    index accesses eliminate redundant bounds checks across all arrays sharing
+    the same static/dependent `#[n; T]` length type (invalidating cleanly on
+    owner resize).
+  - **Track 4B — Generalized AoS `#[Vec2]` (8 B) & `#[Vec4]` (16 B) record auto-SIMD (`direct/function_spark.goose`, `direct/function_control.goose`):**
+    Added `tryEmitAosF32RecordLoop` to auto-vectorize structural and
+    single-constructor nominal F32 record arrays (`+`, `-`, `*`, `*s`,
+    `a + b*s`, `a - b*s`) using 4×-unrolled descending `48,32,16,0` `v128`
+    stripes + 1× `v128` tail, optional `--relaxed-simd` FMA, and canonical
+    `0x7fc00000` NaN normalization.
+  - **Track 4C — `wtime-aot v0.1.2`, `--wasm3`, AoS `Vec2`/`Vec4`, multi-core & `entry process` benchmarks (`benchmarks/comparison/multicore_aos_bench.blot`, `bench_multicore_kernel.ts`, `rust_bench_main.rs`, `plot_benchmarks.py`, `README.md`):**
+    Measured on AMD Ryzen 7 7800X3D (`wtime-aot 0.1.2`, `ad175d5`, bit-exact
+    checksums): preserved the 11/11 sweep (`matmul_64` `18.10 µs` vs `19.76 µs`
+    native Rust AVX2; Ink ECS sparse query `0.0607 ms` vs `0.0677 ms` Bevy);
+    AoS `#[Vec4]` 65k × 32 Euler runs in **`2.15 ms`** default / **`2.06 ms`**
+    `--wasm3` vs **`2.77 ms`** native Rust (`1.29×–1.35×` faster); 8-thread
+    isolated `wtime-aot` scaling reaches **`1.18 ms`** (`5.05×` scaling,
+    **`3.69×` faster** than 8-thread native Rust `4.35 ms`), Deno `KernelPool`
+    scales **`4.08×`** (`9.56 → 2.35 ms`); ABI 8 `entry process` commits no-op
+    steps in **`47 ns`** (**`21.2M steps/sec`**) and 4,096-particle AoS `Vec4`
+    ticks in **`2.47 µs/step`** (**`1.66B particles/sec`**).
+  - **Qualification:** Added [track2_track4_execution.test.ts](tests/guest/track2_track4_execution.test.ts);
+    re-recorded the 3 strictly smaller BCE fixtures (`fixed_scalar_spans.blot`
+    `8726→8717 B`, `primitive-aliases.blot` `13165→13138 B`,
+    `scoped-loop-cleanup.blot` `9643→9634 B`) in `expected.json`; passed
+    `deno task test:compiler` (`1139 passed | 0 failed`, `109/109` fixtures,
+    `206/206` uniqueness, `2/2` direct), `test:editor` (`6/6`), `deno fmt`/`check`,
+    `../pen` (`blot-host` + `examples/bounce`), `../ink` (`pen test-blot`), and
+    `../gdev` (`build_gdev.ts --frontend-workers 8 --profile`: `compiled: true`,
+    `464.3 ms`, `312` modules, `6,060,229` B Wasm).
+
+- **Track 1 — `serve-project`, LSP live diagnostics/quick-fixes & Pen blame output (`b54f4c03`, `../pen` `6d15e26`):**
+  Forwarded structured `OriginDetails` blame spans through `serve-project`
+  (`reuse/partial_dependency.goose`, `reuse/dependency_consumer.goose`),
+  `host/zig_project_client.ts`, `host/diagnostics.ts` (quick-fix generator),
+  `host/lsp.ts` (LSP 3.17 pull diagnostics + `relatedInformation` + `codeAction`
+  + `didSave` push), and `../pen/crates/pen/src/plugin_build.rs`.
+
+- **Solid-2-style agent-legible diagnostics, blame spans & skills (`b254444b`, after `3ef81d12`):**
   - **Compiler blame origins & targeted suggestions (`check/uniqueness.goose`, `check/check.goose`, `direct/direct.goose`, `driver/cli_diagnostics.goose`, `driver/cli.goose`, `driver/cli_project.goose`):**
     Added error-path-only `blot_check_uniqueness::explain` (`OriginInfo`) and
     `LowerDiagnostic` (`origin_kind` = `"moved"` / `"borrowed"` / `"aliased"` /

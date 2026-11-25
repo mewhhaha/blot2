@@ -93,8 +93,8 @@ Curried functions (`->`), exhaustive algebraic data types (`$Some`, `$Nothing`),
 
 All benchmarks below were measured on an **AMD Ryzen 7 7800X3D (8C / 16T)** running Linux, comparing:
 
-- **Blot (`blotc-goose`)** AOT-compiled and executed via **`wtime-aot 0.1.1`** (`--backend x64 --target-cpu native --blot-cdylib`, `x64-v3`, explicit software bounds checks, zero signal handlers).
-- **Rust (`rustc 1.96.0-nightly`, `-C opt-level=3`)** compiled both to **`wasm32-unknown-unknown +simd128` (`panic=abort`)** on the exact same `wtime-aot 0.1.1` (`--backend x64`) runtime and to **native `x86_64`** (`-O3`, thin LTO, `codegen-units = 1`).
+- **Blot (`blotc-goose`)** AOT-compiled and executed via **`wtime-aot 0.1.2`** (`--backend x64 --target-cpu native --blot-cdylib`, `x64-v3`, explicit software bounds checks, zero signal handlers).
+- **Rust (`rustc 1.96.0-nightly`, `-C opt-level=3`)** compiled both to **`wasm32-unknown-unknown +simd128` (`panic=abort`)** on the exact same `wtime-aot 0.1.2` (`--backend x64`) runtime and to **native `x86_64`** (`-O3`, thin LTO, `codegen-units = 1`).
 
 Every kernel reports the median of 15 timed runs after warmup and verified **bit-exact checksum parity** across all three targets. Source and runner live in [benchmarks/comparison/](benchmarks/comparison/README.md); raw JSON measurements are recorded in [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json).
 
@@ -115,13 +115,18 @@ Every kernel reports the median of 15 timed runs after warmup and verified **bit
   - `merge_sort`: **3.69 ms** vs **5.74 ms** Rust Wasm (**1.55× faster**) and **4.99 ms** native Rust (**1.35× faster**), via dead-fill elision, 4-wide SIMD LCG array-init, inlined `merge_pass`/`merge_range`, zero-shift 2×-unrolled byte-pointer branchless `select` (`cmov`) merge with descending stores, and `memory.copy` tail fast paths.
   - `matmul_64`: **0.018 ms** (`18.18 µs`) vs **0.030 ms** Rust Wasm (**1.63× faster**) and **0.020 ms** (`20.18 µs`) native Rust AVX2 (**1.11× faster**), via dead-fill elision, zero-spill 4-row × 8-col `4×k`-unrolled tiling with `v128.load32_splat` + GP-register BCE pre-proofs (11 live XMMs), 4-wide SIMD LCG matrix init, and 8× exact F32 reduction.
   - All six kernels preserve canonical `0x7fc00000` quiet NaN determinism at every observable boundary and full Wasm bounds safety.
-- Meanwhile, Blot compiles **6.9× faster** than `rustc -O3 wasm32` (**12.5 ms** vs **85.9 ms**; even combined with `wtime-aot x64`'s **4.3 ms** AOT step it is **5.1× faster**) to **64× smaller** `.wasm` binaries (**23.0 KiB** vs **1,468 KiB**).
+- Meanwhile, Blot compiles **6.9× faster** than `rustc -O3 wasm32` (**12.7 ms** vs **87.0 ms**; even combined with `wtime-aot x64`'s **4.4 ms** AOT step it is **5.1× faster**) to **64× smaller** `.wasm` binaries (**23.0 KiB** vs **1,468 KiB**).
+- **Generalized AoS record SIMD, multi-core scaling, persistent processes & opt-in `--wasm3`:**
+  - Idiomatic AoS `#[Vec4]` particle Euler integration (65,536 particles × 32 steps, [multicore_aos_bench.blot](benchmarks/comparison/multicore_aos_bench.blot)) auto-vectorizes to **2.15 ms** default / **2.06 ms** `--wasm3` vs **2.77 ms** native Rust `-O3` (**1.29×–1.35× faster**, bit-exact checksum `16529059`).
+  - Fanning 8 × 256×256 Mandelbrot tiles across 1 → 8 isolated `wtime-aot 0.1.2` guest instances scales **5.05×** (`5.95 → 1.18 ms`, **3.69× faster** than 8-thread native Rust's `4.35 ms`, bit-exact checksum `13500030`); Deno's copied-packet `KernelPool` scales **4.08×** (`9.56 → 2.35 ms` across 8 workers on 512×512 × 500-iter Mandelbrot).
+  - ABI 8 persistent `entry process` (`particle_sim`, 4,096 owned `Vec4`s) commits no-op steps in **47 ns** (**21.2M steps/sec** on `wtime-aot 0.1.2`; **0.73 µs** in Deno) and full 4,096-particle AoS `Vec4` ticks in **2.47 µs/step** (**1.66B particles/sec**).
+  - Opt-in `--wasm3` (`--tail-calls` with `return_call` + `return_call_indirect`, `--relaxed-simd` with FMA + `relaxed_min`/`relaxed_max`/`relaxed_trunc`) runs natively on both V8/Deno (hardware FMA3: **1.15×** on `matmul_64`, **1.06×** on `particle_spark_simd`, **1.04×** on Mandelbrot) and `wtime-aot 0.1.2` (**1.04×** on AoS `Vec4`, **1.09×** on AoS `Vec2`; unfused FMA lowering keeps default faster on `matmul_64` in `wtime-aot 0.1.2`).
 
 ---
 
 ## Ink ECS vs Bevy ECS
 
-We benchmarked **Ink ECS** (`ink/ecs` + `ink/ecs/query`, written in pure Blot and compiled to a **75.9 KiB** Wasm module executed on `wtime-aot 0.1.1 --backend x64`) against **Bevy ECS `0.20.1`** (native x86_64 Rust `-O3` + thin LTO) on identical 10,000-entity worlds (`Pos { x, y, z }`, `Vel { vx, vy, vz }`, 10% `Active`, 5% `Frozen`) with **bit-exact checksum parity** on all matching workloads ([ink_ecs_bench.blot](benchmarks/comparison/ink_ecs_bench.blot), [rust_bench_main.rs](benchmarks/comparison/rust_bench_main.rs)):
+We benchmarked **Ink ECS** (`ink/ecs` + `ink/ecs/query`, written in pure Blot and compiled to a **75.8 KiB** Wasm module executed on `wtime-aot 0.1.2 --backend x64`) against **Bevy ECS `0.20.1`** (native x86_64 Rust `-O3` + thin LTO) on identical 10,000-entity worlds (`Pos { x, y, z }`, `Vel { vx, vy, vz }`, 10% `Active`, 5% `Frozen`) with **bit-exact checksum parity** on all matching workloads ([ink_ecs_bench.blot](benchmarks/comparison/ink_ecs_bench.blot), [rust_bench_main.rs](benchmarks/comparison/rust_bench_main.rs)):
 
 ![Ink ECS vs Bevy ECS 0.20.1 performance comparison](benchmarks/evidence/measurements/2026-11-24-ink-vs-bevy-ecs.svg)
 

@@ -44,6 +44,20 @@ fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32
     }
     return 0, false;
 }
+fn resolveBoundSizedLength(m: const Module&, node_id: u32) -> TId {
+    let n = m.node(node_id);
+    if n.tag == blot_check_core::Tag.project {
+        let spelling = m.fieldSpelling(m.projection(n.b).field);
+        if spelling.present && spelling.value == "length" {
+            return coreSizedLength(m, m.typeOf(n.a));
+        }
+    }
+    if lengthReceiver(m, node_id) != 0 {
+        let args = m.children(node_id);
+        if args.len == 1 { return coreSizedLength(m, m.typeOf(args[0])); }
+    }
+    return 0;
+}
 recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: u32, invert: bool, depth: i64 = 0) {
     if cond_id == 0 || depth > 8 { return; }
     let cond = m.node(cond_id);
@@ -78,8 +92,11 @@ recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: 
         let iv, iok = bindGet(g, f, idx_b);
         if !iok || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return; }
         let bnd_loc, bok = resolveBoundLocal(g, f, m, bnd_node);
+        let sized_len_ty = resolveBoundSizedLength(m, bnd_node);
         if bok {
-            recordCheckedBound(f, w(g, iv, 0), bnd_loc);
+            recordCheckedBoundSized(f, w(g, iv, 0), bnd_loc, sized_len_ty);
+        } else if sized_len_ty != 0 {
+            recordCheckedBoundSized(f, w(g, iv, 0), 0xffffffff, sized_len_ty);
         }
     }
 }
@@ -1318,7 +1335,7 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     // or enclosing releasing loops require unwinding on exit.
     var prev_tail = f.tail_call_node;
     if f.tco_inhibit == 0 && f.handles_len == 0 && f.scratch_cut.target == 0 &&
-        n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.call &&
+        n.a != 0 && (m.node(n.a).tag == blot_check_core::Tag.call || (m.node(n.a).tag == blot_check_core::Tag.apply && blot_direct_writer::tailCallsEnabled())) &&
         (f.self_tco_loop != 0xffffffff || blot_direct_writer::tailCallsEnabled()) {
         var check_at = g.s.labels.len;
         var found_fn_exit = false;
@@ -7948,6 +7965,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if matmul_err != blot_direct_types::Error.none { return neverVal(), matmul_err; }
         let v3_err = tryEmitVec3MaybeLoop4x(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if v3_err != blot_direct_types::Error.none { return neverVal(), v3_err; }
+        let aos_err = tryEmitAosF32RecordLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
+        if aos_err != blot_direct_types::Error.none { return neverVal(), aos_err; }
         let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
         let ainit_err = tryEmitAffineInitLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));

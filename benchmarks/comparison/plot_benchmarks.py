@@ -227,7 +227,7 @@ def build_kernels_chart(data: dict) -> str:
         text(
             28,
             h - 16,
-            "Linear 0..max scale per card. Executed via wtime-aot 0.1.1 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
+            "Linear 0..max scale per card. Executed via wtime-aot 0.1.2 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
             size=10.5,
             fill=TEXT_MUTED,
         )

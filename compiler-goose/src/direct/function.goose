@@ -88,6 +88,7 @@ struct CheckedElem {
 struct CheckedBound {
     index: u32 = 0,
     bound: u32 = 0,
+    sized_len_ty: TId = 0,
     depth: u32 = 0
 }
 struct CheckedLeBound {
@@ -437,7 +438,7 @@ fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
                     var bout: i64 = 0;
                     for bi in 0..f.checked_bounds_len {
                         let bentry = f.checked_bounds[bi];
-                        if bentry.bound != entry.length && bentry.index != entry.length {
+                        if bentry.bound != entry.length && bentry.bound != 0xffffffff && bentry.index != entry.length {
                             f.checked_bounds[bout] = bentry;
                             bout += 1;
                         }
@@ -481,20 +482,39 @@ fn recordCheckedLe(f: Fn&, a: u32, b: u32) {
     f.checked_le_len += 1;
 }
 fn findCheckedBound(f: const Fn&, index: u32, bound: u32) -> i64 {
+    if bound == 0xffffffff { return -1; }
     var i = f.checked_bounds_len;
     while i > 0 {
         i -= 1;
         let entry = f.checked_bounds[i];
-        if entry.index == index && entry.bound == bound { return i; }
-        if entry.index == index && findCheckedLe(f, entry.bound, bound) >= 0 { return i; }
+        if entry.index == index && entry.bound != 0xffffffff && (entry.bound == bound || findCheckedLe(f, entry.bound, bound) >= 0) { return i; }
     }
     return -1;
 }
+fn findCheckedSizedBound(m: const Module&, f: const Fn&, index: u32, len_ty: TId) -> bool {
+    if len_ty == 0 { return false; }
+    var i = f.checked_bounds_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_bounds[i];
+        if entry.index == index && entry.sized_len_ty != 0 && sameSizedLength(m, entry.sized_len_ty, len_ty) { return true; }
+    }
+    return false;
+}
+fn recordCheckedBoundSized(f: Fn&, index: u32, bound: u32, sized_len_ty: TId) {
+    var i = f.checked_bounds_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_bounds[i];
+        if entry.index == index && entry.bound == bound && entry.sized_len_ty == sized_len_ty { return; }
+    }
+    if f.checked_bounds_len >= 8 { return; }
+    f.checked_bounds[f.checked_bounds_len] = CheckedBound { index: index, bound: bound, sized_len_ty: sized_len_ty, depth: f.depth };
+    f.checked_bounds_len += 1;
+}
 fn recordCheckedBound(f: Fn&, index: u32, bound: u32) {
     if findCheckedBound(f, index, bound) >= 0 { return; }
-    if f.checked_bounds_len >= 8 { return; }
-    f.checked_bounds[f.checked_bounds_len] = CheckedBound { index: index, bound: bound, depth: f.depth };
-    f.checked_bounds_len += 1;
+    recordCheckedBoundSized(f, index, bound, 0);
 }
 fn invalidateCheckedContainers(f: Fn&) {
     f.checked_arrays_len = 0;
