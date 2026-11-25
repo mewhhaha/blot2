@@ -1124,6 +1124,30 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
     }
 }
 
+fn comptimeFieldPos(g: Generator&, record_ty: Ty, nom_unit: u32, nom_decl: u32, fi: i64, field_count: i64) -> i64 {
+    if nom_unit != 0 && g.hasUnit(nom_unit) {
+        let owner .= g.units[nom_unit - 1];
+        let ordinal, oerr = g.types.nominalOrdinal(owner, blot_check_types::NominalIdentity { nom_unit, nom_decl });
+        if oerr == blot_direct_types::Error.none {
+            let ctors = owner.nominalConstructors(ordinal);
+            if ctors.len == 1 {
+                let declared_payload = owner.constructor(ctors[0]).payload;
+                if declared_payload != 0 && owner.types.node(declared_payload).tag == blot_check_types::Tag.record {
+                    let dshape = owner.types.node(declared_payload);
+                    if (dshape.b as i64) == field_count {
+                        let dfield = owner.types.recordField(dshape, fi);
+                        let fname, has_fname = g.types.fieldNameOf(owner, dfield.name, true);
+                        if has_fname {
+                            let pos = g.types.findField(record_ty, fname);
+                            if pos >= 0 { return pos; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return fi;
+}
 recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -1170,7 +1194,8 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         var field_count: i64 = 0;
         if record_ty != 0 { field_count = g.types.node(record_ty).b as i64; }
         for fi in 0..field_count {
-            let fld = g.types.recordField(record_ty, fi);
+            let pos = comptimeFieldPos(g, record_ty, nom_unit, nom_decl, fi, field_count);
+            let fld = g.types.recordField(record_ty, pos);
             f.env = saved_env;
             for pi in 0..proj_var_len { g.types.envPut(f.env, f.unit, proj_vars[pi], fld.ty); }
             for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[current.start + at]); }

@@ -270,6 +270,14 @@ func inspect_player_meta (): U32 =>
       total := total + 100
   return total
 
+// Verify nominal #fields iterates in declared order (name, hp, ratio, bonus),
+// NOT alphabetical order (bonus, hp, name, ratio).
+func player_field_order_code (): U32 =>
+  let code = 0
+  #for field in #fields Player:
+    code := code * 10 + field.name.length
+  return code
+
 func sum_structural (r: { a: U32, b: U32 }): U32 =>
   let s = 0
   #for f in #fields { a: U32, b: U32 }:
@@ -294,11 +302,12 @@ entry func main (): U32 =>
   let meta = inspect_player_meta ()
   // sum_structural = 11 + 22 = 33
   let sr = sum_structural { a: 11, b: 22 }
-  return s1 + s2 + meta + sr + p1.name.length
+  // player_field_order_code: name(4), hp(2), ratio(5), bonus(5) = 4255
+  return s1 + s2 + meta + sr + p1.name.length + player_field_order_code ()
 `,
     (guest) => {
-      // 107 + 45 + 150 + 33 + 4 = 339
-      equal(guest.call("main", null), 339);
+      // 107 + 45 + 150 + 33 + 4 + 4255 = 4594
+      equal(guest.call("main", null), 4594);
     },
   );
 });
