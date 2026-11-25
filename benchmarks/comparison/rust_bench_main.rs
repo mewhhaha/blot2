@@ -932,12 +932,22 @@ fn main() {
     };
 
     let blot_commit = git_short_rev(blot_root);
-    let wtime_commit = git_short_rev(&workspace_parent.join("wtime"));
+    let wtime_dir = workspace_parent.join("wtime");
+    let wtime_commit = git_short_rev(&wtime_dir);
+    let wtime_version = std::fs::read_to_string(wtime_dir.join("tools/wtime-aot/Cargo.toml"))
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.trim_start().starts_with("version = "))
+                .and_then(|l| l.split('"').nth(1))
+                .map(|v| v.to_string())
+        })
+        .unwrap_or_else(|| "0.1.3".to_string());
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
             "blot_commit": blot_commit,
-            "wtime_aot": format!("0.1.2 (x64-v3, {wtime_commit})"),
+            "wtime_aot": format!("{wtime_version} (x64-v3, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
             "rustc": "1.96.0-nightly",
         },

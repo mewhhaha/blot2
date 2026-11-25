@@ -797,11 +797,11 @@
      "syntax_nodes": 2162,
      "type_nodes": 4896,
      "type_versions": 696,
-     "wasm_bytes": 6312
+     "wasm_bytes": 6121
     }
    ],
-   "wasm_bytes": 6312,
-   "wasm_sha256": "839aa3e2a133ebdf20259720ef8b65cb5524bfc5553d6e26ea06a7282d446ebf"
+   "wasm_bytes": 6121,
+   "wasm_sha256": "9310f44542fe83dce0ddbc38fd2f032d20eec186a1e6b028d98a385f306593e0"
   },
   "direct/branch_appends.blot": {
    "exit": 0,

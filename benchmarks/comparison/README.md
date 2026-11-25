@@ -50,8 +50,10 @@ deno run --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMB
 
 ## Recorded Evidence
 
-- [2026-11-24-rust-and-bevy-ecs.json](../evidence/measurements/2026-11-24-rust-and-bevy-ecs.json):
+- [2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json](../evidence/measurements/2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json):
   Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
-  AMD Ryzen 7 7800X3D with `blotc-goose` (Tier 7 + Track 2/4A/4B),
-  `wtime-aot 0.1.2` (`--backend x64`, `x64-v3`, `ad175d5`),
-  `rustc 1.96.0-nightly`, and `bevy_ecs 0.20.1`.
+  AMD Ryzen 7 7800X3D with `blotc-goose` (Batch C + Batch C2 FBIP reuse),
+  `wtime-aot 0.1.3` (`--backend x64`, `x64-v3`, `1125fd5`, native 256-opcode
+  register SIMD + `--wasm3`), `rustc 1.96.0-nightly`, and `bevy_ecs 0.20.1`.
+- [2026-11-24-rust-and-bevy-ecs.json](../evidence/measurements/2026-11-24-rust-and-bevy-ecs.json):
+  Earlier baseline on `wtime-aot 0.1.2` (`ad175d5`).

@@ -32,7 +32,8 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let info = m.updateInfo(id);
     let root, error = expr(g, f, info.root);
     if error != blot_direct_types::Error.none { return root, error; }
-    let prev_reuse_node = f.reuse_node;
+    let prev_reuse_nodes = f.reuse_nodes;
+    let prev_reuse_nodes_len = f.reuse_nodes_len;
     let prev_reuse_block = f.reuse_block;
     let prev_reuse_ty = f.reuse_ty;
     if !g.runtime_().has_fork {
@@ -40,14 +41,16 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if root_binding != 0 && isUniqueBoxed(g, f, root_binding) && uses(g, f, root_binding) == 1 && !bindingCaptured(g, f, root_binding) {
             let boxed, berr = isBoxed(g, f, root.ty, id);
             if berr == blot_direct_types::Error.none && boxed && root.len == 1 {
-                f.reuse_node = id;
+                f.reuse_nodes = [id, 0, 0, 0];
+                f.reuse_nodes_len = 1;
                 f.reuse_block = w(g, root, 0);
                 f.reuse_ty = root.ty;
             }
         }
     }
     let result, uerr = updateAt(g, f, id, root, 0);
-    f.reuse_node = prev_reuse_node;
+    f.reuse_nodes = prev_reuse_nodes;
+    f.reuse_nodes_len = prev_reuse_nodes_len;
     f.reuse_block = prev_reuse_block;
     f.reuse_ty = prev_reuse_ty;
     return result, uerr;
@@ -234,8 +237,7 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
         for index in 0..(old.len as i64) { if g.s.words[replacement.start + index] != g.s.words[old.start + index] { same = false; } }
         if same { return value, blot_direct_types::Error.none; }
     }
-    if f.reuse_node == id && f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty {
-        f.reuse_node = 0;
+    if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
         f.reuse_block = 0;
         let written = writeFlat(g, f, w(g, value, 0), offset, replacement, id);
         if written != blot_direct_types::Error.none { return neverVal(), written; }
@@ -302,8 +304,7 @@ recursive fn updateBoxedShared(g: Generator&, f: Fn&, id: u32, value: Val, cases
     if error != blot_direct_types::Error.none { return replacement, error; }
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
     if replacement.ty != ty { return neverVal(), g.fail(m, id, "an update that changes a boxed field's type"); }
-    if f.reuse_node == id && f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty {
-        f.reuse_node = 0;
+    if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
         f.reuse_block = 0;
         let written = writeFlat(g, f, old_address, 0, replacement, id);
         if written != blot_direct_types::Error.none { return neverVal(), written; }
@@ -716,10 +717,8 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if boxed {
         var memory_block: u32 = 0;
-        if f.reuse_node == id && f.reuse_block != 0 && f.reuse_ty == ty {
+        if f.reuse_block != 0 && f.reuse_ty == ty && consumeReuseNode(f, id) {
             memory_block = f.reuse_block;
-            f.reuse_node = 0;
-            f.reuse_block = 0;
         } else {
             let made, error = newBlock(g, f, ty, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }

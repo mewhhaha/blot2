@@ -2456,7 +2456,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let arms = m.matchArms(id);
     var fbip_block: u32 = 0;
     var fbip_ty: Ty = 0;
-    if !info.statement && inputs.len == 1 && !g.runtime_().has_fork {
+    if inputs.len == 1 && !g.runtime_().has_fork {
         let matched_binding = localRef(m, inputs[0]);
         if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(g, f, matched_binding) {
             let input_val = g.s.vals[values.start];
@@ -2537,19 +2537,23 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_i32_eqz);
             br(g, f, OP_br_if, next);
         }
-        let prev_reuse_node = f.reuse_node;
+        let prev_reuse_nodes = f.reuse_nodes;
+        let prev_reuse_nodes_len = f.reuse_nodes_len;
         let prev_reuse_block = f.reuse_block;
         let prev_reuse_ty = f.reuse_ty;
         if fbip_block != 0 {
-            let target_construct = tailConstruct(m, arm.body);
-            if target_construct != 0 {
-                f.reuse_node = target_construct;
+            var targets: u32[4] = [0; 4];
+            var target_len: i64 = 0;
+            if collectTailConstructs(m, arm.body, info.statement, targets, target_len) && target_len > 0 {
+                f.reuse_nodes = targets;
+                f.reuse_nodes_len = target_len;
                 f.reuse_block = fbip_block;
                 f.reuse_ty = fbip_ty;
             }
         }
         let body, error = stmt(g, f, arm.body);
-        f.reuse_node = prev_reuse_node;
+        f.reuse_nodes = prev_reuse_nodes;
+        f.reuse_nodes_len = prev_reuse_nodes_len;
         f.reuse_block = prev_reuse_block;
         f.reuse_ty = prev_reuse_ty;
         if error != blot_direct_types::Error.none { return body, error; }
@@ -7729,7 +7733,11 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
         for carry, at in carries {
             bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
-            if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming) {
+            // A copiedBox carry lives in a fresh loop-reserved block copied on
+            // entry and backedge, so carry.iteration is always exclusively owned
+            // for in-place FBIP when its sole read is a match/update.
+            if g.s.words[slots.start + at] != 0 ||
+                (isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(g, f, carry.incoming)) {
                 blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
             }
             if tagOf(g, g.s.vals[iteration.start + at].ty) == blot_direct_types::Tag.array &&

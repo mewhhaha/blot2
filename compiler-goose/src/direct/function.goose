@@ -148,7 +148,8 @@ struct Fn {
     owned_uses_computed: bool = false,
     owned_uses: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     owned_flows: blot_support_zigmap::Map = blot_support_zigmap::Map {},
-    reuse_node: u32 = 0,
+    reuse_nodes: u32[4] = [0; 4],
+    reuse_nodes_len: i64 = 0,
     reuse_block: u32 = 0,
     reuse_ty: Ty = 0,
     // The module of this body, as `g.units[unit - 1]`.
@@ -1461,6 +1462,7 @@ fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: T
             let local_id = localRef(m, id);
             return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
         },
+        suite, block_ => { return isFreshBoxedNode(m, id, 0); },
         if_value => {
             return isFreshBoxedNode(m, n.b, 0) && isFreshBoxedNode(m, n.c, 0);
         },
@@ -1483,6 +1485,17 @@ recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
             if items.len == 0 { return false; }
             return isFreshBoxedNode(m, items[items.len - 1], depth + 1);
         },
+        block_ => {
+            if n.a == 0 { return false; }
+            var last = n.a;
+            if m.node(n.a).tag == blot_check_core::Tag.suite {
+                let items = m.children(n.a);
+                if items.len == 0 { return false; }
+                last = items[items.len - 1];
+            }
+            let ln = m.node(last);
+            return ln.tag == blot_check_core::Tag.break_ && ln.a == id && ln.b != 0 && isFreshBoxedNode(m, ln.b, depth + 1);
+        },
         if_value => { return isFreshBoxedNode(m, n.b, depth + 1) && isFreshBoxedNode(m, n.c, depth + 1); },
         match_ => {
             for arm in m.matchArms(id) { if !isFreshBoxedNode(m, arm.body, depth + 1) { return false; } }
@@ -1491,21 +1504,74 @@ recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
         _ => { return false; },
     }
 }
-fn tailConstruct(m: const Module&, id: u32) -> u32 {
-    var cursor = id;
-    for step in 0..8 {
-        if cursor == 0 { return 0; }
-        let n = m.node(cursor);
-        if n.tag == blot_check_core::Tag.construct { return cursor; }
-        if n.tag == blot_check_core::Tag.suite {
-            let items = m.children(cursor);
-            if items.len == 0 { return 0; }
-            cursor = items[items.len - 1];
-            continue;
+fn consumeReuseNode(f: Fn&, id: u32) -> bool {
+    for i in 0..f.reuse_nodes_len {
+        if f.reuse_nodes[i] == id {
+            f.reuse_nodes[i] = 0;
+            return true;
         }
-        return 0;
     }
-    return 0;
+    return false;
+}
+recursive fn collectTailConstructs(
+    m: const Module&,
+    id: u32,
+    allow_bind: bool,
+    out: u32[4]&,
+    out_len: i64&,
+    depth: i64 = 0,
+) -> bool {
+    if id == 0 || depth > 8 { return true; }
+    let n = m.node(id);
+    match n.tag {
+        construct => {
+            if out_len >= 4 { return false; }
+            out[out_len] = id;
+            out_len += 1;
+            return true;
+        },
+        suite => {
+            let items = m.children(id);
+            if items.len == 0 { return true; }
+            return collectTailConstructs(m, items[items.len - 1], allow_bind, out, out_len, depth + 1);
+        },
+        return_ => {
+            return collectTailConstructs(m, n.a, false, out, out_len, depth + 1);
+        },
+        block_ => {
+            if n.a == 0 { return true; }
+            var last = n.a;
+            if m.node(n.a).tag == blot_check_core::Tag.suite {
+                let items = m.children(n.a);
+                if items.len == 0 { return true; }
+                last = items[items.len - 1];
+            }
+            let ln = m.node(last);
+            if ln.tag == blot_check_core::Tag.break_ && ln.a == id && ln.b != 0 {
+                return collectTailConstructs(m, ln.b, false, out, out_len, depth + 1);
+            }
+            return true;
+        },
+        bind => {
+            if allow_bind && n.c < 2 && n.b != 0 {
+                return collectTailConstructs(m, n.b, false, out, out_len, depth + 1);
+            }
+            return true;
+        },
+        if_value => {
+            return collectTailConstructs(m, n.b, false, out, out_len, depth + 1) &&
+                collectTailConstructs(m, n.c, false, out, out_len, depth + 1);
+        },
+        if_stmt => {
+            if !allow_bind { return true; }
+            if n.c != 0 {
+                return collectTailConstructs(m, n.b, true, out, out_len, depth + 1) &&
+                    collectTailConstructs(m, n.c, true, out, out_len, depth + 1);
+            }
+            return collectTailConstructs(m, n.b, true, out, out_len, depth + 1);
+        },
+        _ => { return true; },
+    }
 }
 
 fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false) -> Val, Error {
