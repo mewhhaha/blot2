@@ -10,21 +10,21 @@ const replace_if = func index => return func value => return func values => retu
     break $Updated (@array.set values index value)
   break $Refused
 type Store is data = $Store { left: Array U32, right: Array U32 }
-entry const checked = func (count: U32) => return do:
+#entry const checked = func (count: U32) => return do:
   let values = @array.fill count 0
   for i in 0..(count + 1):
     let $Updated next = replace_if i (i + 1) values else:
       break values
     values := next
   break values
-entry const nested = func (count: U32) => return do:
+#entry const nested = func (count: U32) => return do:
   let store = $Store { left: @array.fill count 0, right: @array.fill count 1 }
   for i in 0..count:
     if i == 2049:
       break
     store.left[i] := i + 1
   break store.left
-entry const forever = func (count: U32) => return do:
+#entry const forever = func (count: U32) => return do:
   let values = @array.fill count 0
   let i = 0
   for ever:
@@ -33,7 +33,7 @@ entry const forever = func (count: U32) => return do:
     values[i] := i + 1
     i := i + 1
   break values
-entry const versions = func () => return do:
+#entry const versions = func () => return do:
   let store = $Store { left: #[1, 2], right: #[1, 2] }
   for i in 0..2:
     store.left[i] := 9
@@ -41,12 +41,12 @@ entry const versions = func () => return do:
       break
   store.left[1] := 8
   break #[store.right[0], store.left[0], store.left[1]]
-entry const extracted = func () => return do:
+#entry const extracted = func () => return do:
   let values = #[#[1], #[2]]
   let first = values[0].copy
   values[0][0] := 9
   break #[first[0], values[0][0]]
-entry const after_break = func () => return do:
+#entry const after_break = func () => return do:
   let values = #[1, 2]
   let saved = values.copy
   for ever:
@@ -85,18 +85,18 @@ Deno.test("scalar replacement preserves record loop versions, branches and mixed
     `
 type Pair is data = $Pair { count: U32, value: F32 }
 const advance = func pair => return $Pair { count: pair.count + 1, value: pair.value + 0.25 }
-entry const iterate = func (count: U32) => return do:
+#entry const iterate = func (count: U32) => return do:
   let value = $Pair { count: 0, value: -0.5 }
   let previous = value
   for i in 0..count:
     previous := value
     value := advance value
   break #[F32.from value.count, value.value, F32.from previous.count, previous.value]
-entry const branch = func (flag: Bool) => return do:
+#entry const branch = func (flag: Bool) => return do:
   let original = $Pair { count: 7, value: -0.0 }
   let changed = if flag then advance original else $Pair { count: 3, value: 1.5 }
   break #[F32.from original.count, original.value, F32.from changed.count, changed.value]
-entry const captured = func () => return do:
+#entry const captured = func () => return do:
   let value = $Pair { count: 1, value: 1.0 }
   let read = func () => return value.count
   value := advance value
@@ -139,17 +139,17 @@ const select = func fallback => return func choice => return case choice of
     break @u32.add cached cached
   $Absent => fallback ()
 const generate = func count => return func callback => return @array.generate count callback
-entry const selected = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const selected = func (host: U32 -> U32 ! {Foreign}) => return do:
   use a <- select (func () => return host 10) ($Chosen 42)
   use b <- select (func () => return host 11) ($Chosen 0)
   use c <- select (func () => return host 12) $Absent
   break #[a, b, c]
-entry const callback = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const callback = func (host: U32 -> U32 ! {Foreign}) => return do:
   use amount <- host 10
   let callback = func i => return @u32.add i amount
   amount := 99
   break generate 4 callback
-entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (host 0) (do:
+#entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (host 0) (do:
   use offset <- host 20
   break func i => return i + offset)
 `,
@@ -195,7 +195,7 @@ const repeated = do:
   for i in 0..4096:
     values[i % 2] := self + 1
   break values
-entry const answer = func () => return
+#entry const answer = func () => return
   #[source[0], constructed[0], constructed[4095], repeated[0], repeated[1]]
 `,
     (guest) => {
@@ -216,7 +216,7 @@ const primitive = do:
   for i in 0..4096:
     values := @array.set values i (i + 1)
   break values
-entry const answer = func (): U32 => return primitive[4095]
+#entry const answer = func (): U32 => return primitive[4095]
 `,
     (guest) => equal(guest.call("answer", null), 4096),
   );
@@ -238,7 +238,7 @@ const custom = do:
       output[start + i] := payload[chunk.start + i]
     start := start + 2
   break output
-entry const answers = func () => return #[flattened[4095], joined[8191], custom[4095]]
+#entry const answers = func () => return #[flattened[4095], joined[8191], custom[4095]]
 `,
     (guest) => {
       assert.deepEqual(

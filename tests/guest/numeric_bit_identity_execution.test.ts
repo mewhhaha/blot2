@@ -14,10 +14,10 @@ const lookup = func (index: U32) => return if @u32.lt index 2 then @array.get #[
 const guarded = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@u32.div index 0) else 0
 `;
 const source = `import {identity, lookup, guarded} from "./logic"
-entry const echo = func (index: U32) => return identity index
-entry const answer = func (index: U32) => return lookup index
-entry const trap = func (index: U32) => return guarded index
-entry const snapshot = func (value: U32) => return #[value]
+#entry const echo = func (index: U32) => return identity index
+#entry const answer = func (index: U32) => return lookup index
+#entry const trap = func (index: U32) => return guarded index
+#entry const snapshot = func (value: U32) => return #[value]
 `;
 
 async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {

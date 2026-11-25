@@ -13,7 +13,7 @@ const metadata = func (key: U32) => return {key, version: 1, encode, decode, ide
 `;
 const source = `
 import * as factory from "./forward"
-entry const run = func (count: U32): Array F32 => return do:
+#entry const run = func (count: U32): Array F32 => return do:
   let codec = factory.metadata 23
   let output: Array F32 = #[]
   @storage.push output (U32.to_f32 codec.key)

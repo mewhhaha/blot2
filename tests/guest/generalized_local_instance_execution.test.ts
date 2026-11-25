@@ -20,7 +20,7 @@ async function returnsArgument(source: string): Promise<void> {
 
 Deno.test("generalized local aliases take the concrete instance of the alias use", async () => {
   await returnsArgument(`${builder}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
   let (_, result) = run c (func () => return x)
@@ -30,7 +30,7 @@ entry const main = func (x: U32) => return do:
 
 Deno.test("generalized locals ignore an unused alias of themselves", async () => {
   await returnsArgument(`${builder}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
   let (_, result) = run b (func () => return x)
@@ -40,7 +40,7 @@ entry const main = func (x: U32) => return do:
 
 Deno.test("generalized locals used repeatedly at one layout share that instance", async () => {
   await returnsArgument(`${builder}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, first) = run b (func () => return x)
   let (_, second) = run b (func () => return x)
@@ -52,7 +52,7 @@ Deno.test("generalized partial applications take the concrete instance of their 
   await returnsArgument(`
 const pair = func a => return func b => return (a, b)
 const wrap = func scope => return func value => return scope value
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let left = pair 1
   let twice = wrap (func p => return (p, p))
   let (_, value) = left x
@@ -88,7 +88,7 @@ const create = func builder => return func action => return do:
 // Direct backend gap: a generalized local from a polymorphic builder traps with "function signature mismatch" (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("rebound generalized builders close every link of the chain", async () => {
   await returnsArgument(`${cells}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let builder = empty ()
   builder := insert_cell 1 self
   let (_, result) = create builder (func () => return x)
@@ -100,7 +100,7 @@ Deno.test("unobserved generalized locals choose storage for their holes", async 
   await returnsArgument(`${builder}
 const pair = func a => return func b => return (a, b)
 const choose = func () => return pair
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let unused = choose ()
   let builder = empty ()
   break x
@@ -111,7 +111,7 @@ entry const main = func (x: U32) => return do:
 Deno.test.ignore("closed generalized locals used at different layouts keep their evaluator value", async () => {
   await returnsArgument(`${builder}
 const twice = func f => return func value => return f (f value)
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, first) = run b (func () => return x)
   let (_, second) = run b (func () => return (x, 1.5))
@@ -126,7 +126,7 @@ entry const main = func (x: U32) => return do:
 Deno.test.ignore("a closure capturing a generalized local whose uses disagree reads its instance", async () => {
   await returnsArgument(`${builder}
 const pair = func a => return func b => return (a, b)
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, first) = run b (func () => return x)
   let (_, second) = run b (func () => return (x, 1.5))
@@ -147,7 +147,7 @@ const pair = "const pair = func a => return func b => return (a, b)";
 Deno.test("syntactic func locals used at different layouts evaluate one instance per layout", async () => {
   await returnsArgument(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let (a, _) = k x
   let (b, _) = k 1.5
@@ -155,7 +155,7 @@ entry const main = func (x: U32) => return do:
 `);
   await compileExpectedFailure(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
@@ -166,12 +166,12 @@ entry const main = func (x: U32) => return do:
 Deno.test("each instance of a syntactic func local keeps its own field layout", async () => {
   await compileAndRun(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let (a, _) = k x
   let (b, _) = k 1.5
   break a
-entry const fraction = func (x: F32) => return do:
+#entry const fraction = func (x: F32) => return do:
   let k = (func b => return pair x b)
   let (_, count) = k 3
   let (_, b) = k (x * 2.0)
@@ -188,13 +188,13 @@ entry const fraction = func (x: F32) => return do:
 
 Deno.test("allocating captured values in syntactic func locals release every instance", async () => {
   await compileAndRun(`
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let arr = @array.fill 64 x
   let k = func b => return (arr.copy, b)
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[3] + second.length - 64
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `, (guest) => {
     equal(guest.call("main", 7), 7);
     for (let index = 0; index < 4096; index++) equal(guest.call("main", index), index);
@@ -205,7 +205,7 @@ entry const memory = func () : Array U32 => return #[]
 // array would return 909 for 7.
 Deno.test("syntactic func locals capturing a collection edit give every instance the same edited value", async () => {
   await compileAndRun(`
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let values = @array.fill 4 x
   let edited = @array.set values 0 (values[0] + 1)
   let k = func b => return (edited.copy, b)
@@ -221,7 +221,7 @@ entry const main = func (x: U32) => return do:
 Deno.test("repeated uses of a syntactic func local at one layout share their instance", async () => {
   await returnsArgument(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let (_, whole) = k (x + 1)
   let (_, half) = k 1.5
@@ -233,7 +233,7 @@ entry const main = func (x: U32) => return do:
 Deno.test("syntactic func local uses in loops and early-returning branches read their own instance", async () => {
   await compileAndRun(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let total = 0
   for index in 0..3:
@@ -253,7 +253,7 @@ entry const main = func (x: U32) => return do:
 Deno.test("non-func aliases of polymorphic locals keep one monomorphic type", async () => {
   await compileExpectedFailure(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let g = k
   let (a, _) = g x
@@ -262,7 +262,7 @@ entry const main = func (x: U32) => return do:
 `, "type_mismatch");
   await compileExpectedFailure(`
 const identity = func value => return value
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let g = identity
   let a = g x
   let b = g 1.5
@@ -270,7 +270,7 @@ entry const main = func (x: U32) => return do:
 `, "type_mismatch");
   await returnsArgument(`
 ${pair}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let k = func b => return pair x b
   let g = func b => return k b
   let h = func b => return g b
@@ -284,7 +284,7 @@ entry const main = func (x: U32) => return do:
 // Direct backend gap: a generalized local used at different types is rejected ("a local value is used at different types") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("rebound runtime builders used at different layouts instance every link", async () => {
   await returnsArgument(`${cells}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let builder = empty ()
   builder := insert_cell x self
   let (_, first) = create builder (func () => return x)
@@ -324,7 +324,7 @@ const initial = func app => return do:
 const run = func app => return func world => return func action => return do:
   let $App { scope } = app
   break scope world action
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `;
 
 // Direct backend gap: a builder whose curried render callback a use leaves open traps "unreachable" in Array.length (tasks/DELETE_SCOPED.md).
@@ -333,7 +333,7 @@ Deno.test.ignore("promoted builders serialize curried callbacks whose rows a use
 const render = func app => return func frame => return do:
   let $App { render } = app
   break render 2 frame
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let app = with_render (func (scale: U32) => return func (frame: U32) => return do:
     use note frame
     break frame * scale) (empty ())
@@ -352,7 +352,7 @@ Deno.test.ignore("rebinding links that read a promoted builder are promoted with
 const render = func app => return func frame => return do:
   let $App { render } = app
   break render frame
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let app = empty ()
   app := with_render (func (frame: U32) => return do:
     use note frame
@@ -378,13 +378,13 @@ const empty = func () => return do:
 const run = func b => return func action => return do:
   let $B { initial, s } = b
   break s initial action
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `;
 
 // Direct backend gap: a generalized local whose uses leave a type variable open is rejected ("unresolved type variable") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("a generalized local read only for its length stores its ambiguous hole as a word", async () => {
   await returnsArgument(`${scoped}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
@@ -399,7 +399,7 @@ entry const main = func (x: U32) => return do:
 // Direct backend gap: a generalized local used at different types is rejected ("a local value is used at different types") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("a quantified hole read later at a heap type keeps one instance per layout", async () => {
   await returnsArgument(`${scoped}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
@@ -415,8 +415,8 @@ entry const main = func (x: U32) => return do:
 Deno.test("a runtime producer read at an ambiguous hole retries with one instance per layout", async () => {
   await returnsArgument(`
 ${pair}
-entry const memory = func () : Array U32 => return #[]
-entry const main = func (x: U32) => return do:
+#entry const memory = func () : Array U32 => return #[]
+#entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k 1.5
   let n = #[k, k].length
@@ -429,7 +429,7 @@ entry const main = func (x: U32) => return do:
 // Direct backend gap: a generalized local from a polymorphic builder traps with "function signature mismatch" (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("a captured local whose quantified hole stays open reads its instance", async () => {
   await returnsArgument(`${scoped}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
@@ -461,7 +461,7 @@ const create = func app => return func () => return do:
   let $App { engine, systems } = app
   let (world, _) = run engine (run_start systems)
   break world
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let builder = new_with (func (e: u) => return e)
   let application = finish builder
   let world = create application ()
@@ -480,7 +480,7 @@ Deno.test.ignore("a large unit still stores the ambiguous holes of its generaliz
   const locals = Array.from({ length: 20 }, (_, index) => `  let boxed${index} = #[b, b]`).join("\n");
   const lengths = Array.from({ length: 20 }, (_, index) => `boxed${index}.length`).join(" + ");
   await returnsArgument(`${scoped}${padding}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, r) = run b (func () => return x)
 ${locals}
@@ -495,7 +495,7 @@ const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = 
 
 Deno.test("generalized local aliases in a unit above 4,096 nodes take the instance of their use", async () => {
   await returnsArgument(`${builder}${padding}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
   let (_, result) = run c (func () => return x)
@@ -506,7 +506,7 @@ entry const main = func (x: U32) => return do:
 // Direct backend gap: a generalized local whose uses leave a type variable open is rejected ("unresolved type variable") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("ambiguous holes in a unit above 4,096 nodes take word storage", async () => {
   await returnsArgument(`${scoped}${padding}
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let b = empty ()
   let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
@@ -516,7 +516,7 @@ entry const main = func (x: U32) => return do:
 
 Deno.test("nested polymorphic local captures instantiate cleanly at every inner closure layout (Council Neon #1)", async () => {
   await compileAndRun(`
-entry func zero_captures (seed: U32): U32 =>
+#entry func zero_captures (seed: U32): U32 =>
   let k = func x => return x
   let a = k 1
   let g = func (n: U32) =>
@@ -526,7 +526,7 @@ entry func zero_captures (seed: U32): U32 =>
     return u + n + (if f > 2.0 then 10 else 0)
   return a + g seed
 
-entry func one_capture (offset: U32): U32 =>
+#entry func one_capture (offset: U32): U32 =>
   let k = func x => return (x, offset)
   let (a, _) = k 1
   let g = func (n: U32) =>
@@ -536,7 +536,7 @@ entry func one_capture (offset: U32): U32 =>
     return u + o1 + o2 + n + (if f > 2.0 then 100 else 0)
   return a + g 5
 
-entry func multi_and_chained_captures (c1: U32): U32 =>
+#entry func multi_and_chained_captures (c1: U32): U32 =>
   let c2 = c1 + 2
   let k1 = func x => return (x, c1, c2)
   let k2 = func y => return k1 y

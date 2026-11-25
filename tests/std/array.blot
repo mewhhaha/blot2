@@ -24,9 +24,9 @@ private func array_checks (): Unit ! { test.Test } =>
   use test.eq "prefix sums wrap" #[0xffff_ffff, 0, 3] (array.prefix_sums #[0xffff_ffff, 1, 3])
   return ()
 
-entry func test_array (): test.Report => test.run array_checks
+#entry func test_array (): test.Report => test.run array_checks
 
-entry func trap_slice_oob (): Unit =>
+#entry func trap_slice_oob (): Unit =>
   let sliced = array.slice 1 2 #[42]
   if sliced.length == 0:
     return ()

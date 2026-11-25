@@ -13,7 +13,7 @@ func sight (map: grid.Grid) -> (origin: U32) -> (direction: grid.Direction): (Bo
       break (false, distance)
     position := next
 
-entry func solve (source: Text): Array U32 => do:
+#entry func solve (source: Text): Array U32 => do:
   let map = grid.parse source
   let visible_count = 0
   let best = 0

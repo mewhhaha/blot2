@@ -12,17 +12,17 @@ const fixed = {${values}}
 const record = func (fixed: {${fields}}) -> payload => return {fixed, payload}
 const boxed = func fixed -> value => return $Box {value, fixed}
 const visit = func callback -> value => return callback value
-entry const integers = func (input: U32) => return do:
+#entry const integers = func (input: U32) => return do:
   let marker: Array U32 = #[input]
   let plain = record fixed marker[0]
   let nominal = boxed plain.fixed (@u32.add plain.payload ${bump})
   let result = visit (func (value: U32) => return @u32.add value nominal.fixed.f63) nominal.value
   return #[plain.fixed.f0, plain.fixed.f31, nominal.fixed.f63, plain.payload, nominal.value, result]
-entry const floating = func (input: F32) => return do:
+#entry const floating = func (input: F32) => return do:
   let plain = record fixed input
   let nominal = boxed plain.fixed (@f32.add plain.payload 1.5)
   return #[plain.payload, nominal.value, @u32.to_f32 nominal.fixed.f63, visit (func value => return value) plain.payload]
-entry const host = func (callback: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const host = func (callback: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let plain = record fixed 7
   let nominal = boxed plain.fixed plain.payload
   return visit callback nominal.value

@@ -51,7 +51,7 @@ let $Done value = result else:
 //^^^^^^^ attribute
 //        ^^^^^^^^ attribute
 
-entry const answer = 42
+#entry const answer = 42
 // <- keyword.storage.modifier
 //    ^^^^^ keyword.storage.type
 

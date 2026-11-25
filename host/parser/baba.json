@@ -18,6 +18,18 @@
         }
       },
       {
+        "rule": "private_declaration_value",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "public_declaration_value",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "import_declaration",
         "boundary": {
           "kind": "terminated",
@@ -61,6 +73,12 @@
           "kind": "paired",
           "open": "[",
           "close": "]"
+        }
+      },
+      {
+        "rule": "entry_modifier",
+        "boundary": {
+          "kind": "root"
         }
       },
       {

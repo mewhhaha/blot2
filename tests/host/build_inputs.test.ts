@@ -29,10 +29,10 @@ func make_lookup (): (U32 -> U32) => return do:
   let bytes = (catalog ()).bytes
   let table = @array.generate (@array.length bytes) (func (i: U32) => return @u32.add i (@array.get bytes i))
   return func (i: U32): U32 => return @array.get table i
-entry func read () => return do:
+#entry func read () => return do:
   let asset = #run (catalog ())
   return asset.bytes
-entry func lookup (i: U32): U32 => return (#run (make_lookup ())) i
+#entry func lookup (i: U32): U32 => return (#run (make_lookup ())) i
 `;
   const selection = (other: boolean) =>
     `const alternate = ${other}
@@ -127,7 +127,7 @@ import { file as left } from "./left"
 import { file as right } from "./right"
 import { include } from "std/build"
 func pick () => return if @u32.eq (@array.get (include mode) 0) 0 then left else right
-entry func answer () => return #run (@array.get (include (pick ())) 0)
+#entry func answer () => return #run (@array.get (include (pick ())) 0)
 `;
   async function build(program = source) {
     return await c.build({ sources: { [entry]: program } });

@@ -143,7 +143,7 @@ try {
     depth++;
   }
   sourceLines.push(
-    `entry const checksum = func (input: U32): Array U32 => return do:`,
+    `#entry const checksum = func (input: U32): Array U32 => return do:`,
     `  let output: GrowArray U32 = #[${level[0]} input]`,
     `  return @storage.freeze output`,
   );

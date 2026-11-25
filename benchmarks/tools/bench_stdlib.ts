@@ -230,7 +230,7 @@ for (const length of [256, 1024, 4096, 8193]) {
   for i in 0..count:
     values := [...self, i]
   break values
-entry const answer = (Array.from_list (build ${length}))[${length - 1}]
+#entry const answer = (Array.from_list (build ${length}))[${length - 1}]
 `,
   );
   const sourceHash = await hash(await Deno.readFile(source));

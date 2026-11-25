@@ -2,7 +2,7 @@ const fresh = func (rows: own Array U32): { rows: Array U32, result: Array U32 }
   rows[0] := @u32.add self 1
   let result: Array U32 = #[rows[0]]
   return { rows: rows, result: result }
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   let a = fresh rows
   let b = fresh a.rows

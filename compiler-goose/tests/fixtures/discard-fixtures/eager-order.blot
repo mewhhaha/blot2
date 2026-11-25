@@ -7,11 +7,11 @@ const mark = func (digit: U32) => return do:
   let $Count old = previous
   use @state.set ($Count (@u32.add (@u32.mul old 10) digit))
   break @u32.to_f32 digit
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let ($Count count, _) = @state.run ($Count 0) (func () => return do:
     let delayed = keep (func () => return mark 7)
     use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), func () => return @panic "unused body ran"))
     break ()
   )
   break count
-entry const folded = answer ()
+#entry const folded = answer ()

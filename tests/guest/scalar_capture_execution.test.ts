@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const source = `
-entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
+#entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use initial <- host 0
   let seed = initial[0]
   let count = initial[1]
@@ -21,7 +21,7 @@ entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
     use produced <- worker index
     sum := self + produced
   break sum
-entry const floating = func (host: F32 -> Array F32 ! {Foreign}) => return do:
+#entry const floating = func (host: F32 -> Array F32 ! {Foreign}) => return do:
   use initial <- host 0.0
   let seed = initial[0]
   let worker = func (value: F32) => return do:

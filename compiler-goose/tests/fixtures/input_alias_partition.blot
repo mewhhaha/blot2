@@ -3,7 +3,7 @@ const pair = func (row: {left: U32, right: U32}): U32 => return
 const edited = func (row: {left: U32, right: U32}): U32 => return do:
   row.left := @u32.add self 1
   return @u32.add (@u32.mul row.left 10) row.right
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input, @u32.add input 7]
   let x = marker[0]
   let y = marker[1]

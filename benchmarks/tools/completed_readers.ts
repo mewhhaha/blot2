@@ -69,7 +69,7 @@ await Promise.all([
 function sourceFor(callers: number): string {
   const lines = [
     'import * as ecs from "ink/ecs"',
-    "entry const answer = func (input: U32) => return do:",
+    "#entry const answer = func (input: U32) => return do:",
   ];
   const results = [];
   for (let at = 0; at < callers; at++) {

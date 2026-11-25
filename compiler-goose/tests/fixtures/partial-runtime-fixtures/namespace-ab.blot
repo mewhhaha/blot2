@@ -12,5 +12,5 @@ const evaluate = func () => return do:
     break Local ()
   let (_, $Cell count) = @state.run ($Cell 1) (func () => return @state.get $Cell)
   break @f32.add (@f32.add (@f32.add first second) third) (@u32.to_f32 count)
-entry const answer = func () => return evaluate ()
-entry const folded = evaluate ()
+#entry const answer = func () => return evaluate ()
+#entry const folded = evaluate ()

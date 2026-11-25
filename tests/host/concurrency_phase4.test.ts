@@ -109,11 +109,11 @@ function rewriteMemorySectionMax(
 const kernelSuiteSource = `
 func prep_ctx (seed: U32): U32 => return seed
 func run_ctx (seed: U32) -> (x: U32): U32 => return @u32.add seed x
-entry kernel with_ctx: Kernel [U32, U32, U32] = { prepare: prep_ctx, run: run_ctx }
+#kernel const with_ctx: Kernel [U32, U32, U32] = { prepare: prep_ctx, run: run_ctx }
 
 func prep_array_ctx (xs: #[U32]): U32 => return if xs.length > 0 then xs[0] else 0
 func run_array_ctx (base: U32) -> (x: U32): U32 => return @u32.add base x
-entry kernel array_ctx_k: Kernel [#[U32], U32, U32] = { prepare: prep_array_ctx, run: run_array_ctx }
+#kernel const array_ctx_k: Kernel [#[U32], U32, U32] = { prepare: prep_array_ctx, run: run_array_ctx }
 
 func prep_spin (x: U32): U32 => return do:
   if x == 1:
@@ -121,20 +121,20 @@ func prep_spin (x: U32): U32 => return do:
       continue
   return x
 func run_spin_ctx (s: U32) -> (x: U32): U32 => return @u32.add s x
-entry kernel spin_ctx: Kernel [U32, U32, U32] = { prepare: prep_spin, run: run_spin_ctx }
+#kernel const spin_ctx: Kernel [U32, U32, U32] = { prepare: prep_spin, run: run_spin_ctx }
 
-entry kernel func add_one (x: U32): U32 => return @u32.add x 1
+#kernel func add_one (x: U32): U32 => return @u32.add x 1
 
-entry kernel func spin_on_one (x: U32): U32 => return do:
+#kernel func spin_on_one (x: U32): U32 => return do:
   if x == 1:
     for ever:
       continue
   return @u32.add x 10
 
-entry kernel func var_emit (n: U32): #[U32] =>
+#kernel func var_emit (n: U32): #[U32] =>
   return @array.generate n (func i => @u32.add i 1)
 
-entry kernel func var_overflow (n: U32): #[U32] =>
+#kernel func var_overflow (n: U32): #[U32] =>
   return @array.generate n (func i => i)
 
 type W8 = #[8; U32]
@@ -150,7 +150,7 @@ func mk_z512 (): W512 => return #[mk_z64 (), mk_z64 (), mk_z64 (), mk_z64 (), mk
 func mk_z4k (): W4K => return #[mk_z512 (), mk_z512 (), mk_z512 (), mk_z512 (), mk_z512 (), mk_z512 (), mk_z512 (), mk_z512 ()]
 func mk_z32k (): W32K => return #[mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k ()]
 
-entry kernel func big_row_1mib (x: U32): W256K =>
+#kernel func big_row_1mib (x: U32): W256K =>
   let f8: W8 = #[x, 0, 0, 0, 0, 0, 0, 0]
   let f64: W64 = #[f8, mk_z8 (), mk_z8 (), mk_z8 (), mk_z8 (), mk_z8 (), mk_z8 (), mk_z8 ()]
   let f512: W512 = #[f64, mk_z64 (), mk_z64 (), mk_z64 (), mk_z64 (), mk_z64 (), mk_z64 (), mk_z64 ()]
@@ -305,7 +305,7 @@ Deno.test("Law #4: unforgeable CompiledModuleReceipt, primordial copyPrivateByte
 
 Deno.test("Law #4(a)(4): bounded policy.memory warm-vs-fresh transport symmetry via MemorySection rewriter", async () => {
   const bytes = await compileBlot(`
-entry kernel func var_mem (n: U32): #[U32] =>
+#kernel func var_mem (n: U32): #[U32] =>
   return @array.generate n (func i => i)
 `);
   // Chunk 1 emits 128 KiB (32768 words), Chunk 2 has 64 KiB input (16384 items) or emits 128 KiB output.
@@ -995,21 +995,21 @@ func u32_init (seed: U32): U32 => return seed
 func u32_step (st: own U32) -> (cmd: U32): (U32, U32) =>
   let next = @u32.add st cmd
   return (next, next)
-entry process p_u32: Process [U32, U32, U32] = { init: u32_init, step: u32_step }
+#process const p_u32: Process [U32, U32, U32] = { init: u32_init, step: u32_step }
 
 // 2. Bare Bool
 func bool_init (seed: Bool): Bool => return seed
 func bool_step (st: own Bool) -> (flip: Bool): (Bool, Bool) =>
   let next = if flip then (not st) else st
   return (next, next)
-entry process p_bool: Process [Bool, Bool, Bool] = { init: bool_init, step: bool_step }
+#process const p_bool: Process [Bool, Bool, Bool] = { init: bool_init, step: bool_step }
 
 // 3. Bare F32
 func f32_init (seed: F32): F32 => return seed
 func f32_step (st: own F32) -> (add: F32): (F32, F32) =>
   let next = @f32.add st add
   return (next, next)
-entry process p_f32: Process [F32, F32, F32] = { init: f32_init, step: f32_step }
+#process const p_f32: Process [F32, F32, F32] = { init: f32_init, step: f32_step }
 
 // 4. 1-word FlatNumeric record (PlannerReply = $Score { value: U32 }) -> wire_tag == 1 (U32)
 type Score is data = $Score { value: U32 }
@@ -1017,12 +1017,12 @@ func score_init (seed: U32): U32 => return seed
 func score_step (st: own U32) -> (delta: U32): (U32, Score) =>
   let next = @u32.add st delta
   return (next, $Score { value: next })
-entry process p_score: Process [U32, U32, Score] = { init: score_init, step: score_step }
+#process const p_score: Process [U32, U32, Score] = { init: score_init, step: score_step }
 
 // 5. Unit -> Unit process (0 B logical reply, continuous mailbox slot check!)
 func unit_init (u: Unit): U32 => return 0
 func unit_step (st: own U32) -> (u: Unit): (U32, Unit) => return (@u32.add st 1, ())
-entry process p_unit: Process [Unit, Unit, Unit] = { init: unit_init, step: unit_step }
+#process const p_unit: Process [Unit, Unit, Unit] = { init: unit_init, step: unit_step }
 
 // 6. Array config & array cmd/reply
 func arr_init (cfg: #[U32]): U32 => return if cfg.length > 0 then cfg[0] else 0
@@ -1030,7 +1030,7 @@ func arr_step (st: own U32) -> (cmd: #[U32]): (U32, #[U32]) =>
   let add = if cmd.length > 0 then cmd[0] else 0
   let next = @u32.add st add
   return (next, #[next, @u32.add next 1])
-entry process p_arr: Process [#[U32], #[U32], #[U32]] = { init: arr_init, step: arr_step }
+#process const p_arr: Process [#[U32], #[U32], #[U32]] = { init: arr_init, step: arr_step }
 
 // 7. Spinning init (0 = ok, 1 = spin forever, 2 = trap)
 func spin_init_fn (mode: U32): U32 => return do:
@@ -1048,7 +1048,7 @@ func spin_step_fn (st: own U32) -> (cmd: U32): (U32, U32) => return do:
     return @panic "step trap"
   let next = @u32.add st cmd
   return (next, next)
-entry process p_spin: Process [U32, U32, U32] = { init: spin_init_fn, step: spin_step_fn }
+#process const p_spin: Process [U32, U32, U32] = { init: spin_init_fn, step: spin_step_fn }
 
 // 8. Slow step process for parallel timer-latch and equivalence tests
 func work_init (seed: U32): U32 => return seed
@@ -1057,7 +1057,7 @@ func work_step (st: own U32) -> (iters: U32): (U32, U32) => return do:
   for i in 0..iters:
     acc := @u32.add self 1
   return (acc, acc)
-entry process p_work: Process [U32, U32, U32] = { init: work_init, step: work_step }
+#process const p_work: Process [U32, U32, U32] = { init: work_init, step: work_step }
 `;
 
 const scalarOnlyProcessSource = `
@@ -1065,7 +1065,7 @@ func s_init (seed: F32): F32 => return seed
 func s_step (st: own F32) -> (x: F32): (F32, F32) =>
   let next = @f32.add st x
   return (next, next)
-entry process scalar_f32: Process [F32, F32, F32] = { init: s_init, step: s_step }
+#process const scalar_f32: Process [F32, F32, F32] = { init: s_init, step: s_step }
 `;
 
 Deno.test("Law #5: admission, all 4 ABI wire_tag categories (incl. scalar-only & 1-word Score & Unit mailbox=1), private copies & persistent two-turn accounting", async () => {

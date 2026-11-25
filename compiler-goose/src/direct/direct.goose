@@ -265,7 +265,7 @@ fn exportedParameter(g: Generator&, m: const Module&, body: const Body&) -> Ty, 
     }
     if body.is_function {
         let parameters = m.bodyParameters(body);
-        if parameters.len != 1 { return 0, false, g.fail(m, body.root, "entry functions take exactly one parameter"); }
+        if parameters.len != 1 { return 0, false, g.fail(m, body.root, "#entry functions take exactly one parameter"); }
         let lowered, error = g.types.lower(m, parameters[0].ty, blot_direct_types::Env {});
         if error != blot_direct_types::Error.none { return 0, false, g.failCode(m, body.root, blot_check_diagnostic_code::Code.entry_type, "an exported binding needs a concrete type"); }
         return lowered, true, blot_direct_types::Error.none;

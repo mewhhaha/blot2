@@ -34,7 +34,7 @@ This is the implemented host boundary. See
 [the executable host example](../../examples/host_io.blot).
 
 ```blot
-entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
+#entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   return next
 ```
@@ -55,8 +55,8 @@ try {
 }
 ```
 
-`main` and `advance` are ordinary names; `entry` makes `main` a host entrypoint.
-The entry module's `entry const` and `entry let` declarations are exactly the
+`main` and `advance` are ordinary names. `#entry` makes `main` a host entrypoint.
+The entry module's `#entry const` and `#entry let` declarations are exactly the
 module's exports. The host selects one and supplies its callable argument; there
 is no implicit entrypoint, ambient registry, operation-name dispatcher, or
 game-specific import. Declaring a source effect does not create host authority.
@@ -148,7 +148,7 @@ and compatibility are application responsibilities.
 
 Only modules with array arguments/results (including callback signatures) export
 `blot:memory`, `blot:allocate` and `blot:reset` for the adapter (`packets == true`).
-Scalar-only `entry process` modules still define internal linear memory without
+Scalar-only `#process` modules still define internal linear memory without
 exporting `blot:memory`/`blot:allocate`/`blot:reset` so existing ABI 8 strict
 export checks continue to accept them. Allocation takes an i32 byte count and
 returns an aligned i32 pointer from the module's transport bank (for host-to-guest

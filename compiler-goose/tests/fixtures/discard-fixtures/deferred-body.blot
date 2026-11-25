@@ -1,6 +1,6 @@
 const identity = func value => return value
 const missing = func value => return value.no_such_member
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let unused = (missing, identity, func input => return input.no_such_member)
   break 42
-entry const folded = answer ()
+#entry const folded = answer ()

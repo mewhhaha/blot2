@@ -7,33 +7,33 @@ const checked_keep = func (value: U32): U32 => return @u32.add value (@u32.div 0
 const guarded_flatten = func (rows: Array {x: F32, y: F32}): Array F32 => return
   #[@u32.to_f32 (@u32.add (@f32.to_u32 value) (@u32.div 0 (@u32.sub (@f32.to_u32 row.x) 3))) | row <- rows, @f32.to_u32 row.x != 3, value <- #[row.x, row.y]]
 type Row is data = $Row {x: F32, count: U32}
-entry const ordered = func () => return do:
+#entry const ordered = func () => return do:
   let input: Array U32 = #[1, 2, 3]
   return #[checked_keep x | x <- input, x != 2]
-entry const selected = func (limit: U32) => return do:
+#entry const selected = func (limit: U32) => return do:
   let input: Array U32 = #[1, 2, 3, 4]
   return #[@u32.mul x 10 | x <- input, @u32.lt x limit]
-entry const nested = func () => return do:
+#entry const nested = func () => return do:
   let left: Array U32 = #[1, 2]
   let right: Array U32 = #[3, 4]
   return #[@u32.add (@u32.mul x 10) y | x <- left, y <- right, @u32.lt y 4]
-entry const closure_guard = func () => return do:
+#entry const closure_guard = func () => return do:
   let input: Array U32 = #[1, 2, 3]
   let selected: Array U32 = #[1, 3]
   return #[x | x <- input, array.any (func wanted => return @u32.eq x wanted and @u32.lt 0 (@array.length selected)) selected]
-entry const aggregate = func () => return do:
+#entry const aggregate = func () => return do:
   let input: Array F32 = #[1.25, 2.5]
   let output = #[$Row {x, count: 1} | x <- input]
   return @f32.add output[0].x output[1].x
-entry const generic = func () => return do:
+#entry const generic = func () => return do:
   let rows: Array {x: F32, y: F32} = #[{x: 1.0, y: 2.0}, {x: 3.0, y: 4.0}]
   return flatten rows
-entry const generic_ordered = func (count: U32) => return do:
+#entry const generic_ordered = func (count: U32) => return do:
   let rows = array.generate count (func index => return {x: @u32.to_f32 (@u32.add (@u32.mul index 2) 1), y: @u32.to_f32 (@u32.add (@u32.mul index 2) 2)})
   return guarded_flatten rows
 `;
 const staged = `const table = #run (@array.get (#[@u32.mul x 2 | x <- #[1, 2, 3], @u32.lt x 3]) 1)
-entry const staged = func () => return do:
+#entry const staged = func () => return do:
   let owner: Array U32 = #[0]
   return @u32.add table owner[0]
 `;

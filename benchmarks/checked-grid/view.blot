@@ -1,4 +1,4 @@
-entry func solve (values: Array U32): Array U32 => do:
+#entry func solve (values: Array U32): Array U32 => do:
   let start = values.length / 2
   let slice = values.view start values.length
   let sum = 0

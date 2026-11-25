@@ -5,21 +5,21 @@ func planner_step (st: own U32) -> (delta: U32): (U32, U32) =>
   let next = @u32.add st delta
   return (next, next)
 
-entry process planner: Process [U32, U32, U32] = { init: planner_init, step: planner_step }
+#process const planner: Process [U32, U32, U32] = { init: planner_init, step: planner_step }
 
 func request (config: U32): U32 ! { Start } => return Start #[config, 112, 108, 97, 110, 110, 101, 114]
 
-entry func local (config: U32): U32 => return do @effect.provider Start (func (packet: Array U32) => return packet[0]):
+#entry func local (config: U32): U32 => return do @effect.provider Start (func (packet: Array U32) => return packet[0]):
   use endpoint <- request config
   return endpoint
 
-entry func live (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider Start host:
+#entry func live (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider Start host:
   use endpoint <- request 11
   return endpoint
 
-entry func twice (xs: Array U32): Array U32 => return spark #[@u32.mul x 2 | x <- xs]
-entry func spark_mix (xs: Array U32): Array U32 => return spark #[@u32.bit_xor (@u32.mul x 1664525) 1013904223 | x <- xs]
-entry func ordinary_mix (xs: Array U32): Array U32 => return #[@u32.bit_xor (@u32.mul x 1664525) 1013904223 | x <- xs]
-entry func indexed_mix (xs: Array U32): Array U32 => return @array.generate xs.length (func i => return @u32.bit_xor (@u32.mul xs[i] 1664525) 1013904223)
+#entry func twice (xs: Array U32): Array U32 => return spark #[@u32.mul x 2 | x <- xs]
+#entry func spark_mix (xs: Array U32): Array U32 => return spark #[@u32.bit_xor (@u32.mul x 1664525) 1013904223 | x <- xs]
+#entry func ordinary_mix (xs: Array U32): Array U32 => return #[@u32.bit_xor (@u32.mul x 1664525) 1013904223 | x <- xs]
+#entry func indexed_mix (xs: Array U32): Array U32 => return @array.generate xs.length (func i => return @u32.bit_xor (@u32.mul xs[i] 1664525) 1013904223)
 
-entry kernel func mix_kernel (x: U32): U32 => return @u32.bit_xor (@u32.mul x 1664525) 1013904223
+#kernel func mix_kernel (x: U32): U32 => return @u32.bit_xor (@u32.mul x 1664525) 1013904223

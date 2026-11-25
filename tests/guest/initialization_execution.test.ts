@@ -3,12 +3,12 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("runtime scalar exports initialize dependency order once and retain their values", async () => {
   await compileAndRun(`
-entry let integer: U32 = @u32.add base 2
+#entry let integer: U32 = @u32.add base 2
 let base: U32 = 40
-entry let floating: F32 = @f32.add 1.25 2.5
-entry let enabled: Bool = true
-entry let empty: Unit = ()
-entry const use_values = func () => return @u32.add integer base
+#entry let floating: F32 = @f32.add 1.25 2.5
+#entry let enabled: Bool = true
+#entry let empty: Unit = ()
+#entry const use_values = func () => return @u32.add integer base
 const unused = @panic "unused const"
 let unused_runtime = @panic "unused initializer"
 `, guest => {
@@ -20,7 +20,7 @@ let unused_runtime = @panic "unused initializer"
       equal(guest.call("use_values", null), 82);
     }
   });
-  await compileExpectedFailure(`entry let values: Array U32 = #[42]\n`, "entry_type");
+  await compileExpectedFailure(`#entry let values: Array U32 = #[42]\n`, "entry_type");
 });
 
 Deno.test("reachable runtime globals initialize in dependency order and survive arena resets", async () => {
@@ -31,7 +31,7 @@ let second = 20
 let values = @array.fill 3 first
 type Point is data = $Point { x: U32, y: U32 }
 let point = $Point { y: second, x: first }
-entry const run = func (amount: U32) : U32 => return do:
+#entry const run = func (amount: U32) : U32 => return do:
   let changed = @array.set values 0 amount
   break @u32.add point.x (@u32.add (@array.get values 0) (@array.get changed 0))
 `, guest => {
@@ -42,18 +42,18 @@ entry const run = func (amount: U32) : U32 => return do:
 const cycle = `let first: U32 = second\nlet second = first\n`;
 
 Deno.test("startup cycles retain original branches after all ordinary entry constants", async () => {
-  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = func value => return func () => return value\nentry const answer = func () => return @u32.add base ((delay saved) ())\n`, guest => equal(guest.call("answer", null), 42));
-  await compileAndRun(cycle + `entry const answer = 42\n`, guest => equal(guest.read("answer"), 42));
-  await compileAndRun(`let first: U32 = @u32.add second 1\nlet second = 41\nentry const answer = if true then 42 else first\n`, guest => equal(guest.read("answer"), 42));
+  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = func value => return func () => return value\n#entry const answer = func () => return @u32.add base ((delay saved) ())\n`, guest => equal(guest.call("answer", null), 42));
+  await compileAndRun(cycle + `#entry const answer = 42\n`, guest => equal(guest.read("answer"), 42));
+  await compileAndRun(`let first: U32 = @u32.add second 1\nlet second = 41\n#entry const answer = if true then 42 else first\n`, guest => equal(guest.read("answer"), 42));
 });
 
 // Direct backend: initialization_cycle for a reachable let cycle and const_runtime_dependency for an entry constant read from a let (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("startup cycles and runtime dependencies of entry constants are rejected", async () => {
-  await compileExpectedFailure(cycle + `entry const answer = if true then 42 else first\n`, "initialization_cycle");
-  await compileExpectedFailure(cycle + `let saved = 42\nentry const answer: Unit -> U32 = func () => return first\nentry const bad = saved\n`, "const_runtime_dependency");
+  await compileExpectedFailure(cycle + `#entry const answer = if true then 42 else first\n`, "initialization_cycle");
+  await compileExpectedFailure(cycle + `let saved = 42\n#entry const answer: Unit -> U32 = func () => return first\n#entry const bad = saved\n`, "const_runtime_dependency");
 });
 
 // Constants run at instantiation, so a panicking entry constant traps there.
 Deno.test("a panicking entry constant traps at instantiation", async () => {
-  await rejects(compileAndRun(`entry const answer: Unit -> U32 = func () => return 42\nentry const bad: U32 = @panic "later"\n`, () => {}), WebAssembly.RuntimeError);
+  await rejects(compileAndRun(`#entry const answer: Unit -> U32 = func () => return 42\n#entry const bad: U32 = @panic "later"\n`, () => {}), WebAssembly.RuntimeError);
 });

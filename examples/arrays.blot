@@ -1,19 +1,19 @@
 import * as array from "std/array"
 
 const numbers: #[U32] = #[10, 20, 12]
-entry const expected = array.fold_left U32.add 0 numbers
+#entry const expected = array.fold_left U32.add 0 numbers
 
-entry func answer () => array.fold_left U32.add 0 numbers
+#entry func answer () => array.fold_left U32.add 0 numbers
 
-entry func unchanged () =>
+#entry func unchanged () =>
   let original = #[1, 2, 3]
   let updated = original.copy
   updated[1] := 40
   return original[1] + updated[1]
 
-entry func checked index => Maybe.unwrap_or 0 $ numbers.get(index)
+#entry func checked index => Maybe.unwrap_or 0 $ numbers.get(index)
 
-entry func nested () =>
+#entry func nested () =>
   let rows: #[(U32, Bool)] = #[(42, true), (7, false)]
   let (value, _) = rows[0]
   return value

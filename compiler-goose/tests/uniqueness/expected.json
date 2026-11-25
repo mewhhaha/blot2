@@ -1142,24 +1142,24 @@
  "o02_push_captured_local": [
   [
    "aliased_update",
-   201,
-   221,
+   202,
+   222,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "o03_push_global": [
   [
    "aliased_update",
-   111,
-   131,
+   112,
+   132,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
  "o04_push_aliased_local": [
   [
    "aliased_update",
-   143,
-   163,
+   144,
+   164,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ],
@@ -1181,8 +1181,8 @@
  "o07_push_shell_element": [
   [
    "aliased_update",
-   153,
-   176,
+   154,
+   177,
    "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating"
   ]
  ]

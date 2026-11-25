@@ -13,7 +13,7 @@ Blot sits between garbage-collected scripting languages and LLVM-heavy systems l
 - **No GC pauses, no `'a` lifetimes.** Values are immutable by default; uniquely owned dynamic arrays (`#[T]`) mutate in place with `:=`, while the compiler infers local borrows (`&T`, `&[T]`) and ownership transfers (`own`) statically.
 - **Native-class speed, direct to Wasm.** No LLVM in the loop — a 6-kernel benchmark compiles in **12.7 ms** (**23 KiB** `.wasm`) and beats native `rustc -O3` across all 6 kernels on `wtime-aot`.
 - **Deterministic & sandboxed by construction.** Pure by default, explicit algebraic effects for I/O and state, canonical IEEE 754 quiet NaN (`0x7fc00000`) across scalar, SIMD, and `#run`.
-- **Low-friction metaprogramming & parallelism.** Field defaults, `@[...]` data tags, compile-time `#for #fields` / `#variants`, speculative `fork` rollback, auto-SIMD `spark #[...]`, and first-class `entry kernel` / `entry process` concurrency.
+- **Low-friction metaprogramming & parallelism.** Field defaults, `@[...]` data tags, compile-time `#for #fields` / `#variants`, speculative `fork` rollback, auto-SIMD `spark #[...]`, and first-class `#kernel` / `#process` concurrency.
 
 ---
 
@@ -30,7 +30,7 @@ func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
   @storage.push items factor
   return items
 
-entry func main (): F32 =>
+#entry func main (): F32 =>
   let base = #[1.0, 2.0, 3.0]
   let snapshot = copy base             // explicit deep snapshot
   let updated = scale_and_append base 2.0
@@ -69,7 +69,7 @@ func encode_record (val: t): #[U32] =>
         @storage.push out word
   return out
 
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   // Defaults fill in `hp`, `alive`, and `cached_score` automatically.
   let p = $Player { id: 7 }
   return encode_record p               // #[10, 7, 20, 100, 30, 1]
@@ -89,7 +89,7 @@ func roll_loot (count: U32): Unit !{ Rng, Log } =>
     use Log.write (r % 100)
   return ()
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let seed: U32 = 42
   let total: U32 = 0
   let step_rng = func () =>
@@ -116,7 +116,7 @@ func score_move (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]
   // `board` is back to its exact pre-fork contents and length.
   return (score, board)
 
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let board: #[U32] = #[1, 2, 3]
   let (preview, restored) = score_move board 1 99
   return #[preview, restored[1], restored.length]   // #[202, 2, 3]
@@ -138,7 +138,7 @@ Two built-in Wasm ABI 8 entry points cover parallel fan-out and long-lived state
 
 ```blot
 // Pure data-parallel worker dispatched across host worker pools:
-entry kernel func shade_row (row: U32): U32 =>
+#kernel func shade_row (row: U32): U32 =>
   let acc: U32 = 0
   for x in 0 .. 256:
     acc := self + ((row * 31 + x) & 255)
@@ -156,7 +156,7 @@ func step_counter (st: own Counter) -> (delta: U32): (Counter, U32) =>
   @storage.push history next
   return ($Counter { tick: next, history }, next)
 
-entry process counter: Process [U32, U32, U32] = {
+#process const counter: Process [U32, U32, U32] = {
   init: init_counter,
   step: step_counter,
 }
@@ -177,7 +177,7 @@ Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goo
 ![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-25-blot-vs-rust-kernels.svg)
 
 - **Runtime throughput:** Blot beats LLVM `-O3` Wasm across all 6 kernels (**0.20×–0.73×**) and beats native Rust `-O3` across all 6 (**0.18×–0.91×**) while keeping Wasm bounds safety and canonical NaN determinism — including **5.48× faster** on `mandelbrot_f32`, **3.46× faster** on `lcg_recurrence`, and **2.02× faster** on `particle_spark_simd` (**0.33 ms** vs **0.67 ms**).
-- **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **1.94 ms** vs **2.80 ms** native Rust (**1.44× faster**); 8-thread Mandelbrot scales **5.52×** across isolated guests (**1.02 ms**, **4.24× faster** than 8-thread native Rust); persistent `entry process` commits in **~52 ns/step** (~19M steps/sec).
+- **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **1.94 ms** vs **2.80 ms** native Rust (**1.44× faster**); 8-thread Mandelbrot scales **5.52×** across isolated guests (**1.02 ms**, **4.24× faster** than 8-thread native Rust); persistent `#process` commits in **~52 ns/step** (~19M steps/sec).
 - **Compile & edit latency:** **7.2× faster** cold builds than `rustc -O3 wasm32` (**12.7 ms** vs **90.9 ms**) with **64× smaller** `.wasm` binaries (**23.0 KiB** vs **1,468 KiB**). On a 319-module / 6.19 MB 3D game, cold builds finish in **~0.63 s**, single-file structural edits localize to `fresh=1` in **61–90 ms**, and literal/comment edits rebuild in **~20 ms**.
 - **Optional Wasm 3.0 (`--wasm3`):** Enables tail calls (`return_call` / `return_call_indirect`) and relaxed SIMD (FMA, `relaxed_min`/`max`/`trunc`) on V8/Deno and `wtime-aot 0.1.3`.
 

@@ -18,7 +18,7 @@ def stores(root):
         for line in open(f,errors='replace'):
             s=line.split('//')[0]
             if s.startswith('lent '): lent+=1
-            if re.match(r'^\s*(lent|let|const|type|func|entry|infix|infixl|infixr|import|data|export|private|impl|case|if|for|return|break|use)\b',s): continue
+            if re.match(r'^\s*(lent|let|const|type|func|#entry|#kernel|#process|infix|infixl|infixr|import|data|export|private|impl|case|if|for|return|break|use)\b',s): continue
             if re.match(r'^\s*[A-Za-z_(][^=!<>:]*[^=!<>:\s]\s=\s[^=>]',s) and '=>' not in s.split(' = ')[0]: k+=1
         if k: files+=1; per[f]=k
         n+=k

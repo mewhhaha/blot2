@@ -15,8 +15,8 @@ const capture = func (callback: Unit -> a ! {State.get a}) => return func () => 
 Deno.test("symbolic operation rows specialize generic callbacks and captured aliases", async () => {
   await compileAndRun(
     library +
-      `entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
-entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
+      `#entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
+#entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
 `,
     (guest) => {
       assert.equal(guest.call("integer", null), 42);
@@ -28,7 +28,7 @@ entry const floating = func () => return @product.get (@effect.run State.get Sta
 
 Deno.test("symbolic written rows cannot become closed reflected descriptors", async () => {
   await compileExpectedFailure(
-    library + "entry const answer = @effect.count (@effect.of read)\n",
+    library + "#entry const answer = @effect.count (@effect.of read)\n",
     "open_effect_descriptor",
     undefined,
     { prelude: "none" },
@@ -41,8 +41,8 @@ Deno.test("symbolic operation rows survive compiled dependencies and retained sp
   const dependency = `${directory}/state.blot`;
   const archive = `${directory}/state.blotdep`;
   const main = `import { State, read, apply, capture } from "./state"
-entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
-entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
+#entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
+#entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
 `;
   try {
     await Deno.writeTextFile(entry, main);
@@ -113,9 +113,9 @@ const number: Unit -> Number ! {Signal.get Number} = func () => return Signal.ge
 `;
   const main = `
 import {Number, Identity, Signal, read, number} from "./read"
-entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
+#entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
   break @u32.add (read ()) (number ())
-entry const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):
+#entry const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):
   break read ()
 `;
   try {

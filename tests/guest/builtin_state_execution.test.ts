@@ -17,9 +17,9 @@ const answer = func () => return do:
   let ($Cell count, ($Cell amount, previous)) = @state.run ($Cell 40) (func () => return
     @state.run ($Cell 1.0) advance)
   break U32.to_f32 count + amount + U32.to_f32 previous
-entry const run = func () => return answer ()
-entry const expected = answer ()
-entry const witness = func () => return do:
+#entry const run = func () => return answer ()
+#entry const expected = answer ()
+#entry const witness = func () => return do:
   let (_, $Cell result) = @state.run ($Cell 42) (func () => return
     read (func ignored : Cell U32 => return @panic "type witnesses must never be called"))
   break result
@@ -40,7 +40,7 @@ const read = func witness => return @state.get witness
 const write = func value => return @state.set value
 const reader = func witness => return func implementation => return func action => return @state.reader witness implementation action
 const writer = func witness => return func implementation => return func action => return @state.writer witness implementation action
-entry const run = func () => return do (@effect.provider Notice (func value => return ())):
+#entry const run = func () => return do (@effect.provider Notice (func value => return ())):
   break reader $Count (func () => return $Count 7) (func () => return do:
     use cell_before <- read $Count
     let $Count before = cell_before
@@ -54,7 +54,7 @@ entry const run = func () => return do (@effect.provider Notice (func value => r
     use cell_after <- read $Count
     let $Count after = cell_after
     break @u32.add before (@u32.add nested after))
-entry const written = func () => return do:
+#entry const written = func () => return do:
   let (final, _) = @state.run ($Count 0) (func () => return writer $Count (func value => return @state.set value) (func () => return
     @state.set ($Count 42)))
   let $Count result = final
@@ -70,9 +70,9 @@ entry const written = func () => return do:
 Deno.test("builtin State rejects unhandled and mismatched instances without publishing Wasm", async () => {
   await compileExpectedFailure(`type Count is data = $Count U32
 const invalid: Unit -> Count = func () => return @state.get $Count
-entry const run = func () => return 42
+#entry const run = func () => return 42
 `, "effect_mismatch");
   await compileExpectedFailure(`type Cell value is data = $Cell value
-entry const run = func () => return @state.run ($Cell 42) (func () => return @state.get (func () => return $Cell 0.0))
+#entry const run = func () => return @state.run ($Cell 42) (func () => return @state.get (func () => return $Cell 0.0))
 `, "entry_type");
 });

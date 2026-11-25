@@ -6,7 +6,7 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 Deno.test("rebinding inside statement case arms carries out of the case", async () => {
   await compileAndRun(`
 type Beat is data = $Up | $Down
-entry const main = func (n: U32) : U32 => return do:
+#entry const main = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 0
   case beat of
@@ -15,7 +15,7 @@ entry const main = func (n: U32) : U32 => return do:
     $Down => do:
       count := 3
   break count
-entry const one = func (n: U32) : U32 => return do:
+#entry const one = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 1
   case beat of
@@ -24,7 +24,7 @@ entry const one = func (n: U32) : U32 => return do:
     $Down => do:
       let unused = 2
   break count
-entry const lone = func (n: U32) : U32 => return do:
+#entry const lone = func (n: U32) : U32 => return do:
   let count = 3
   case (n, n + 1) of
     (low, high) => do:
@@ -43,7 +43,7 @@ Deno.test("case arms carry field, self, nested if and three-arm rebinding, and s
   await compileAndRun(`
 type Beat is data = $Up | $Down
 type Tri is data = $Rise | $Fall | $Still
-entry const fielded = func (n: U32) : U32 => return do:
+#entry const fielded = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let held = { node: 5, other: 9 }
   case beat of
@@ -52,7 +52,7 @@ entry const fielded = func (n: U32) : U32 => return do:
     $Down => do:
       held.node := self + 1
   break held.node + held.other
-entry const selfish = func (n: U32) : U32 => return do:
+#entry const selfish = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 10
   case beat of
@@ -62,7 +62,7 @@ entry const selfish = func (n: U32) : U32 => return do:
     $Down => do:
       count := self - 1
   break count
-entry const nested = func (n: U32) : U32 => return do:
+#entry const nested = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 0
   case beat of
@@ -74,7 +74,7 @@ entry const nested = func (n: U32) : U32 => return do:
     $Down => do:
       count := 1
   break count
-entry const three = func (n: U32) : U32 => return do:
+#entry const three = func (n: U32) : U32 => return do:
   let beat = if n == 0 then $Fall else if n == 1 then $Rise else $Still
   let count = 0
   let other = 100
@@ -87,7 +87,7 @@ entry const three = func (n: U32) : U32 => return do:
     $Still => do:
       count := 11
   break count + other
-entry const scalar = func (n: U32) : U32 => return do:
+#entry const scalar = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 4
   case beat of
@@ -95,7 +95,7 @@ entry const scalar = func (n: U32) : U32 => return do:
     $Down => do:
       count := 9
   break count
-entry const guarded = func (n: U32) : U32 => return do:
+#entry const guarded = func (n: U32) : U32 => return do:
   let count = 0
   case n of
     0 => do:
@@ -105,7 +105,7 @@ entry const guarded = func (n: U32) : U32 => return do:
     _ => do:
       count := 1
   break count
-entry const retyped = func (n: U32) : U32 => return do:
+#entry const retyped = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let ready = 1
   case beat of
@@ -139,7 +139,7 @@ entry const retyped = func (n: U32) : U32 => return do:
 Deno.test("a direct return ends a case arm with its rebinding, and loops carry arm rebinding and breaks", async () => {
   await compileAndRun(`
 type Beat is data = $Up | $Down
-entry const direct = func (n: U32) : U32 => return do:
+#entry const direct = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 2
   case beat of
@@ -149,7 +149,7 @@ entry const direct = func (n: U32) : U32 => return do:
     $Down => do:
       count := self + 1
   break count
-entry const looped = func (n: U32) : U32 => return do:
+#entry const looped = func (n: U32) : U32 => return do:
   let total = 0
   for index in 0..n:
     let beat = if index % 2 == 0 then $Up else $Down
@@ -159,7 +159,7 @@ entry const looped = func (n: U32) : U32 => return do:
       $Down => do:
         total := self + 1
   break total
-entry const breaking = func (n: U32) : U32 => return do:
+#entry const breaking = func (n: U32) : U32 => return do:
   let total = 0
   for index in 0..10:
     let beat = if index < n then $Up else $Down
@@ -183,7 +183,7 @@ entry const breaking = func (n: U32) : U32 => return do:
 Deno.test("owned arrays rebound across case arms keep guest memory stable", async () => {
   await compileAndRun(`
 type Bag is data = $Many (Array U32) | $One U32 | $Empty
-entry const owned = func (n: U32) : U32 => return do:
+#entry const owned = func (n: U32) : U32 => return do:
   let bag = if n % 3 == 0 then $Many (@array.generate (n % 40 + 8) (func index => return index + 1)) else if n % 3 == 1 then $One n else $Empty
   let values = @array.generate 12 (func index => return index)
   let total = 0
@@ -200,7 +200,7 @@ entry const owned = func (n: U32) : U32 => return do:
       else:
         values[0] := self + 77
   break values.length + values[0] + total
-entry const escaping = func (n: U32) : Array U32 => return do:
+#entry const escaping = func (n: U32) : Array U32 => return do:
   let beat = if n % 2 == 0 then $Up else $Down
   let values = @array.generate 4 (func index => return index)
   case beat of
@@ -254,8 +254,8 @@ const pick = func (n: U32) : U32 => return do:
 const folded_fall = pick 0
 const folded_rise = pick 1
 const folded_still = pick 9
-entry const folded = func () : U32 => return folded_fall * 10000 + folded_rise * 100 + folded_still
-entry const runtime = func (n: U32) : U32 => return pick n
+#entry const folded = func () : U32 => return folded_fall * 10000 + folded_rise * 100 + folded_still
+#entry const runtime = func (n: U32) : U32 => return pick n
 `, (guest) => {
     equal(guest.call("folded", null), 51052);
     const [fall, rise, still] = [0, 1, 9].map((n) => guest.call("runtime", n) as number);
@@ -266,7 +266,7 @@ entry const runtime = func (n: U32) : U32 => return pick n
 Deno.test("a return nested inside a carrying case arm is rejected", async () => {
   await compileExpectedFailure(`
 type Beat is data = $Up | $Down
-entry const main = func (n: U32) : U32 => return do:
+#entry const main = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 0
   case beat of
@@ -283,7 +283,7 @@ entry const main = func (n: U32) : U32 => return do:
 
 Deno.test("an unread rebinding inside a statement do block is rejected", async () => {
   await compileExpectedFailure(`
-entry const main = func (n: U32) : U32 => return do:
+#entry const main = func (n: U32) : U32 => return do:
   let count = n
   do:
     count := self + 1
@@ -299,7 +299,7 @@ const build = func start => return do:
   start := step self
   start := step self
   break start
-entry const arm = func (n: U32) : U32 => return do:
+#entry const arm = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 2
   let result = case beat of
@@ -310,21 +310,21 @@ entry const arm = func (n: U32) : U32 => return do:
       count := self + 1
       break count
   break result
-entry const branch = func (n: U32) : U32 => return do:
+#entry const branch = func (n: U32) : U32 => return do:
   let count = 0
   if n > 0:
     count := 7
   else:
     count := 3
   break count
-entry const chosen = func (n: U32) : U32 => return do:
+#entry const chosen = func (n: U32) : U32 => return do:
   let beat = if n > 0 then $Up else $Down
   let count = 0
   count := case beat of
     $Up => 7
     $Down => 3
   break count
-entry const guarded = func (n: U32) : U32 => return do:
+#entry const guarded = func (n: U32) : U32 => return do:
   let held = n
   break case n of
     0 => do:
@@ -334,7 +334,7 @@ entry const guarded = func (n: U32) : U32 => return do:
         total := held + 1
       break total
     _ => 2
-entry const looped = func (n: U32) : U32 => return do:
+#entry const looped = func (n: U32) : U32 => return do:
   let total = 0
   for 0 .. n:
     total := self + 2

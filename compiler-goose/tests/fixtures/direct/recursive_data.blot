@@ -7,11 +7,11 @@ func sum (node: Node): U32 => return case node of
 func length (link: Link): U32 => return case link of
   $End => 0
   $Next (rest, value) => value + length rest
-entry func tree (n: U32): U32 => return do:
+#entry func tree (n: U32): U32 => return do:
   let t = $Branch {total: n, left: leaf 2, right: $Branch {total: 3, left: leaf 4, right: $Empty}}
   let nodes = #[t, leaf 100]
   return sum t + sum nodes[1] * 1000
-entry func chain (n: U32): U32 => return do:
+#entry func chain (n: U32): U32 => return do:
   let link = $End
   for i in 0..n:
     link := $Next (link, i)

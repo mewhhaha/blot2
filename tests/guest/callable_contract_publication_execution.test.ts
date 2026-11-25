@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const main = `import * as library from "./library"
-entry const run = func (seed: U32) => return do:
+#entry const run = func (seed: U32) => return do:
   let callable = library.make seed
   let alias = callable
   let published = {callback: callable}

@@ -11,14 +11,14 @@ const append = func (rows: own Array Row) -> (text: &[U32]): Array Row => return
   @storage.push rows ($Row {text})
   return rows
 const consume = func (row: Row): U32 => return row.text.at 0
-entry const empty = func (count: U32): U32 => return do:
+#entry const empty = func (count: U32): U32 => return do:
   let rows: Array Row = #[]
   let total = 0
   for row in rows:
     for code in row.text:
       total := self + code
   return total
-entry const seeded = func (count: U32): U32 => return do:
+#entry const seeded = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65]
   let rows: Array Row = #[]
   if count > 0:
@@ -28,7 +28,7 @@ entry const seeded = func (count: U32): U32 => return do:
     for code in row.text:
       total := self + code
   return total
-entry const joined = func (choose: U32): U32 => return do:
+#entry const joined = func (choose: U32): U32 => return do:
   let first: Array Row = #[]
   let second: Array Row = #[]
   let rows = if choose == 0 then first else second
@@ -37,7 +37,7 @@ entry const joined = func (choose: U32): U32 => return do:
     for code in row.text:
       total := self + code
   return total
-entry const mixed = func (choose: U32): U32 => return do:
+#entry const mixed = func (choose: U32): U32 => return do:
   let labels: Array U32 = #[65]
   let first: Array Row = #[]
   let second: Array Row = #[$Row {text: &labels[0..1]}]
@@ -47,7 +47,7 @@ entry const mixed = func (choose: U32): U32 => return do:
     for code in row.text:
       total := self + code
   return total
-entry const alias_write = func (count: U32): U32 => return do:
+#entry const alias_write = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65]
   let rows: Array Row = #[]
   for index in 0 .. count:
@@ -57,7 +57,7 @@ entry const alias_write = func (count: U32): U32 => return do:
     for code in row.text:
       total := self + code
   return total
-entry const skipped = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const skipped = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let labels: Array U32 = #[65]
   let rows: Array Row = #[]
   if false:
@@ -66,33 +66,33 @@ entry const skipped = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreig
     return row.text.at 0
   @storage.push rows ($Row {text: &labels[0..1]})
   return rows[0].text.at 0
-entry const direct = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const direct = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let rows: Array Row = #[]
   use idx <- index_effect 0
   return rows[idx].text.at 0
-entry const pattern = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const pattern = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let rows: Array Row = #[]
   use idx <- index_effect 0
   let $Row {text} = rows[idx]
   return text.at 0
-entry const argument = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const argument = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let rows: Array Row = #[]
   use idx <- index_effect 0
   return consume rows[idx]
-entry const record = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const record = func (index_effect: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let rows: Array Row = #[]
   use idx <- index_effect 0
   let stored = {row: rows[idx]}
   return stored.row.text.at 0
-entry const array = func (index_effect: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
+#entry const array = func (index_effect: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
   let rows: Array Row = #[]
   use idx <- index_effect 0
   return #[rows[idx].text.at 0]
-entry const copied = func (): U32 => return do:
+#entry const copied = func (): U32 => return do:
   let rows: Array Row = #[]
   let copy = @storage.copy rows
   return copy.length
-entry const plain = func (count: U32): U32 => return do:
+#entry const plain = func (count: U32): U32 => return do:
   let rows: Array Plain = #[]
   let total = 0
   for index in 0 .. count:

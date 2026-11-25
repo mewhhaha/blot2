@@ -20,7 +20,7 @@ import * as array from "./array"
 const numbers = #[1, 2, 3, 4, 5]
 const even = func value => return value % 2 == 0
 const choose = func value => return if even value then $Some (value * 10) else $Nothing
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let selected = array.filter even numbers
   let mapped = array.filter_map choose numbers
   let payload = array.concat selected #[6]
@@ -29,8 +29,8 @@ entry const answer = func () => return do:
   let (left, right) = array.unzip (array.zip flat mapped)
   break left[0] + right[1]
 const no_payload: Array U32 = #[]
-entry const empties = array.length (array.flatten #[{start: 0, count: 0}, {start: 0, count: 0}] no_payload)
-entry const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
+#entry const empties = array.length (array.flatten #[{start: 0, count: 0}, {start: 0, count: 0}] no_payload)
+#entry const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
 `,
     );
     const compiler = Deno.args[0] ??
@@ -88,12 +88,12 @@ Deno.test.ignore("partial Array methods keep result evidence without constrainin
       `
 const values = #[]
 const map = func transform => return func items => return @array.generate items.length (func index => return transform items[index])
-entry const zero: F32 = values.convert
-entry const nested: F32 = #[#[], #[]].convert
-entry const concrete: F32 = #[1, 2].convert
-entry const length = values.length
-entry const mapped = (map .length #[#[], #[]])[1]
-entry const runtime = func () : F32 => return #[].convert
+#entry const zero: F32 = values.convert
+#entry const nested: F32 = #[#[], #[]].convert
+#entry const concrete: F32 = #[1, 2].convert
+#entry const length = values.length
+#entry const mapped = (map .length #[#[], #[]])[1]
+#entry const runtime = func () : F32 => return #[].convert
 `,
       (guest) => {
         equal(guest.read("zero"), 0);

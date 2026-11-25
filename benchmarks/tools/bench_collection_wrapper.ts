@@ -17,7 +17,7 @@ const source = `
 import * as array from "std/array"
 const replace = array.replace
 const wrapped = func index -> value -> values => return replace index value values
-entry const update = func count => return do:
+#entry const update = func count => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := wrapped index (index + 1) values

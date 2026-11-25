@@ -15,12 +15,12 @@ const registry = (size: number, wanted: number) => {
   return `const registry = #[${items}]
 const contains = func (index: U32) => return func (wanted: U32) : Bool => return if index == registry.length then false else if registry[index] == wanted then true else contains (index + 1) wanted
 const present: Bool = contains 0 ${wanted}
-entry const found = func () : Bool => return present
+#entry const found = func () : Bool => return present
 `;
 };
 const runaway = `const forever = func (n: U32) : U32 => return forever (n + 1)
 const value: U32 = forever 0
-entry const found = func () : U32 => return value
+#entry const found = func () : U32 => return value
 `;
 Deno.test("constant recursion walks long tables and traps runaway calls at run time", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-depth-" });

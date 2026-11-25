@@ -4,4 +4,4 @@ const invoke = func callback => return callback 1
 const run = func packed => return func (value: U32) => return do:
   let $Pack { selected } = packed
   break selected value
-entry const partial = func (value: U32) : U32 => return invoke (run packed)
+#entry const partial = func (value: U32) : U32 => return invoke (run packed)

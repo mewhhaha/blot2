@@ -1654,25 +1654,25 @@ fn verifyNamedFunctionArity(units: const Module[:], from_unit: u32, ref_: Bindin
     return (body.parameters.len as i64) == expected_arity;
 }
 
-// Validate all `entry kernel` and `entry process` declarations in `entry` module and compute
+// Validate all `#kernel` and `#process` declarations in `entry` module and compute
 // canonical wire schemas and hashes.
 fn analyze(units: const Module[:], entry: u32, info: ProgramInfo&) {
     analyzeWithForkFlags(units, entry, default<const u8[:]>(), info);
 }
 fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8[:], info: ProgramInfo&) {
     if !hasUnit(units, entry) { return; }
-    // `entry kernel` and `entry process` are only valid in the entry module (§2.3).
+    // `#kernel` and `#process` are only valid in the entry module (§2.3).
     // Scan `has_fork` in the same single pass (reusing precomputed worker/retained flags
     // when available) so neither `computeNonStagedReceipt` nor `direct/emit::runtime_`
     // has to re-walk every Core node of every module.
     for u, ui in units {
         if u.unit != entry {
             if u.kernels.len != 0 {
-                info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel is only valid in the entry module" };
+                info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel is only valid in the entry module" };
                 return;
             }
             if u.processes.len != 0 {
-                info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process is only valid in the entry module" };
+                info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process is only valid in the entry module" };
                 return;
             }
         }
@@ -1700,17 +1700,17 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         // Verify named-function targets and exact arities across modules.
         if decl.has_context {
             if !verifyNamedFunctionArity(units, entry, decl.prepare_target, 1) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel prepare must resolve to a 1-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel prepare must resolve to a 1-argument named function" };
                 return;
             }
             if !verifyNamedFunctionArity(units, entry, decl.run_target, 2) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel run must resolve to a 2-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel run must resolve to a 2-argument named function" };
                 return;
             }
             // Validate WireCtx (`#[U32]`, `#[F32]`, or `FlatNumeric`).
             let ctx_s, ctx_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.ctx_type, false, true, false, false);
             if !ctx_ok {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel WireCtx must be FlatNumeric, #[U32], or #[F32]" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel WireCtx must be FlatNumeric, #[U32], or #[F32]" };
                 return;
             }
             kinfo.ctx_schema = ctx_s;
@@ -1719,12 +1719,12 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
             let ps_ok = decl.prepared_type != 0 && checkPersistentSafe(units, cache, entry, decl.prepared_type, 0, 0, ps_amark, 0);
             cache.active_pool.resize(ps_amark);
             if !ps_ok {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel PreparedCtx must be PersistentSafe" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel PreparedCtx must be PersistentSafe" };
                 return;
             }
         } else {
             if !verifyNamedFunctionArity(units, entry, decl.run_target, 1) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "stateless entry kernel must be a 1-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "stateless #kernel must be a 1-argument named function" };
                 return;
             }
             kinfo.ctx_schema = WireSchema { kind: SCHEMA_KIND_UNIT, wire_tag: WIRE_TAG_UNIT, stride: 0, schema_hash: 0 };
@@ -1732,14 +1732,14 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         // Item must be non-zero-width FlatNumeric.
         let in_s, in_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.item_type, false, false, false, false);
         if !in_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel Item must be a non-zero-width FlatNumeric type within the transport budget" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel Item must be a non-zero-width FlatNumeric type within the transport budget" };
             return;
         }
         kinfo.in_schema = in_s;
         // Out must be FlatNumeric OR #[U32] / #[F32].
         let out_s, out_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.out_type, false, true, true, false);
         if !out_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry kernel Out must be FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel Out must be FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         kinfo.out_schema = out_s;
@@ -1783,33 +1783,33 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         let decl = m.processes[pi];
         var pinfo = ProcessInfo { decl_index: pi as u32 };
         if !verifyNamedFunctionArity(units, entry, decl.init_target, 1) {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process init must resolve to a 1-argument named function" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process init must resolve to a 1-argument named function" };
             return;
         }
         if !verifyNamedFunctionArity(units, entry, decl.step_target, 2) {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process step must resolve to a 2-argument named function" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process step must resolve to a 2-argument named function" };
             return;
         }
         let cfg_s, cfg_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.config_type, true, true, false, true);
         if !cfg_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process Config must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Config must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let cmd_s, cmd_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.cmd_type, true, true, false, true);
         if !cmd_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process Cmd must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Cmd must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let rep_s, rep_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.reply_type, true, true, false, true);
         if !rep_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process Reply must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Reply must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let ps_amark = cache.active_pool.len;
         let ps_ok = decl.state_type != 0 && checkPersistentSafe(units, cache, entry, decl.state_type, 0, 0, ps_amark, 0);
         cache.active_pool.resize(ps_amark);
         if !ps_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "entry process State must be PersistentSafe" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process State must be PersistentSafe" };
             return;
         }
         pinfo.config_schema = cfg_s;

@@ -32,10 +32,10 @@ Deno.test.ignore("operator failures explain prelude dispatch through the CLI", a
   const directory = await Deno.makeTempDir();
   try {
     const cases: [string, unknown][] = [
-      ["entry const answer = func () : U32 => return 1 + 2.5\n", [
+      ["#entry const answer = func () : U32 => return 1 + 2.5\n", [
         { side: "left", operand: "U32", outcome: "incompatible" },
       ]],
-      ["entry const answer = func () : Bool => return true + false\n", [
+      ["#entry const answer = func () : Bool => return true + false\n", [
         { side: "left", operand: "Bool", outcome: "no_member" },
       ]],
     ];
@@ -70,8 +70,8 @@ Deno.test.ignore("operator failures explain prelude dispatch through the CLI", a
 Deno.test.ignore("callable subtraction reports source operands and recovers after correction", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
-  const invalid = `entry const good = func (value: F32) : F32 => return value - 1.0
-entry const broken = func (value: F32) : F32 => return do:
+  const invalid = `#entry const good = func (value: F32) : F32 => return value - 1.0
+#entry const broken = func (value: F32) : F32 => return do:
   let transform: F32 -> F32 = func (x: F32) => return x + 1.0
   break transform - value
 `;
@@ -145,7 +145,7 @@ Deno.test.ignore("imported generic subtraction points to the mismatched call", a
   const helper = `${directory}/helper.blot`;
   const generic = "const difference = func left => return func right => return left - right\n";
   const invalid = `import { difference } from "./helper"
-entry const broken = func (value: F32) : F32 => return do:
+#entry const broken = func (value: F32) : F32 => return do:
   let transform: F32 -> F32 = func (x: F32) => return x + 1.0
   break difference transform value
 `;
@@ -218,7 +218,7 @@ Deno.test("mixed-type associated subtraction remains valid in both tiers", async
 const Meters.sub = func (left: Meters) => return func (right: F32) => return do:
   let $Meters amount = left
   break amount - right
-entry const distance = func (value: F32) : F32 => return ($Meters value) - 1.0
+#entry const distance = func (value: F32) : F32 => return ($Meters value) - 1.0
 `;
   try {
     {
@@ -252,7 +252,7 @@ const method = "const Meters.add = func left => return func right => return do:\
   "  break $Meters (@f32.add a b)\n";
 const main = (annotation: string) =>
   'import { meters } from "./library"\n' +
-  "entry const answer = func () => return do:\n" +
+  "#entry const answer = func () => return do:\n" +
   `  let total${annotation} = meters 1.0 + meters 2.0\n  break 7\n`;
 
 // Direct backend: missing_associated has no dispatch explanation and points into the prelude (tasks/DELETE_SCOPED.md).
@@ -324,7 +324,7 @@ Deno.test.ignore("dispatch over a compiled dependency's type is explained", asyn
     await Deno.writeTextFile(`${directory}/library.blot`, library);
     await Deno.writeTextFile(
       entry,
-      'import { meters } from "./library"\nentry const answer = func () => return 7\n',
+      'import { meters } from "./library"\n#entry const answer = func () => return 7\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", prelude],

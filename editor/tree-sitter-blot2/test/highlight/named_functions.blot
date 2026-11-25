@@ -1,4 +1,4 @@
-entry func add (left: U32) -> (right: U32): U32 => return left
+#entry func add (left: U32) -> (right: U32): U32 => return left
 // <- keyword.storage.modifier
 //    ^^^^ keyword.function
 //         ^^^ function
@@ -39,7 +39,7 @@ func separate value => return value
 // <- keyword.function
 //   ^^^^^^^^ function
 
-"entry func hidden (value: U32) => return value"
+"#entry func hidden (value: U32) => return value"
 // ^ string
 // ^ !keyword.storage.modifier
 

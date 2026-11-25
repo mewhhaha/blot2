@@ -1,5 +1,5 @@
 import * as list from "std/list"
-entry const run = func (seed: U32) : U32 => return do:
+#entry const run = func (seed: U32) : U32 => return do:
   let values = list.generate 4096 (func index => return (seed + index) % 1024)
   let mapped = list.map (func value => return value * 3) values
   let selected = list.filter (func value => return value % 2 == 0) mapped

@@ -1,5 +1,5 @@
 // @storage.push on an indexed element of a shell (non-deep) array is rejected.
-entry func run (): U32 =>
+#entry func run (): U32 =>
   let left = #[1]
   let rows = #[left, #[2]]
   @storage.push rows[0] 9

@@ -81,7 +81,7 @@ const checked = func computation => return do:
       complete value =>
         break value
 
-entry const answer = func () => return checked (@computation (func () => return do:
+#entry const answer = func () => return checked (@computation (func () => return do:
   use left <- Validate.check 40
   use right <- Validate.check 2
   break left + right
@@ -227,12 +227,12 @@ interface changes. Runtime-reachable descriptor operations are a diagnostic.
 
 ## Controlled host IO
 
-Host functions are passed explicitly to entry functions (`entry const`), the
+Host functions are passed explicitly to entry functions (`#entry const`), the
 module's only exports. The boundary accepts one scalar or numeric-array callback
 and returns a scalar or numeric array. For example:
 
 ```blot
-entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
+#entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   break next
 ```

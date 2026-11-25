@@ -8,11 +8,11 @@ const Box.add = func (self: Box U32) => return func (extra: U32) => return @u32.
 const access = func self => return self.add
 const read = func self => return self.get
 const constant = ($Box { value: 40 }).add 2
-entry const staged: U32 = constant
-entry const unary = func (input: U32) : U32 => return read ($Box { value: input })
-entry const floating = func (input: F32) : F32 => return read ($Box { value: input })
-entry const curried = func (input: U32) : U32 => return access ($Box { value: input }) 2
-entry const nested = func (input: U32) : U32 => return ($Box { value: $Box { value: input } }).get.get
+#entry const staged: U32 = constant
+#entry const unary = func (input: U32) : U32 => return read ($Box { value: input })
+#entry const floating = func (input: F32) : F32 => return read ($Box { value: input })
+#entry const curried = func (input: U32) : U32 => return access ($Box { value: input }) 2
+#entry const nested = func (input: U32) : U32 => return ($Box { value: $Box { value: input } }).get.get
 `, guest => {
     equal(guest.read("staged"), 42);
     equal(guest.call("unary", 40), 40);
@@ -28,7 +28,7 @@ Deno.test("field and method collisions remain errors through generic callers", a
 type Box is data = $Box { value: U32 }
 const Box.value = func self => return 99
 const read = func self => return self.value
-entry const result: U32 = ${access}
+#entry const result: U32 = ${access}
 `, "ambiguous_member");
   }
 });
@@ -40,13 +40,13 @@ const Box.get = func (self: Box value) => return self.value
 const get = .get
 const read = .value
 const nested = .get.value
-entry const integer = func (input: U32) : U32 => return get ($Box { value: input })
-entry const floating = func (input: F32) : F32 => return read ($Box { value: input })
-entry const path = func (input: U32) : U32 => return nested ($Box { value: $Box { value: input } })
-entry const local = func (input: U32) : U32 => return do:
+#entry const integer = func (input: U32) : U32 => return get ($Box { value: input })
+#entry const floating = func (input: F32) : F32 => return read ($Box { value: input })
+#entry const path = func (input: U32) : U32 => return nested ($Box { value: $Box { value: input } })
+#entry const local = func (input: U32) : U32 => return do:
   let accessor = .value
   break accessor ($Box { value: input })
-entry const mixed = func () : U32 => return do:
+#entry const mixed = func () : U32 => return do:
   let accessor = func box => return box.value
   let integer = accessor ($Box { value: 40 })
   let floating = accessor ($Box { value: 2.5 })
@@ -60,7 +60,7 @@ entry const mixed = func () : U32 => return do:
   });
   await compileExpectedFailure(`
 type Box value is data = $Box { value: value }
-entry const mixed = func () : U32 => return do:
+#entry const mixed = func () : U32 => return do:
   let accessor = .value
   let integer = accessor ($Box { value: 40 })
   let floating = accessor ($Box { value: 2.5 })
@@ -72,7 +72,7 @@ Deno.test("writable fields remain distinct from receiver methods", async () => {
   await compileAndRun(`
 type Box is data = $Box { value: U32 }
 const Box.value = func self => return 99
-entry const answer = func () : U32 => return do:
+#entry const answer = func () : U32 => return do:
   let box = $Box { value: 1 }
   box.value := 42
   break case box of
@@ -81,7 +81,7 @@ entry const answer = func () : U32 => return do:
   await compileExpectedFailure(`
 type Box is data = $Box U32
 const Box.method = func self => return 99
-entry const answer = func () : U32 => return do:
+#entry const answer = func () : U32 => return do:
   let box = $Box 1
   box.method := 42
   break 42
@@ -95,8 +95,8 @@ const Point.add = func (left: Point) => return func (right: U32) => return @u32.
 const Point.eq = func (left: Point) => return func (right: Point) => return @u32.eq left.x right.x
 const combine = func left => return func right => return left + right
 const same = func left => return func right => return left == right
-entry const add = func (value: U32) : U32 => return combine ($Point { x: value }) 22
-entry const equal = func (value: U32) : Bool => return same ($Point { x: value }) ($Point { x: 42 })
+#entry const add = func (value: U32) : U32 => return combine ($Point { x: value }) 22
+#entry const equal = func (value: U32) : Bool => return same ($Point { x: value }) ($Point { x: 42 })
 `, guest => {
     equal(guest.call("add", 20), 42);
     equal(guest.call("add", 0xffffffff), 21);
@@ -108,8 +108,8 @@ entry const equal = func (value: U32) : Bool => return same ($Point { x: value }
 Deno.test("ordinary scalar method names do not alter compiler primitives", async () => {
   await compileAndRun(`
 const U32.add = func (left: U32) => return func (right: U32) => return @u32.sub left right
-entry const dispatched = func (value: U32) : U32 => return U32.add value 2
-entry const primitive = func (value: U32) : U32 => return @u32.add value 2
+#entry const dispatched = func (value: U32) : U32 => return U32.add value 2
+#entry const primitive = func (value: U32) : U32 => return @u32.add value 2
 `, guest => {
     equal(guest.call("dispatched", 44), 42);
     equal(guest.call("primitive", 40), 42);
@@ -125,9 +125,9 @@ func Right.add (a: Left) -> (b: Right): U32 => return 42
 func combine a -> b => return @type.call "add" a b
 `;
   for (const expr of ['@type.call "add" ($Left n) ($Right n)', 'combine ($Left n) ($Right n)']) {
-    await compileExpectedFailure(source + `entry func answer (n: U32): U32 => return ${expr}\n`,
+    await compileExpectedFailure(source + `#entry func answer (n: U32): U32 => return ${expr}\n`,
       "missing_associated", undefined, {prelude: "none"});
   }
-  await compileAndRun(source + "entry func answer (n: U32): U32 => return Right.add ($Left n) ($Right n)\n",
+  await compileAndRun(source + "#entry func answer (n: U32): U32 => return Right.add ($Left n) ($Right n)\n",
     guest => equal(guest.call("answer", 0), 42), {prelude: "none"});
 });

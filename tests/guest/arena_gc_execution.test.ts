@@ -5,7 +5,7 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("forever collection preserves array carries, older captures and scalar bits with bounded memory", async () => {
   await compileAndRun(
     `
-entry const run = func (limit: U32) : U32 => return do:
+#entry const run = func (limit: U32) : U32 => return do:
   let older = @array.fill 4096 65552
   let read = func index => return @array.get older index
   let values = #[0]
@@ -16,7 +16,7 @@ entry const run = func (limit: U32) : U32 => return do:
     let discarded = @array.fill 8192 index
     values[0] := @u32.add self 1
     index := @u32.add self 1
-entry const floating = func (limit: U32) : F32 => return do:
+#entry const floating = func (limit: U32) : F32 => return do:
   let total = 0.0
   let index = 0
   for ever:
@@ -25,7 +25,7 @@ entry const floating = func (limit: U32) : F32 => return do:
     let discarded = @array.fill 8192 index
     total := @f32.add self 0.5
     index := @u32.add self 1
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("run", 256), 65808);
@@ -43,7 +43,7 @@ Deno.test.ignore("forever collection traces updated state cells pinned before th
   await compileAndRun(
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const run = func (limit: U32) : U32 => return do:
+#entry const run = func (limit: U32) : U32 => return do:
   let provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[0]
   let (state,result) = do provider:
     let index = 0
@@ -55,7 +55,7 @@ entry const run = func (limit: U32) : U32 => return do:
       use State.set (Array U32) #[index]
       let discarded = @array.fill 8192 index
   break @u32.add (@array.get state 0) result
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("run", 256), 512);
@@ -75,7 +75,7 @@ Deno.test({
   fn: async () => {
     await compileAndRun(
       `
-entry const main = func (host: Array F32 -> Array F32 ! {Foreign}) : Unit => return do:
+#entry const main = func (host: Array F32 -> Array F32 ! {Foreign}) : Unit => return do:
   let pending = #[0.0, 1.0]
   for ever:
     if @f32.eq (@array.get pending 1) 0.0:

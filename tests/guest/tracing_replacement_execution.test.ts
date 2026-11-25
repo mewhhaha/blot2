@@ -17,7 +17,7 @@ Deno.test("discarded Arrays inside nested collecting loops keep the checksum", a
     const result = await compiler.build({
       sources: {
         [entry]: `
-entry const run = func (count: U32) => return do:
+#entry const run = func (count: U32) => return do:
   let rows = @array.generate 90 (func index => return #[index, index + 1])
   let checksum = 0
   for row in rows:
@@ -64,8 +64,8 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
       sources: {
         [entry]: `
 const change = func (candidate: Result [U32, Array U32]) : Result [U32, Array U32] => return Result.map (func value => return value + 1) candidate
-entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change ($Ok value))
-entry const alias = func (value: U32) => return do:
+#entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change ($Ok value))
+#entry const alias = func (value: U32) => return do:
   let child = #[value, value + 1]
   let candidate = $Err child
   let mapped = change candidate
@@ -111,7 +111,7 @@ Deno.test("borrowed reference returns preserve field aliases when their parent r
       sources: {
         [entry]: `
 const identity = func value => return value
-entry const run = func (count: U32) => return do:
+#entry const run = func (count: U32) => return do:
   let fresh = #[7, 42]
   let direct = identity fresh
   let rows = @array.generate 2 (func index => return #[index, index + 1])
@@ -160,7 +160,7 @@ const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1 + ${offset}]
   shape.value := self + 2
   break shape
-entry const run = func (mode: U32) => return do:
+#entry const run = func (mode: U32) => return do:
   let original = if mode == 0 then $Small {child: #[40], value: 7} else $Large {alpha: -0.0, child: #[40], value: 7, tail: 3}
   let captured = func () => return original.child[0]
   let changed = replace original
@@ -169,7 +169,7 @@ entry const run = func (mode: U32) => return do:
     if pressure[8191] != index:
       break #[0]
   break #[original.child[0], changed.child[0], captured (), original.value, changed.value]
-entry const packed = func (value: U32) => return do:
+#entry const packed = func (value: U32) => return do:
   let rows = #[{x: value, y: value + 1}]
   let original = rows
   rows := #[{x: value + 40, y: value + 1}, ...self]
@@ -177,7 +177,7 @@ entry const packed = func (value: U32) => return do:
   let before = items.copy
   items[0] := {x: self.x + 1, y: self.y + 2}
   break #[original[0].x, rows[0].x, before[0].x, items[0].x, items[0].y]
-entry const floating = func (value: F32) => return do:
+#entry const floating = func (value: F32) => return do:
   let original = $Large {alpha: value, child: #[40], value: 7, tail: 3}
   let changed = replace original
   let $Large {alpha, child: _, value: _, tail: _} = changed else:
@@ -236,14 +236,14 @@ Deno.test("allocating loops compute their totals with ordinary and shared machin
         const result = await compiler.build({
           sources: {
             [entry]: `
-entry const run = func (count: U32) => return do:
+#entry const run = func (count: U32) => return do:
   let kept = #[7, 11]
   let total = 0
   for index in 0..count:
     let pressure = @array.fill 8192 index
     total := self + pressure[8191]
   break total + kept[0] + kept[1]
-entry const memory = func (value: U32) => return #[value]
+#entry const memory = func (value: U32) => return #[value]
 `,
           },
         });

@@ -47,7 +47,7 @@ async function project(
 Deno.test("namespace-qualified values retain field projections", async () => {
   await project({
     main: `import * as s from "./defaults"
-entry const main = func () : F32 => return s.defaults.x
+#entry const main = func () : F32 => return s.defaults.x
 `,
     defaults: `type Defaults is data = $Defaults { x: F32 }
 const defaults = $Defaults { x: 3.0 }
@@ -69,9 +69,9 @@ effect Read: Unit -> U32
 effect Measure: Unit -> F32
 const reader = @effect.provider Read (func () => return 42)
 const measure = @effect.provider Measure (func () => return 42.5)
-entry const integer = func () => return do reader:
+#entry const integer = func () => return do reader:
   break invoke (func () => return Read ())
-entry const floating = func () => return do measure:
+#entry const floating = func () => return do measure:
   break invoke (func () => return Measure ())
 `,
     library:
@@ -91,7 +91,7 @@ entry const floating = func () => return do measure:
 Deno.test("builtin State shares exact identities across imported helpers and separates generic instances", async () => {
   await project({
     main: `import { read, write, Cell } from "./library"
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let ($Cell final, ($Cell floating, value)) = @state.run ($Cell 40) (func () => return
     @state.run ($Cell 1.0) (func () => return do:
       use integer <- read (func () => return $Cell 0)
@@ -124,9 +124,9 @@ Deno.test("project emits shared generic producers across a diamond", async () =>
     main: `import * as left from "./left"
 import * as right from "./right"
 import { identity as id } from "./shared"
-entry const integer = func (value: U32) : U32 => return left.twice (id value)
-entry const floating = func (value: F32) : F32 => return right.twice (id value)
-entry const answer = left.answer
+#entry const integer = func (value: U32) : U32 => return left.twice (id value)
+#entry const floating = func (value: F32) : F32 => return right.twice (id value)
+#entry const answer = left.answer
 `,
     left: `import * as shared from "./shared"
 const twice = func (value: U32) : U32 => return shared.twice (shared.identity value)
@@ -158,9 +158,9 @@ Deno.test("project aliases preserve producer identities", async () => {
     main: `import * as arithmetic from "./arithmetic"
 import { identity } from "./arithmetic"
 const alias = arithmetic.identity
-entry const identity_entry = alias
-entry const subtract_entry = func (value: U32) : U32 => return arithmetic.subtract 20 value
-entry const grouped = func (value: U32) : U32 => return (arithmetic).identity value
+#entry const identity_entry = alias
+#entry const subtract_entry = func (value: U32) : U32 => return arithmetic.subtract 20 value
+#entry const grouped = func (value: U32) : U32 => return (arithmetic).identity value
 `,
     arithmetic: `const identity = func (value: U32) : U32 => return value
 const subtract = func left => return func right => return @u32.sub left right

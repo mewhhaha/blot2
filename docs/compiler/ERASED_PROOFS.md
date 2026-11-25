@@ -71,7 +71,7 @@ Contradictory automatic branch facts make that successor unreachable after
 evaluating its guard. They never supply a witness to a reachable successor.
 
 ```blot
-entry const checked = func (values: Array U32) => return func (index: U32) => return do:
+#entry const checked = func (values: Array U32) => return func (index: U32) => return do:
   let valid = @proof.index values index
   break at values index valid
 ```
@@ -160,7 +160,7 @@ ordinary guard below evaluates once. The access retains its load and result but
 removes its redundant bounds comparison:
 
 ```blot
-entry const guarded = func (values: Array U32) => return func (index: U32) => return do:
+#entry const guarded = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     break @array.get values index
   break 0
@@ -174,7 +174,7 @@ comparison requires proof from its checked body before supplying these facts.
 A new index version keeps its own check:
 
 ```blot
-entry const next = func (values: Array U32) => return func (index: U32) => return do:
+#entry const next = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     index := index + 1
     break @array.get values index

@@ -46,7 +46,7 @@ for (const name of ["parameter", "record", "capture"] as const) {
 }
 
 Deno.test("opening callback use rows preserves closed pure callback requirements", async () => {
-  const entry = "entry const answer = func (host:Unit -> F32 ! {Foreign}) => return ";
+  const entry = "#entry const answer = func (host:Unit -> F32 ! {Foreign}) => return ";
   for (
     const source of [
       "const invoke: (Unit -> F32) -> F32 = func callback=> return callback ()\n" +
@@ -55,7 +55,7 @@ Deno.test("opening callback use rows preserves closed pure callback requirements
       entry + "alias host\n",
       "type Invoke is data = $Invoke {run:(Unit -> F32) -> F32}\nconst invoke= $Invoke {run:func callback=> return callback ()}\n" +
       entry + "invoke.run host\n",
-      "entry const answer: (Unit -> F32 ! {Foreign}) -> (Unit -> F32) = func host=> return host\n",
+      "#entry const answer: (Unit -> F32 ! {Foreign}) -> (Unit -> F32) = func host=> return host\n",
       entry + "do:\n  let pure:Unit -> F32=host\n  break pure ()\n",
     ]
   ) {

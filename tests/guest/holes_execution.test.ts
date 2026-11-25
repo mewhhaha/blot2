@@ -11,7 +11,7 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
   const compiler = await createZigProjectCompiler({ executable, entry });
   try {
     const original =
-      'import { next } from "./library"\nentry const answer = func () => return next 41\n';
+      'import { next } from "./library"\n#entry const answer = func () => return next 41\n';
     const sources = {
       [entry]: original,
       [`${directory}/library.blot`]:
@@ -63,7 +63,7 @@ Deno.test("typed holes expose shared generic requirements and repeated structure
     const built = await compiler.build({
       sources: {
         [entry]: `const incomplete: a -> a where { associated "add" a a a } = func value => return @hole
-entry const answer = 42
+#entry const answer = 42
 `,
       },
     });
@@ -81,7 +81,7 @@ entry const answer = 42
       sources: {
         [entry]: `type Read a is effect = Unit -> a
 const incomplete: Unit -> {value: U32} ! {Read U32, Read U32 | e} = @hole
-entry const answer = 42
+#entry const answer = 42
 `,
       },
     });

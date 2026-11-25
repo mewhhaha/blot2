@@ -1,32 +1,15 @@
 ["import" "from" "as"] @keyword.control.import
 (export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
-(entry_modifier) @variable
-(kernel_modifier) @variable
-(process_modifier) @variable
-((entry_binding (entry_modifier) @keyword.storage.modifier) @_entry
-  (#match? @_entry "^entry[ \t]+(const|let)"))
+[(entry_modifier) (kernel_modifier) (process_modifier)] @keyword.storage.modifier
 (entry_binding (binding_keyword) @keyword.storage.type)
-((entry_kernel_function_header
-    (entry_modifier) @keyword.storage.modifier
-    (kernel_modifier) @keyword.storage.modifier) @_entry_kernel_fn
-  (#match? @_entry_kernel_fn "^entry[ \t]+kernel[ \t]+func"))
-((entry_kernel_binding
-    (entry_modifier) @keyword.storage.modifier
-    (kernel_modifier) @keyword.storage.modifier) @_entry_kernel
-  (#match? @_entry_kernel "^entry[ \t]+kernel[ \t]+"))
-((entry_process_binding
-    (entry_modifier) @keyword.storage.modifier
-    (process_modifier) @keyword.storage.modifier) @_entry_process
-  (#match? @_entry_process "^entry[ \t]+process[ \t]+"))
 (private_modifier) @variable
 ((named_function_header
-    (private_modifier)? @keyword.storage.modifier
-    (entry_modifier)? @keyword.storage.modifier) @_named_function
-  (#match? @_named_function "^(private[ \t]+)?(entry[ \t]+)?func"))
+    (private_modifier) @keyword.storage.modifier) @_named_function
+  (#match? @_named_function "^(private[ \t]+)?(#entry[ \t]+)?func"))
 "func" @keyword.function
 ((private_binding (private_modifier) @keyword.storage.modifier) @_private
-  (#match? @_private "^private[ \t]+(entry[ \t]+)?(const|let)"))
+  (#match? @_private "^private[ \t]+(#entry[ \t]+)?(const|let)"))
 ((private_effect_header (private_modifier) @keyword.storage.modifier) @_private_effect
   (#match? @_private_effect "^private[ \t]+effect"))
 ((type_header . (private_modifier) @keyword.storage.modifier) @_private_type

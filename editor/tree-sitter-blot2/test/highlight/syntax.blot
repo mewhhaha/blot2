@@ -4,11 +4,11 @@ func add left -> right => return left + right
 //       ^ variable.parameter
 //               ^ variable.parameter
 
-private entry func answer () => do:
+private #entry func answer () => do:
 // <- keyword.storage.modifier
 //      ^ keyword.storage.modifier
-//            ^ keyword.function
-//                 ^ function
+//             ^ keyword.function
+//                  ^ function
   func local value => return value
 //^ keyword.function
 //     ^ function

@@ -2,7 +2,7 @@ const change = func (row: {__TYPES__}) => return do:
   let saved = @storage.at row.f0 0
   row.f0[0] := @u32.add self 1
   return {row, saved}
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[@u32.add input 10]
   let distinct = {__DISTINCT__}

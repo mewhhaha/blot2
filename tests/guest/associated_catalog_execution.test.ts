@@ -5,10 +5,10 @@ import {
 } from "./compile_helpers.ts";
 
 const catalogSources = [
-  'entry const answer=func(): U32 => return @type.call "add" 21 21\n',
-  'entry const folded: U32=@type.call "add" 21 21\n',
-  'const U32.add=func left=> return func right=> return @u32.add left right\nentry const answer=func(): U32 => return @type.call "add" 21 21\n',
-  'const U32.add=func left=> return func right=> return 99\nentry const answer=func(): U32 => return @type.call "add" 21 21\n',
+  '#entry const answer=func(): U32 => return @type.call "add" 21 21\n',
+  '#entry const folded: U32=@type.call "add" 21 21\n',
+  'const U32.add=func left=> return func right=> return @u32.add left right\n#entry const answer=func(): U32 => return @type.call "add" 21 21\n',
+  'const U32.add=func left=> return func right=> return 99\n#entry const answer=func(): U32 => return @type.call "add" 21 21\n',
 ];
 
 Deno.test("primitive associated selection fails without a prelude catalog", async () => {
@@ -18,7 +18,7 @@ Deno.test("primitive associated selection fails without a prelude catalog", asyn
     });
   }
   await compileExpectedFailure(
-    'entry const answer=func(): Bool => return @type.call "eq" true true\n',
+    '#entry const answer=func(): Bool => return @type.call "eq" true true\n',
     "missing_associated",
     undefined,
     { prelude: "none" },
@@ -28,7 +28,7 @@ Deno.test("primitive associated selection fails without a prelude catalog", asyn
 Deno.test("primitive associated selection uses the actual prelude catalog", async () => {
   for (const source of catalogSources) {
     await compileAndRun(source, (guest) => {
-      if (source.includes("entry const folded")) {
+      if (source.includes("#entry const folded")) {
         equal(guest.read("folded"), 42);
       } else {for (let i = 0; i < 100; i++) {
           equal(guest.call("answer", null), 42);
@@ -36,7 +36,7 @@ Deno.test("primitive associated selection uses the actual prelude catalog", asyn
     }, { prelude: "std/prelude.blot" });
   }
   await compileAndRun(
-    'entry const answer=func(): Bool => return @type.call "eq" true true\n',
+    '#entry const answer=func(): Bool => return @type.call "eq" true true\n',
     (guest) => {
       equal(guest.call("answer", null), true);
     },
@@ -46,7 +46,7 @@ Deno.test("primitive associated selection uses the actual prelude catalog", asyn
 
 Deno.test("ordinary primitive names keep lexical meaning while nominal methods enter their type catalog", async () => {
   await compileAndRun(
-    "const U32.add=func left=> return func right=> return @u32.add left right\nentry const answer=func()=> return U32.add 21 21\nentry const folded=answer ()\n",
+    "const U32.add=func left=> return func right=> return @u32.add left right\n#entry const answer=func()=> return U32.add 21 21\n#entry const folded=answer ()\n",
     (guest) => {
       equal(guest.read("folded"), 42);
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 42);
@@ -59,9 +59,9 @@ const Box.add=func left=> return func right=> return do:
   let $Box a=left
   let $Box b=right
   break $Box (@u32.add a b)
-entry const answer=func()=> return case @type.call "add" ($Box 21) ($Box 21) of
+#entry const answer=func()=> return case @type.call "add" ($Box 21) ($Box 21) of
   $Box value=>value
-entry const folded=answer ()
+#entry const folded=answer ()
 `,
     (guest) => {
       equal(guest.read("folded"), 42);

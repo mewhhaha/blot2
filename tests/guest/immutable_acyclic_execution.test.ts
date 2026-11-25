@@ -11,7 +11,7 @@ const grow = func (count: U32) => return do:
   for index in 0..count:
     root := $Next (self, index)
   break root
-entry const run = func (count: U32) => return do:
+#entry const run = func (count: U32) => return do:
   let original = grow count
   let changed = $Next (original, 8192)
   let saved = case original of
@@ -22,7 +22,7 @@ entry const run = func (count: U32) => return do:
       $Next (_, latest) => @u32.add value (@u32.add latest saved)
       _ => 0
     _ => 0
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `;
 
 function inspect(bytes: Uint8Array<ArrayBuffer>) {
@@ -106,13 +106,13 @@ Deno.test("temporary containers of scalar elements keep their results", async ()
   await compileAndRun(
     `import * as array from "std/array"
 type Scalar is data = $Scalar { a: U32, b: F32 }
-entry const run = func (frames: U32) : U32 => return do:
+#entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
     let items = #[$Scalar { a: index, b: 1.0 } | index <- array.generate 4000 identity]
     total := self + items[3].a
   break total
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))
@@ -132,13 +132,13 @@ type Item is data = $Plain Scalar | $Lazy (Unit -> U32)
 const value = func (item: Item) : U32 => return case item of
   $Plain ($Scalar { a, b }) => a
   $Lazy later => later ()
-entry const run = func (frames: U32) : U32 => return do:
+#entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
     let items = #[$Plain ($Scalar { a: index, b: 1.0 }) | index <- array.generate 4000 identity]
     total := self + value items[3]
   break total
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))
@@ -183,13 +183,13 @@ const frame = func (stacks: Array Stack) => return do:
   for d in flat:
     sum := self + d.material
   break sum
-entry const run = func (frames: U32) : U32 => return do:
+#entry const run = func (frames: U32) : U32 => return do:
   let stacks = array.generate 64 (func i => return $Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
   let total = 0
   for f in 0..frames:
     total := self + frame stacks
   break total
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `;
 
 // Direct backend gap: a loop that calls an allocating function is not reclaimed per iteration, so 100 frames exhaust memory (tasks/DELETE_SCOPED.md).

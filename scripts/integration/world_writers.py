@@ -40,7 +40,7 @@ for f in sorted(root.rglob('*.blot')):
 def direct(body):
     for line in body.split('\n')[1:]:
         t=line.split('//')[0]
-        if re.match(r'^\s*(lent|let|const|type|func|entry|infix|infixl|infixr|import|data|export|private|impl|case|if|for|return|break|use)\b',t): continue
+        if re.match(r'^\s*(lent|let|const|type|func|#entry|#kernel|#process|infix|infixl|infixr|import|data|export|private|impl|case|if|for|return|break|use)\b',t): continue
         if re.match(r'^\s*[A-Za-z_(][^=!<>:]*[^=!<>:\s]\s=\s[^=>]',t) and '=>' not in t.split(' = ')[0]: return True
         if re.search(r'\.(push|truncate|pop)\b|@storage\.(push|truncate|pop)\b',t): return True
     return False

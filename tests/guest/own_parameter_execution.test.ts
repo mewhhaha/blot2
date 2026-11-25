@@ -33,26 +33,26 @@ func forward (rows: own Array U32) -> (n: U32): Array U32 => return do:
   rows[1] := n
   break fill rows n
 func total (rows: own Array U32): U32 => return rows[0] + rows[1]
-entry func rebound (n: U32) : U32 => return do:
+#entry func rebound (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0, 0], size: 3 }
   world := damage world 1
   for i in 0..n:
     world := damage world 2
   world.counts[0] := world.size
   break world.counts[0] * 100 + world.counts[1] * 10 + world.counts[2]
-entry func fresh (n: U32) : U32 => return do:
+#entry func fresh (n: U32) : U32 => return do:
   let rows = fill #[1, 2, 3] n
   rows[0] := 1
   break rows[0] + rows[1] + rows[2]
-entry func copied (n: U32) : U32 => return do:
+#entry func copied (n: U32) : U32 => return do:
   let rows = #[1, 2, 3]
   let after = fill rows.copy n
   break rows[0] * 100 + after[0]
-entry func read_first (n: U32) : U32 => return do:
+#entry func read_first (n: U32) : U32 => return do:
   let rows = #[n, 2]
   let after = fill rows (first rows + 1)
   break after[0] * 10 + after[1]
-entry func arms (n: U32) : U32 => return do:
+#entry func arms (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let result = 0
   if n == 0:
@@ -62,20 +62,20 @@ entry func arms (n: U32) : U32 => return do:
     let changed = forward rows n
     result := changed[0] + changed[1]
   break result
-entry func each_iteration (n: U32) : U32 => return do:
+#entry func each_iteration (n: U32) : U32 => return do:
   let sum = 0
   for i in 0..n:
     let rows = #[i, i]
     sum := sum + total rows
   break sum
-entry func dotted (n: U32) : U32 => return do:
+#entry func dotted (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 1 }
   for i in 0..n:
     world := world.grow 2
   let grown = World.grow world 10
   grown.counts[1] := 5
   break grown.size * 100 + grown.counts[0] * 10 + grown.counts[1]
-entry func scalar (n: U32) : U32 => return do:
+#entry func scalar (n: U32) : U32 => return do:
   let rows = #[n, 2]
   let read = rows[0]
   let after = fill rows 4
@@ -114,20 +114,20 @@ func each (hooks: Hooks) -> (world: own World): World => return do:
   for index in 0..world.size:
     world := hooks.step world index
   break world
-entry func lambda (n: U32) : U32 => return do:
+#entry func lambda (n: U32) : U32 => return do:
   let rows = through (func (rows: own Array U32) -> (k: U32) => return do:
     rows[1] := k
     break rows) n
   break rows[0] * 10 + rows[1]
-entry func inferred (n: U32) : U32 => return do:
+#entry func inferred (n: U32) : U32 => return do:
   let rows = through (func rows -> k => return do:
     rows[1] := k + 1
     break rows) n
   break rows[0] * 10 + rows[1]
-entry func named (n: U32) : U32 => return do:
+#entry func named (n: U32) : U32 => return do:
   let rows = through fill n
   break rows[0] * 10 + rows[1]
-entry func stored (n: U32) : U32 => return do:
+#entry func stored (n: U32) : U32 => return do:
   let hooks = $Hooks { step: damage, scale: n }
   let world = each hooks ($World { counts: #[0, 0, 0], size: 3 })
   world.counts[0] := self + hooks.scale
@@ -149,15 +149,15 @@ func twice step -> (own state) => return do:
 func settle (own access) => return do:
   access.counts[0] := access.size
   break access
-entry func named (n: U32) : U32 => return do:
+#entry func named (n: U32) : U32 => return do:
   let rows = twice fill #[n, 9]
   break rows[0] * 10 + rows[1]
-entry func lambda (n: U32) : U32 => return do:
+#entry func lambda (n: U32) : U32 => return do:
   let rows = twice (func rows -> k => return do:
     rows[1] := rows[1] + k
     break rows) #[n, 2]
   break rows[0] * 10 + rows[1]
-entry func untyped (n: U32) : U32 => return do:
+#entry func untyped (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: n }
   world := settle world
   break world.counts[0]
@@ -168,7 +168,7 @@ entry func untyped (n: U32) : U32 => return do:
   });
   const lent = `${declarations}
 func read (rows: Array U32) -> (k: U32): U32 => return rows[k]
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[n, 2]
   break read (own rows) 1
 `;
@@ -184,24 +184,24 @@ type Pair is data = $Pair { left: Array U32, right: Array U32 }
 func copied (from: Array U32) -> (rows: own Array U32): Array U32 => return do:
   rows[0] := from[0]
   break rows
-entry func put_back (n: U32) : U32 => return do:
+#entry func put_back (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   world.counts := fill world.counts n
   world := damage world 1
   break world.counts[0] * 10 + world.counts[1]
-entry func later (n: U32) : U32 => return do:
+#entry func later (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: n }
   let filled = fill world.counts 3
   let size = world.size
   world.counts := filled
   break world.counts[1] * 10 + size
-entry func rounds (n: U32) : U32 => return do:
+#entry func rounds (n: U32) : U32 => return do:
   let pair = $Pair { left: #[1, 1], right: #[5, 5] }
   for i in 0 .. n:
     pair.left := fill pair.left (pair.right[0] + i)
     pair.right := copied pair.left pair.right
   break pair.left[1] * 100 + pair.right[0]
-entry func lent_beside (n: U32) : U32 => return do:
+#entry func lent_beside (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   let seen = #[n, 9]
   world.counts := copied seen world.counts
@@ -238,24 +238,24 @@ func made (n: U32): Frame => return do:
 func out_of (frame: own Frame): Array U32 => return frame.out
 func parts (frame: own Frame) => return (frame.rows, frame.out)
 func swapped (sides: own Sides): Sides => return $Sides { left: sides.right, right: sides.left }
-entry func beside (n: U32) : U32 => return do:
+#entry func beside (n: U32) : U32 => return do:
   let frame = made n
   break frame.rows[0] * 100 + frame.out[0]
-entry func leaving (n: U32) : U32 => return do:
+#entry func leaving (n: U32) : U32 => return do:
   let out = out_of (made n)
   out[0] := out[0] + 1
   break out[0] * 10 + out[1]
-entry func apart (n: U32) : U32 => return do:
+#entry func apart (n: U32) : U32 => return do:
   let (rows, out) = parts (made n)
   rows[1] := rows[1] + out[0]
   break rows[0] * 100 + rows[1]
-entry func swap (n: U32) : U32 => return do:
+#entry func swap (n: U32) : U32 => return do:
   let left: Array U32 = #[n]
   let right: Array U32 = #[9]
   let sides = swapped ($Sides { left, right })
   sides.left[0] := sides.left[0] + 1
   break sides.left[0] * 10 + sides.right[0]
-entry func after_view (n: U32) : U32 => return do:
+#entry func after_view (n: U32) : U32 => return do:
   let rows: Array U32 = #[n, 3]
   let out: Array U32 = #[]
   let twice = doubled (&rows[0..2]) out
@@ -287,11 +287,11 @@ func picked (world: own World) -> (kind: U32): World => return case kind of
   0 => damage world 1
   _ => world
 func either (world: own World) -> (flag: Bool): World => return if flag then damage world 1 else world
-entry func read_first (n: U32) : U32 => return do:
+#entry func read_first (n: U32) : U32 => return do:
   let rows = #[n, 2]
   let after = fill rows (first rows + 1)
   break after[0] * 10 + after[1]
-entry func arms (n: U32) : U32 => return do:
+#entry func arms (n: U32) : U32 => return do:
   let world = either (picked (stepped ($World { counts: #[0, 0], size: 2 }) n) n) (n == 2)
   world.counts[0] := world.counts[0] + 5
   break world.counts[0] * 10 + world.counts[1]
@@ -317,17 +317,17 @@ func step (world: own Wide): Wide => return do:
 func counted (world: own Wide) => return do:
   world := step world
   break (world.f0[0], world)
-entry func updated (n: U32) : U32 => return do:
+#entry func updated (n: U32) : U32 => return do:
   let world = wide ()
   for 0 .. n:
     world.f1[0] := world.f1[0] + 2
   break world.f1[0]
-entry func handed (n: U32) : U32 => return do:
+#entry func handed (n: U32) : U32 => return do:
   let world = wide ()
   for 0 .. n:
     world := step world
   break world.f0[0]
-entry func paired (n: U32) : U32 => return do:
+#entry func paired (n: U32) : U32 => return do:
   let world = wide ()
   let seen = 0
   for 0 .. n:
@@ -344,18 +344,18 @@ entry func paired (n: U32) : U32 => return do:
 
 const rejected: [string, string, string, string][] = [
   ["a name read after it was given away", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let after = fill rows n
   break «rows»[0] + after[0]`],
   ["a name given away twice", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let one = fill rows n
   let two = fill «rows» n
   break one[0] + two[0]`],
   ["a name given away in one arm and read after both", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let seen = 0
   if n == 1:
@@ -366,27 +366,27 @@ entry func run (n: U32) : U32 => return do:
 func put (rows: own Array U32) -> (seen: Array U32): Array U32 => return do:
   rows[0] := seen[1]
   break rows
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let after = put «rows» rows
   break after[0]`],
   ["a closure that reads a name given away", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let after = fill rows n
   let read = func (i: U32) => return «rows»[i]
   break read 0 + after[0]`],
   ["an argument another name holds", "own_argument", argument, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let alias = rows
   let after = fill «rows» n
   break alias[0] + after[0]`],
   ["a borrowed parameter as the argument", "own_argument", argument, `
 func lend (rows: Array U32) -> (n: U32): Array U32 => return fill «rows» n
-entry func run (n: U32) : U32 => return (lend #[1, 2] n)[0]`],
+#entry func run (n: U32) : U32 => return (lend #[1, 2] n)[0]`],
   ["a local of an outer scope given away in a loop", "own_argument", argument, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let sum = 0
   for i in 0..n:
@@ -394,18 +394,18 @@ entry func run (n: U32) : U32 => return do:
     sum := sum + after[0]
   break sum`],
   ["a record that shares a field", "own_argument", argument, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let counts = #[0, 0]
   let world = $World { counts: counts, size: 2 }
   let next = damage «world» 0
   break next.counts[0] + counts[0]`],
   ["a part of a local read after it was given", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   let after = fill world.counts n
   break after[0] + «world.counts»[1]`],
   ["a local read as a whole while a part of it is given", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   let after = fill world.counts n
   let next = damage «world» 0
@@ -417,7 +417,7 @@ func settle (own access) => return do:
 func settled access => return do:
   access := settle «access»
   break access
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: n }
   let kept = world
   let after = settled world
@@ -426,38 +426,38 @@ entry func run (n: U32) : U32 => return do:
 func mixed (seen: Array U32) -> (rows: own Array U32): Array U32 => return do:
   rows[0] := seen[1]
   break rows
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, n], size: 2 }
   world.counts := mixed world.counts «world.counts»
   break world.counts[0]`],
   ["a result that is a borrowed parameter", "result_not_owned", result, `
 func pick (rows: own Array U32) -> (other: Array U32): Array U32 => return «other»
-entry func run (n: U32) : U32 => return (pick #[1] #[n])[0]`],
+#entry func run (n: U32) : U32 => return (pick #[1] #[n])[0]`],
   ["a result two fields share", "result_not_owned", result, `
 func both (rows: own Array U32) => return do:
   let alias = rows
   break { left: «rows», right: alias }
-entry func run (n: U32) : U32 => return (both #[n]).left[0]`],
+#entry func run (n: U32) : U32 => return (both #[n]).left[0]`],
   ["a value read after a function value took it over", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let apply = fill
   let rows = #[1, 2]
   let after = apply rows n
   break after[0] + «rows»[0]`],
   ["a lambda's own parameter given a borrowed value", "own_argument", argument, `
 func through (step: own Array U32 -> Array U32) -> (rows: Array U32): U32 => return (step «rows»)[0]
-entry func run (n: U32) : U32 => return through (func (rows: own Array U32) => return rows) #[n]`],
+#entry func run (n: U32) : U32 => return through (func (rows: own Array U32) => return rows) #[n]`],
   ["an own function partly applied", "own_function_value", value, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let with_rows = «fill #[1, 2]»
   break (with_rows n)[0]`],
   ["a value read after value.member gave it away", "spent_value", spent, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 1 }
   let grown = world.grow n
   break grown.size + «world.size»`],
   ["value.member of an own function used as a value", "own_function_value", value, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 1 }
   let grow = «world.grow»
   break (grow n).size`],
@@ -465,23 +465,23 @@ entry func run (n: U32) : U32 => return do:
 func World.add (left: own World) -> (right: World): World => return do:
   left.size := left.size + right.size
   break left
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let sum = $World { counts: #[0], size: n } + $World { counts: #[1], size: 2 }
   break sum.size`],
   ["own in a type that is not a function's parameter", "own_parameter", position, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let rows: Array («own U32») = #[n]
   break rows[0]`],
   ["own as the name of a local", "own_parameter", position, `
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let own = n
   break own`],
   ["own as the name of a parameter", "own_parameter", position, `
 func twice own => return own + own
-entry func run (n: U32) : U32 => return twice n`],
+#entry func run (n: U32) : U32 => return twice n`],
   ["own as the name of a constant", "own_parameter", position, `
 const own = 3
-entry func run (n: U32) : U32 => return n`],
+#entry func run (n: U32) : U32 => return n`],
 ];
 
 Deno.test("own arguments, spent names, owned results and own positions are checked", async () => {
@@ -543,13 +543,13 @@ func bump (own access) => return do:
 func first r => return r.items[0]
 `;
 Deno.test("a field of a record that is not known yet is indexed and updated in place", async () => {
-  const body = `entry func run (n: U32) : U32 => return do:
+  const body = `#entry func run (n: U32) : U32 => return do:
   let log: Array U32 = #[1]
   let items: Array Item = #[$Item { open: true, count: n }]
   let world = { items, log, fixed: #[0, 2] }
   world := bump world
   break world.items[0].count * 100 + world.log[0] * 10 + world.fixed[0]
-entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
+#entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
 `;
   await compileAndRun(`${systems}${body}`, (guest) => {
     equal(guest.call("run", 4), 772);
@@ -564,7 +564,7 @@ entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
   } finally {
     guest.dispose();
   }
-  const nonArray = `entry func run (n: U32) : U32 => return do:
+  const nonArray = `#entry func run (n: U32) : U32 => return do:
   let items: U32 = n
   break first { items }
 `;
@@ -576,7 +576,7 @@ entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
 Deno.test("a call into another module gives its argument away", async () => {
   const built = await project({
     main: `import { damage, World } from "./worlds"
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   for i in 0..n:
     world := damage world 1
@@ -597,7 +597,7 @@ entry func run (n: U32) : U32 => return do:
 
 Deno.test("a name given to another module's own parameter is spent", async () => {
   const main = `import { damage, World } from "./worlds"
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   let next = damage world 1
   break world.counts[1] + next.counts[1]
@@ -614,7 +614,7 @@ entry func run (n: U32) : U32 => return do:
 Deno.test("another module's own function is a value that takes its argument over", async () => {
   const built = await project({
     main: `import { damage, World } from "./worlds"
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let step = damage
   let next = step ($World { counts: #[0, 0], size: 2 }) 1
   break next.counts[1]
@@ -623,7 +623,7 @@ entry func run (n: U32) : U32 => return do:
   });
   equal(built.success, true);
   const main = `import { damage, World } from "./worlds"
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let step = damage
   let world = $World { counts: #[0, 0], size: 2 }
   let next = step world 1
@@ -638,7 +638,7 @@ entry func run (n: U32) : U32 => return do:
 
 Deno.test("a value given to another module's member by value.member is spent", async () => {
   const main = `import { World } from "./worlds"
-entry func run (n: U32) : U32 => return do:
+#entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   let next = world.grow n
   break world.size + next.size
@@ -656,7 +656,7 @@ Deno.test("ownership queries distinguish a generic constructor's two substitutio
     const fields = [...Array<string>(20).fill("U32"), "Box U32", "Box " + lastType];
     return `type Box a is data = $Box a
 func forward (x: (${fields.join(", ")})) => return x
-entry func answer (x: U32): U32 => return x
+#entry func answer (x: U32): U32 => return x
 `;
   }
   const options = { prelude: "none" };

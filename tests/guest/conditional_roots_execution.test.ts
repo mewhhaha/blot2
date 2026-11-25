@@ -11,7 +11,7 @@ const choose = func (values: own Array U32) -> (branch: U32) => return do:
       break values
     break @array.set values 0 77
   break @array.fill 64 branch
-entry const run = func (branch: U32) => return do:
+#entry const run = func (branch: U32) => return do:
   let values = @array.fill 64 41
   let selected = choose values branch
   for index in 0..200:
@@ -19,11 +19,11 @@ entry const run = func (branch: U32) => return do:
     if discarded[8191] != index:
       @panic "pressure"
   break selected
-entry const suspend = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
+#entry const suspend = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let selected = choose (@array.fill 64 41) 1
   use reply <- host selected
   break #[selected[0], reply[0]]
-entry const trap = func (branch: U32) => return do:
+#entry const trap = func (branch: U32) => return do:
   let selected = choose (@array.fill 64 41) branch
   if selected[0] == 41:
     @panic "selected trap"

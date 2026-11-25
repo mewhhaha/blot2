@@ -48,7 +48,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const entrySource = (seed: number) =>
           `import {generated, build} from "./producer"
 const first = build ${seed}
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let value = 100
   let left = ${staged ? "@code.emit generated" : "generated"}
   let right = ${staged ? "@code.emit first" : "first"}

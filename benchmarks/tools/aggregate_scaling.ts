@@ -73,7 +73,7 @@ function sourceFor(kind: Kind, width: number, count: number) {
   }
   lines.push(
     "  return sum",
-    "entry const answer = func (input: U32): Array U32 => return do:",
+    "#entry const answer = func (input: U32): Array U32 => return do:",
   );
   // The identical indexed marker selects the owned backend for scalar controls.
   lines.push("  let marker: Array U32 = #[0]", "  marker[0] := input");

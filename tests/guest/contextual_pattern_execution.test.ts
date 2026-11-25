@@ -4,15 +4,15 @@ for(const asynchronous of [false,true])Deno.test(`contextual record schemas and 
 type Pair is data= $Pair {x:U32,y:U32}
 type Empty is data= $Empty {}
 type Choice a is data= $Some a| $None
-entry const empty=func()=> return case $Empty {} of
+#entry const empty=func()=> return case $Empty {} of
   $Empty {}=>42
-entry const selected=func (value:U32)=> return do:
+#entry const selected=func (value:U32)=> return do:
   let $Some chosen= $Some value else:
     break 0
   break chosen
-entry const reordered=func (value:U32)=> return case $Pair {y:2,x:value} of
+#entry const reordered=func (value:U32)=> return case $Pair {y:2,x:value} of
   $Pair {x}=>x
-entry const generic=func()=> return do:
+#entry const generic=func()=> return do:
   let identity=func value=> return value
   let first=identity 42
   let second=identity 1.5
@@ -25,13 +25,34 @@ entry const generic=func()=> return do:
 });
 Deno.test('record and guarded-pattern errors retain their actual source context',async()=>{
  for(const[source,code,message]of[
-  ['type Pair is data= $Pair {x:U32,y:U32}\nentry const answer= $Pair {x:42}\n','missing_record_field','missing record field: y'],
-  ['type Pair is data= $Pair {x:U32,y:U32}\nentry const answer= $Pair {z:missing}\n','unknown_record_field','record has no field named z'],
-  ['type Box is data= $Box U32\nentry const answer= $Box {x:missing}\n','record_constructor','named fields require a declared record constructor'],
-  ['type Empty is data= $Empty\nentry const answer= $Empty {}\n','record_constructor','named fields require a declared record constructor'],
-  ['pub const answer=missing\n','unknown_modifier','only `entry` may precede `const` or `let`'],
-  ['entry const answer=func()=> return do:\n  let (true,value)=(true,42)\n  break value\n','non_exhaustive_match',undefined],
-  ['entry const answer=func()=> return do:\n  let value=42 else:\n    0\n  break value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
-  ['entry const answer=func()=> return do:\n  let (x,y,z)=(1,2)\n  break x\n','product_arity','cannot unify products with different element counts'],
+  ['type Pair is data= $Pair {x:U32,y:U32}\n#entry const answer= $Pair {x:42}\n','missing_record_field','missing record field: y'],
+  ['type Pair is data= $Pair {x:U32,y:U32}\n#entry const answer= $Pair {z:missing}\n','unknown_record_field','record has no field named z'],
+  ['type Box is data= $Box U32\n#entry const answer= $Box {x:missing}\n','record_constructor','named fields require a declared record constructor'],
+  ['type Empty is data= $Empty\n#entry const answer= $Empty {}\n','record_constructor','named fields require a declared record constructor'],
+  ['pub const answer=missing\n','unknown_modifier','only `#entry` may precede `func`, `const`, or `let`'],
+  ['#entry const answer=func()=> return do:\n  let (true,value)=(true,42)\n  break value\n','non_exhaustive_match',undefined],
+  ['#entry const answer=func()=> return do:\n  let value=42 else:\n    0\n  break value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
+  ['#entry const answer=func()=> return do:\n  let (x,y,z)=(1,2)\n  break x\n','product_arity','cannot unify products with different element counts'],
  ]as const)await compileExpectedFailure(source,code,message,{prelude:'none'});
+});
+
+Deno.test('bare entry declarations report an unknown modifier', async () => {
+  for (const source of [
+    'entry func f () => return 1\n',
+    'entry const x = 1\n',
+  ]) {
+    await compileExpectedFailure(source, 'unknown_modifier', undefined, { prelude: 'none' });
+  }
+});
+
+Deno.test('entry, kernel, and process are ordinary identifiers', async () => {
+  await compileAndRun(`
+const entry: U32 = 40
+func kernel (process: U32): U32 => return @u32.add process entry
+#entry func answer (): U32 =>
+  let process: U32 = 2
+  return kernel process
+`, guest => {
+    equal(guest.call('answer', null), 42);
+  }, { prelude: 'none' });
 });

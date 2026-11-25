@@ -108,9 +108,9 @@ type  use  with
 ```
 
 Contextual keywords (ordinary names elsewhere): `opaque`, `trait` (after `is`);
-`private`, `entry`, `export` (start of module item); `kernel`, `process`
-(immediately after `entry`); `from` (imports); `where` (after signature);
-`self` (RHS of `:=`); `own` (before parameter type).
+`private`, `export` (start of module item); `from` (imports); `where` (after
+signature); `self` (RHS of `:=`); `own` (before parameter type). Bare `entry`,
+`kernel` and `process` are ordinary names.
 
 ### 3.4 Literals
 
@@ -178,26 +178,25 @@ Import      = "import" "*" "as" LowerName "from" String
 ImportName  = Name ("as" Name)?
 Name        = LowerName | UpperName
 Item        = Reexport
-            | Tag* "private"? "entry"? Declaration
-            | EntryKernelDecl
-            | EntryProcessDecl
+            | "private"? Tag* Declaration
+            | Tag* (EntryKernelDecl | EntryProcessDecl)
 Reexport    = "export" "{" ImportName,+ "}" "from" String
-Declaration = FuncDecl | ConstDecl | LetDecl | TypeDecl
+Declaration = "#entry"? (FuncDecl | ConstDecl | LetDecl) | TypeDecl
 CallablePath     = (LowerName ".")? (UpperName ".")* LowerName
-EntryKernelDecl  = "entry" "kernel" FuncDecl
-                 | "entry" "kernel" LowerName ":" Type "=" "{" "prepare" ":" CallablePath "," "run" ":" CallablePath ","? "}"
-EntryProcessDecl = "entry" "process" LowerName ":" Type "=" "{" "init" ":" CallablePath "," "step" ":" CallablePath ","? "}"
+EntryKernelDecl  = "#kernel" FuncDecl
+                 | "#kernel" "const" LowerName ":" Type "=" "{" "prepare" ":" CallablePath "," "run" ":" CallablePath ","? "}"
+EntryProcessDecl = "#process" "const" LowerName ":" Type "=" "{" "init" ":" CallablePath "," "step" ":" CallablePath ","? "}"
 ```
 
 - Imports precede all declarations. Import cycles are errors.
 - Declarations are public by default; `private` restricts to the defining module.
 - A public signature cannot expose a private type or effect.
-- `entry` marks host Wasm exports on the entry module only (at least one entry
-  required). Only the entry module may declare entries. `private entry func` is
-  allowed; `private entry kernel` and `private entry process` are errors.
-- `entry kernel` declares a pure, compiler-verified multi-core batch kernel
+- `#entry` marks host Wasm exports on the entry module only (at least one entry
+  required). Only the entry module may declare entries. `private #entry func` is
+  allowed; `private #kernel` and `private #process` are errors.
+- `#kernel` declares a pure, compiler-verified multi-core batch kernel
   (stateless or prepared-context) and binds its entry-module `Kernel [ctx, item, out]`
-  handle. `entry process` declares an isolated stateful actor (`init` + `step`
+  handle. `#process` declares an isolated stateful actor (`init` + `step`
   with `own State`) and binds its entry-module `Process [cfg, cmd, reply]` handle.
   Each `CallablePath` must resolve to a named function of the exact required arity.
 - Module-level names are declared once (no ad-hoc overloads).
@@ -635,7 +634,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
    - `own` parameter = **taken linearly**. The argument must be linear (or a
      disjoint linear field of a linear local). The caller's name/field is spent
      until shadowed again (`let (plan, w) = step world dt; world := w`).
-   - Every non-`entry` call result is linear and belongs solely to the caller.
+   - Every non-`#entry` call result is linear and belongs solely to the caller.
    - Partial application cannot supply an `own` parameter unless the whole call
      is saturated.
 4. **Explicit `copy` and `freeze`:**

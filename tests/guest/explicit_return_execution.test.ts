@@ -21,14 +21,14 @@ const nested = func () => do:
   let value = do:
     break 40
   return value + 2
-entry const direct = func (x: U32) => return x
-entry const partial = func () => return (add 40) 2
-entry const old_identifier = func () => return add fn 2
-entry const annotated = func () => return add_typed 40 2
-entry const matched = func () => return unbox ($Box 42)
-entry const selected = func (flag: Bool) => return choose flag
-entry const block = func () => return nested ()
-entry const returned_block = func () => return do:
+#entry const direct = func (x: U32) => return x
+#entry const partial = func () => return (add 40) 2
+#entry const old_identifier = func () => return add fn 2
+#entry const annotated = func () => return add_typed 40 2
+#entry const matched = func () => return unbox ($Box 42)
+#entry const selected = func (flag: Bool) => return choose flag
+#entry const block = func () => return nested ()
+#entry const returned_block = func () => return do:
   break 42
 `,
     (guest) => {
@@ -48,10 +48,10 @@ entry const returned_block = func () => return do:
 Deno.test("function do blocks reject fallthrough and block results without a return", async () => {
   for (
     const source of [
-      "entry const invalid = func () => do:\n  break 42\n",
-      "entry const invalid = func (flag: Bool) => do:\n  if flag:\n    return ()\n",
-      "entry const invalid = func () => do:\n  let inner = func () => return 42\n  break inner ()\n",
-      "type Box is data = $Box U32\nentry const invalid = func ($Box value) => do:\n  break value\n",
+      "#entry const invalid = func () => do:\n  break 42\n",
+      "#entry const invalid = func (flag: Bool) => do:\n  if flag:\n    return ()\n",
+      "#entry const invalid = func () => do:\n  let inner = func () => return 42\n  break inner ()\n",
+      "type Box is data = $Box U32\n#entry const invalid = func ($Box value) => do:\n  break value\n",
     ]
   ) await compileExpectedFailure(source, "function_return_required");
 });

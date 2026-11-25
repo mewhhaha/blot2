@@ -1,5 +1,5 @@
 // Physical-stride recursive FlatNumeric pack/unpack, `@flat.encode`/`@flat.decode`,
-// `entry kernel` & `entry process` ABI 8 wrappers, and `blot:kernels`/`blot:processes`
+// `#kernel` & `#process` ABI 8 wrappers, and `blot:kernels`/`blot:processes`
 // v1 custom sections (tasks/CONCURRENCY_VNEXT.md §3.1, §3.2, §4.2.3).
 namespace blot_direct_function;
 import .function;
@@ -823,7 +823,7 @@ fn emitUnpackWireInput(
     return emitUnpackFlatNumeric(g, f, unit, core_tid, ty, cursor, true, true, 0, subst, 0, 0);
 }
 
-// Emit all `entry kernel` wrappers (`<name>`, `blot:kernel_ctx:<name>`, `blot:kernel_clear:<name>`)
+// Emit all `#kernel` wrappers (`<name>`, `blot:kernel_ctx:<name>`, `blot:kernel_clear:<name>`)
 // and append their entries to `abi`, returning the count of exported ABI entries added.
 fn emitKernelExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, Error {
     if m.kernels.len == 0 { return 0, blot_direct_types::Error.none; }
@@ -836,9 +836,9 @@ fn emitKernelExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, Er
         let kinfo = g.s.kernels[ki];
 
         let item_ty, iterr = g.types.lower(m, decl.item_type, Env {});
-        if iterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry kernel Item needs a concrete type"); }
+        if iterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#kernel Item needs a concrete type"); }
         let out_ty, oterr = g.types.lower(m, decl.out_type, Env {});
-        if oterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry kernel Out needs a concrete type"); }
+        if oterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#kernel Out needs a concrete type"); }
 
         var root = PersistRoot {};
         var prepared_ty: Ty = 0;
@@ -846,9 +846,9 @@ fn emitKernelExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, Er
 
         if decl.has_context {
             let ctx_ty, cterr = g.types.lower(m, decl.ctx_type, Env {});
-            if cterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry kernel WireCtx needs a concrete type"); }
+            if cterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#kernel WireCtx needs a concrete type"); }
             let p_ty, pterr = g.types.lower(m, decl.prepared_type, Env {});
-            if pterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry kernel PreparedCtx needs a concrete type"); }
+            if pterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#kernel PreparedCtx needs a concrete type"); }
             prepared_ty = p_ty;
             let created_root, rerr = createPersistRoot(g, prepared_ty);
             if rerr != blot_direct_types::Error.none { return 0, rerr; }
@@ -1307,7 +1307,7 @@ fn emitKernelExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, Er
     return added, blot_direct_types::Error.none;
 }
 
-// Emit all `entry process` wrappers (`blot:proc_init:<name>`, `blot:proc_step:<name>`)
+// Emit all `#process` wrappers (`blot:proc_init:<name>`, `blot:proc_step:<name>`)
 // and `blot:processes` v1 custom section (§3.1, §3.2, §4.2.2 item 5).
 fn emitProcessExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, Error {
     if m.processes.len == 0 { return 0, blot_direct_types::Error.none; }
@@ -1320,13 +1320,13 @@ fn emitProcessExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, E
         let pinfo = g.s.processes[pi];
 
         let cfg_ty, cterr = g.types.lower(m, decl.config_type, Env {});
-        if cterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry process Config needs a concrete type"); }
+        if cterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#process Config needs a concrete type"); }
         let state_ty, sterr = g.types.lower(m, decl.state_type, Env {});
-        if sterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry process State needs a concrete type"); }
+        if sterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#process State needs a concrete type"); }
         let cmd_ty, cmterr = g.types.lower(m, decl.cmd_type, Env {});
-        if cmterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry process Cmd needs a concrete type"); }
+        if cmterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#process Cmd needs a concrete type"); }
         let rep_ty, rterr = g.types.lower(m, decl.reply_type, Env {});
-        if rterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "entry process Reply needs a concrete type"); }
+        if rterr != blot_direct_types::Error.none { return 0, g.failCode(m, 0, blot_check_diagnostic_code::Code.kernel_type, "#process Reply needs a concrete type"); }
 
         let root, rerr = createPersistRoot(g, state_ty);
         if rerr != blot_direct_types::Error.none { return 0, rerr; }

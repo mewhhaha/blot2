@@ -7,7 +7,7 @@ func both () => return do:
   use first <- Read.first ()
   use forwarded <- Read.second ()
   break first + forwarded
-entry func nested (n: U32): U32 => return do outer:
+#entry func nested (n: U32): U32 => return do outer:
   break do second:
     break do younger:
       use total <- both ()
@@ -17,7 +17,7 @@ func bump () => return do:
   use count <- State.get U32 ()
   use State.set U32 (count + 1)
   break count
-entry func counted (n: U32): U32 => return do:
+#entry func counted (n: U32): U32 => return do:
   let (final, previous) = do counter:
     use a <- bump ()
     use b <- bump ()
@@ -28,7 +28,7 @@ func early (n: U32): U32 => return do outer:
     return 7
   use value <- Read.first ()
   break value
-entry func returned (n: U32): U32 => return do younger:
+#entry func returned (n: U32): U32 => return do younger:
   let left = early n
   use right <- Read.first ()
   break left * 100 + right

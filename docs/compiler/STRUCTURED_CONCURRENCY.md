@@ -58,7 +58,7 @@ one.
 const scope = func body => return @task.scope body
 const spawn = func group => return func action => return @task.spawn group action
 const await = func source => return |source|
-entry const sum = func () => return scope (func group => return do:
+#entry const sum = func () => return scope (func group => return do:
   let here = spawn group
   let left = here (func () => return 20)
   let right = here (func () => return 22)

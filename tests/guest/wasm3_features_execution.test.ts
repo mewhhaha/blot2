@@ -110,20 +110,20 @@ func fork_in_body (n: U32): U32 =>
     return 1
   return a[0] + inner
 
-entry func run_sum (n: U32): U32 =>
+#entry func run_sum (n: U32): U32 =>
   return sum_tail n 0
 
-entry func run_swap (n: U32): U32 =>
+#entry func run_swap (n: U32): U32 =>
   return swap_tail n 10 20
 
-entry func run_pair (n: U32): U32 =>
+#entry func run_pair (n: U32): U32 =>
   return pair_tail n ($Pair { a: 3, b: 7 })
 
-entry func run_arr_sum (n: U32): U32 =>
+#entry func run_arr_sum (n: U32): U32 =>
   let a = #[1, 2, 3, 4]
   return sum_arr_tail n a 0
 
-entry func run_fork_check (n: U32): U32 =>
+#entry func run_fork_check (n: U32): U32 =>
   return fork_in_body n
 `;
   await withModule("blot-self-tco-", src, {}, (guest) => {
@@ -192,7 +192,7 @@ func step_c (n: U32) -> (acc: U32): U32 =>
     return acc + 1000
   return step_a (n - 1) (acc + 3)
 
-entry func mutual_run (n: U32): U32 =>
+#entry func mutual_run (n: U32): U32 =>
   return step_a n 0
 `;
   let defaultId = "";
@@ -258,7 +258,7 @@ func f32_bits (x: F32): U32 =>
   return b
 
 // 1. spark FMA: both relaxed_madd (a*b + c, c + a*b) and relaxed_nmadd (c - a*b) + NaN canonicalization
-entry func spark_fma (n: U32): #[U32] =>
+#entry func spark_fma (n: U32): #[U32] =>
   let a = @array.fill n 0.0
   let b = @array.fill n 0.0
   let c = @array.fill n 0.0
@@ -278,7 +278,7 @@ entry func spark_fma (n: U32): #[U32] =>
   return out
 
 // 2. matmul FMA across 4x8 (6B-1), 2x16 (5C), and 1x16 (4C)
-entry func matmul_fma (packed: U32): #[U32] =>
+#entry func matmul_fma (packed: U32): #[U32] =>
   let rows = packed & 63
   let inner = (packed >> 6) & 63
   let cols = (packed >> 12) & 63
@@ -303,7 +303,7 @@ entry func matmul_fma (packed: U32): #[U32] =>
   return out
 
 // 3. Escape-time SIMD (2.0 * zr * zi + ci -> relaxed_madd)
-entry func escape_fma (size: U32): U32 =>
+#entry func escape_fma (size: U32): U32 =>
   let inv = 1.0 / U32.to_f32 size
   let total: U32 = 0
   for py in 0 .. size:

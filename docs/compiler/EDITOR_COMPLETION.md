@@ -371,13 +371,13 @@ expect no real diagnostic besides errors explicitly shown.
 
 Start: hello contains editor-completion-v1; send
 `{"kind":"open","id":1,"version":1,"entry":"/p/main.blot"}`. Build disk source
-`entry const answer = 42` with id 2, obtaining revision 1. All following
+`#entry const answer = 42` with id 2, obtaining revision 1. All following
 complete replies keep revision 1. Each scenario uses fresh increasing IDs and
 tokens.
 
 | Query source / action                                                                                              | Required reply/assertion                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `const work = func (value: U32) : U32 => return va<cursor>` followed by `entry const answer = 42`                          | replace covers `va`; sole prefix match value, kind value, insertText value, match exact; expected u32                 |
+| `const work = func (value: U32) : U32 => return va<cursor>` followed by `#entry const answer = 42`                          | replace covers `va`; sole prefix match value, kind value, insertText value, match exact; expected u32                 |
 | `const take = func (value: U32) => return value` then `const work = func (value: U32) => return take (<cursor>` at EOF               | close one scratch parenthesis; expected u32; value precedes take as a candidate; no scratch edit persists             |
 | `type Point = { x: U32, y: F32 }` then `const work = func (point: Point) : F32 => return point.<cursor>`                   | items y exact then x incompatible; both kind field; insertText has no dot                                             |
 | `const work = func (value: U32) : U32 => return do:` then `let original = value`, `value := true`, `return @ho<cursor>le` | replace entire @hole; original exact precedes value incompatible; graph scope has value Bool, never earlier value U32 |
@@ -390,7 +390,7 @@ Selector fixture, with no prelude:
 type Point = { x: U32, y: F32 }
 const select = func (get: Point -> F32) => return func (point: Point) => return get point
 const work = func (point: Point) : F32 => return select .<cursor> point
-entry const answer = 42
+#entry const answer = 42
 ```
 
 Expected callback is Point -> F32: y inserts `y` after the existing dot and is
@@ -415,7 +415,7 @@ Generic fixture:
 type Add a is contract = { associated "add" a a a }
 const twice: a -> a where { Add a } = func value => return value
 const work: a -> a where { Add a } = func value => return tw<cursor>
-entry const answer = 42
+#entry const answer = 42
 ```
 
 At the final function's result position, twice itself is a function and must not

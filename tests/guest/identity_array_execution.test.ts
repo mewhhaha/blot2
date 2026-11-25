@@ -6,7 +6,7 @@ Deno.test("identity array sharing rechecks imported wrapper bodies across retain
   const directory = await Deno.makeTempDir({ prefix: "blot-identity-edit-" });
   const entry = `${directory}/main.blot`, helper = `${directory}/helper.blot`;
   const main = `import {generate} from "./helper"
-entry const run = func (seed: U32) => return do:
+#entry const run = func (seed: U32) => return do:
   let saved = #[seed]
   let copied = generate saved.length (func index => return saved[index])
   break copied[0]

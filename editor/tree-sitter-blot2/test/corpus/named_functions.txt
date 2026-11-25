@@ -3,7 +3,7 @@ Named function headers preserve modifiers parameters and expression lambdas
 ==================
 
 func add left -> right => return left + right
-private entry func answer () => do:
+private #entry func answer () => do:
   func local (value: U32) -> extra => return add value extra
   let anonymous = func value => return value
 

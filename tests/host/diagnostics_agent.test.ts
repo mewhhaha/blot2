@@ -82,10 +82,11 @@ Deno.test("diagnostics: canonical codes and explain catalog", async () => {
 });
 
 Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point column", () => {
-  const source = "entry func main (): U32 =>\n  // café ✓\n  return bad_name\n";
+  const source =
+    "#entry func main (): U32 =>\n  // café ✓\n  return bad_name\n";
   const bytes = new TextEncoder().encode(source);
   const start = new TextEncoder().encode(
-    "entry func main (): U32 =>\n  // café ✓\n  return ",
+    "#entry func main (): U32 =>\n  // café ✓\n  return ",
   ).length;
   const end = start + "bad_name".length;
   equal(bytes.length > end, true);
@@ -98,7 +99,7 @@ Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point colu
   };
   const rendered = formatDiagnostic(record, { source });
   match(rendered, /\[UNKNOWN_VALUE\]/);
-  match(rendered, /in unicode\.blot › entry func main/);
+  match(rendered, /in unicode\.blot › #entry func main/);
   match(rendered, /at unicode\.blot:3:10/);
   match(rendered, /3 \|   return bad_name/);
   match(rendered, /\^\^\^\^\^\^\^\^ did you mean `good_name`\?/);
@@ -129,11 +130,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
       {
         name: "bare_list.blot",
         cmd: "check",
-        source: "entry func main (): #[U32] => return [1, 2, 3]\n",
+        source: "#entry func main (): #[U32] => return [1, 2, 3]\n",
         patterns: [
           /\[UNSUPPORTED_EXPRESSION\]/,
-          /in bare_list\.blot › entry func main/,
-          /at .*bare_list\.blot:1:38/,
+          /in bare_list\.blot › #entry func main/,
+          /at .*bare_list\.blot:1:39/,
           /use `#\[\.\.\.\]` here/,
           /fix: Replace bare `\[\.\.\.\]` with `#\[\.\.\.\]`/,
           /doc: blot explain UNSUPPORTED_EXPRESSION/,
@@ -143,11 +144,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "missing_dollar.blot",
         cmd: "check",
         source:
-          "type Opt is data = $Some U32 | $Nothing\nentry func main (): Opt => return Some 1\n",
+          "type Opt is data = $Some U32 | $Nothing\n#entry func main (): Opt => return Some 1\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in missing_dollar\.blot › entry func main/,
-          /at .*missing_dollar\.blot:2:35/,
+          /in missing_dollar\.blot › #entry func main/,
+          /at .*missing_dollar\.blot:2:36/,
           /add `\$` -> `\$Some`/,
           /fix: Prefix the data constructor with `\$`: use `\$Some`/,
         ],
@@ -156,11 +157,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "typo_name.blot",
         cmd: "check",
         source:
-          "func compute_total (x: U32): U32 => return x + 1\nentry func main (): U32 => return compute_totla 5\n",
+          "func compute_total (x: U32): U32 => return x + 1\n#entry func main (): U32 => return compute_totla 5\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in typo_name\.blot › entry func main/,
-          /at .*typo_name\.blot:2:35/,
+          /in typo_name\.blot › #entry func main/,
+          /at .*typo_name\.blot:2:36/,
           /did you mean `compute_total`\?/,
           /fix: Replace `compute_totla` with `compute_total`\./,
         ],
@@ -169,11 +170,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "missing_field.blot",
         cmd: "check",
         source:
-          "type Pt = { x: U32, y: U32 }\nentry func main (): U32 =>\n  let p: Pt = { x: 1, y: 2 }\n  return p.z\n",
+          "type Pt = { x: U32, y: U32 }\n#entry func main (): U32 =>\n  let p: Pt = { x: 1, y: 2 }\n  return p.z\n",
         patterns: [
           /\[MISSING_MEMBER\]/,
           /Type `\{ x: U32, y: U32 \}` has no field or member `\.z`/,
-          /in missing_field\.blot › entry func main/,
+          /in missing_field\.blot › #entry func main/,
           /at .*missing_field\.blot:4:10/,
           /fix: Available fields on `\{ x: U32, y: U32 \}`: `x`, `y`\./,
         ],
@@ -181,7 +182,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
       {
         name: "type_mismatch.blot",
         cmd: "check",
-        source: "entry func main (): U32 => return 1.5\n",
+        source: "#entry func main (): U32 => return 1.5\n",
         patterns: [
           /\[TYPE_MISMATCH\]/,
           /F32.*U32|U32.*F32/,
@@ -193,10 +194,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "spent_value.blot",
         cmd: "build",
         source:
-          "func consume (xs: own #[U32]): U32 => return xs.length\nentry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
+          "func consume (xs: own #[U32]): U32 => return xs.length\n#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
         patterns: [
           /\[SPENT_VALUE\] `a` was already moved at line 4/,
-          /in spent_value\.blot › entry func main/,
+          /in spent_value\.blot › #entry func main/,
           /at .*spent_value\.blot:5:14/,
           /--------- `a` moved here/,
           /\^\^\^\^\^\^\^\^ `a` used after move/,
@@ -208,10 +209,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "aliased_update.blot",
         cmd: "build",
         source:
-          "entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
+          "#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate `a` in place while `b` still borrows it/,
-          /in aliased_update\.blot › entry func main/,
+          /in aliased_update\.blot › #entry func main/,
           /at .*aliased_update\.blot:4:3/,
           /--------- borrowed by `b` here/,
           /\^\^\^\^\^\^\^\^\^\^ mutated while borrowed/,
@@ -223,7 +224,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "param_update.blot",
         cmd: "build",
         source:
-          "func bad (a: #[U32]): #[U32] =>\n  a[0] := 99\n  return a\nentry func main (): U32 => return (bad #[1, 2])[0]\n",
+          "func bad (a: #[U32]): #[U32] =>\n  a[0] := 99\n  return a\n#entry func main (): U32 => return (bad #[1, 2])[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate borrowed parameter `a` in place without `own`/,
           /in param_update\.blot › func bad/,
@@ -236,10 +237,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "unhandled_effect.blot",
         cmd: "build",
         source:
-          "type Clock is effect = { now: Unit -> U32 }\nentry func main (): U32 =>\n  use t <- Clock.now ()\n  return t\n",
+          "type Clock is effect = { now: Unit -> U32 }\n#entry func main (): U32 =>\n  use t <- Clock.now ()\n  return t\n",
         patterns: [
           /\[ENTRY_TYPE\] Entry function leaves effect `Clock\.now` unhandled/,
-          /in unhandled_effect\.blot › entry func main/,
+          /in unhandled_effect\.blot › #entry func main/,
           /unhandled effect `Clock\.now`/,
           /fix: Handle `Clock\.now` inside the entry function with `with Clock = \{ now:/,
           /doc: blot explain ENTRY_TYPE/,

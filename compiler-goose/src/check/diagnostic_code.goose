@@ -42,9 +42,9 @@ fn message(self_: Code, detail: const u8[:]) -> const u8[:] {
         initialization_cycle => { return "top-level let initializers form a dependency cycle"; },
         backend_const_only => { return "Effect reflection and descriptors are available only during constant evaluation"; },
         unsupported => { return "This typed core form is not supported by constant evaluation or native Wasm lowering"; },
-        no_entry => { return "A build requires at least one entry declaration"; },
-        entry_type => { if detail.len != 0 { return detail; } return "An entry requires one supported guest parameter and result, or a scalar constant"; },
-        entry_let_type => { if detail.len != 0 { return detail; } return "A runtime-initialized entry requires a supported guest function or a scalar global"; },
+        no_entry => { return "A build requires at least one #entry, #kernel, or #process declaration"; },
+        entry_type => { if detail.len != 0 { return detail; } return "A #entry declaration requires one supported guest parameter and result, or a scalar constant"; },
+        entry_let_type => { if detail.len != 0 { return detail; } return "A #entry let declaration requires a supported guest function or a scalar global"; },
         unresolved_type => { return "Code emission requires concrete representation evidence"; },
         constant_expression => { return "This compile-time value cannot be evaluated by the native evaluator"; },
         complexity => { return "Typed-core lowering exceeds the native compiler limit"; },
@@ -58,8 +58,8 @@ fn message(self_: Code, detail: const u8[:]) -> const u8[:] {
         code_shape_mismatch => { return "The generated code does not have its checked shape"; },
         cross_stage_authority => { return "The value cannot cross this stage boundary"; },
         staging_budget => { return "Typed staging exceeds the evaluation budget"; },
-        kernel_type => { if detail.len != 0 { return detail; } return "Kernel or process wire type does not satisfy FlatNumeric, PersistentSafe, or stride requirements"; },
-        kernel_effectful => { if detail.len != 0 { return detail; } return "Kernel and process entry functions must be pure (! {})"; },
+        kernel_type => { if detail.len != 0 { return detail; } return "A #kernel or #process wire type does not satisfy FlatNumeric, PersistentSafe, or stride requirements"; },
+        kernel_effectful => { if detail.len != 0 { return detail; } return "#kernel and #process functions must be pure (! {})"; },
     }
 }
 

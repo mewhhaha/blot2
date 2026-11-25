@@ -27,10 +27,10 @@ Deno.test("source closed State witness diamonds retain unrelated argument instan
   lines.push(
     "const factory = do:",
     "  break f_12",
-    "entry const integer = func (value: U32) : U32 => return do:",
+    "#entry const integer = func (value: U32) : U32 => return do:",
     "  let (_, $Cell result) = @state.run ($Cell value) (func () => return factory value)",
     "  break result",
-    "entry const floating = func (value: F32) : U32 => return do:",
+    "#entry const floating = func (value: F32) : U32 => return do:",
     "  let (_, $Cell result) = @state.run ($Cell 42) (func () => return factory value)",
     "  break result",
   );
@@ -59,10 +59,10 @@ Deno.test("source parametric State witness heads preserve independent nominal ar
   lines.push(
     "const factory = do:",
     "  break f_12",
-    "entry const integer = func (value: U32) : U32 => return do:",
+    "#entry const integer = func (value: U32) : U32 => return do:",
     "  let (_, $Cell result) = @state.run ($Cell value) (func () => return factory ($Cell 0))",
     "  break result",
-    "entry const floating = func (value: F32) : F32 => return do:",
+    "#entry const floating = func (value: F32) : F32 => return do:",
     "  let (_, $Cell result) = @state.run ($Cell value) (func () => return factory ($Cell 0.0))",
     "  break result",
   );
@@ -109,10 +109,10 @@ const Box.from = func value => return $Box (factory value)
       `
 import * as library from "./library"
 const from = func value => return @type.result "from" value
-entry const integer = func (value: U32) => return do:
+#entry const integer = func (value: U32) => return do:
   let $library.Box result: library.Box U32 = from (library.first ({first: value}))
   break result
-entry const floating = func (value: F32) => return do:
+#entry const floating = func (value: F32) => return do:
   let $library.Box result: library.Box F32 = from (library.first ({first: value}))
   break result
 `,
@@ -183,9 +183,9 @@ const apply = func callback => return func value => return callback value
 const compose = func outer => return func inner => return func value => return outer (inner value)
 const plus = func amount => return func value => return @u32.add amount value
 const reading = func () => return apply (func () => return Read ()) ()
-entry const integer = func (value: U32) => return apply (compose (plus 2) (plus 3)) value
-entry const floating = func (value: F32) => return apply (func item => return @f32.add item 0.5) value
-entry const answer = func (value: U32) => return do @effect.provider Read (func () => return value):
+#entry const integer = func (value: U32) => return apply (compose (plus 2) (plus 3)) value
+#entry const floating = func (value: F32) => return apply (func item => return @f32.add item 0.5) value
+#entry const answer = func (value: U32) => return do @effect.provider Read (func () => return value):
   use result <- reading ()
   break @u32.add result 5
 `,
@@ -229,7 +229,7 @@ for (
           if (leaf.includes("@u32")) argument = "0";
           const use = `f_${depth} ${argument}`;
           const source = chain(leaf, depth) +
-            `entry const answer = func () : ${resultType} => return ${use}\n`;
+            `#entry const answer = func () : ${resultType} => return ${use}\n`;
           await Deno.writeTextFile(
             input,
             source,
@@ -294,7 +294,7 @@ Deno.test("summary jobs survive dependencies edits and failed revision recovery"
     await Deno.writeTextFile(library, source("1"));
     await Deno.writeTextFile(
       entry,
-      'import { callback } from "./library"\nentry const answer = func (value: U32) => return callback value\n',
+      'import { callback } from "./library"\n#entry const answer = func (value: U32) => return callback value\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -379,18 +379,18 @@ const floating_factory: F32 -> F32 = do:
     'import * as library from "./library"\n' +
     'const add = func left => return func right => return @type.call "add" left right\n' +
     'const from = func value => return @type.result "from" value\n' +
-    `entry const integer = func (value: U32) => return case ($library.Box (($library.Box (${
+    `#entry const integer = func (value: U32) => return case ($library.Box (($library.Box (${
       invalid ? "true" : "{first: value}"
     })).read)).twice of\n  $library.Box result => result\n` +
-    `entry const floating = func (value: F32) => return case ($library.Box (($library.Box ({first: value})).read)).twice of
+    `#entry const floating = func (value: F32) => return case ($library.Box (($library.Box ({first: value})).read)).twice of
   $library.Box result => result
-entry const associated = func (value: U32) => return case add ($library.Box value) ($library.Box value) of
+#entry const associated = func (value: U32) => return case add ($library.Box value) ($library.Box value) of
   $library.Box result => result
-entry const constructed = func (value: F32) => return do:
+#entry const constructed = func (value: F32) => return do:
   let $library.Box result: library.Box F32 = from value
   break result
-entry const integer_factory = func (value: U32) => return library.integer_factory value
-entry const floating_factory = func (value: F32) => return library.floating_factory value
+#entry const integer_factory = func (value: U32) => return library.integer_factory value
+#entry const floating_factory = func (value: F32) => return library.floating_factory value
 `;
   const options = { executable, entry, prelude };
   try {

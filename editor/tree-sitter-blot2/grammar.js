@@ -16,8 +16,6 @@ export default grammar({
     [$.private_binding, $.identifier],
     [$.private_effect_header, $.identifier],
     [$.implementation_header, $.identifier],
-    [$.entry_binding, $.identifier],
-    [$.entry_process_binding, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
 
@@ -135,8 +133,7 @@ export default grammar({
         prec.right(
           3,
           seq(
-            alias("entry", $.entry_modifier),
-            alias("kernel", $.kernel_modifier),
+            $.kernel_modifier,
             "func",
             field("name", choice($.identifier, $.qualified_function_name)),
             field("parameter", $._parameter),
@@ -149,8 +146,8 @@ export default grammar({
       prec.dynamic(
         2,
         seq(
-          alias("entry", $.entry_modifier),
-          alias("kernel", $.kernel_modifier),
+          $.kernel_modifier,
+          "const",
           field("name", $.identifier),
           alias(":", $.separator),
         ),
@@ -160,8 +157,8 @@ export default grammar({
       prec.dynamic(
         2,
         seq(
-          alias("entry", $.entry_modifier),
-          alias("process", $.process_modifier),
+          $.process_modifier,
+          "const",
           field("name", $.identifier),
           alias(":", $.separator),
         ),
@@ -174,7 +171,7 @@ export default grammar({
           3,
           seq(
             optional(alias("private", $.private_modifier)),
-            optional(alias("entry", $.entry_modifier)),
+            optional($.entry_modifier),
             "func",
             field("name", choice($.identifier, $.qualified_function_name)),
             field("parameter", $._parameter),
@@ -194,13 +191,11 @@ export default grammar({
 
     binding_keyword: (_) => choice("const", "let"),
 
-    // The query checks that both keywords are on the same line. Keeping spaces
-    // as ordinary extras avoids stealing whitespace after variable `entry`.
-    entry_binding: ($) =>
-      prec.dynamic(
-        1,
-        seq(alias("entry", $.entry_modifier), $.binding_keyword),
-      ),
+    entry_modifier: (_) => "#entry",
+    kernel_modifier: (_) => "#kernel",
+    process_modifier: (_) => "#process",
+
+    entry_binding: ($) => seq($.entry_modifier, $.binding_keyword),
 
     private_binding: ($) =>
       prec.dynamic(
@@ -441,9 +436,6 @@ export default grammar({
       choice(
         $._identifier,
         "complete",
-        "entry",
-        "kernel",
-        "process",
         "private",
         "opaque",
         "export",

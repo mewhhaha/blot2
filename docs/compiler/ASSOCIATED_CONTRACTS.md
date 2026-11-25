@@ -85,7 +85,7 @@ impl ArraySource a : Source (Array a) = {
 
 const read: s -> (Source.Item s) where { Source s } =
   func values => return Source.first values
-entry const answer = func () => return read #[42]
+#entry const answer = func () => return read #[42]
 ```
 
 `impl` is contextual at a declaration start. Its grammar is
@@ -111,7 +111,7 @@ not justify circular type equations or circular evidence prerequisites.
 
 An implementation adds no initializer, effect, provider or guest export. Method
 bodies execute only when called, with ordinary argument evaluation, effect,
-failure, fuel, capture and ownership behavior. `entry impl` and `opaque impl`
+failure, fuel, capture and ownership behavior. `#entry impl` and `opaque impl`
 are invalid. `private impl` is permitted. Evidence selection and
 normalization never evaluate a method or force its captures. Creating a selected
 method callback materializes captures using the ordinary named-function rules at

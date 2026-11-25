@@ -15,7 +15,7 @@ function wideRecord(width: number): SyntheticProgram {
     name: "review_record",
     size: width,
     source: `const keep = func value => return value
-entry const main = func (x: U32) => return do:
+#entry const main = func (x: U32) => return do:
   let value = keep { ${fields.join(", ")} }
   break @u32.add value.f0 value.f${width - 1}
 `,
@@ -51,7 +51,7 @@ function deepClosure(depth: number): SyntheticProgram {
   return {
     name: "review_closures",
     size: depth,
-    source: `entry const main = func (x: U32) => return do:\n  let nested = ` +
+    source: `#entry const main = func (x: U32) => return do:\n  let nested = ` +
       Array.from({ length: depth }, (_, i) => `func (v${i}: U32) => return `)
         .join("") +
       `@u32.add v0 (@u32.add v${depth - 1} 1)\n  break nested ` +
@@ -67,13 +67,13 @@ function quantified(width: number): SyntheticProgram {
   return {
     name: "review_quantified",
     size: width,
-    source: `entry const seed: U32 where { type_rep U32 } = do:
+    source: `#entry const seed: U32 where { type_rep U32 } = do:
   let keep = func (value: {${
       fields.map((name, i) => `${name}: a${i}`).join(", ")
     }}) => value
   let value = keep {${fields.map((name) => `${name}: 7`).join(", ")}}
   break @u32.add value.f0 value.f${width - 1}
-entry const main = func (x: U32) => return @u32.add x seed
+#entry const main = func (x: U32) => return @u32.add x seed
 `,
     edit: { search: "f0: 7", replace: "f0: 8" },
   };
@@ -117,7 +117,7 @@ export const reviewPrograms: readonly SyntheticProgram[] = [
   {
     name: "review_small",
     size: 1,
-    source: "entry const main = func (x: U32) => return @u32.add x 1\n",
+    source: "#entry const main = func (x: U32) => return @u32.add x 1\n",
     edit: { search: "@u32.add x 1", replace: "@u32.add x 2" },
   },
 ];

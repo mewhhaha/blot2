@@ -57,7 +57,7 @@ for (const count of [1, 2, 9]) {
   ).join("\n");
   const source = `import * as tween from "ink/tween"
 const apply_ease = func (ease: tween.Ease) -> (t: F32) => return tween.eased ease t
-entry const main = func (t: F32) => return do:
+#entry const main = func (t: F32) => return do:
   let marker: GrowArray F32 = #[]
 ${calls}
   return @storage.freeze marker

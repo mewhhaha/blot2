@@ -3,7 +3,7 @@ const make = func (input: {__INPUT_TYPES__}): Result => return do:
   let words: Array U32 = #[input.f0[0], @u32.add input.f0[0] 1]
   return $Result {left: words, right: words, view: &words[0..2], __FIELDS__}
 const nested = func (input: {__NESTED_TYPES__}): Result => return make input
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let original: Array U32 = #[marker[0]]
   let first = nested {__FIRST__}

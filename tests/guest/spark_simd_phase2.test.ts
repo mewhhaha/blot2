@@ -63,8 +63,8 @@ const sample_b: #[F32] = #[
   0.0
 ]
 
-entry func run_spark_op (op: U32) : #[F32] => return spark_f32_op op sample_a sample_b
-entry func run_scalar_op (op: U32) : #[F32] => return scalar_f32_op op sample_a sample_b
+#entry func run_spark_op (op: U32) : #[F32] => return spark_f32_op op sample_a sample_b
+#entry func run_scalar_op (op: U32) : #[F32] => return scalar_f32_op op sample_a sample_b
 
 // Verify #run comptime staging matches runtime bit-for-bit on NaNs and non-canonicalizing ops.
 const staged_nan_checks: #[F32] = #run #[
@@ -79,10 +79,10 @@ const staged_nan_checks: #[F32] = #run #[
   F32.min (0.0 / 0.0) 1.0,
   F32.min 1.0 (0.0 / 0.0),
 ]
-entry func get_staged_nan_checks (unused: U32) : #[F32] => return staged_nan_checks
+#entry func get_staged_nan_checks (unused: U32) : #[F32] => return staged_nan_checks
 
 // Runtime spark SIMD over NaNs (including non-canonical 0xffc12345 from f32_from_bits).
-entry func get_spark_nan_checks (unused: U32) : #[F32] => return do:
+#entry func get_spark_nan_checks (unused: U32) : #[F32] => return do:
   let a = #[0.0, inf, 0.0, -1.0, non_canon_nan, non_canon_nan, non_canon_nan, non_canon_nan]
   let b = #[0.0, inf, inf, 1.0, 1.0, 1.0, 1.0, 1.0]
   let r0 = spark #[a[i] / b[i] | i <- 0..4]
@@ -108,7 +108,7 @@ entry func get_spark_nan_checks (unused: U32) : #[F32] => return do:
 
 // std/simd relaxed_madd / relaxed_nmadd canonicalize NaN to 0x7fc00000 while
 // preserving separate rounding and leaving neg/abs/min/max uncanonicalized.
-entry func get_std_simd_nan (unused: U32) : #[F32] => return do:
+#entry func get_std_simd_nan (unused: U32) : #[F32] => return do:
   let (m0, m1, m2, m3) = simd.f32_relaxed_madd (0.0, non_canon_nan, 1.5, inf) (inf, 1.0, 2.0, 0.0) (1.0, 2.0, 3.0, 0.0)
   let (n0, n1, n2, n3) = simd.f32_relaxed_nmadd (0.0, non_canon_nan, 1.5, 2.0) (inf, 1.0, 2.0, 3.0) (1.0, 2.0, 10.0, 5.0)
   let (g0, g1, g2, g3) = simd.f32_neg (0.0 / 0.0, non_canon_nan, 1.0, -0.0)
@@ -118,9 +118,9 @@ entry func get_std_simd_nan (unused: U32) : #[F32] => return do:
 // #run comptime evaluation of spark expressions (both array and range sources).
 const staged_spark_range: #[U32] = #run (spark #[i * 3 + 1 | i <- 0..6])
 const staged_spark_arr: #[F32] = #run (spark #[x + 1.0 | x <- #[1.0, -0.0, 0.0 / 0.0, sqrt (-1.0), 2.5]])
-entry func get_staged_spark_range (unused: U32) : #[U32] => return staged_spark_range
-entry func get_staged_spark_arr (unused: U32) : #[F32] => return staged_spark_arr
-entry func get_runtime_spark_arr (unused: U32) : #[F32] => return
+#entry func get_staged_spark_range (unused: U32) : #[U32] => return staged_spark_range
+#entry func get_staged_spark_arr (unused: U32) : #[F32] => return staged_spark_arr
+#entry func get_runtime_spark_arr (unused: U32) : #[F32] => return
   spark #[x + 1.0 | x <- #[1.0, -0.0, 0.0 / 0.0, sqrt (-1.0), 2.5]]
 `,
     (guest) => {
@@ -197,18 +197,18 @@ Deno.test("Phase 2: U32 ops, unsigned min/max, Bool mask normalization, range-af
   let d = max a b
   break c + (d - x)
 
-entry func spark_u32 (n: U32) : #[U32] => return do:
+#entry func spark_u32 (n: U32) : #[U32] => return do:
   let shift: U32 = 5
   break spark #[mix_u32 (i + 0xfffffffd) shift | i <- 0..n]
 
-entry func scalar_u32 (n: U32) : #[U32] => return do:
+#entry func scalar_u32 (n: U32) : #[U32] => return do:
   let shift: U32 = 5
   break @array.generate n (func (i: U32) : U32 => return mix_u32 (i + 0xfffffffd) shift)
 
 // Strict Bool mask normalization: #[Bool] load -> not/and/or/eq/ne/if -> #[Bool] store.
 // Verify stored words in linear memory are STRICTLY 0 or 1 (never 0xffffffff) by
 // testing exact scalar equality against true (1) and false (0); 0xffffffff returns 99!
-entry func spark_bool_strict (n: U32) : #[U32] => return do:
+#entry func spark_bool_strict (n: U32) : #[U32] => return do:
   let a = spark #[(i & 1) == 0 | i <- 0..n]
   let b = spark #[(i & 2) != 0 | i <- 0..n]
   let flag: Bool = (n & 1) == 1
@@ -219,39 +219,39 @@ entry func spark_bool_strict (n: U32) : #[U32] => return do:
 // Range-affine stream with offset + wrapping-safe fallback!
 const table: #[U32] = #[10, 20, 30, 40, 50, 60, 70, 80, 90]
 
-entry func affine_normal (offset: U32) : #[U32] => return
+#entry func affine_normal (offset: U32) : #[U32] => return
   spark #[table[offset + i] + table[i + 1] | i <- 0..6]
 
 // Unsigned wrap: offset = 0xfffffffe, start = 2 -> offset + start wraps to 0!
 // Pre-loop proof detects wrap (base_idx < offset) and falls back to scalar loop.
-entry func affine_wrap_ok (unused: U32) : #[U32] => return do:
+#entry func affine_wrap_ok (unused: U32) : #[U32] => return do:
   let off: U32 = 0xfffffffe
   break spark #[table[off + i] | i <- 2..7]
 
 // Conditional short-array guard: arr.len == 3 < 8 -> pre-loop proof fails,
 // falls back cleanly to scalar loop so out-of-bounds lane NEVER executes!
-entry func affine_short_guarded (unused: U32) : #[U32] => return do:
+#entry func affine_short_guarded (unused: U32) : #[U32] => return do:
   let short = #[11, 22, 33]
   break spark #[if i < short.length then short[i] else 99 | i <- 0..8]
 
 // Array-generator gather falls back to scalar cleanly.
-entry func gather_fallback (unused: U32) : #[U32] => return do:
+#entry func gather_fallback (unused: U32) : #[U32] => return do:
   let idxs = #[4, 1, 7, 0, 2]
   break spark #[table[x] | x <- idxs]
 
 // Integer division and trapping logical RHS fall back to scalar preserving exact trap order.
-entry func guarded_div (xs: #[U32]) : #[U32] => return
+#entry func guarded_div (xs: #[U32]) : #[U32] => return
   spark #[if x != 0 then 100 / x else 0 | x <- xs]
 
-entry func guarded_and_div (xs: #[U32]) : #[U32] => return do:
+#entry func guarded_and_div (xs: #[U32]) : #[U32] => return do:
   let flags = spark #[x != 0 and (100 / x > 10) | x <- xs]
   break spark #[if f then 1 else 0 | f <- flags]
 
-entry func trap_div (xs: #[U32]) : #[U32] => return
+#entry func trap_div (xs: #[U32]) : #[U32] => return
   spark #[100 / x | x <- xs]
 
 // Nested spark: outer scalar fallback, inner vectorized, escape-safe.
-entry func nested_spark (unused: U32) : #[U32] => return do:
+#entry func nested_spark (unused: U32) : #[U32] => return do:
   let rows = spark #[spark #[r * 10 + c | c <- 0..5] | r <- 0..3]
   break #[rows[0][0], rows[0][4], rows[1][2], rows[2][4]]
 `,
@@ -285,9 +285,9 @@ Deno.test("Phase 2: work counters, unpatchableOperand (-2) & recordInlined repla
   const entry = `${dir}/main.blot`;
   const v1 = `func scale_helper (x: F32) : F32 => return x * 2.0 + 3.0
 func unrelated (n: U32) : U32 => return n + 10
-entry func simd_map (xs: #[F32]) : #[F32] => return spark #[scale_helper x + 1.0 | x <- xs]
-entry func fallback_map (xs: #[U32]) : #[U32] => return spark #[100 / x | x <- xs]
-entry func call_unrelated (n: U32) : U32 => return unrelated n
+#entry func simd_map (xs: #[F32]) : #[F32] => return spark #[scale_helper x + 1.0 | x <- xs]
+#entry func fallback_map (xs: #[U32]) : #[U32] => return spark #[100 / x | x <- xs]
+#entry func call_unrelated (n: U32) : U32 => return unrelated n
 `;
   try {
     await Deno.writeTextFile(entry, v1);

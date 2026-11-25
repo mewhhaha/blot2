@@ -106,7 +106,7 @@ func xor_scalar_ref (pos: #[Maybe Pos]): U32 =>
     i := self + 1
   return acc
 
-entry func check_all (packed: U32): U32 =>
+#entry func check_all (packed: U32): U32 =>
   let n = packed >> 4
   let mode = packed & 15
   let pool = make_pool n mode
@@ -116,7 +116,7 @@ entry func check_all (packed: U32): U32 =>
   let x2 = xor_scalar_ref pool
   return if s1 == s2 and x1 == x2 then s1 ^ x1 else 0xdeadbeef
 
-entry func oob_sum (n: U32): U32 =>
+#entry func oob_sum (n: U32): U32 =>
   let pool = make_pool n 0
   let sum: U32 = 0
   for i in 0 .. (n + 1):
@@ -141,7 +141,7 @@ entry func oob_sum (n: U32): U32 =>
 
 Deno.test("Tier 7B: Dead @array.fill elision preserves conditional, self-read, and zero-len semantics", async () => {
   const source = `
-entry func full_overwrite (n: U32): U32 =>
+#entry func full_overwrite (n: U32): U32 =>
   let a = @array.fill n 99
   let b = @array.fill n 77
   let c = @array.fill n 5
@@ -153,7 +153,7 @@ entry func full_overwrite (n: U32): U32 =>
     sum := self + a[i] + b[i] + c[i]
   return sum
 
-entry func conditional_must_keep_fill (n: U32): U32 =>
+#entry func conditional_must_keep_fill (n: U32): U32 =>
   let a = @array.fill n 7
   for i in 0 .. n:
     if i % 2 == 0:
@@ -163,7 +163,7 @@ entry func conditional_must_keep_fill (n: U32): U32 =>
     sum := self + a[i]
   return sum
 
-entry func self_read_must_keep_fill (n: U32): U32 =>
+#entry func self_read_must_keep_fill (n: U32): U32 =>
   let a = @array.fill n 11
   for i in 0 .. n:
     a[i] := a[i] + i
@@ -197,7 +197,7 @@ func f32_bits (x: F32): U32 =>
   let (b, _, _, _) = simd.f32_bits (x, 0.0, 0.0, 0.0)
   return b
 
-entry func multi_init (packed: U32): U32 =>
+#entry func multi_init (packed: U32): U32 =>
   let n = packed >> 4
   let seed = packed & 15
   let px = @array.fill n 0.0
@@ -220,7 +220,7 @@ entry func multi_init (packed: U32): U32 =>
     sa := self + ax[i]
   return f32_bits (sp + sv + sa)
 
-entry func multi_init_ref (packed: U32): U32 =>
+#entry func multi_init_ref (packed: U32): U32 =>
   let n = packed >> 4
   let seed = packed & 15
   let px = @array.fill n 0.0
@@ -259,7 +259,7 @@ entry func multi_init_ref (packed: U32): U32 =>
     l := self + 1
   return f32_bits (sp + sv + sa)
 
-entry func exact_f32_sum_order (n: U32): U32 =>
+#entry func exact_f32_sum_order (n: U32): U32 =>
   let xs = @array.fill n 0.0
   for i in 0 .. n:
     xs[i] := if i == 0 then 16777216.0 else 0.75
@@ -275,7 +275,7 @@ entry func exact_f32_sum_order (n: U32): U32 =>
     j := self + 1
   return if f32_bits s1 == f32_bits s2 then f32_bits s1 else 0xdeadbeef
 
-entry func f32_sum_nan_canon (n: U32): U32 =>
+#entry func f32_sum_nan_canon (n: U32): U32 =>
   let xs = @array.fill n 1.0
   if n > 3:
     xs[3] := 0.0 / 0.0
@@ -284,7 +284,7 @@ entry func f32_sum_nan_canon (n: U32): U32 =>
     s := self + xs[i]
   return f32_bits s
 
-entry func f32_sum_oob (n: U32): U32 =>
+#entry func f32_sum_oob (n: U32): U32 =>
   let xs = @array.fill n 1.0
   let s: F32 = 0.0
   for i in 0 .. (n + 1):
@@ -339,7 +339,7 @@ func merge_u32 (src: #[U32]) -> (dst: own #[U32]) -> (lo: U32) -> (mid: U32) -> 
     k := self + 1
   return dst
 
-entry func sort_u32_hash (packed: U32): U32 =>
+#entry func sort_u32_hash (packed: U32): U32 =>
   let n = packed >> 8
   let seed = packed & 255
   let a = @array.fill n 0
@@ -400,7 +400,7 @@ func f32_bits (x: F32): U32 =>
   let (b, _, _, _) = simd.f32_bits (x, 0.0, 0.0, 0.0)
   return b
 
-entry func check_matmul (packed: U32): U32 =>
+#entry func check_matmul (packed: U32): U32 =>
   let rows = (packed >> 16) & 255
   let n = (packed >> 8) & 255
   let m = packed & 255

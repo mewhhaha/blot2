@@ -12,7 +12,7 @@ const transfer = func state => return reflect state
 const tick = func (counter: Array U32): U32 => return do:
   counter[0] := @u32.add self 1
   return counter[0]
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[@u32.add input 3]
   let effects: Array U32 = #[0]
   let pick: Pick = if @u32.eq (@u32.rem input 2) 0 then $Small input else $Large {left: input, right: @u32.add input 9}

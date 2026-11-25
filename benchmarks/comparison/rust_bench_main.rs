@@ -676,7 +676,7 @@ fn main() {
 
     // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot v0.1.2,
     //    generalized AoS Vec2/Vec4 record auto-SIMD, multi-core isolated-guest scaling,
-    //    and persistent entry process throughput.
+    //    and persistent #process throughput.
     let blot_kernels_w3_wasm = Path::new("/tmp/blot_kernels_w3.wasm");
     let blot_kernels_w3_so = Path::new("/tmp/blot_kernels_w3_wtime.so");
     let st = Command::new(&blotc)
@@ -722,7 +722,7 @@ fn main() {
         }));
     }
 
-    // 4b. Generalized AoS #[Vec4] & #[Vec2] record auto-SIMD + multi-core scaling + entry process.
+    // 4b. Generalized AoS #[Vec4] & #[Vec2] record auto-SIMD + multi-core scaling + #process.
     let mc_src = blot_root.join("benchmarks/comparison/multicore_aos_bench.blot");
     let mc_def_wasm = Path::new("/tmp/multicore_aos_def.wasm");
     let mc_w3_wasm = Path::new("/tmp/multicore_aos_w3.wasm");
@@ -910,7 +910,7 @@ fn main() {
         }));
     }
 
-    // 4d. Persistent ABI 8 `entry process` zero-alloc step throughput on wtime-aot v0.1.2.
+    // 4d. Persistent ABI 8 `#process` zero-alloc step throughput on wtime-aot v0.1.2.
     let (proc_noop_us, proc_phys_us) = {
         let mut g = mc_def_mod.instantiate();
         g.call_proc_init("particle_sim", 4096);

@@ -24,7 +24,7 @@ const nested = func (own access) => return do:
 const number = func (mode: Mode): U32 => return case mode of
   $Play => 0
   $Edit => 1
-entry const run = func (count: U32): Array U32 => return do:
+#entry const run = func (count: U32): Array U32 => return do:
   let state = {editor: #[$Editor {mode: $Play, counter: 0, nested: {mode: $Play}}]}
   state := set_mode state
   for index in 0 .. count:
@@ -75,14 +75,14 @@ entry const run = func (count: U32): Array U32 => return do:
         const body of [
           `const invalid = func access => return do:
   access.editor[0].mode := 7
-entry const rejected = func (): U32 => return do:
+#entry const rejected = func (): U32 => return do:
   let editor: Array Editor = #[$Editor {mode: $Play, counter: 0, nested: {mode: $Play}}]
   invalid {editor}
   return 0
 `,
           `const invalid = func access => return do:
   access.editor[0].counter := true
-entry const rejected = func (): U32 => return do:
+#entry const rejected = func (): U32 => return do:
   let editor: Array Editor = #[$Editor {mode: $Play, counter: 0, nested: {mode: $Play}}]
   invalid {editor}
   return 0
@@ -102,7 +102,7 @@ entry const rejected = func (): U32 => return do:
 ${source}
 const invalid = func access => return do:
   access.tokens[0].region := 99
-entry const rejected = func (): U32 => return do:
+#entry const rejected = func (): U32 => return do:
   let tokens = #[token.make () 1 2 3 4]
   invalid {tokens}
   return 0

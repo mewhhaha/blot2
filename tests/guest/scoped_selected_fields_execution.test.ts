@@ -6,7 +6,7 @@ const source = `type Point is data = $Point {padding: U32, x: F32, y: F32}
 type Row is data = $Row {prefix: U32, count: U32, untouched: U32, point: Point}
 const row = func (value: U32): Row => return $Row {point: $Point {y: -0.0, padding: 29, x: 1.25}, untouched: 100, count: value, prefix: 71}
 const last_u32 = func (xs: Array U32): U32 => return xs[@u32.sub (@storage.length xs) 1]
-entry const ordered = func (input: U32) => return do:
+#entry const ordered = func (input: U32) => return do:
   let rows: Array Row = #[row input]
   let effects: Array U32 = #[0]
   let idx0 = do:
@@ -26,14 +26,14 @@ entry const ordered = func (input: U32) => return do:
     break 0
   let selected = rows[idx1].count
   return #[rows[0].count, rows[0].untouched, rows[0].prefix, last_u32 effects, @storage.length rows, rows[64].count, selected]
-entry const floating = func (input: F32) => return do:
+#entry const floating = func (input: F32) => return do:
   let rows: Array Row = #[row 0]
   rows[0].point.x := input
   rows[0].point.y := do:
     rows[0].point.padding := 47
     break self
   return #[rows[0].point.x, rows[0].point.y, @u32.to_f32 rows[0].point.padding, @u32.to_f32 rows[0].prefix]
-entry const joined = func (choose_left: Bool) => return do:
+#entry const joined = func (choose_left: Bool) => return do:
   let left: Array Row = #[row 10]
   let right: Array Row = #[row 20]
   if choose_left:
@@ -41,29 +41,29 @@ entry const joined = func (choose_left: Bool) => return do:
   else:
     right[0].count := @u32.add self 9
   return #[left[0].count, right[0].count, left[0].untouched, right[0].untouched]
-entry const out_of_bounds_trap = func (at: U32): U32 => return do:
+#entry const out_of_bounds_trap = func (at: U32): U32 => return do:
   let rows: Array Row = #[row 1]
   rows[at].count := @u32.div 99 0
   return rows[0].count
-entry const out_of_bounds_ok = func (): Array U32 => return do:
+#entry const out_of_bounds_ok = func (): Array U32 => return do:
   let rows: Array Row = #[row 1]
   let trace: Array U32 = #[]
   rows[0].count := do:
     @storage.push trace 1
     break 99
   return #[rows[0].count, @storage.length trace]
-entry const empty = func (): U32 => return do:
+#entry const empty = func (): U32 => return do:
   let rows: Array Row = #[]
   rows[0].count := @u32.div 99 0
   return 0
 const Row.consume = func (value: Row): U32 => return value.count
-entry const getter = func (input: U32) => return do:
+#entry const getter = func (input: U32) => return do:
   let getter_rows: Array Row = #[]
   @storage.push getter_rows (row input)
   let value = (&getter_rows[0..1])[0].consume
   @storage.truncate getter_rows 0
   return #[value, @storage.length getter_rows]
-entry const view_bound = func (at: U32): U32 => return do:
+#entry const view_bound = func (at: U32): U32 => return do:
   let rows: Array Row = #[row 10, row 20, row 30]
   return (&rows[1..2])[at].count
 `;

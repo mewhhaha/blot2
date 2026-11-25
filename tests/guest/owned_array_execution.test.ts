@@ -3,13 +3,13 @@ Deno.test("exclusive fresh arrays update through nested loop carries", async () 
   await compileAndRun(
     `
 const fill = func count => return func value => return @array.fill count value
-entry const build = func (count: U32) : Array U32 => return do:
+#entry const build = func (count: U32) : Array U32 => return do:
   let values = fill (@u32.mul count 2) 0
   for outer in 0 .. count:
     for inner in 0 .. 2:
       values[@u32.add (@u32.mul outer 2) inner] := outer
   break values
-entry const floating = func (count: U32) : Array F32 => return do:
+#entry const floating = func (count: U32) : Array F32 => return do:
   let values = @array.generate count (func index => return @u32.to_f32 index)
   for index in 0 .. count:
     values[index] := @f32.add self 0.5
@@ -45,41 +45,41 @@ type Cell value is data = $Cell value
 const stored = #[1, 2]
 const read = func values => return values[1]
 const delay = func (value: Array U32) => return func () => return value[1]
-entry const copy_snapshot = func () => return do:
+#entry const copy_snapshot = func () => return do:
   let values = #[1, 2]
   let before = values.copy
   values[1] := 9
   break @u32.add before[1] values[1]
-entry const callback = func () => return do:
+#entry const callback = func () => return do:
   let values = #[1, 2]
   let before = values.copy
   let read_before = func () => return before[1]
   values[1] := 9
   break @u32.add (read_before ()) values[1]
-entry const suspended = func () => return do:
+#entry const suspended = func () => return do:
   let values = #[1, 2]
   let before = delay values.copy
   values[1] := 9
   break @u32.add (before ()) values[1]
-entry const parameter = func (values: own Array U32) => return do:
+#entry const parameter = func (values: own Array U32) => return do:
   values[1] := 9
   break values
-entry const global_copy = func () => return do:
+#entry const global_copy = func () => return do:
   let values = stored.copy
   values[1] := 9
   break @u32.add stored[1] values[1]
-entry const retained = func () => return do:
+#entry const retained = func () => return do:
   let values = #[1, 2]
   let state = $Cell values.copy
   values[1] := 9
   let ($Cell before, _) = @state.run state (func () => return ())
   break @u32.add before[1] values[1]
-entry const calls = func () => return do:
+#entry const calls = func () => return do:
   let values = #[1, 2]
   let before = read values
   values[1] := 9
   break @u32.add before values[1]
-entry const nested = func () => return do:
+#entry const nested = func () => return do:
   let values = #[#[1], #[1]]
   values[0][0] := 9
   break @u32.add values[0][0] values[1][0]
@@ -116,38 +116,38 @@ const total = func (values: Array F32) => return do:
 const matched = func (values: Array F32) -> (index: U32) => return case true of
   true => values[index]
   false => 0.0
-entry const inlined = func (n: U32) : F32 => return do:
+#entry const inlined = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   for i in 0..n:
     let x = get1 i values
     values[i] := x * 0.5 + 0.25
   break values[n - 1]
-entry const called = func (n: U32) : F32 => return do:
+#entry const called = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
     values[i] := total values / @u32.to_f32 n + 1.0
   break values[n - 1]
 const double_values = func (n: U32) -> (values: Array F32) => return @array.generate n (func i => return values[i] * 2.0)
-entry const generated = func (n: U32) : F32 => return do:
+#entry const generated = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   let doubled = double_values n values
   for i in 0..n:
     values[i] := values[i] + doubled[i]
   break values[n - 1]
-entry const mapped = func (n: U32) : F32 => return do:
+#entry const mapped = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   let doubled = array.map (func value => return value * 2.0) values
   for i in 0..n:
     values[i] := values[i] + doubled[i]
   break values[n - 1]
-entry const local = func (n: U32) : F32 => return do:
+#entry const local = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   let read = func (xs: Array F32) -> (index: U32) => return xs[index]
   for i in 0..n:
     let x = read values i
     values[i] := x + 1.0
   break values[n - 1]
-entry const match_read = func (n: U32) : F32 => return do:
+#entry const match_read = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
     let x = matched values i
@@ -192,7 +192,7 @@ const pair = func values => return (values, 1)
 const first_elem = func (values: Array (Array U32)) => return values[0][0]
 const reader = func values => return func index => return values[index]
 const left = func a => return func b => return a[0] + b[0]
-entry const returned = func (n: U32) => return do:
+#entry const returned = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
@@ -200,7 +200,7 @@ entry const returned = func (n: U32) => return do:
     values[i] := 9
     sum := sum + before[i] + values[i]
   break sum
-entry const stored = func (n: U32) => return do:
+#entry const stored = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
@@ -208,7 +208,7 @@ entry const stored = func (n: U32) => return do:
     values[i] := 9
     sum := sum + before[i] + values[i]
   break sum
-entry const paired = func (n: U32) => return do:
+#entry const paired = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
@@ -216,7 +216,7 @@ entry const paired = func (n: U32) => return do:
     values[i] := 9
     sum := sum + before[i] + values[i]
   break sum
-entry const captured = func (n: U32) => return do:
+#entry const captured = func (n: U32) => return do:
   let values = @array.fill n 1
   let snapshot = values.copy
   let read = reader snapshot
@@ -226,7 +226,7 @@ entry const captured = func (n: U32) => return do:
     sum := sum + read i + values[i]
   break sum
 const copy_values = func (n: U32) -> (values: Array U32) => return @array.generate n (func index => return values[index])
-entry const kept = func (n: U32) => return do:
+#entry const kept = func (n: U32) => return do:
   let values = @array.fill n 1
   let copied = copy_values n values
   let sum = 0
@@ -234,7 +234,7 @@ entry const kept = func (n: U32) => return do:
     values[i] := 9
     sum := sum + values[i] + copied[i]
   break sum
-entry const nested = func (n: U32) => return do:
+#entry const nested = func (n: U32) => return do:
   let values = @array.generate n (func i => return @array.fill 2 i)
   let sum = 0
   for i in 0..n:
@@ -242,10 +242,10 @@ entry const nested = func (n: U32) => return do:
     values[0] := #[9, values[0][1]]
     sum := sum + values[0][0] - (if i == 0 then before else 0)
   break sum
-entry const ordered = func (n: U32) => return do:
+#entry const ordered = func (n: U32) => return do:
   let values = @array.fill n 1
   break left values (@array.set values 0 9)
-entry const indexed = func (n: U32) => return do:
+#entry const indexed = func (n: U32) => return do:
   let values = @array.fill n 1
   break values[(@array.set values 0 5)[1] - 1]
 `,
@@ -265,13 +265,13 @@ entry const indexed = func (n: U32) => return do:
 // Slices and explicit copies keep sources independent across branch writes.
 Deno.test("fresh copies and disjoint writes preserve sources across branches and slices", async () => {
   await compileAndRun(`
-entry const sliced = func (count: U32) => return do:
+#entry const sliced = func (count: U32) => return do:
   let source = @array.generate count (func i => return i)
   let values = @array.slice source 0 count
   for i in 0 .. count:
     values[i] := self + 1
   break #[source[0], source[count - 1], values[0], values[count - 1]]
-entry const branched = func (count: U32) => return do:
+#entry const branched = func (count: U32) => return do:
   let values = @array.fill count 0
   for i in 0 .. count:
     if i % 2 == 0:
@@ -279,7 +279,7 @@ entry const branched = func (count: U32) => return do:
     else:
       values[i] := i + 3
   break values
-entry const retained = func (flag: Bool) => return do:
+#entry const retained = func (flag: Bool) => return do:
   let values = #[10, 20]
   let previous = values.copy
   if flag:
@@ -287,7 +287,7 @@ entry const retained = func (flag: Bool) => return do:
   else:
     values[0] := 3
   break #[previous[0], previous[1], values[0], values[1]]
-entry const nested_slice = func (value: U32) => return do:
+#entry const nested_slice = func (value: U32) => return do:
   let source = #[#[value], #[value]]
   let values = #[source[0].copy, source[1].copy]
   values[0][0] := value + 1

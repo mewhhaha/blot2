@@ -9,14 +9,14 @@ const callbacks = Array(13).fill("inspect").join(" ");
 const wide = `type Wide = {${fields.join(",")}}
 const inspect = func (value: Wide): U32 ! {} => return 0
 const policy = func ${parameters} -> (value: U32): U32 => return @u32.add value 1
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let kept: Array U32 = #[41]
   return policy ${callbacks} kept[0]
 `;
 const captured =
   `const capture = func value => return func (ignored: Unit) => return value
 const invoke = func callback => return callback ()
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let kept: Array U32 = #[0]
   let whole = invoke (capture 40)
   let fraction = invoke (capture 1.25)

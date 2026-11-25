@@ -35,17 +35,17 @@ const validate = func (node: Node) => return case node of
   $Next delayed => case delayed () of
     $End => 0
     $Next _ => @panic "summary changed its captured node"
-entry const monoid = func (count: U32) => return do:
+#entry const monoid = func (count: U32) => return do:
   let node = retained_node ()
   let values = $Mapped { cursor: $Range { current: 0, end: count }, transform: func index => return {sum: index, node} }
   let total = fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
   break @u32.add total (validate node)
-entry const group = func (count: U32) => return do:
+#entry const group = func (count: U32) => return do:
   let node = retained_node ()
   let values = $Mapped { cursor: $Range { current: 0, end: count }, transform: func index => return {sum: index, node} }
   let total = fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
   break @u32.add total (validate node)
-entry const update = func (count: U32) => return do:
+#entry const update = func (count: U32) => return do:
   let node = retained_node ()
   let initial = {sum: 0, node}
   let original = summary.build combine initial ($Mapped { cursor: $Range { current: 0, end: 31 }, transform: func index => return {sum: index, node} })
@@ -55,7 +55,7 @@ entry const update = func (count: U32) => return do:
   let old = summary.query combine initial 0 31 original
   let current = summary.query combine initial 0 31 tree
   break @u32.add (@u32.add old.sum current.sum) (validate current.node)
-entry const memory = func () : Array U32 => return #[]
+#entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       for (const count of counts) {

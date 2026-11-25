@@ -70,11 +70,11 @@ func test_fork_returns_fresh_and_copy (): U32 =>
   // xs is still [3, 4, 5]; fresh is [50, 4, 77]; snap is [3, 88, 5]
   return fresh[0] + fresh[1] + fresh[2] + snap[0] + snap[1] + snap[2] + xs[0] + xs[1] + xs[2]
 
-entry func run_basic (): U32 => test_basic_fork ()
-entry func run_grow (): U32 => test_grow_fork ()
-entry func run_resize (): U32 => test_resize_and_seal_fork ()
-entry func run_nested (): U32 => test_nested_and_own_fork ()
-entry func run_fresh (): U32 => test_fork_returns_fresh_and_copy ()
+#entry func run_basic (): U32 => test_basic_fork ()
+#entry func run_grow (): U32 => test_grow_fork ()
+#entry func run_resize (): U32 => test_resize_and_seal_fork ()
+#entry func run_nested (): U32 => test_nested_and_own_fork ()
+#entry func run_fresh (): U32 => test_fork_returns_fresh_and_copy ()
 `,
     (guest) => {
       // spec = 100 + 20 + 300 = 420; xs = 10 + 20 + 30 = 60 => 420060
@@ -98,14 +98,14 @@ func bad (xs: #[U32]): U32 =>
   return fork xs:
     xs[0] := 1
     return xs[0]
-entry func main (): U32 => bad #[1, 2]
+#entry func main (): U32 => bad #[1, 2]
 `,
     "aliased_update",
   );
 
   await compileExpectedFailure(
     `
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let xs = #[1, 2, 3]
   return fork xs:
     xs[0] := 9
@@ -119,7 +119,7 @@ entry func main (): #[U32] =>
 func bump (xs: own #[U32]): #[U32] =>
   xs[0] := 9
   return xs
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let xs = #[1, 2, 3]
   return fork xs:
     let ys = bump xs
@@ -130,7 +130,7 @@ entry func main (): #[U32] =>
 
   await compileExpectedFailure(
     `
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let xs = #[1, 2, 3]
   let leaked: *#[U32] = fork xs:
     xs[0] := 9
@@ -142,7 +142,7 @@ entry func main (): U32 =>
 
   await compileExpectedFailure(
     `
-entry func main (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} =>
+#entry func main (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} =>
   let xs = #[1, 2]
   return fork xs:
     return use host xs[0]
@@ -152,7 +152,7 @@ entry func main (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} =>
 
   await compileExpectedFailure(
     `
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let xs = #[1, 2]
   let ys = #[3, 4]
   return fork xs:
@@ -188,7 +188,7 @@ func apply_all (fs: #[*(U32 -> U32)]) -> (x: U32): U32 =>
     v := f v
   return v
 
-entry func run_closures (x: U32): U32 =>
+#entry func run_closures (x: U32): U32 =>
   let f1 = make_adder 5
   let f2 = make_lookup ()
   let p = make_pipeline 7
@@ -203,7 +203,7 @@ entry func run_closures (x: U32): U32 =>
 
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let arr = #[10, 20, 30]
   let f: *(U32 -> U32) = freeze (func i => arr[i])
   return f 0
@@ -214,7 +214,7 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `
 func pick (arr: #[U32]) -> (i: U32): U32 => arr[i]
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let arr = #[10, 20, 30]
   let f: *(U32 -> U32) = freeze (pick arr)
   return f 0
@@ -225,7 +225,7 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `
 func bad_wrap (cb: U32 -> U32): *(U32 -> U32) => freeze cb
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let f = bad_wrap (func x => x + 1)
   return f 5
 `,
@@ -303,10 +303,10 @@ func test_linked_dot (): U32 =>
   let d: #[4; U32] = #[10, 20, 30, 40]
   return dot_linked c d + dot_shared_linked sa sb
 
-entry func run_dot (): U32 => test_linked_dot ()
-entry func run_tree (iters: U32): U32 => test_fbip_tree iters
-entry func run_alias (): U32 => test_fbip_alias_safety ()
-entry func run_big (iters: U32): U32 => test_fbip_big_record iters
+#entry func run_dot (): U32 => test_linked_dot ()
+#entry func run_tree (iters: U32): U32 => test_fbip_tree iters
+#entry func run_alias (): U32 => test_fbip_alias_safety ()
+#entry func run_big (iters: U32): U32 => test_fbip_big_record iters
 `,
     (guest) => {
       // 300 + 300 = 600
@@ -440,7 +440,7 @@ func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 =>
   for i in 0..a.length:
     acc := self + a[i] * b[i]
   return acc
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a: #[4; U32] = #[1, 2, 3, 4]
   let b: #[4; U32] = #[10, 20, 30, 40]
   return dot a b
@@ -457,7 +457,7 @@ func dot (a: #[U32]) -> (b: #[U32]): U32 =>
   for i in 0..a.length:
     acc := self + a[i] * b[i]
   return acc
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a = #[1, 2, 3, 4]
   let b = #[10, 20, 30, 40]
   let f = dot
@@ -508,7 +508,7 @@ func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 =>
   for i in 0..a.length:
     acc := self + a[i] * b[i]
   return acc
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a: #[4; U32] = #[1, 2, 3, 4]
   let b: #[4; U32] = #[10, 20, 30, 40]
   return dot a b
@@ -522,7 +522,7 @@ func dot (a: #[U32]) -> (b: #[U32]): U32 =>
   for i in 0..a.length:
     acc := self + a[i] * b[i]
   return acc
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a = #[1, 2, 3, 4]
   let b = #[10, 20, 30, 40]
   let f = dot

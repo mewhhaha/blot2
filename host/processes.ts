@@ -1008,7 +1008,7 @@ export class Processes {
       if (!manifest) {
         throw new ProcessError(
           "unknown_process",
-          `Unknown entry process ${policy.name}`,
+          `Unknown #process ${policy.name}`,
         );
       }
       if (this.#policies.has(policy.name)) {

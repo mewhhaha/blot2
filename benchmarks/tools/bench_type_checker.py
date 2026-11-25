@@ -14,9 +14,9 @@ def programs(directory):
     cases = {}
     families = [
         ("generics", [32, 256, 1024], "func equal_{i} left -> right => return left == right",
-         "entry func answer (n: U32): Bool => return equal_{i} n n"),
+         "#entry func answer (n: U32): Bool => return equal_{i} n n"),
         ("callbacks", [32, 256], "func twice_{i} apply -> value => return apply (apply value)",
-         "entry func answer (n: U32): U32 => return twice_{i} (func (v: U32) => return v + 1) n"),
+         "#entry func answer (n: U32): U32 => return twice_{i} (func (v: U32) => return v + 1) n"),
     ]
     for family, sizes, declaration, entry in families:
         for size in sizes:
@@ -33,7 +33,7 @@ def programs(directory):
         record = ", ".join(f"f{i}: n" for i in range(width))
         source.write_text(f"type Row = {{{fields}}}\n"
                           f"func pick (row: Row) => return row.f{width - 1}\n"
-                          f"entry func answer (n: U32): U32 => return pick {{{record}}}\n")
+                          f"#entry func answer (n: U32): U32 => return pick {{{record}}}\n")
         cases[name] = source
     for depth in [3, 6, 9]:
         name = f"shared-pair-{depth}"
@@ -41,7 +41,7 @@ def programs(directory):
         lines = ["func layer0 x => return x"]
         for i in range(1, depth + 1):
             lines.append(f"func layer{i} x => return (layer{i - 1} x, layer{i - 1} x)")
-        lines.append("entry const answer = 42")
+        lines.append("#entry const answer = 42")
         source.write_text("\n".join(lines) + "\n")
         cases[name] = source
     for fanout in [2, 8, 32]:
@@ -56,7 +56,7 @@ def programs(directory):
                 'func read (n: U32): U32 => return identity n\n')
             imports.append(f'import {{ read as read{i} }} from "./leaf{i}"')
             calls.append(f"read{i} n")
-        entry = "entry func answer (n: U32): U32 => return " + " + ".join(calls)
+        entry = "#entry func answer (n: U32): U32 => return " + " + ".join(calls)
         source = folder / "main.blot"
         source.write_text("\n".join([*imports, entry]) + "\n")
         cases[name] = source
@@ -77,7 +77,7 @@ def programs(directory):
             "func carry (n: U32) => return make n\n")
         source = folder / "main.blot"
         source.write_text('import { carry } from "./bridge"\n'
-                          "entry func answer (n: U32): U32 => return (carry n).x\n")
+                          "#entry func answer (n: U32): U32 => return (carry n).x\n")
         cases[name] = source
     fixtures = ROOT / "compiler-goose/tests/fixtures"
     cases["imported-generics"] = fixtures / "closure-fixtures/main.blot"
@@ -86,7 +86,7 @@ def programs(directory):
         cases["sort-" + sort] = ROOT / f"benchmarks/goose/ports/sort_{sort}.blot"
     invalid = directory / "invalid.blot"
     invalid.write_text("func add x -> y => return x + y\n"
-                       "entry func answer (a: U32): Bool => return add a true\n")
+                       "#entry func answer (a: U32): Bool => return add a true\n")
     cases["rejected-generic"] = invalid
     return cases
 

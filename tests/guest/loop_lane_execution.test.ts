@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
-const source = `entry const lanes = func (input: U32): Array U32 => return do:
+const source = `#entry const lanes = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 4:
@@ -12,7 +12,7 @@ const source = `entry const lanes = func (input: U32): Array U32 => return do:
     if @u32.eq index 2:
       break
   return #[row.first, row.second, row.steady, marker[0]]
-entry const changed = func (input: U32): Array U32 => return do:
+#entry const changed = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 4:
@@ -21,13 +21,13 @@ entry const changed = func (input: U32): Array U32 => return do:
       row.steady := @u32.add self 7
       continue
   return #[row.first, row.second, row.steady, marker[0]]
-entry const zero = func (input: U32): Array U32 => return do:
+#entry const zero = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 0:
     row.first := @u32.add self 1
   return #[row.first, row.second, row.steady, marker[0]]
-entry const swaps = func (input: U32): Array U32 => return do:
+#entry const swaps = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 3:
@@ -35,7 +35,7 @@ entry const swaps = func (input: U32): Array U32 => return do:
     if @u32.eq index 1:
       continue
   return #[row.first, row.second, row.steady, marker[0]]
-entry const nested = func (input: U32): Array U32 => return do:
+#entry const nested = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 3:
@@ -44,7 +44,7 @@ entry const nested = func (input: U32): Array U32 => return do:
       if @u32.eq inner 1:
         break
   return #[row.first, row.second, row.steady, marker[0]]
-entry const breakchange = func (input: U32): Array U32 => return do:
+#entry const breakchange = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
   for index in 0 .. 4:

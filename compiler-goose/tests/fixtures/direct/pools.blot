@@ -1,7 +1,7 @@
 const values: Array U32 = #[41, 5, 6]
-entry func read (index: U32): U32 => return values[index]
-entry func doubled (input: Array U32): Array U32 => return @array.generate input.length (func i => return input[i] * 2)
-entry func scaled (input: Array F32): F32 => return do:
+#entry func read (index: U32): U32 => return values[index]
+#entry func doubled (input: Array U32): Array U32 => return @array.generate input.length (func i => return input[i] * 2)
+#entry func scaled (input: Array F32): F32 => return do:
   let total = 0.0
   for v in input:
     total := self + v

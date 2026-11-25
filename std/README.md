@@ -11,7 +11,7 @@ formatting, validation and a linear builder. Import
 [codec.blot](codec.blot) for explicit numeric-lane codecs; the
 [derivation guide](../docs/host/derive.md) shows opt-in equality, debug and
 codec generation from checked data declarations. Only the root module's
-`entry const` and `entry let` declarations become Wasm exports; they must fit
+`#entry const` and `#entry let` declarations become Wasm exports; they must fit
 the guest ABI, and Wasm emission keeps the declarations they reach. Unused
 source declarations are still checked. Use `{ prelude: null }` with
 `createCompiler` for a freestanding module, or `--prelude none` with the CLI.
@@ -46,9 +46,9 @@ const increment = func value => return value + 1
 const double = U32.mul 2
 const transform = compose double increment
 
-entry const answer = func () => return transform 20
+#entry const answer = func () => return transform 20
 
-entry const inferred = func () => return do:
+#entry const inferred = func () => return do:
   let same = func value => return value
   if same true:
     break same 42
@@ -78,12 +78,12 @@ Wrap a value or constructor/function witness with `$Type` (or prefix it with
 type Count is data = $Count U32
 type Other is data = $Other U32
 
-entry const same_value = 1 == 2                         // False
-entry const same_type = $Type 1 == $Type 2                // True
-entry const same_nominal = $Type $Count == $Type ($Count 42) // True
-entry const different = $Type $Count != $Type $Other       // True
+#entry const same_value = 1 == 2                         // False
+#entry const same_type = $Type 1 == $Type 2                // True
+#entry const same_nominal = $Type $Count == $Type ($Count 42) // True
+#entry const different = $Type $Count != $Type $Other       // True
 
-entry const compare = func () => return do:
+#entry const compare = func () => return do:
   let head = $Type $Count
   let witness = $Type ($Count 0)
   break head == witness
@@ -138,12 +138,12 @@ const nonzero = func value => return do:
 
 const candidate = Maybe.bind ($Some 40) nonzero
 
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let $Some value = Maybe.map (U32.add 2) candidate else:
     break 0
   break Result.unwrap_or 0 (Maybe.to_result false ($Some value))
 
-entry const inspect = func () => return case $Some ($Some 42) of
+#entry const inspect = func () => return case $Some ($Some 42) of
   $Some ($Some value) => value
   $Some $Nothing => 0
   $Nothing => 0
@@ -183,7 +183,7 @@ work as ordinary calls:
 ```blot
 const step = func count => return
   if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
-entry const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+#entry const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
 `Maybe.iterate` and `Result.iterate` finish each callback before starting the
@@ -235,7 +235,7 @@ const Vec2.add = func (a: Vec2) -> (b: Vec2) => return do:
   break $Vec2 { x: ax + bx, y: ay + by }
 
 const twice = func value => return value + value
-entry const answer = func (value: F32) => return twice value
+#entry const answer = func (value: F32) => return twice value
 ```
 
 Generic functions that depend on associated dispatch are specialized for their
@@ -255,7 +255,7 @@ special cases. Backticks also call a named function infix:
 
 ```blot
 const plus = func left -> right => return U32.add left right
-entry const answer = func () => return 20 `plus` 22
+#entry const answer = func () => return 20 `plus` 22
 ```
 
 Custom fixity declarations belong before other declarations. Application binds
@@ -271,12 +271,12 @@ backtick operators. Unlike Haskell, Blot still evaluates ordinary arguments
 eagerly; `$` neither defers work nor handles effects.
 
 ```blot
-entry const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
-entry const discarded = func () => return do:
+#entry const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
+#entry const discarded = func () => return do:
   use identity $ 42
 
 const invoke = func callback => return callback 41
-entry const callback_example = func () => return invoke $ func value => return value + 1
+#entry const callback_example = func () => return invoke $ func value => return value + 1
 ```
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
@@ -307,13 +307,13 @@ arguments: `F32.mul speed (-2.5)`.
 | `F32.sin`, `cos`, `tan`                    | Pure Blot trigonometric approximations      |
 
 ```blot
-entry const negative_zero = -0.0
-entry const rounded = F32.add 16_777_216.0 1.0
+#entry const negative_zero = -0.0
+#entry const rounded = F32.add 16_777_216.0 1.0
 
-entry const vector_length = func () => return F32.length3 2.0 3.0 6.0
-entry const bounded_speed = func (value: F32) => return F32.clamp 0.0 12.0 value
-entry const halfway = func (value: F32) => return F32.lerp value 10.0 0.5
-entry const integer_part = func (value: F32) => return F32.to_u32 value
+#entry const vector_length = func () => return F32.length3 2.0 3.0 6.0
+#entry const bounded_speed = func (value: F32) => return F32.clamp 0.0 12.0 value
+#entry const halfway = func (value: F32) => return F32.lerp value 10.0 0.5
+#entry const integer_part = func (value: F32) => return F32.to_u32 value
 ```
 
 `rounded` is 16,777,216, and `vector_length ()` is 7. Arithmetic rounds each
@@ -465,7 +465,7 @@ Import [array.blot](array.blot) for additional collection functions:
 import * as array from "std/array"
 
 const values: Array U32 = #[10, 20, 12]
-entry const answer = func () => return array.fold_left U32.add 0 values
+#entry const answer = func () => return array.fold_left U32.add 0 values
 ```
 
 - `length values` and `is_empty values` inspect length without visiting elements

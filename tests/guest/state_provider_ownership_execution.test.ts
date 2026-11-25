@@ -8,7 +8,7 @@ const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 // A read shares what the state holds, so a function that hands it on copies it.
 const selected = func () => return (State.get (Array U32) ()).copy
-entry const run = func (count: U32) => return do:
+#entry const run = func (count: U32) => return do:
   let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[7, 42]
   let (_, old) = do local:
     use value <- State.get (Array U32) ()
@@ -19,7 +19,7 @@ entry const run = func (count: U32) => return do:
     if pressure[8191] != index:
       @panic "lost pressure"
   break old
-entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
+#entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
   let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[7, 42]
   let (_, old) = do local:
     use value <- State.get (Array U32) ()
@@ -27,14 +27,14 @@ entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
     break value
   use host old
   break old[1]
-entry const floating = func () => return do:
+#entry const floating = func () => return do:
   let local = @effect.state (State.get F32) (State.set F32) (-0.0)
   let (_, value) = do local:
     break State.get F32 ()
   break value
 `;
 const callback = `
-entry const alternate = func (seed: U32) => return do:
+#entry const alternate = func (seed: U32) => return do:
   let local = @effect.provider (State.get (Array U32)) (func () => return #[seed + 1, 42])
   let result = do local:
     break selected ()

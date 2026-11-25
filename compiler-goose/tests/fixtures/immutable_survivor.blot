@@ -1,6 +1,6 @@
 type Choice a is data = $Some a | $Nothing
 const capture = func (saved: U32) => return func (amount: U32): U32 => return @u32.add saved amount
-entry const single = func (input: U32): Array U32 => return do:
+#entry const single = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   let payload = {rows: rows, cold: {left: input, right: @u32.add input 1}, hook: capture input}
   let selected = payload
@@ -13,7 +13,7 @@ entry const single = func (input: U32): Array U32 => return do:
     return #[99]
   return #[selected.rows[0], selected.cold.left, selected.hook 7]
 type Pick is data = $Left U32 | $Right U32 | $Empty
-entry const rowed = func (input: U32): Array U32 => return do:
+#entry const rowed = func (input: U32): Array U32 => return do:
   let observations: Array U32 = #[]
   let candidate = if @u32.eq (@u32.rem input 2) 0 then $Left input else $Right input
   case candidate of

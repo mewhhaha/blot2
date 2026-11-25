@@ -22,11 +22,11 @@ const diamond: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else
 const arm_left: U32 -> U32 = func value => return diamond value
 const arm_right: U32 -> U32 = func value => return diamond value
 const repeat = func value => return func (depth: U32) => return if @u32.eq depth 0 then value else repeat value (@u32.sub depth 1)
-entry const ring: U32 -> U32 = func value => return ring_0 value
-entry const callback: U32 -> U32 = func value => return left value
-entry const branching: U32 -> U32 = func value => return diamond value
-entry const integer: U32 -> U32 = func depth => return repeat 42 depth
-entry const floating: U32 -> F32 = func depth => return repeat 1.5 depth
+#entry const ring: U32 -> U32 = func value => return ring_0 value
+#entry const callback: U32 -> U32 = func value => return left value
+#entry const branching: U32 -> U32 = func value => return diamond value
+#entry const integer: U32 -> U32 = func depth => return repeat 42 depth
+#entry const floating: U32 -> F32 = func depth => return repeat 1.5 depth
 `,
       (guest) => {
         for (const depth of [0, 1, 7, 17]) {
@@ -45,8 +45,8 @@ Deno.test("queued associated methods select each left operand independently", as
   await compileAndRun(
     `type L is data = $L U32
 type R is data = $R U32
-entry const prime: F32 = @type.call "merge" ($R 1) ($R 2)
-entry const answer: U32 = @type.call "merge" ($L 1) ($R 2)
+#entry const prime: F32 = @type.call "merge" ($R 1) ($R 2)
+#entry const answer: U32 = @type.call "merge" ($L 1) ($R 2)
 const L.merge: L -> R -> U32 = func left => return func right => return 1
 const R.merge: a -> R -> F32 = func left => return func right => return 1.0
 `,
@@ -72,7 +72,7 @@ Deno.test("forward annotated and generic chains execute after iterative inferenc
         `const f_${index}${annotation} = func value => return f_${index + 1} value`,
     ).join("\n");
     await compileAndRun(
-      `entry const run: U32 -> U32 = func value => return f_0 value\n${links}\nconst f_${depth}${annotation} = func value => return value\n`,
+      `#entry const run: U32 -> U32 = func value => return f_0 value\n${links}\nconst f_${depth}${annotation} = func value => return value\n`,
       (guest) => {
         for (const value of [0, 42, 0xFFFF_FFFF]) {
           equal(guest.call("run", value), value);

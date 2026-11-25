@@ -14,8 +14,8 @@ const project = await gdevProject(
 const source = `import * as trails from "game/world/trails"
 import * as derived from "ink/derived/keyed"
 import * as array from "std/array"
-entry func lanes (): Array U32 => return #[0]
-entry func probe (observe: U32 -> U32): U32 => return do:
+#entry func lanes (): Array U32 => return #[0]
+#entry func probe (observe: U32 -> U32): U32 => return do:
   let initial = $derived.Revision {epoch: 3221225469, change: 17}
   let surface = $trails.SurfaceEpoch {ground: initial, clearings: initial, surface: initial, tiles: array.fill trails.surface_tile_count initial}
   let saved = trails.copy_surface surface

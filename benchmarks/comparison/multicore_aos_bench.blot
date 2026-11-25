@@ -1,11 +1,11 @@
 // Track 4B & 4C showcase: generalized AoS Vec2/Vec4 record auto-SIMD,
-// multi-core entry kernel scaling, and zero-alloc persistent entry process throughput.
+// multi-core #kernel scaling, and zero-alloc persistent #process throughput.
 
 type Vec2 = { x: F32, y: F32 }
 type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
 
 // 1. AoS #[Vec4] (16 B) ballistic Euler integration: 65,536 particles x 32 steps.
-entry func aos_vec4_euler (seed: U32): U32 =>
+#entry func aos_vec4_euler (seed: U32): U32 =>
   let n: U32 = 65536
   let pos = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
   let vel = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
@@ -42,7 +42,7 @@ entry func aos_vec4_euler (seed: U32): U32 =>
   return F32.to_u32 (sum * 4.0)
 
 // 2. AoS #[Vec2] (8 B) structural Euler integration: 65,536 particles x 32 steps.
-entry func aos_vec2_euler (seed: U32): U32 =>
+#entry func aos_vec2_euler (seed: U32): U32 =>
   let n: U32 = 65536
   let pos = @array.fill n { x: 0.0, y: 0.0 }
   let vel = @array.fill n { x: 0.0, y: 0.0 }
@@ -64,7 +64,7 @@ entry func aos_vec2_euler (seed: U32): U32 =>
   return F32.to_u32 (sum * 8.0)
 
 // 3. Stateless 256x256 Mandelbrot tile for multi-core wtime-aot worker scaling.
-entry func mandelbrot_tile (tile_id: U32): U32 =>
+#entry func mandelbrot_tile (tile_id: U32): U32 =>
   let size: U32 = 256
   let inv = 1.0 / U32.to_f32 size
   let bias = U32.to_f32 (tile_id & 7) * 0.001
@@ -90,9 +90,9 @@ entry func mandelbrot_tile (tile_id: U32): U32 =>
       total := self + it
   return total
 
-// 4. Real ABI 8 `entry kernel` for Deno KernelPool multi-worker execution:
+// 4. Real ABI 8 `#kernel` for Deno KernelPool multi-worker execution:
 // computes one row (512 pixels, max 500 iters) of a 512x512 Mandelbrot image.
-entry kernel func mandelbrot_row (py: U32): U32 =>
+#kernel func mandelbrot_row (py: U32): U32 =>
   let size: U32 = 512
   let inv = 1.0 / U32.to_f32 size
   let ci = U32.to_f32 py * inv * 2.4 - 1.2
@@ -116,7 +116,7 @@ entry kernel func mandelbrot_row (py: U32): U32 =>
     total := self + it
   return total
 
-// 5. Real ABI 8 persistent `entry process` for zero-alloc step throughput.
+// 5. Real ABI 8 persistent `#process` for zero-alloc step throughput.
 type SimState is data = $SimState {
   tick: U32,
   pos: #[Vec4],
@@ -152,7 +152,7 @@ func sim_step (st: own SimState) -> (cmd: U32): (SimState, U32) =>
   let sample = F32.to_u32 ((x + y + z + w) * 16.0)
   return ($SimState { tick: tick + 1, pos, vel }, sample)
 
-entry process particle_sim: Process [U32, U32, U32] = {
+#process const particle_sim: Process [U32, U32, U32] = {
   init: sim_init,
   step: sim_step,
 }

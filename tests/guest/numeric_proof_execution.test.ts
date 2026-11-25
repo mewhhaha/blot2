@@ -22,7 +22,7 @@ const count = func (values: Array U32) => return do:
   break @array.length copied
 `;
     const main = `import {forwarded, count} from "./index"
-entry const lookup = func (index: U32) => return do:
+#entry const lookup = func (index: U32) => return do:
   let values = #[8, 13]
   if @u32.lt index (count values):
     break @array.get values (forwarded index)
@@ -142,8 +142,8 @@ const access = func probe => return func (index: U32) => return do:
   break 0
 `;
     const main = `import {access, Probe} from "./index"
-entry const lookup = func (index: U32) => return access ($Probe 42) index
-entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const lookup = func (index: U32) => return access ($Probe 42) index
+#entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
   let selected = access ($Probe first) 1
   use final <- host 2
@@ -284,9 +284,9 @@ const access = func probe => return func (index: U32) => return do:
   break 0
 `;
     const main = `import {access, decode, Probe} from "./index"
-entry const lookup = func (index: U32) => return access ($Probe 42) index
-entry const identity = func (index: U32) => return decode ($Probe 42) index
-entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const lookup = func (index: U32) => return access ($Probe 42) index
+#entry const identity = func (index: U32) => return decode ($Probe 42) index
+#entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
   let selected = access ($Probe first) 1
   use final <- host 2
@@ -423,7 +423,7 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       `const selected = func (index: U32) => return if @u32.eq (@u32.div 1 index) 0 then index else index
 `;
     const main = `import {selected} from "./index"
-entry const lookup = func (index: U32) => return do:
+#entry const lookup = func (index: U32) => return do:
   let values = #[8, 13, 21, 34]
   if @u32.lt index (@array.length values):
     break @array.get values (selected index)

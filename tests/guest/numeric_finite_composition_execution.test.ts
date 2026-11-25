@@ -26,9 +26,9 @@ const run_unknown = func (index: U32) => return lookup_unknown ($Probe 42) index
 const run_foreign = func callback => return lookup_foreign ($Probe 42) callback
 `;
 const source = `import {run, run_unknown, run_foreign} from "./logic"
-entry const answer = func (index: U32) => return run index
-entry const unknown = func (index: U32) => return run_unknown index
-entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return run_foreign callback
+#entry const answer = func (index: U32) => return run index
+#entry const unknown = func (index: U32) => return run_unknown index
+#entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return run_foreign callback
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
   for (const asynchronous of [false, true]) {

@@ -30,7 +30,7 @@ private func passing (): Unit ! { test.Test } =>
   use test.is_err "Err" err
   return ()
 
-entry func test_assertions (): test.Report => test.run passing
+#entry func test_assertions (): test.Report => test.run passing
 
 private func failure_cases (): Unit ! { test.Test } =>
   use test.fail "explicit" "雪🙂"
@@ -101,7 +101,7 @@ private func wire_checks (): Unit ! { test.Test } =>
   use test.eq "exact BTST v1 packet" expected (test.run failure_cases)
   return ()
 
-entry func test_wire (): test.Report => test.run wire_checks
+#entry func test_wire (): test.Report => test.run wire_checks
 
 private func fork_checks (): Unit ! { test.Test } =>
   let values = #[1, 2]
@@ -118,10 +118,10 @@ private func fork_report_checks (): Unit ! { test.Test } =>
   use test.eq "fork rolls back report writes and counters" #[0x4254_5354, 1, 2, 0] (test.run fork_checks)
   return ()
 
-entry func test_fork (): test.Report => test.run fork_report_checks
+#entry func test_fork (): test.Report => test.run fork_report_checks
 
 @[test.suite]
-entry const test_suite_decorator = func (): Unit ! { test.Test } =>
+#entry const test_suite_decorator = func (): Unit ! { test.Test } =>
   use test.eq "decorator runs" 42 (40 + 2)
   let neg_tol = test.run (func () =>
     use test.near "negative tolerance rejected" (-1.0) 1.0 1.0
@@ -129,7 +129,7 @@ entry const test_suite_decorator = func (): Unit ! { test.Test } =>
   use test.eq "negative tolerance fails" 1 neg_tol[3]
   return ()
 
-entry func trap_div_zero (): Unit =>
+#entry func trap_div_zero (): Unit =>
   let values = #[0]
   if 1 / values[0] == 0:
     return ()

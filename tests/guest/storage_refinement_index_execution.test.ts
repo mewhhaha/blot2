@@ -8,7 +8,7 @@ const source = `const read = func row => return {${
     ", ",
   )
 }}
-entry const answer = func (input: U32) => return do:
+#entry const answer = func (input: U32) => return do:
   let values: Array U32 = #[input]
   values[0] := input
   let selected = read {${

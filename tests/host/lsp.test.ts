@@ -401,7 +401,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
     // 1. SPENT_VALUE with secondary relatedInformation pointing to move line + `.copy` quick-fix
     const spentSource = [
       "func consume (xs: own #[U32]): U32 => return xs.length",
-      "entry func main (): U32 =>",
+      "#entry func main (): U32 =>",
       "  let a = #[1, 2, 3]",
       "  let n = consume a",
       "  return n + a.length",
@@ -441,7 +441,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
     // 2. Missing `$` constructor hint -> quick-fix `$Some`
     const ctorSource = [
       "type Opt is data = $Some U32 | $Nothing",
-      "entry func main (): Opt => return Some 1",
+      "#entry func main (): Opt => return Some 1",
       "",
     ].join("\n");
     await send("textDocument/didChange", {

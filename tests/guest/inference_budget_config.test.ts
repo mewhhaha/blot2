@@ -9,7 +9,7 @@ Deno.test("runtime inference configuration binds identity and preserves the prod
   const directory = await Deno.makeTempDir({ prefix: "blot-budget-config-" });
   const entry = `${directory}/main.blot`;
   const options = { executable, entry, prelude: null };
-  const sources = { [entry]: "entry const answer = func () => return 42\n" };
+  const sources = { [entry]: "#entry const answer = func () => return 42\n" };
   const production = await createZigProjectCompiler(options);
   const explicit = await createZigProjectCompiler({
     ...options,

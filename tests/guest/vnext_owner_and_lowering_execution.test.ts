@@ -10,7 +10,7 @@ const stdRoot = new URL("../../std", import.meta.url).pathname;
 Deno.test("Item 1: array length mutations require sole ownership and preserve explicit copies", async () => {
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   @storage.push rows 2
@@ -20,7 +20,7 @@ entry func bad (): U32 =>
   );
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   @storage.truncate rows 0
@@ -30,7 +30,7 @@ entry func bad (): U32 =>
   );
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1, 2]
   let saved = rows
   let _ = @storage.pop rows
@@ -40,7 +40,7 @@ entry func bad (): U32 =>
   );
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   rows := self.push 2
@@ -52,7 +52,7 @@ entry func bad (): U32 =>
   );
   await compileExpectedFailure(
     `
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   rows := self.truncate 0
@@ -67,7 +67,7 @@ entry func bad (): U32 =>
 func add_one (xs: #[U32]): Unit =>
   @storage.push xs 9
   return ()
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   add_one rows
@@ -80,7 +80,7 @@ entry func bad (): U32 =>
 func add_one_owned (xs: own #[U32]): #[U32] =>
   @storage.push xs 9
   return xs
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let rows: #[U32] = #[1]
   let saved = rows
   rows := add_one_owned self
@@ -96,7 +96,7 @@ func add_one_owned (xs: own #[U32]): #[U32] =>
 func shrink_owned (xs: own #[U32]): #[U32] =>
   @storage.truncate xs 0
   return xs
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let rows: #[U32] = #[42]
   let saved = @storage.copy rows
   rows := add_one_owned self
@@ -124,7 +124,7 @@ func fill (draws: own #[U32]) -> (sounds: own #[U32]): (#[U32], #[U32]) =>
 func run (pools: own Pools): Pools =>
   let (draws, sounds) = fill pools.draws pools.sounds
   return { draws, sounds }
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let draws: #[U32] = #[1, 2]
   let sounds: #[U32] = #[3]
   let pools: Pools = { draws, sounds }
@@ -148,7 +148,7 @@ func fill (a: own #[U32]) -> (b: own #[U32]): (#[U32], #[U32]) =>
 func run (pools: own Pools): Pools =>
   let (a, b) = fill pools.draws pools.draws
   return { draws: a, sounds: b }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let draws: #[U32] = #[1]
   let sounds: #[U32] = #[3]
   let pools: Pools = { draws, sounds }
@@ -163,7 +163,7 @@ type Holder = { rows: #[U32] }
 func append (h: Holder) -> (v: U32): U32 =>
   @storage.push h.rows v
   return @storage.length h.rows
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let base: #[U32] = #[1]
   let fresh: Holder = { rows: @storage.copy base }
   return append fresh 9 + @storage.length base
@@ -176,7 +176,7 @@ type Holder = { rows: #[U32] }
 func append (h: own Holder) -> (v: U32): Holder =>
   @storage.push h.rows v
   return h
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let base: #[U32] = #[1]
   let fresh: Holder = { rows: @storage.copy base }
   fresh := append self 9
@@ -208,7 +208,7 @@ const run: a -> (U32 -> U32 ! {Foreign}) -> (U32 -> U32 ! {Foreign}) where { Mak
   use f <- Make.make x log
   use _ <- log 2
   return f y
-entry func main (log: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => run ($Box 100) log 23
+#entry func main (log: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => run ($Box 100) log 23
 `,
     (guest) => {
       const seen: number[] = [];
@@ -246,7 +246,7 @@ const run: a -> (U32 -> U32 ! {Tick}) where { MakeEffect a } = func x -> y => re
   use f <- MakeEffect.make x
   use _ <- Tick 20
   return f y
-entry func main (log: U32 -> U32 ! {Foreign}): U32 ! {Foreign} =>
+#entry func main (log: U32 -> U32 ! {Foreign}): U32 ! {Foreign} =>
   return do (@effect.provider Tick log):
     return run ($Box 50) 7
 `,
@@ -308,7 +308,7 @@ func decode_schema (own access) -> (f1: Bool) -> (f2: Bool) -> (v1: #[U32]) -> (
   access := restore_into f2 dec_b rst_b access v2
   return access
 
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let access = $Access { a: #[0], b: #[0], surface_epoch: $State { epoch: 200 } }
   access := decode_schema access true false #[3] #[4]
   let access2 = $Access { a: #[0], b: #[0], surface_epoch: $State { epoch: 200 } }
@@ -329,7 +329,7 @@ Deno.test("Item 4: runtime-guarded noteStoreToSlot releases loop-local slice bui
   await compileAndRun(
     `
 type SliceHolder = { span: &[U32], tag: U32 }
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let base: #[U32] = #[10, 20, 30, 40]
   let total = 0
   for round in 0 .. 4000:
@@ -363,7 +363,7 @@ func append_rows (dst: own #[#[U32]]) -> (n: U32): #[#[U32]] =>
     let row = #[i + 1, i + 10]
     @storage.push dst row
   return dst
-entry func main (): #[U32] =>
+#entry func main (): #[U32] =>
   let rows: #[#[U32]] = #[]
   rows := append_rows self 4
   return #[rows[0][0], rows[1][1], rows[2][0], rows[3][1]]

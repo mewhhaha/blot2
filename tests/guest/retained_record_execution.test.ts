@@ -21,14 +21,14 @@ const capture = func packed => return func (value: U32) => return invoke (func e
 Deno.test("constant records retain unused generic fields across calls and mixed static/dynamic captures", async () => {
   await compileAndRun(
     declarations + `
-entry const answer = func (value: U32) => return run packed value
-entry const captured = func (value: U32) => return capture packed value
-entry const partial = func (value: U32) => return invoke (run packed)
-entry const partial_pair = func (value: U32) => return invoke (sum packed value)
-entry const partial_chain = func (value: U32) => return do:
+#entry const answer = func (value: U32) => return run packed value
+#entry const captured = func (value: U32) => return capture packed value
+#entry const partial = func (value: U32) => return invoke (run packed)
+#entry const partial_pair = func (value: U32) => return invoke (sum packed value)
+#entry const partial_chain = func (value: U32) => return do:
   let callback = sum packed
   break invoke (callback value)
-entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return capture packed (host 40)
+#entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return capture packed (host 40)
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) {
@@ -68,8 +68,8 @@ const read = func pack => return do:
 const invoke = func pack => return do:
   let $Pack { callback } = pack
   break callback 1 2
-entry const marker = func () => return read packed
-entry const answer = func (value: U32) => return do:
+#entry const marker = func () => return read packed
+#entry const answer = func (value: U32) => return do:
   let clock = @effect.provider Clock.tick (func () => return value)
   break do clock:
     break invoke packed
@@ -90,7 +90,7 @@ const unused = func (value: F32): Unit => return do:
   let next = value * 0.25
   break ()
 const actions = #[$Ignored unused, $Chosen (func () => return 42)]
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let total = 0
   for action in actions:
     total := total + (case action of
@@ -110,7 +110,7 @@ Deno.test("retained generic records invalidate constant values and inlined bodie
   const options = { entry, executable };
   const compiler = await createCompiler(options);
   const main = `import * as lib from "./lib"
-entry const answer = func (value: U32) => return lib.capture lib.packed value
+#entry const answer = func (value: U32) => return lib.capture lib.packed value
 `;
   let original: Uint8Array | undefined;
   try {

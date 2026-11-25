@@ -1,7 +1,7 @@
 func add (left: U32) -> (right: U32): U32 => return @u32.add left right
 
-entry func answer (): U32 => return #do:
+#entry func answer (): U32 => return #do:
   let subtotal = add 20 20
   break add subtotal 2
 
-entry func guarded (): Bool => return #run (true or (@u32.div 1 0 == 0))
+#entry func guarded (): Bool => return #run (true or (@u32.div 1 0 == 0))

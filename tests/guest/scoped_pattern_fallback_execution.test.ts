@@ -13,29 +13,29 @@ const size = func collections: U32 => return do:
     let text_length: U32 = row.text.length
     total := self + text_length
   return total
-entry const empty = func (count: U32): U32 => return do:
+#entry const empty = func (count: U32): U32 => return do:
   let rows: Array Row = #[]
   return size {rows: &rows[0..rows.length]}
-entry const populated = func (count: U32): U32 => return do:
+#entry const populated = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65, 66]
   let rows: Array Row = #[]
   if count > 0:
     @storage.push rows ($Row {text: &labels[0..2]})
   return size {rows: &rows[0..rows.length]}
-entry const joined = func (count: U32): U32 => return do:
+#entry const joined = func (count: U32): U32 => return do:
   let labels: Array U32 = #[65, 66]
   let first: Array Row = #[]
   let second: Array Row = #[$Row {text: &labels[0..2]}]
   let selected = if count == 0 then first else second
   return size {rows: &selected[0..selected.length]}
-entry const fallback_return = func (value: U32): Array U32 => return do:
+#entry const fallback_return = func (value: U32): Array U32 => return do:
   let ticks: Array U32 = #[]
   let absent: Maybe Row = $Nothing
   let $Some row = absent else:
     @storage.push ticks 1
     return #[value, @storage.length ticks]
   return #[row.text.at 0, @storage.length ticks]
-entry const fallback_break = func (count: U32): Array U32 => return do:
+#entry const fallback_break = func (count: U32): Array U32 => return do:
   let ticks: Array U32 = #[]
   for index in 0 .. count:
     let absent: Maybe Row = $Nothing
@@ -44,7 +44,7 @@ entry const fallback_break = func (count: U32): Array U32 => return do:
       break
     return #[row.text.at 0, @storage.length ticks]
   return #[42, @storage.length ticks]
-entry const fallback_continue = func (count: U32): Array U32 => return do:
+#entry const fallback_continue = func (count: U32): Array U32 => return do:
   let ticks: Array U32 = #[]
   for index in 0 .. count:
     let absent: Maybe Row = $Nothing
@@ -53,7 +53,7 @@ entry const fallback_continue = func (count: U32): Array U32 => return do:
       continue
     return #[row.text.at 0, @storage.length ticks]
   return #[42, @storage.length ticks]
-entry const evaluated = func (value: U32): Array U32 => return do:
+#entry const evaluated = func (value: U32): Array U32 => return do:
   let ticks: Array U32 = #[]
   @storage.push ticks 1
   let needle = value
@@ -65,7 +65,7 @@ entry const evaluated = func (value: U32): Array U32 => return do:
     @storage.push ticks 1
     return #[99, @storage.length ticks]
   return #[item, @storage.length ticks]
-entry const dynamic = func (value: U32): Array U32 => return do:
+#entry const dynamic = func (value: U32): Array U32 => return do:
   let ticks: Array U32 = #[]
   let candidate: Maybe U32 = if value == 0 then $Nothing else do:
     @storage.push ticks 1

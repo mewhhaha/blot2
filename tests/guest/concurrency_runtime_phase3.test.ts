@@ -301,8 +301,8 @@ func proj_step (st: own ProjState) -> (cmd: U32): (ProjState, #[U32]) =>
   let alast = active.nested_grow[0][@u32.sub alen 1]
   return ($ProjState { active: big, wrap: $OuterBox { tag_id: cmd, big: active } }, #[v_big, blen, blast, v_act, alen, alast])
 
-entry process full_proc: Process [U32, U32, #[U32]] = { init: p_init, step: p_step }
-entry process proj_proc: Process [U32, U32, #[U32]] = { init: proj_init, step: proj_step }
+#process const full_proc: Process [U32, U32, #[U32]] = { init: p_init, step: p_step }
+#process const proj_proc: Process [U32, U32, #[U32]] = { init: proj_init, step: proj_step }
 `,
     (guest) => {
       // Turn 0 init
@@ -377,7 +377,7 @@ func drift_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
   let rep = @array.fill 65536 cmd
   return (tmp, rep)
 
-entry process drift_proc: Process [U32, U32, #[U32]] = { init: drift_init, step: drift_step }
+#process const drift_proc: Process [U32, U32, #[U32]] = { init: drift_init, step: drift_step }
 `,
     (guest) => {
       guest.call("blot:proc_init:drift_proc", 0);
@@ -411,13 +411,13 @@ func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
     @storage.push out v
   return out
 
-entry func logical_oom (_: #[U32]): #[U32] =>
+#entry func logical_oom (_: #[U32]): #[U32] =>
   // Two 64 MiB blocks during second realloc -> logical heap_live_bytes (64+32+64 = 160 MiB > 128 MiB) -> offset 640 MUST be 0!
   let a = alloc_heap_u32 16000000 1
   let b = alloc_heap_u32 16000000 2
   return #[a[0], b[0]]
 
-entry func warm_class_a (_: #[U32]): #[U32] =>
+#entry func warm_class_a (_: #[U32]): #[U32] =>
   // Carve 4 x 16 MiB blocks (64 MiB total in heap_top, freed to 16 MiB free list on return)
   let a = alloc_heap_u32 4000000 1
   let b = alloc_heap_u32 4000000 2
@@ -425,7 +425,7 @@ entry func warm_class_a (_: #[U32]): #[U32] =>
   let d = alloc_heap_u32 4000000 4
   return #[a[0], b[0], c[0], d[0]]
 
-entry func alloc_64m (_: #[U32]): #[U32] =>
+#entry func alloc_64m (_: #[U32]): #[U32] =>
   // Fresh: needs 64M+32M+16M+... = 128M -> succeeds!
   // Warm after warm_class_a: 64M already sitting in 16 MiB free list -> logical heap_live_bytes <= 96 MiB passes,
   // yet physical heap_top + 64M > 128M -> traps with Page-0 offset 640 == 1!
@@ -521,7 +521,7 @@ func l_step (st: own List) -> (add_head: U32): (List, U32) =>
   let next = $Cons { head: add_head, tail: st }
   return (next, sum_list next)
 
-entry process deep_list: Process [U32, U32, U32] = { init: l_init, step: l_step }
+#process const deep_list: Process [U32, U32, U32] = { init: l_init, step: l_step }
 `,
     (guest) => {
       guest.call("blot:proc_init:deep_list", 5000);
@@ -536,12 +536,12 @@ entry process deep_list: Process [U32, U32, U32] = { init: l_init, step: l_step 
 // Acceptance Law #2: ABI 8 array-to-array callback growth (8B req in 16B bank
 // + 12B/20B host reply without blot:reset), heap-at-limit transport packet,
 // and unmodified Deno strict export check with zero extra exports + unexported
-// memory for scalar-only entry process.
+// memory for scalar-only #process.
 // ============================================================================
 
 Deno.test("Phase 3 Law #2: array-to-array callback growth, heap-at-limit packet, and scalar-only process unexported memory", async () => {
   const bytes = await compileToWasm(`
-entry func roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
+#entry func roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
   // 2-word (8B payload + 4B hdr = 12B) fits in 16B bank; host replies with 3 words (16B) and 5 words (24B) without blot:reset!
   let r1 = cb #[11, 22]
   let r2 = cb #[33, 44]
@@ -553,7 +553,7 @@ func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
     @storage.push out v
   return out
 
-entry func heap_at_limit_packet (xs: #[U32]): #[U32] =>
+#entry func heap_at_limit_packet (xs: #[U32]): #[U32] =>
   // Fill heap_live_bytes to 127.75 MiB (only 256 KiB free in 128 MiB heap_budget!)
   let a = alloc_heap_u32 16000000 1
   let b = alloc_heap_u32 8000000 2
@@ -606,7 +606,7 @@ entry func heap_at_limit_packet (xs: #[U32]): #[U32] =>
     }
   }
 
-  // Scalar-only entry process MUST NOT export blot:memory / blot:allocate / blot:reset,
+  // Scalar-only #process MUST NOT export blot:memory / blot:allocate / blot:reset,
   // yet still loads cleanly under unmodified Deno host/guest.ts strict export check!
   const scalarProcBytes = await compileToWasm(`
 type WrapU32 is data = $WrapU32 { v: U32 }
@@ -615,7 +615,7 @@ func s_step (st: own U32) -> (cmd: WrapU32): (U32, WrapU32) =>
   let next = @u32.add st cmd.v
   return (next, $WrapU32 { v: next })
 
-entry process scalar_only: Process [WrapU32, WrapU32, WrapU32] = { init: s_init, step: s_step }
+#process const scalar_only: Process [WrapU32, WrapU32, WrapU32] = { init: s_init, step: s_step }
 `);
   const mod = new WebAssembly.Module(scalarProcBytes);
   const expNames = new Set(WebAssembly.Module.exports(mod).map((e) => e.name));
@@ -658,7 +658,7 @@ func helper_simd_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   let d = #[@u32.add v 3]
   return @simd.store dst 0 (a, b, c, d)
 
-entry func test_escape_helpers (x: U32): #[U32] =>
+#entry func test_escape_helpers (x: U32): #[U32] =>
   let holder: #[#[U32]] = #[#[0], #[0], #[0], #[0]]
   holder := helper_store_fresh holder x
   let a0 = holder[0][0]
@@ -666,7 +666,7 @@ entry func test_escape_helpers (x: U32): #[U32] =>
   holder := helper_simd_store_fresh holder (@u32.add x 10)
   return #[a0, a2, holder[0][0], holder[1][0], holder[2][0], holder[3][0]]
 
-entry func test_box_simd_and_fork (x: U32): #[U32] =>
+#entry func test_box_simd_and_fork (x: U32): #[U32] =>
   let mk = func (k: U32): Big5 => return $Big5 { a: k, b: @u32.add k 1, c: @u32.add k 2, d: @u32.add k 3, e: @u32.add k 4 }
   let arr: #[Big5] = #[mk x, mk (@u32.add x 10), mk (@u32.add x 20), mk (@u32.add x 30)]
   let (b0, b1, b2, b3) = @simd.load arr 0
@@ -698,7 +698,7 @@ entry func test_box_simd_and_fork (x: U32): #[U32] =>
 // ============================================================================
 // Physical-stride FlatNumeric (#[3; Big20Word], #[2; #[3; U32]], Bool),
 // std/flat (@flat.encode/@flat.decode/@flat.schema_hash/@flat.kernel_*),
-// entry kernel (stateless, prepared, clear, count==0 pre-check, variable
+// #kernel (stateless, prepared, clear, count==0 pre-check, variable
 // output + [0xffffffff] overflow sentinel), and custom sections blot:kernels
 // & blot:processes v1 binary encoding.
 // ============================================================================
@@ -738,11 +738,11 @@ func run_k (ctx: KPrep) -> (it: KItem): KOut =>
 
 func run_var (n: U32): #[U32] => return @array.fill n 7
 
-entry kernel func double_fixed (x: U32): U32 => return @u32.mul x 2
-entry kernel prepared_k: Kernel [#[U32], KItem, KOut] = { prepare: prep_k, run: run_k }
-entry kernel func var_k (n: U32): #[U32] => return run_var n
+#kernel func double_fixed (x: U32): U32 => return @u32.mul x 2
+#kernel const prepared_k: Kernel [#[U32], KItem, KOut] = { prepare: prep_k, run: run_k }
+#kernel func var_k (n: U32): #[U32] => return run_var n
 
-entry func test_flat_roundtrip (seed: U32): #[U32] =>
+#entry func test_flat_roundtrip (seed: U32): #[U32] =>
   let r0: #[3; U32] = #[seed, @u32.add seed 1, @u32.add seed 2]
   let r1: #[3; U32] = #[10, 20, 30]
   let grid: #[2; #[3; U32]] = #[r0, r1]
@@ -902,9 +902,9 @@ import * as dep from "./dep"
 func helper (x: U32): U32 => return @u32.mul x ${helperMult}
 ${useRun ? "func staged_factor (): U32 => return #run dep.factor" : "func staged_factor (): U32 => return 1"}
 
-entry kernel func work (x: U32): U32 => return @u32.add (helper x) (staged_factor ())
+#kernel func work (x: U32): U32 => return @u32.add (helper x) (staged_factor ())
 
-entry func get_meta (_: Unit): #[U32] =>
+#entry func get_meta (_: Unit): #[U32] =>
   let (bh_lo, bh_hi) = flat.kernel_binding_hash work
   return #[${nonKernelConst}, bh_lo, bh_hi]
 `;
@@ -1031,15 +1031,15 @@ func scope_pair (n1: U32) -> (n2: U32): U32 =>
   let b = @array.fill n2 5
   return @u32.add a[@u32.sub n1 1] b[@u32.sub n2 1]
 
-entry func fill_60m (_: #[U32]): #[U32] =>
+#entry func fill_60m (_: #[U32]): #[U32] =>
   let a = @array.fill 15000000 7
   return #[a[0], a[14999999]]
 
-entry func fill_80m (_: #[U32]): #[U32] =>
+#entry func fill_80m (_: #[U32]): #[U32] =>
   let a = @array.fill 20000000 9
   return #[a[0], a[19999999]]
 
-entry func reversed_rewind (_: #[U32]): #[U32] =>
+#entry func reversed_rewind (_: #[U32]): #[U32] =>
   // Warmup (32K, 10M, 80M) -> Scope 1 (80M, 10M) -> rewind -> Scope 2 (10M, 80M)
   let s1 = scope_pair 20000000 2500000
   let s2 = scope_pair 2500000 20000000
@@ -1118,7 +1118,7 @@ func fp_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
   let slen = st.length
   return (st, #[spec, s0, slen, STATIC_LUT[2]])
 
-entry process fork_proc: Process [U32, U32, #[U32]] = { init: fp_init, step: fp_step }
+#process const fork_proc: Process [U32, U32, #[U32]] = { init: fp_init, step: fp_step }
 `);
   const pMod = new WebAssembly.Module(procBytes);
   const pSecs = WebAssembly.Module.customSections(pMod, "blot:processes");

@@ -146,7 +146,14 @@ fn string_symbol(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Symbo
  bytes.deinit(); }
 recursive fn declaration(p: Parser&,source: const u8[:],tokens: const Token[:],declarations_seen: bool,body_declarations_seen: bool) -> Id {
  var private=false; var is_opaque=false;
- if word(p,source,tokens,"entry")&&peek(p,tokens,1)==t_identifier&&text(p,source,tokens[p.index+1])=="private" { advance(p,source,tokens); let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end}; return fail(p,source,tokens,c_unexpected_token); }
+ if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#"&&peek(p,tokens,1)==t_identifier&&peek(p,tokens,2)==t_identifier&&text(p,source,tokens[p.index+2])=="private" {
+  let directive=text(p,source,tokens[p.index+1]);
+  if directive=="entry"||directive=="kernel"||directive=="process" {
+   advance(p,source,tokens); advance(p,source,tokens);
+   let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end};
+   return fail(p,source,tokens,c_unexpected_token);
+  }
+ }
  if word(p,source,tokens,"private") { private=true; advance(p,source,tokens); if word(p,source,tokens,"private") { let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end}; return fail(p,source,tokens,c_unexpected_token); } }
  if word(p,source,tokens,"export")&&peek(p,tokens,1)==t_l_brace { if private { return fail(p,source,tokens,c_unexpected_token); } return import_decl(p,source,tokens,true); }
  let id=declaration_body(p,source,tokens,declarations_seen,body_declarations_seen,is_opaque,private); if p.failure!=blot_error::Error.none { return 0; }
@@ -171,13 +178,23 @@ recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token
  if at(p,source,tokens,t_kw_type)||at(p,source,tokens,t_kw_data) { let __cleanup_result_8_0: Id = type_declaration(p,source,tokens,attrs,start,is_opaque); attributes.deinit(); return __cleanup_result_8_0; }
  if eat(p,source,tokens,t_kw_effect) { let name=qualified(p,source,tokens); expect(p,source,tokens,t_colon); let signature=type_expression(p,source,tokens); let __cleanup_result_9_0: Id = add(p,source,tokens,a_effect_decl,name,signature,extra(p,source,tokens,[attrs.start,attrs.len]),start); attributes.deinit(); return __cleanup_result_9_0; }
  var modifier: Symbol=0; var flags: u32=0;
- if word(p,source,tokens,"entry")&&peek(p,tokens,1)==t_identifier {
-  let second=text(p,source,tokens[p.index+1]);
-  if second=="kernel" { let decl_id=entry_kernel_declaration(p,source,tokens,attrs,start); attributes.deinit(); return decl_id; }
-  if second=="process" { let decl_id=entry_process_declaration(p,source,tokens,attrs,start); attributes.deinit(); return decl_id; }
+ if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#" {
+  if peek(p,tokens,1)!=t_identifier { attributes.deinit(); return fail(p,source,tokens,c_unexpected_token); }
+  let directive=text(p,source,tokens[p.index+1]);
+  if directive=="kernel" { let decl_id=entry_kernel_declaration(p,source,tokens,attrs,start); attributes.deinit(); return decl_id; }
+  if directive=="process" { let decl_id=entry_process_declaration(p,source,tokens,attrs,start); attributes.deinit(); return decl_id; }
+  if directive=="entry" {
+   advance(p,source,tokens); advance(p,source,tokens);
+   flags=1; modifier=intern(p,source,tokens,"#entry");
+  } else if peek(p,tokens,2)==t_kw_const||peek(p,tokens,2)==t_kw_let||peek(p,tokens,2)==t_kw_func {
+   advance(p,source,tokens); modifier=lower_identifier(p,source,tokens);
+  } else {
+   attributes.deinit(); return fail(p,source,tokens,c_unexpected_token);
+  }
+ } else {
+  if (at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false))&&(peek(p,tokens,1)==t_kw_const||peek(p,tokens,1)==t_kw_let||peek(p,tokens,1)==t_kw_func) { let __cleanup_result_10_0: Id = identifier_syntax(p,source,tokens); attributes.deinit(); return __cleanup_result_10_0; }
+  if at(p,source,tokens,t_identifier)&&(peek(p,tokens,1)==t_kw_const||peek(p,tokens,1)==t_kw_let||peek(p,tokens,1)==t_kw_func) { modifier=lower_identifier(p,source,tokens); }
  }
- if (at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false))&&(peek(p,tokens,1)==t_kw_const||peek(p,tokens,1)==t_kw_let||peek(p,tokens,1)==t_kw_func) { let __cleanup_result_10_0: Id = identifier_syntax(p,source,tokens); attributes.deinit(); return __cleanup_result_10_0; }
- if at(p,source,tokens,t_identifier)&&(peek(p,tokens,1)==t_kw_const||peek(p,tokens,1)==t_kw_let||peek(p,tokens,1)==t_kw_func) { if word(p,source,tokens,"entry") { flags=1; } modifier=lower_identifier(p,source,tokens); }
  if at(p,source,tokens,t_kw_func) {let declaration_id=function_declaration(p,source,tokens,attrs,start,modifier,flags);attributes.deinit();return declaration_id;}
  var runtime: u32=0; if eat(p,source,tokens,t_kw_const) {} else if eat(p,source,tokens,t_kw_let) { runtime=1; } else { let __cleanup_result_11_0: Id = fail(p,source,tokens,c_expected_token); attributes.deinit(); return __cleanup_result_11_0; }
  let name_point=current(p,source,tokens).start; let name=qualified(p,source,tokens); var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); }
@@ -1059,7 +1076,7 @@ fn callable_path(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  return id;
 }
 recursive fn entry_kernel_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attributes: List,start: u32) -> Id {
- advance(p,source,tokens); // entry
+ advance(p,source,tokens); // #
  advance(p,source,tokens); // kernel
  if at(p,source,tokens,t_kw_func) {
   let func_start=advance(p,source,tokens).start;
@@ -1076,6 +1093,8 @@ recursive fn entry_kernel_declaration(p: Parser&,source: const u8[:],tokens: con
   p.tree.constant_names.push(blot_parse_ast::RuntimeName {decl_id,name_point});
   return decl_id;
  }
+ expect(p,source,tokens,t_kw_const);
+ if p.failure!=blot_error::Error.none { return 0; }
  let name_point=current(p,source,tokens).start;
  let name=lower_identifier(p,source,tokens);
  expect(p,source,tokens,t_colon);
@@ -1116,8 +1135,10 @@ recursive fn entry_kernel_declaration(p: Parser&,source: const u8[:],tokens: con
  return decl_id;
 }
 recursive fn entry_process_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attributes: List,start: u32) -> Id {
- advance(p,source,tokens); // entry
+ advance(p,source,tokens); // #
  advance(p,source,tokens); // process
+ expect(p,source,tokens,t_kw_const);
+ if p.failure!=blot_error::Error.none { return 0; }
  let name_point=current(p,source,tokens).start;
  let name=lower_identifier(p,source,tokens);
  expect(p,source,tokens,t_colon);

@@ -28,7 +28,7 @@ const write = func access -> (destination: own Array U32): Array U32 => return d
   destination := write_stored access self
   destination := write_component appearance_codec access.appearance self
   return write_stored access destination
-entry const answer = func (offset: U32) => return do:
+#entry const answer = func (offset: U32) => return do:
   let stored: Array (Maybe Stored) = #[$Some ($Stored {start: 7, count: 3}), $Nothing]
   let appearance: Array (Maybe Appearance) = #[$Nothing, $Some ($Appearance {mesh: 41, material: 19})]
   let offsets: Array U32 = #[offset]

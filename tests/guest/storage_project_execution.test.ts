@@ -17,7 +17,7 @@ Deno.test("imported generic access projections retain field names without concre
     await Deno.writeTextFile(
       entry,
       `import * as access from "./access"
-entry const answer = func (value: U32) => return do:
+#entry const answer = func (value: U32) => return do:
   let marker: Array U32 = #[]
   let rows: Array U32 = #[0]
   let result = access.write {rows} value
@@ -52,7 +52,7 @@ Deno.test("project service retains data-stack output across edits errors and bac
   const entry = `${directory}/main.blot`;
   const source = (value: number) =>
     `const values: Array U32 = #[${value}]
-entry const answer = func () => return values[0]
+#entry const answer = func () => return values[0]
 `;
   try {
     await Deno.writeTextFile(entry, source(41));
@@ -87,7 +87,7 @@ entry const answer = func () => return values[0]
       assert.deepEqual(await run(42), changed);
       await Deno.writeTextFile(
         entry,
-        "entry const answer = func () => return 43\n",
+        "#entry const answer = func () => return 43\n",
       );
       await run(43);
       await Deno.writeTextFile(entry, source(41));

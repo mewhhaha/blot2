@@ -23,7 +23,7 @@ const compiler = await createCompiler({
 try {
   const result = await compiler.build({
     sources: {
-      "/project/main.blot": "entry const answer = func () => return 42\n",
+      "/project/main.blot": "#entry const answer = func () => return 42\n",
     },
   });
   if (result.success) await Deno.writeFile("program.wasm", result.bytes);

@@ -34,7 +34,7 @@ const leaf = func access: U32 => return
   @u32.add (access.step access.${
   names[0]
 }[0]) (@u32.add access.${middle}[0] access.${last}[0])
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   rows[0] = input
   let access = {${

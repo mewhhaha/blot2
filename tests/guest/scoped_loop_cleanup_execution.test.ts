@@ -99,7 +99,7 @@ const entry =
 const shrink_rhs = func (rows: Array U32): U32 => return do:
   @storage.truncate rows 0
   return 42
-entry const invalid = func (): U32 => return do:
+#entry const invalid = func (): U32 => return do:
   let rows: Array U32 = #[1]
   let alias = rows
   rows[0] := shrink_rhs alias
@@ -122,7 +122,7 @@ entry const invalid = func (): U32 => return do:
 type Boxed = { a: U32, b: U32, c: U32, d: U32, e: U32, view: &[U32] }
 func make_row (base: &[U32]) -> (i: U32): Boxed =>
   return { a: i, b: i + 1, c: i + 2, d: i + 3, e: i + 4, view: base }
-entry func main (count: U32): U32 =>
+#entry func main (count: U32): U32 =>
   let backing: #[U32] = #[10, 20, 30, 40]
   let view = &backing[0..backing.length]
   let out: #[Boxed] = #[]

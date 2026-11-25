@@ -23,7 +23,7 @@ const zero = scan.replace("const scan =", "const scan_zero =")
   .replace("@u32.add self 2", "@u32.add self 0");
 const source = scan + wrap + zero + `
 const persisted: Array U32 = @array.generate 96 (func index => return @u32.rem index 2)
-entry const local = func (bounds: Array U32): Array U32 => return do:
+#entry const local = func (bounds: Array U32): Array U32 => return do:
   let rows: Array U32 = @array.generate 96 (func index => return do:
     if @u32.eq bounds[4] 0:
       return 0
@@ -34,15 +34,15 @@ entry const local = func (bounds: Array U32): Array U32 => return do:
     return 0)
   let alias = rows
   return scan alias bounds
-entry const globals = func (bounds: Array U32): Array U32 => return scan persisted bounds
-entry const public = func (input: Array U32): Array U32 => return scan input input
-entry const wrapped = func (bounds: Array U32): Array U32 => return do:
+#entry const globals = func (bounds: Array U32): Array U32 => return scan persisted bounds
+#entry const public = func (input: Array U32): Array U32 => return scan input input
+#entry const wrapped = func (bounds: Array U32): Array U32 => return do:
   let rows: Array U32 = @array.fill 96 1
   return scan_wrap rows bounds
-entry const zeroed = func (bounds: Array U32): Array U32 => return do:
+#entry const zeroed = func (bounds: Array U32): Array U32 => return do:
   let rows: Array U32 = @array.fill 96 1
   return scan_zero rows bounds
-entry const read = func (): Array U32 => return @storage.copy persisted
+#entry const read = func (): Array U32 => return @storage.copy persisted
 `;
 
 function expected(rows: Uint32Array, bounds: number[], stride = 2) {

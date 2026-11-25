@@ -11,46 +11,46 @@ const named = read
 const apply = func (callback: Fields -> U32) -> (row: Fields): U32 => return callback row
 const boxed = func (value: U32): Box => return $Box { a: value, b: value + 1 }
 const read_box = func (row: Box): U32 => return row.a + row.b
-entry const direct = func (value: U32): U32 => return do:
+#entry const direct = func (value: U32): U32 => return do:
   let row = fields value
   break row.a + row.b
-entry const helper = func (value: U32): U32 => return read (fields value)
-entry const named_callback = func (value: U32): U32 => return named (fields value)
-entry const inline_callback = func (value: U32): U32 => return apply (func (row: Fields) => return row.a + row.b) (fields value)
-entry const generic_callback = func (value: U32): U32 => return apply read (fields value)
-entry const aliased_callback = func (value: U32): U32 => return apply named (fields value)
-entry const local_callback = func (value: U32): U32 => return do:
+#entry const helper = func (value: U32): U32 => return read (fields value)
+#entry const named_callback = func (value: U32): U32 => return named (fields value)
+#entry const inline_callback = func (value: U32): U32 => return apply (func (row: Fields) => return row.a + row.b) (fields value)
+#entry const generic_callback = func (value: U32): U32 => return apply read (fields value)
+#entry const aliased_callback = func (value: U32): U32 => return apply named (fields value)
+#entry const local_callback = func (value: U32): U32 => return do:
   let callback = func (row: Fields) => return row.a + row.b
   break apply callback (fields value)
-entry const nominal_record = func (value: U32): U32 => return read_box (boxed value)
+#entry const nominal_record = func (value: U32): U32 => return read_box (boxed value)
 const replace = array.replace
 const wrapped_replace = func (index: U32) -> (value: U32) -> (values: Array U32): Array U32 => return replace index value values
 const direct_wrapper = func (index: U32) -> (value: U32) -> (values: Array U32): Array U32 => return array.replace index value values
 const reordered_wrapper = func (values: Array U32) -> (index: U32) -> (value: U32): Array U32 => return array.replace index value values
-entry const array_generate = func (count: U32): U32 => return do:
+#entry const array_generate = func (count: U32): U32 => return do:
   let values = array.generate count (func (index: U32) => return index + 1)
   break values[count - 1]
-entry const update_direct = func (count: U32): U32 => return do:
+#entry const update_direct = func (count: U32): U32 => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := array.replace index (index + 1) values
   break values[count - 1]
-entry const update_wrapped = func (count: U32): U32 => return do:
+#entry const update_wrapped = func (count: U32): U32 => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := wrapped_replace index (index + 1) values
   break values[count - 1]
-entry const update_direct_wrapper = func (count: U32): U32 => return do:
+#entry const update_direct_wrapper = func (count: U32): U32 => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := direct_wrapper index (index + 1) values
   break values[count - 1]
-entry const update_reordered_wrapper = func (count: U32): U32 => return do:
+#entry const update_reordered_wrapper = func (count: U32): U32 => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := reordered_wrapper values index (index + 1)
   break values[count - 1]
-entry const update_snapshot = func (count: U32): U32 => return do:
+#entry const update_snapshot = func (count: U32): U32 => return do:
   let values = array.fill count 0
   let previous = values
   for index in 0..count:

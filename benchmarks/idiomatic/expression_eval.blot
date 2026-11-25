@@ -9,4 +9,4 @@ const evaluate = func (expr: Expr) : U32 => return case expr of
   $Value value => value
   $Add (left, right) => evaluate left + evaluate right
   $Multiply (left, right) => evaluate left * evaluate right
-entry const run = func (seed: U32) : U32 => return evaluate (make_expr 9 seed)
+#entry const run = func (seed: U32) : U32 => return evaluate (make_expr 9 seed)

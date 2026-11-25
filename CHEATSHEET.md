@@ -37,7 +37,7 @@ func clamp (x: U32) -> (hi: U32): U32 =>
   return x
 
 // Entry point exported to Wasm ABI 8 (must handle all effects)
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let sum = 0
   for i in 0 .. 10:
     sum := self + i
@@ -72,7 +72,7 @@ func unwrap_or_zero (opt: Option U32): U32 =>
 - Non-entry functions returning storage must return a fresh value, `.copy`, or an `own` parameter (`[RESULT_NOT_OWNED]`).
 - Module `const` arrays are deeply immutable; copy (`pool.copy`) before mutating.
 
-## 5. Fast SIMD (`spark`) & Multi-Core (`entry kernel` / `entry process`)
+## 5. Fast SIMD (`spark`) & Multi-Core (`#kernel` / `#process`)
 
 ```blot
 // Auto-vectorized 4-wide Wasm v128 SIMD (must be pure)
@@ -89,7 +89,7 @@ func step (pos: F32) -> (vel: F32): F32 =>
   use dt <- Clock.delta ()
   return pos + vel * dt
 
-entry func run (): F32 =>
+#entry func run (): F32 =>
   with Clock = { delta: func () => return 0.01666667 }:
     use next <- step 10.0 6.0
     return next

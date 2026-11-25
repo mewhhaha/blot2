@@ -29,20 +29,20 @@ const read_if = func (rows: Array U32) -> (index: U32) -> (flag: U32): U32 => re
     return 0
   return rows[index]
 const global: Array U32 = #[10, 20, 30, 40]
-entry const mixed = func (input: own Array U32): Array U32 => return do:
+#entry const mixed = func (input: own Array U32): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
 ${calls("input")}
   return #[local[0], local[1], local[2], local[3], input[0], input[1], input[2], input[3]]
-entry const globals = func (): Array U32 => return do:
+#entry const globals = func (): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
   let g: Array U32 = @storage.copy global
 ${calls("g")}
   return #[local[0], local[1], local[2], local[3], g[0], g[1], g[2], g[3]]
-entry const skipped = func (input: own Array U32): U32 => return do:
+#entry const skipped = func (input: own Array U32): U32 => return do:
   let empty: Array U32 = #[]
   let (empty, input) = wrapped empty input 0
   return @u32.add (read_if empty 4294967295 0) (read_if input 4294967295 0)
-entry const varying = func (iterations: U32): U32 => return do:
+#entry const varying = func (iterations: U32): U32 => return do:
   let total = 0
   for iteration in 0 .. iterations:
     let capacity = @u32.rem iteration 5
@@ -52,30 +52,30 @@ entry const varying = func (iterations: U32): U32 => return do:
       rows := forwarded rows last
       total := @u32.add self rows[last]
   return total
-entry const varying_oob = func (): Unit => return do:
+#entry const varying_oob = func (): Unit => return do:
   for iteration in 0 .. 3:
     let rows: Array U32 = @array.fill (@u32.sub 4 iteration) 7
     let _ = forwarded rows 3
   return ()
-entry const created_oob = func (index: U32): Unit => return do:
+#entry const created_oob = func (index: U32): Unit => return do:
   let rows: Array U32 = @array.fill 4 7
   let _ = forwarded rows index
   return ()
-entry const public_oob = func (input: own Array U32): Unit => return do:
+#entry const public_oob = func (input: own Array U32): Unit => return do:
   let len = input.length
   let _ = forwarded input len
   return ()
-entry const prefix_trap = func (end: U32): Array U32 => return do:
+#entry const prefix_trap = func (end: U32): Array U32 => return do:
   let base: Array U32 = #[10, 20, 30, 40]
   let out: Array U32 = #[]
   for index in 0 .. end:
     @storage.push out (@u32.add base[index] 1)
   return out
-entry const read_global = func (): Array U32 => return @storage.copy global
+#entry const read_global = func (): Array U32 => return @storage.copy global
 const copy_float = func (dst: own Array F32) -> (src: Array F32) -> (index: U32): Array F32 => return do:
   dst[index] := src[index]
   return dst
-entry const floats = func (input: own Array F32): Array F32 => return do:
+#entry const floats = func (input: own Array F32): Array F32 => return do:
   let rows: Array F32 = @array.fill 2 0.0
   rows := copy_float rows input 0
   rows := copy_float rows input 1

@@ -1,5 +1,5 @@
 const touch = func (rows: Array U32): Ref U32 => return @storage.at rows 0
-entry const answer = func (): U32 => return do:
+#entry const answer = func (): U32 => return do:
   let rows: Array U32 = #[7,8]
   let saved = touch rows
   @storage.truncate rows 0

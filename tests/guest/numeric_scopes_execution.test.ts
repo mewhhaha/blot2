@@ -14,17 +14,17 @@ const floating = func (index: U32) => return do:
   let scaled = @f32.mul value 16777216.0
   let rounded = @f32.add scaled 1.0
   break @f32.sub rounded scaled
-entry const integers = func (count: U32) => return @array.generate count integer
-entry const floats = func (count: U32) => return @array.generate count floating
-entry const divide = func (count: U32) => return @array.generate count (func index => return do:
+#entry const integers = func (count: U32) => return @array.generate count integer
+#entry const floats = func (count: U32) => return @array.generate count floating
+#entry const divide = func (count: U32) => return @array.generate count (func index => return do:
   let divisor = @u32.sub 4 index
   break @u32.div 12 divisor)
-entry const shared = func (count: U32) => return do:
+#entry const shared = func (count: U32) => return do:
   let original = @array.generate count integer
   let saved = @storage.copy original
   original[0] := 99
   break #[saved[0], original[0], saved[@u32.sub count 1]]
-entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = @array.fill 9 0
   for index in 0..9:
     use value <- host index

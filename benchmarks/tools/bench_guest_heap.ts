@@ -10,7 +10,7 @@ const executable = resolve(
 );
 const output = resolve(Deno.args[1] ?? `${root}build/bench/guest-heap`);
 await Deno.mkdir(output, { recursive: true });
-const source = `entry const gen = func (count: U32) => return do:
+const source = `#entry const gen = func (count: U32) => return do:
   let rows = @array.generate count (func index => return #[128578, 97 + index % 26])
   let checksum = 0
   for row in rows:

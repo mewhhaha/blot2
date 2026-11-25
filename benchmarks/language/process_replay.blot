@@ -5,36 +5,36 @@ func planner_step (st: own U32) -> (delta: U32): (U32, U32) =>
   let next = @u32.add st delta
   return (next, next)
 
-entry process planner: Process [U32, U32, U32] = { init: planner_init, step: planner_step }
+#process const planner: Process [U32, U32, U32] = { init: planner_init, step: planner_step }
 
 func costly_init (seed: U32): U32 => return seed
 func costly_step (st: own U32) -> (delta: U32): (U32, U32) =>
   let next = @u32.add st delta
   return (next, next)
 
-entry process costly: Process [U32, U32, U32] = { init: costly_init, step: costly_step }
+#process const costly: Process [U32, U32, U32] = { init: costly_init, step: costly_step }
 
 func bad_init_fn (seed: U32): U32 => return @panic "init fault"
 func bad_init_step_fn (st: own U32) -> (delta: U32): (U32, U32) => return (st, 0)
-entry process bad_init: Process [U32, U32, U32] = { init: bad_init_fn, step: bad_init_step_fn }
+#process const bad_init: Process [U32, U32, U32] = { init: bad_init_fn, step: bad_init_step_fn }
 
 func bad_step_init_fn (seed: U32): U32 => return seed
 func bad_step_fn (st: own U32) -> (delta: U32): (U32, U32) => return @panic "step fault"
-entry process bad_step: Process [U32, U32, U32] = { init: bad_step_init_fn, step: bad_step_fn }
+#process const bad_step: Process [U32, U32, U32] = { init: bad_step_init_fn, step: bad_step_fn }
 
 func request (seed: U32): U32 ! { Start } => return Start #[seed, 112, 108, 97, 110, 110, 101, 114]
 
-entry func local (seed: U32): U32 => return do @effect.provider Start (func packet => return if packet[0] < 5 then packet[0] else 0):
+#entry func local (seed: U32): U32 => return do @effect.provider Start (func packet => return if packet[0] < 5 then packet[0] else 0):
   use admission <- request seed
   return admission
 
-entry func live (start: Array U32 -> U32 ! { Foreign }): Array U32 => return do @effect.provider Start start:
+#entry func live (start: Array U32 -> U32 ! { Foreign }): Array U32 => return do @effect.provider Start start:
   use a <- request 10
   use b <- request 100
   use refused <- request 500
   return #[a, b, refused]
 
-entry func apply_tick (input: Array U32): U32 => return do:
+#entry func apply_tick (input: Array U32): U32 => return do:
   let world = input[0]
   for index in 1..input.length:
     world := @u32.add (@u32.mul self 33) input[index]

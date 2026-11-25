@@ -31,7 +31,7 @@ ordinary effect declarations determine members and signatures.
 ```blot
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 
-entry const two = func () => return @effect.scope (func (left: State U32) => return
+#entry const two = func () => return @effect.scope (func (left: State U32) => return
   @effect.scope (func (right: State U32) => return do:
     use (outer, result) <- do (@effect.state left.get left.set 10):
       use (inner, reads) <- do (@effect.state right.get right.set 100):

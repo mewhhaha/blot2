@@ -45,7 +45,7 @@ function source(kind: string, size: number) {
       } else lines.push(`func id${i} x => return x`);
     }
   }
-  lines.push("entry const answer = 42");
+  lines.push("#entry const answer = 42");
   return lines.join("\n") + "\n";
 }
 try {

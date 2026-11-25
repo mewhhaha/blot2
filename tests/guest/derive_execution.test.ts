@@ -63,37 +63,37 @@ impl PositiveCodec : _derive_codec.Codec Positive = {
   const decode = func words => return if words.length == 1 and words[0] > 0 then $Some ($Positive words[0]) else $Nothing,
 }
 ${derived}
-entry const equal = func () => return
+#entry const equal = func () => return
   ($Box { values: #[42, 7] }) ==
   ($Box { values: #[42, 7] })
-entry const unequal = func () => return $Ticket { number: 42, active: true } == $Empty
-entry const nested_equal = func () => return
+#entry const unequal = func () => return $Ticket { number: 42, active: true } == $Empty
+#entry const nested_equal = func () => return
   ($Box { values: #[$Ticket { number: 42, active: true }] }) ==
   ($Box { values: #[$Ticket { number: 42, active: true }] })
-entry const bool_equal = func () => return true == true
-entry const debug = func () => return _derive_text.format ($Box { values: #[42, 7] })
-entry const nested_debug = func () => return _derive_text.format ($Box { values: #[$Ticket { number: 42, active: true }] })
-entry const encode_record = func () => return _derive_codec.encode ($Ticket { number: 42, active: true })
-entry const roundtrip = func () => return do:
+#entry const bool_equal = func () => return true == true
+#entry const debug = func () => return _derive_text.format ($Box { values: #[42, 7] })
+#entry const nested_debug = func () => return _derive_text.format ($Box { values: #[$Ticket { number: 42, active: true }] })
+#entry const encode_record = func () => return _derive_codec.encode ($Ticket { number: 42, active: true })
+#entry const roundtrip = func () => return do:
   let original = $Box { values: #[42, 7] }
   let encoded = _derive_codec.encode original
   let decoded: Maybe (Box U32) = _derive_codec.Codec.decode encoded
   break case decoded of
     $Some value => if value == original then 1 else 0
     $Nothing => 0
-entry const nested_roundtrip = func () => return do:
+#entry const nested_roundtrip = func () => return do:
   let original = $Box { values: #[$Ticket { number: 42, active: true }, $Empty] }
   let encoded = _derive_codec.encode original
   let decoded: Maybe (Box Ticket) = _derive_codec.Codec.decode encoded
   break case decoded of
     $Some value => if value == original then 1 else 0
     $Nothing => 0
-entry const decode_record = func (words: Array U32) : U32 => return do:
+#entry const decode_record = func (words: Array U32) : U32 => return do:
   let decoded: Maybe Ticket = _derive_codec.Codec.decode words
   break case decoded of
     $Some ($Ticket { number: value, active: flag }) => if flag then value else 0
     _ => 0
-entry const decode_envelope = func (words: Array U32) : U32 => return do:
+#entry const decode_envelope = func (words: Array U32) : U32 => return do:
   let decoded: Maybe Envelope = _derive_codec.Codec.decode words
   break case decoded of
     $Some ($Envelope { value: $Positive number }) => number
@@ -182,14 +182,14 @@ import * as _derive_codec from "std/codec"
 ${source}
 ${deriveEqualityAndDebug(ticket)}
 ${deriveCodec(ticket, schema)}
-entry const encode_v2 = func () => return _derive_codec.encode ($Ticket { active: true, number: 42 })
-entry const decode_v2 = func (words: Array U32) : U32 => return do:
+#entry const encode_v2 = func () => return _derive_codec.encode ($Ticket { active: true, number: 42 })
+#entry const decode_v2 = func (words: Array U32) : U32 => return do:
   let decoded: Maybe Ticket = _derive_codec.Codec.decode words
   break case decoded of
     $Some ($Ticket { active: true, number: number }) => number
     _ => 0
 // The application owns migration from its published version 1 layout.
-entry const migrate_v1 = func (words: Array U32) : Array U32 => return do:
+#entry const migrate_v1 = func (words: Array U32) : Array U32 => return do:
   if words.length != 9 or words[0] != 1 or words[1] != 8 or words[2] != 2:
     return #[]
   if words[3] != 10 or words[4] != 1 or words[5] > 1:
@@ -283,7 +283,7 @@ Deno.test.ignore("derive command validates source and generated module before pu
     assert.doesNotMatch(codecOnly, /DerivedEquality|DerivedFormat|std\/text/);
     await compileAndRun(
       codecOnly +
-        "entry const words = func () => return _derive_codec.encode ($Ticket { number: 42 })\n",
+        "#entry const words = func () => return _derive_codec.encode ($Ticket { number: 42 })\n",
       (guest) =>
         assert.deepEqual(
           guest.call("words", null),
@@ -317,7 +317,7 @@ Deno.test.ignore("derive command validates source and generated module before pu
     );
     await compileAndRun(
       equalityOnly +
-        "entry const same = func () => return ($Coordinate { x: 1.5 }) == ($Coordinate { x: 1.5 })\n",
+        "#entry const same = func () => return ($Coordinate { x: 1.5 }) == ($Coordinate { x: 1.5 })\n",
       (guest) => assert.equal(guest.call("same", null), true),
       { stdRoot },
     );
@@ -350,7 +350,7 @@ import * as _derive_text from "std/text"
 import * as _derive_codec from "std/codec"
 ${source}
 ${generated}
-entry const run = func () => return do:
+#entry const run = func () => return do:
   let original = $Pair ($Token 42, true)
   let words = _derive_codec.encode original
   let decoded: Maybe (Pair [Token, Bool]) = _derive_codec.Codec.decode words
@@ -388,8 +388,8 @@ const unsigned_value = func (word: U32) => return $Some word
 const boolean_word = func value => return if value then 1 else 0
 const boolean_value = func (word: U32) => return if word <= 1 then $Some (word == 1) else $Nothing
 ${generated}
-entry const encode = func () => return _derive_codec.encode ($Fixed { number: 4294967295, enabled: true })
-entry const decode = func (words: Array U32) => return do:
+#entry const encode = func () => return _derive_codec.encode ($Fixed { number: 4294967295, enabled: true })
+#entry const decode = func (words: Array U32) => return do:
   let value: Maybe Fixed = _derive_codec.Codec.decode words
   return case value of
     $Some ($Fixed { number, enabled }) => if enabled then number else 0

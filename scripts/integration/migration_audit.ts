@@ -10,7 +10,7 @@ import {
 
 export function demoteEntries(source: string): string {
   return source.replace(
-    /^([ \t]*)entry[ \t]+(const|let|func)(?=[ \t])/gm,
+    /^([ \t]*)#entry[ \t]+(const|let|func)(?=[ \t])/gm,
     "$1$2",
   );
 }
@@ -265,7 +265,7 @@ export async function auditProject(options: Options) {
         sources[entry] = group.map((file, index) =>
           `import * as target_${index} from "__migration_repo/${file}"\n`
         ).join("") +
-          "entry func migration_frontend_probe () : U32 => return 0\n";
+          "#entry func migration_frontend_probe () : U32 => return 0\n";
         try {
           const result = await compiler.build({
             sources,

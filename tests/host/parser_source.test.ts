@@ -81,7 +81,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
       "const fraction = 1.25",
       "const bounded: U32 where { self < 100 } = 42",
       "const same = func (value: U32 where { self < 1000 }) => return value",
-      "entry const result = func () => return do:",
+      "#entry const result = func () => return do:",
       "  let value = 19",
       "  break @u32.add value 23",
       "",

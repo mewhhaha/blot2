@@ -63,10 +63,10 @@ let xs = #[1, 2, 3]
 
 ```blot
 // Before
-entry func main (): #[U32] => return [1, 2, 3]
+#entry func main (): #[U32] => return [1, 2, 3]
 
 // After
-entry func main (): #[U32] => return #[1, 2, 3]
+#entry func main (): #[U32] => return #[1, 2, 3]
 ```
 
 ---
@@ -83,11 +83,11 @@ entry func main (): #[U32] => return #[1, 2, 3]
 ```blot
 // Before
 type Opt is data = $Some U32 | $Nothing
-entry func main (): Opt => return Some 1
+#entry func main (): Opt => return Some 1
 
 // After
 type Opt is data = $Some U32 | $Nothing
-entry func main (): Opt => return $Some 1
+#entry func main (): Opt => return $Some 1
 ```
 
 ---
@@ -121,10 +121,10 @@ let n = arr.length
 
 ```blot
 // Before
-entry func main (): U32 => return 1.5
+#entry func main (): U32 => return 1.5
 
 // After
-entry func main (): F32 => return 1.5
+#entry func main (): F32 => return 1.5
 ```
 
 ---
@@ -200,18 +200,18 @@ func set0 (a: own #[U32]): #[U32] =>
 
 ## ENTRY_TYPE
 
-**Cause:** An `entry func` / `entry kernel` / `entry process` leaves an algebraic effect unhandled (`(unhandled: Effect.op)`) or uses a non-ABI-8 boundary type (e.g. closure).
+**Cause:** A declaration marked `#entry`, `#kernel`, or `#process` leaves an algebraic effect unhandled (`(unhandled: Effect.op)`) or uses a type outside ABI 8, such as a closure.
 
 ```blot
 // Before
 type Clock is effect = { now: Unit -> U32 }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   use t <- Clock.now ()
   return t
 
 // After
 type Clock is effect = { now: Unit -> U32 }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t
@@ -221,10 +221,10 @@ entry func main (): U32 =>
 
 ## EFFECT_MISMATCH
 
-**Cause:** An effectful call appears in a pure position (`let`, `const`, `spark`, `entry kernel`, or pure function signature).
+**Cause:** An effectful call appears in a pure position (`let`, `const`, `spark`, `#kernel`, or pure function signature).
 
 - Use `use x <- Effect.op arg` instead of `let x = Effect.op arg`.
-- Keep `spark #[...]` and `entry kernel` pure.
+- Keep `spark #[...]` and `#kernel` pure.
 
 ---
 

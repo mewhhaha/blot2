@@ -28,7 +28,7 @@ for (const width of [8, 600]) {
 const carry = func row -> (flag: U32) => return do:
   use Tick.bump ()
   return ${returned}
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let effects = 0
   let original = {${fields}}
   let first = original

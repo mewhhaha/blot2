@@ -9,9 +9,9 @@ async function rollingWindows(counts: number[]) {
 import * as rolling from "std/rolling"
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
 const inverse = func (value: U32) => return @u32.sub 0 value
-entry const sequential = func (input: Array U32) => return #[x | x <- rolling.fold add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
-entry const monoid = func (input: Array U32) => return #[x | x <- rolling.monoid add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
-entry const group = func (input: Array U32) => return #[x | x <- rolling.group add inverse 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
+#entry const sequential = func (input: Array U32) => return #[x | x <- rolling.fold add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
+#entry const monoid = func (input: Array U32) => return #[x | x <- rolling.monoid add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
+#entry const group = func (input: Array U32) => return #[x | x <- rolling.group add inverse 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1))]
 `,
     (guest) => {
       for (const count of counts) {
@@ -103,9 +103,9 @@ const permutation = func (index: U32) => return case @u32.rem index 6 of
   4 => {a: 1, b: 2, c: 0}
   _ => {a: 2, b: 0, c: 1}
 const code = func value => return @u32.add (@u32.add (@u32.mul value.a 9) (@u32.mul value.b 3)) value.c
-entry const monoid = func (width: U32) => return #[code value | value <- rolling.monoid combine {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
-entry const group = func (width: U32) => return #[code value | value <- rolling.group combine inverse {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
-entry const forks = func (width: U32) => return do:
+#entry const monoid = func (width: U32) => return #[code value | value <- rolling.monoid combine {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
+#entry const group = func (width: U32) => return #[code value | value <- rolling.group combine inverse {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
+#entry const forks = func (width: U32) => return do:
   let original = rolling.monoid add 0 width (@array.generate 32 (func index => return index))
   use first <- original.next
   let $Some (a, rest) = first else:
@@ -122,7 +122,7 @@ entry const forks = func (width: U32) => return do:
   let $Some (c, _) = third else:
     break #[]
   break #[a, b, again, c]
-entry const references = func (count: U32) => return do:
+#entry const references = func (count: U32) => return do:
   let values = @array.generate count (func index => return #[index])
   let windows = rolling.monoid (func (left: Array U32) => return func (right: Array U32) => return @array.concat left right) #[] 3 values
   break #[@u32.add (@u32.add window[0] window[1]) window[2] | window <- windows]
@@ -183,7 +183,7 @@ Deno.test("rolling ordered F32 windows keep scalar rounding and signed zero", as
     `
 import * as rolling from "std/rolling"
 const add = func (left: F32) => return func (right: F32) => return @f32.add left right
-entry const run = func (input: Array F32) => return #[x | x <- rolling.fold add input[1] (@f32.to_u32 input[0]) (@array.slice input 2 (@u32.sub (@array.length input) 2))]
+#entry const run = func (input: Array F32) => return #[x | x <- rolling.fold add input[1] (@f32.to_u32 input[0]) (@array.slice input 2 (@u32.sub (@array.length input) 2))]
 `,
     (guest) => {
       for (
@@ -255,10 +255,10 @@ const sequential = func (host: U32 -> U32 ! {Foreign}) => return func (width: U3
 const monoid = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return take_collect limit (rolling.monoid add 0 width ($Input {index: 0, count, pull: host}))
 const group = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return take_collect limit (rolling.group add inverse 0 width ($Input {index: 0, count, pull: host}))
 ` + ["sequential", "monoid", "group"].flatMap((name) => [
-        `entry const ${name}_none = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 0`,
-        `entry const ${name}_short = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 2 9`,
-        `entry const ${name}_two = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 2`,
-        `entry const ${name}_invalid = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 0 9 0`,
+        `#entry const ${name}_none = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 0`,
+        `#entry const ${name}_short = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 2 9`,
+        `#entry const ${name}_two = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 2`,
+        `#entry const ${name}_invalid = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 0 9 0`,
       ]
       ).join("\n"),
     (guest) => {
@@ -326,7 +326,7 @@ const Input.next = func (cursor: Input) => return do:
   use value <- cursor.pull cursor.index
   break $Some (#[value], $Input {index: @u32.add cursor.index 1, pull: cursor.pull})
 const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
-entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
+#entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
   let cursor = rolling.monoid combine #[] 3 ($Input {index: 0, pull: host})
   let out: Array U32 = #[]
   for _ in 0..2:
@@ -397,7 +397,7 @@ Deno.test("rolling fast callbacks require closed pure arrows", async () => {
     await compileExpectedFailure(
       `
 import * as rolling from "std/rolling"
-entry const run = func (host: U32 -> U32 ! {Foreign}) => return #[x | x <- ${operation} 3 (@array.generate 9 (func i => return i))]
+#entry const run = func (host: U32 -> U32 ! {Foreign}) => return #[x | x <- ${operation} 3 (@array.generate 9 (func i => return i))]
 `,
       "effect_mismatch",
       undefined,

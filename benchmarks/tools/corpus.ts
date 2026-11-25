@@ -20,7 +20,7 @@ export function chainMono(size: number): SyntheticProgram {
   for (let i = 1; i <= size; i++) {
     rows.push(`const f_${i} = func (x: U32) : U32 => return f_${i - 1} x + 1`);
   }
-  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
+  rows.push(`#entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "chain_mono",
     size,
@@ -38,7 +38,7 @@ export function chainGeneric(size: number): SyntheticProgram {
   for (let i = 1; i <= size; i++) {
     rows.push(`const f_${i} = func x => return f_${i - 1} x + 1`);
   }
-  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
+  rows.push(`#entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "chain_generic",
     size,
@@ -56,7 +56,7 @@ export function diamond(size: number): SyntheticProgram {
   for (let i = 1; i <= size; i++) {
     rows.push(`const f_${i} = func x => return f_${i - 1} (f_${i - 1} x)`);
   }
-  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
+  rows.push(`#entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "diamond",
     size,
@@ -74,7 +74,7 @@ export function fanout(size: number): SyntheticProgram {
   for (let i = 0; i < size; i++) {
     rows.push(`const g_${i} = func x => return x + x`);
   }
-  rows.push("entry const main = func (x: U32) => return do:");
+  rows.push("#entry const main = func (x: U32) => return do:");
   rows.push("  let whole = 0");
   rows.push("  let fraction = 0.0");
   for (let i = 0; i < size; i++) {
@@ -149,9 +149,9 @@ export const editSuite: SyntheticProject = {
       'import * as math from "./math"',
       'import * as robots from "./robots"',
       'import * as hud from "./hud"',
-      "entry const score = func (x: F32) => return robots.reach (math.scale x math.unit) + hud.width (math.scale x math.unit)",
-      "entry const walked = func (x: F32) => return robots.walk x",
-      "entry const carried = func (x: F32) => return robots.carried x",
+      "#entry const score = func (x: F32) => return robots.reach (math.scale x math.unit) + hud.width (math.scale x math.unit)",
+      "#entry const walked = func (x: F32) => return robots.walk x",
+      "#entry const carried = func (x: F32) => return robots.carried x",
     ]),
   },
   scenarios: [

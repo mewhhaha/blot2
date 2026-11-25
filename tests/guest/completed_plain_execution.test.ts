@@ -46,12 +46,12 @@ const floating = func (bits: U32): Array U32 => return do:
 
 const mainSource = `import * as left from "trial/left"
 import * as right from "trial/right"
-entry const integer = func (input: U32): Array U32 => return do:
+#entry const integer = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let a = left.integer marker[0]
   let b = right.integer input
   return #[a[0],a[1],a[2],a[3],a[4],a[5],a[6],b[0],b[1],b[2],b[3],b[4],b[5],b[6]]
-entry const floating = func (bits: U32): Array U32 => return do:
+#entry const floating = func (bits: U32): Array U32 => return do:
   let marker: Array U32 = #[bits]
   let a = left.floating marker[0]
   let b = right.floating bits
@@ -62,7 +62,7 @@ const persistentSource = `const pool: Array U32 = #[4, 14]
 const peek = func (value: {x: U32}) -> (index: U32): {x: U32} => return do:
   value.x := @u32.add self pool[index]
   return value
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let a = peek {x: input} 0
   let b = peek {x: input} 1
   return #[a.x,b.x,pool[1]]
@@ -73,7 +73,7 @@ const hostSource =
   value.x := @u32.add self 1
   use reply <- host value.x
   return @u32.add reply value.x
-entry const answer = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const answer = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let marker: Array U32 = #[7]
   use reply <- invoke host {x: marker[0]}
   return reply
@@ -258,7 +258,7 @@ const choose = func (flag: Bool) -> (input: U32): Choice => return do:
 const total = func (input: U32): U32 => return do:
   let values: Array U32 = #[input, @u32.add input 1]
   return @u32.add values[0] values[1]
-entry const answer = func (bits: U32): Array U32 => return do:
+#entry const answer = func (bits: U32): Array U32 => return do:
   let marker: Array U32 = #[bits]
   let (input,a,b,c) = @simd.u32x4.from_bits (bits,bits,bits,bits)
   let result = floating input

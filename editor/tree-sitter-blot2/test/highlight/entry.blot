@@ -1,12 +1,12 @@
-entry const create = func () => return 1
+#entry const create = func () => return 1
 // <- keyword.storage.modifier
-//    ^^^^^ keyword.storage.type
-//          ^ function
+//     ^^^^^ keyword.storage.type
+//           ^ function
 
-entry let count: U32 = 2
+#entry let count: U32 = 2
 // <- keyword.storage.modifier
-//    ^^^ keyword.storage.type
-//        ^ variable
+//     ^^^ keyword.storage.type
+//         ^ variable
 
 const entry = func entry => return entry
 // <- keyword.storage.type
@@ -30,7 +30,7 @@ entry constancy
 // <- !keyword.storage.modifier
 //    ^^^^^^^^^ variable
 
-"entry const answer = 42"
+"#entry const answer = 42"
 // ^ string
 // ^ !keyword.storage.modifier
 
@@ -46,19 +46,18 @@ func namespace.member value => return value
 //   ^^^^^^^^^ namespace
 //             ^^^^^^ function
 
-entry kernel func mix (x: U32): U32 => return x
+#kernel func mix (x: U32): U32 => return x
 // <- keyword.storage.modifier
-//    ^^^^^^ keyword.storage.modifier
-//           ^^^^ keyword.function
-//                ^^^ function
+//      ^^^^ keyword.function
+//           ^^^ function
 
-entry kernel plan: Kernel [#[F32], U32, U32] = { prepare: p, run: r }
+#kernel const plan: Kernel [#[F32], U32, U32] = { prepare: p, run: r }
 // <- keyword.storage.modifier
-//    ^^^^^^ keyword.storage.modifier
+//      ^^^^^ keyword.storage.type
 
-entry process planner: Process [U32, U32, U32] = { init: i, step: s }
+#process const planner: Process [U32, U32, U32] = { init: i, step: s }
 // <- keyword.storage.modifier
-//    ^^^^^^^ keyword.storage.modifier
+//       ^^^^^ keyword.storage.type
 
 const kernel = 1
 //    ^^^^^^ variable

@@ -112,14 +112,14 @@ async function compile(
 }
 const common =
   `let retained = @list.generate 1000000 (func index => return index)
-entry const fold = func count => return do:
+#entry const fold = func count => return do:
   let sum = 0
   for value in retained:
     if value == count:
       break
     sum := self + value
   break sum
-entry const generate = func count => return @array.generate count (func index => return index * 3 + 1)
+#entry const generate = func count => return @array.generate count (func index => return index * 3 + 1)
 `;
 const guests: Awaited<ReturnType<typeof instantiateGuest>>[] = [];
 for (const variant of variants) {
@@ -167,10 +167,10 @@ const protocols = await compile(
   `import * as iter from "std/iter"
 import * as list from "std/list"
 let retained = @list.generate 1000000 (func index => return index)
-entry const cursor = func count => return iter.fold_left add 0 (iter.take count retained.iter)
-entry const range = func count => return iter.fold_left add 0 (iter.range 0 count)
-entry const slice = func start => return @array.from_list (list.slice start 100000 retained)
-entry const concat = func count => return @array.from_list (list.concat (list.take count retained) (list.take 1000 retained))
+#entry const cursor = func count => return iter.fold_left add 0 (iter.take count retained.iter)
+#entry const range = func count => return iter.fold_left add 0 (iter.range 0 count)
+#entry const slice = func start => return @array.from_list (list.slice start 100000 retained)
+#entry const concat = func count => return @array.from_list (list.concat (list.take count retained) (list.take 1000 retained))
 `,
   "protocols",
 );

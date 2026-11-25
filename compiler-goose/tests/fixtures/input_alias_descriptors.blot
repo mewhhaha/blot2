@@ -15,7 +15,7 @@ const append = func (first: own Array U32): {rows: Array U32, before: U32, after
   let after = @storage.length first
   let last = first[before]
   return {rows: first, before, after, last}
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let left: Array U32 = #[input, @u32.add input 1, @u32.add input 2, @u32.add input 3]
   let right: Array U32 = #[@u32.add input 20]
   let selected = right

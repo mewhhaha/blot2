@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const caller = `import * as values from "./values"
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let left = values.four marker[0]
   let right = values.four (@u32.add input 10)
@@ -12,7 +12,7 @@ entry const answer = func (input: U32): Array U32 => return do:
   let overwrite = values.four 123
   let (a, b, c, d) = @simd.f32x4.bits (mixed.zero, mixed.nan, mixed.zero, mixed.nan)
   return #[left.one.x, left.y, left.z, left.w, right.one.x, right.w, latest.x, mixed.word, a, b, c, d, overwrite.one.x]
-entry const fallback = func (input: U32): Array U32 => return do:
+#entry const fallback = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let row = values.five marker[0]
   let selected = values.choice input
@@ -20,12 +20,12 @@ entry const fallback = func (input: U32): Array U32 => return do:
     $values.Left value => value
     $values.Right value => @u32.add value 1
   return #[row.a, row.e, word]
-entry const guarded = func (input: U32): Array U32 => return do:
+#entry const guarded = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let first = values.four marker[0]
   let row = values.guarded input
   return #[first.one.x, first.w, row.one.x, row.w]
-entry const stopped = func (input: U32): U32 => return do:
+#entry const stopped = func (input: U32): U32 => return do:
   let marker: Array U32 = #[input]
   return (values.stopped marker[0]).one.x
 `;
@@ -163,7 +163,7 @@ const exercise = func (value: U32) -> (destination: own Array U32): Array U32 =>
   for index in 0 .. 3:
     destination := consume self (func () => return value)
   return destination
-entry const answer = func (input: U32): Array U32 => return do:
+#entry const answer = func (input: U32): Array U32 => return do:
   let counter: Array U32 = #[]
   let destination: Array U32 = #[]
   let held = pair input
@@ -184,7 +184,7 @@ const change = func (rows: own Array Row): Array U32 => return do:
   @storage.truncate rows 1
   let later = rollback_pair 9
   return #[v0, v1, @u32.add held.y later.y]
-entry const rollback = func (input: U32): Array U32 => return do:
+#entry const rollback = func (input: U32): Array U32 => return do:
   let left: Array U32 = #[input]
   let right: Array U32 = #[@u32.add input 10]
   let rows: Array Row = #[$Row {owner: left, index: 0}, $Row {owner: right, index: 0}]

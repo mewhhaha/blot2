@@ -51,7 +51,7 @@ func same_generic (x: a) -> (y: a): Bool where { Eq a } => x.eq y
 
 func use_explicit_dict (d: Eq a) -> (x: a) -> (y: a): Bool => d.eq x y
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a = square 7
   let v = $Vec2 { x: 3, y: 4 }
   let v2 = v * 5
@@ -87,7 +87,7 @@ Deno.test("vNext 3A: missing trait impl is rejected", async () => {
 type Eq a is trait = { eq: a -> a -> Bool }
 type Foo is data = $Foo U32
 func same (x: a) -> (y: a): Bool where { Eq a } => x.eq y
-entry func main (): U32 =>
+#entry func main (): U32 =>
   return if same ($Foo 1) ($Foo 1) then 1 else 0
 `,
     "missing_implementation",
@@ -127,7 +127,7 @@ func push_grow (a: own #[U32]) -> (x: U32): #[U32] =>
   @storage.push a x
   return a
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   // 1. Pre-built effect record and passing Log as parameter
   let r1 = run_with_log quiet 9
 
@@ -172,7 +172,7 @@ type State s is effect = {
   put: s -> Unit,
 }
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let n = 10
   let dummy = #[1]
   let preview = 0
@@ -198,7 +198,7 @@ Deno.test("vNext 3B: suite cannot read or rebind a local shadowed by an active w
   await compileExpectedFailure(
     `
 type Log is effect = { write: U32 -> Unit }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let count = 0
   with Log = { write: func x => count := count + x }:
     use Log.write 1
@@ -212,7 +212,7 @@ entry func main (): U32 =>
 Deno.test("vNext 3B: with Foreign is rejected as sealed_effect", async () => {
   await compileExpectedFailure(
     `
-entry func main (): U32 =>
+#entry func main (): U32 =>
   with Foreign = { x: func () => () }:
     let a = 1
   return 0
@@ -284,7 +284,7 @@ func sum_structural (r: { a: U32, b: U32 }): U32 =>
     s := s + r.(f)
   return s
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   // Omit defaulted fields (name, hp, ratio), supply only required bonus
   let p1 = $Player { bonus: 5 }
   // Override defaulted hp while omitting name & ratio
@@ -336,7 +336,7 @@ func inspect_colors (): U32 =>
       acc := acc + v.tag $Weight
   return acc
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   // Red: index 0 + len 3 + weight 10 = 13
   // Green: index 1 + len 5 + deprecated 1000 + weight 20 = 1026
   // Blue: index 2 + len 4 = 6
@@ -353,7 +353,7 @@ Deno.test("vNext 3C: omitting a required non-defaulted field is rejected", async
   await compileExpectedFailure(
     `
 type Boxed is data = $Boxed { a: U32 = 1, b: U32 }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let x = $Boxed { a: 2 }
   return x.a
 `,
@@ -365,7 +365,7 @@ Deno.test("vNext 3C: field default type mismatch is rejected", async () => {
   await compileExpectedFailure(
     `
 type Bad is data = $Bad { hp: U32 = true }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let x = $Bad { hp: 1 }
   return x.hp
 `,
@@ -387,7 +387,7 @@ func encode_packet (p: Packet): Unit ! {Emit U32} =>
     use Encode.encode p.(field)
   return ()
 
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let total = 0
   let p = $Packet { id: 10, flag: true }
   with Emit U32 = func v => total := total + v:

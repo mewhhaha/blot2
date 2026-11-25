@@ -8,8 +8,8 @@ const Box.add = func left => return func right => return do:
 const twice: a -> a ! {Tick} where { associated "add" a a a ! {} } = func value => return do:
   use Tick ()
   break @type.call "add" value value
-entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
+#entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
   use boxed <- twice ($Box 21)
   let $Box value=boxed
   break value
-entry const folded=answer ()
+#entry const folded=answer ()

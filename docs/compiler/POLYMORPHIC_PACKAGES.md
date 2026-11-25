@@ -31,7 +31,7 @@ unannotated value.
 const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return
   (identity 42, identity 3.0)
 const id: forall [a] => a -> a = func value => return value
-entry const answer = two id
+#entry const answer = two id
 ```
 
 Accept the same annotation through an imported producer. Reject passing a

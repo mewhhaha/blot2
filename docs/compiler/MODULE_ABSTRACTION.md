@@ -18,13 +18,13 @@ they do not become re-exports automatically.
 private const offset = 7
 private type Internal = { value: U32 }
 const answer: U32 = offset
-entry const main = answer
+#entry const main = answer
 ```
 
-`entry` continues to control guest exports from the project's entry module. It
-does not grant module visibility. `private entry const main = answer` is legal:
+`#entry` controls guest exports from the project's entry module. It
+does not grant module visibility. `private #entry const main = answer` is legal:
 the host can invoke main, while another Blot module cannot import it. `private`
-precedes `entry`; repeated or misplaced modifiers reject at the modifier. No
+precedes `#entry`; repeated or misplaced modifiers reject at the modifier. No
 public modifier or export list is required for existing programs. Imported
 modules retain the existing prohibition on entry declarations. The new words
 `private` and `export` are contextual at declaration starts, and `opaque` is
@@ -219,7 +219,7 @@ import { Token, make, read } from "./tokens"
 import * as facade from "./outward"
 const direct: Token = make 41
 const forwarded: facade.Ticket = direct
-entry const answer = facade.read forwarded
+#entry const answer = facade.read forwarded
 ```
 
 The result is 42. Importing offset, importing/re-exporting the hidden Token

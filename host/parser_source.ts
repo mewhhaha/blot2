@@ -82,7 +82,7 @@ export function parserSource(
       topLevel && declarationStart && !attributeOpener &&
       token.text !== "\uE000"
     ) {
-      if (["privatE", "exporT", "impL", "entrY", "tesT"].includes(token.text)) {
+      if (["privatE", "exporT", "impL", "tesT"].includes(token.text)) {
         throw reservedMarker(token);
       }
       const testName = next?.text === "expect_trap"
@@ -100,12 +100,6 @@ export function parserSource(
           moduleDeclaration = true;
         } else if (token.text === "impl") {
           replace(token.span.end - 1, token.span.end, "L");
-        } else if (
-          !sawPrivate && token.text === "entry" &&
-          (prepared.tokens[index + 1]?.text === "kernel" ||
-            prepared.tokens[index + 1]?.text === "process")
-        ) {
-          replace(token.span.end - 1, token.span.end, "Y");
         } else if (
           !sawPrivate && token.text === "test" &&
           testName?.type === "named" && testName.kind === "STRING"

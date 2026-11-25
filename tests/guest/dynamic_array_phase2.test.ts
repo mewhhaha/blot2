@@ -13,7 +13,7 @@ func push_draw (frame: own Frame) -> (v: U32): Frame =>
   frame.count := self + 1
   return frame
 
-entry func grow_truncate_pop (n: U32): #[U32] =>
+#entry func grow_truncate_pop (n: U32): #[U32] =>
   let xs: #[U32] = #[]
   for i in 0..n:
     xs := self.push (i * 3)
@@ -23,14 +23,14 @@ entry func grow_truncate_pop (n: U32): #[U32] =>
   let (xs2, popped) = xs.pop
   return xs2.push popped
 
-entry func stack_to_heap_and_cache (): U32 =>
+#entry func stack_to_heap_and_cache (): U32 =>
   let xs: #[U32] = #[10, 20]
   let first = xs[0]
   xs := self.push 30
   xs := self.push 40
   return first + xs[2] + xs[3]
 
-entry func record_field_push (n: U32): U32 =>
+#entry func record_field_push (n: U32): U32 =>
   let frame = $Frame { draws: #[], count: 0 }
   for i in 0..n:
     frame := push_draw self (i + 1)
@@ -53,7 +53,7 @@ Deno.test("Phase 2 strict ownedInPlace on #[T] and SizedArray #[N; T] immutabili
     `func bad (xs: #[U32]) =>
   @storage.push xs 1
   return ()
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a = #[1]
   let _ = bad a
   return a[0]
@@ -64,7 +64,7 @@ entry func main (): U32 =>
     `func bad (xs: #[U32]) =>
   @storage.truncate xs 0
   return ()
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let a = #[1]
   let _ = bad a
   return a.length
@@ -74,7 +74,7 @@ entry func main (): U32 =>
   // Module const global #[T] cannot be pushed
   await compileExpectedFailure(
     `const GLOBAL: #[U32] = #[1, 2]
-entry func main (): U32 =>
+#entry func main (): U32 =>
   @storage.push GLOBAL 3
   return GLOBAL.length
 `,
@@ -82,7 +82,7 @@ entry func main (): U32 =>
   );
   // Aliased local #[T] cannot be pushed
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let ys = xs
   @storage.push xs 3
@@ -92,7 +92,7 @@ entry func main (): U32 =>
   );
   // Active view borrows #[T] and rejects push
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let v = &xs[0..2]
   @storage.push xs 3
@@ -103,7 +103,7 @@ entry func main (): U32 =>
   // Outer #[T] captured in closure cannot be pushed
   await compileExpectedFailure(
     `func run (f: Unit -> Unit) => f ()
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let _ = run (func () => @storage.push xs 3)
   return xs.length
@@ -112,7 +112,7 @@ entry func main (): U32 =>
   );
   // Compile-time fixed-length SizedArray #[N; T] rejects push, pop, truncate (intrinsic & method)
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[4; U32] = #[1, 2, 3, 4]
   @storage.push xs 5
   return xs[0]
@@ -120,7 +120,7 @@ entry func main (): U32 =>
     "type_mismatch",
   );
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[4; U32] = #[1, 2, 3, 4]
   @storage.truncate xs 2
   return xs[0]
@@ -128,7 +128,7 @@ entry func main (): U32 =>
     "type_mismatch",
   );
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[4; U32] = #[1, 2, 3, 4]
   let _ = xs.push 5
   return 0
@@ -140,7 +140,7 @@ entry func main (): U32 =>
 Deno.test("Phase 2 backend hardening (S4, S5, S6, S7): loop borrow, range hoisting, backedge cache invalidation, and RHS update lock", async () => {
   // S4: for x in xs borrows scalar #[U32] so pushing/mutating xs inside the loop is rejected
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2, 3]
   let total = 0
   for x in xs:
@@ -151,7 +151,7 @@ Deno.test("Phase 2 backend hardening (S4, S5, S6, S7): loop borrow, range hoisti
     "aliased_update",
   );
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2, 3]
   for x in xs:
     xs := self.push x
@@ -162,7 +162,7 @@ Deno.test("Phase 2 backend hardening (S4, S5, S6, S7): loop borrow, range hoisti
 
   // S7: @simd.store locks target container during RHS evaluation
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2, 3, 4]
   let _ = @simd.store xs 0 (always (10, 20, 30, 40) (@storage.push xs 99))
   return xs[0]
@@ -175,7 +175,7 @@ Deno.test("Phase 2 backend hardening (S4, S5, S6, S7): loop borrow, range hoisti
   for row in rows:
     return (row, rows)
   return (#[], rows)
-entry func main (): U32 =>
+#entry func main (): U32 =>
   let (a, _) = bad #[#[1]]
   return a.length
 `,
@@ -183,7 +183,7 @@ entry func main (): U32 =>
   );
   // 1-arg own method xs.pop consumes xs; partial 2-arg xs.push is rejected
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let (xs2, _) = xs.pop
   return xs[0] + xs2.length
@@ -191,7 +191,7 @@ entry func main (): U32 =>
     "spent_value",
   );
   await compileExpectedFailure(
-    `entry func main (): U32 =>
+    `#entry func main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let f = xs.push
   return (f 3).length
@@ -210,18 +210,18 @@ func early_return_from_scalar_loop (xs: own #[U32]) -> (target: U32): (Bool, #[U
   xs := self.push target
   return (false, xs)
 
-entry func early_return_scalar_loop_test (): U32 =>
+#entry func early_return_scalar_loop_test (): U32 =>
   let (found1, xs1) = early_return_from_scalar_loop #[10, 20] 20
   let (found2, xs2) = early_return_from_scalar_loop xs1 30
   return (if found1 then 100 else 0) + (if found2 then 10 else 0) + xs2.length
 
-entry func sibling_field_loop (): U32 =>
+#entry func sibling_field_loop (): U32 =>
   let p = $Pair { src: #[10, 20, 30], dst: #[] }
   for x in p.src:
     p.dst := self.push (x + 1)
   return p.dst[0] + p.dst[1] + p.dst[2]
 
-entry func loop_backedge_reloads_base_and_len (): U32 =>
+#entry func loop_backedge_reloads_base_and_len (): U32 =>
   let xs: #[U32] = #[1, 2, 3]
   let before = xs[0]
   let sum = before
@@ -230,7 +230,7 @@ entry func loop_backedge_reloads_base_and_len (): U32 =>
     sum := self + xs[xs.length - 1]
   return sum + xs.length
 
-entry func range_truncate_must_trap (): U32 =>
+#entry func range_truncate_must_trap (): U32 =>
   let xs: #[U32] = #[10, 20, 30]
   let acc = 0
   for i in 0..xs.length:
@@ -238,7 +238,7 @@ entry func range_truncate_must_trap (): U32 =>
     acc := self + xs[i]
   return acc
 
-entry func indexed_update_rhs_promotes_to_heap (): U32 =>
+#entry func indexed_update_rhs_promotes_to_heap (): U32 =>
   let xs: #[U32] = #[10]
   xs[0] := do:
     for i in 0..64:
@@ -246,7 +246,7 @@ entry func indexed_update_rhs_promotes_to_heap (): U32 =>
     break self + 32
   return xs[0] + xs.length + xs[64]
 
-entry func indexed_update_rhs_pop_must_trap (): U32 =>
+#entry func indexed_update_rhs_pop_must_trap (): U32 =>
   let xs: #[U32] = #[10]
   xs[0] := do:
     let _ = @storage.pop xs
@@ -280,7 +280,7 @@ entry func indexed_update_rhs_pop_must_trap (): U32 =>
 
 Deno.test("Phase 2 fork rewind across stack-to-heap promotion on #[T]", async () => {
   await compileAndRun(
-    `entry func fork_promotes_and_rewinds (): U32 =>
+    `#entry func fork_promotes_and_rewinds (): U32 =>
   let xs: #[U32] = #[10, 20]
   let spec = fork xs:
     xs := self.push 30

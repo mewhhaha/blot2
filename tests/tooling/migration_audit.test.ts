@@ -10,10 +10,10 @@ import {
 
 Deno.test("migration overlays demote exports without altering names or bodies", () => {
   const source =
-    "// entry const ignored = 2\nentry const answer = func () => return 42\nentry let rows: Array U32 = #[]\n  entry func answer_named () => return 42\n";
+    "// #entry const ignored = 2\n#entry const answer = func () => return 42\n#entry let rows: Array U32 = #[]\n  #entry func answer_named () => return 42\n";
   assert.equal(
     demoteEntries(source),
-    "// entry const ignored = 2\nconst answer = func () => return 42\nlet rows: Array U32 = #[]\n  func answer_named () => return 42\n",
+    "// #entry const ignored = 2\nconst answer = func () => return 42\nlet rows: Array U32 = #[]\n  func answer_named () => return 42\n",
   );
   assert.equal(demoteEntries(demoteEntries(source)), demoteEntries(source));
 });
@@ -107,7 +107,7 @@ Deno.test("frontend audit checks unused declarations and exact rejection expecta
     );
     await Deno.writeTextFile(
       resolve(project, "valid.blot"),
-      "entry func answer () : U32 => return 42\n",
+      "#entry func answer () : U32 => return 42\n",
     );
     const invalid = "const unused: U32 = true\n";
     await Deno.writeTextFile(resolve(project, "invalid.blot"), invalid);

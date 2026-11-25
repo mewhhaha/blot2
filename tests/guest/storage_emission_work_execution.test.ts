@@ -13,7 +13,7 @@ const source =
   let values = #[${Array.from({ length: rows }, () => record).join(",\n    ")}]
   use reply <- host #[values[0].f0, values[${rows - 1}].f${fields - 1}]
   return @u32.add reply[0] reply[1]
-entry const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+#entry const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let marker: Array U32 = #[0]
   let total: U32 = 0
 ${

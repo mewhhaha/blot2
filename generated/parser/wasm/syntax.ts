@@ -136,8 +136,9 @@ export type LiteralKind =
   | ":"
   | "=>"
   | "return"
-  | "entrY"
+  | "#"
   | "kernel"
+  | "const"
   | "="
   | "prepare"
   | "run"
@@ -149,17 +150,16 @@ export type LiteralKind =
   | "is"
   | "opaquE"
   | "impL"
-  | "const"
   | "@"
   | "["
   | "]"
+  | "entry"
   | "let"
   | "func"
   | "->"
   | "effect"
   | "data"
   | "|"
-  | "#"
   | "infixl"
   | "infixr"
   | "infix"
@@ -285,6 +285,8 @@ export type RuleName =
   | "named_import"
   | "import_binding"
   | "declaration"
+  | "private_declaration_value"
+  | "public_declaration_value"
   | "test_declaration"
   | "entry_concurrency_declaration"
   | "entry_kernel_declaration"
@@ -302,6 +304,7 @@ export type RuleName =
   | "implementation_value_member"
   | "declaration_attribute"
   | "attribute_name"
+  | "entry_modifier"
   | "value_declaration"
   | "named_function_declaration"
   | "named_function"
@@ -510,10 +513,16 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | EntryConcurrencyDeclarationCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TestDeclarationCursor | TypeAliasCursor | ValueDeclarationCursor;
+  field(name: "value"): PrivateDeclarationValueCursor | PublicDeclarationValueCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface PrivateDeclarationValueCursor extends RuleCursorBase<"private_declaration_value"> {
+}
+
+export interface PublicDeclarationValueCursor extends RuleCursorBase<"public_declaration_value"> {
 }
 
 export interface TestDeclarationCursor extends RuleCursorBase<"test_declaration"> {
@@ -643,10 +652,13 @@ export interface AttributeNameCursor extends RuleCursorBase<"attribute_name"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface EntryModifierCursor extends RuleCursorBase<"entry_modifier"> {
+}
+
 export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaration"> {
   field(name: "annotation"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
   field(name: "kind"): TokenCursor<"literal", "const"> | TokenCursor<"literal", "let">;
-  field(name: "modifier"): SourceIdentifierCursor | null;
+  field(name: "modifier"): EntryModifierCursor | null;
   field(name: "name"): QualifiedNameCursor;
   field(name: "value"): ExpressionCursor;
   field(name: "where"): WhereClauseCursor | null;
@@ -655,7 +667,7 @@ export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaratio
 }
 
 export interface NamedFunctionDeclarationCursor extends RuleCursorBase<"named_function_declaration"> {
-  field(name: "modifier"): SourceIdentifierCursor | null;
+  field(name: "modifier"): EntryModifierCursor | null;
   field(name: "value"): NamedFunctionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1534,7 +1546,7 @@ export interface QuantifiedTypeCursor extends RuleCursorBase<"quantified_type"> 
 }
 
 export interface QuantifiedBinderCursor extends RuleCursorBase<"quantified_binder"> {
-  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "expect_trap"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "init"> | TokenCursor<"literal", "kernel"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "prepare"> | TokenCursor<"literal", "process"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "step"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
+  field(name: "name"): TokenCursor<"literal", "borrow"> | TokenCursor<"literal", "borrow_mut"> | TokenCursor<"literal", "cleanup"> | TokenCursor<"literal", "concurrent"> | TokenCursor<"literal", "entry"> | TokenCursor<"literal", "exists"> | TokenCursor<"literal", "expect_trap"> | TokenCursor<"literal", "forall"> | TokenCursor<"literal", "init"> | TokenCursor<"literal", "kernel"> | TokenCursor<"literal", "many"> | TokenCursor<"literal", "once"> | TokenCursor<"literal", "pack"> | TokenCursor<"literal", "prepare"> | TokenCursor<"literal", "process"> | TokenCursor<"literal", "shared"> | TokenCursor<"literal", "step"> | TokenCursor<"literal", "unique"> | TokenCursor<"literal", "unpack"> | TokenCursor<"literal", "where"> | TokenCursor<"named", "IDENT">;
   field(name: "sort"): TokenCursor<"literal", "region"> | TokenCursor<"literal", "row"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1573,6 +1585,8 @@ export type AnyRuleCursor =
   | NamedImportCursor
   | ImportBindingCursor
   | DeclarationCursor
+  | PrivateDeclarationValueCursor
+  | PublicDeclarationValueCursor
   | TestDeclarationCursor
   | EntryConcurrencyDeclarationCursor
   | EntryKernelDeclarationCursor
@@ -1590,6 +1604,7 @@ export type AnyRuleCursor =
   | ImplementationValueMemberCursor
   | DeclarationAttributeCursor
   | AttributeNameCursor
+  | EntryModifierCursor
   | ValueDeclarationCursor
   | NamedFunctionDeclarationCursor
   | NamedFunctionCursor

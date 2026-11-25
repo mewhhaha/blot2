@@ -7,11 +7,11 @@ Deno.test("text parses unsigned decimals and iterates borrowed words and lines",
     `
 import * as text from "std/text"
 
-entry func parse (source: Text): Array U32 => return case text.parse_u32 source of
+#entry func parse (source: Text): Array U32 => return case text.parse_u32 source of
   $Some value => #[value]
   $Nothing => #[]
 
-entry func whitespace (value: U32): Bool => return text.is_whitespace value
+#entry func whitespace (value: U32): Bool => return text.is_whitespace value
 
 func encode_tokens tokens: Array U32 => do:
   let result: Array U32 = #[]
@@ -21,13 +21,13 @@ func encode_tokens tokens: Array U32 => do:
       @storage.push result ch
   return result
 
-entry func words (source: Text): Array U32 => return
+#entry func words (source: Text): Array U32 => return
   encode_tokens (text.split_whitespace source)
 
-entry func lines (source: Text): Array U32 => return
+#entry func lines (source: Text): Array U32 => return
   encode_tokens (text.lines source)
 
-entry func numbers (source: Text): Array U32 => do:
+#entry func numbers (source: Text): Array U32 => do:
   let result: Array U32 = #[]
   for token in text.split_whitespace source:
     let $Some value = text.parse_u32 token else:
@@ -35,7 +35,7 @@ entry func numbers (source: Text): Array U32 => do:
     @storage.push result value
   return result
 
-entry func independent (source: Text): Array U32 => do:
+#entry func independent (source: Text): Array U32 => do:
   let cursor = text.split_whitespace source
   let $Some (first, rest) = cursor.next else:
     return #[]

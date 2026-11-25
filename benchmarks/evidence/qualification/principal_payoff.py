@@ -20,8 +20,8 @@ def diamond(depth):
     for i in range(1, depth + 1):
         lines += [f"const w{i} = func value => do:", f"  let ignored = w{i - 1} value", f"  return w{i - 1} value"]
     lines += ["const factory = do:", f"  return w{depth}"]
-    lines += ["entry const integer = func (value: U32) -> U32 => factory value"]
-    lines += ["entry const floating = func (value: F32) -> F32 => factory value"]
+    lines += ["#entry const integer = func (value: U32) -> U32 => factory value"]
+    lines += ["#entry const floating = func (value: F32) -> F32 => factory value"]
     return "\n".join(lines) + "\n"
 
 

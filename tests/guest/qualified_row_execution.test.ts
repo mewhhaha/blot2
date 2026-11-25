@@ -23,9 +23,9 @@ Deno.test("qualified primitive associated calls preserve pure implementations th
 const twice: a -> a ! {Tick} where { associated "add" a a a ! {} } = func value => return do:
   use Tick ()
   break ${direct ? '@type.call "add" value value' : "value + value"}
-entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
+#entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
   ${local ? "let alias=twice\n  break alias 21" : "break twice 21"}
-entry const folded=answer ()
+#entry const folded=answer ()
 `;
       await compileAndRun(source, (guest) => {
         equal(guest.read("folded"), 42);
@@ -58,7 +58,7 @@ const Box.twice: Box -> (Unit -> Box ! {Read}) where { associated "add" U32 U32 
   let $Box value = box
   use offset <- Read ()
   break $Box (@u32.add (@type.call "add" value value) offset)
-entry const answer = func (value: U32) => return do (@effect.provider Read (func () => return 1)):
+#entry const answer = func (value: U32) => return do (@effect.provider Read (func () => return 1)):
   use box <- ($Box value).twice ()
   let $Box result = box
   break result
@@ -72,7 +72,7 @@ entry const answer = func (value: U32) => return do (@effect.provider Read (func
   await compileExpectedFailure(
     `type Box a is data = $Box a
 const Box.twice: Box a -> Box a where { associated "add" a a a } = func box => return box
-entry const answer = func () => return do:
+#entry const answer = func () => return do:
   let $Box value = ($Box true).twice
   break 42
 `,

@@ -7,7 +7,7 @@ for (const owned of [false, true]) {
       let storage = "";
       if (owned) storage = "  let marker = #[0]\n  marker[0] := 1\n";
       await compileAndRun(
-        `entry const answer = func (host: U32 -> U32 ! {Foreign}) => return do:
+        `#entry const answer = func (host: U32 -> U32 ! {Foreign}) => return do:
 ${storage}  use skipped_and <- false and (host 100 == 100)
   use skipped_or <- true or (host 200 == 200)
   use selected_and <- true and (host 3 == 3)
@@ -50,8 +50,8 @@ Deno.test("ordinary callbacks repeat work and explicit local values share result
 const share = func callback => return do:
   use value <- callback ()
   break value + value
-entry const repeated = func (host: Unit -> U32 ! {Foreign}) => return repeat host
-entry const shared = func (host: Unit -> U32 ! {Foreign}) => return share host
+#entry const repeated = func (host: Unit -> U32 ! {Foreign}) => return repeat host
+#entry const shared = func (host: Unit -> U32 ! {Foreign}) => return share host
 `,
     (guest) => {
       let calls = 0;

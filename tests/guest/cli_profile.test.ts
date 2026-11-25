@@ -8,7 +8,7 @@ const executable = Deno.args[0] ??
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 const source = `const twice = func x => return x + x
 const quad = func x => return twice (twice x)
-entry const answer = func (x: U32) : U32 => return quad x + quad 1
+#entry const answer = func (x: U32) : U32 => return quad x + quad 1
 `;
 interface Phases {
   total_us?: number;
@@ -143,7 +143,7 @@ Deno.test("independent field requirements take linear candidate scans", async ()
     (_, i) => `func read${i} x => return x.value`,
   );
   lines.push(
-    `entry func answer (x: U32): U32 => return read0 {value: read${
+    `#entry func answer (x: U32): U32 => return read0 {value: read${
       count - 1
     } {value: x}}`,
   );
@@ -193,7 +193,7 @@ Deno.test("ownership analysis handles shared tuple and record subtrees", async (
     }
   }
   lines.push(
-    "entry func answer (x: U32): U32 => return do:",
+    "#entry func answer (x: U32): U32 => return do:",
     "  let (_, _, (_, _, (_, _, (_, _, right)))) = mixed2 x",
     "  let ((left, _), _) = diamond0 right",
     "  break (record0 left).right",

@@ -9,34 +9,34 @@ import {
 Deno.test("generic value interfaces reject before constant bounds while explicit scalar entries trap at instantiation", async () => {
   for (
     const source of [
-      "entry const answer = @array.get #[] 0\n",
-      'entry const answer = @panic "boom"\n',
-      'entry const earlier: U32 = @panic "earlier"\nentry const answer = @array.get #[] 0\n',
+      "#entry const answer = @array.get #[] 0\n",
+      '#entry const answer = @panic "boom"\n',
+      '#entry const earlier: U32 = @panic "earlier"\n#entry const answer = @array.get #[] 0\n',
     ]
   ) await compileExpectedFailure(source, "entry_type");
   for (const type of ["U32", "F32"]) {
     await assert.rejects(
-      compileAndRun(`entry const answer: ${type} = @array.get #[] 0\n`, () => {}),
+      compileAndRun(`#entry const answer: ${type} = @array.get #[] 0\n`, () => {}),
       WebAssembly.RuntimeError,
     );
   }
   const prelude =
     new URL("./entry-interface-order/prelude.blot", import.meta.url).pathname;
   await compileExpectedFailure(
-    "entry const answer = #[].first\n",
+    "#entry const answer = #[].first\n",
     "entry_type",
     undefined,
     { prelude },
   );
   await assert.rejects(
-    compileAndRun("entry const answer: U32 = #[].first\n", () => {}, { prelude }),
+    compileAndRun("#entry const answer: U32 = #[].first\n", () => {}, { prelude }),
     WebAssembly.RuntimeError,
   );
 });
 
 Deno.test("explicit scalar entries initialized by a panic trap at instantiation", async () => {
   await assert.rejects(
-    compileAndRun('entry const answer: U32 = @panic "boom"\n', () => {}),
+    compileAndRun('#entry const answer: U32 = @panic "boom"\n', () => {}),
     WebAssembly.RuntimeError,
   );
 });
@@ -44,7 +44,7 @@ Deno.test("explicit scalar entries initialized by a panic trap at instantiation"
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("written associated requirements reject before the generic value interface", async () => {
   await compileExpectedFailure(
-    `entry const answer = do:
+    `#entry const answer = do:
   let selected: U32 where {associated "missing" Bool Bool Bool} = 42
   break @array.get #[] 0
 `,
@@ -53,9 +53,9 @@ Deno.test.ignore("written associated requirements reject before the generic valu
 });
 const source =
   `const maker = func captured => return func (value: U32) => return @u32.add captured value
-entry const selected = maker 21
-entry const answer = if true then 42 else @panic "unreachable"
-entry const typed: Unit -> U32 = func () => return @array.get #[] 0
+#entry const selected = maker 21
+#entry const answer = if true then 42 else @panic "unreachable"
+#entry const typed: Unit -> U32 = func () => return @array.get #[] 0
 `;
 for (const asynchronous of [false, true]) {
   Deno.test(`interface preflight preserves staged closures and runtime traps (${asynchronous ? "JSPI" : "sync"})`, async () => {
@@ -86,11 +86,11 @@ for (const asynchronous of [false, true]) {
 for (
   const [name, code, origin] of [
     ["imported-index", "entry_type", undefined],
-    ["runtime-array-prefix", "entry_let_type", 10],
-    ["generic-function-prefix", "entry_type", 12],
+    ["runtime-array-prefix", "entry_let_type", 11],
+    ["generic-function-prefix", "entry_type", 13],
   ] as const
 ) {
-  // Direct backend: an `entry let` runtime array reports entry_type ("exported constants must be scalars") at its value instead of entry_let_type at its name (tasks/DELETE_SCOPED.md).
+  // Direct backend: an `#entry let` runtime array reports entry_type ("exported constants must be scalars") at its value instead of entry_let_type at its name (tasks/DELETE_SCOPED.md).
   // Direct backend: a generic entry function reports entry_type at its body instead of its name (tasks/DELETE_SCOPED.md).
   const ignored = name === "runtime-array-prefix" ||
     name === "generic-function-prefix";

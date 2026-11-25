@@ -190,8 +190,8 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     summary: "This expression form is not supported in executable Blot code.",
     why:
       "Bare `[1, 2, 3]` list literals are retired. Blot has one unified owned array type `#[T]` constructed with `#[1, 2, 3]`.",
-    before: `entry func main (): #[U32] => return [1, 2, 3]`,
-    after: `entry func main (): #[U32] => return #[1, 2, 3]`,
+    before: `#entry func main (): #[U32] => return [1, 2, 3]`,
+    after: `#entry func main (): #[U32] => return #[1, 2, 3]`,
     checklist: [
       "Prefix array literals with `#`: `#[1, 2, 3]` and empty typed arrays `let xs: #[U32] = #[]`.",
       "Prefix array types with `#`: `#[U32]` or `Array U32`.",
@@ -206,9 +206,9 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     why:
       "Most commonly caused by omitting `$` on a sum-type constructor (`Some 1` instead of `$Some 1`), using `None` instead of `$Nothing`, a typo in a local/global name, or forgetting an `import`.",
     before: `type Opt is data = $Some U32 | $Nothing
-entry func main (): Opt => return Some 1`,
+#entry func main (): Opt => return Some 1`,
     after: `type Opt is data = $Some U32 | $Nothing
-entry func main (): Opt => return $Some 1`,
+#entry func main (): Opt => return $Some 1`,
     checklist: [
       "Prefix every data constructor with `$` in expressions and patterns (`$Some x`, `$Nothing`, `$Vec2 { x: 1.0, y: 2.0 }`).",
       "Check for typos against declared `func` / `const` / `let` names.",
@@ -239,8 +239,8 @@ entry func main (): Opt => return $Some 1`,
       "Two types that must be equal failed unification (for example, returning `F32` where `U32` was declared).",
     why:
       "Blot has strict static typing with zero implicit numeric conversions (`U32` vs `F32` vs `Bool` vs `Unit`), and curried functions apply one argument at a time.",
-    before: `entry func main (): U32 => return 1.5`,
-    after: `entry func main (): F32 => return 1.5`,
+    before: `#entry func main (): U32 => return 1.5`,
+    after: `#entry func main (): F32 => return 1.5`,
     checklist: [
       "Convert explicitly between `U32` and `F32` with `@u32.to_f32` or `@f32.to_u32` (or `U32.to_f32` / `F32.to_u32`).",
       "Remember curried call syntax: `add a b` passes two curried args, whereas `f (a, b)` passes one 2-tuple.",
@@ -328,15 +328,15 @@ return a[0] + b[0]`,
     title:
       "Entry function has unhandled effects or invalid ABI-8 boundary type",
     summary:
-      "An `entry func`, `entry kernel`, or `entry process` cannot leave algebraic effects unhandled or expose closures/internal handles directly across the Wasm ABI-8 boundary.",
+      "Declarations marked `#entry`, `#kernel`, or `#process` cannot leave algebraic effects unhandled or expose closures/internal handles directly across the Wasm ABI-8 boundary.",
     why:
       "The WebAssembly host boundary has no ambient effect handlers or GC object references. Every effect used inside an entry point must be handled lexically with `with ...:` or `do <provider>:`.",
     before: `type Clock is effect = { now: Unit -> U32 }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   use t <- Clock.now ()
   return t`,
     after: `type Clock is effect = { now: Unit -> U32 }
-entry func main (): U32 =>
+#entry func main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t`,
@@ -357,14 +357,14 @@ entry func main (): U32 =>
     title:
       "Effectful computation used where pure code or a different effect row is required",
     summary:
-      "An expression performs an algebraic effect that is not permitted in this pure context (`const`, `let`, `spark`, `entry kernel`, or pure function signature).",
+      "An expression performs an algebraic effect that is not permitted in this pure context (`const`, `let`, `spark`, `#kernel`, or pure function signature).",
     why:
-      "Blot functions, `const` definitions, `spark` SIMD comprehensions, and `entry kernel` workers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `with` / `do`.",
+      "Blot functions, `const` definitions, `spark` SIMD comprehensions, and `#kernel` workers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `with` / `do`.",
     before: `let t = Clock.now ()`,
     after: `use t <- Clock.now ()`,
     checklist: [
       "Use `use x <- effect_call` (not `let x = ...`) to invoke effectful operations.",
-      "Keep `spark #[...]` bodies and `entry kernel` functions completely pure.",
+      "Keep `spark #[...]` bodies and `#kernel` functions completely pure.",
       "Handle local effects with `with Effect = { ... }:` or `do provider:` before crossing a pure boundary.",
     ],
   },
@@ -443,16 +443,16 @@ x := 2`,
     why:
       "Only local `let` bindings and parameters can be updated with `:=`. Module-level `const` bindings are immutable.",
     before: `const count = 0
-entry func main (): U32 =>
+#entry func main (): U32 =>
   count := 1
   return count`,
-    after: `entry func main (): U32 =>
+    after: `#entry func main (): U32 =>
   let count = 0
   count := 1
   return count`,
     checklist: [
       "Introduce local state with `let name = initial` before updating with `name := next`.",
-      "For persistent cross-turn state, use `entry process` instead of mutable module globals.",
+      "For persistent cross-turn state, use `#process` instead of mutable module globals.",
     ],
   },
 };
@@ -594,7 +594,7 @@ function findEnclosingScope(
   line1Based: number,
 ): string | null {
   const declRe =
-    /^(?:private\s+)?(entry\s+(?:func|kernel|process|const|let)|func|const|let|type|impl|contract|effect)\s+([A-Za-z_][A-Za-z0-9_.]*)/;
+    /^(?:private\s+)?(#entry\s+(?:func|const|let)|#kernel(?:\s+(?:func|const))?|#process(?:\s+const)?|func|const|let|type|impl|contract|effect)\s+([A-Za-z_][A-Za-z0-9_.]*)/;
   for (let i = Math.min(line1Based - 1, index.lines.length - 1); i >= 0; i--) {
     const line = index.lines[i];
     if (!line || line.startsWith(" ") || line.startsWith("\t")) continue;
@@ -793,14 +793,15 @@ function buildHeadlineAndFix(
       fix =
         "Algebraic data types require `is data`: `type Opt is data = $Some U32 | $Nothing`.";
     } else if (
-      /^(?:entry\s+|private\s+)?func\b.*->\s*[A-Z][A-Za-z0-9_]*\s*(?:=>|:|$)/
+      /^(?:private\s+)?(?:#entry\s+|#kernel\s+)?func\b.*->\s*[A-Z][A-Za-z0-9_]*\s*(?:=>|:|$)/
         .test(trimmedLine) && !trimmedLine.includes("): ")
     ) {
       fix =
         "Write the return type after `:` before `=>` (`func f (x: U32): U32 => ...`); `->` separates curried parameters.";
     } else if (
       trimmedLine.includes("{") &&
-      /^(?:entry\s+|private\s+)?(?:func|if|for|while|else)\b/.test(trimmedLine)
+      /^(?:private\s+)?(?:#entry\s+|#kernel\s+)?(?:func|if|for|while|else)\b/
+        .test(trimmedLine)
     ) {
       fix =
         "Blot uses indented suites after `=>` or `:`, not `{ ... }` braces.";

@@ -3,7 +3,7 @@ import * as fixture from "../../test_support/path_plans"
 import * as ground from "ink/navigation/ground"
 import * as math from "ink/math"
 
-entry func serial_shared (seed: U32) => return fixture.direct_shared seed
+#entry func serial_shared (seed: U32) => return fixture.direct_shared seed
 
 type RouteWorld = { storage: ground.Storage, stored: ground.Stored }
 
@@ -24,7 +24,7 @@ func run_one_route (ctx: RouteWorld) -> (query: U32): #[F32] =>
   return #[]
 
 // Variable-width prepared route kernel: each query yields [4 summary lanes, XYZ points...].
-entry kernel routes: Kernel [U32, U32, #[F32]] = { prepare: prepare_routes, run: run_one_route }
+#kernel const routes: Kernel [U32, U32, #[F32]] = { prepare: prepare_routes, run: run_one_route }
 
 effect StartRoute: Array U32 -> U32
 
@@ -39,9 +39,9 @@ func route_planner_step (st: own U32) -> (delta: U32): (U32, U32) =>
       best := q
   return (next, best)
 
-entry process route_planner: Process [U32, U32, U32] = { init: route_planner_init, step: route_planner_step }
+#process const route_planner: Process [U32, U32, U32] = { init: route_planner_init, step: route_planner_step }
 
 func request_planner (): U32 ! { StartRoute } => return StartRoute #[11, 114, 111, 117, 116, 101, 95, 112, 108, 97, 110, 110, 101, 114]
-entry func start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
+#entry func start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
   use endpoint <- request_planner ()
   return endpoint

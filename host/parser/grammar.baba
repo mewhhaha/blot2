@@ -22,12 +22,14 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | test_declaration | entry_concurrency_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+declaration = (visibility:"privatE" attributes:declaration_attribute* value:private_declaration_value LAYOUT_NEWLINE | attributes:declaration_attribute* value:public_declaration_value LAYOUT_NEWLINE) ;
+private_declaration_value = (value_declaration | named_function_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) ;
+public_declaration_value = (value_declaration | named_function_declaration | test_declaration | entry_concurrency_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) ;
 test_declaration = ("tesT" trap:"expect_trap"? name:STRING (":" body:suite | "=>" ("return" body:expression | body:suite | body:expression))) ;
-entry_concurrency_declaration = ("entrY" (entry_kernel_declaration | entry_process_declaration)) ;
-entry_kernel_declaration = ("kernel" (value:named_function | name:source_identifier ":" annotation:type_expression "=" body:kernel_body)) ;
+entry_concurrency_declaration = (entry_kernel_declaration | entry_process_declaration) ;
+entry_kernel_declaration = ("#" "kernel" (value:named_function | "const" name:source_identifier ":" annotation:type_expression "=" body:kernel_body)) ;
 kernel_body = ("{" LAYOUT_NEWLINE? ("prepare" ":" prepare:callable_path "," LAYOUT_NEWLINE? "run" ":" run:callable_path | "run" ":" run:callable_path "," LAYOUT_NEWLINE? "prepare" ":" prepare:callable_path) ","? LAYOUT_NEWLINE? "}") ;
-entry_process_declaration = ("process" name:source_identifier ":" annotation:type_expression "=" body:process_body) ;
+entry_process_declaration = ("#" "process" "const" name:source_identifier ":" annotation:type_expression "=" body:process_body) ;
 process_body = ("{" LAYOUT_NEWLINE? ("init" ":" init:callable_path "," LAYOUT_NEWLINE? "step" ":" step:callable_path | "step" ":" step:callable_path "," LAYOUT_NEWLINE? "init" ":" init:callable_path) ","? LAYOUT_NEWLINE? "}") ;
 callable_path = (root:source_identifier ("." (TYPE_IDENT ".")* name:source_identifier)? | types:(TYPE_IDENT ".")+ name:source_identifier) ;
 // The source adapter marks `opaque` only directly after `is`.
@@ -41,8 +43,9 @@ implementation_type_member = ("type" name:TYPE_IDENT "=" value:type_expression) 
 implementation_value_member = ("const" name:(source_identifier | TYPE_IDENT) annotation:(":" type_expression)? "=" value:lambda) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
-value_declaration = (modifier:source_identifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
-named_function_declaration = (modifier:source_identifier? value:named_function) ;
+entry_modifier = ("#" "entry") ;
+value_declaration = (modifier:entry_modifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
+named_function_declaration = (modifier:entry_modifier? value:named_function) ;
 named_function = ("func" name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:suite | body:expression)) ;
 function_name = (root:source_identifier rest:("." (source_identifier | TYPE_IDENT))* | root:TYPE_IDENT rest:("." (source_identifier | TYPE_IDENT))+) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
@@ -180,10 +183,10 @@ collection_if = ("if" condition:collection_infix "then" consequence:collection_e
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
 collection_infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
-source_identifier = (IDENT | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
+source_identifier = (IDENT | "entry" | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 
 quantified_type = (kind:("forall" | "exists") "[" binders:quantified_binder ("," binders:quantified_binder)* "]" where:quantified_where? "=>" body:type_expression) ;
-quantified_binder = (sort:("row" | "region")? name:(IDENT | "expect_trap" | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
+quantified_binder = (sort:("row" | "region")? name:(IDENT | "entry" | "expect_trap" | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
 quantified_where = (("where" | "wherE") body:constraint_body) ;
 package_pack = ("pack" "[" witnesses:type_expression ("," witnesses:type_expression)* "]" value:expression "as" annotation:type_expression) ;
 package_unpack = ("unpack" package:expression "as" "[" binders:quantified_binder ("," binders:quantified_binder)* "]" name:source_identifier "in" body:expression) ;

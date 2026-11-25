@@ -7,7 +7,7 @@ func shift (access: own Access) -> (by: U32): Access => return do:
     access.bricks[index] := brick
   access.count[0] := 7
   return access
-entry func run (n: U32): U32 => return do:
+#entry func run (n: U32): U32 => return do:
   let bricks: Array Brick = #[$Brick { from: 1, to: 2 }]
   let access = { bricks, count: #[0] }
   access := shift access n

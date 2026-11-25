@@ -12,12 +12,12 @@ Reproducible cross-language benchmark suite backing the numbers in the root
   -C panic=abort`) and natively (`x86_64`, `-O3`, thin LTO).
 - [ink_ecs_bench.blot](ink_ecs_bench.blot): Real Ink ECS benchmark using
   `ink/ecs` (`ecs.Entities`, `ecs.Pool`, `ecs.Metadata`) and `ink/ecs/query`
-  (`query.prepare`, `query.is_current`) inside ABI 8 persistent `entry process`
+  (`query.prepare`, `query.is_current`) inside ABI 8 persistent `#process`
   guests, plus an idiomatic Blot/Ink SoA + `spark` SIMD process.
 - [multicore_aos_bench.blot](multicore_aos_bench.blot): Generalized AoS `#[Vec4]` /
   `#[Vec2]` record auto-SIMD particle Euler integration, stateless 256×256
-  Mandelbrot tiles for multi-core isolated-guest scaling, an ABI 8 `entry kernel`
-  (`mandelbrot_row`) for Deno `KernelPool`, and a persistent `entry process`
+  Mandelbrot tiles for multi-core isolated-guest scaling, an ABI 8 `#kernel`
+  (`mandelbrot_row`) for Deno `KernelPool`, and a persistent `#process`
   (`particle_sim`) for zero-alloc step throughput.
 - [bench_multicore_kernel.ts](bench_multicore_kernel.ts): Deno `KernelPool`
   (0, 1, 2, 4, 8 workers) and `Processes` runner for `multicore_aos_bench.blot`
@@ -27,7 +27,7 @@ Reproducible cross-language benchmark suite backing the numbers in the root
   the same `wtime-aot 0.1.2` (`--backend x64 --target-cpu native --blot-cdylib`,
   `x64-v3` with AVX2/BMI2, zero external deps, explicit software bounds checks),
   native Rust `-O3` kernels, `bevy_ecs 0.20.1` native worlds, AoS `Vec2`/`Vec4`
-  record SIMD, 1–8 thread isolated-guest scaling, and persistent `entry process`
+  record SIMD, 1–8 thread isolated-guest scaling, and persistent `#process`
   throughput with bit-exact checksum verification on every matching workload.
 - [plot_benchmarks.py](plot_benchmarks.py): Generates the SVG graphs embedded in
   [README.md](../../README.md) directly from the recorded JSON evidence.

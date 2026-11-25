@@ -108,7 +108,7 @@ function fieldSource(repetitions: number, fieldCount: number): string {
     `const make = func (input: U32) => return ${constructor}{${record}}`,
   );
   lines.push(
-    "entry const answer = func (input: U32): U32 => return do:",
+    "#entry const answer = func (input: U32): U32 => return do:",
     "  let marker: GrowArray U32 = #[input]",
     "  let result = @u32.add input marker[0]",
   );
@@ -139,7 +139,7 @@ function sourceFor(width: number): string {
     tops.push(prior);
   }
   lines.push(
-    "entry const answer = func (input: U32): U32 => return do:",
+    "#entry const answer = func (input: U32): U32 => return do:",
     "  let marker: GrowArray U32 = #[input]",
     "  let result = @u32.add input marker[0]",
   );

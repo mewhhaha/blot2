@@ -19,7 +19,7 @@ const Gauge.lerp = func (a: Gauge) => return func (b: Gauge) => return func (t: 
   let $Gauge x = a
   let $Gauge y = b
   break $Gauge (x + (y - x) * t)
-entry const main = func (x: F32) : F32 => return do:
+#entry const main = func (x: F32) : F32 => return do:
   let $Gauge v = mix.halfway ($Gauge 0.0) ($Gauge x)
   break v
 `,

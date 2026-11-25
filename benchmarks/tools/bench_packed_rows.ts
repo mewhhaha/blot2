@@ -13,7 +13,7 @@ const fixtures = [
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
 let rows = @array.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
-entry const run = func factor => return do:
+#entry const run = func factor => return do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
@@ -26,7 +26,7 @@ entry const run = func factor => return do:
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
 let rows = @list.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
-entry const run = func factor => return do:
+#entry const run = func factor => return do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
@@ -39,7 +39,7 @@ entry const run = func factor => return do:
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
 let rows = @list.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
-entry const run = func count => return do:
+#entry const run = func count => return do:
   let cursor = rows.iter
   let result = 0
   for i in 0..count:
@@ -60,7 +60,7 @@ const sum = func values => return do:
   for row in values:
     result := self + row.a + row.b + row.c
   break result
-entry const run = func count => return sum (build count)
+#entry const run = func count => return sum (build count)
 `,
   },
   {
@@ -74,7 +74,7 @@ const sum = func values => return do:
   for (a, b, c) in values:
     result := self + a + b + c
   break result
-entry const run = func count => return sum (build count)
+#entry const run = func count => return sum (build count)
 `,
   },
   {
@@ -83,7 +83,7 @@ entry const run = func count => return sum (build count)
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
 const build = func count => return @array.generate count (func i => return {c: i * 2, a: i, b: i + 1})
-entry const run = func count => return do:
+#entry const run = func count => return do:
   let rows = build count
   let result = 0
   for i in 0..count:
@@ -102,7 +102,7 @@ const sum = func values => return do:
   for row in values:
     result := self + row.a + row.b
   break result
-entry const run = func count => return sum (@array.from_list (@list.from_array (build count)))
+#entry const run = func count => return sum (@array.from_list (@list.from_array (build count)))
 `,
   },
   {
@@ -111,7 +111,7 @@ entry const run = func count => return sum (@array.from_list (@list.from_array (
     expected: (100000 * 100000) >>> 0,
     source: `
 const build = func count => return @array.generate count (func i => return {a: #[i], b: i + 1})
-entry const run = func count => return do:
+#entry const run = func count => return do:
   let result = 0
   for row in build count:
     result := self + row.a[0] + row.b

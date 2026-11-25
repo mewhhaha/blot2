@@ -95,7 +95,7 @@ func merge_pass (src: #[U32]) -> (dst: own #[U32]) -> (width: U32) -> (n: U32): 
     lo := self + step
   return dst
 
-entry func sort_vec (n: U32): #[U32] =>
+#entry func sort_vec (n: U32): #[U32] =>
   let a = @array.fill n 0
   let b = @array.fill n 0
   let s: U32 = 98765
@@ -117,7 +117,7 @@ entry func sort_vec (n: U32): #[U32] =>
   return if in_b then b else a
 
 // Self-overlapping copy-tail (dst == src, k = i + 1) must fall back from memory.copy!
-entry func aliased_copy_tail (n: U32): #[U32] =>
+#entry func aliased_copy_tail (n: U32): #[U32] =>
   let a = @array.fill n 0
   for idx in 0 .. n:
     a[idx] := idx + 1
@@ -133,7 +133,7 @@ entry func aliased_copy_tail (n: U32): #[U32] =>
   return a
 
 // OOB dst in 2-way merge loop or copy-tail must trap!
-entry func merge_dst_oob (packed: U32): #[U32] =>
+#entry func merge_dst_oob (packed: U32): #[U32] =>
   let n_src = packed & 255
   let n_dst = (packed >> 8) & 255
   let mid = (packed >> 16) & 255
@@ -201,7 +201,7 @@ type Pos is data = $Pos { x: F32, y: F32, z: F32 }
 type Vel is data = $Vel { vx: F32, vy: F32, vz: F32 }
 
 // 5B-1 + 5B-2: scrambled field construction, sub, $Nothing preservation, NaN canonicalization, indirect dense_ids!
-entry func vec3_indirect_step (packed: U32): #[U32] =>
+#entry func vec3_indirect_step (packed: U32): #[U32] =>
   let n = packed & 255
   let steps = (packed >> 8) & 255
   let mode = (packed >> 16) & 255
@@ -249,7 +249,7 @@ entry func vec3_indirect_step (packed: U32): #[U32] =>
   return out
 
 // Self-aliased pos == vel (doubling every lane)
-entry func vec3_self_alias (n: U32): #[U32] =>
+#entry func vec3_self_alias (n: U32): #[U32] =>
   let pos: #[Maybe Pos] = @array.fill n $Nothing
   for i in 0 .. n:
     let f = U32.to_f32 (i + 1)
@@ -327,7 +327,7 @@ entry func vec3_self_alias (n: U32): #[U32] =>
 });
 
 Deno.test("Tier 5C: 2-row x 16-col matmul across even/odd rows, tails, NaNs, overlapping C-stride & OOB trap", async () => {
-  const src = `entry func matmul_rect (packed: U32): #[F32] =>
+  const src = `#entry func matmul_rect (packed: U32): #[F32] =>
   let rows = packed & 255
   let inner = (packed >> 8) & 255
   let cols = (packed >> 16) & 255
@@ -353,7 +353,7 @@ Deno.test("Tier 5C: 2-row x 16-col matmul across even/odd rows, tails, NaNs, ove
   return c
 
 // NaN canonicalization in BOTH row 0 and row 1 (SIMD tile col=5 AND scalar tail col=17)
-entry func matmul_nan_2row (m: U32): #[F32] =>
+#entry func matmul_nan_2row (m: U32): #[F32] =>
   let a = @array.fill 6 1.0
   let b = @array.fill (2 * m) 1.0
   let c = @array.fill (3 * m) 0.0
@@ -378,7 +378,7 @@ entry func matmul_nan_2row (m: U32): #[F32] =>
   return c
 
 // Overlapping c_stride < cols MUST fall back to sequential row order!
-entry func matmul_overlap_c (m: U32): #[F32] =>
+#entry func matmul_overlap_c (m: U32): #[F32] =>
   let a = @array.fill 4 1.0
   let b = @array.fill (2 * m) 1.0
   let c = @array.fill (m + 8) 0.0
@@ -395,7 +395,7 @@ entry func matmul_overlap_c (m: U32): #[F32] =>
   return c
 
 // OOB row access must fall back and trap!
-entry func matmul_oob (m: U32): F32 =>
+#entry func matmul_oob (m: U32): F32 =>
   let a = @array.fill 4 1.0
   let b = @array.fill (2 * m) 1.0
   let c = @array.fill (m + 4) 0.0
@@ -482,7 +482,7 @@ entry func matmul_oob (m: U32): F32 =>
 });
 
 Deno.test("Tier 5D: 16-wide SIMD masked Bool and unmasked U32 reductions with edges and OOB traps", async () => {
-  const src = `entry func masked_reduce (packed: U32): #[U32] =>
+  const src = `#entry func masked_reduce (packed: U32): #[U32] =>
   let start = packed & 255
   let end = (packed >> 8) & 255
   let len = (packed >> 16) & 255
@@ -500,7 +500,7 @@ Deno.test("Tier 5D: 16-wide SIMD masked Bool and unmasked U32 reductions with ed
       sum := self + i
   return #[count, sum]
 
-entry func unmasked_reduce (packed: U32): #[U32] =>
+#entry func unmasked_reduce (packed: U32): #[U32] =>
   let start = packed & 255
   let end = (packed >> 8) & 255
   let len = (packed >> 16) & 255
@@ -591,7 +591,7 @@ entry func unmasked_reduce (packed: U32): #[U32] =>
 });
 
 Deno.test("Tier 5E: 4-wide v128 outer-loop escape-time SIMD with divergence, tails & non-dead carry fallback", async () => {
-  const src = `entry func mandel_small (packed: U32): U32 =>
+  const src = `#entry func mandel_small (packed: U32): U32 =>
   let size = packed & 255
   let limit = (packed >> 8) & 255
   let inv = if size > 0 then 1.0 / U32.to_f32 size else 0.0
@@ -618,7 +618,7 @@ Deno.test("Tier 5E: 4-wide v128 outer-loop escape-time SIMD with divergence, tai
   return total
 
 // When a non-it carry (zr) is ALSO used after the inner loop, 5E MUST fall back to scalar!
-entry func non_dead_carry_fallback (n: U32): U32 =>
+#entry func non_dead_carry_fallback (n: U32): U32 =>
   let total: U32 = 0
   let acc = 0.0
   for px in 0 .. n:
@@ -709,7 +709,7 @@ entry func non_dead_carry_fallback (n: U32): U32 =>
 });
 
 Deno.test("Tier 5F: 16-wide SIMD LCG recurrence & 8x scalar affine unroll across all remainders", async () => {
-  const src = `entry func lcg_xor (packed: U32): U32 =>
+  const src = `#entry func lcg_xor (packed: U32): U32 =>
   let seed = packed & 65535
   let n = packed >> 16
   let state = seed | 1
@@ -719,7 +719,7 @@ Deno.test("Tier 5F: 16-wide SIMD LCG recurrence & 8x scalar affine unroll across
     acc := self ^ (state >> 16)
   return acc ^ state
 
-entry func lcg_add_range (packed: U32): U32 =>
+#entry func lcg_add_range (packed: U32): U32 =>
   let start = packed & 255
   let end = (packed >> 8) & 255
   let state: U32 = 77
@@ -730,7 +730,7 @@ entry func lcg_add_range (packed: U32): U32 =>
   return acc ^ state
 
 // Non-associative 2-op carry exercises the 8x scalar unroll fallback!
-entry func lcg_scalar8 (n: U32): U32 =>
+#entry func lcg_scalar8 (n: U32): U32 =>
   let state: U32 = 1337
   let acc: U32 = 0
   for _ in 0 .. n:

@@ -13,13 +13,13 @@ Deno.test("Phase 1 executable controls: k==1 tuple Box, escape-safe nested spark
 func unwrap_pos (b: Box): U32 => return case b of
   $Box (a, c) => @u32.add a c
 
-entry func test_k1_box (x: U32): U32 =>
+#entry func test_k1_box (x: U32): U32 =>
   let mk = $Box
   let b1 = $Box (x, 10)
   let b2 = mk (x, 4)
   return @u32.add (unwrap_pos b1) (unwrap_pos b2)
 
-entry func test_nested_spark (): Array U32 =>
+#entry func test_nested_spark (): Array U32 =>
   let rows = spark #[#[x, @u32.add x 1] | x <- 0..2]
   return #[rows[0][0], rows[0][1], rows[1][0], rows[1][1]]
 
@@ -30,7 +30,7 @@ func scratch_iter (x: U32): U32 =>
     acc := @u32.add self tmp[i]
   return acc
 
-entry func test_scratch_spark (n: U32): Array U32 => return spark #[scratch_iter x | x <- 0..n]
+#entry func test_scratch_spark (n: U32): Array U32 => return spark #[scratch_iter x | x <- 0..n]
 `,
     (guest) => {
       // (5 + 10) + (5 + 4) = 24
@@ -45,8 +45,8 @@ entry func test_scratch_spark (n: U32): Array U32 => return spark #[scratch_iter
   );
 });
 
-Deno.test("Phase 1 entry kernel / entry process syntax, represented handles, visibility, wire types, and opacity bans", async () => {
-  // Positive: private entry func preserved, dynamic Kernel handle selection, stateless & prepared kernel, process
+Deno.test("Phase 1 #kernel / #process syntax, represented handles, visibility, wire types, and opacity bans", async () => {
+  // Positive: private #entry func preserved, dynamic Kernel handle selection, stateless & prepared kernel, process
   await compileAndRun(
     `type Query is data = $Query { x: U32, y: F32 }
 type Ctx is data = $Ctx { scale: U32, weights: #[U32] }
@@ -65,14 +65,14 @@ func proc_step (st: own PState) -> (cmd: U32): (PState, U32) =>
   let next = @u32.add total cmd
   return ($PState { total: next, log: log }, next)
 
-private entry func keep_private (x: U32): U32 => return @u32.add x 1
-entry kernel func double_u32 (x: U32): U32 => return @u32.mul x 2
-entry kernel plan_a: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item }
-entry kernel plan_b: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item_alt }
-entry process counter: Process [U32, U32, U32] = { init: proc_init, step: proc_step }
+private #entry func keep_private (x: U32): U32 => return @u32.add x 1
+#kernel func double_u32 (x: U32): U32 => return @u32.mul x 2
+#kernel const plan_a: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item }
+#kernel const plan_b: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item_alt }
+#process const counter: Process [U32, U32, U32] = { init: proc_init, step: proc_step }
 
 func select_kernel (flag: Bool): Kernel [#[U32], Query, U32] => return if flag then plan_a else plan_b
-entry func ok (x: U32): U32 =>
+#entry func ok (x: U32): U32 =>
   let _ = select_kernel true
   let _ = counter
   let _ = double_u32
@@ -86,28 +86,46 @@ entry func ok (x: U32): U32 =>
 
   // Reject $Kernel / $Process forging outside std/prelude
   await compileExpectedFailure(
-    `entry func forge () => return $Process 0\n`,
+    `#entry func forge () => return $Process 0\n`,
     "unknown_value",
   );
 
-  // Reject private entry kernel / private entry process
+  // Reject private #kernel / private #process
   await compileExpectedFailure(
-    `private entry kernel func bad (x: U32): U32 => return x\n`,
+    `private #kernel func bad (x: U32): U32 => return x\n`,
     "GPU_FRONTEND_SYNTAX_ERROR",
   );
   await compileExpectedFailure(
     `func i (x: U32): U32 => return x
 func s (st: own U32) -> (c: U32): (U32, U32) => return (st, c)
-private entry process bad: Process [U32, U32, U32] = { init: i, step: s }
+private #process const bad: Process [U32, U32, U32] = { init: i, step: s }
 `,
     "GPU_FRONTEND_SYNTAX_ERROR",
   );
+
+  const callables = `func p (x: U32): U32 => return x
+func r (ctx: U32) -> (x: U32): U32 => return @u32.add ctx x
+func i (x: U32): U32 => return x
+func s (st: own U32) -> (c: U32): (U32, U32) => return (st, c)
+`;
+  for (const declaration of [
+    "entry kernel func old (x: U32): U32 => return x",
+    "entry kernel old: Kernel [U32, U32, U32] = { prepare: p, run: r }",
+    "entry process old: Process [U32, U32, U32] = { init: i, step: s }",
+    "#kernel bad: Kernel [U32, U32, U32] = { prepare: p, run: r }",
+    "#process bad: Process [U32, U32, U32] = { init: i, step: s }",
+  ]) {
+    await compileExpectedFailure(
+      `${callables}${declaration}\n`,
+      "GPU_FRONTEND_SYNTAX_ERROR",
+    );
+  }
 
   // Reject non-PersistentSafe process state (closure inside State)
   await compileExpectedFailure(
     `func i (_: U32): { f: Unit -> Unit } => return { f: func () => return () }
 func s (st: own { f: Unit -> Unit }) -> (_: U32): ({ f: Unit -> Unit }, U32) => return (st, 0)
-entry process bad_state: Process [U32, U32, U32] = { init: i, step: s }
+#process const bad_state: Process [U32, U32, U32] = { init: i, step: s }
 `,
     "kernel_type",
   );
@@ -115,14 +133,14 @@ entry process bad_state: Process [U32, U32, U32] = { init: i, step: s }
   // Reject opaque wire types (even in defining module)
   await compileExpectedFailure(
     `type Secret is opaque = U32
-entry kernel func leak (x: Secret): U32 => return 0
+#kernel func leak (x: Secret): U32 => return 0
 `,
     "kernel_type",
   );
 
   // Reject non-FlatNumeric wire item (variable array as Item)
   await compileExpectedFailure(
-    `entry kernel func bad_item (x: #[U32]): U32 => return x.length\n`,
+    `#kernel func bad_item (x: #[U32]): U32 => return x.length\n`,
     "kernel_type",
   );
 
@@ -131,7 +149,7 @@ entry kernel func leak (x: Secret): U32 => return 0
     `effect Ping: Unit -> U32
 func p (w: U32): U32 ! { Ping } => return Ping ()
 func r (c: U32) -> (x: U32): U32 => return x
-entry kernel k: Kernel [U32, U32, U32] = { prepare: p, run: r }
+#kernel const k: Kernel [U32, U32, U32] = { prepare: p, run: r }
 `,
     "kernel_effectful",
   );
@@ -141,27 +159,27 @@ entry kernel k: Kernel [U32, U32, U32] = { prepare: p, run: r }
     `func make_fn (): U32 -> U32 => return func x => return x
 const not_a_func: U32 -> U32 = make_fn ()
 func r (c: U32) -> (x: U32): U32 => return x
-entry kernel k: Kernel [U32, U32, U32] = { prepare: not_a_func, run: r }
+#kernel const k: Kernel [U32, U32, U32] = { prepare: not_a_func, run: r }
 `,
     "kernel_callable",
   );
 
-  // Reject `entry func` / `export` callables as kernel prepare/run or process init/step
+  // Reject `#entry func` / `export` callables as kernel prepare/run or process init/step
   // (host entries are exempt from `ownedResult` and could otherwise leak a static global into `own State`).
   await compileExpectedFailure(
     `const pool: #[U32] = #[10, 20, 30]
-entry func p_init (_: U32): #[U32] => return pool
+#entry func p_init (_: U32): #[U32] => return pool
 func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   s[0] := cmd
   return (s, s[0])
-entry process p: Process [U32, U32, U32] = { init: p_init, step: p_step }
+#process const p: Process [U32, U32, U32] = { init: p_init, step: p_step }
 `,
     "kernel_callable",
   );
   await compileExpectedFailure(
-    `entry func prep (w: U32): U32 => return w
+    `#entry func prep (w: U32): U32 => return w
 func r (c: U32) -> (x: U32): U32 => return @u32.add c x
-entry kernel k: Kernel [U32, U32, U32] = { prepare: prep, run: r }
+#kernel const k: Kernel [U32, U32, U32] = { prepare: prep, run: r }
 `,
     "kernel_callable",
   );
@@ -169,7 +187,7 @@ entry kernel k: Kernel [U32, U32, U32] = { prepare: prep, run: r }
   // Reject shallow `@storage.copy` mutating nested inner arrays on composites or shared nested arrays
   await compileExpectedFailure(
     `const nested: #[#[U32]] = #[#[1, 2]]
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let c = copy { box: nested }
   c.box[0][0] := 99
   return nested[0][0]
@@ -177,7 +195,7 @@ entry func bad (): U32 =>
     "aliased_update",
   );
   await compileExpectedFailure(
-    `entry func bad (): U32 =>
+    `#entry func bad (): U32 =>
   let s: *#[#[U32]] = freeze #[#[1, 2]]
   let c: #[#[U32]] = copy s
   c[0][0] := 99
@@ -188,7 +206,7 @@ entry func bad (): U32 =>
   await compileExpectedFailure(
     `type Boxed is data = $Boxed { rows: #[#[U32]] }
 const nested: #[#[U32]] = #[#[1, 2]]
-entry func bad (): U32 =>
+#entry func bad (): U32 =>
   let c = copy ($Boxed { rows: nested })
   c.rows[0][0] := 99
   return nested[0][0]
@@ -198,8 +216,8 @@ entry func bad (): U32 =>
 
   // Reject @flat.* outside std/
   await compileExpectedFailure(
-    `entry kernel func k (x: U32): U32 => return x
-entry func bad (): U32 => return @flat.kernel_id k
+    `#kernel func k (x: U32): U32 => return x
+#entry func bad (): U32 => return @flat.kernel_id k
 `,
     "std_only_intrinsic",
   );
@@ -221,7 +239,7 @@ func run_fill (): U32 =>
 `;
   await compileExpectedFailure(
     fillDecls +
-      `entry func bad (xs: #[U32]): #[U32] => return spark #[run_fill () | x <- xs]\n`,
+      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_fill () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -254,7 +272,7 @@ func pick (): Unit -> Unit => return touch_pool
 func body (x: U32): U32 =>
 ${snippet}
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
       "aliased_update",
     );
@@ -265,7 +283,7 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
     `func touch (row: #[U32]): U32 =>
   @storage.push row 1
   return row[0]
-entry func bad (): #[U32] =>
+#entry func bad (): #[U32] =>
   let seed: #[U32] = #[0]
   return spark #[touch row | row <- #[seed]]
 `,
@@ -275,7 +293,7 @@ entry func bad (): #[U32] =>
     `func touch (row: #[U32]): U32 =>
   @storage.push row 1
   return row[0]
-entry func bad (): #[U32] =>
+#entry func bad (): #[U32] =>
   let seed: #[U32] = #[0]
   let xs: #[#[U32]] = #[seed]
   return spark #[touch row | row <- xs]
@@ -283,7 +301,7 @@ entry func bad (): #[U32] =>
     "aliased_update",
   );
 
-  // (b4) entry process global mutation & Config/Cmd mutation vs @storage.copy accepted
+  // (b4) #process global mutation & Config/Cmd mutation vs @storage.copy accepted
   await compileExpectedFailure(
     `const shared_arr: #[U32] = #[1, 2, 3]
 func p_init (_: U32): #[U32] =>
@@ -293,7 +311,7 @@ func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   s[0] := cmd
   let v = s[0]
   return (s, v)
-entry process bad: Process [U32, U32, U32] = { init: p_init, step: p_step }
+#process const bad: Process [U32, U32, U32] = { init: p_init, step: p_step }
 `,
     "aliased_update",
   );
@@ -303,17 +321,17 @@ func p_init (_: U32): #[U32] => return #[0]
 func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   @storage.push shared_arr cmd
   return (s, shared_arr[0])
-entry process bad2: Process [U32, U32, U32] = { init: p_init, step: p_step }
+#process const bad2: Process [U32, U32, U32] = { init: p_init, step: p_step }
 `,
     "aliased_update",
   );
-  // Flat-numeric `entry process` Config/Cmd inputs are borrowed `#[U32]`:
+  // Flat-numeric `#process` Config/Cmd inputs are borrowed `#[U32]`:
   await compileExpectedFailure(
     `func p_init (cfg: #[U32]): #[U32] =>
   let _ = @simd.store cfg 0 (99, 0, 0, 0)
   return #[0]
 func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) => return (s, cmd)
-entry process bad_cfg: Process [#[U32], U32, U32] = { init: p_init, step: p_step }
+#process const bad_cfg: Process [#[U32], U32, U32] = { init: p_init, step: p_step }
 `,
     "aliased_update",
   );
@@ -322,7 +340,7 @@ entry process bad_cfg: Process [#[U32], U32, U32] = { init: p_init, step: p_step
 func p_step (s: own #[U32]) -> (cmd: #[U32]): (#[U32], U32) =>
   let _ = @simd.store cmd 0 (99, 0, 0, 0)
   return (s, cmd[0])
-entry process bad_cmd: Process [U32, #[U32], U32] = { init: p_init, step: p_step }
+#process const bad_cmd: Process [U32, #[U32], U32] = { init: p_init, step: p_step }
 `,
     "aliased_update",
   );
@@ -333,8 +351,8 @@ func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   s[0] := cmd
   let v = s[0]
   return (s, v)
-entry process good: Process [U32, U32, U32] = { init: p_init, step: p_step }
-entry func ok (): U32 => return 1
+#process const good: Process [U32, U32, U32] = { init: p_init, step: p_step }
+#entry func ok (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("ok", null), 1);
@@ -356,7 +374,7 @@ func prep (w: #[U32]): #[U32] =>
     @storage.push ctx a
     @storage.push out b
     return out[@u32.sub out.length 1]) x 1
-entry kernel k: Kernel [#[U32], U32, U32] = { prepare: prep, run: bad_run }
+#kernel const k: Kernel [#[U32], U32, U32] = { prepare: prep, run: bad_run }
 `,
     "aliased_update",
   );
@@ -366,8 +384,8 @@ entry kernel k: Kernel [#[U32], U32, U32] = { prepare: prep, run: bad_run }
     let out: #[U32] = #[0]
     @storage.push out (@u32.add ctx[0] (@u32.add a b))
     return out[@u32.sub out.length 1]) x 1
-entry kernel k: Kernel [#[U32], U32, U32] = { prepare: prep, run: good_run }
-entry func ok (): U32 => return 1
+#kernel const k: Kernel [#[U32], U32, U32] = { prepare: prep, run: good_run }
+#entry func ok (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("ok", null), 1);
@@ -386,7 +404,7 @@ func body (x: U32): U32 =>
   let scratch: #[U32] = #[0, 0]
   ${body}
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
 
   const cases: [string, string, string][] = [
@@ -509,7 +527,7 @@ func run_with_cell (): U32 =>
 `;
   await compileExpectedFailure(
     withCellDecls +
-      `entry func bad (xs: #[U32]): #[U32] => return spark #[run_with_cell () | x <- xs]\n`,
+      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_with_cell () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -528,7 +546,7 @@ func run_state_prov (): U32 =>
 `;
   await compileExpectedFailure(
     stateProvDecls +
-      `entry func bad (xs: #[U32]): #[U32] => return spark #[run_state_prov () | x <- xs]\n`,
+      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_state_prov () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -546,7 +564,7 @@ func run_stored_op (): U32 =>
 `;
   await compileExpectedFailure(
     storedOpDecls +
-      `entry func bad (xs: #[U32]): #[U32] => return spark #[run_stored_op () | x <- xs]\n`,
+      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_stored_op () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -563,7 +581,7 @@ func run_nested_with (): U32 =>
 `;
   await compileExpectedFailure(
     nestedWithDecls +
-      `entry func bad (xs: #[U32]): #[U32] => return spark #[run_nested_with () | x <- xs]\n`,
+      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_nested_with () | x <- xs]\n`,
     "aliased_update",
   );
 });
@@ -579,7 +597,7 @@ func write_first (rows: #[#[U32]]): U32 =>
 func body (_: U32): U32 =>
   let rows = array.slice 0 1 #[pool]
   return write_first rows
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
     undefined,
@@ -594,7 +612,7 @@ func body (x: U32): U32 =>
   let popped = @storage.pop stack
   @storage.push popped 99
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -623,7 +641,7 @@ func fill_nested (dst: own #[Unit -> Unit]) -> (p: #[U32]): #[Unit -> Unit] =>
 func body (x: U32): U32 =>
   ${body}
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
         "aliased_update",
       );
@@ -640,7 +658,7 @@ func body (x: U32): U32 =>
   let ys = #[...#[pool]]
   push_grow ys[0] 99
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -653,7 +671,7 @@ func body (sw: *Holder) -> (x: U32): U32 =>
   let r: Holder = copy sw
   let _ = @simd.store r.arr[0] 0 (99, 0, 0, 0)
   return x
-entry func bad (xs: #[U32]): #[U32] =>
+#entry func bad (xs: #[U32]): #[U32] =>
   let sw: *Holder = freeze ($Holder { arr: #[#[1, 2, 3, 4]] })
   return spark #[body sw x | x <- xs]
 `,
@@ -665,7 +683,7 @@ func body (sw: *Holder) -> (x: U32): U32 =>
   let r: Holder = copy sw
   let _ = @simd.store r.arr 0 (@u32.add x 10, 0, 0, 0)
   return @u32.add r.arr[0] sw.arr[0]
-entry func good (xs: #[U32]): #[U32] =>
+#entry func good (xs: #[U32]): #[U32] =>
   let sw: *Holder = freeze ($Holder { arr: #[1, 2, 3, 4] })
   return spark #[body sw x | x <- xs]
 `,
@@ -685,7 +703,7 @@ func body (x: U32): U32 =>
   let p = @storage.load r
   push_grow p 99
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -693,10 +711,10 @@ entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
   // External entry mutating const pool -> rejected everywhere by ownership (`aliased_update`)
   await compileExpectedFailure(
     `const table: #[U32] = #[1, 2, 3]
-entry func mutate_outside (v: U32): U32 =>
+#entry func mutate_outside (v: U32): U32 =>
   @storage.push table v
   return table[0]
-entry kernel func read_table (x: U32): U32 => return @u32.add x table[0]
+#kernel func read_table (x: U32): U32 => return @u32.add x table[0]
 `,
     "aliased_update",
   );
@@ -706,9 +724,9 @@ entry kernel func read_table (x: U32): U32 => return @u32.add x table[0]
     `const base_table: #[U32] = #[1, 2, 3]
 const view_table: #[&[U32]] = #[&base_table[0..1]]
 const pure_table: #[U32] = #[10, 20, 30]
-entry kernel func read_view (x: U32): U32 => return @u32.add x view_table[0][0]
-entry kernel func read_pure (x: U32): U32 => return @u32.add x pure_table[1]
-entry func ok (): U32 => return @u32.add base_table[0] pure_table[1]
+#kernel func read_view (x: U32): U32 => return @u32.add x view_table[0][0]
+#kernel func read_pure (x: U32): U32 => return @u32.add x pure_table[1]
+#entry func ok (): U32 => return @u32.add base_table[0] pure_table[1]
 `,
     (guest) => equal(guest.call("ok", null), 21),
   );
@@ -730,7 +748,7 @@ func body (x: U32): U32 =>
   let p = f0 pool (x == 0)
   @storage.push p 99
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
   await compileExpectedFailure(diamondSrc, "aliased_update");
 
@@ -751,7 +769,7 @@ func body (x: U32): U32 =>
   let w = dispatch x pool
   @storage.push w[0] 99
   return x
-entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
   await compileExpectedFailure(widenSrc, "aliased_update");
 });
@@ -780,7 +798,7 @@ func relay_two (p: a) -> (s: own b): #[b] =>
   let b = make_one_box s
   return b
 
-entry kernel func read_computed_lut (x: U32): U32 => return @u32.add x computed_lut[2]
+#kernel func read_computed_lut (x: U32): U32 => return @u32.add x computed_lut[2]
 
 func precise_body (x: U32): U32 =>
   let scratch: #[U32] = #[1, 2, 0, 0]
@@ -831,7 +849,7 @@ func precise_body (x: U32): U32 =>
 
   return @u32.add x (@u32.add copied[0] computed_lut[1])
 
-entry func precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x | x <- xs]
+#entry func precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x | x <- xs]
 `,
     (guest) => {
       // copied[0] = 91, computed_lut[1] = 10 -> x + 101
@@ -839,7 +857,7 @@ entry func precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x |
     },
   );
 
-  // Positive precision for `entry kernel`: plain-record context projection,
+  // Positive precision for `#kernel`: plain-record context projection,
   // nested higher-order callable captures (`array.map` -> `array.generate`),
   // curried multi-arg callbacks, and pure-scalar `WireCtx` elements pushed
   // into locally allocated storage without false aliasing to `WireCtx`.
@@ -870,8 +888,8 @@ func solve (ctx: PreparedCtx) -> (idx: U32): F32 =>
     return ctx.storage.values[idx]
   return 0.0
 
-entry kernel k: Kernel [#[F32], U32, F32] = { prepare: prep, run: solve }
-entry func smoke (): U32 => return 1
+#kernel const k: Kernel [#[F32], U32, F32] = { prepare: prep, run: solve }
+#entry func smoke (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("smoke", null), 1);

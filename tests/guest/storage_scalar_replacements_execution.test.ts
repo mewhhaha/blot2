@@ -2,23 +2,23 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const source = `entry const copied = func (input: U32): Array U32 => return do:
+const source = `#entry const copied = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input, 7, 9]
   for index in 1 .. 3:
     rows[index] := rows[@u32.sub index 1]
   rows[1] := @u32.add self 5
   return rows
-entry const self_value = func (input: U32): U32 => return do:
+#entry const self_value = func (input: U32): U32 => return do:
   let rows: Array U32 = #[@u32.add input 9]
   rows[0] := @u32.add self 5
   return rows[0]
-entry const floats = func (input: F32): Array F32 => return do:
+#entry const floats = func (input: F32): Array F32 => return do:
   let (negative_zero, nan, _, _) = @simd.u32x4.from_bits (0x80000000, 0x7fc01234, 0, 0)
   let rows: Array F32 = #[input, 0.0, 0.0, negative_zero, nan]
   rows[1] := rows[3]
   rows[2] := rows[4]
   return rows
-entry const booleans = func (input: Bool): Bool => return do:
+#entry const booleans = func (input: Bool): Bool => return do:
   let rows: Array Bool = #[input, false, true]
   rows[1] := rows[2]
   rows[1] := self and true
@@ -28,13 +28,13 @@ entry const booleans = func (input: Bool): Bool => return do:
     return true
   return rows[1]
 const target: Array U32 = #[9]
-entry const rhs_trap = func (denominator: U32): U32 => return do:
+#entry const rhs_trap = func (denominator: U32): U32 => return do:
   let local = @storage.copy target
   let value = @u32.div 42 denominator
   local[0] := value
   return local[0]
-entry const read = func (): U32 => return target[0]
-entry const destination_first = func (index: U32): U32 => return do:
+#entry const read = func (): U32 => return target[0]
+#entry const destination_first = func (index: U32): U32 => return do:
   let rows = @storage.copy target
   rows[index] := @u32.div 42 (@u32.sub index 1)
   return rows[0]

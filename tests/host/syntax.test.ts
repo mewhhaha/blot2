@@ -94,7 +94,7 @@ Deno.test("named functions retain declaration names parameters and local boundar
 private func hidden_keep value => return value
 @[test]
 func tagged () => return add 20 22
-private entry func answer () => do:
+private #entry func answer () => do:
   func local (value: U32) -> extra => return add value extra
   let anonymous = func value => return value
   return local (anonymous 40) 2
@@ -108,7 +108,12 @@ private entry func answer () => do:
     );
     equal(rows.filter((row) => row.kind === "lambda").length, 1);
     equal(rows.filter((row) => row.kind === "declaration_attribute").length, 1);
-    ok(rows.some((row) => row.field === "modifier" && row.text === "entry"));
+    ok(
+      rows.some((row) =>
+        row.field === "modifier" && row.kind === "entry_modifier" &&
+        source.startsWith("#entry", row.offset)
+      ),
+    );
     equal(
       normalizedNodes(
         frontend.parse(source.replaceAll("\n", "\r\n")).root,
@@ -116,7 +121,7 @@ private entry func answer () => do:
       ),
       rows,
     );
-    for (const modifier of ["entry", "private"]) {
+    for (const modifier of ["#entry", "private"]) {
       throws(
         () =>
           frontend.parse(
@@ -345,7 +350,7 @@ private type Read a is contract = {type_rep a}
 private effect Hidden: Unit -> U32
 private type HiddenFamily is effect = {ask: Unit -> U32}
 private const private = func opaque => return opaque
-private entry const exported = func export => return private export
+private #entry const exported = func export => return private export
 const unwrap = func ($Box value) => return value.value
 const typed = func (value: U32) => return value
 const ordinary = func opaque => return func private => return func export => return (opaque, private, export)
@@ -519,7 +524,7 @@ Deno.test("implementation headers are contextual and retain explicit row and typ
         "impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }\n",
         "private impl Arrow (a,b,e) : Callable (a -> b ! {| e}) where { type_eq a U32 } = { type Run = a -> b ! {| e} }\n",
         "impl Curried a => type b : Pair (a,b) = { type Item = a }\n",
-        "const impl = func impl => return impl\nentry const answer = impl 42\n",
+        "const impl = func impl => return impl\n#entry const answer = impl 42\n",
       ]
     ) frontend.parse(source);
     throws(() => frontend.parse("impL Name : Source U32 = {}\n"), SourceError);
@@ -553,19 +558,19 @@ const read=func item=> return unpack item as [a] value in Render.show value
   }
 });
 
-Deno.test("spark, entry kernel, entry process, and callable paths enforce reserved and contextual boundaries", async () => {
+Deno.test("spark, #kernel, #process, and callable paths enforce reserved and contextual boundaries", async () => {
   const frontend = await createFrontend();
   const source = `const kernel = 1
 const process = 2
 const prepare = 3
 const init = 4
 const step = 5
-private entry func keep () => return 1
-entry kernel func mix (x: U32): U32 => return x
-entry kernel plan: Kernel [#[F32], U32, U32] = { prepare: routes.Planner.prep, run: Planner.step }
-entry process planner: Process [U32, U32, U32] = { init: routes.init_p, step: step_p }
-entry func mapped (xs: #[U32]): #[U32] => return spark #[x | x <- xs]
-entry func ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
+private #entry func keep () => return 1
+#kernel func mix (x: U32): U32 => return x
+#kernel const plan: Kernel [#[F32], U32, U32] = { prepare: routes.Planner.prep, run: Planner.step }
+#process const planner: Process [U32, U32, U32] = { init: routes.init_p, step: step_p }
+#entry func mapped (xs: #[U32]): #[U32] => return spark #[x | x <- xs]
+#entry func ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
 `;
   try {
     const rows = normalizedNodes(frontend.parse(source).root, source);
@@ -576,11 +581,15 @@ entry func ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
     for (
       const invalid of [
         "const spark = 1\n",
-        "private entry kernel func bad (x: U32): U32 => return x\n",
-        "private entry process bad: Process [U32, U32, U32] = { init: i, step: s }\n",
-        "entry kernel bad: Kernel [U32, U32, U32] = { prepare: BadCtor, run: r }\n",
-        "entry kernel bad: Kernel [U32, U32, U32] = { prepare: a.b.c, run: r }\n",
-        "entrY kernel func bad (x: U32): U32 => return x\n",
+        "private #kernel func bad (x: U32): U32 => return x\n",
+        "private #process const bad: Process [U32, U32, U32] = { init: i, step: s }\n",
+        "#kernel const bad: Kernel [U32, U32, U32] = { prepare: BadCtor, run: r }\n",
+        "#kernel const bad: Kernel [U32, U32, U32] = { prepare: a.b.c, run: r }\n",
+        "#kernel bad: Kernel [U32, U32, U32] = { prepare: p, run: r }\n",
+        "#process bad: Process [U32, U32, U32] = { init: i, step: s }\n",
+        "entry func old (): U32 => return 1\n",
+        "entry kernel func old (x: U32): U32 => return x\n",
+        "#entry private func bad (): U32 => return 1\n",
       ]
     ) {
       throws(() => frontend.parse(invalid), SourceError, invalid);

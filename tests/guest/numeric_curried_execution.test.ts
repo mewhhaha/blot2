@@ -19,8 +19,8 @@ const lookup = func probe => return func (index: U32) => return do:
 const run = func index => return lookup ($Probe 42) index
 `;
 const source = `import {run} from "./logic"
-entry const answer = func (index: U32) => return run index
-entry const snapshot = func (value: U32) => return #[value]
+#entry const answer = func (index: U32) => return run index
+#entry const snapshot = func (value: U32) => return #[value]
 `;
 const remainingArgumentsLibrary = library
   .replace(

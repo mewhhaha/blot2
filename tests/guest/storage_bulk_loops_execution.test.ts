@@ -23,33 +23,33 @@ const ffill = func (dst: own Array F32) -> (end: U32): Array F32 => return do:
   for index in 0 .. end:
     dst[index] := 1.5
   return dst
-entry const copied = func (bounds: Array U32): Array U32 => return do:
+#entry const copied = func (bounds: Array U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
   let src: Array U32 = @array.generate 48 (func index => return @u32.add index 100)
   return copy dst src bounds[0] bounds[1]
-entry const filled = func (bounds: Array U32): Array U32 => return do:
+#entry const filled = func (bounds: Array U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
   return fill dst bounds[0] bounds[1]
-entry const zeroed = func (end: U32): Array U32 => return do:
+#entry const zeroed = func (end: U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
   return zero dst end
-entry const alias = func (end: U32): Array U32 => return do:
+#entry const alias = func (end: U32): Array U32 => return do:
   let rows: Array U32 = @array.generate 48 (func index => return index)
   return copy rows rows.copy 0 end
-entry const floating = func (end: U32): Array F32 => return do:
+#entry const floating = func (end: U32): Array F32 => return do:
   let dst: Array F32 = @array.fill 48 9.0
   let (negative_zero, nan, _, _) = @simd.u32x4.from_bits (0x80000000, 0x7fc01234, 0, 0)
   let src: Array F32 = @array.generate 48 (func index => return if @u32.eq index 0 then negative_zero else if @u32.eq index 1 then nan else 1.25)
   return fcopy dst src end
-entry const float_fill = func (end: U32): Array F32 => return do:
+#entry const float_fill = func (end: U32): Array F32 => return do:
   let dst: Array F32 = @array.fill 48 9.0
   return ffill dst end
-entry const bool_fill = func (end: U32): Bool => return do:
+#entry const bool_fill = func (end: U32): Bool => return do:
   let dst: Array Bool = @array.fill 48 false
   for index in 0 .. end:
     dst[index] := true
   return dst[0] and dst[47]
-entry const shifted = func (end: U32): Array U32 => return do:
+#entry const shifted = func (end: U32): Array U32 => return do:
   let rows: Array U32 = @array.generate 48 (func index => return index)
   for index in 1 .. end:
     rows[index] := rows[@u32.sub index 1]
@@ -60,9 +60,9 @@ const push_range = func (emit: U32 -> U32 ! {Foreign}) -> (src: Array U32) -> (e
   for index in 0 .. end:
     use _ <- emit src[index]
   return ()
-entry const trap_source = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit short 48
-entry const trap_target = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit long 64
-entry const ordered_trap = func (emit: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
+#entry const trap_source = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit short 48
+#entry const trap_target = func (emit: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return push_range emit long 64
+#entry const ordered_trap = func (emit: U32 -> U32 ! {Foreign}): Array U32 ! {Foreign} => return do:
   let dst: Array U32 = @array.fill 48 9
   for index in 0 .. 49:
     dst[index] := if @u32.eq index 48 then @u32.div 1 0 else index
@@ -73,7 +73,7 @@ const fill_then_read = func (rows: own Array U32) -> (first: U32) -> (end: U32) 
     rows[index] := 7
   let selected = rows[read_index]
   return @u32.add selected rows[0]
-entry const reads_after_fill = func (bounds: Array U32): U32 => return do:
+#entry const reads_after_fill = func (bounds: Array U32): U32 => return do:
   let rows: Array U32 = @array.fill 48 9
   return fill_then_read rows bounds[0] bounds[1] bounds[2]
 const conditional_read = func (rows: Array U32) -> (flag: U32) -> (first: U32) -> (second: U32): U32 => return do:
@@ -81,7 +81,7 @@ const conditional_read = func (rows: Array U32) -> (flag: U32) -> (first: U32) -
   if @u32.lt 0 flag:
     selected := rows[first]
   return @u32.add selected rows[second]
-entry const conditional_reads = func (inputs: Array U32): U32 => return do:
+#entry const conditional_reads = func (inputs: Array U32): U32 => return do:
   let rows: Array U32 = @array.generate 48 (func index => return @u32.add index 100)
   return conditional_read rows inputs[0] inputs[1] inputs[2]
 const loop_read = func (rows: Array U32) -> (first: U32) -> (end: U32) -> (read_index: U32): U32 => return do:
@@ -89,7 +89,7 @@ const loop_read = func (rows: Array U32) -> (first: U32) -> (end: U32) -> (read_
   for index in first .. end:
     selected := @u32.add selected rows[index]
   return @u32.add selected rows[read_index]
-entry const reads_after_loop = func (bounds: Array U32): U32 => return do:
+#entry const reads_after_loop = func (bounds: Array U32): U32 => return do:
   let rows: Array U32 = @array.generate 48 (func index => return @u32.add index 100)
   return loop_read rows bounds[0] bounds[1] bounds[2]
 `;

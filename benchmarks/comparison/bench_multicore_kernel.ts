@@ -1,4 +1,4 @@
-// Deno host multi-core `entry kernel` (KernelPool) & persistent `entry process` (Processes) showcase.
+// Deno host multi-core `#kernel` (KernelPool) & persistent `#process` (Processes) showcase.
 // Run with:
 //   deno run --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT \
 //     benchmarks/comparison/bench_multicore_kernel.ts [compiler_path] [--wasm3]
@@ -97,7 +97,7 @@ for (const workers of [0, 1, 2, 4, 8]) {
   }
 }
 
-// Persistent `entry process` step throughput via Deno `Processes` host
+// Persistent `#process` step throughput via Deno `Processes` host
 const host = new Processes(
   built.bytes,
   [{

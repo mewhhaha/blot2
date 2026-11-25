@@ -1,5 +1,5 @@
-// 100% iterative two-phase persistent state staging for `entry kernel` prepared
-// contexts and `entry process` state (tasks/CONCURRENCY_VNEXT.md §4.2.2 item 5).
+// 100% iterative two-phase persistent state staging for `#kernel` prepared
+// contexts and `#process` state (tasks/CONCURRENCY_VNEXT.md §4.2.2 item 5).
 // Uses O(1) Wasm call stack via heap-backed scratch vectors & O(1) open-addressed
 // hash maps, guarantees zero persistent mutations in Phase 1, and commits
 // atomically in Phase 2 with explicit temp-slot detach ONLY for transferred

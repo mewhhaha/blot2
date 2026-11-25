@@ -8,44 +8,44 @@ const read = func (v: Choice) : U32 => return case v of
   $Empty => 0
   $One n => n
   $Pair (x, y) => x + y
-entry const mixed = func (count: U32) => return do:
+#entry const mixed = func (count: U32) => return do:
   let values = @array.generate count make
   let sum = 0
   for value in values:
     sum := self + read value
   break sum
-entry const saved = func (index: U32) => return do:
+#entry const saved = func (index: U32) => return do:
   let values = @array.generate 513 make
   let old = values.copy
   values[index] := $Pair {x: 100, y: 200}
   break read old[index] + read values[index]
-entry const static_values = func (index: U32) => return do:
+#entry const static_values = func (index: U32) => return do:
   let values = #[$Empty, $One 7, $Pair {x: 2, y: 3}]
   break read values[index]
-entry const conversions = func (index: U32) => return do:
+#entry const conversions = func (index: U32) => return do:
   let values = @array.generate 700 make
   let middle = @array.slice values 17 600
   let copied = @array.slice middle 63 513
   break read copied[index]
-entry const callback = func (index: U32) => return do:
+#entry const callback = func (index: U32) => return do:
   let values = @array.generate 513 make
   let selected = values[index]
   let callbacks = #[func (ignored: U32) => return read selected]
   break callbacks[0] 0
 type Nested is data = $Wrapped Choice | $Scalar U32
 type FloatChoice is data = $NoFloat | $Float F32
-entry const absent_escape = func (count: U32) => return do:
+#entry const absent_escape = func (count: U32) => return do:
   let values = @array.generate count (func (i: U32) : Choice => return $Empty)
   let saved = values
   let copy = @array.generate count (func i => return saved[i])
   break copy.length
-entry const anonymous = func (seed: U32) => return do:
+#entry const anonymous = func (seed: U32) => return do:
   let values = @array.generate 2000 (func (i: U32) : Choice => return if i % 2 == 0 then $One seed else $Empty)
   let sum = 0
   for value in values:
     sum := self + read value
   break sum
-entry const nested = func (count: U32) => return do:
+#entry const nested = func (count: U32) => return do:
   let values = @array.generate count (func (i: U32) : Nested => return if i % 2 == 0 then $Wrapped (if i % 4 == 0 then $Empty else $One i) else $Scalar i)
   let sum = 0
   for value in values:
@@ -55,7 +55,7 @@ entry const nested = func (count: U32) => return do:
       $Wrapped ($Pair (x, y)) => x + y
       $Scalar n => n
   break sum
-entry const floating = func (seed: F32) => return do:
+#entry const floating = func (seed: F32) => return do:
   let values = @array.generate 3 (func (i: U32) : FloatChoice => return if i == 1 then $NoFloat else $Float seed)
   let result = @array.fill 3 1.0
   for i in 0..3:

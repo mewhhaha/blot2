@@ -67,7 +67,7 @@ async function host() {
     prefix: "blot-native-assets-wire-",
   });
   const entry = directory + "/main.blot";
-  await Deno.writeTextFile(entry, "entry const answer = 42\n");
+  await Deno.writeTextFile(entry, "#entry const answer = 42\n");
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
     clearEnv: true,
@@ -332,7 +332,7 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
     for (const [path, , input] of inputs) await peer.write(path, input);
     await peer.write(
       "main.blot",
-      'import * as config from "./data.json"\nimport * as catalog from "./catalog.json"\nimport * as words from "./text.json"\nimport * as shader from "./shader.wgsl"\nentry const answer = @u32.add (config.value).answer shader.count\nentry const mesh = (catalog.meshes).second\nentry const letter = @array.get (words.text).greeting 0\n',
+      'import * as config from "./data.json"\nimport * as catalog from "./catalog.json"\nimport * as words from "./text.json"\nimport * as shader from "./shader.wgsl"\n#entry const answer = @u32.add (config.value).answer shader.count\n#entry const mesh = (catalog.meshes).second\n#entry const letter = @array.get (words.text).greeting 0\n',
     );
     await peer.open({
       imports: inputs.map(([path, kind]) => definition(peer, path, kind)),
@@ -382,15 +382,15 @@ Deno.test("source and asset decimals round in their declared precision", async (
     const shader = [];
     const answers: Metadata = {};
     for (const [name, literal, expected] of cases) {
-      source.push(`entry const src_${name} = ${literal}`);
-      source.push(`entry const asset_${name} = shader.${name}`);
+      source.push(`#entry const src_${name} = ${literal}`);
+      source.push(`#entry const asset_${name} = shader.${name}`);
       shader.push(`const ${name}: f32 = ${literal};`);
       answers["src_" + name] = expected;
       answers["asset_" + name] = expected;
     }
     source.push(
-      `entry const src_above = ${above}`,
-      "entry const asset_above = shader.above",
+      `#entry const src_above = ${above}`,
+      "#entry const asset_above = shader.above",
     );
     shader.push(`const above: f32 = ${above};`);
     answers.src_above = 1 + 2 ** -23;
@@ -413,7 +413,7 @@ Deno.test("native asset wire: mixed source/asset partitions, rejected edits, del
   try {
     const path = await peer.write("data.json", '{"answer":42}');
     const source =
-      'import * as config from "./data.json"\nentry const answer = (config.value).answer\n';
+      'import * as config from "./data.json"\n#entry const answer = (config.value).answer\n';
     await peer.open({ imports: [definition(peer, "data.json", "json")] });
     const original = await peer.build([[peer.entry, source]]);
     const wasm = await success(original, { answer: 42 });
@@ -434,7 +434,7 @@ Deno.test("native asset wire: mixed source/asset partitions, rejected edits, del
     );
     const compilerFailure = await peer.build([[
       peer.entry,
-      "entry const answer: U32 = true\n",
+      "#entry const answer: U32 = true\n",
     ]], [[path, '{"answer":44}']]);
     equal(compilerFailure.metadata.success, false);
     ok(compilerFailure.metadata.diagnostics[0].stage !== "asset");
@@ -480,7 +480,7 @@ Deno.test("native asset wire: deterministic content handles, binary frames and o
       ],
     });
     const source =
-      'import * as a from "./a.bin"\nimport * as alias from "./alias"\nentry const answer = case a.content of\n  $a.Content id => id\nentry const same = case alias.content of\n  $alias.Content id => id\n';
+      'import * as a from "./a.bin"\nimport * as alias from "./alias"\n#entry const answer = case a.content of\n  $a.Content id => id\n#entry const same = case alias.content of\n  $alias.Content id => id\n';
     const first = await peer.build([[peer.entry, source]], [[aPath, a], [
       bPath,
       b,
@@ -526,7 +526,7 @@ Deno.test("native asset wire: root discovery reacquires additions removals and v
     equal(empty.metadata.assetStats.parsed, 0);
     const shader = await peer.write("assets/new.wgsl", "const count=7u;");
     const source =
-      'import * as shader from "./assets/new.wgsl"\nentry const answer = shader.count\n';
+      'import * as shader from "./assets/new.wgsl"\n#entry const answer = shader.count\n';
     const added = await peer.build([[peer.entry, source]]);
     await success(added, { answer: 7 });
     equal(added.metadata.assetStats.parsed, 1);
@@ -557,7 +557,7 @@ Deno.test("native asset wire: symlink retargeting changes captured inputs and du
     await Deno.symlink(firstPath, link);
     await peer.write(
       "main.blot",
-      'import * as config from "./linked.json"\nentry const answer=(config.value).answer\n',
+      'import * as config from "./linked.json"\n#entry const answer=(config.value).answer\n',
     );
     await peer.open({ imports: [definition(peer, "linked.json", "json")] });
     await success(await peer.build(), { answer: 1 });
@@ -886,7 +886,7 @@ Deno.test("native asset wire: explicit aliases share input acquisition with norm
       roots: [peer.directory, peer.directory],
     });
     const source =
-      'import * as normal from "./text.json"\nimport * as alias from "./alias"\nentry const answer = @u32.add (@array.get (normal.text).greeting 0) (@array.get (alias.text).greeting 0)\n';
+      'import * as normal from "./text.json"\nimport * as alias from "./alias"\n#entry const answer = @u32.add (@array.get (normal.text).greeting 0) (@array.get (alias.text).greeting 0)\n';
     const built = await peer.build([[peer.entry, source]]);
     await success(built, { answer: 458 });
     equal(built.metadata.assetStats.parsed, 2);
@@ -925,7 +925,7 @@ Deno.test("native asset wire: long Unicode JSON names reject with bounded UTF8 a
     const path = await peer.write("data.json", '{"answer":42}');
     await peer.write(
       "main.blot",
-      'import * as config from "./data.json"\nentry const answer = (config.value).answer\n',
+      'import * as config from "./data.json"\n#entry const answer = (config.value).answer\n',
     );
     await peer.open({ imports: [definition(peer, "data.json", "json")] });
     const before = await peer.build();

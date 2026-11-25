@@ -2,6 +2,6 @@ type Entry is data = $Entry { enabled: Bool, ids: Array U32 }
 
 func make (id: U32): Entry => return $Entry {ids: #[id, @u32.add id 1], enabled: true}
 
-entry func answer (): U32 => return #do:
+#entry func answer (): U32 => return #do:
   let row = make 41
   break if row.enabled then @array.get row.ids 1 else 0

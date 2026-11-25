@@ -5,8 +5,8 @@ const make = func value => return func other => return do:
 const compose = func first => return func second => return func value => return first (second value)
 const add_forty = make 40
 const provider = @effect.provider Read.get (func () => return 1)
-entry const answer = func () => return do provider:
+#entry const answer = func () => return do provider:
   let increment = func value => return @u32.add value 1
   use result <- (compose increment add_forty) 0
   break result
-entry const folded = answer ()
+#entry const folded = answer ()

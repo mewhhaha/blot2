@@ -862,7 +862,7 @@ fn message(self_:Diagnostic)->const u8[:] {
         request_case_scope => {return "Request cases require a request loop";},
         record_constructor => {return "named fields require a declared record constructor";},
         missing_record_field => {return "missing record field";},
-        unknown_modifier => {return "only `entry` may precede `const` or `let`";},
+        unknown_modifier => {return "only `#entry` may precede `func`, `const`, or `let`";},
         guard_fallthrough => {return "let-else fallback must exit its enclosing do block";},
         product_arity => {return "cannot unify products with different element counts";},
         unknown_value => {if self_.implicit_type_witness {return "unknown value: Type";}return "unknown value";},
@@ -954,9 +954,9 @@ fn message(self_:Diagnostic)->const u8[:] {
         spark_generator => {return "A spark requires an irrefutable pattern";},
         spark_effectful => {return "A spark body must be pure (! {})";},
         spark_capture => {return "A spark body cannot rebind an outer local variable";},
-        kernel_type => {return "Entry kernel or process requires a valid Kernel or Process type matching its callables";},
-        kernel_callable => {return "Entry kernel and process targets must name top-level functions of the exact required arity";},
-        kernel_effectful => {return "Entry kernel and process functions must be pure (! {})";},
+        kernel_type => {return "A #kernel or #process declaration requires a valid Kernel or Process type matching its callables";},
+        kernel_callable => {return "#kernel and #process targets must name top-level functions of the exact required arity";},
+        kernel_effectful => {return "#kernel and #process functions must be pure (! {})";},
         std_only_intrinsic => {return "@flat intrinsics are internal to the standard library";},
     }
 }

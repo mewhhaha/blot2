@@ -19,12 +19,12 @@ async function fixture(run: (dir: string) => Promise<void>): Promise<void> {
     await Deno.writeTextFile(`${dir}/helper.blot`, "const base = identity 44\n");
     await Deno.writeTextFile(`${dir}/main.blot`, `
 import { base } from "./helper"
-entry const ordinary = func () : U32 => return base + 2
-entry const primitive = func () : U32 => return @u32.add 40 2
-entry const floating = func () : F32 => return identity (1.5 + 2.5)
-entry const converted = func (value: U32) : F32 => return convert value
-entry const accessor = func (value: U32) : F32 => return (.to_f32) value
-entry const nominal = func (value: U32) : U32 => return case $Some value of
+#entry const ordinary = func () : U32 => return base + 2
+#entry const primitive = func () : U32 => return @u32.add 40 2
+#entry const floating = func () : F32 => return identity (1.5 + 2.5)
+#entry const converted = func (value: U32) : F32 => return convert value
+#entry const accessor = func (value: U32) : F32 => return (.to_f32) value
+#entry const nominal = func (value: U32) : U32 => return case $Some value of
   $Some item => identity item
   $Nothing => 0
 `);

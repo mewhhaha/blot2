@@ -6,11 +6,11 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 const fixture = `
 func prepare_mask (mask: U32): U32 => return mask
 func run_with_mask (mask: U32) -> (x: U32): U32 => return @u32.bit_xor mask x
-entry kernel with_world: Kernel [U32, U32, U32] = { prepare: prepare_mask, run: run_with_mask }
+#kernel const with_world: Kernel [U32, U32, U32] = { prepare: prepare_mask, run: run_with_mask }
 
-entry kernel func fault (x: U32): U32 => return if x == 1 then @panic "worker trap" else x
+#kernel func fault (x: U32): U32 => return if x == 1 then @panic "worker trap" else x
 
-entry kernel func stalled (x: U32): U32 => return do:
+#kernel func stalled (x: U32): U32 => return do:
   if x == 1:
     for ever:
       continue

@@ -14,10 +14,10 @@ const program = await Deno.readTextFile(
 Deno.test("spark source maps and KernelPool execution preserve bits, cardinality and order", async () => {
   await compileAndRun(
     program + `
-entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
-entry func keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
-entry kernel func negative (x: U32): F32 => return @f32.neg (@u32.to_f32 x)
-entry kernel func reciprocal (x: U32): F32 => return @f32.div 1.0 (@u32.to_f32 x)
+#entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
+#entry func keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
+#kernel func negative (x: U32): F32 => return @f32.neg (@u32.to_f32 x)
+#kernel func reciprocal (x: U32): F32 => return @f32.div 1.0 (@u32.to_f32 x)
 `,
     async (guest, bytes) => {
       const floating = Float32Array.of(-0, Infinity, -Infinity, 1.25);
@@ -115,11 +115,11 @@ Deno.test("Processes uses scoped admission and isolated budgeted turns with rese
     program + `
 func faulty_init (seed: U32): U32 => return @panic "initialization"
 func faulty_step (st: own U32) -> (cmd: U32): (U32, U32) => return (st, 0)
-entry process faulty: Process [U32, U32, U32] = { init: faulty_init, step: faulty_step }
+#process const faulty: Process [U32, U32, U32] = { init: faulty_init, step: faulty_step }
 
 func fragile_init (seed: U32): U32 => return seed
 func fragile_step (st: own U32) -> (cmd: U32): (U32, U32) => return @panic "step"
-entry process fragile: Process [U32, U32, U32] = { init: fragile_init, step: fragile_step }
+#process const fragile: Process [U32, U32, U32] = { init: fragile_init, step: fragile_step }
 `,
     async (guest, bytes) => {
       const host = new Processes(
@@ -246,7 +246,7 @@ func slower_init (seed: U32): U32 => return seed
 func slower_step (st: own U32) -> (delta: U32): (U32, U32) =>
   let next = @u32.add st delta
   return (next, next)
-entry process slower: Process [U32, U32, U32] = { init: slower_init, step: slower_step }
+#process const slower: Process [U32, U32, U32] = { init: slower_init, step: slower_step }
 `,
     async (_guest, bytes) => {
       const host = new Processes(
@@ -313,8 +313,8 @@ Deno.test("spark accepts pure helpers and captures while rejecting invalid gener
   await compileAndRun(
     `func hidden (x: U32): U32 => return @u32.add x 1
 const captured: U32 = 5
-entry func pure_spark (xs: Array U32): Array U32 => return spark #[@u32.add (hidden x) captured | x <- xs]
-entry func range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <- 0..n]
+#entry func pure_spark (xs: Array U32): Array U32 => return spark #[@u32.add (hidden x) captured | x <- xs]
+#entry func range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <- 0..n]
 `,
     (guest) => {
       equal(String(guest.call("pure_spark", Uint32Array.of(1, 2, 3))), "7,8,9");
@@ -322,35 +322,35 @@ entry func range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <
     },
   );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return spark #[x | x <- xs, x <- xs]\n",
+    "#entry func nope (xs: Array U32) => return spark #[x | x <- xs, x <- xs]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return spark #[x | x <- xs, x < 8]\n",
+    "#entry func nope (xs: Array U32) => return spark #[x | x <- xs, x < 8]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: U32) => return spark #[x | x <- xs]\n",
+    "#entry func nope (xs: U32) => return spark #[x | x <- xs]\n",
     "type_mismatch",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return @spark #[x | x <- xs]\n",
+    "#entry func nope (xs: Array U32) => return @spark #[x | x <- xs]\n",
     "unknown_intrinsic",
   );
   await compileExpectedFailure(
-    "entry func nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
+    "#entry func nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
     "unknown_intrinsic",
   );
   await compileExpectedFailure(
     `effect Ping: Unit -> U32
-entry func nope (xs: Array U32): Array U32 ! { Ping } => return spark #[Ping () | x <- xs]
+#entry func nope (xs: Array U32): Array U32 ! { Ping } => return spark #[Ping () | x <- xs]
 `,
     "spark_effectful",
   );
   await compileExpectedFailure(
     `func bad_step (st: U32) -> (cmd: U32): (U32, U32) => return (st, cmd)
 func init_p (seed: U32): U32 => return seed
-entry process p: Process [U32, U32, U32] = { init: init_p, step: bad_step }
+#process const p: Process [U32, U32, U32] = { init: init_p, step: bad_step }
 `,
     "kernel_callable",
   );

@@ -21,7 +21,7 @@ const exercise = func (value: ${scalar}) -> (destination: own Array ${scalar}): 
   for index in 0 .. 3:
     destination := consume self (func () => return value)
   return destination
-entry const answer = func (input: ${scalar}) => return do:
+#entry const answer = func (input: ${scalar}) => return do:
   let counter: Array U32 = #[]
   let destination: Array ${scalar} = #[]
   let (counter, computed) = calculate counter input
