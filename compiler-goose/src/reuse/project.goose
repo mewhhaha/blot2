@@ -684,6 +684,64 @@ fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?
             }
         }
     }
+    // Preserve the entire previous checking symbol table when the project graph
+    // is unchanged so adding new identifiers in one non-entry file appends at
+    // the end without shifting symbol IDs or invalidating unrelated modules.
+    if previous && previous.units.len==project.units.len && previous.entry==entry &&
+       previous.imports.len==project.imports.len && previous.order.items==project.order.items &&
+       projects[previous.lease-1].parser_symbols.lease!=0 && previous.symbols.entries.len>0 {
+        let cerr=project.symbols.appendUniqueSlice(previous.symbols,0,previous.symbols.entries.len);
+        if cerr!=blot_error::Error.none {return cerr;}
+        var names:u32[>..]=[];names.resize(original.entries.len+1,0);
+        for i in 1..original.entries.len+1 {
+            let error=linkSymbol(original,project.symbols,names[..],i as u32);
+            if error!=blot_error::Error.none {return error;}
+        }
+        for &unit in project.units.items {
+            unit.filename=names[unit.filename];
+        }
+        for &edge in project.imports.items {
+            edge.path=names[edge.path];
+        }
+        var ranges:Range[>..]=[];ranges.resize(project.units.len,Range{..});
+        var contracts:blot_reuse_project_check::ContractName[>..]=[];
+        var order:u32[>..]=[];checkingOrder(project,order);
+        for id in order {
+            if id==entry {continue;}
+            let unit .= project.units.items[id-1];
+            let prev_u .= previous.units.items[id-1];
+            let unchanged_tree=prev_u.source==unit.source && prev_u.implicit_prelude==unit.implicit_prelude &&
+                prev_u.filename==unit.filename && prev_u.visible_names!=0 && prev_u.tree.lease!=0;
+            var linked=blot_parse_ast::Tree{..};
+            var error=blot_error::Error.none;
+            var max_vis:i64=prev_u.visible_names;
+            if unchanged_tree {
+                linked,error=prev_u.tree.retainParsed();
+            } else {
+                for old in unit.parse_names {
+                    if (names[old] as i64)>max_vis {max_vis=names[old] as i64;}
+                }
+                linked,error=blot_parse_ast::initPooled();
+                if error==blot_error::Error.none {error=linked.copyParsed(unit.tree);}
+                if error==blot_error::Error.none && !blot_reuse_parse_packet::relocate_tree(linked,0,names[1..]) {error=blot_error::Error.invalid_artifact;}
+            }
+            if error!=blot_error::Error.none {linked.deinit();return error;}
+            unit.parser_tree=blot_parse_ast::canonical(unit.tree);
+            unit.tree=blot_parse_ast::canonical(linked);
+            let range=unit.imports;
+            for &edge in project.imports.items[range.start..range.start+range.len] {
+                edge.namespace_=unit.tree.import_decl(edge.declaration.node).namespace_;
+            }
+            let before_prep=project.symbols.entries.len;
+            let prepared=blot_reuse_project_check::prepareUnitNames(project,id,ranges[..],contracts);
+            if prepared!=blot_error::Error.none {return prepared;}
+            if !unchanged_tree && project.symbols.entries.len>before_prep {max_vis=project.symbols.entries.len;}
+            if unchanged_tree {unit.visible_names=prev_u.visible_names;}
+            else {unit.visible_names=max_vis;}
+        }
+        projects[project.lease-1].checking_ids=blot_reuse_project_check::copyOwned(names[..]);
+        return blot_error::Error.none;
+    }
     if previous {
         let rerr=project.symbols.reserve(previous.symbols.entries.len,previous.symbols.bytes.len);
         if rerr!=blot_error::Error.none {return rerr;}

@@ -76,7 +76,38 @@ fn makeItem(loaded:Project&,project_checked:CheckedProject&,checked:Checked&,cap
  if name.kind==blot_check_check::EditorName_kind.constructor && prefix_kind!=blot_reuse_completion_probe::Kind.constructor {if text.len==256 {truncated=true;let __cleanup_result_1_0: blot_support::Option<Item> = blot_support::none<Item>(); let __cleanup_result_1_1: Error = blot_error::Error.none; {if !published {item.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}var insertion:u8[>..<]=[];insertion.push('$');insertion.append(text);item.insertText=own(insertion[..]);}else {item.insertText=own(text);}
  if name.identity.unit!=0 && name.identity.unit<=loaded.units.len {
   item.filename=own(loaded.filename(name.identity.unit));var declaration=name.identity.decl;
-  if (declaration&blot_check_types::opaque_name_bit)!=0 {declaration=0;if name.identity.unit<=project_checked.modules.len {let module=project_checked.modules[name.identity.unit-1];if module.present {for nominal in module.value.checked.nominals {if nominal.identity==name.identity {declaration=nominal.declaration;break;}}}}}
+  if name.kind==blot_check_check::EditorName_kind.type_ || name.kind==blot_check_check::EditorName_kind.field || name.kind==blot_check_check::EditorName_kind.constructor {
+   declaration=0;
+   if name.identity.unit<=project_checked.modules.len {
+    let module=project_checked.modules[name.identity.unit-1];
+    if module.present {
+     if name.kind==blot_check_check::EditorName_kind.constructor {
+      for ctor in module.value.checked.constructors {
+       if ctor.identity==name.identity {
+        let nom=module.value.checked.nominals[ctor.nominal];
+        if nom.declaration!=0 {
+         let children=loaded.unit(name.identity.unit).tree.children(loaded.unit(name.identity.unit).tree.node(nom.declaration).b);
+         if (ctor.tag as i64)<children.len {declaration=children[ctor.tag];}
+        }
+        break;
+       }
+      }
+     } else {
+      for nominal in module.value.checked.nominals {if nominal.identity==name.identity {declaration=nominal.declaration;break;}}
+      if declaration==0 {for contract in module.value.checked.contracts {if contract.identity==name.identity {declaration=contract.declaration;break;}}}
+      if declaration==0 {
+       for family in module.value.checked.effect_families {
+        if family.identity==name.identity {
+         let utree .= loaded.unit(name.identity.unit).tree;
+         for rid in utree.roots.items {let rn=utree.node(rid);if (rn.tag==blot_parse_ast::tag_effect_decl || rn.tag==blot_parse_ast::tag_effect_type_decl) && rn.a==family.name {declaration=rid;break;}}
+         break;
+        }
+       }
+      }
+     }
+    }
+   }
+  }
   if name.external.present {let external=name.external.value;if external.unit!=0 && external.unit<=project_checked.modules.len {let module=project_checked.modules[external.unit-1];if module.present {declaration=module.value.checked.bindings[external.binding].declaration;}}}
   if declaration!=0 {item.start=loaded.unit(name.identity.unit).tree.span(declaration).start;}
  }else {item.filename=own("");}

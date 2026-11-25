@@ -418,7 +418,11 @@ fn fieldDefaultExpr(self_:const Builder&,catalog:u32,field_name:u32)->u32 {
  if catalog==0 || catalog>=self_.source.checked.constructors.len { return 0; }
  let ctor=self_.source.checked.constructors[catalog];
  if ctor.identity.unit!=self_.source.checked.unit { return 0; }
- let cnode=self_.source.tree.node(ctor.identity.decl);
+ let nom=self_.source.checked.nominals[ctor.nominal];
+ if nom.declaration==0 { return 0; }
+ let decl_children=self_.source.tree.children(self_.source.tree.node(nom.declaration).b);
+ if (ctor.tag as i64)>=decl_children.len { return 0; }
+ let cnode=self_.source.tree.node(decl_children[ctor.tag]);
  if cnode.tag!=blot_parse_ast::tag_constructor_ref || cnode.b==0 { return 0; }
  let pnode=self_.source.tree.node(cnode.b);
  if pnode.tag!=blot_parse_ast::tag_type_record { return 0; }

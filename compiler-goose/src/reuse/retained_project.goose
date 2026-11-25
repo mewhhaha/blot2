@@ -279,12 +279,17 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
   return prepareWithRetainedCore(source,empty,previous_core,changed[..]);
  }
  var affected:bool[>..]=[];affected.resize(changed.len,false);
+ var symbol_shifted:bool[>..]=[];symbol_shifted.resize(changed.len,false);
  if scoped {
   for unit,i in source.units.items {
    let old=previous.source.units.items[i];
    if i+1==source.entry {
-    affected[i]=source.symbols.entries.len!=previous.parsed_symbols || common<source.symbols.entries.len;
-   } else {affected[i]=unit.visible_names!=old.visible_names || unit.visible_names>common;}
+    symbol_shifted[i]=common<previous.parsed_symbols;
+    affected[i]=symbol_shifted[i];
+   } else {
+    symbol_shifted[i]=old.visible_names>common;
+    affected[i]=unit.visible_names!=old.visible_names || symbol_shifted[i];
+   }
    if affected[i] {propagates[i]=true;}
   }
  }
@@ -295,7 +300,7 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
  for dirty in changed {any_reused=any_reused || !dirty;}
  if !any_reused {return Preparation.inactive,blot_error::Error.none;}
  if previous.packets.len!=0 {
-  return prepareRetainedPersistent(source,previous,previous_core,changed[..],affected[..],scoped || entry_only,candidate);
+  return prepareRetainedPersistent(source,previous,previous_core,changed[..],affected[..],symbol_shifted[..],scoped || entry_only,candidate);
  }
 
  // A fallback starts with the loaded parser symbols exactly as they were.
@@ -411,12 +416,12 @@ fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&,literal:
  return blot_error::Error.none;
 }
 
-fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
+fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
  var symbols,error=blot_parse_symbols::initPooled();
  if error!=blot_error::Error.none {return declineRetained(error);}
  let packets=allocateRetainedPackets(changed.len);
  let debits=blot_reuse_project_check::allocateModuleDebits(changed.len);
- let value,error=checkRetainedPersistent(source,previous,previous_core,changed,affected,symbols,packets,debits,verified_suffix,candidate);
+ let value,error=checkRetainedPersistent(source,previous,previous_core,changed,affected,symbol_shifted,symbols,packets,debits,verified_suffix,candidate);
  symbols.deinit();
  if candidate.source.lease==0 {
   releaseRetainedPackets(packets);
@@ -425,7 +430,7 @@ fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_c
  return value,error;
 }
 
-fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
+fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
  let parsed=source.symbols.entries.len;
  let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,parsed);
  if error!=blot_error::Error.none {return declineRetained(error);}
@@ -451,7 +456,7 @@ fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_cor
  var ready=Prepared{entry:source.entry,source_bytes:source.source_bytes,catalog_owner:owner,..};
  let allocated=allocateCatalog(ready,changed.len);
  var failure=allocated;
- if failure==blot_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,affected,debits,packets,ready);}
+ if failure==blot_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,affected,symbol_shifted,debits,packets,ready);}
  engine.deinit();
  if failure!=blot_error::Error.none {ready.deinit();return declineRetained(failure);}
  candidate.adoptPersistent(source,symbols,parsed,debits,packets);
@@ -691,7 +696,7 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
  return id,new_bits;
 }
 
-fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
+fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
  let cache .= engine.persistentCache();
  // An unchanged packet certifies the complete catalog that a caller reads.
@@ -735,6 +740,9 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   let associated=engine.associated_remaining;
   let symbol_count=engine.source.symbols.entries.len;
   cache.current=unit;
+  if inherited && unit!=engine.source.entry && engine.source.units.items[index].visible_names<engine.source.symbols.entries.len {
+   engine.source.units.items[index].visible_names=engine.source.symbols.entries.len;
+  }
   engine.selectUnitNames(unit);
   let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
   let continued,error=engine.checkOrdered(unit);
@@ -751,7 +759,7 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   let encoded=blot_reuse_project_check::encodePersistentInterface(engine.source.prelude_unit,engine.source.unit(unit).tree,module,unit,packet);
   freeze.exit();
   if encoded!=blot_error::Error.none {return encoded;}
-  propagated[index]=inherited || affected[index] || packet[..]!=previous.packets[index];
+  propagated[index]=inherited || symbol_shifted[index] || packet[..]!=previous.packets[index];
   owned[index]=blot_reuse_project_check::copyOwned(packet[..]);
   let lowered=lowerRetainedUnit(engine.source,module.checked,unit,ready);
   if lowered!=blot_error::Error.none {return lowered;}

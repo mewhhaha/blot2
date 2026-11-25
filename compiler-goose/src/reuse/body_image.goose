@@ -689,6 +689,28 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
                    sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
         },
+        type_constructor=>{ return na.a==nb.a && na.b==nb.b && na.c==nb.c; },
+        type_same=>{
+            return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
+                   sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
+        },
+        operation_value=>{
+            let oa=a.operationValue(ia);
+            let ob=b.operationValue(ib);
+            if oa.identity!=ob.identity || oa.instance!=ob.instance || oa.arguments.len!=ob.arguments.len { return false; }
+            if !sameCoreType(a,oa.signature,b,ob.signature,0) || !sameCoreType(a,oa.witness_result,b,ob.witness_result,0) { return false; }
+            if !sameCoreExpr(old_units,a,oa.witness,new_units,b,ob.witness,locals,blocks,depth+1) { return false; }
+            if !sameCoreExpr(old_units,a,oa.capability,new_units,b,ob.capability,locals,blocks,depth+1) { return false; }
+            let aa=a.operationValueArguments(ia);
+            let bb=b.operationValueArguments(ib);
+            for i in 0..aa.len { if !sameCoreType(a,aa[i],b,bb[i],0) { return false; } }
+            return true;
+        },
+        flat_op=>{
+            if na.c!=nb.c { return false; }
+            if na.c==blot_check_core::flat_op_kernel_handle || na.c==blot_check_core::flat_op_process_handle { return na.a==nb.a; }
+            return sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
+        },
         // Any complex or uncommon form conservatively marks the body as changed.
         _=>{ return false; },
     }
@@ -728,25 +750,26 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     }
     for i in 0..a.associated.len {
         let aa=a.associated[i]; let ab=b.associated[i];
-        if aa.identity!=ab.identity || aa.operator!=ab.operator || aa.target!=ab.target { return false; }
+        if aa.identity!=ab.identity || aa.operator!=ab.operator || resolveRef(old_units,a,aa.target)!=resolveRef(new_units,b,ab.target) { return false; }
         if (aa.member!=0 || ab.member!=0) && !sameFieldSymbol(a,aa.member,b,ab.member) { return false; }
     }
     if a.primitives!=b.primitives || a.operation_names!=b.operation_names || a.type_tags!=b.type_tags || a.tag_calls!=b.tag_calls { return false; }
     if a.contracts.len!=0 && (a.contracts!=b.contracts || a.contract_members!=b.contract_members) { return false; }
     if a.implementations.len!=0 && (!blot_reuse_body_shape::same___reuse_principal_interface_Implementation(a.implementations,b.implementations) || a.implementation_members!=b.implementation_members || a.member_templates!=b.member_templates) { return false; }
 
-    // Check every global/external binding keeps its ID, metadata and structural type.
+    // Check every global binding keeps its ID, metadata and structural type.
+    // External bindings can shift indices when an edited function adds/removes
+    // locals before a lazily-imported callee; sameCoreExpr resolves through them.
     for ob,bi in a.bindings {
-        if ob.kind!=blot_reuse_principal_interface::Kind.global && ob.kind!=blot_reuse_principal_interface::Kind.external { continue; }
+        if ob.kind!=blot_reuse_principal_interface::Kind.global { continue; }
         if bi>=b.bindings.len { return false; }
         let nb=b.bindings[bi];
         if ob.kind!=nb.kind || ob.private!=nb.private || ob.body_id!=nb.body_id ||
            ob.capability_parameters!=nb.capability_parameters || ob.has_explicit!=nb.has_explicit { return false; }
-        if ob.kind==blot_reuse_principal_interface::Kind.external && resolveRef(old_units,a,ob.target)!=resolveRef(new_units,b,nb.target) { return false; }
         if !sameCoreType(a,ob.ty,b,nb.ty,0) { return false; }
     }
     for nb,bi in b.bindings {
-        if nb.kind!=blot_reuse_principal_interface::Kind.global && nb.kind!=blot_reuse_principal_interface::Kind.external { continue; }
+        if nb.kind!=blot_reuse_principal_interface::Kind.global { continue; }
         if bi>=a.bindings.len || a.bindings[bi].kind!=nb.kind { return false; }
     }
 

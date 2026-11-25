@@ -481,7 +481,9 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
     }, null);
     await compare({}, 24, 1);
     const renamed = initialBridge.replaceAll("value", "new_binding");
-    await compare({ [bridge]: renamed }, 24, 2);
+    // Adding a new local symbol in bridge appends to the project symbol pool
+    // without shifting downstream units or perturbing bridge's interface packet.
+    await compare({ [bridge]: renamed }, 24, 1);
     await compare(
       { [bridge]: renamed.replace("(v0 ())", "(missing ())") },
       null,
@@ -701,12 +703,14 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
       15,
       true,
     );
-    // Changing the @panic message adds a new symbol / data bytes; fallback must still match oracle.
+    // Changing the @panic message adds a new symbol / data bytes without
+    // changing worker's interface, so entry stays cached (wire_schema skipped)
+    // and replayEdits falls back cleanly to a byte-exact oracle emit.
     await runAndCheck(
       { [worker]: editedWorker.replace("zero input", "must be nonzero") },
       22,
       15,
-      false,
+      true,
     );
     // Editing a module INSIDE the kernel dep cone must update kernel output and match oracle.
     await runAndCheck(
@@ -815,6 +819,102 @@ Deno.test("persistent trivia and single U32/F32 literal edits skip check and low
     await checkEdit(specialF32, 9, 16.0, false);
     // Restoring from 2.00 back to 0.25 must not relocate the strength-reduced f32.add.
     await checkEdit(baseCalc, 10, 2.0, false);
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("structural body edits before data/effect declarations with new locals and associated calls stay fresh=1 and oracle-exact", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const leaf = dir + "/leaf.blot";
+  const mid = dir + "/mid.blot";
+  const baseLeaf = [
+    "func compute (xs: #[U32]) -> (n: U32): U32 => return do:",
+    "  let acc: U32 = n",
+    "  return acc + xs.length",
+    "type Item is data = $Item { value: U32 } | $Empty",
+    "effect Ping: U32 -> U32",
+    "func make_item (v: U32): Item => return $Item { value: v }",
+    "func read_item (item: Item): U32 => return case item of",
+    "  $Item { value } => value",
+    "  $Empty => 0",
+    "",
+  ].join("\n");
+  const baseMid = [
+    'import { compute, make_item, read_item, Item, Ping } from "./leaf"',
+    "func run_mid (n: U32): U32 => return do:",
+    "  let xs = #[1, 2, 3]",
+    "  let it = make_item (compute xs n)",
+    "  return read_item it",
+    "",
+  ].join("\n");
+  const dummyImports: string[] = [];
+  for (let i = 0; i < 15; i++) {
+    await Deno.writeTextFile(dir + `/d${i}.blot`, "const tag: U32 = 1\n");
+    dummyImports.push(`import * as d${i} from "./d${i}"`);
+  }
+  const mainSource = [
+    ...dummyImports,
+    'import { run_mid } from "./mid"',
+    "entry func answer (n: U32): U32 => return run_mid n",
+    "",
+  ].join("\n");
+  await Deno.writeTextFile(leaf, baseLeaf);
+  await Deno.writeTextFile(mid, baseMid);
+  await Deno.writeTextFile(entry, mainSource);
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    frontendWorkers: 8,
+  };
+  const session = await createZigProjectCompiler(options);
+  try {
+    const checkEdit = async (
+      src: string,
+      want: number,
+      expectFresh: number,
+    ) => {
+      const actual = await session.build({ sources: { [leaf]: src } });
+      assert(actual.success, JSON.stringify(actual));
+      assert.equal(actual.stats.freshModules, expectFresh);
+      const oracle = await createZigProjectCompiler(options);
+      try {
+        const fresh = await oracle.build({ sources: { [leaf]: src } });
+        assert(fresh.success, JSON.stringify(fresh));
+        assert.deepEqual(actual.bytes, fresh.bytes);
+      } finally {
+        await oracle.dispose();
+      }
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", 10), want);
+      } finally {
+        guest.dispose();
+      }
+    };
+    // Initial cold build: 10 + 3 = 13.
+    await checkEdit(baseLeaf, 13, 19);
+    // 1. Structural expression edit BEFORE type Item & effect Ping (shifts AST IDs).
+    const exprEdit = baseLeaf.replace("let acc: U32 = n", "let acc: U32 = n + 2");
+    await checkEdit(exprEdit, 15, 1);
+    // 2. Add a new local let with a brand-new identifier AND reorder associated uses (.length vs +).
+    const newSymEdit = baseLeaf.replace(
+      "  let acc: U32 = n\n  return acc + xs.length",
+      "  let brand_new_tmp_len: U32 = xs.length\n  let acc: U32 = n + 5\n  return acc + brand_new_tmp_len",
+    );
+    await checkEdit(newSymEdit, 18, 1);
+    // 3. Edit a second function body after the type/effect declarations.
+    const secondFnEdit = newSymEdit.replace(
+      "$Item { value } => value",
+      "$Item { value } => value + 4",
+    );
+    await checkEdit(secondFnEdit, 22, 1);
+    // 4. Restore original source.
+    await checkEdit(baseLeaf, 13, 1);
   } finally {
     await session.dispose();
     await Deno.remove(dir, { recursive: true });
