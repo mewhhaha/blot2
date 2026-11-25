@@ -236,3 +236,4 @@ fn detailWrite(writer:Writer&,value:blot_check_types::NominalIdentity)->Error {r
 fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::HoleDetails)->Error {return detailRecord(writer,value);}
 fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ExplanationDetails)->Error {return detailRecord(writer,value);}
 fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ContextDetails)->Error {return detailRecord(writer,value);}
+fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::OriginDetails)->Error {return detailRecord(writer,value);}

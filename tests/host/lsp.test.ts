@@ -371,3 +371,101 @@ for (const mode of ["cancel", "deadline"]) {
     }
   });
 }
+
+Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-fix codeActions", async () => {
+  const directory = await Deno.makeTempDir();
+  const output = new Bytes();
+  const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
+  const prelude = fileURLToPath(
+    new URL("../../std/prelude.blot", import.meta.url),
+  );
+  const bridge = new CompletionBridge(new LspWriter(output), {
+    executable,
+    prelude,
+    stdRoot,
+  });
+  const entry = directory + "/main.blot";
+  const uri = pathToFileURL(entry).href;
+  const send = (method: string, params: unknown = {}, id?: number) => {
+    const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
+    if (id !== undefined) message.id = id;
+    return bridge.handle(message);
+  };
+  try {
+    await send("initialize", { rootUri: pathToFileURL(directory).href }, 1);
+    const initReply = (await output.messages())[0];
+    ok(initReply.result.capabilities.diagnosticProvider);
+    ok(initReply.result.capabilities.codeActionProvider);
+    await send("initialized");
+
+    // 1. SPENT_VALUE with secondary relatedInformation pointing to move line + `.copy` quick-fix
+    const spentSource = [
+      "func consume (xs: own #[U32]): U32 => return xs.length",
+      "entry func main (): U32 =>",
+      "  let a = #[1, 2, 3]",
+      "  let n = consume a",
+      "  return n + a.length",
+      "",
+    ].join("\n");
+    await send("textDocument/didOpen", {
+      textDocument: { uri, languageId: "blot", text: spentSource, version: 1 },
+    });
+    await send("textDocument/diagnostic", { textDocument: { uri } }, 10);
+    let rows = await output.messages();
+    equal(rows[0].result.kind, "full");
+    equal(rows[0].result.items.length, 1);
+    const spentDiag = rows[0].result.items[0];
+    equal(spentDiag.code, "SPENT_VALUE");
+    equal(spentDiag.source, "blot");
+    ok(spentDiag.message.includes("already moved at line 4"));
+    ok(spentDiag.message.includes("fix: Pass `a.copy` at line 4"));
+    equal(spentDiag.relatedInformation.length, 1);
+    equal(spentDiag.relatedInformation[0].location.uri, uri);
+    equal(spentDiag.relatedInformation[0].location.range.start.line, 3);
+    ok(spentDiag.relatedInformation[0].message.includes("`a` moved here"));
+
+    // Request quick-fix codeAction for SPENT_VALUE
+    await send("textDocument/codeAction", {
+      textDocument: { uri },
+      range: spentDiag.range,
+      context: { diagnostics: [spentDiag] },
+    }, 11);
+    rows = await output.messages();
+    equal(rows[0].result.length, 1);
+    equal(rows[0].result[0].kind, "quickfix");
+    equal(rows[0].result[0].title, "Pass `a.copy` at move site");
+    const edit = rows[0].result[0].edit.changes[uri][0];
+    equal(edit.newText, ".copy");
+    equal(edit.range.start.line, 3);
+
+    // 2. Missing `$` constructor hint -> quick-fix `$Some`
+    const ctorSource = [
+      "type Opt is data = $Some U32 | $Nothing",
+      "entry func main (): Opt => return Some 1",
+      "",
+    ].join("\n");
+    await send("textDocument/didChange", {
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: ctorSource }],
+    });
+    // Also verify push-on-save (`textDocument/didSave` -> `publishDiagnostics`)
+    await send("textDocument/didSave", { textDocument: { uri } });
+    rows = await output.messages();
+    equal(rows[0].method, "textDocument/publishDiagnostics");
+    equal(rows[0].params.diagnostics.length, 1);
+    const ctorDiag = rows[0].params.diagnostics[0];
+    equal(ctorDiag.code, "UNKNOWN_VALUE");
+    ok(ctorDiag.message.includes("$Some"));
+    await send("textDocument/codeAction", {
+      textDocument: { uri },
+      range: ctorDiag.range,
+      context: { diagnostics: [] },
+    }, 12);
+    rows = await output.messages();
+    equal(rows[0].result[0].title, "Replace with constructor `$Some`");
+    equal(rows[0].result[0].edit.changes[uri][0].newText, "$Some");
+  } finally {
+    await bridge.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

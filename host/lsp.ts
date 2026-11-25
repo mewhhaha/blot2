@@ -1,10 +1,12 @@
-/** Full-buffer completion bridge. Native query graphs never enter editor state. */
+/** Full-buffer completion, diagnostics, and quick-fix bridge. Native query graphs never enter editor state. */
 import { dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { analyzeDiagnostic, type RawDiagnosticRecord } from "./diagnostics.ts";
 import {
   createZigProjectCompiler,
   type ZigProjectCompiler,
   type ZigProjectCompilerOptions,
+  type ZigProjectDiagnostic,
 } from "./zig_project_client.ts";
 import {
   byteOffset,
@@ -16,6 +18,114 @@ import {
 
 type Id = string | number | null;
 type Document = { filename: string; text: string; version: number };
+interface LspRange {
+  start: Position;
+  end: Position;
+}
+interface LspQuickFixData {
+  title: string;
+  range: LspRange;
+  newText: string;
+}
+interface LspDiagnostic {
+  range: LspRange;
+  severity: number;
+  code: string;
+  source: string;
+  message: string;
+  relatedInformation?: Array<{
+    location: { uri: string; range: LspRange };
+    message: string;
+  }>;
+  data?: { blotQuickFixes: LspQuickFixData[] };
+}
+const utf8Encoder = new TextEncoder();
+function safeUtf16Position(text: string, offset: number): Position {
+  const bytes = utf8Encoder.encode(text);
+  let clamped = Math.max(0, Math.min(bytes.length, Math.trunc(offset)));
+  while (clamped > 0 && (bytes[clamped] & 0xc0) === 0x80) clamped--;
+  return utf16Position(text, clamped);
+}
+function utf16Range(
+  text: string,
+  startByte: number,
+  endByte: number,
+): LspRange {
+  const start = safeUtf16Position(text, startByte);
+  const end = safeUtf16Position(text, Math.max(startByte, endByte));
+  return { start, end };
+}
+function rangesOverlap(a: LspRange, b: LspRange): boolean {
+  const cmp = (x: Position, y: Position) =>
+    x.line !== y.line ? x.line - y.line : x.character - y.character;
+  return cmp(a.start, b.end) <= 0 && cmp(b.start, a.end) <= 0;
+}
+function toLspDiagnostic(
+  diag: ZigProjectDiagnostic,
+  sourceText: string | undefined,
+  uri: string,
+): LspDiagnostic {
+  const raw: RawDiagnosticRecord = {
+    filename: diag.filename,
+    stage: diag.stage,
+    code: diag.code,
+    start: diag.start,
+    end: diag.end,
+    message: diag.message,
+    offset_encoding: diag.offset_encoding,
+    details: diag.details as RawDiagnosticRecord["details"],
+    origin_kind: diag.blame?.kind,
+    origin_start: diag.blame?.start,
+    origin_end: diag.blame?.end,
+    subject_start: diag.blame?.subjectStart,
+    subject_end: diag.blame?.subjectEnd,
+    holder_start: diag.blame?.holderStart,
+    holder_end: diag.blame?.holderEnd,
+  };
+  const analyzed = analyzeDiagnostic(raw, sourceText);
+  const range = sourceText !== undefined
+    ? utf16Range(
+      sourceText,
+      analyzed.primarySpan.startByte,
+      analyzed.primarySpan.endByte,
+    )
+    : { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+  const lines = [analyzed.headline];
+  if (analyzed.fix) lines.push(`fix: ${analyzed.fix}`);
+  lines.push(`doc: ${analyzed.docRef}`);
+  const item: LspDiagnostic = {
+    range,
+    severity: 1,
+    code: analyzed.canonicalCode,
+    source: "blot",
+    message: lines.join("\n"),
+  };
+  if (analyzed.secondarySpan && sourceText !== undefined) {
+    item.relatedInformation = [
+      {
+        location: {
+          uri,
+          range: utf16Range(
+            sourceText,
+            analyzed.secondarySpan.startByte,
+            analyzed.secondarySpan.endByte,
+          ),
+        },
+        message: analyzed.secondarySpan.label,
+      },
+    ];
+  }
+  if (analyzed.quickFixes.length > 0 && sourceText !== undefined) {
+    item.data = {
+      blotQuickFixes: analyzed.quickFixes.map((qf) => ({
+        title: qf.title,
+        range: utf16Range(sourceText, qf.startByte, qf.endByte),
+        newText: qf.newText,
+      })),
+    };
+  }
+  return item;
+}
 class RpcError extends Error {
   constructor(readonly code: number, message: string) {
     super(message);
@@ -56,6 +166,10 @@ function source(value: unknown): string {
 }
 export class CompletionBridge {
   #documents = new Map<string, Document>();
+  #diagnosticsCache = new Map<
+    string,
+    { version: number; items: LspDiagnostic[] }
+  >();
   #requests = new Map<Id, AbortController>();
   #snapshot = 0;
   #generation = 0;
@@ -247,6 +361,128 @@ export class CompletionBridge {
       if (this.#requests.get(id) === controller) this.#requests.delete(id);
     }
   }
+  async #diagnose(file: string, id: Id | null): Promise<LspDiagnostic[]> {
+    const document = this.#documents.get(file);
+    if (!document) return [];
+    const cached = this.#diagnosticsCache.get(file);
+    if (cached && cached.version === document.version) {
+      return cached.items;
+    }
+    const sources = Object.fromEntries(
+      [...this.#documents.values()].map((doc) => [doc.filename, doc.text]),
+    );
+    const controller = new AbortController();
+    if (id !== null) this.#requests.set(id, controller);
+    const operation = this.#work.then(async () => {
+      controller.signal.throwIfAborted();
+      if (this.#child?.filename !== file) await this.#disposeChild();
+      controller.signal.throwIfAborted();
+      if (!this.#child) {
+        const compiler = await createZigProjectCompiler({
+          ...this.options,
+          entry: file,
+        });
+        this.#child = {
+          compiler,
+          filename: file,
+          generation: ++this.#generation,
+        };
+      }
+      const child = this.#child;
+      try {
+        const result = await child.compiler.build({
+          sources,
+          signal: controller.signal,
+        });
+        if (this.#documents.get(file) !== document) return [];
+        const items: LspDiagnostic[] = [];
+        if (!result.success) {
+          for (const diag of result.diagnostics) {
+            if (diag.filename !== file) continue;
+            items.push(
+              toLspDiagnostic(diag, document.text, pathToFileURL(file).href),
+            );
+          }
+        }
+        this.#diagnosticsCache.set(file, {
+          version: document.version,
+          items,
+        });
+        return items;
+      } catch (error) {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        await this.#disposeChild();
+        throw error;
+      }
+    });
+    this.#work = operation.catch(() => {});
+    try {
+      return await operation;
+    } finally {
+      if (id !== null && this.#requests.get(id) === controller) {
+        this.#requests.delete(id);
+      }
+    }
+  }
+  async #codeActions(params: unknown, id: Id) {
+    const request = object(params);
+    const uri = object(request.textDocument).uri;
+    const file = filename(uri);
+    const document = this.#documents.get(file);
+    if (!document) return [];
+    const rangeObj = object(request.range);
+    const reqRange: LspRange = {
+      start: object(rangeObj.start) as unknown as Position,
+      end: object(rangeObj.end) as unknown as Position,
+    };
+    const context = object(request.context);
+    const passed = Array.isArray(context.diagnostics)
+      ? context.diagnostics
+      : [];
+    const fixes: Array<{
+      title: string;
+      kind: string;
+      isPreferred: boolean;
+      diagnostics: unknown[];
+      edit: {
+        changes: Record<string, Array<{ range: LspRange; newText: string }>>;
+      };
+    }> = [];
+    const seen = new Set<string>();
+    const addFromDiagnostics = (diags: unknown[]) => {
+      for (const d of diags) {
+        if (!d || typeof d !== "object") continue;
+        const diag = d as LspDiagnostic;
+        const quickFixes = diag.data?.blotQuickFixes;
+        if (!Array.isArray(quickFixes)) continue;
+        if (diag.range && !rangesOverlap(diag.range, reqRange)) continue;
+        for (let i = 0; i < quickFixes.length; i++) {
+          const qf = quickFixes[i];
+          const key =
+            `${qf.title}:${qf.range.start.line}:${qf.range.start.character}:${qf.newText}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          fixes.push({
+            title: qf.title,
+            kind: "quickfix",
+            isPreferred: i === 0,
+            diagnostics: [diag],
+            edit: {
+              changes: {
+                [uri as string]: [{ range: qf.range, newText: qf.newText }],
+              },
+            },
+          });
+        }
+      }
+    };
+    addFromDiagnostics(passed);
+    if (fixes.length === 0) {
+      const fresh = await this.#diagnose(file, id);
+      addFromDiagnostics(fresh);
+    }
+    return fixes;
+  }
   async handle(raw: unknown): Promise<void> {
     let id: Id = null;
     let hasId = false;
@@ -285,6 +521,7 @@ export class CompletionBridge {
           "initialized",
           "textDocument/didOpen",
           "textDocument/didChange",
+          "textDocument/didSave",
           "textDocument/didClose",
         ].includes(method)
       ) return;
@@ -314,10 +551,17 @@ export class CompletionBridge {
           result: {
             capabilities: {
               positionEncoding: "utf-16",
-              textDocumentSync: { openClose: true, change: 1 },
+              textDocumentSync: { openClose: true, change: 1, save: true },
               completionProvider: {
                 resolveProvider: false,
                 triggerCharacters: [".", "$"],
+              },
+              diagnosticProvider: {
+                interFileDependencies: true,
+                workspaceDiagnostics: false,
+              },
+              codeActionProvider: {
+                codeActionKinds: ["quickfix"],
               },
             },
             serverInfo: { name: "blot" },
@@ -370,15 +614,54 @@ export class CompletionBridge {
             text: source(object(params.contentChanges[0]).text),
             version: next,
           });
+          this.#diagnosticsCache.delete(file);
           this.#invalidate();
+        } else if (method === "textDocument/didSave") {
+          this.#diagnosticsCache.delete(file);
+          const items = await this.#diagnose(file, null);
+          const current = this.#documents.get(file);
+          if (current) {
+            await this.output.send({
+              jsonrpc: "2.0",
+              method: "textDocument/publishDiagnostics",
+              params: {
+                uri: textDocument.uri,
+                version: current.version,
+                diagnostics: items,
+              },
+            });
+          }
         } else if (method === "textDocument/didClose") {
           this.#documents.delete(file);
+          this.#diagnosticsCache.delete(file);
           this.#invalidate();
           if (this.#child?.filename === file) await this.#disposeChild();
         }
         return;
       }
       if (!hasId) return;
+      if (method === "textDocument/diagnostic") {
+        if (this.#requests.has(id)) {
+          throw new RpcError(-32600, "Request ID is already pending");
+        }
+        const params = object(message.params);
+        const file = filename(object(params.textDocument).uri);
+        const items = await this.#diagnose(file, id);
+        await this.output.send({
+          jsonrpc: "2.0",
+          id,
+          result: { kind: "full", items },
+        });
+        return;
+      }
+      if (method === "textDocument/codeAction") {
+        if (this.#requests.has(id)) {
+          throw new RpcError(-32600, "Request ID is already pending");
+        }
+        const result = await this.#codeActions(message.params, id);
+        await this.output.send({ jsonrpc: "2.0", id, result });
+        return;
+      }
       if (method !== "textDocument/completion") {
         throw new RpcError(-32601, "Method not found");
       }

@@ -39,6 +39,32 @@ export interface RawDiagnosticDetailsObject {
   explanation?: RawDispatchExplanation | null;
   contexts?: RawDiagnosticContext[];
   hole?: Record<string, unknown> | null;
+  origin_kind?: string;
+  origin_start?: number;
+  origin_end?: number;
+  subject_start?: number;
+  subject_end?: number;
+  holder_start?: number;
+  holder_end?: number;
+}
+
+export interface DiagnosticQuickFix {
+  title: string;
+  startByte: number;
+  endByte: number;
+  newText: string;
+}
+
+export interface AnalyzedDiagnostic {
+  canonicalCode: string;
+  headline: string;
+  primarySpan: { startByte: number; endByte: number; label: string };
+  secondarySpan:
+    | { startByte: number; endByte: number; label: string }
+    | null;
+  fix: string | null;
+  docRef: string;
+  quickFixes: DiagnosticQuickFix[];
 }
 
 export interface RawDiagnosticRecord {
@@ -1048,39 +1074,217 @@ function buildHeadlineAndFix(
   };
 }
 
-export function formatDiagnostic(
-  record: RawDiagnosticRecord,
-  options: FormatDiagnosticOptions = {},
-): string {
-  const canonical = canonicalDiagnosticCode(record.code);
-  const file = options.displayFilename ?? record.filename ?? "<input>";
-  const index = typeof options.source === "string"
-    ? buildLineIndex(options.source)
-    : null;
+interface NormalizedBlame {
+  originKind: string;
+  originStart: number;
+  originEnd: number;
+  subjectStart: number;
+  subjectEnd: number;
+  holderStart: number;
+  holderEnd: number;
+}
 
-  const subjectRaw = index && record.subject_end &&
-      record.subject_end > (record.subject_start ?? 0)
-    ? sliceUtf8(index, record.subject_start ?? 0, record.subject_end)
+function extractNormalizedBlame(record: RawDiagnosticRecord): NormalizedBlame {
+  const detailsObj = record.details && !Array.isArray(record.details)
+    ? record.details
+    : undefined;
+  return {
+    originKind: record.origin_kind || detailsObj?.origin_kind || "",
+    originStart: record.origin_start ?? detailsObj?.origin_start ?? 0,
+    originEnd: record.origin_end ?? detailsObj?.origin_end ?? 0,
+    subjectStart: record.subject_start ?? detailsObj?.subject_start ?? 0,
+    subjectEnd: record.subject_end ?? detailsObj?.subject_end ?? 0,
+    holderStart: record.holder_start ?? detailsObj?.holder_start ?? 0,
+    holderEnd: record.holder_end ?? detailsObj?.holder_end ?? 0,
+  };
+}
+
+function buildQuickFixes(
+  canonical: string,
+  record: RawDiagnosticRecord,
+  index: LineIndex | null,
+  blame: NormalizedBlame,
+  subjectName: string,
+  subjectRaw: string,
+): DiagnosticQuickFix[] {
+  if (!index) return [];
+  const [pStart, pEnd] = expandPointSpan(index, record.start, record.end);
+  const snippet = sliceUtf8(index, pStart, pEnd);
+  const trimmed = snippet.trim();
+  const fixes: DiagnosticQuickFix[] = [];
+
+  if (canonical === "SYNTAX_ERROR") {
+    if (trimmed === "fn") {
+      fixes.push({
+        title: "Replace `fn` with `func`",
+        startByte: pStart,
+        endByte: pEnd,
+        newText: "func",
+      });
+    }
+  } else if (canonical === "UNSUPPORTED_EXPRESSION") {
+    if (trimmed.startsWith("[") && !trimmed.startsWith("#[")) {
+      fixes.push({
+        title: "Convert bare list `[...]` to array `#[...]`",
+        startByte: pStart,
+        endByte: pStart,
+        newText: "#",
+      });
+    }
+  } else if (canonical === "UNKNOWN_VALUE") {
+    const ctorMatch = /did you mean `(\$[A-Za-z0-9_]+)`\?/.exec(record.message);
+    if (ctorMatch) {
+      fixes.push({
+        title: `Replace with constructor \`${ctorMatch[1]}\``,
+        startByte: pStart,
+        endByte: pEnd,
+        newText: ctorMatch[1],
+      });
+    } else {
+      const typoMatch = /did you mean `([^`]+)`\?/.exec(record.message);
+      if (typoMatch) {
+        fixes.push({
+          title: `Replace with \`${typoMatch[1]}\``,
+          startByte: pStart,
+          endByte: pEnd,
+          newText: typoMatch[1],
+        });
+      } else if (trimmed === "None") {
+        fixes.push({
+          title: "Replace `None` with `$Nothing`",
+          startByte: pStart,
+          endByte: pEnd,
+          newText: "$Nothing",
+        });
+      }
+    }
+  } else if (canonical === "MISSING_MEMBER") {
+    const exp = getDispatchExplanation(record);
+    if (exp?.member === "len" && snippet.endsWith(".len")) {
+      const dotIdx = pEnd - 3;
+      fixes.push({
+        title: "Replace `.len` with `.length`",
+        startByte: dotIdx,
+        endByte: pEnd,
+        newText: "length",
+      });
+    }
+  } else if (canonical === "SPENT_VALUE") {
+    if (
+      blame.originKind === "moved" &&
+      blame.originEnd > blame.originStart &&
+      subjectName
+    ) {
+      const moveText = sliceUtf8(index, blame.originStart, blame.originEnd);
+      const tokenRe = new RegExp(`\\b${subjectName}\\b(?!\\.copy)`);
+      const match = tokenRe.exec(moveText);
+      if (match) {
+        const prefixBytes = textEncoder.encode(
+          moveText.slice(0, match.index + match[0].length),
+        ).length;
+        const insertAt = blame.originStart + prefixBytes;
+        fixes.push({
+          title: `Pass \`${subjectName}.copy\` at move site`,
+          startByte: insertAt,
+          endByte: insertAt,
+          newText: ".copy",
+        });
+      }
+    }
+  } else if (canonical === "ALIASED_UPDATE") {
+    if (
+      blame.originKind === "borrowed" &&
+      blame.originEnd > blame.originStart &&
+      subjectName
+    ) {
+      const borrowText = sliceUtf8(index, blame.originStart, blame.originEnd);
+      const eqIdx = borrowText.indexOf("=");
+      if (eqIdx >= 0) {
+        const rhs = borrowText.slice(eqIdx + 1);
+        const tokenRe = new RegExp(`\\b${subjectName}\\b(?!\\.copy)`);
+        const match = tokenRe.exec(rhs);
+        if (match) {
+          const prefixBytes = textEncoder.encode(
+            borrowText.slice(0, eqIdx + 1 + match.index + match[0].length),
+          ).length;
+          const insertAt = blame.originStart + prefixBytes;
+          fixes.push({
+            title: `Snapshot with \`${subjectName}.copy\``,
+            startByte: insertAt,
+            endByte: insertAt,
+            newText: ".copy",
+          });
+        }
+      }
+    } else if (
+      blame.originKind === "parameter" &&
+      blame.originEnd > blame.originStart &&
+      subjectName
+    ) {
+      const ownSuggestion = formatOwnParameterSuggestion(
+        subjectRaw,
+        subjectName,
+      );
+      if (subjectRaw.trim().startsWith("(")) {
+        fixes.push({
+          title: `Mark parameter \`${subjectName}\` as \`own\``,
+          startByte: blame.originStart,
+          endByte: blame.originEnd,
+          newText: ownSuggestion,
+        });
+      }
+    }
+  } else if (canonical === "RESULT_NOT_OWNED") {
+    if (trimmed && !trimmed.endsWith(".copy")) {
+      fixes.push({
+        title: `Return \`${trimmed}.copy\``,
+        startByte: pEnd,
+        endByte: pEnd,
+        newText: ".copy",
+      });
+    }
+  }
+
+  return fixes;
+}
+
+export function analyzeDiagnostic(
+  record: RawDiagnosticRecord,
+  source?: string,
+): AnalyzedDiagnostic {
+  const canonical = canonicalDiagnosticCode(record.code);
+  const index = typeof source === "string" ? buildLineIndex(source) : null;
+  const blame = extractNormalizedBlame(record);
+
+  const subjectRaw = index && blame.subjectEnd > blame.subjectStart
+    ? sliceUtf8(index, blame.subjectStart, blame.subjectEnd)
     : "";
   const subjectName = subjectRaw ? extractBindingIdent(subjectRaw) : "";
-  const holderName = index && record.holder_end &&
-      record.holder_end > (record.holder_start ?? 0)
-    ? extractBindingIdent(
-      sliceUtf8(index, record.holder_start ?? 0, record.holder_end),
-    )
+  const holderName = index && blame.holderEnd > blame.holderStart
+    ? extractBindingIdent(sliceUtf8(index, blame.holderStart, blame.holderEnd))
     : "";
 
   const hasOrigin = Boolean(
-    index && record.origin_kind && record.origin_end &&
-      record.origin_end > (record.origin_start ?? 0),
+    index && blame.originKind && blame.originEnd > blame.originStart,
   );
   const originLine = hasOrigin && index
-    ? byteOffsetToLineCol(index, record.origin_start ?? 0).line
+    ? byteOffsetToLineCol(index, blame.originStart).line
     : null;
+
+  const normalizedRecord: RawDiagnosticRecord = {
+    ...record,
+    origin_kind: blame.originKind,
+    origin_start: blame.originStart,
+    origin_end: blame.originEnd,
+    subject_start: blame.subjectStart,
+    subject_end: blame.subjectEnd,
+    holder_start: blame.holderStart,
+    holder_end: blame.holderEnd,
+  };
 
   const { headline, primaryLabel, fix } = buildHeadlineAndFix(
     canonical,
-    record,
+    normalizedRecord,
     index,
     subjectName,
     subjectRaw,
@@ -1088,7 +1292,85 @@ export function formatDiagnostic(
     originLine,
   );
 
-  const out: string[] = [`[${canonical}] ${headline}`];
+  const [pStart, pEnd] = index
+    ? expandPointSpan(index, record.start, record.end)
+    : [record.start, record.end];
+
+  let secondarySpan:
+    | { startByte: number; endByte: number; label: string }
+    | null = null;
+  if (hasOrigin) {
+    let originLabel = "related here";
+    if (blame.originKind === "moved") {
+      originLabel = subjectName
+        ? `\`${subjectName}\` moved here`
+        : "moved here";
+    } else if (blame.originKind === "borrowed") {
+      originLabel = holderName
+        ? `borrowed by \`${holderName}\` here`
+        : "borrowed here";
+    } else if (blame.originKind === "aliased") {
+      originLabel = "aliased here";
+    } else if (blame.originKind === "parameter") {
+      originLabel = "borrowed parameter (not `own`)";
+    }
+    secondarySpan = {
+      startByte: blame.originStart,
+      endByte: blame.originEnd,
+      label: originLabel,
+    };
+  } else {
+    const syn = getSyntaxDetail(record);
+    if (
+      syn.detailSpan &&
+      (syn.detailSpan.start !== record.start ||
+        syn.detailSpan.end !== record.end)
+    ) {
+      secondarySpan = {
+        startByte: syn.detailSpan.start,
+        endByte: syn.detailSpan.end,
+        label: syn.actualToken
+          ? `unexpected ${syn.actualToken} here`
+          : "failed here",
+      };
+    }
+  }
+
+  const hasDoc = Boolean(lookupDiagnosticExplanation(canonical));
+  const docRef = hasDoc
+    ? `blot explain ${canonical} (skills/blot-diagnostics/SKILL.md#${canonical})`
+    : "blot explain --list (CHEATSHEET.md)";
+
+  const quickFixes = buildQuickFixes(
+    canonical,
+    normalizedRecord,
+    index,
+    blame,
+    subjectName,
+    subjectRaw,
+  );
+
+  return {
+    canonicalCode: canonical,
+    headline,
+    primarySpan: { startByte: pStart, endByte: pEnd, label: primaryLabel },
+    secondarySpan,
+    fix,
+    docRef,
+    quickFixes,
+  };
+}
+
+export function formatDiagnostic(
+  record: RawDiagnosticRecord,
+  options: FormatDiagnosticOptions = {},
+): string {
+  const file = options.displayFilename ?? record.filename ?? "<input>";
+  const index = typeof options.source === "string"
+    ? buildLineIndex(options.source)
+    : null;
+  const analyzed = analyzeDiagnostic(record, options.source);
+  const out: string[] = [`[${analyzed.canonicalCode}] ${analyzed.headline}`];
 
   if (index) {
     const pos = byteOffsetToLineCol(index, record.start);
@@ -1098,51 +1380,14 @@ export function formatDiagnostic(
     out.push(`at ${file}:${pos.line}:${pos.col}`);
 
     const spans: AnnotatedSpan[] = [];
-
-    // Secondary blame span from uniqueness origins
-    if (
-      hasOrigin && record.origin_start !== undefined &&
-      record.origin_end !== undefined
-    ) {
-      let originLabel = "related here";
-      if (record.origin_kind === "moved") {
-        originLabel = subjectName
-          ? `\`${subjectName}\` moved here`
-          : "moved here";
-      } else if (record.origin_kind === "borrowed") {
-        originLabel = holderName
-          ? `borrowed by \`${holderName}\` here`
-          : "borrowed here";
-      } else if (record.origin_kind === "aliased") {
-        originLabel = "aliased here";
-      } else if (record.origin_kind === "parameter") {
-        originLabel = "borrowed parameter (not `own`)";
-      }
+    if (analyzed.secondarySpan) {
       spans.push({
-        startByte: record.origin_start,
-        endByte: record.origin_end,
+        startByte: analyzed.secondarySpan.startByte,
+        endByte: analyzed.secondarySpan.endByte,
         marker: "-",
-        label: originLabel,
+        label: analyzed.secondarySpan.label,
       });
     } else {
-      // Secondary span from syntax detail (e.g. exact unexpected token inside declaration)
-      const syn = getSyntaxDetail(record);
-      if (
-        syn.detailSpan &&
-        (syn.detailSpan.start !== record.start ||
-          syn.detailSpan.end !== record.end)
-      ) {
-        const synLabel = syn.actualToken
-          ? `unexpected ${syn.actualToken} here`
-          : "failed here";
-        spans.push({
-          startByte: syn.detailSpan.start,
-          endByte: syn.detailSpan.end,
-          marker: "-",
-          label: synLabel,
-        });
-      }
-      // Secondary context spans from check-project
       for (const ctx of getDiagnosticContexts(record)) {
         if (ctx.span && ctx.span.end > ctx.span.start) {
           spans.push({
@@ -1159,7 +1404,7 @@ export function formatDiagnostic(
       startByte: record.start,
       endByte: record.end,
       marker: "^",
-      label: primaryLabel,
+      label: analyzed.primarySpan.label,
     });
 
     out.push(...formatExcerpt(index, spans));
@@ -1167,17 +1412,10 @@ export function formatDiagnostic(
     out.push(`at ${file}:${record.start}-${record.end}`);
   }
 
-  if (fix) {
-    out.push(`fix: ${fix}`);
+  if (analyzed.fix) {
+    out.push(`fix: ${analyzed.fix}`);
   }
-  const hasDoc = Boolean(lookupDiagnosticExplanation(canonical));
-  if (hasDoc) {
-    out.push(
-      `doc: blot explain ${canonical} (skills/blot-diagnostics/SKILL.md#${canonical})`,
-    );
-  } else {
-    out.push("doc: blot explain --list (CHEATSHEET.md)");
-  }
+  out.push(`doc: ${analyzed.docRef}`);
 
   return out.join("\n");
 }

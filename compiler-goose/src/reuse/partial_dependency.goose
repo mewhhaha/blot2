@@ -16,6 +16,7 @@ import reuse.dispatch_explanation;
 import check.core;
 import check.check;
 import check.core_builder;
+import check.uniqueness;
 import check.wire_schema;
 import parse.ast;
 import parse.syntax_diagnostics;
@@ -171,7 +172,25 @@ fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_sup
    ir.value.unit=id;ready.stats.body_lowerings+=ir.value.body_lowerings;ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
   }
   ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index].tables=ir.owner;
-  if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}return blot_support::some(diagnostic),blot_error::Error.none;}
+  if ir.value.diagnostics.len!=0 {
+   let issue=ir.value.diagnostics[0];
+   var origins:blot_check_uniqueness::OriginInfo[>..<]=[];
+   blot_check_uniqueness::explain(ir.value,origins);
+   var matched=false;
+   var origin=blot_check_uniqueness::OriginInfo{..};
+   for candidate in origins {
+    if candidate.code==issue.code&&candidate.span.start==issue.span.start&&candidate.span.end==issue.span.end&&(candidate.has_origin||candidate.subject_end>candidate.subject_start) {
+     origin=candidate;matched=true;break;
+    }
+   }
+   if matched {
+    let publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:coreCodeName(issue.code),span:issue.span,message:issue.message()};
+    let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(id,"lower",unit.source,publication,OriginDetails{origin_kind:origin.origin_kind,origin_start:origin.origin_start,origin_end:origin.origin_end,subject_start:origin.subject_start,subject_end:origin.subject_end,holder_start:origin.holder_start,holder_end:origin.holder_end});
+    if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}
+    return blot_support::some(diagnostic),blot_error::Error.none;
+   }
+   let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}return blot_support::some(diagnostic),blot_error::Error.none;
+  }
  }
  return blot_support::none<ConsumerDiagnostic>(),blot_error::Error.none;
 }
@@ -186,6 +205,7 @@ fn coreCodeName(code:blot_check_core::Code)->const u8[:] {match code {const for 
 struct HoleDetails {hole:blot_reuse_hole_diagnostics::Snapshot}
 struct ExplanationDetails {explanation:blot_reuse_dispatch_explanation::Explanation,contexts:const blot_check_check::DiagnosticContext[:]}
 struct ContextDetails {contexts:const blot_check_check::DiagnosticContext[:]}
+struct OriginDetails {origin_kind:const u8[:],origin_start:u32,origin_end:u32,subject_start:u32,subject_end:u32,holder_start:u32,holder_end:u32}
 fn rejectChecked(source:Project&,entry_path:const u8[:],issue:blot_reuse_project_check::Diagnostic)->Preparation,Error {
  let unit .= source.unit(issue.unit);let contexts=issue.contexts[..issue.context_len];let publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:issue.codeName(),span:issue.span,message:issue.message()};
  if issue.hole.present {let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,publication,HoleDetails{issue.hole.value});if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);}
@@ -197,7 +217,7 @@ fn rejectChecked(source:Project&,entry_path:const u8[:],issue:blot_reuse_project
   var message:u8[>..]=[];let error=blot_reuse_purity_diagnostics::format(source.symbols,"",witness,message);if error!=blot_error::Error.none {return Preparation.inactive,error;}var actual=publication;actual.message=message[..];let details=[witness];
   let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,actual,details[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
  }
- var message:u8[>..<]=[];message.append(issue.message());if issue.symbol!=0 {let code=issue.codeName();if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(source.symbols.get(issue.symbol));}
+ var message:u8[>..<]=[];message.append(issue.message());if !issue.detail.present && issue.symbol!=0 {let code=issue.codeName();if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(source.symbols.get(issue.symbol));}
  let diagnostic,error=blot_reuse_dependency_consumer::init(issue.unit,"check-project",issue.codeName(),issue.span,message[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
 }
 // Dependency owner is borrowed throughout. All new frontend/solver owners are
@@ -228,3 +248,5 @@ fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_d
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ExplanationDetails)->bool {return true;}
 
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ContextDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::OriginDetails)->bool {return true;}

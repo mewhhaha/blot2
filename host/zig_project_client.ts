@@ -64,6 +64,15 @@ export interface ZigProjectSourceLocation {
 export interface ZigProjectDiagnosticContext extends ZigProjectSourceLocation {
   kind: "callee" | "argument" | "left_operand" | "right_operand";
 }
+export interface ZigProjectDiagnosticBlame {
+  kind: "moved" | "borrowed" | "aliased" | "parameter" | "";
+  start: number;
+  end: number;
+  subjectStart: number;
+  subjectEnd: number;
+  holderStart: number;
+  holderEnd: number;
+}
 export interface ZigProjectDiagnostic {
   filename: string;
   stage: string;
@@ -81,6 +90,8 @@ export interface ZigProjectDiagnostic {
   related?: ZigProjectSourceLocation | null;
   /** Source expressions involved in a type, effect, or dispatch mismatch. */
   contexts?: ZigProjectDiagnosticContext[];
+  /** Secondary blame span (move site, borrow holder, or borrowed parameter). */
+  blame?: ZigProjectDiagnosticBlame;
   origins?: Array<
     ZigProjectSourceLocation & {
       kind: "quote" | "generator" | "splice" | "invocation";
@@ -399,6 +410,7 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
   delete object.hole;
   delete object.explanation;
   delete object.contexts;
+  delete object.blame;
   if (object.code === "typed_hole" && object.details != null) {
     try {
       object.hole = readTypedHole(record(object.details, "hole details").hole);
@@ -452,6 +464,41 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
         offset_encoding: "utf8_bytes",
       };
     });
+  }
+  if (
+    object.details != null && typeof object.details === "object" &&
+    ("origin_kind" in object.details || "subject_end" in object.details)
+  ) {
+    const d = object.details as Record<string, unknown>;
+    const kind = typeof d.origin_kind === "string" ? d.origin_kind : "";
+    if (
+      kind === "" || kind === "moved" || kind === "borrowed" ||
+      kind === "aliased" || kind === "parameter"
+    ) {
+      const originStart = natural(d.origin_start ?? 0, "blame origin start");
+      const originEnd = natural(d.origin_end ?? 0, "blame origin end");
+      const subjectStart = natural(
+        d.subject_start ?? 0,
+        "blame subject start",
+      );
+      const subjectEnd = natural(d.subject_end ?? 0, "blame subject end");
+      const holderStart = natural(d.holder_start ?? 0, "blame holder start");
+      const holderEnd = natural(d.holder_end ?? 0, "blame holder end");
+      if (
+        originStart <= originEnd && subjectStart <= subjectEnd &&
+        holderStart <= holderEnd
+      ) {
+        object.blame = {
+          kind,
+          start: originStart,
+          end: originEnd,
+          subjectStart,
+          subjectEnd,
+          holderStart,
+          holderEnd,
+        };
+      }
+    }
   }
   return object as unknown as ZigProjectDiagnostic;
 }
