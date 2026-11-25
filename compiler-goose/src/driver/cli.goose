@@ -137,8 +137,7 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  if command==Command.check {checked.deinit();tree.deinit();names.deinit();return true,blot_error::Error.none;}
  let lower_start=now();var lowered,error=blot_check_core_builder::lower(tree,names,checked);if error!=blot_error::Error.none {checked.deinit();tree.deinit();names.deinit();return false,error;}
  lowered.value.unit=1;stats.lower_us=elapsed(lower_start);stats.core_nodes=lowered.value.nodes.len-1;stats.body_lowerings=lowered.value.body_lowerings;
- for item in lowered.value.diagnostics {let error=diagnostic(writer,filename,"lower",enumName(item.code),item.span.start,item.span.end,item.message());if error!=blot_error::Error.none {lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,error;}}
- if lowered.value.diagnostics.len!=0 {lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,blot_error::Error.none;}
+ if lowered.value.diagnostics.len!=0 {let error=lowerDiagnostics(writer,filename,lowered.value);lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,error;}
  checked.deinit();tree.deinit();names.deinit();source.clear();tokens.clear();comments.clear();diagnostics.clear();
  let emit_start=now();var wasm:u8[>..<]=[];var detail:u8[>..<]=[];let units:blot_check_core::Module[1]=[lowered.value];
  let compiled=blot_compile::compile(units[..],1,wasm,detail);stats.emit_us=elapsed(emit_start);stats.emitted_functions=compiled.emitted_functions;

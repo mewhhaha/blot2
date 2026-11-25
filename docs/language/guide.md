@@ -18,10 +18,8 @@ qualification.
   `return use call`. Legacy `=> return expr` and `=> return do:` remain accepted
   during migration.
 - **Array & ownership type symbols:**
-  - `#[T]` (fixed-length mutable array, equivalent to `Array T`),
-  - `#[+T]` (growable array, equivalent to `GrowArray T`),
-  - `#[~T]` (resizable/shrinkable array, equivalent to `ResizeArray T`),
-  - `#[n; T]` (equal-length-checked array family),
+  - `#[T]` (unified owned dynamic array, equivalent to `Array T`),
+  - `#[n; T]` (equal-length-checked fixed array family),
   - `&[T]` (read-only borrowed view, equivalent to `View T`),
   - `*T` (shared immutable handle via `freeze` / `seal`),
   - `*(A -> B)` (frozen closure value).

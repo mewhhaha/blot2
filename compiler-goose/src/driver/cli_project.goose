@@ -82,8 +82,8 @@ fn projectChecked(writer:blot_io::Writer,command:Command,filename:const u8[:],ou
 fn projectLowered(writer:blot_io::Writer,filename:const u8[:],output:Text,lower_start:u64,stats:ProjectStats&,loaded:Project&,checked:CheckedProject&,checked_live:bool&,units:Core[:],unit_owners:InputOwner[>..<]&)->bool,Error {
  for unit,index in loaded.units.items {let id=(index+1) as u32;let lowering=blot_phase_profile::enter(blot_phase_profile::Phase.lower);let owned,error=blot_check_core_builder::lowerWithOrigins(unit.tree,loaded.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(loaded));lowering.exit();if error!=blot_error::Error.none {return false,error;}
   var lowered=owned;lowered.value.unit=id;units[index]=lowered.value;unit_owners.push(lowered.owner);stats.core_nodes+=units[index].nodes.len-1;stats.body_lowerings+=units[index].body_lowerings;
-  for item in units[index].diagnostics {let error=diagnostic(writer,loaded.filename(id),"lower",enumName(item.code),item.span.start,item.span.end,item.message());if error!=blot_error::Error.none {return false,error;}}
-  stats.lower_us=elapsed(lower_start);if units[index].diagnostics.len!=0 {return false,blot_error::Error.none;}}
+  if units[index].diagnostics.len!=0 {let error=lowerDiagnostics(writer,loaded.filename(id),units[index]);stats.lower_us=elapsed(lower_start);return false,error;}
+  stats.lower_us=elapsed(lower_start);}
  // Paths and the tiny import catalog remain for diagnostics; source, syntax
  // and mutable inference state cannot be consulted by emission.
  let release_start=now();checked.deinit();checked_live=false;for &unit in loaded.units.items {unit.tree.deinit();blot_reuse_project::releaseSource(unit.source);unit.source=default<const u8[:]>();}stats.teardown_us+=elapsed(release_start);

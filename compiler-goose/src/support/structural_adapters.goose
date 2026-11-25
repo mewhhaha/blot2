@@ -905,6 +905,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::LoopFr
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::LoopFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::LoopOuter)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::LoopOuter,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::OriginInfo)->bool {return equalFields(left,right);}
+fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::OriginInfo,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Place)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::Place,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Record)->bool {return equalFields(left,right);}
@@ -949,6 +951,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ExplanationDetail)-
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ExplanationDetail,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::HoleDetail)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::HoleDetail,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::LowerDiagnostic)->bool {return equalFields(left,right);}
+fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::LowerDiagnostic,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ProjectStats)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ProjectStats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SignatureSummary)->bool {return equalFields(left,right);}

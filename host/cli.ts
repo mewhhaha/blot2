@@ -1,9 +1,16 @@
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  formatDiagnosticCodeList,
+  formatDiagnosticReport,
+  formatExplanation,
+  type RawDiagnosticRecord,
+} from "./diagnostics.ts";
 import { extractStandardLibrary } from "./packaged_native.ts";
 import { resolveProject } from "./packages.ts";
 
-const usage = `Usage: blot guide | fmt SOURCE [--check]
+const usage =
+  `Usage: blot guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
        blot check ENTRY [project options]
        blot build ENTRY [OUTPUT.wasm] [project options]
        blot dependencies ENTRY OUTPUT.blotdep [project options]
@@ -23,13 +30,44 @@ export async function runCli(
     console.log(usage);
     return 0;
   }
-  if (command === "guide" && args.length === 1) {
-    console.log(
-      await Deno.readTextFile(
-        new URL("../docs/language/guide.md", import.meta.url),
-      ),
-    );
-    return 0;
+  if (command === "guide") {
+    if (args.length === 1) {
+      console.log(
+        await Deno.readTextFile(
+          new URL("../docs/language/guide.md", import.meta.url),
+        ),
+      );
+      return 0;
+    }
+    if (args.length === 2 && filename === "--cheatsheet") {
+      console.log(
+        await Deno.readTextFile(
+          new URL("../CHEATSHEET.md", import.meta.url),
+        ),
+      );
+      return 0;
+    }
+    console.error(usage);
+    return 2;
+  }
+  if (command === "explain") {
+    if (args.length === 1 || (args.length === 2 && filename === "--list")) {
+      console.log(formatDiagnosticCodeList());
+      return 0;
+    }
+    if (args.length === 2 && filename) {
+      const text = formatExplanation(filename);
+      if (!text) {
+        console.error(
+          `Unknown diagnostic code: ${filename}\n\n${formatDiagnosticCodeList()}`,
+        );
+        return 1;
+      }
+      console.log(text);
+      return 0;
+    }
+    console.error(usage);
+    return 2;
   }
   let library: Awaited<ReturnType<typeof extractStandardLibrary>> | undefined;
   try {
@@ -156,13 +194,15 @@ export async function runCli(
     const stderr = new TextDecoder().decode(result.stderr);
     if (json) await Deno.stdout.write(result.stdout);
     else {
+      const diagnostics: RawDiagnosticRecord[] = [];
       for (const line of stdout.trim().split("\n").filter(Boolean)) {
         const record = JSON.parse(line);
         if (record.kind === "diagnostic") {
-          console.error(
-            `${record.filename}:${record.start}-${record.end}: ${record.code}: ${record.message}`,
-          );
+          diagnostics.push(record as RawDiagnosticRecord);
         }
+      }
+      if (diagnostics.length > 0) {
+        console.error(await formatDiagnosticReport(diagnostics));
       }
       if (result.success) {
         console.log(

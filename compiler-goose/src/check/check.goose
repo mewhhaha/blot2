@@ -1047,7 +1047,7 @@ fn validateModuleBodies(self_:Engine&)->blot_error::Error {
         self_.source_header_diagnostics_start=start;self_.source_header_diagnostics_count=count;self_.diagnostics.clear();}
     var source_issue=blot_parse_source_operators::Issue{..};var has_issue=false;
     if tree.diagnostics.len==0 {let issue,present,err=blot_parse_source_operators::validate(tree,pool,self_);if err!=blot_error::Error.none {return err;}source_issue=issue;has_issue=present;}
-    if has_issue {deinitDiagnosticPayloads(self_.diagnostics);self_.diagnostics.clear();var numeric=blot_support::none<blot_parse_ast::NumericFault>();       if source_issue.has_numeric_literal {numeric=blot_support::some(source_issue.numeric_literal);}              let __field_order_37_code: blot_check_check::Code = sourceIssueCode(source_issue.code); let __field_order_38_node: u32 = source_issue.node; let __field_order_39_span: blot_parse_ast::Span = blot_parse_ast::Span{source_issue.point,source_issue.point, ..}; let __field_order_40_symbol: u32 = source_issue.symbol; let __field_order_41_implicit_type_witness: bool = source_issue.implicit_type_witness; let __field_order_42_source_terminator: blot_parse_source_operators::Terminator = source_issue.terminator; let __field_order_43_numeric_literal: blot_support::Option<blot_parse_ast::NumericFault> = numeric; self_.diagnostics.push(Diagnostic{ code: __field_order_37_code, span: __field_order_39_span, node: __field_order_38_node, symbol: __field_order_40_symbol, implicit_type_witness: __field_order_41_implicit_type_witness, source_terminator: __field_order_42_source_terminator, numeric_literal: __field_order_43_numeric_literal, .. });}
+    if has_issue {deinitDiagnosticPayloads(self_.diagnostics);self_.diagnostics.clear();var numeric=blot_support::none<blot_parse_ast::NumericFault>();       if source_issue.has_numeric_literal {numeric=blot_support::some(source_issue.numeric_literal);}              let __field_order_37_code: blot_check_check::Code = sourceIssueCode(source_issue.code); let __field_order_38_node: u32 = source_issue.node; let __field_order_39_span: blot_parse_ast::Span = blot_parse_ast::Span{source_issue.point,source_issue.point, ..}; let __field_order_40_symbol: u32 = source_issue.symbol; let __field_order_41_implicit_type_witness: bool = source_issue.implicit_type_witness; let __field_order_42_source_terminator: blot_parse_source_operators::Terminator = source_issue.terminator; let __field_order_43_numeric_literal: blot_support::Option<blot_parse_ast::NumericFault> = numeric; var detail=blot_support::none<const u8[:]>(); if __field_order_37_code==Code.unknown_value && !__field_order_41_implicit_type_witness && __field_order_40_symbol!=0 {detail=self_.unknownSymbolDetail(__field_order_40_symbol);} self_.diagnostics.push(Diagnostic{ code: __field_order_37_code, span: __field_order_39_span, node: __field_order_38_node, symbol: __field_order_40_symbol, implicit_type_witness: __field_order_41_implicit_type_witness, source_terminator: __field_order_42_source_terminator, numeric_literal: __field_order_43_numeric_literal, detail: detail, .. });}
     if !self_.source_validation && tree.diagnostics.len==0 && !has_issue {
         let ast_walk_8_count=tree.roots.items.len;for ast_walk_8_index in 0..ast_walk_8_count {let id=tree.roots.items[ast_walk_8_index];let rtag=tree.node(id).tag;if (rtag==blot_parse_ast::tag_value_decl || rtag==blot_parse_ast::tag_entry_kernel_decl || rtag==blot_parse_ast::tag_entry_process_decl) && self_.resolved[id]!=0 {self_.root_global=self_.resolved[id];let err=self_.inferGlobal(self_.resolved[id]);if err!=blot_error::Error.none {return err;}}}
         for declaration in self_.implementations {if declaration.identity.unit!=unit {continue;}for member in self_.implementation_members[declaration.members.start..declaration.members.start+declaration.members.len] {if member.kind!=blot_reuse_principal_interface::ImplementationMemberKind.value {continue;}self_.root_global=member.target.binding;let err=self_.inferGlobal(member.target.binding);if err!=blot_error::Error.none {return err;}}}self_.root_global=0;
@@ -3908,12 +3908,81 @@ recursive fn comptimeNameChain(self_:Engine&,id:u32,name_sym:u32)->blot_support:
  self_.access_types[id]=tlist;
  return blot_support::some(ty),blot_error::Error.none;
 }
-recursive fn nameExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) && self_.editor_marker.present && self_.editor_marker.value.kind==blot_reuse_completion_probe::Kind.expression {return self_.captureEditor(id,0,0);}if comptime_binder_len!=0 {let prop,perr=self_.comptimeNameChain(id,node.a);if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}let found=self_.lookup(node.a);if found.present {let binding=found.value;if isWithLocked(binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}self_.resolved[id]=binding;let ty,err=self_.instantiate(binding,id);if err!=blot_error::Error.none {return 0,err;}return ty,blot_error::Error.none;}let global,err=self_.globalBinding(node.a);if err!=blot_error::Error.none {return 0,err;}if global.present {return self_.globalReference(global.value,id);}let qualified,err=self_.qualifiedValue(id,node.a);if err!=blot_error::Error.none {return 0,err;}if qualified.present {return qualified.value,blot_error::Error.none;}let template,err=self_.operationTemplate(node.a);if err!=blot_error::Error.none {return 0,err;}if template.present {return self_.operationValue(id,template.value,blot_support::none<const u32[:]>());}let constructor,err=self_.typeConstructorValue(self_.catalogKey(node.a));if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}return self_.diagnosticFresh(Code.unknown_name,id);}
+fn diagnosticEditDistanceLe2(a:const u8[:],b:const u8[:])->i64 {
+    let al=a.len;let bl=b.len;
+    if al==0 || bl==0 || al>48 || bl>48 {return 3;}
+    var diff=al-bl;if diff<0 {diff=-diff;}
+    if diff>2 {return 3;}
+    var prev:i64[49]=[0;49];var curr:i64[49]=[0;49];
+    for j in 0..(bl+1) {prev[j]=j;}
+    for i in 1..(al+1) {
+        curr[0]=i;var row_min=curr[0];
+        for j in 1..(bl+1) {
+            var cost:i64=1;if a[i-1]==b[j-1] {cost=0;}
+            var best=prev[j]+1;
+            if curr[j-1]+1<best {best=curr[j-1]+1;}
+            if prev[j-1]+cost<best {best=prev[j-1]+cost;}
+            curr[j]=best;if best<row_min {row_min=best;}
+        }
+        if row_min>2 {return 3;}
+        for j in 0..(bl+1) {prev[j]=curr[j];}
+    }
+    return prev[bl];
+}
+fn unknownSymbolDetail(self_:Engine&,symbol:u32)->blot_support::Option<const u8[:]> {
+    if symbol==0 {return blot_support::none<const u8[:]>();}
+    let missing=self_.pool.get(symbol);
+    if self_.sourceConstructorExists(symbol) {
+        self_.diagnostic_bytes.clear();
+        self_.diagnostic_bytes.append("Unknown value `");
+        self_.diagnostic_bytes.append(missing);
+        self_.diagnostic_bytes.append("`; constructors require a leading `$` in Blot (did you mean `$");
+        self_.diagnostic_bytes.append(missing);
+        self_.diagnostic_bytes.append("`?)");
+        return blot_support::some<const u8[:]>(ownDiagnosticText(self_.diagnostic_bytes));
+    }
+    var best_sym:u32=0;var best_dist:i64=3;
+    for entry in self_.env {
+        if entry.name==0 {continue;}
+        let d=diagnosticEditDistanceLe2(missing,self_.pool.get(entry.name));
+        if d>0 && d<best_dist {best_dist=d;best_sym=entry.name;}
+    }
+    for slot in self_.catalogs.globals.slots {
+        if slot.tag==0 || slot.key==0 {continue;}
+        let d=diagnosticEditDistanceLe2(missing,self_.pool.get(slot.key));
+        if d>0 && d<best_dist {best_dist=d;best_sym=slot.key;}
+    }
+    for slot in self_.imported_globals.slots {
+        if slot.tag==0 || slot.key==0 {continue;}
+        let d=diagnosticEditDistanceLe2(missing,self_.pool.get(slot.key));
+        if d>0 && d<best_dist {best_dist=d;best_sym=slot.key;}
+    }
+    if best_sym!=0 {
+        self_.diagnostic_bytes.clear();
+        self_.diagnostic_bytes.append("Unknown value `");
+        self_.diagnostic_bytes.append(missing);
+        self_.diagnostic_bytes.append("`; did you mean `");
+        self_.diagnostic_bytes.append(self_.pool.get(best_sym));
+        self_.diagnostic_bytes.append("`?");
+        return blot_support::some<const u8[:]>(ownDiagnosticText(self_.diagnostic_bytes));
+    }
+    return blot_support::none<const u8[:]>();
+}
+fn unknownNameDiagnosticFresh(self_:Engine&,id:u32,symbol:u32)->u32,blot_error::Error {
+    let err=self_.diagnostic(Code.unknown_name,id);
+    if err!=blot_error::Error.none {return 0,err;}
+    let index=self_.diagnostics.len-1;
+    self_.diagnostics[index].symbol=symbol;
+    let detail=self_.unknownSymbolDetail(symbol);
+    if detail.present {self_.diagnostics[index].detail=detail;}
+    return self_.types.fresh();
+}
+recursive fn nameExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) && self_.editor_marker.present && self_.editor_marker.value.kind==blot_reuse_completion_probe::Kind.expression {return self_.captureEditor(id,0,0);}if comptime_binder_len!=0 {let prop,perr=self_.comptimeNameChain(id,node.a);if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}let found=self_.lookup(node.a);if found.present {let binding=found.value;if isWithLocked(binding) {return self_.diagnosticFresh(Code.borrow_conflict,id);}self_.resolved[id]=binding;let ty,err=self_.instantiate(binding,id);if err!=blot_error::Error.none {return 0,err;}return ty,blot_error::Error.none;}let global,err=self_.globalBinding(node.a);if err!=blot_error::Error.none {return 0,err;}if global.present {return self_.globalReference(global.value,id);}let qualified,err=self_.qualifiedValue(id,node.a);if err!=blot_error::Error.none {return 0,err;}if qualified.present {return qualified.value,blot_error::Error.none;}let template,err=self_.operationTemplate(node.a);if err!=blot_error::Error.none {return 0,err;}if template.present {return self_.operationValue(id,template.value,blot_support::none<const u32[:]>());}let constructor,err=self_.typeConstructorValue(self_.catalogKey(node.a));if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}return self_.unknownNameDiagnosticFresh(id,node.a);}
 recursive fn fieldExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);var parent=node.a;while self_.tree.node(parent).tag==blot_parse_ast::tag_group {parent=self_.tree.node(parent).a;}let base=self_.tree.node(parent);if comptime_binder_len!=0 && base.tag==blot_parse_ast::tag_name {let prop,perr=self_.checkComptimeProp(id,base.a,self_.pool.get(node.b));if perr!=blot_error::Error.none {return 0,perr;}if prop.present {return prop.value,blot_error::Error.none;}}if base.tag==blot_parse_ast::tag_name && !self_.lookup(base.a).present {let binding,err=self_.qualifiedImportBinding(Qualified{namespace_:base.a,member:node.b, ..});if err!=blot_error::Error.none {return 0,err;}if binding.present {return self_.globalReference(binding.value,id);}let constructor,err=self_.typeConstructorValue(Qualified{namespace_:base.a,member:node.b, ..});if err!=blot_error::Error.none {return 0,err;}if constructor.present {return constructor.value,blot_error::Error.none;}}if self_.editorAt(id) {var namespace_:u32=0;var receiver:u32=0;if base.tag==blot_parse_ast::tag_name && !self_.lookup(base.a).present && self_.isNamespace(base.a) {namespace_=base.a;}else {let ty,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}receiver=ty;}return self_.captureEditor(id,receiver,namespace_);}let receiver,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let operation,err=self_.scopedOperation(id,receiver,node.b,node.a);if err!=blot_error::Error.none {return 0,err;}if operation.present {return operation.value,blot_error::Error.none;}let projected,err=self_.projectField(receiver,node.b,id,false,blot_support::none<PendingObligation>());if err!=blot_error::Error.none {return 0,err;}self_.projection_resolved[id]=projected.projection;return projected.ty,blot_error::Error.none;}
 fn constructorExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);if self_.editorAt(id) {return self_.captureEditor(id,0,self_.catalogKey(node.a).namespace_);}let ctor:u32={let scalar_lookup_91 .= self_.catalogs.constructor_names.get(self_.catalogKey(node.a));if !scalar_lookup_91 {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let scalar_value_91:u32=scalar_lookup_91;scalar_value_91};self_.constructor_resolved[id]=ctor;let ty,err=self_.constructorType(ctor);if err!=blot_error::Error.none {return 0,err;}return self_.types.openCovariant(ty);}
 recursive fn witnessExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);let value,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let name,present=self_.pool.lookup("Type");if !present {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let ctor:u32={let scalar_lookup_92 .= self_.catalogs.constructor_names.get(self_.catalogKey(name));if !scalar_lookup_92 {let err=self_.constructorDiagnostic(node.a,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}let scalar_value_92:u32=scalar_lookup_92;scalar_value_92};self_.constructor_resolved[id]=ctor;let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let constructor,err=self_.constructorType(ctor);if err!=blot_error::Error.none {return 0,err;}let function,err=self_.types.function(value,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(constructor,function,id);return result,err;}
 recursive fn indexExpression(self_:Engine&,id:u32)->u32,blot_error::Error {let node=self_.tree.node(id);let owner,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let index,err=self_.expression(node.b);if err!=blot_error::Error.none {return 0,err;}let element,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let actual=blot_check_storage_types::readableElement(self_.types,self_.types.head(owner,0));if actual.present {let err=self_.constrain(element,actual.value,id);if err!=blot_error::Error.none {return 0,err;}}else {let err=self_.constrainIndexed(owner,element,id);if err!=blot_error::Error.none {return 0,err;}}let err=self_.constrain(index,blot_check_types::u32_type,node.b);return element,err;}
-recursive fn arrayExpression(self_:Engine&,id:u32)->u32,blot_error::Error {if self_.tree.node(id).c!=0 {return self_.diagnosticFresh(Code.unsupported_expression,id);}let element,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}var diverges=false;let syntax_source_43=id;let syntax_count_43=self_.tree.children(syntax_source_43).len;for syntax_index_43 in 0..syntax_count_43 {let child=self_.tree.children(syntax_source_43)[syntax_index_43];let expression,err=self_.expression(child);if err!=blot_error::Error.none {return 0,err;}let value,err=self_.runtimeValue(expression,child);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element,value,child);if err!=blot_error::Error.none {return 0,err;}let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return 0,err;}diverges=diverges || resolved==blot_check_types::never;}if diverges {return blot_check_types::never,blot_error::Error.none;}return self_.types.sequence(blot_check_types::Tag.array,element);}
+recursive fn arrayExpression(self_:Engine&,id:u32)->u32,blot_error::Error {if self_.tree.node(id).c!=0 {let err=self_.diagnostic(Code.unsupported_expression,id);if err!=blot_error::Error.none {return 0,err;}self_.diagnostic_bytes.clear();self_.diagnostic_bytes.append("Bare `[...]` list literals are not supported; array literals use `#[...]` in Blot (e.g. `#[1, 2, 3]`)");self_.diagnostics[self_.diagnostics.len-1].detail=blot_support::some<const u8[:]>(ownDiagnosticText(self_.diagnostic_bytes));return self_.types.fresh();}let element,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}var diverges=false;let syntax_source_43=id;let syntax_count_43=self_.tree.children(syntax_source_43).len;for syntax_index_43 in 0..syntax_count_43 {let child=self_.tree.children(syntax_source_43)[syntax_index_43];let expression,err=self_.expression(child);if err!=blot_error::Error.none {return 0,err;}let value,err=self_.runtimeValue(expression,child);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(element,value,child);if err!=blot_error::Error.none {return 0,err;}let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return 0,err;}diverges=diverges || resolved==blot_check_types::never;}if diverges {return blot_check_types::never,blot_error::Error.none;}return self_.types.sequence(blot_check_types::Tag.array,element);}
 reusable[] var lambda_storage_frames:Engine_storage_frames[>..];
 struct LambdaContext {scoped_parameter:u32,scope:i64,owner:u32,target:u32,function_body:u32,function_exit_allowed:bool,function_exit_target:u32,function_result_expected:u32,ambient:u32,loops:LoopFrame[:]=default<LoopFrame[:]>(),frames:Engine_storage_frames[:]=default<Engine_storage_frames[:]>(),has_frames:bool=false,body_started:bool=false}
 fn restore(self_:LambdaContext&,engine:Engine&) {engine.scoped_parameter=self_.scoped_parameter;if self_.has_frames {engine.storage_frames.clear();engine.storage_frames.append(self_.frames);if self_.frames.len!=0 {lambda_storage_frames.free_slice(self_.frames);}}if self_.body_started {engine.env.resize(self_.scope);engine.owner=self_.owner;engine.return_target=self_.target;engine.function_body=self_.function_body;engine.function_exit_allowed=self_.function_exit_allowed;engine.function_exit_target=self_.function_exit_target;engine.function_result_expected=self_.function_result_expected;engine.loop_stack.clear();for frame in self_.loops {engine.loop_stack.push(canonicalLoop(frame));}if self_.loops.len!=0 {global_loop_runs.free_slice(self_.loops);}}engine.ambient=self_.ambient;}

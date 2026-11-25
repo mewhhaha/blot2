@@ -45,6 +45,7 @@
   "exports": {
     ".": "./mod.ts",
     "./cli": "./host/installed_cli.ts",
+    "./diagnostics": "./host/diagnostics.ts",
     "./bpm": "./host/bpm.ts",
     "./packages": "./host/packages.ts",
     "./processes": "./host/processes.ts",
@@ -59,8 +60,12 @@
     "include": [
       "LICENSE",
       "README.md",
+      "CHEATSHEET.md",
+      "skills/blot/SKILL.md",
+      "skills/blot-diagnostics/SKILL.md",
       "mod.ts",
       "host/cli.ts",
+      "host/diagnostics.ts",
       "host/guest.ts",
       "host/kernels.ts",
       "host/kernel_worker.ts",

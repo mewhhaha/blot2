@@ -1,18 +1,63 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 7 Runtime Optimizations (7A–7E) (25 November 2026)
+## Current frontier: Solid-2-Style Agent Diagnostics & Tier 7 Runtime Optimizations (25 November 2026)
 
-Tier 7 direct-backend runtime optimizations (7A–7E) are complete and qualified
+Solid-2-inspired agent-legible compiler diagnostics, `blot explain` /
+`blot guide --cheatsheet`, and in-repo agent skills are complete and qualified
 (`blotc-goose` SHA-256
-`edf642183628f6cf3eadb5bd4dce210c6fbe4dc0ced6af8fd424f69f16a3f40e`, `8,558,504` B;
+`b85485319f3f40d66d997e8b56e0fe5080c34d921f0d972619902ab503c1e7de`, `8,979,928` B;
 `generated/compiler/blotc.gz` SHA-256
-`4db1d5bfd325fc198d3000d7ab060ec61471b449ba032dda3a2cda7da1f4ff7f`, `3,697,667` B),
-completing an **11 / 11 clean sweep** across both benchmark suites on
-`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`, `ad175d5`) — **6 / 6 vs Rust `-O3`
-Wasm (`0.42×` geomean — 2.37× faster)**, **6 / 6 vs native Rust `-O3` (`0.51×`
-geomean — 1.98× faster)**, and **5 / 5 Ink ECS vs native Bevy ECS `0.20.1`**:
+`b237d92017e034c58cb399ad0ac170989f26a8bbaa0d62d277136477a9810636`, `3,840,466` B),
+building directly on top of the Tier 7 11 / 11 benchmark sweep (`3ef81d12`):
 
-- **Tier 7 direct-backend runtime optimizations (this commit, after `cfdabee4`):**
+- **Solid-2-style agent-legible diagnostics, blame spans & skills (this commit, after `3ef81d12`):**
+  - **Compiler blame origins & targeted suggestions (`check/uniqueness.goose`, `check/check.goose`, `direct/direct.goose`, `driver/cli_diagnostics.goose`, `driver/cli.goose`, `driver/cli_project.goose`):**
+    Added error-path-only `blot_check_uniqueness::explain` (`OriginInfo`) and
+    `LowerDiagnostic` (`origin_kind` = `"moved"` / `"borrowed"` / `"aliased"` /
+    `"parameter"`, `origin_start..origin_end`, `subject_start..subject_end`,
+    `holder_start..holder_end`) with zero `.blotdep` wire changes and zero
+    overhead on valid builds. Added `$Constructor` missing-prefix hints and
+    edit-distance ≤ 2 `"did you mean \`...\`?"` suggestions to both
+    `unknown_value` (`validateModuleBodies`) and `unknown_name`, crisp `#[...]`
+    guidance for bare `[...]` list literals, and exact unhandled effect
+    operation naming (`(unhandled: Clock.now); handle with \`with ...:\` or \`do <provider>:\``)
+    in `direct.goose`.
+  - **Solid-2 host diagnostic renderer & CLI (`host/diagnostics.ts`, `host/cli.ts`, `deno.json`):**
+    Added [host/diagnostics.ts](host/diagnostics.ts) formatting every CLI error
+    with canonical `[CODE]`, enclosing scope breadcrumb (`in file.blot › entry func main`),
+    UTF-8 byte-to-1-based `line:col`, multi-span excerpts (`-` secondary blame
+    for move site / borrow holder / non-`own` parameter + `^` primary caret),
+    targeted LLM-pitfall `fix:` suggestions (including exact binding names
+    `a.copy`, `(a: own #[U32])`, available record fields, `fn` → `func`,
+    `[...]` → `#[...]`, `.len` → `.length`, `Some` → `$Some`), and
+    `doc: blot explain <CODE> (skills/blot-diagnostics/SKILL.md#<CODE>)`.
+    Added `blot explain <CODE>`, `blot explain --list`, and
+    `blot guide --cheatsheet`; kept `--json` output intact.
+  - **Version-matched agent documentation:** Added [CHEATSHEET.md](CHEATSHEET.md),
+    [skills/blot/SKILL.md](skills/blot/SKILL.md), and
+    [skills/blot-diagnostics/SKILL.md](skills/blot-diagnostics/SKILL.md)
+    (included in `deno.json` `publish.include`), linked them from
+    [README.md](README.md), and updated stale array-type notes in
+    [docs/language/guide.md](docs/language/guide.md).
+  - **Qualification:** Added [diagnostics_agent.test.ts](tests/host/diagnostics_agent.test.ts)
+    covering 10 real compiler CLI pitfalls, UTF-8 byte-offset mapping, and the
+    complete `blot explain` catalog; re-recorded the 2 rejected lowering fixture
+    records (`global_call_freeze.blot`, `mutating_owner_return_truncate.blot`)
+    in `compiler-goose/tests/fixtures/expected.json`; passed `deno fmt --check`
+    (87 files), `deno check`, `deno task test:editor` (`6/6`),
+    `deno task test:compiler` (`1135 passed | 0 failed` guests/hosts, `109/109`
+    fixtures, `206/206` uniqueness), and `../pen` (`cargo test -p blot-host`
+    `40/40` + `examples/bounce` `pen check`).
+
+- **Tier 7 direct-backend runtime optimizations (`3ef81d12`, after `cfdabee4`):**
+  Qualified at `blotc-goose` SHA-256
+  `edf642183628f6cf3eadb5bd4dce210c6fbe4dc0ced6af8fd424f69f16a3f40e` (`8,558,504` B;
+  `generated/compiler/blotc.gz` SHA-256
+  `4db1d5bfd325fc198d3000d7ab060ec61471b449ba032dda3a2cda7da1f4ff7f`, `3,697,667` B),
+  completing an **11 / 11 clean sweep** across both benchmark suites on
+  `wtime-aot 0.1.1` (`--backend x64`, `x64-v3`, `ad175d5`) — **6 / 6 vs Rust `-O3`
+  Wasm (`0.42×` geomean — 2.37× faster)**, **6 / 6 vs native Rust `-O3` (`0.51×`
+  geomean — 1.98× faster)**, and **5 / 5 Ink ECS vs native Bevy ECS `0.20.1`**:
   - **7A (`Maybe Vec3` 4-wide branchless 4×4-transposed `v128` SIMD reduction):**
     Added `tryEmitVec3MaybeReductionLoop` (`direct/function_spark.goose`,
     `direct/function_control.goose`) to vectorize read-only 16-byte `Maybe Vec3`

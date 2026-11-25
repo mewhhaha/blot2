@@ -155,6 +155,14 @@ strength reduction (5E); and 16-wide (`4 × v128`) SIMD affine LCG recurrence +
 `scoped-loop-refinement.blot` 47→46 funcs / 10393→10286 B) with zero exit-code,
 diagnostic, or frontend work-counter changes.
 
+Agent Diagnostics (25 November 2026) added secondary blame origin fields
+(`origin_kind`, `origin_start`, `origin_end`, `subject_start`, `subject_end`,
+`holder_start`, `holder_end`) to rejected lowering diagnostics via
+`blot_check_uniqueness::explain` on error paths. Re-recorded `expected.json`:
+107 of 109 fixtures stayed byte-identical; only the 2 rejected lowering
+diagnostics (`global_call_freeze.blot` and `mutating_owner_return_truncate.blot`)
+gained the new blame span fields with zero exit-code, Wasm, or counter changes.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

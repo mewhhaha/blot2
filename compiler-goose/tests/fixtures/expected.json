@@ -2884,10 +2884,17 @@
      "code": "aliased_update",
      "end": 119,
      "filename": "global_call_freeze.blot",
+     "holder_end": 0,
+     "holder_start": 0,
      "kind": "diagnostic",
      "message": "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating",
+     "origin_end": 0,
+     "origin_kind": "",
+     "origin_start": 0,
      "stage": "lower",
-     "start": 98
+     "start": 98,
+     "subject_end": 88,
+     "subject_start": 83
     },
     {
      "body_elaborations": 144,
@@ -3331,10 +3338,17 @@
      "code": "aliased_update",
      "end": 205,
      "filename": "mutating_owner_return_truncate.blot",
+     "holder_end": 165,
+     "holder_start": 160,
      "kind": "diagnostic",
      "message": "This := writes through storage that something else may still observe; take values.copy first to keep the old value, or end earlier borrows before updating",
+     "origin_end": 178,
+     "origin_kind": "borrowed",
+     "origin_start": 168,
      "stage": "lower",
-     "start": 181
+     "start": 181,
+     "subject_end": 133,
+     "subject_start": 129
     },
     {
      "body_elaborations": 144,

@@ -164,6 +164,10 @@ deno task blot build examples/syntax.blot --out build/syntax.wasm --wasm3
 
 # Format Blot source files
 deno task blot fmt examples/syntax.blot
+
+# Explain any compiler diagnostic code or print the agent cheatsheet
+deno task blot explain SPENT_VALUE
+deno task blot guide --cheatsheet
 ```
 
 ### Run the Test Suite
@@ -186,6 +190,6 @@ Blot is in active development and already powers **Ink** (an engine/ECS library 
 
 ## Documentation
 
-- **Language & Examples:** [Language guide](docs/language/guide.md) · [Effects and controlled I/O](docs/language/effects-and-io.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [Pure Blot ECS example](examples/ecs.blot)
+- **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Agent skills](skills/blot/SKILL.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Effects and controlled I/O](docs/language/effects-and-io.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [Pure Blot ECS example](examples/ecs.blot)
 - **Compiler & Host:** [Goose compiler](compiler-goose/README.md) · [Deno host & CLI](host/README.md) · [Guest ABI](docs/host/guest-abi.md) · [Packages](docs/host/packages.md)
 - **Benchmarks & Project State:** [Comparison benchmark suite](benchmarks/comparison/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)

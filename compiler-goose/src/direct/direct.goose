@@ -216,7 +216,18 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
 // The parameter type of an exported function, or of an exported constant
 // whose value is a function; absent for an exported scalar constant.
 fn exportedParameter(g: Generator&, m: const Module&, body: const Body&) -> Ty, bool, Error {
-    if unhandledEffect(m, m.binding(body.binding).ty) { return 0, false, g.failCode(m, body.root, blot_check_diagnostic_code::Code.entry_type, "an exported function cannot leave source effects unhandled"); }
+    let has_unhandled, eff_name = unhandledEffect(g, m, m.binding(body.binding).ty);
+    if has_unhandled {
+        g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
+        g.put("an exported function cannot leave source effects unhandled");
+        if eff_name.len != 0 {
+            g.put(" (unhandled: ");
+            g.put(eff_name);
+            g.put(")");
+        }
+        g.put("; handle with `with ...:` or `do <provider>:`");
+        return 0, false, g.failClose();
+    }
     if body.is_function {
         let parameters = m.bodyParameters(body);
         if parameters.len != 1 { return 0, false, g.fail(m, body.root, "entry functions take exactly one parameter"); }
@@ -231,19 +242,35 @@ fn exportedParameter(g: Generator&, m: const Module&, body: const Body&) -> Ty, 
     return 0, false, blot_direct_types::Error.none;
 }
 
-// Whether the outer arrow of `ty` has an effect other than Foreign.
-fn unhandledEffect(m: const Module&, ty: blot_check_types::Id) -> bool {
+// Whether the outer arrow of `ty` has an effect other than Foreign, plus its diagnostic name if known.
+fn lookupOperationName(m: const Module&, id: blot_check_types::NominalIdentity) -> const u8[:] {
+    for entry in m.operation_names {
+        if entry.identity.unit == id.unit && entry.identity.decl == id.decl {
+            if entry.diagnostic_name.len != 0 { return m.name(entry.diagnostic_name); }
+        }
+    }
+    return "";
+}
+fn unhandledEffect(g: const Generator&, m: const Module&, ty: blot_check_types::Id) -> bool, const u8[:] {
     var arrow = ty;
     var n = m.types.node(arrow);
     while n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.usage {
         arrow = n.a;
         n = m.types.node(arrow);
     }
-    if n.tag != blot_check_types::Tag.function || n.c == 0 { return false; }
+    if n.tag != blot_check_types::Tag.function || n.c == 0 { return false, ""; }
     for label in m.types.rowLabels(n.c) {
         let operation = m.types.operation(label);
         let foreign = operation.identity.unit == 0 && operation.identity.decl == 1 && operation.instance.unit == 0 && operation.instance.decl == 0 && operation.arguments.len == 0;
-        if !foreign { return true; }
+        if !foreign {
+            let local_name = lookupOperationName(m, operation.identity);
+            if local_name.len != 0 { return true, local_name; }
+            if operation.identity.unit != 0 && g.hasUnit(operation.identity.unit) {
+                let home_name = lookupOperationName(g.units[operation.identity.unit - 1], operation.identity);
+                if home_name.len != 0 { return true, home_name; }
+            }
+            return true, "";
+        }
     }
-    return false;
+    return false, "";
 }
