@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json"
+DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json"
 OUT_DIR = ROOT / "benchmarks/evidence/measurements"
 
 FONT = "'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
@@ -93,7 +93,6 @@ def build_compile_and_size(data: dict) -> str:
 
     compile_rows = [
         ("Blot · 6 kernels", c["blot_6_kernels_ms"], C_BLOT),
-        ("Blot · 9-mod Ink ECS", c["blot_ink_ecs_app_ms"], C_BLOT_ALT),
         ("Rust -O3 · native rlib", c["rust_native_opt3_ms"], C_RUST_NAT),
         ("Rust -O3 · wasm32", c["rust_wasm32_opt3_ms"], C_RUST_WASM),
     ]
@@ -101,33 +100,31 @@ def build_compile_and_size(data: dict) -> str:
     bar_x = lx + 160
     bar_max_w = 182.0
     for idx, (label, val, color) in enumerate(compile_rows):
-        ry = ly + 62 + idx * 33
+        ry = ly + 68 + idx * 40
         bw = max(4.0, (val / max_c) * bar_max_w)
-        els.append(text(lx + 16, ry + 13, label, size=11.5, weight="500", fill=TEXT_MAIN))
-        els.append(f'  <rect x="{bar_x:.1f}" y="{ry:.1f}" width="{bar_max_w:.1f}" height="18" rx="4" fill="{GRID}"/>')
-        els.append(f'  <rect x="{bar_x:.1f}" y="{ry:.1f}" width="{bw:.1f}" height="18" rx="4" fill="{color}"/>')
-        els.append(text(bar_x + bw + 8, ry + 13, f"{val:.1f} ms", size=11.5, weight="600", fill=TEXT_MAIN))
+        els.append(text(lx + 16, ry + 14, label, size=11.5, weight="500", fill=TEXT_MAIN))
+        els.append(f'  <rect x="{bar_x:.1f}" y="{ry:.1f}" width="{bar_max_w:.1f}" height="20" rx="4" fill="{GRID}"/>')
+        els.append(f'  <rect x="{bar_x:.1f}" y="{ry:.1f}" width="{bw:.1f}" height="20" rx="4" fill="{color}"/>')
+        els.append(text(bar_x + bw + 8, ry + 14, f"{val:.1f} ms", size=11.5, weight="600", fill=TEXT_MAIN))
 
     # Right card: Binary size
     rx, ry0, rw, rh = 470, 80, 422, 196
     els.append(f'  <rect x="{rx}" y="{ry0}" width="{rw}" height="{rh}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(rx + 16, ry0 + 26, "Output .wasm size (KiB)", size=13.5, weight="700"))
     size_ratio = c["rust_wasm_bytes"] / c["blot_wasm_bytes"]
-    els.append(pill(rx + rw - 14, ry0 + 25, f"{size_ratio:.0f}× smaller (6 kernels)", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    els.append(pill(rx + rw - 14, ry0 + 25, f"{size_ratio:.0f}× smaller", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
     blot_kib = c["blot_wasm_bytes"] / 1024.0
-    ink_kib = c["ink_ecs_wasm_bytes"] / 1024.0
     rust_kib = c["rust_wasm_bytes"] / 1024.0
     size_rows = [
         ("Blot · 6 kernels", blot_kib, C_BLOT, f"{blot_kib:.1f} KiB"),
-        ("Blot · 9-mod Ink ECS", ink_kib, C_BLOT_ALT, f"{ink_kib:.1f} KiB"),
         ("Rust -O3 · 6 kernels", rust_kib, C_RUST_WASM, f"{rust_kib:,.0f} KiB"),
     ]
     max_s = max(v for _, v, _, _ in size_rows)
     sbar_x = rx + 156
     sbar_max_w = 174.0
     for idx, (label, val, color, fmt) in enumerate(size_rows):
-        ry = ry0 + 68 + idx * 40
+        ry = ry0 + 84 + idx * 46
         bw = max(4.0, (val / max_s) * sbar_max_w)
         els.append(text(rx + 16, ry + 14, label, size=11.5, weight="500", fill=TEXT_MAIN))
         els.append(f'  <rect x="{sbar_x:.1f}" y="{ry:.1f}" width="{sbar_max_w:.1f}" height="20" rx="4" fill="{GRID}"/>')
@@ -136,12 +133,11 @@ def build_compile_and_size(data: dict) -> str:
 
     # Footer
     aot_k = c.get("wtime_aot_blot_kernels_ms", 0.0)
-    aot_e = c.get("wtime_aot_ink_ecs_ms", 0.0)
     els.append(
         text(
             28,
             304,
-            f"wtime-aot x64 AOT-compiles Blot Wasm to native x86-64 in {aot_k:.1f} ms (6 kernels) / {aot_e:.1f} ms (Ink ECS). Gdev (307 mods, 5,029 fns): 549.4 ms cold.",
+            f"wtime-aot 0.1.3 x64 AOT-compiles Blot Wasm in {aot_k:.1f} ms. On a 319-module / 6.19 MB 3D game: ~0.63 s cold, 61–90 ms structural edits, ~20 ms literal edits.",
             size=10.8,
             fill=TEXT_MUTED,
         )
@@ -227,7 +223,7 @@ def build_kernels_chart(data: dict) -> str:
         text(
             28,
             h - 16,
-            "Linear 0..max scale per card. Executed via wtime-aot 0.1.2 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
+            "Linear 0..max scale per card. Executed via wtime-aot 0.1.3 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
             size=10.5,
             fill=TEXT_MUTED,
         )
@@ -391,9 +387,8 @@ def build_ecs_chart(data: dict) -> str:
 def main() -> None:
     data = json.loads(DATA_PATH.read_text())
     outputs = {
-        "2026-11-24-compile-and-size.svg": build_compile_and_size(data),
-        "2026-11-24-blot-vs-rust-kernels.svg": build_kernels_chart(data),
-        "2026-11-24-ink-vs-bevy-ecs.svg": build_ecs_chart(data),
+        "2026-11-25-compile-and-size.svg": build_compile_and_size(data),
+        "2026-11-25-blot-vs-rust-kernels.svg": build_kernels_chart(data),
     }
     for fname, content in outputs.items():
         path = OUT_DIR / fname
