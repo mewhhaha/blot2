@@ -920,3 +920,113 @@ Deno.test("structural body edits before data/effect declarations with new locals
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("retained declaration splices match cold Wasm and rejection diagnostics", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const leaf = dir + "/leaf.blot";
+  const base = `func edited (n: U32): U32 =>
+  let x: U32 = unchanged n
+  return x + 1
+func unchanged (n: U32): U32 => n + 2
+func padding_a (x: U32): U32 => x
+func padding_b (y: U32): U32 => y + 3
+func padding_c (x: U32): U32 => x + 4
+func evolving (n: U32) => n
+func even (n: U32) => if n == 0 then 1 else odd (n - 1)
+func odd (n: U32) => even n
+`;
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    frontendWorkers: 8,
+  };
+  const imports: string[] = [];
+  for (let i = 0; i < 15; i++) {
+    await Deno.writeTextFile(dir + `/padding${i}.blot`, "const tag: U32 = 1\n");
+    imports.push(`import * as padding${i} from "./padding${i}"`);
+  }
+  await Deno.writeTextFile(leaf, base);
+  await Deno.writeTextFile(
+    entry,
+    `${imports.join("\n")}
+import { edited, evolving, even } from "./leaf"
+#entry func answer (n: U32): U32 =>
+  let unused_evolving = evolving n
+  let unused_recursive = even n
+  return edited n
+`,
+  );
+  const session = await createZigProjectCompiler(options);
+  async function compare(
+    source: string,
+    expected?: "selective" | "full" | "type_mismatch" | "aliased_update",
+  ) {
+    const request = { sources: { [leaf]: source } };
+    const cold = await createZigProjectCompiler(options);
+    try {
+      const actual = await session.build(request);
+      const oracle = await cold.build(request);
+      if (expected === "type_mismatch" || expected === "aliased_update") {
+        assert(!actual.success && !oracle.success, JSON.stringify(actual));
+        assert.deepEqual(actual.diagnostics, oracle.diagnostics);
+        assert(actual.diagnostics.some(({ code }) => code === expected));
+        return;
+      }
+      assert(actual.success && oracle.success, JSON.stringify(actual));
+      assert.deepEqual(actual.bytes, oracle.bytes);
+      if (expected === "selective") {
+        assert.equal(actual.stats.freshModules, 1);
+        assert.equal(actual.stats.frontend.body_elaborations, 1);
+        assert.equal(actual.stats.frontend.body_lowerings, 1);
+      }
+      if (expected === "full") {
+        assert(Number(actual.stats.frontend.body_elaborations) > 1);
+        assert(Number(actual.stats.frontend.body_lowerings) > 1);
+        assert(actual.stats.freshModules > 1);
+      }
+    } finally {
+      await cold.dispose();
+    }
+  }
+  try {
+    await compare(base);
+    await compare(
+      base.replace("return x + 1", "let y = x + n\n  return y"),
+      "selective",
+    );
+    await compare(
+      base.replace("return x + 1", "let brand_new = x * n\n  return brand_new"),
+      "selective",
+    );
+    await compare(base, "selective");
+    await compare(
+      base.replace("return x + 1", "let bad: U32 = true\n  return bad"),
+      "type_mismatch",
+    );
+    await compare(
+      base.replace(
+        "return x + 1",
+        "let array: #[U32] = #[x]\n  let alias = array\n  array[0] := n\n  return alias[0]",
+      ),
+      "aliased_update",
+    );
+    await compare(
+      base.replace("=> n\nfunc even", "=> n == 0\nfunc even"),
+      "full",
+    );
+    await compare(base);
+    await compare(
+      base.replace("then 1 else odd (n - 1)", "then n + 2 else odd (n - 1)"),
+    );
+    await compare(
+      base.replace("then 1 else odd (n - 1)", "then true else odd (n - 1)"),
+      "full",
+    );
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});

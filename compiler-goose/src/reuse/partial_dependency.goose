@@ -50,13 +50,13 @@ fn deinit(self_:Result&) {self_.result.deinit();if self_.diagnostic_filename.pre
 // the unit vector, the paths and the flags; unit_owners owns each Core. A
 // cached Core is a copy of the admitted seed's (raw frozen input carries no
 // lifetime authority in this port); `borrowed` marks those positions.
-struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),unit_has_fork:u8[:]=default<u8[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:CoreOwners[:]=default<CoreOwners[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
+struct Prepared {spliced_unit:u32=0,units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),unit_has_fork:u8[:]=default<u8[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:CoreOwners[:]=default<CoreOwners[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
 // Re-publish the owned runs without retaining the temporary header.
 fn publishPrepared(value:Prepared)->Prepared {
  assert(value.catalog_owner.unique());
  let units=value.catalog_owner.mutable(value.units);let paths=value.catalog_owner.mutable(value.paths);let borrowed=value.catalog_owner.mutable(value.borrowed);let unit_has_fork=value.catalog_owner.mutable(value.unit_has_fork);
  let unit_owners=core_owners.realloc_slice(value.unit_owners,value.unit_owners.len);assert(blot_support::same_slice_identity(unit_owners,value.unit_owners));
- return Prepared{units:units,paths:paths,borrowed:borrowed,unit_has_fork:unit_has_fork,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
+ return Prepared{spliced_unit:value.spliced_unit,units:units,paths:paths,borrowed:borrowed,unit_has_fork:unit_has_fork,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
 }
 fn scanUnitFork(m:const Core&)->u8 {
  for node in m.nodes { if node.tag==blot_check_core::Tag.fork_ { return 2; } }

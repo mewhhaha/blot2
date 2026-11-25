@@ -203,11 +203,311 @@ fn checkEngineBody(engine:Engine&,imports:const ImportedBinding[:],headers:const
  var binding_capacity=imports.len+headers.len+1;let ast_walk_2_count=engine.tree.nodes.items.len;for ast_walk_2_index in 0..ast_walk_2_count {let node=engine.tree.nodes.items[ast_walk_2_index];if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_entry_process_decl {binding_capacity+=1;}else if node.tag==blot_parse_ast::tag_entry_kernel_decl {binding_capacity+=2;}else if !source_validation && (node.tag==blot_parse_ast::tag_parameter || node.tag==blot_parse_ast::tag_pattern_name) {binding_capacity+=1;}}let ignored,error=engine.addBinding(Binding{name:0,declaration:0,owner:0,kind:blot_reuse_principal_interface::Kind.local,ty:0, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}let ast_walk_3_count=engine.tree.diagnostics.items.len;for ast_walk_3_index in 0..ast_walk_3_count {let diagnostic=engine.tree.diagnostics.items[ast_walk_3_index];engine.diagnostics.push(Diagnostic{code:Code.syntax,span:blot_parse_ast::Span{diagnostic.start,diagnostic.end, ..},node:0, ..});}
  let checked,error=checkEngineSemantic(engine,imports,headers,catalogs,source_catalogs,allow_imports,options,source_validation);var steps=engine.completed_projection_steps;var limit=engine.completed_projection_limit;var exhausted=engine.completed_projection_exhausted;if engine.types.lease!=0 {steps=engine.types.projection_steps;limit=engine.types.projection_limit;exhausted=engine.types.projection_exhausted;}let remaining .= options.associated_remaining;if remaining {remaining-=min(remaining,steps);}if exhausted {engine.exhaustBudget();exhaustion.associated=true;exhaustion.associated_limit=limit;}return checked,error;
 }
-fn checkEngineSemantic(engine:Engine&,imports:const ImportedBinding[:],headers:const SourceHeader[:],catalogs:const ImportedCatalog[:],source_catalogs:const SourceCatalog[:],allow_imports:bool,options:ModuleOptions,source_validation:bool)->Checked,blot_error::Error {let error=engine.collectModuleHeaders(imports,headers,catalogs,source_catalogs,allow_imports);if error!=blot_error::Error.none {return default<Checked>(),error;}let error=engine.validateModuleBodies();if error!=blot_error::Error.none {return default<Checked>(),error;}let value,error=publishChecked(engine);if error!=blot_error::Error.none {return default<Checked>(),error;}var checked=value;if !source_validation && engine.initializer_rejected {let result,error=rejectedSource(checked.diagnostics);checked.deinit();if error!=blot_error::Error.none {return default<Checked>(),error;}var rejected=result;rejected.initializer_rejected=true;rejected.unit=engine.unit;return rejected,blot_error::Error.none;}
+fn checkEngineSemantic(engine:Engine&,imports:const ImportedBinding[:],headers:const SourceHeader[:],catalogs:const ImportedCatalog[:],source_catalogs:const SourceCatalog[:],allow_imports:bool,options:ModuleOptions,source_validation:bool)->Checked,blot_error::Error {let error=engine.collectModuleHeaders(imports,headers,catalogs,source_catalogs,allow_imports);if error!=blot_error::Error.none {return default<Checked>(),error;}let retained .= options.retained_core;
+if retained {
+ let error=engine.seedRetainedGlobals(retained,options.skip_root);
+ if error!=blot_error::Error.none {return default<Checked>(),error;}
+}
+let error=engine.validateModuleBodies(options.skip_root);
+if error!=blot_error::Error.none {return default<Checked>(),error;}
+if retained && !engine.acceptRetainedGlobals(retained,options.skip_root) {return default<Checked>(),blot_error::Error.invalid_artifact;}
+let value,error=publishChecked(engine);if error!=blot_error::Error.none {return default<Checked>(),error;}var checked=value;if !source_validation && engine.initializer_rejected {let result,error=rejectedSource(checked.diagnostics);checked.deinit();if error!=blot_error::Error.none {return default<Checked>(),error;}var rejected=result;rejected.initializer_rejected=true;rejected.unit=engine.unit;return rejected,blot_error::Error.none;}
 engine.frontend_work.modules=1;engine.frontend_work.type_nodes=checked.types.nodes.len as u64;engine.frontend_work.dependency_hits=engine.scheme_dependencies.hits;engine.frontend_work.dependency_recomputations=engine.scheme_dependencies.recomputations;engine.frontend_work.normalization=checked.types.normalization;for binding in checked.bindings {if binding.kind==blot_reuse_principal_interface::Kind.external && binding.read {engine.frontend_work.imported_read+=1;}}blot_phase_profile::recordChecking(engine.frontend_work);return checked,blot_error::Error.none;
 }
 fn deinitEngine(engine:Engine&) {
  engine.import_tables.private_scopes.deinit();engine.import_tables.mapping.deinit();engine.import_tables.row_variables.deinit();engine.import_tables.rows.deinit();engine.import_tables.labels.deinit();
  engine.imported_values.clear();
  deinitDiagnosticPayloads(engine.diagnostics);for slot in engine.staged_global_diagnostics.slots {if slot.tag!=0 {deinitDiagnosticPayloads(slot.val);if slot.val.len!=0 {component_diagnostics.free_slice(slot.val);}}}for slot in engine.callee_memo.slots {if slot.tag!=0 {freeDiagnosticText(slot.key);if slot.val.types.len!=0 {equation_type_ids.free_slice(slot.val.types);}if slot.val.rows.len!=0 {equation_type_ids.free_slice(slot.val.rows);}}}engine.type_env.deinit();engine.row_env.deinit();if engine.editor_capture.present {blot_reuse_completion_names::release(engine.editor_capture.value.names);if engine.editor_capture.value.context.present {engine.editor_capture.value.context.value.deinit();}}engine.parameter_patterns.deinit();engine.types.deinit();engine.pending_queue.deinit();engine.scheme_dependencies.deinit();deinitDiagnosticPayloads(engine.header_diagnostics);
+}
+
+// Rehydrate principals into this inference store. Core IDs are never used as
+// mutable checker IDs, including the local targets of shared obligations.
+fn retainedTypeSource(core:const blot_check_core::Module&)->blot_check_frozen_types::Source {
+ let effects=core.types.effects;
+ return blot_check_frozen_types::Source.frozen{
+  value:blot_check_frozen_types::Graph{nodes:core.types.nodes,extra:core.types.extra,
+   rows:effects.rows,labels:effects.labels,operations:core.types.operations,row_variable_count:effects.variable_count},..};
+}
+
+fn seedRetainedGlobals(self_:Engine&,core:const blot_check_core::Module&,skip_root:const bool[:])->blot_error::Error {
+ if self_.diagnostics.len!=0 {return blot_error::Error.invalid_artifact;}
+ var edited:bool[>..<]=[];
+ edited.resize(self_.bindings.len,false);
+ for root,index in self_.tree.roots.items {if !skip_root[index] {edited[self_.resolved[root]]=true;}}
+ for binding,index in self_.bindings {
+  if binding.kind!=blot_reuse_principal_interface::Kind.global {continue;}
+  if index>=core.bindings.len {return blot_error::Error.invalid_artifact;}
+  let old=core.bindings[index];
+  if old.kind!=binding.kind || old.private!=binding.private || old.body_id==0 || old.body_id>=core.bodies.len ||
+     core.bodies[old.body_id].binding!=index ||
+     !self_.sameRetainedGlobalName(core,index as u32,binding) {return blot_error::Error.invalid_artifact;}
+ }
+ for before,index in core.bindings {
+  if before.kind==blot_reuse_principal_interface::Kind.global &&
+     (index>=self_.bindings.len || self_.bindings[index].kind!=before.kind) {return blot_error::Error.invalid_artifact;}
+ }
+ var copier=blot_check_check_scheme_import::init(retainedTypeSource(core),self_.types,self_.import_tables);
+ copier.fresh_variables=true;
+ copier.fresh_rows=true;
+ let error=seedRetainedSchemes(self_,core,edited[..],copier);
+ copier.reset();
+ return error;
+}
+
+fn sameRetainedGlobalName(self_:const Engine&,core:const blot_check_core::Module&,index:u32,binding:Binding)->bool {
+ let name=core.name(core.bodies[core.bindings[index].body_id].declaration_name);
+ if name==self_.pool.get(binding.name) {return true;}
+ // Template bodies have no source-name entry. Their header was freshly
+ // collected, and its contract and member key identify the same binding.
+ if name.len!=0 {return false;}
+ for template,ordinal in self_.member_templates {
+  if template.binding!=index {continue;}
+  if ordinal>=core.member_templates.len {return false;}
+  let old=core.member_templates[ordinal];
+  return old.binding==index && old.contract==template.contract && old.name==template.name;
+ }
+ return false;
+}
+
+fn seedRetainedSchemes(self_:Engine&,core:const blot_check_core::Module&,edited:const bool[:],copier:blot_check_check_scheme_import::Copier&)->blot_error::Error {
+ var mapped:u32[>..]=[];
+ var visiting:bool[>..]=[];
+ mapped.resize(core.bindings.len,0);
+ visiting.resize(core.bindings.len,false);
+ for before,index in core.bindings {
+  if before.kind!=blot_reuse_principal_interface::Kind.global || edited[index] {continue;}
+  let error=self_.seedRetainedScheme(core,index as u32,self_.bindings[index].declaration,edited,mapped[..],visiting[..],copier,0);
+  if error!=blot_error::Error.none {return error;}
+ }
+ return blot_error::Error.none;
+}
+
+recursive fn seedRetainedScheme(self_:Engine&,core:const blot_check_core::Module&,index:u32,origin:u32,edited:const bool[:],mapped:u32[:],visiting:bool[:],copier:blot_check_check_scheme_import::Copier&,depth:i64)->blot_error::Error {
+ if index==0 || index>=mapped.len || depth>=256 || visiting[index] {return blot_error::Error.invalid_artifact;}
+ if mapped[index]!=0 {return blot_error::Error.none;}
+ let old=core.bindings[index];
+ let global=old.kind==blot_reuse_principal_interface::Kind.global;
+ if global {
+  if edited[index] {return blot_error::Error.invalid_artifact;}
+  if self_.bindings[index].scheme.root!=0 {
+   mapped[index]=index;
+   return blot_error::Error.none;
+  }
+ } else if old.kind!=blot_reuse_principal_interface::Kind.external || old.target.unit==0 {
+  return blot_error::Error.invalid_artifact;
+ }
+ visiting[index]=true;
+ let range=old.scheme.obligations;
+ for goal in core.obligations[range.start..range.start+range.len] {
+  if goal.kind!=blot_check_types::ObligationKind.callee_use {continue;}
+  let error=self_.seedRetainedScheme(core,goal.identity.decl,origin,edited,mapped,visiting,copier,depth+1);
+  if error!=blot_error::Error.none {return error;}
+ }
+ let ty,error=copier.copy(old.ty,0);
+ if error!=blot_error::Error.none {return error;}
+ let root,error=copier.copy(old.scheme.root,0);
+ if error!=blot_error::Error.none {return error;}
+ if root==0 {return blot_error::Error.invalid_artifact;}
+ let variables,error=copier.copyTypeList(old.scheme.variables);
+ if error!=blot_error::Error.none {return error;}
+ let rows,error=copier.relocatedRows(core.types.list(old.scheme.row_variables));
+ if error!=blot_error::Error.none {return error;}
+ let closed,error=copier.relocatedRows(core.types.list(old.scheme.closed_rows));
+ if error!=blot_error::Error.none {return error;}
+ let generative,error=copier.copyGenerative(old.scheme.generative);
+ if error!=blot_error::Error.none {return error;}
+ let start=self_.obligations.len as u32;
+ for goal in core.obligations[range.start..range.start+range.len] {
+  let ty,error=copier.copy(goal.ty,0);
+  if error!=blot_error::Error.none {return error;}
+  let result,error=copier.copy(goal.result,0);
+  if error!=blot_error::Error.none {return error;}
+  let other,error=copier.copy(goal.other,0);
+  if error!=blot_error::Error.none {return error;}
+  let signature,error=copier.copy(goal.signature,0);
+  if error!=blot_error::Error.none {return error;}
+  var identity=goal.identity;
+  if goal.kind==blot_check_types::ObligationKind.callee_use {identity.decl=mapped[identity.decl];}
+  self_.obligations.push(blot_check_types::Obligation{ty:ty,kind:goal.kind,source:origin,
+   name:goal.name,result:result,other:other,signature:signature,operator:goal.operator,identity:identity,
+   explicit:goal.explicit,qualification_span:goal.qualification_span,qualification_unit:goal.qualification_unit,..});
+ }
+ let principal=blot_check_types::Scheme{root:root,variables:variables,row_variables:rows,closed_rows:closed,
+  generative:generative,obligations:blot_check_types::List{start,range.len,..},..};
+ var summary,error=self_.summarizeFrom(principal,self_.obligations[..]);
+ if error!=blot_error::Error.none {return error;}
+ summary.has_explicit=old.has_explicit;
+ if global {
+  self_.bindings[index].scheme=principal;
+  self_.bindings[index].ty=ty;
+  self_.bindings[index].summary=summary;
+  self_.bindings[index].capability_parameters=old.capability_parameters;
+  self_.global_states.insert(index,Global{state:State.complete,..});
+  mapped[index]=index;
+ } else {
+  // A private transitive callee may be present only as frozen evidence in
+  // the old Core. Keep it reachable through the obligation, without adding
+  // it to name lookup or replacing an ordinary import in the edited body.
+  let target=ExternalTarget{old.target.unit,old.target.binding,..};
+  let binding,error=self_.addBinding(Binding{name:0,declaration:origin,owner:origin,kind:old.kind,
+   ty:ty,scheme:principal,summary:summary,capability_parameters:old.capability_parameters,
+   external:blot_support::some(target),..});
+  if error!=blot_error::Error.none {return error;}
+  mapped[index]=binding;
+ }
+ visiting[index]=false;
+ return blot_error::Error.none;
+}
+
+fn acceptRetainedGlobals(self_:Engine&,core:const blot_check_core::Module&,skip_root:const bool[:])->bool {
+ if self_.diagnostics.len!=0 || self_.initializer_rejected || self_.reflections.len!=0 ||
+    self_.holes.len!=0 {return false;}
+ // Lowering erases effect-family nominals to plain function or record
+ // types. Those shapes cannot certify a source principal once that
+ // principal is observed by the edited body.
+ let has_effect_families=self_.effect_families.len>1;
+ if has_effect_families {
+  for binding,i in self_.bindings {
+   if binding.kind!=blot_reuse_principal_interface::Kind.global || !binding.read {continue;}
+   if !retainedPrincipalExact(core,i as u32) {return false;}
+  }
+ }
+ var copier=blot_check_check_scheme_import::init(retainedTypeSource(core),self_.types,self_.import_tables);
+ var count:i64=0;
+ var equal=true;
+ for root,index in self_.tree.roots.items {
+  if skip_root[index] {continue;}
+  count++;
+  let binding=self_.resolved[root];
+  if (has_effect_families && !retainedPrincipalExact(core,binding)) ||
+     !self_.sameRetainedPrincipal(core,binding,copier) {equal=false;break;}
+  copier.reset();
+ }
+ copier.reset();
+ return equal && self_.body_elaborations==count;
+}
+
+fn sameRetainedPrincipal(self_:Engine&,core:const blot_check_core::Module&,index:u32,copier:blot_check_check_scheme_import::Copier&)->bool {
+ let before=core.bindings[index];
+ let after=self_.bindings[index];
+ let old=before.scheme;
+ let next=after.scheme;
+ if before.capability_parameters!=after.capability_parameters || before.has_explicit!=after.summary.has_explicit ||
+    old.variables.len!=next.variables.len || old.row_variables.len!=next.row_variables.len ||
+    old.closed_rows.len!=next.closed_rows.len || old.obligations.len!=next.obligations.len ||
+    old.generative.len!=next.generative.len {return false;}
+ // Compare both roots and evidence under the same renaming of quantifiers.
+ let variables=self_.types.list(next.variables);
+ for variable,i in core.types.list(old.variables) {
+  let fresh=self_.types.head(variables[i],0);
+  if core.types.node(variable).tag!=blot_check_types::Tag.variable ||
+     self_.types.node(fresh).tag!=blot_check_types::Tag.variable {return false;}
+  for prior in variables[..i] {if self_.types.head(prior,0)==fresh {return false;}}
+  copier.mapping.insert(variable,fresh);
+ }
+ if !self_.matchRetainedRows(copier,core.types.list(old.row_variables),self_.types.list(next.row_variables)) ||
+    !self_.matchRetainedRows(copier,core.types.list(old.closed_rows),self_.types.list(next.closed_rows)) {return false;}
+ let certificates=core.types.list(core.bodies[before.body_id].closed_rows);
+ var rows:u32[>..]=[];
+ for decision in self_.body_closed_rows {if decision.owner==index {rows.push(decision.variable);}}
+ let cert=self_.matchRetainedRows(copier,certificates,rows[..]);
+ if !cert || !self_.sameRetainedType(copier,old.root,next.root) {return false;}
+ let generative=self_.types.list(next.generative);
+ for ty,i in core.types.list(old.generative) {if !self_.sameRetainedType(copier,ty,generative[i]) {return false;}}
+ for goal,i in core.obligations[old.obligations.start..old.obligations.start+old.obligations.len] {
+  let other=self_.obligations[next.obligations.start+i];
+  if goal.kind!=other.kind || goal.name!=other.name || goal.operator!=other.operator ||
+     goal.explicit!=other.explicit || goal.qualification_unit!=other.qualification_unit ||
+     goal.qualification_span!=other.qualification_span {return false;}
+  if goal.kind==blot_check_types::ObligationKind.callee_use {
+   let original=core.bindings[goal.identity.decl];
+   let current=self_.bindings[other.identity.decl];
+   if original.kind!=current.kind {return false;}
+   if current.external.present {
+    if original.target.unit!=current.external.value.unit || original.target.binding!=current.external.value.binding {return false;}
+   } else if goal.identity!=other.identity {return false;}
+  } else if goal.identity!=other.identity {return false;}
+  if !self_.sameRetainedType(copier,goal.ty,other.ty) ||
+     !self_.sameRetainedType(copier,goal.other,other.other) ||
+     !self_.sameRetainedType(copier,goal.result,other.result) ||
+     !self_.sameRetainedType(copier,goal.signature,other.signature) {return false;}
+ }
+ return true;
+}
+
+fn matchRetainedRows(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,before:const u32[:],after:const u32[:])->bool {
+ if before.len!=after.len {return false;}
+ for old,i in before {
+  let next=after[i];
+  let a=blot_check_types::rowKeyFormal(old);
+  let b=blot_check_types::rowKeyFormal(next);
+  if a.present || b.present {
+   if !a.present || !b.present || !self_.sameRetainedType(copier,a.value,b.value) {return false;}
+   continue;
+  }
+  let row,error=self_.types.effects.row([],blot_check_effects::Tail.variable{value:next,..});
+  if error!=blot_error::Error.none {return false;}
+  let known .= copier.row_variables.get(old);
+  if known {
+   if self_.types.effects.node(known).tail!=self_.types.effects.node(row).tail {return false;}
+   continue;
+  }
+  for prior,j in after[..i] {if prior==next && before[j]!=old {return false;}}
+  copier.row_variables.insert(old,row);
+ }
+ return true;
+}
+
+fn sameRetainedType(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,old:u32,next:u32)->bool {
+ if old==0 || next==0 {return old==next;}
+ let copied,error=copier.copy(old,0);
+ if error!=blot_error::Error.none {return false;}
+ let a,error=self_.types.resolve(copied,0);
+ if error!=blot_error::Error.none {return false;}
+ let b,error=self_.types.resolve(next,0);
+ if error!=blot_error::Error.none {return false;}
+ let equal,error=self_.types.equalSymbolic(a,b);
+ return error==blot_error::Error.none && equal;
+}
+
+// Function arrows introduced by the named lambda are source arrows. Any
+// nested function or raw record is ambiguous in the presence of effects.
+fn retainedPrincipalExact(core:const blot_check_core::Module&,binding:u32)->bool {
+ if binding>=core.bindings.len {return false;}
+ let value=core.bindings[binding];
+ if value.body_id==0 {return false;}
+ let arity=core.bodies[value.body_id].parameters.len;
+ if !retainedTypeExact(core,value.scheme.root,arity,0) ||
+    !retainedTypeExact(core,value.ty,arity,0) {return false;}
+ let range=value.scheme.obligations;
+ for goal in core.obligations[range.start..range.start+range.len] {
+  if goal.kind==blot_check_types::ObligationKind.callee_use ||
+     !retainedTypeExact(core,goal.ty,0,0) || !retainedTypeExact(core,goal.result,0,0) ||
+     !retainedTypeExact(core,goal.other,0,0) || !retainedTypeExact(core,goal.signature,0,0) {return false;}
+ }
+ return true;
+}
+
+recursive fn retainedTypeExact(core:const blot_check_core::Module&,ty:u32,arrows:u32,depth:i64)->bool {
+ if depth>=64 {return false;}
+ let node=core.types.node(ty);
+ match node.tag {
+  function=>{
+   if arrows==0 || core.types.rowLabels(node.c).len!=0 {return false;}
+   return retainedTypeExact(core,node.a,0,depth+1) && retainedTypeExact(core,node.b,arrows-1,depth+1);
+  },
+  nominal,projection,instance_selection=>{
+   for arg in core.types.nominalArguments(node) {if !retainedTypeExact(core,arg,0,depth+1) {return false;}}
+  },
+  product=>{
+   for item in core.types.list(blot_check_types::List{node.a,node.b,..}) {
+    if !retainedTypeExact(core,item,0,depth+1) {return false;}
+   }
+  },
+  usage=>{return retainedTypeExact(core,node.a,arrows,depth+1) && retainedTypeExact(core,node.c,0,depth+1);},
+  array,list,cursor,resolver=>{return retainedTypeExact(core,node.a,0,depth+1);},
+  record,provider,state_provider,scoped,forall,existential,rigid,instance_version=>{return false;},
+  _=>{},
+ }
+ return arrows==0;
 }

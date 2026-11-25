@@ -704,6 +704,106 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
  return id,new_bits;
 }
 
+// Parsing a declaration with the same source and linked symbol prefix
+// produces the same syntax. Compare the complete declaration slice so string
+// contents, layout, and syntax stored outside the fixed node fields count.
+fn sameAstSubtree(old:const Unit&,a:u32,next:const Unit&,b:u32)->bool {
+ if a==0 || b==0 {return a==b;}
+ let before=old.tree.span(a);
+ let after=next.tree.span(b);
+ return before.end>=before.start && after.end>=after.start &&
+  old.tree.node(a).tag==next.tree.node(b).tag &&
+  old.source[before.start..before.end]==next.source[after.start..after.end];
+}
+
+fn selectiveRoots(old:const Unit&,next:const Unit&,skip_root:bool[>..]&)->bool {
+ let a:const Tree& =old.tree;
+ let b:const Tree& =next.tree;
+ if a.diagnostics.len!=0 || b.diagnostics.len!=0 || a.has_typed_staging || b.has_typed_staging ||
+    !sameTests(a,b) || a.roots.len!=b.roots.len {return false;}
+ var edited:i64=0;
+ var unchanged:i64=0;
+ for ar,index in a.roots.items {
+  let br=b.roots.items[index];
+  let tag=a.node(ar).tag;
+  if tag!=b.node(br).tag {return false;}
+  if tag!=blot_parse_ast::tag_value_decl {
+   if !sameAstSubtree(old,ar,next,br) {return false;}
+   skip_root.push(true);
+   continue;
+  }
+  let av=a.value_decl(ar);
+  let bv=b.value_decl(br);
+  let at=blot_parse_ast::declaration_traits(a,ar);
+  let bt=blot_parse_ast::declaration_traits(b,br);
+  if av.name!=bv.name || at.private!=bt.private || at.is_opaque!=bt.is_opaque ||
+     av.runtime!=bv.runtime || av.exported!=bv.exported || av.modifier!=bv.modifier ||
+     av.function_declaration!=bv.function_declaration || av.where.len!=bv.where.len ||
+     !sameAstSubtree(old,av.annotation,next,bv.annotation) ||
+     !sameAstSubtree(old,av.where_node,next,bv.where_node) ||
+     av.attributes.len!=bv.attributes.len {return false;}
+  for attr,i in a.list(av.attributes) {
+   if !sameAstSubtree(old,attr,next,b.list(bv.attributes)[i]) {return false;}
+  }
+  let a_lambda=a.node(av.body).tag==blot_parse_ast::tag_lambda;
+  let b_lambda=b.node(bv.body).tag==blot_parse_ast::tag_lambda;
+  if a_lambda!=b_lambda {return false;}
+  let same=sameAstSubtree(old,ar,next,br) && sameAstSubtree(old,av.body,next,bv.body);
+  if same {unchanged+=1;}
+  else {
+   if !a_lambda || av.attributes.len!=0 || av.runtime {return false;}
+   var first:u32=1;
+   if index!=0 {first=a.roots.items[index-1]+1;}
+   for node in a.nodes.items[first..ar] {
+    if node.tag==blot_parse_ast::tag_fork_expr {return false;}
+   }
+   edited+=1;
+   if edited>16 {return false;}
+  }
+  skip_root.push(same);
+ }
+ return edited!=0 && unchanged>=4;
+}
+
+fn trySelectiveRetainedUnit(engine:blot_reuse_project_check::Engine&,unit:u32,old_tree:const Tree&,previous:const Core&,skip_root:const bool[:],ready:Prepared&)->bool,Error {
+ let source=engine.source.unit(unit);
+ // Bound the append-only tables even when one session keeps editing the
+ // same body. A normal rebuild drops unreachable versions of edited bodies.
+ if previous.nodes.len>2*source.tree.nodes.len || previous.bindings.len>2*source.tree.nodes.len {
+  return false,blot_error::Error.none;
+ }
+ var checked=default<blot_check_check::Checked>();
+ let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
+ let error=engine.checkModuleBody(unit,previous,skip_root,checked);
+ check.exit();
+ if error!=blot_error::Error.none {return false,error;}
+ let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
+ var shifts:blot_check_core_builder::SourceShift[>..]=[];
+ var offset:i64=0;
+ for root,index in old_tree.roots.items {
+  let start=old_tree.span(root).start;
+  let next=source.tree.span(source.tree.roots.items[index]).start as i64-start;
+  if next==offset {continue;}
+  shifts.push(blot_check_core_builder::SourceShift{start:start,offset:next});
+  offset=next;
+ }
+ let core,error=blot_check_core_builder::lowerRetainedUnitSelective(source.tree,engine.source.symbols,checked,blot_reuse_project_check::moduleOrigins(engine.source),previous,skip_root,shifts[..]);
+ timing.exit();
+ if error==blot_error::Error.none {
+  ready.stats.body_elaborations+=checked.body_elaborations;
+  ready.stats.imported_schemes+=checked.imported_schemes;
+  ready.stats.normalization.merge(checked.types.normalization);
+  ready.stats.body_lowerings+=core.value.body_lowerings;
+  ready.stats.syntax_nodes+=source.tree.nodes.len-1;
+  ready.units[unit-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
+  ready.unit_owners[unit-1].tables=core.owner;
+  ready.unit_has_fork[unit-1]=scanUnitFork(ready.units[unit-1]);
+  ready.spliced_unit=unit;
+ }
+ checked.deinit();
+ return error==blot_error::Error.none,error;
+}
+
 fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
  let cache .= engine.persistentCache();
@@ -752,6 +852,29 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
    engine.source.units.items[index].visible_names=engine.source.symbols.entries.len;
   }
   engine.selectUnitNames(unit);
+  if !inherited && !symbol_shifted[index] && sameSymbolPrefix(previous.source.symbols,engine.source.symbols) {
+   var skip_root:bool[>..]=[];
+   if selectiveRoots(previous.source.unit(unit),engine.source.unit(unit),skip_root) {
+    let accepted,error=trySelectiveRetainedUnit(engine,unit,previous.source.unit(unit).tree,previous_core.units[index],skip_root[..],ready);
+    if error==blot_error::Error.out_of_memory {return error;}
+    if engine.source.symbols.outsideView() || engine.source.symbols.missing_name ||
+       engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
+    if accepted {
+     owned[index]=blot_reuse_project_check::copyOwned(previous.packets[index]);
+     let debit=previous.debits[index];
+     // The prior debit covers unchanged work. Charge the trial's projections
+     // too, so a selective success cannot give later modules more budget.
+     if debit.resolution>resolution || debit.associated>engine.associated_remaining {return blot_error::Error.invalid_artifact;}
+     engine.resolution_remaining=resolution-debit.resolution;
+     engine.associated_remaining-=debit.associated;
+     debits[index]=ModuleDebit{debit.resolution,associated-engine.associated_remaining,symbol_count};
+     cache.current=0;
+     continue;
+    }
+    engine.resolution_remaining=resolution;
+    engine.associated_remaining=associated;
+   }
+  }
   let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
   let continued,error=engine.checkOrdered(unit);
   check.exit();

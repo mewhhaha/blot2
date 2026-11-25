@@ -225,90 +225,6 @@ fn sameImporter(old:const Core[:],updated:const Core[:],i:i64,edit:u32)->bool {
     return sameUnit(a,b);
 }
 
-fn sameFieldSymbol(a:const Core&,sa:u32,b:const Core&,sb:u32)->bool {
-    let fa=a.fieldSpelling(sa);
-    let fb=b.fieldSpelling(sb);
-    if fa.present!=fb.present { return false; }
-    if !fa.present { return sa==sb; }
-    return fa.value==fb.value;
-}
-
-recursive fn sameCoreType(a:const Core&,ta:u32,b:const Core&,tb:u32,depth:i64)->bool {
-    if depth>64 { return false; }
-    if ta<=blot_check_types::never || tb<=blot_check_types::never { return ta==tb; }
-    if ta>=a.types.nodes.len || tb>=b.types.nodes.len { return false; }
-    let na=a.types.nodes[ta];
-    let nb=b.types.nodes[tb];
-    if na.tag!=nb.tag { return false; }
-    match na.tag {
-        unit,boolean,unsigned32,floating32,never=>{ return true; },
-        variable,bound=>{ return na.a==nb.a && na.b==nb.b; },
-        usage=>{ return na.b==nb.b && sameCoreType(a,na.a,b,nb.a,depth+1) && sameCoreType(a,na.c,b,nb.c,depth+1); },
-        forall,existential=>{ return na.b==nb.b && sameCoreType(a,na.a,b,nb.a,depth+1); },
-        array,list,cursor,resolver=>{ return sameCoreType(a,na.a,b,nb.a,depth+1); },
-        function=>{
-            if !sameCoreType(a,na.a,b,nb.a,depth+1) || !sameCoreType(a,na.b,b,nb.b,depth+1) { return false; }
-            return sameEffectRow(a,na.c,b,nb.c,depth+1);
-        },
-        product=>{
-            if na.b!=nb.b { return false; }
-            for i in 0..(na.b as i64) {
-                if !sameCoreType(a,a.types.extra[na.a+i],b,b.types.extra[nb.a+i],depth+1) { return false; }
-            }
-            return true;
-        },
-        record=>{
-            if na.b!=nb.b { return false; }
-            for i in 0..(na.b as i64) {
-                let fa=a.types.recordField(na,i);
-                let fb=b.types.recordField(nb,i);
-                if !sameFieldSymbol(a,fa.name,b,fb.name) { return false; }
-                if !sameCoreType(a,fa.ty,b,fb.ty,depth+1) { return false; }
-            }
-            return true;
-        },
-        nominal,projection,instance_selection=>{
-            if na.a!=nb.a || na.b!=nb.b { return false; }
-            let aa=a.types.nominalArguments(na);
-            let bb=b.types.nominalArguments(nb);
-            if aa.len!=bb.len { return false; }
-            for i in 0..aa.len {
-                if !sameCoreType(a,aa[i],b,bb[i],depth+1) { return false; }
-            }
-            if na.tag==blot_check_types::Tag.projection {
-                return sameFieldSymbol(a,a.types.projectionMember(na),b,b.types.projectionMember(nb));
-            }
-            return true;
-        },
-        provider=>{ return sameCoreType(a,na.a,b,nb.a,depth+1) && sameEffectRow(a,na.c,b,nb.c,depth+1); },
-        state_provider=>{ return sameCoreType(a,na.a,b,nb.a,depth+1) && sameCoreType(a,na.b,b,nb.b,depth+1) && sameCoreType(a,na.c,b,nb.c,depth+1); },
-        scoped=>{ return na.b==nb.b && na.c==nb.c && sameCoreType(a,na.a,b,nb.a,depth+1); },
-        type_constructor,rigid,instance_version=>{ return na.a==nb.a && na.b==nb.b && na.c==nb.c; },
-        _=>{ return false; },
-    }
-}
-
-recursive fn sameEffectRow(a:const Core&,ra:u32,b:const Core&,rb:u32,depth:i64)->bool {
-    if ra==0 && rb==0 { return true; }
-    if ra==0 || rb==0 || depth>64 { return false; }
-    let row_a=a.types.row(ra);
-    let row_b=b.types.row(rb);
-    if row_a.tail!=row_b.tail || row_a.labels.len!=row_b.labels.len { return false; }
-    let la=a.types.rowLabels(ra);
-    let lb=b.types.rowLabels(rb);
-    for i in 0..la.len {
-        let oa=a.types.operation(la[i]);
-        let ob=b.types.operation(lb[i]);
-        if oa.identity!=ob.identity || oa.instance!=ob.instance || oa.arguments.len!=ob.arguments.len { return false; }
-        let aa=a.types.operationArguments(la[i]);
-        let bb=b.types.operationArguments(lb[i]);
-        for j in 0..aa.len {
-            if !sameCoreType(a,aa[j],b,bb[j],depth+1) { return false; }
-        }
-    }
-    return true;
-}
-
 struct LocalPair { old_id:u32, new_id:u32 }
 struct LocalMap { items:LocalPair[>..<]=[] }
 fn mapBind(m:LocalMap&,o:u32,n:u32) { m.items.push(LocalPair{o,n}); }
@@ -352,15 +268,15 @@ fn sameProjection(a:const Core&,pa_id:u32,b:const Core&,pb_id:u32)->bool {
     let pa=a.projection(pa_id);
     let pb=b.projection(pb_id);
     if pa.nominal!=pb.nominal || pa.variants.len!=pb.variants.len { return false; }
-    if !sameCoreType(a,pa.source_type,b,pb.source_type,0) || !sameCoreType(a,pa.result_type,b,pb.result_type,0) { return false; }
+    if !blot_check_core::sameCoreType(a,pa.source_type,b,pb.source_type,0) || !blot_check_core::sameCoreType(a,pa.result_type,b,pb.result_type,0) { return false; }
     if pa.field!=0 || pb.field!=0 {
-        if !sameFieldSymbol(a,pa.field,b,pb.field) { return false; }
+        if !blot_check_core::sameFieldSymbol(a,pa.field,b,pb.field) { return false; }
     }
     let va=a.projectionVariants(pa_id);
     let vb=b.projectionVariants(pb_id);
     if va.len!=vb.len { return false; }
     for i in 0..va.len {
-        if va[i].tag!=vb[i].tag || !sameFieldSymbol(a,va[i].field,b,vb[i].field) { return false; }
+        if va[i].tag!=vb[i].tag || !blot_check_core::sameFieldSymbol(a,va[i].field,b,vb[i].field) { return false; }
     }
     return true;
 }
@@ -371,7 +287,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
     let na=a.node(ia);
     let nb=b.node(ib);
     if na.tag!=nb.tag || na.op!=nb.op { return false; }
-    if !sameCoreType(a,na.ty,b,nb.ty,0) { return false; }
+    if !blot_check_core::sameCoreType(a,na.ty,b,nb.ty,0) { return false; }
     match na.tag {
         constant=>{ return na.a==nb.a && na.b==nb.b && na.c==nb.c; },
         reference=>{
@@ -452,7 +368,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
                 if !ok || mapped!=nb.c-2 { return false; }
             } else if na.c!=nb.c { return false; }
             if !sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1) { return false; }
-            if !sameCoreType(a,a.binding(na.a).ty,b,b.binding(nb.a).ty,0) { return false; }
+            if !blot_check_core::sameCoreType(a,a.binding(na.a).ty,b,b.binding(nb.a).ty,0) { return false; }
             mapBind(locals,na.a,nb.a);
             return true;
         },
@@ -519,7 +435,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             if sa.len!=sb.len { return false; }
             for i in 0..sa.len {
                 if sa[i].kind!=sb[i].kind { return false; }
-                if !sameCoreType(a,sa[i].source_type,b,sb[i].source_type,0) || !sameCoreType(a,sa[i].result_type,b,sb[i].result_type,0) { return false; }
+                if !blot_check_core::sameCoreType(a,sa[i].source_type,b,sb[i].source_type,0) || !blot_check_core::sameCoreType(a,sa[i].result_type,b,sb[i].result_type,0) { return false; }
                 if sa[i].kind==blot_check_core::UpdateKind.index {
                     if !sameCoreExpr(old_units,a,sa[i].index,new_units,b,sb[i].index,locals,blocks,depth+1) { return false; }
                 } else {
@@ -536,7 +452,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             let ca=a.call(ia);
             let cb=b.call(ib);
             if resolveRef(old_units,a,ca.target)!=resolveRef(new_units,b,cb.target) { return false; }
-            if ca.own!=cb.own || !sameCoreType(a,ca.callee_type,b,cb.callee_type,0) { return false; }
+            if ca.own!=cb.own || !blot_check_core::sameCoreType(a,ca.callee_type,b,cb.callee_type,0) { return false; }
             if ca.arguments.len!=cb.arguments.len { return false; }
             for i in 0..ca.arguments.len {
                 if !sameCoreExpr(old_units,a,ca.arguments[i],new_units,b,cb.arguments[i],locals,blocks,depth+1) { return false; }
@@ -570,14 +486,14 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         constructor_function,primitive_function=>{ return na.a==nb.a; },
         result_associated=>{
-            if !sameFieldSymbol(a,na.b,b,nb.b) { return false; }
+            if !blot_check_core::sameFieldSymbol(a,na.b,b,nb.b) { return false; }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
         },
         closure=>{
             let ca=a.closure(ia);
             let cb=b.closure(ib);
             if ca.parameter.inferred!=cb.parameter.inferred { return false; }
-            if !sameCoreType(a,ca.function_type,b,cb.function_type,0) || !sameCoreType(a,ca.parameter.ty,b,cb.parameter.ty,0) { return false; }
+            if !blot_check_core::sameCoreType(a,ca.function_type,b,cb.function_type,0) || !blot_check_core::sameCoreType(a,ca.parameter.ty,b,cb.parameter.ty,0) { return false; }
             let caps_a=a.closureCaptures(ia);
             let caps_b=b.closureCaptures(ib);
             if caps_a.len!=caps_b.len { return false; }
@@ -684,7 +600,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         associated=>{
             if na.c!=0 || nb.c!=0 {
-                if !sameFieldSymbol(a,na.c,b,nb.c) { return false; }
+                if !blot_check_core::sameFieldSymbol(a,na.c,b,nb.c) { return false; }
             }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
                    sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
@@ -698,18 +614,18 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             let oa=a.operationValue(ia);
             let ob=b.operationValue(ib);
             if oa.identity!=ob.identity || oa.instance!=ob.instance || oa.arguments.len!=ob.arguments.len { return false; }
-            if !sameCoreType(a,oa.signature,b,ob.signature,0) || !sameCoreType(a,oa.witness_result,b,ob.witness_result,0) { return false; }
+            if !blot_check_core::sameCoreType(a,oa.signature,b,ob.signature,0) || !blot_check_core::sameCoreType(a,oa.witness_result,b,ob.witness_result,0) { return false; }
             if !sameCoreExpr(old_units,a,oa.witness,new_units,b,ob.witness,locals,blocks,depth+1) { return false; }
             if !sameCoreExpr(old_units,a,oa.capability,new_units,b,ob.capability,locals,blocks,depth+1) { return false; }
             let aa=a.operationValueArguments(ia);
             let bb=b.operationValueArguments(ib);
-            for i in 0..aa.len { if !sameCoreType(a,aa[i],b,bb[i],0) { return false; } }
+            for i in 0..aa.len { if !blot_check_core::sameCoreType(a,aa[i],b,bb[i],0) { return false; } }
             return true;
         },
         flat_op=>{
             if na.c!=nb.c { return false; }
             if na.c==blot_check_core::flat_op_kernel_handle || na.c==blot_check_core::flat_op_process_handle { return na.a==nb.a; }
-            return sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
+            return blot_check_core::sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
         },
         // Any complex or uncommon form conservatively marks the body as changed.
         _=>{ return false; },
@@ -727,7 +643,7 @@ fn sameBodyShape(old_units:const Core[:],a:const Core&,ob:blot_check_core::Body,
     return sameCoreExpr(old_units,a,ob.root,new_units,b,nb.root,locals,blocks,0);
 }
 
-fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,edited:u32[>..<]&)->bool {
+fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,edited:u32[>..<]&,spliced:bool)->bool {
     let a .= old_units[unit-1];
     let b .= new_units[unit-1];
     if a.unit!=b.unit || a.bodies.len!=b.bodies.len || a.diagnostics.len!=0 || b.diagnostics.len!=0 { return false; }
@@ -745,13 +661,13 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     }
     for i in 0..a.constructors.len {
         let ca=a.constructors[i]; let cb=b.constructors[i];
-        if ca.tag!=cb.tag || ca.nominal!=cb.nominal || !sameFieldSymbol(a,ca.name,b,cb.name) { return false; }
-        if !sameCoreType(a,ca.payload,b,cb.payload,0) || !sameCoreType(a,ca.scheme.root,b,cb.scheme.root,0) { return false; }
+        if ca.tag!=cb.tag || ca.nominal!=cb.nominal || !blot_check_core::sameFieldSymbol(a,ca.name,b,cb.name) { return false; }
+        if !blot_check_core::sameCoreType(a,ca.payload,b,cb.payload,0) || !blot_check_core::sameCoreType(a,ca.scheme.root,b,cb.scheme.root,0) { return false; }
     }
     for i in 0..a.associated.len {
         let aa=a.associated[i]; let ab=b.associated[i];
         if aa.identity!=ab.identity || aa.operator!=ab.operator || resolveRef(old_units,a,aa.target)!=resolveRef(new_units,b,ab.target) { return false; }
-        if (aa.member!=0 || ab.member!=0) && !sameFieldSymbol(a,aa.member,b,ab.member) { return false; }
+        if (aa.member!=0 || ab.member!=0) && !blot_check_core::sameFieldSymbol(a,aa.member,b,ab.member) { return false; }
     }
     if a.primitives!=b.primitives || a.operation_names!=b.operation_names || a.type_tags!=b.type_tags || a.tag_calls!=b.tag_calls { return false; }
     if a.contracts.len!=0 && (a.contracts!=b.contracts || a.contract_members!=b.contract_members) { return false; }
@@ -766,7 +682,7 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
         let nb=b.bindings[bi];
         if ob.kind!=nb.kind || ob.private!=nb.private || ob.body_id!=nb.body_id ||
            ob.capability_parameters!=nb.capability_parameters || ob.has_explicit!=nb.has_explicit { return false; }
-        if !sameCoreType(a,ob.ty,b,nb.ty,0) { return false; }
+        if !(spliced && ob.ty==nb.ty) && !blot_check_core::sameCoreType(a,ob.ty,b,nb.ty,0) { return false; }
     }
     for nb,bi in b.bindings {
         if nb.kind!=blot_reuse_principal_interface::Kind.global { continue; }
@@ -779,11 +695,13 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
         let nb=b.bodies[bi];
         if ob.binding!=nb.binding || ob.exported!=nb.exported || ob.runtime!=nb.runtime || ob.is_function!=nb.is_function || ob.is_kernel!=nb.is_kernel { return false; }
         if a.name(ob.declaration_name)!=b.name(nb.declaration_name) || a.name(ob.export_name)!=b.name(nb.export_name) { return false; }
+        // The splice preserves all existing expression and parameter IDs.
+        if spliced && ob.root==nb.root && ob.parameters==nb.parameters {continue;}
         let pa=a.bodyParameters(ob);
         let pb=b.bodyParameters(nb);
         if pa.len!=pb.len { return false; }
         for pi in 0..pa.len {
-            if pa[pi].inferred!=pb[pi].inferred || !sameCoreType(a,pa[pi].ty,b,pb[pi].ty,0) { return false; }
+            if pa[pi].inferred!=pb[pi].inferred || !blot_check_core::sameCoreType(a,pa[pi].ty,b,pb[pi].ty,0) { return false; }
         }
         if !sameBodyShape(old_units,a,ob,new_units,b,nb) {
             if ob.exported && !ob.is_function { return false; }
@@ -833,7 +751,7 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     if changed_unit==0 { return false; }
     if hasStagedUnit(image.layout.sites,changed_unit) { return false; }
     var edited:u32[>..<]=[];
-    if !findEditedBindings(previous.units,next.units,changed_unit,edited) { return false; }
+    if !findEditedBindings(previous.units,next.units,changed_unit,edited,next.spliced_unit==changed_unit) { return false; }
 
     let m .= next.units[changed_unit-1];
     let old_m .= previous.units[changed_unit-1];

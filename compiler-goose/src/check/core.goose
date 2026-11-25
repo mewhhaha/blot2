@@ -1017,3 +1017,94 @@ type ContractMemberKind = blot_reuse_principal_interface::ContractMemberKind;
 
 // Named binding classification is shared by all immutable consumers.
 type BindingKind = blot_check_check::Kind;
+
+fn sameFieldSymbol(a:const Module&,sa:u32,b:const Module&,sb:u32)->bool {
+    let fa=a.fieldSpelling(sa);
+    let fb=b.fieldSpelling(sb);
+    if fa.present!=fb.present { return false; }
+    if !fa.present { return sa==sb; }
+    return fa.value==fb.value;
+}
+
+recursive fn sameCoreType(a:const Module&,ta:u32,b:const Module&,tb:u32,depth:i64)->bool {
+    if depth>64 { return false; }
+    if ta<=blot_check_types::never || tb<=blot_check_types::never { return ta==tb; }
+    if ta>=a.types.nodes.len || tb>=b.types.nodes.len { return false; }
+    let na=a.types.nodes[ta];
+    let nb=b.types.nodes[tb];
+    if na.tag!=nb.tag { return false; }
+    match na.tag {
+        unit,boolean,unsigned32,floating32,never=>{ return true; },
+        variable,bound=>{ return na.a==nb.a && na.b==nb.b; },
+        usage=>{ return na.b==nb.b && sameCoreType(a,na.a,b,nb.a,depth+1) && sameCoreType(a,na.c,b,nb.c,depth+1); },
+        forall,existential=>{
+            if na.c!=nb.c || !sameCoreType(a,na.a,b,nb.a,depth+1) {return false;}
+            for i in 0..na.c {
+                if !sameCoreType(a,a.types.extra[na.b+i],b,b.types.extra[nb.b+i],depth+1) {return false;}
+            }
+            return true;
+        },
+        erased_proof=>{return true;},
+        array,list,cursor,resolver=>{ return sameCoreType(a,na.a,b,nb.a,depth+1); },
+        function=>{
+            if !sameCoreType(a,na.a,b,nb.a,depth+1) || !sameCoreType(a,na.b,b,nb.b,depth+1) { return false; }
+            return sameEffectRow(a,na.c,b,nb.c,depth+1);
+        },
+        product=>{
+            if na.b!=nb.b { return false; }
+            for i in 0..(na.b as i64) {
+                if !sameCoreType(a,a.types.extra[na.a+i],b,b.types.extra[nb.a+i],depth+1) { return false; }
+            }
+            return true;
+        },
+        record=>{
+            if na.b!=nb.b { return false; }
+            for i in 0..(na.b as i64) {
+                let fa=a.types.recordField(na,i);
+                let fb=b.types.recordField(nb,i);
+                if !sameFieldSymbol(a,fa.name,b,fb.name) { return false; }
+                if !sameCoreType(a,fa.ty,b,fb.ty,depth+1) { return false; }
+            }
+            return true;
+        },
+        nominal,projection,instance_selection=>{
+            if na.a!=nb.a || na.b!=nb.b { return false; }
+            let aa=a.types.nominalArguments(na);
+            let bb=b.types.nominalArguments(nb);
+            if aa.len!=bb.len { return false; }
+            for i in 0..aa.len {
+                if !sameCoreType(a,aa[i],b,bb[i],depth+1) { return false; }
+            }
+            if na.tag==blot_check_types::Tag.projection {
+                return sameFieldSymbol(a,a.types.projectionMember(na),b,b.types.projectionMember(nb));
+            }
+            return true;
+        },
+        provider=>{ return sameCoreType(a,na.a,b,nb.a,depth+1) && sameEffectRow(a,na.c,b,nb.c,depth+1); },
+        state_provider=>{ return sameCoreType(a,na.a,b,nb.a,depth+1) && sameCoreType(a,na.b,b,nb.b,depth+1) && sameCoreType(a,na.c,b,nb.c,depth+1); },
+        scoped=>{ return na.b==nb.b && na.c==nb.c && sameCoreType(a,na.a,b,nb.a,depth+1); },
+        type_constructor,rigid,instance_version=>{ return na.a==nb.a && na.b==nb.b && na.c==nb.c; },
+        _=>{ return false; },
+    }
+}
+
+recursive fn sameEffectRow(a:const Module&,ra:u32,b:const Module&,rb:u32,depth:i64)->bool {
+    if ra==0 && rb==0 { return true; }
+    if ra==0 || rb==0 || depth>64 { return false; }
+    let row_a=a.types.row(ra);
+    let row_b=b.types.row(rb);
+    if row_a.tail!=row_b.tail || row_a.labels.len!=row_b.labels.len { return false; }
+    let la=a.types.rowLabels(ra);
+    let lb=b.types.rowLabels(rb);
+    for i in 0..la.len {
+        let oa=a.types.operation(la[i]);
+        let ob=b.types.operation(lb[i]);
+        if oa.identity!=ob.identity || oa.instance!=ob.instance || oa.arguments.len!=ob.arguments.len { return false; }
+        let aa=a.types.operationArguments(la[i]);
+        let bb=b.types.operationArguments(lb[i]);
+        for j in 0..aa.len {
+            if !sameCoreType(a,aa[j],b,bb[j],depth+1) { return false; }
+        }
+    }
+    return true;
+}

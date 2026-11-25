@@ -34,7 +34,7 @@ fn moduleExports<D>(self_:Engine&,unit:u32,catalog:blot_check_check::Declaration
  exports.append(forwarded);let error=self_.appendDiagnostics(unit,diagnostics);if error!=blot_error::Error.none {return default<Export[:]>(),error;}return copyOwned(exports[..]),blot_error::Error.none;
 }
 fn checkModule(self_:Engine&,unit:u32)->Error {let source=self_.source.unit(unit);blot_phase_profile::traceModule(unit,self_.source.symbols.get(source.filename),source.source.len);let region=blot_phase_profile::region("check.module",unit,0,source.source.len as u32);let error=checkModuleBody(self_,unit);region.exit();return error;}
-fn checkModuleBody(self_:Engine&,unit:u32)->Error {
+fn checkModuleBody(self_:Engine&,unit:u32,options_core:const blot_check_core::Module?=null,skip_root:const bool[:]=default<const bool[:]>(),selective:blot_check_check::Checked?=null)->Error {
  let before=self_.diagnostics.items.len;let source=self_.source.unit(unit);let tree:const blot_parse_ast::Tree& =source.tree;
  var occupied=dictionary<u32,bool>{};var forwarded:Export[>..<]=[];var imports:blot_check_check::ImportedBinding[>..]=[];var headers:blot_check_check::SourceHeader[>..]=[];var catalogs:blot_check_check::ImportedCatalog[>..]=[];var source_catalogs:blot_check_check::SourceCatalog[>..]=[];
  for root in tree.roots.items {let node=tree.node(root);if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_entry_kernel_decl || node.tag==blot_parse_ast::tag_entry_process_decl || node.tag==blot_parse_ast::tag_data_decl || node.tag==blot_parse_ast::tag_type_alias_decl || node.tag==blot_parse_ast::tag_contract_decl || node.tag==blot_parse_ast::tag_implementation_decl || node.tag==blot_parse_ast::tag_effect_type_decl || node.tag==blot_parse_ast::tag_effect_decl {occupied.insert(node.a,true);}if node.tag==blot_parse_ast::tag_data_decl {let constructor_count=tree.children(node.b).len;for index in 0..constructor_count {let constructor=tree.children(node.b)[index];let name=tree.node(constructor).a;occupied.insert(name,true);}}
@@ -63,7 +63,15 @@ fn checkModuleBody(self_:Engine&,unit:u32)->Error {
  if blot_check_check::hasNumericFailure(tree) && validation.diagnostics.len==0 {validation.deinit();return blot_error::Error.numeric_validation_incomplete;}
  let exports,error=self_.moduleExports(unit,blot_check_check::declarationCatalog(validation),validation.declarations,validation.diagnostics,forwarded[..]);if error!=blot_error::Error.none {validation.deinit();return error;}self_.source_modules[unit-1]=blot_support::Option<SourceModule>{true,SourceModule{validation,exports,self_.diagnostics.items.len==before, ..}};return blot_error::Error.none;
  }
+ options.retained_core .= options_core;
+ options.skip_root=skip_root;
  let value,error=blot_check_check::checkModuleWithPrivateExecution(tree,self_.source.symbols,imports[..],catalogs[..],unit,options,self_.execution);{ let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } }var checked=value;
+ let output .= selective;
+ if output {
+  if checked.diagnostics.len!=0 || checked.initializer_rejected {checked.deinit();return blot_error::Error.invalid_artifact;}
+  output=checked;
+  return blot_error::Error.none;
+ }
  accountEditorBudget(self_.editor,checked.counters.inference_steps as i64,checked.initializer_rejected,checked.diagnostics);
  if checked.initializer_rejected {let error=self_.appendDiagnostics(unit,checked.diagnostics);checked.deinit();return error;}
  let exports,error=self_.moduleExports(unit,blot_check_check::declarationCatalog(checked),checked.bindings,checked.diagnostics,forwarded[..]);if error!=blot_error::Error.none {checked.deinit();return error;}

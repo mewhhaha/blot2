@@ -190,3 +190,52 @@ fn expressionReferences(module: const Module&, root: u32) -> BindingRef[:], Erro
 fn captureReferences(scan: Capture&, root: u32) -> BindingRef[:], Error { let recipe, error = scan.scan(blot_check_core::Body { root: root , ..}); if error != blot_error::Error.none { return default<BindingRef[:]>(), error; } return copyReferences(scan.references[..]), blot_error::Error.none; }
 fn usesBinding(module: const Module&, root: u32, binding: u32) -> bool, Error { return withCapture(module, root, false, binding, checkBinding); }
 fn checkBinding(scan: Capture&, root: u32) -> bool, Error { let recipe, error = scan.scan(blot_check_core::Body { root: root , ..}); return scan.watched_used, error; }
+
+// A successful check with frozen principals is insufficient when the old
+// or new body participates in recursion with another global. Cold checking
+// can infer both sides of a cycle as one component.
+fn independentEdits(module:const Module&,edited:const u32[:])->bool {
+ return withCapture(module,edited,true,0,independentEditGraph);
+}
+
+fn independentEditGraph(scan:Capture&,edited:const u32[:])->bool {
+ let module .= scan.module;
+ var pending:u32[>..]=[];
+ var seen:bool[>..]=[];
+ seen.resize(module.bindings.len,false);
+ pending.append(edited);
+ var i:i64=0;
+ while i<pending.len {
+  let binding=pending[i];
+  i++;
+  if seen[binding] {continue;}
+  seen[binding]=true;
+  let body_id=module.bindings[binding].body_id;
+  if body_id==0 {continue;}
+  let recipe,error=scan.scan(module.bodies[body_id]);
+  if error!=blot_error::Error.none || recipe.runtime_metadata!=0 {return false;}
+  for target in scan.references[recipe.references.start..recipe.references.start+recipe.references.len] {
+   if !addSpliceDependency(module,target,edited,pending) {return false;}
+  }
+  for member in scan.members[recipe.members.start..recipe.members.start+recipe.members.len] {
+   for method in module.associated {
+    if member.name!=0 && member.name==method.member ||
+       member.operator!=blot_check_types::Operator.none && member.operator==method.operator {
+     if !addSpliceDependency(module,method.target,edited,pending) {return false;}
+    }
+   }
+  }
+ }
+ return true;
+}
+
+fn addSpliceDependency(module:const Module&,reference:BindingRef,edited:const u32[:],pending:u32[>..]&)->bool {
+ var target=reference;
+ if target.unit==0 && module.bindings[target.binding].kind==blot_reuse_principal_interface::Kind.external {
+  target=module.bindings[target.binding].target;
+ }
+ if target.unit!=0 && target.unit!=module.unit {return true;}
+ for binding in edited {if binding==target.binding {return false;}}
+ pending.push(target.binding);
+ return true;
+}

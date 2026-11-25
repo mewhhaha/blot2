@@ -1,5 +1,6 @@
 // Source inference. Tables borrow explicit compilation owners.
 namespace blot_check_check;
+import check.core;
 import backend.collection_ops;
 import backend.loop_targets;
 import backend.opaque_storage;
@@ -83,6 +84,8 @@ struct EditorCapture {
     context: blot_support::Option<blot_reuse_hole_diagnostics::Snapshot>   = blot_support::none<blot_reuse_hole_diagnostics::Snapshot>()
 }
 struct ModuleOptions {
+    retained_core: const blot_check_core::Module? = null,
+    skip_root: const bool[:] = default<const bool[:]>(),
     editor: blot_support::Option<EditorMarker>   = blot_support::none<EditorMarker>(),
     purity_origins: ModuleOrigins = ModuleOrigins {..},
     builtin_catalog: bool = false,
@@ -1041,16 +1044,16 @@ fn sourceIssueCode(value:u32)->Code {match value {
     blot_parse_source_operators::c_operator_associativity=>{return Code.operator_associativity;},blot_parse_source_operators::c_operator_header_order=>{return Code.operator_header_order;},blot_parse_source_operators::c_operator_precedence=>{return Code.operator_precedence;},blot_parse_source_operators::c_duplicate_operator=>{return Code.duplicate_operator;},blot_parse_source_operators::c_unsupported_prefix=>{return Code.unsupported_prefix;},blot_parse_source_operators::c_unknown_intrinsic=>{return Code.unknown_intrinsic;},blot_parse_source_operators::c_unsupported_expression=>{return Code.unsupported_expression;},blot_parse_source_operators::c_private_access=>{return Code.private_access;},blot_parse_source_operators::c_unknown_constructor=>{return Code.unknown_constructor;},blot_parse_source_operators::c_sealed_effect=>{return Code.sealed_effect;},blot_parse_source_operators::c_call_arity=>{return Code.call_arity;},blot_parse_source_operators::c_requests_scope=>{return Code.requests_scope;},blot_parse_source_operators::c_yield_scope=>{return Code.yield_scope;},blot_parse_source_operators::c_break_scope=>{return Code.break_scope;},blot_parse_source_operators::c_continue_scope=>{return Code.continue_scope;},blot_parse_source_operators::c_literal_required=>{return Code.literal_required;},blot_parse_source_operators::c_product_index_literal=>{return Code.product_index_literal;},blot_parse_source_operators::c_nesting_limit=>{return Code.nesting_limit;},
     _=>{return Code.unsupported;},
 }}
-fn validateModuleBodies(self_:Engine&)->blot_error::Error {
+fn validateModuleBodies(self_:Engine&,skip_root:const bool[:]=default<const bool[:]>())->blot_error::Error {
     let tree .= self_.tree;let pool .= self_.pool;let unit=self_.unit;if self_.source_validation {let start=self_.header_diagnostics.len;let count=self_.diagnostics.len;
         for index in 0..count {let diagnostic=self_.diagnostics[index];self_.header_diagnostics.push(canonicalDiagnostic(diagnostic));}
         self_.source_header_diagnostics_start=start;self_.source_header_diagnostics_count=count;self_.diagnostics.clear();}
     var source_issue=blot_parse_source_operators::Issue{..};var has_issue=false;
-    if tree.diagnostics.len==0 {let issue,present,err=blot_parse_source_operators::validate(tree,pool,self_);if err!=blot_error::Error.none {return err;}source_issue=issue;has_issue=present;}
+    if tree.diagnostics.len==0 {let issue,present,err=blot_parse_source_operators::validate(tree,pool,self_,skip_root);if err!=blot_error::Error.none {return err;}source_issue=issue;has_issue=present;}
     if has_issue {deinitDiagnosticPayloads(self_.diagnostics);self_.diagnostics.clear();var numeric=blot_support::none<blot_parse_ast::NumericFault>();       if source_issue.has_numeric_literal {numeric=blot_support::some(source_issue.numeric_literal);}              let __field_order_37_code: blot_check_check::Code = sourceIssueCode(source_issue.code); let __field_order_38_node: u32 = source_issue.node; let __field_order_39_span: blot_parse_ast::Span = blot_parse_ast::Span{source_issue.point,source_issue.point, ..}; let __field_order_40_symbol: u32 = source_issue.symbol; let __field_order_41_implicit_type_witness: bool = source_issue.implicit_type_witness; let __field_order_42_source_terminator: blot_parse_source_operators::Terminator = source_issue.terminator; let __field_order_43_numeric_literal: blot_support::Option<blot_parse_ast::NumericFault> = numeric; var detail=blot_support::none<const u8[:]>(); if __field_order_37_code==Code.unknown_value && !__field_order_41_implicit_type_witness && __field_order_40_symbol!=0 {detail=self_.unknownSymbolDetail(__field_order_40_symbol);} self_.diagnostics.push(Diagnostic{ code: __field_order_37_code, span: __field_order_39_span, node: __field_order_38_node, symbol: __field_order_40_symbol, implicit_type_witness: __field_order_41_implicit_type_witness, source_terminator: __field_order_42_source_terminator, numeric_literal: __field_order_43_numeric_literal, detail: detail, .. });}
     if !self_.source_validation && tree.diagnostics.len==0 && !has_issue {
-        let ast_walk_8_count=tree.roots.items.len;for ast_walk_8_index in 0..ast_walk_8_count {let id=tree.roots.items[ast_walk_8_index];let rtag=tree.node(id).tag;if (rtag==blot_parse_ast::tag_value_decl || rtag==blot_parse_ast::tag_entry_kernel_decl || rtag==blot_parse_ast::tag_entry_process_decl) && self_.resolved[id]!=0 {self_.root_global=self_.resolved[id];let err=self_.inferGlobal(self_.resolved[id]);if err!=blot_error::Error.none {return err;}}}
-        for declaration in self_.implementations {if declaration.identity.unit!=unit {continue;}for member in self_.implementation_members[declaration.members.start..declaration.members.start+declaration.members.len] {if member.kind!=blot_reuse_principal_interface::ImplementationMemberKind.value {continue;}self_.root_global=member.target.binding;let err=self_.inferGlobal(member.target.binding);if err!=blot_error::Error.none {return err;}}}self_.root_global=0;
+        let ast_walk_8_count=tree.roots.items.len;for ast_walk_8_index in 0..ast_walk_8_count {if skip_root.len!=0 && skip_root[ast_walk_8_index] {continue;}let id=tree.roots.items[ast_walk_8_index];let rtag=tree.node(id).tag;if (rtag==blot_parse_ast::tag_value_decl || rtag==blot_parse_ast::tag_entry_kernel_decl || rtag==blot_parse_ast::tag_entry_process_decl) && self_.resolved[id]!=0 {self_.root_global=self_.resolved[id];let err=self_.inferGlobal(self_.resolved[id]);if err!=blot_error::Error.none {return err;}}}
+        if skip_root.len==0 {for declaration in self_.implementations {if declaration.identity.unit!=unit {continue;}for member in self_.implementation_members[declaration.members.start..declaration.members.start+declaration.members.len] {if member.kind!=blot_reuse_principal_interface::ImplementationMemberKind.value {continue;}self_.root_global=member.target.binding;let err=self_.inferGlobal(member.target.binding);if err!=blot_error::Error.none {return err;}}}}self_.root_global=0;
         let err=self_.finish();if err!=blot_error::Error.none {return err;}let err=self_.finishReflection();if err!=blot_error::Error.none {return err;}let err=self_.finishHoles();if err!=blot_error::Error.none {return err;}
         if self_.diagnostics.len==0 {let err=self_.validateVisibility();if err!=blot_error::Error.none {return err;}}
     }return blot_error::Error.none;

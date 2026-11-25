@@ -423,7 +423,7 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
   let guard_=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,body,depth+1); walk(self_,tree,pool,context,locals,guard_,depth+1);
   { locals.resize(saved); } }
 }
-fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Error {
+fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const bool[:]=default<const bool[:]>()) -> Issue,bool,Error {
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;
  while collected!=0 {
   collected--; let id=tree.roots.items[collected];
@@ -441,6 +441,7 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
   index--; let id=tree.roots.items[index]; validator.failure=context.source_declaration_header(id);
   if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_87_0: Issue = Issue {}; let __cleanup_result_87_1: bool = false; let __cleanup_result_87_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_87_0, __cleanup_result_87_1, __cleanup_result_87_2; }
   if tree.node(id).tag==a_implementation_decl {
+   if skip_root.len!=0 {continue;}
    let saved=locals.len; let implementation=tree.implementation(id);
    let ast_visit_19_source=implementation.members;let ast_visit_19_count=tree.list(ast_visit_19_source).len;for ast_visit_19_index in 0..ast_visit_19_count {let member=tree.list(ast_visit_19_source)[ast_visit_19_index]; if tree.node(member).tag==a_value_decl { locals.push(tree.node(member).a); } }
    let scope,err=context.source_implementation_start(id); if err!=blot_error::Error.none { locals.resize(saved); let __cleanup_result_88_0: Issue = Issue {}; let __cleanup_result_88_1: bool = false; let __cleanup_result_88_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_88_0, __cleanup_result_88_1, __cleanup_result_88_2; }
@@ -487,7 +488,7 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
    if annotations_stopped(validator,tree,pool,context,locals) { let __p_ann_0: Issue = Issue {}; let __p_ann_1: bool = false; let __p_ann_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __p_ann_0, __p_ann_1, __p_ann_2; }
    continue;
   }
-  if tree.node(id).tag!=a_value_decl { continue; } let value=tree.value_decl(id);
+  if tree.node(id).tag!=a_value_decl || (skip_root.len!=0 && skip_root[index]) { continue; } let value=tree.value_decl(id);
   if pool.get(value.name)=="own" { let __own_name_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_name_1: bool = true; let __own_name_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_name_0, __own_name_1, __own_name_2; }
   if value.modifier!=0&&(!value.exported||pool.get(value.modifier)!="#entry") { let __cleanup_result_91_0: Issue = Issue {code:c_unknown_modifier,node:id,point:tree.span(id).start}; let __cleanup_result_91_1: bool = true; let __cleanup_result_91_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_91_0, __cleanup_result_91_1, __cleanup_result_91_2; }
   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __cleanup_result_92_0: Issue = Issue {}; let __cleanup_result_92_1: bool = false; let __cleanup_result_92_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_92_0, __cleanup_result_92_1, __cleanup_result_92_2; }

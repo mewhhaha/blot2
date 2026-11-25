@@ -251,3 +251,13 @@ reusable[] var pool_IdentityMap:dictionary_slot<Identity,Identity>[>..];
 fn restore(map:IdentityMap&,slots:const dictionary_slot<Identity,Identity>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_IdentityMap.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return blot_error::Error.none;}
 
 fn saturatingAdd(value:u64&,amount:u64) { if amount>0xffffffffffffffff-value { value=0xffffffffffffffff; } else { value+=amount; } }
+
+fn copyTypeList(self_:Copier&,source:List)->List,Error {
+ var words=IdBuffer{..};
+ let copied=copyIds(self_,self_.source.list(source),0,words);
+ var result=List{..};
+ var error=copied;
+ if error==blot_error::Error.none {result,error=self_.destination.saveList(words.items);}
+ deinit(words);
+ return result,error;
+}

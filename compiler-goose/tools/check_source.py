@@ -4,8 +4,12 @@ import argparse,collections,json,math,os,re,signal,subprocess,time
 ROOT=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser();p.add_argument('--phase',choices=['parse','check'],default='parse');p.add_argument('--area',default='');p.add_argument('--log',default='current');p.add_argument('--timeout',type=float,default=30);p.add_argument('--entry',default='compiler-goose/src/main.goose');p.add_argument('--goose',type=Path);p.add_argument('--keep-going',action='store_true');args=p.parse_args()
 if not math.isfinite(args.timeout) or args.timeout<=0:p.error('--timeout must be positive and finite')
-compiler=args.goose or ROOT.parent/'goose-to-wasm/build/native/goose';stdlib=ROOT.parent/'goose-to-wasm/build/source/stdlib';log=ROOT/'build/goose-port/verification'/f'{args.log}.log';log.parent.mkdir(parents=True,exist_ok=True)
-command=[str(compiler),'--'+args.phase,'--diagnostics',('text' if args.phase=='check' else 'json'),'--stdlib',str(stdlib),args.entry]
+default_goose=ROOT.parent/'goose-to-wasm/build/bin/goosew'
+if not default_goose.exists():default_goose=ROOT/'build/goose-port/upstream-d5ae5bb/build-precision/goose'
+compiler=args.goose or default_goose;stdlib=ROOT/'build/goose-port/upstream-d5ae5bb/source-precision/stdlib';log=ROOT/'build/goose-port/verification'/f'{args.log}.log';log.parent.mkdir(parents=True,exist_ok=True)
+diag_flag='--error-format' if compiler.name=='goosew' else '--diagnostics'
+extra_flags=['--reachable-program'] if compiler.name=='goosew' else []
+command=[str(compiler),'--'+args.phase,*extra_flags,diag_flag,('text' if args.phase=='check' else 'json'),'--stdlib',str(stdlib),args.entry]
 started=time.monotonic()
 with log.open('w') as stream:
  child=subprocess.Popen(command,cwd=ROOT,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
