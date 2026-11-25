@@ -477,7 +477,7 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
             lget(g, index);
             lget(g, len);
             op(g, OP_i32_ge_u);
-            trap(g, f);
+            trapBounds(g, f, id);
             recordCheckedBoundSized(f, index, len, arr_len_ty);
         }
         let addr = emitOffsetAddress(g, f, base, index, step);
@@ -502,7 +502,7 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
         lget(g, index);
         lget(g, w(g, container, 3));
         op(g, OP_i32_ge_u);
-        trap(g, f);
+        trapBounds(g, f, id);
         let position = local32(g, f);
         lget(g, w(g, container, 2));
         lget(g, index);
@@ -522,7 +522,7 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
         lget(g, index);
         lget(g, w(g, container, 3));
         op(g, OP_i32_ge_u);
-        trap(g, f);
+        trapBounds(g, f, id);
         position = local32(g, f);
         lget(g, w(g, container, 2));
         lget(g, index);
@@ -542,6 +542,35 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
 fn trap(g: Generator&, f: Fn&) {
     let opened = open(g, f, OP_if_);
     op(g, OP_unreachable_);
+    close(g, f);
+}
+// Bounds trap: identical to `trap` outside `--test`, records `blot:traps` kind=2 in `--test` mode.
+fn trapBounds(g: Generator&, f: Fn&, id: u32) {
+    let opened = open(g, f, OP_if_);
+    if blot_direct_writer::testModeEnabled() {
+        emitTrapSite(g, f, 2, id, "index out of bounds");
+    }
+    op(g, OP_unreachable_);
+    close(g, f);
+}
+// Runtime guard against mutating immutable static const pools (`slot >= persistent_split && static_pool_flag != 0`).
+// Matches runtime.push/pop/truncate while leaving temporary transport pins (`slot < persistent_split`) untouched.
+fn checkMutableOwner(g: Generator&, f: Fn&, container: Val) {
+    if tagOf(g, container.ty) != blot_direct_types::Tag.array { return; }
+    let rt = g.runtime_();
+    lget(g, w(g, container, 0));
+    i32Const(g, rt.layout.persistent_split);
+    op(g, OP_i32_ge_u);
+    let opened = open(g, f, OP_if_);
+    lget(g, w(g, container, 0));
+    lget(g, w(g, container, 1));
+    callf(g, rt.check);
+    op(g, OP_i32_load);
+    uleb(g, 2);
+    uleb(g, blot_direct_runtime::entry_capacity);
+    i32Const(g, blot_direct_runtime::static_pool_flag);
+    op(g, OP_i32_and);
+    trap(g, f);
     close(g, f);
 }
 fn scalarLocal(g: Generator&, f: const Fn&, value: Val, id: u32) -> u32, Error {
@@ -740,7 +769,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_i32_sub);
             op(g, OP_i32_gt_u);
             op(g, OP_i32_or);
-            trap(g, f);
+            trapBounds(g, f, id);
             let handle, _, error = createUninit(g, f, ty, count, id);
             if error != blot_direct_types::Error.none { return handle, error; }
             let zero = constLocal(g, f, 0);
@@ -763,7 +792,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             ltee(g, last);
             lget(g, index);
             op(g, OP_i32_lt_u);
-            trap(g, f);
+            trapBounds(g, f, id);
             let last_address, error = elementAddress(g, f, container, last, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             let address, error = elementAddress(g, f, container, index, id);
@@ -811,6 +840,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             let lanes_value, error = expr(g, f, children[2]);
             if error != blot_direct_types::Error.none { return lanes_value, error; }
+            checkMutableOwner(g, f, container);
             let noted = noteStoreToSlot(g, f, w(g, container, 0), lanes_value);
             if noted != blot_direct_types::Error.none { return neverVal(), noted; }
             var store_addr = address;
@@ -828,6 +858,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 let werr = writeElement(g, f, store_addr, (li as u32) * elem_stride, lv, id);
                 if werr != blot_direct_types::Error.none { return neverVal(), werr; }
             }
+            f.checked_elems_len = 0;
             return container, blot_direct_types::Error.none;
         },
         flatten => {
@@ -1209,7 +1240,7 @@ fn emitStorageViewVal(g: Generator&, f: Fn&, container: Val, start: u32, end: u3
     lget(g, length);
     op(g, OP_i32_gt_u);
     op(g, OP_i32_or);
-    trap(g, f);
+    trapBounds(g, f, id);
     let result, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
     let copied = copyHandle(g, f, container, result, id);
@@ -1485,37 +1516,171 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
 }
 
-recursive fn holdsContainer(g: Generator&, ty: Ty, depth: i64) -> bool {
-    if depth > 32 { return false; }
+recursive fn holdsContainerVisited(g: Generator&, ty: Ty, visited: Ty[64]&, visited_len: i64&) -> bool {
     let n = g.types.node(ty);
     match n.tag {
         array => { return true; },
         tuple => {
-            for at in 0..(n.b as i64) { if holdsContainer(g, g.types.words[n.a + at], depth + 1) { return true; } }
+            for at in 0..(n.b as i64) { if holdsContainerVisited(g, g.types.words[n.a + at], visited, visited_len) { return true; } }
             return false;
         },
         record => {
-            for index in 0..(n.b as i64) { if holdsContainer(g, g.types.recordField(ty, index).ty, depth + 1) { return true; } }
+            for index in 0..(n.b as i64) { if holdsContainerVisited(g, g.types.recordField(ty, index).ty, visited, visited_len) { return true; } }
             return false;
         },
         nominal => {
+            for vi in 0..visited_len { if visited[vi] == ty { return false; } }
+            if visited_len >= 64 { return true; }
+            visited[visited_len] = ty;
+            visited_len += 1;
             let cases, error = g.types.variants(ty);
             if error != blot_direct_types::Error.none { return false; }
             for at in 0..(cases.len as i64) {
                 let payload = g.types.variant_payloads[cases.payloads + at];
-                if payload != ty && holdsContainer(g, payload, depth + 1) { return true; }
+                if holdsContainerVisited(g, payload, visited, visited_len) { return true; }
             }
             return false;
         },
         _ => { return false; },
     }
 }
+fn holdsContainer(g: Generator&, ty: Ty, depth: i64) -> bool {
+    var visited: Ty[64] = [0; 64];
+    var visited_len: i64 = 0;
+    return holdsContainerVisited(g, ty, visited, visited_len);
+}
+
+// Emit a memoized recursive Wasm helper `deep_copy_nom(old_ptr: i32) -> new_ptr: i32`
+// for recursive nominal types so deep copying arbitrary-depth recursive ADTs never
+// truncates at a compile-time recursion cutoff or blows up code size.
+recursive fn ensureDeepCopyNomHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Error {
+    let key = blot_direct_emit::key64(ty, 1);
+    let existing, found = g.s.deep_copy_helpers.get(key);
+    if found { return existing, blot_direct_types::Error.none; }
+    let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
+    g.s.deep_copy_helpers.put(key, fn_id);
+    let s .= g.s;
+    let code_mark = s.code.len;
+    let sites_mark = blot_direct_relocations::mark();
+    let locals_mark = s.locals.len;
+    let labels_mark = s.labels.len;
+    let handles_mark = s.handles.len;
+    let handle_cells_mark = s.handle_cells_len;
+    var nf = newFn(g, unit, 0);
+    let old_ptr = local(g, nf, VT_i32);
+    nf.parameter_words = 1;
+    lget(g, old_ptr);
+    op(g, OP_i32_eqz);
+    let z_if = open(g, nf, OP_if_);
+    i32Const(g, 0);
+    op(g, OP_return_);
+    close(g, nf);
+    let old_val = valOf1(g, ty, old_ptr);
+    let copied, cerr = deepCopyNominalInline(g, nf, old_val, ty, 0, 0);
+    if cerr != blot_direct_types::Error.none {
+        blot_direct_relocations::rewind(sites_mark);
+        s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
+        return 0, cerr;
+    }
+    lget(g, w(g, copied, 0));
+    op(g, OP_end);
+    finishWith(g, fn_id, nf, false, 0, 0, 0);
+    blot_direct_relocations::rewind(sites_mark);
+    s.code.resize(code_mark);
+    s.locals.resize(locals_mark);
+    s.labels.resize(labels_mark);
+    s.handles.resize(handles_mark);
+    s.handle_cells_len = handle_cells_mark;
+    return fn_id, blot_direct_types::Error.none;
+}
+
+recursive fn deepCopyNominalInline(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, depth: i64) -> Val, Error {
+    let cases, error = g.types.variants(ty);
+    if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+    if cases.len == 1 {
+        let vtag = g.types.variant_tags[cases.tags];
+        let payload_ty = g.types.variant_payloads[cases.payloads];
+        let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        return wrapVariant(g, f, ty, vtag, copied, id);
+    }
+    let result, error = fresh(g, f, ty, id);
+    if error != blot_direct_types::Error.none { return result, error; }
+    let vtag_local = local32(g, f);
+    lget(g, w(g, value, 0));
+    let boxed, error = isBoxed(g, f, ty, id);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if boxed { memoryOp(g, OP_i32_load, 0); }
+    lset(g, vtag_local);
+    let exit = open(g, f, OP_block);
+    for pos in 0..(cases.len as i64) {
+        let vtag = g.types.variant_tags[cases.tags + pos];
+        let payload_ty = g.types.variant_payloads[cases.payloads + pos];
+        let next = open(g, f, OP_block);
+        lget(g, vtag_local);
+        i32Const(g, vtag);
+        op(g, OP_i32_ne);
+        br(g, f, OP_br_if, next);
+        let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let wrapped, error = wrapVariant(g, f, ty, vtag, copied, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let stored = copy(g, f, wrapped, result, id);
+        if stored != blot_direct_types::Error.none { return neverVal(), stored; }
+        br(g, f, OP_br, exit);
+        close(g, f);
+    }
+    op(g, OP_unreachable_);
+    close(g, f);
+    return result, blot_direct_types::Error.none;
+}
 
 recursive fn deepCopyValue(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, depth: i64) -> Val, Error {
-    if depth > 32 || value.ty == blot_direct_types::never { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
+    if value.ty == blot_direct_types::never { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
+    if depth > 256 { return neverVal(), g.fail(g.units[f.unit - 1], id, "deep copy type nesting exceeds 256"); }
     let tag = tagOf(g, ty);
     if tag == blot_direct_types::Tag.array {
-        return copyContainer(g, f, value, ty, id);
+        let elem_ty, error = elementOf(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if !holdsContainer(g, elem_ty, 0) {
+            return copyContainer(g, f, value, ty, id);
+        }
+        let length, error = lengthOf(g, f, value, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let handle, dst_base, error = createUninit(g, f, ty, length, id);
+        if error != blot_direct_types::Error.none { return handle, error; }
+        let step, error = stride(g, f, elem_ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let src_base, _ = ensureCheckedArray(g, f, value);
+        let idx = constLocal(g, f, 0);
+        let exit = open(g, f, OP_block);
+        let top = open(g, f, OP_loop);
+        lget(g, idx);
+        lget(g, length);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, exit);
+        let src_addr = emitOffsetAddress(g, f, src_base, idx, step);
+        let elem_val, error = loadElement(g, f, src_addr, 0, elem_ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let copied_elem, error = deepCopyValue(g, f, elem_val, elem_ty, id, depth + 1);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let dst_addr = emitOffsetAddress(g, f, dst_base, idx, step);
+        let noted = noteStoreToSlot(g, f, w(g, handle, 0), copied_elem);
+        if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+        let written = writeElement(g, f, dst_addr, 0, copied_elem, id);
+        if written != blot_direct_types::Error.none { return neverVal(), written; }
+        lget(g, idx);
+        i32Const(g, 1);
+        op(g, OP_i32_add);
+        lset(g, idx);
+        br(g, f, OP_br, top);
+        close(g, f);
+        close(g, f);
+        return handle, blot_direct_types::Error.none;
     }
     if !holdsContainer(g, ty, 0) { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
     if tag == blot_direct_types::Tag.record {
@@ -1587,48 +1752,18 @@ recursive fn deepCopyValue(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, d
         return Val { ty, start, words_count }, blot_direct_types::Error.none;
     }
     if tag == blot_direct_types::Tag.nominal {
-        let cases, error = g.types.variants(ty);
-        if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
-        if cases.len == 1 {
-            let vtag = g.types.variant_tags[cases.tags];
-            let payload_ty = g.types.variant_payloads[cases.payloads];
-            let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            return wrapVariant(g, f, ty, vtag, copied, id);
+        let is_rec, rerr = g.types.isRecursive(ty);
+        if rerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        if is_rec {
+            let fn_id, herr = ensureDeepCopyNomHelper(g, f.unit, ty);
+            if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+            lget(g, w(g, value, 0));
+            callf(g, fn_id);
+            f.allocates = true;
+            f.allocations += 1;
+            return pop(g, f, ty, id);
         }
-        let result, error = fresh(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return result, error; }
-        let vtag_local = local32(g, f);
-        lget(g, w(g, value, 0));
-        let boxed, error = isBoxed(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        if boxed { memoryOp(g, OP_i32_load, 0); }
-        lset(g, vtag_local);
-        let exit = open(g, f, OP_block);
-        for pos in 0..(cases.len as i64) {
-            let vtag = g.types.variant_tags[cases.tags + pos];
-            let payload_ty = g.types.variant_payloads[cases.payloads + pos];
-            let next = open(g, f, OP_block);
-            lget(g, vtag_local);
-            i32Const(g, vtag);
-            op(g, OP_i32_ne);
-            br(g, f, OP_br_if, next);
-            let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let wrapped, error = wrapVariant(g, f, ty, vtag, copied, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let stored = copy(g, f, wrapped, result, id);
-            if stored != blot_direct_types::Error.none { return neverVal(), stored; }
-            br(g, f, OP_br, exit);
-            close(g, f);
-        }
-        op(g, OP_unreachable_);
-        close(g, f);
-        return result, blot_direct_types::Error.none;
+        return deepCopyNominalInline(g, f, value, ty, id, depth);
     }
     return Val { ty, value.start, value.len }, blot_direct_types::Error.none;
 }

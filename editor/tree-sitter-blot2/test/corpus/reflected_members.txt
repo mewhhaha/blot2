@@ -1,0 +1,63 @@
+==================
+Reflected field access and updates parse cleanly
+==================
+
+func bump (val: t) -> (arr: #[t]): U32 =>
+  #for field in #fields t:
+    let x = val.(field)
+    val.(field) := x
+    arr[0].(field) := val.(f1).(f2)
+  return 0
+
+---
+
+(source_file
+  (named_function_header
+    (identifier)
+    (parenthesized
+      (identifier)
+      (separator)
+      (identifier))
+    (parenthesized
+      (identifier)
+      (separator)
+      (array
+        (identifier))))
+  (separator)
+  (type_identifier)
+  (operator)
+  (staging_marker)
+  (identifier)
+  (keyword)
+  (staging_marker)
+  (identifier)
+  (separator)
+  (binding_keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (reflected_member
+    (parenthesized
+      (identifier)))
+  (identifier)
+  (reflected_member
+    (parenthesized
+      (identifier)))
+  (operator)
+  (identifier)
+  (identifier)
+  (bracketed
+    (integer))
+  (reflected_member
+    (parenthesized
+      (identifier)))
+  (operator)
+  (identifier)
+  (reflected_member
+    (parenthesized
+      (identifier)))
+  (reflected_member
+    (parenthesized
+      (identifier)))
+  (keyword)
+  (integer))

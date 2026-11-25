@@ -1,0 +1,37 @@
+import * as test from "std/test"
+import * as simd from "std/simd"
+import { Vec2, Vec3 } from "std/vector"
+
+private func vector_checks (): Unit ! { test.Test } =>
+  let big2 = ($Vec2 { x: 1e30, y: 0.0 }).normalized
+  use test.eq "Vec2 huge x" 1.0 big2.x
+  use test.eq "Vec2 huge y" 0.0 big2.y
+  let small2 = ($Vec2 { x: 1e-30, y: 0.0 }).normalized
+  use test.eq "Vec2 tiny x" 1.0 small2.x
+  use test.eq "Vec2 tiny y" 0.0 small2.y
+  let (subnormal, _, _, _) = simd.f32_from_bits (1, 0, 0, 0)
+  let sub2 = ($Vec2 { x: 0.0, y: subnormal }).normalized
+  use test.eq "Vec2 subnormal x" 0.0 sub2.x
+  use test.eq "Vec2 subnormal y" 1.0 sub2.y
+  let zero2 = ($Vec2 { x: 0.0, y: 0.0 }).normalized
+  use test.eq "Vec2 zero x" 0.0 zero2.x
+  use test.eq "Vec2 zero y" 0.0 zero2.y
+  let unit2 = ($Vec2 { x: 3.0, y: 4.0 }).normalized
+  use test.near "Vec2 3-4 x" 1e-6 0.6 unit2.x
+  use test.near "Vec2 3-4 y" 1e-6 0.8 unit2.y
+  let nan = F32.div 0.0 0.0
+  let nan2 = ($Vec2 { x: nan, y: 1.0 }).normalized
+  use test.holds_not "Vec2 NaN propagates" (F32.eq nan2.x nan2.x)
+  let inf = F32.div 1.0 0.0
+  let inf2 = ($Vec2 { x: inf, y: 0.0 }).normalized
+  use test.holds_not "Vec2 Inf x is NaN" (F32.eq inf2.x inf2.x)
+  use test.eq "Vec2 Inf y is 0.0" 0.0 inf2.y
+  let big3 = ($Vec3 { x: 0.0, y: 1e30, z: 0.0 }).normalized
+  use test.eq "Vec3 huge y" 1.0 big3.y
+  let small3 = ($Vec3 { x: 0.0, y: 0.0, z: -1e-30 }).normalized
+  use test.eq "Vec3 tiny z" (-1.0) small3.z
+  let zero3 = ($Vec3 { x: 0.0, y: 0.0, z: 0.0 }).normalized
+  use test.eq "Vec3 zero z" 0.0 zero3.z
+  return ()
+
+#entry func test_vector (): test.Report => test.run vector_checks

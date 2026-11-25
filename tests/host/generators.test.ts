@@ -219,6 +219,97 @@ func vec_value (info: VecInfo): F32 => return info.pos[1]
     }
   }));
 
+Deno.test("WGSL generator preserves exact unsuffixed U32 constants, scientific floats, and rejects reserved Blot keywords", () =>
+  workspace(async (root) => {
+    const entry = root + "/main.blot";
+    const input = root + "/shader.wgsl";
+    const compiler = await createCompiler({
+      executable,
+      entry,
+      assets: {
+        "./shader.wgsl": {
+          path: input,
+          parser: createBlotGenerator({
+            executable,
+            generator: new URL("wgsl_gen.blot", examples),
+            inputMode: "text",
+          }),
+        },
+      },
+    });
+    try {
+      const built = await compiler.build({
+        sources: {
+          [entry]:
+            `import { exactly, eps, scale, half, whole_f } from "./shader.wgsl"
+#entry func exact_u32 (): U32 => return exactly
+#entry func sci_small (): F32 => return eps
+#entry func sci_neg (): F32 => return scale
+#entry func suffix_f (): F32 => return half + whole_f
+`,
+        },
+        assetSources: {
+          "./shader.wgsl": `const exactly = 16777217;
+const eps = 1e-6;
+const scale = -2.5E+2;
+const half = 0.5f;
+const whole_f = 2f;
+`,
+        },
+      });
+      equal(
+        await calls(built, "exact_u32", "sci_small", "sci_neg", "suffix_f"),
+        [16777217, Math.fround(1e-6), -250, 2.5],
+      );
+      checkAssetError(
+        await compiler.build({
+          sources: {
+            [entry]:
+              'import { bad } from "./shader.wgsl"\n#entry func run () => return bad\n',
+          },
+          assetSources: { "./shader.wgsl": "const bad = 4294967296;\n" },
+        }),
+        input,
+        /Unsupported WGSL constant value for bad/,
+      );
+      checkAssetError(
+        await compiler.build({
+          sources: {
+            [entry]:
+              'import { bad } from "./shader.wgsl"\n#entry func run () => return bad\n',
+          },
+          assetSources: { "./shader.wgsl": "const bad = -5;\n" },
+        }),
+        input,
+        /Unsupported WGSL constant value for bad/,
+      );
+      checkAssetError(
+        await compiler.build({
+          sources: {
+            [entry]:
+              'import { Bad } from "./shader.wgsl"\n#entry func run (): U32 => return 0\n',
+          },
+          assetSources: { "./shader.wgsl": "struct Bad { spark: f32 };\n" },
+        }),
+        input,
+        /WGSL field 'spark' in Bad collides with a reserved Blot keyword/,
+      );
+      checkAssetError(
+        await compiler.build({
+          sources: {
+            [entry]:
+              'import { fork } from "./shader.wgsl"\n#entry func run (): U32 => return 0\n',
+          },
+          assetSources: { "./shader.wgsl": "const fork = 1u;\n" },
+        }),
+        input,
+        /WGSL constant 'fork' collides with a reserved Blot keyword/,
+      );
+    } finally {
+      await compiler.dispose();
+    }
+  }));
+
 Deno.test("CSV generator embeds typed rows, decimal speed and quoted Unicode names in Wasm", () =>
   workspace(async (root) => {
     const entry = root + "/main.blot";

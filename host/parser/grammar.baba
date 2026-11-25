@@ -46,7 +46,7 @@ attribute_name = ("[" value:expression "]") ;
 entry_modifier = ("#" "entry") ;
 value_declaration = (modifier:entry_modifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
 named_function_declaration = (modifier:entry_modifier? value:named_function) ;
-named_function = ("func" name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:suite | body:expression)) ;
+named_function = ("func" name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:suite | body:rebinding | body:effect_step | body:expression)) ;
 function_name = (root:source_identifier rest:("." (source_identifier | TYPE_IDENT))* | root:TYPE_IDENT rest:("." (source_identifier | TYPE_IDENT))+) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom* ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
@@ -64,7 +64,7 @@ qualified_name = (root:(source_identifier | TYPE_IDENT) rest:("." (source_identi
 parameter = (name:source_identifier | "(" (typed:typed_parameter | pattern:pattern)? ")") ;
 typed_parameter = (name:source_identifier ":" annotation:type_expression where:where_clause?) ;
 type_array = ("[" (elements:type_expression ("," elements:type_expression)* ","?)? "]") ;
-type_symbol_array = ("#" "[" modifier:("+" | "~")? first:type_expression (";" second:type_expression)? "]") ;
+type_symbol_array = ("#" "[" modifier:("+" | "~")? first:(INTEGER | type_expression) (";" second:type_expression)? "]") ;
 type_record = ("{" LAYOUT_NEWLINE? (fields:type_field (("," LAYOUT_NEWLINE? | LAYOUT_NEWLINE) fields:type_field)* ("," LAYOUT_NEWLINE? | LAYOUT_NEWLINE)?)? "}") ;
 type_field = (attributes:declaration_attribute* name:source_identifier (":" value:type_expression ("=" default:expression)?)?) ;
 type_expression = (head:type_application results:("->" type_application)* effects:effect_row?) ;
@@ -95,8 +95,8 @@ usage_type = (kind:("own" | "unique" | "shared" | "once" | "many" | "cleanup" | 
 type_binder = ("(" name:source_identifier ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
-expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | receive | infix_expression)) ;
-lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:suite | body:rebinding | body:expression)) ;
+expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | fork_statement | comptime_for | comptime_if | receive | infix_expression)) ;
+lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:suite | body:rebinding | body:effect_step | body:expression)) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
 infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "|" | "and" | "or" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
@@ -118,7 +118,7 @@ if_expression = ("if" condition:infix_expression "then" consequence:expression "
 record = (name:qualified_name fields:record_values) ;
 record_values = ("{" LAYOUT_NEWLINE? (fields:record_value ("," LAYOUT_NEWLINE? fields:record_value)* ","?)? LAYOUT_NEWLINE? "}") ;
 record_value = (name:source_identifier (":" value:expression)?) ;
-group = ("(" (value:expression ("," value:expression)*)? ")") ;
+group = ("(" (value:expression ("," value:expression)* ","?)? ")") ;
 list = ("[" (elements:collection_expression ("," elements:collection_expression)* ","?)? "]") ;
 array = ("#" "[" (elements:collection_expression ("," elements:collection_expression)* ","?)? "]") ;
 collection_open = ("#"? "[") ;
@@ -141,11 +141,11 @@ constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:rec
 // Braces after a constructor always name its fields, never a record payload.
 constructor_payload = (source_identifier | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_pattern) ;
 qualified_constructor = (((source_identifier | TYPE_IDENT) ".")+ TYPE_IDENT) ;
-pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
+pattern_group = ("(" (value:pattern ("," value:pattern)* ","?)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:source_identifier (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(named_function | binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | fork_statement | with_statement | comptime_for | comptime_if | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(named_function | binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | with_statement | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 fork_statement = ("fork" targets:source_identifier ("," targets:source_identifier)* ":" body:suite) ;
 with_statement = ("with" entries:with_entry ("," entries:with_entry)* ":" body:suite) ;
 with_entry = (target:type_application ("=" handler:expression)?) ;
@@ -153,7 +153,7 @@ comptime_for = ("#" "for" name:source_identifier "in" "#" kind:("fields" | "vari
 comptime_if = ("#" "if" condition:expression ":" consequence:suite fallback:comptime_else?) ;
 comptime_else = (LAYOUT_NEWLINE? "#" "else" ":" alternative:suite) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
-rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
+rebinding = (name:source_identifier path:(member_access | comptime_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
 slice_access = ("[" start:expression ".." end:expression "]") ;
 for_statement = ("for" "let"? pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;

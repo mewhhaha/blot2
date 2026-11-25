@@ -2874,6 +2874,7 @@ fn tryEmitVectorReductionLoop(
                     red_kind[r_idx] = 1;
                 } else if rn.tag == blot_check_core::Tag.constant && rn.a == 1 && !red_is_xor[r_idx] {
                     red_kind[r_idx] = 2;
+                    red_rhs_id[r_idx] = rhs;
                 } else if rn.tag == blot_check_core::Tag.constant {
                     red_kind[r_idx] = 3;
                     red_rhs_id[r_idx] = rhs;
@@ -2921,6 +2922,11 @@ fn tryEmitVectorReductionLoop(
         }
     }
     if !matched { return blot_direct_types::Error.none; }
+    if is_masked {
+        for ri in 0..red_count {
+            if red_kind[ri] == 2 { blot_direct_relocations::unpatchableOperand(g.units[f.unit - 1].unit, red_rhs_id[ri]); }
+        }
+    }
 
     let av, _ = bindGet(g, f, arr_b);
     let arr_base, arr_len = ensureCheckedArray(g, f, av);
@@ -3263,6 +3269,7 @@ recursive fn emitVec3F32Expr(
 ) {
     let n = m.node(id);
     if n.tag == blot_check_core::Tag.constant {
+        blot_direct_relocations::unpatchableOperand(m.unit, id);
         v128Const4(g, n.a);
         return;
     }
@@ -3726,11 +3733,13 @@ fn tryEmitVectorEscapeLoop(
 
         // Verify `it` is initialized to constant 0 in the prelude!
         var it_pre_idx: i64 = -1;
+        var it_init_node: u32 = 0;
         for pi in 0..pre_len {
             if pre_b[pi] == ic_incoming[it_ci] {
                 let en = m.node(pre_expr[pi]);
                 if en.tag == blot_check_core::Tag.constant && en.a == 0 {
                     it_pre_idx = pi;
+                    it_init_node = pre_expr[pi];
                     pre_skip[pi] = true;
                 }
                 break;
@@ -3795,6 +3804,7 @@ fn tryEmitVectorEscapeLoop(
 
         var found_exit = false;
         var found_it_inc = false;
+        var it_inc_node: u32 = 0;
         for si in 1..ich.len {
             let sn = m.node(ich[si]);
             if sn.tag == blot_check_core::Tag.if_stmt && sn.c == 0 && isBreakBody(m, sn.b) {
@@ -3813,6 +3823,7 @@ fn tryEmitVectorEscapeLoop(
                     if !found_exit || found_it_inc || !matchVarPlusConstOne(m, sn.b, ic_iter[it_ci]) {
                         return blot_direct_types::Error.none;
                     }
+                    it_inc_node = sn.b;
                     found_it_inc = true;
                 } else {
                     let bty, bok = lowerInEnv(g, m, m.typeOf(sn.b), f.env);
@@ -3872,6 +3883,8 @@ fn tryEmitVectorEscapeLoop(
         for hi in 0..plan.hoisted_len {
             if plan.hoisted[hi].node_id == total_iter { return blot_direct_types::Error.none; }
         }
+        blot_direct_relocations::unpatchableOperand(m.unit, it_init_node);
+        markUnpatchableExprConstants(m, it_inc_node, 0);
         matched = true;
     }
     if !matched { return blot_direct_types::Error.none; }
@@ -4330,12 +4343,14 @@ fn tryEmitAffineInitLoop(
         };
         plan.locals_len = 1;
 
+        var step_expr_id: u32[2] = [0; 2];
         var cur_s = s_iter;
         for step in 0..k_steps {
             let bs = m.node(ch[step * 2]);
             if bs.tag != blot_check_core::Tag.bind || bs.c >= 2 { return blot_direct_types::Error.none; }
             let ok, ma, mc = matchAffineU32Step(m, bs.b, cur_s);
             if !ok { return blot_direct_types::Error.none; }
+            step_expr_id[step] = bs.b;
             if step == 0 { a1 = ma; c1 = mc; }
             else if ma != a1 || mc != c1 { return blot_direct_types::Error.none; }
             s_step_b[step] = bs.a;
@@ -4384,6 +4399,7 @@ fn tryEmitAffineInitLoop(
         for hi in 0..plan.hoisted_len {
             if plan.hoisted[hi].node_id == s_iter { return blot_direct_types::Error.none; }
         }
+        for step in 0..k_steps { markUnpatchableExprConstants(m, step_expr_id[step], 0); }
         matched = true;
     }
     if !matched { return blot_direct_types::Error.none; }
@@ -4960,6 +4976,9 @@ fn tryEmitAosF32RecordLoop(
             let be, beerr = elementOf(g, f, bv.ty, loop_id);
             if beerr != blot_direct_types::Error.none || be != elem_ty { g.dropFailure(); return blot_direct_types::Error.none; }
             srcB_val = bv;
+        }
+        if mode >= 3 && scale_is_const {
+            for lane in 0..k { markUnpatchableExprConstants(m, lane_exprs[lane], 0); }
         }
         matched = true;
     }

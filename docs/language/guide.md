@@ -29,9 +29,13 @@ qualification.
 - **Speculative undo scopes:** `fork x:` borrows linear `x` mutably inside an
   indented suite, logs writes, and restores `x` on exit (rejecting `Foreign`
   effects inside `fork`).
-- **Typed compile-time introspection:** `for #field in #fields T:` and
-  `#variants T` unroll over a concrete record/sum type's fields or variants,
-  with `val.(field)` field access and `#if` compile-time conditionals.
+- **Typed compile-time introspection:** `#for field in #fields T:` and
+  `#for variant in #variants T:` unroll over a concrete record/sum type's
+  fields or variants, supporting `val.(field)` reads, `val.(field) := expr`
+  updates, `#if` / `#else` compile-time conditionals, field metadata
+  (`field.name`, `field.index`, `field.has_default`, `field.default`,
+  `field.has_tag`, `field.tag`), and expression-position reflected record
+  builders (`let built: T = #for field in #fields T: ... break value`).
 
 ## Commands
 
@@ -159,7 +163,7 @@ func apply_twice transform => return func value => return transform (transform v
     break 1
   break value * factorial (value - 1)
 
-#entry func offset value => return value + 1.0
+#entry func offset (value: F32): F32 => return value + 1.0
 #entry func answer (value: F32) : F32 => return apply_twice offset (twice value)
 #entry let delayed = func () => return (func () => return factorial 5) ()
 ```
@@ -347,7 +351,7 @@ type Candidate is data = $Keep U32 | $Skip
 
 #entry func weighted () => return do:
   let total = 0
-  for (value, weight) in [(2, 3), (4, 5)]:
+  for (value, weight) in #[(2, 3), (4, 5)]:
     total := self + value * weight
   break total
 
@@ -371,7 +375,7 @@ Constructors use `$` in declarations, expressions and patterns:
 `type Choice is data = $Some U32 | $None` and `$Some 42`. Booleans use plain
 `true` and `false`, without a constructor marker. Keep `$` adjacent to the
 constructor name. A spaced `f $ value` remains ordinary operator application.
-Arrays keep their `#[...]` spelling and lists use `[...]`.
+Arrays keep their `#[...]` spelling.
 
 A type or effect constructor takes at most one argument pattern. Use a list,
 tuple, or record to bind several types. These shapes can nest; record arguments
@@ -544,33 +548,21 @@ and each index are evaluated once, left to right, before the replacement; `self`
 is the old value at the selected leaf. Existing aliases keep the old root. As
 with plain `:=`, the replacement must be pure; use `use` first for effects. A
 path that reaches an array updates that storage in place, so its root must be
-unique; otherwise store with `=` ([Stores and successors](#stores-and-successors)).
+unique (see [Owned updates and copies](#owned-updates-and-copies)).
 
-`std/path` packages pure getters and setters as
-`Path source target focus replacement`. `make read write` constructs a path,
-`get path source` reads its focus, and `set path replacement source` returns the
-target. `modify path transform source` applies the transform once to the old
-focus; the transform may perform effects. Each ordinary argument evaluates once,
-left to right. Paths construct successors, so existing aliases and untouched
-fields, including callbacks, keep their values.
-
-`compose outer inner` selects the inner focus within the outer focus. Setters
-rebuild from the inner target outward, allowing the replacement and enclosing
-record types to change. `identity` selects the whole value. These are ordinary
-source functions; custom getters and setters must be pure, and the type checker
-checks their common source type and every composition boundary.
+Nested path updates rebuild records cleanly while preserving existing aliases
+and even changing a field's type:
 
 ```blot
-import * as path from "std/path"
-const position = path.make (func source => return source.position)
-  (func replacement => return func source => return @record.merge source { position: replacement })
-const x = path.make (func source => return source.x)
-  (func replacement => return func source => return @record.merge source { x: replacement })
-const position_x = path.compose position x
-#entry func answer () => return do:
+func set_position_x (replacement: F32) -> (source: { position: { x: U32, y: U32 }, health: U32 }) =>
+  let updated = source
+  updated.position.x := replacement
+  return updated
+
+#entry func answer (): F32 =>
   let original = { position: { x: 40, y: 7 }, health: 2 }
-  let changed = path.set position_x 2.5 original
-  break @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
+  let changed = set_position_x 2.5 original
+  return @f32.add changed.position.x (@u32.to_f32 original.health)
 ```
 
 Generic functions depending on dispatch monomorphize at their uses before const
@@ -621,56 +613,47 @@ func twice value => return value + value
   $Box result => result
 ```
 
-## Lists, arrays, and libraries
+## Arrays and libraries
 
-Lists and arrays are distinct homogeneous types. `[]`, `[1, 2]`, and
-`[[1], [2]]` construct `List` values. `#[]` and `#[1, 2]` construct `Array`
-values. Use `List T` and `Array T` in annotations. Passing one to a function
-expecting the other is a type error. Explicit conversions copy elements;
-conversion support depends on the selected backend. List syntax and constant
-evaluation remain available, but general runtime Lists are not promised by the
-owned-storage profile.
+Arrays are the single homogeneous collection type. `#[]`, `#[1, 2]`, and
+`#[#[1], #[2]]` construct owned `#[T]` (`Array T`) values. Fixed-length arrays
+use `#[N; T]` (or `#[n; T]` to tie equal lengths across parameters), read-only
+borrowed slices use `&[T]` (`View T`), and frozen shared handles use `*T` (via
+`freeze value`).
 
-Arrays have contiguous checked row storage. `#[T]` (`Array T`) fixes the extent
-while allowing element writes; `#[+T]` (`GrowArray T`) permits append, `#[~T]`
-(`ResizeArray T`) also permits shrinking, `#[n; T]` ties equal lengths across
-arrays, and `&[T]` (`View T`) is a read-only borrowed slice. Named payload
-owners and fixed spans replace arrays of fresh owning child collections. Reads
-of inline scalar/record rows copy their values; owner and borrowed descriptors
-retain aliases. Copy payloads explicitly (`values.copy`) when retaining an
-independent version. Exact layout and lifetime support is in
-[the owned-storage profile](../compiler/SCOPED_STORAGE.md) and
-[docs/language/spec.md](spec.md).
+Arrays have contiguous checked row storage. An owned `#[T]` supports in-place
+element updates (`values[index] := replacement`), growth and truncation
+(`@storage.push`, `@storage.pop`, `@storage.truncate`), and explicit copies
+(`values.copy`). Reads of inline scalar/record rows copy their values; owner
+and borrowed descriptors retain aliases. Copy payloads explicitly
+(`values.copy`) when retaining an independent version. Exact layout and
+lifetime support is in [the owned-storage profile](../compiler/SCOPED_STORAGE.md)
+and [docs/language/spec.md](spec.md).
 
-Both types have ordinary prelude members `values.length` and `values.is_empty`.
-Only arrays support `values[index]`, the store `values[index] = replacement`,
-`values[index] := replacement` on a unique root, `values.copy`, `get`, and
-`set`. Lists use `for`, comprehensions, `map`, `filter`, and folds; convert with
-`Array.from_list` when positional access is required. Generic indexing therefore
-infers an Array argument, while generic traversal accepts either type. Lengths
-and indices use U32. Indexing binds more tightly than application:
+Arrays and views share ordinary prelude members `values.length` and
+`values.is_empty`. Owned arrays support `values[index]`, `values[index] :=
+replacement` on a unique root, `values.copy`, `get`, and `set`. Lengths and
+indices use `U32`. Indexing binds more tightly than application:
 `f values[index]` passes the element to `f`. Separate an array argument with a
 space (`f #[1]`), or write `f(#[1])`.
 
-Spreads append or prepend while preserving written evaluation order:
+Spreads append or prepend elements into a fresh array while preserving written
+evaluation order:
 
 ```blot
-func prepend value => return func values => return [value, ...values]
-func append value => return func values => return [...values, value]
-func surrounded values => return [0, ...values, 99]
-func append_array value => return func values => return #[...values, value]
+func prepend (value: U32) -> (values: #[U32]): #[U32] => return #[value, ...values]
+func append (value: U32) -> (values: #[U32]): #[U32] => return #[...values, value]
+func surrounded (values: #[U32]): #[U32] => return #[0, ...values, 99]
 ```
 
-The spread operand must have the same collection type as the result. One spread
-is allowed, with any number of prefix and suffix elements. The cons form
-`[head | tail]` is also accepted.
+One spread is allowed, with any number of prefix and suffix elements.
 
-Comprehensions construct the collection selected by their opening bracket:
+Comprehensions construct owned arrays with `#[...]`:
 
 ```blot
-const squares: List U32 = [x * x | x <- [1, 2, 3]]
-const pairs: Array U32 = #[x * 10 + y | x <- [1, 2], y <- #[3, 4]]
-const selected = [square | x <- [1, 2, 3], x > 1, let square = x * x]
+const squares: #[U32] = #[x * x | x <- #[1, 2, 3]]
+const pairs: #[U32] = #[x * 10 + y | x <- #[1, 2], y <- #[3, 4]]
+const selected: #[U32] = #[square | x <- #[1, 2, 3], x > 1, let square = x * x]
 ```
 
 Generators run from left to right, with the leftmost as the outer loop. Later
@@ -703,59 +686,29 @@ const Countdown.next = func (cursor: Countdown) => return do:
 ```
 
 Both operations may have effects. Each pull happens before the corresponding
-body, and `break` or `return` stops further pulls. Nested loops and
-`do (monad Maybe)` retain their normal control flow. Array/list loops and
-numeric ranges keep their direct traversal paths.
+body, and `break` or `return` stops further pulls. Array loops and numeric
+ranges keep their direct traversal paths.
 
 A cursor keeps its own traversal position; copying a cursor does not advance the
 original. In the owned profile an Array cursor reads the same owner rather than
 preserving an independent payload snapshot. Borrow and mutation checks still
-apply. Copy the input first when traversal needs an earlier version. The
-low-level operations `@cursor.has cursor`, `@cursor.value cursor` and
-`@cursor.advance cursor` provide sequential traversal; value/advance on an
-exhausted cursor trap. They do not add indexing to List.
+apply. Copy the input first when traversal needs an earlier version.
 
-`std/iter` supplies ordinary source functions. Adapters take the iterable last:
+`std/array` provides structural and higher-order array operations with the
+collection last for pipelines:
 
 ```blot
-import * as iter from "std/iter"
-func selected count => return
-  iter.collect_list (iter.take count
-    (iter.map (func value => return value * 2)
-      (iter.filter (func value => return value > 2) [1, 2, 3, 4, 5])))
+import * as array from "std/array"
+
+#entry func answer (): U32 =>
+  let joined = array.concat #[1, 2, 3] #[4, 5]
+  let middle = array.slice 1 3 joined       // #[2, 3, 4]
+  let doubled = array.map (func value => value * 2) (array.filter (func value => value > 2) middle)
+  return array.fold_left U32.add 0 doubled  // (3 + 4) * 2 = 14
 ```
 
-The module includes `range start end`, `map`, `filter`, `take`, `take_while`,
-`drop`, `enumerate`, `zip`, `zip_strict`, `windows`, `fold_left`, `any`,
-`all`, `find`, `position`, `collect_list` and `collect_array`.
-`drop count values` skips up to count items on its first pull and traverses
-the rest in order. `find predicate values` returns the first matching value
-and `position predicate values` its zero-based U32 position in the traversal.
-Both return `$Nothing` when there is no match, propagate callback effects and
-stop pulling after a match. `take 0` never pulls its input. `zip` stops
-when either input ends and polls left before right; if the right ends first, one
-unpaired left value may have been consumed. `zip_strict` polls both and traps on
-unequal lengths. `windows width input` requires positive width and returns only
-complete sliding List windows. Saved List values remain immutable. These
-pipelines compose explicit traversal; owned-profile support still follows the
-checked cursor and layout rules.
-
-`std/list` provides structural operations with the collection last:
-
-```blot
-import * as list from "std/list"
-const joined = list.concat [1, 2, 3] [4, 5]
-const middle = list.slice 1 3 joined       // [2, 3, 4]
-const halves = list.split_at 2 joined      // ([1, 2], [3, 4, 5])
-const prefix = list.take 20 joined         // clamps to the length
-const suffix = list.drop 2 joined          // [3, 4, 5]
-```
-
-`slice start count` and `split_at index` check their ranges; `take` and `drop`
-clamp. `@list.concat` and `@list.slice` provide the underlying operations.
-`std/array` also exposes `concat` and `slice`, which copy selected elements into
-independent storage. Preserve separately borrowed payload lifetimes when the
-copied elements contain descriptors.
+`array.concat` and `array.slice start count` copy selected elements into
+independent storage.
 
 Direct array reads and updates check bounds at runtime and fail during constant
 evaluation for an invalid index. `values.get(index)` returns `$Some value` or
@@ -765,11 +718,10 @@ such as `if index < values.length:` is also useful. Direct accesses keep their
 bounds checks inside guards; no proof token is required.
 
 `@array.length`, `@array.get`, and `@array.set` are the underlying array
-primitives. Lists have `@list.length`, but no `@list.get` or `@list.set`.
-`@array.fill count value` evaluates the fill value once;
+primitives. `@array.fill count value` evaluates the fill value once;
 `@array.generate count generator` calls a pure `U32 -> T` generator in ascending
-index order. Lists also have `@list.fill` and `@list.generate`. Empty
-collections can need a `List T` or `Array T` annotation.
+index order. Empty array literals `#[]` can need an explicit `#[T]` (`Array T`)
+annotation.
 
 `array.flatten ranges payload` copies selected ranges from one readable payload
 into an independent destination. Each range has `start` and `count` fields;
@@ -876,9 +828,9 @@ taken to be unique either:
   returns. Implementations are held to it.
 
 A result whose type owns no array is not checked: a number, a view, a
-function, a type variable. Growable storage (`GrowArray`, `ResizeArray`)
-is owned like an array: a function that returns one returns its own, and
-an `own` parameter of that type takes a growable array nothing else holds.
+function, a type variable. Every owned array `#[T]` (`Array T`) follows these
+rules: a function returning one returns its own, and an `own` parameter takes
+an array nothing else holds.
 
 **Names that borrow.** Binding a name to something a local still holds
 shares it only while the name is in use:
@@ -941,14 +893,13 @@ let mine = (grid.at 0).copy  // an array of its own; grid stays unique
 Such a function cannot be used as a value, or applied partly, where the
 variable is an array (`lent_result_value`): pass a function that copies.
 
-**Growable storage and kept values.** Values pushed into growable storage the
-function does not own, written via `@simd.store`, or passed to an effect
-operation (whose handler may keep them) must hold no borrowed arrays: passing a
-borrowed parameter or part of one is `kept_value`; pass `values.copy` instead.
-Appending to an immutable `Array` can reuse its allocation when the function
-owns it; a `ResizeArray` or `GrowArray` has explicit `@storage.push` and
-`@storage.truncate` operations. To preserve a snapshot before handing a value
-to a helper with an `own` parameter, copy it with `.copy`.
+**Dynamic arrays and kept values.** Values pushed into an array the function
+does not own, written via `@simd.store`, or passed to an effect operation
+(whose handler may keep them) must hold no borrowed arrays: passing a borrowed
+parameter or part of one is `kept_value`; pass `values.copy` instead. An owned
+`#[T]` supports in-place `@storage.push`, `@storage.pop`, and
+`@storage.truncate` directly. To preserve a snapshot before handing a value to
+a helper with an `own` parameter, copy it with `.copy`.
 
 **Closures passed to a call.** A closure holds what it captured, so a
 captured local is shared while the closure lives. A closure written as an
@@ -958,9 +909,11 @@ lent (storing or pushing one is `kept_value`). So afterwards the local is
 unique again:
 
 ```blot
-let seen: GrowArray U32 = #[]
-each rows (func row => return @storage.push seen row.length)
-let lengths = @storage.freeze seen   // seen is this function's alone again
+func collect_lengths (rows: #[#[U32]]): *#[U32] =>
+  let seen: #[U32] = #[]
+  for row in rows:
+    @storage.push seen row.length
+  return freeze seen   // read-only shared handle *#[U32]
 ```
 
 A closure bound to a name first, or passed to a call whose result is a
@@ -1091,8 +1044,8 @@ type comes from the record it is called with:
 
 ```blot
 func count (own access) => return do:
-  access.log[0] := access.log[0] + 1    // an Array, a GrowArray or a ResizeArray
-  access.log.push 7                      // then it must be one that grows
+  access.log[0] := access.log[0] + 1
+  @storage.push access.log 7
   break access
 ```
 
@@ -1146,7 +1099,7 @@ those aliases. Inline records and scalar values copy by value.
 storage. Use it for retained history and previous-state data; copy separately
 referenced payloads as needed.
 A view records a borrowed range and length, not a snapshot of its contents.
-`@storage.freeze` removes growth authority across aliases; it does not copy the
+`freeze value` produces a read-only shared `*T` handle without copying the
 payload. Functions can return fresh owners directly; their checked lifetime
 transfers to the caller. Return an owner together with any borrowed fields that
 need it. A bare borrow cannot outlive its owner. Do not store borrowed rows in
@@ -1184,12 +1137,6 @@ const squares = array.generate 4 (func index => return index * index)
   break original[0] + values[0]
 func checked index => return squares.get(index)
 ```
-
-Import `std/list` for `generate`, `fill`, `from_array`, `to_array`, `length`,
-`is_empty`, `map`, `filter`, `append`, `prepend`, `fold_left`, `any`, and `all`.
-The fold and predicates propagate callback effects, and `any`/`all` stop early.
-Lists have no indexed access or indexed updates. Direct compiler conversions are
-`@list.from_array` and `@array.from_list`.
 
 The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 `on`, `Bool.not`; `Maybe.map/bind/unwrap_or/is_some/to_result`;
@@ -1276,14 +1223,17 @@ import * as text from "std/text"
   return sum
 ```
 
-`text.from_u32` formats a decimal integer. `text.from_f32_fixed places value`
-formats 0–6 fractional places and returns `$Nothing` for non-finite values or
-when the scaled result does not fit U32. `text.Format` is an ordinary contract:
-applications can implement its `format` member for their own types. Each
-`text.concat` copies both inputs, so repeatedly appending to a growing `Text`
-can take quadratic time. Build with `text.builder`, `text.push` or
-`text.append`, and `text.finish` to collect scalars in a List and convert once.
-`text.join` uses this path.
+`text.from_u32` formats a decimal integer. `text.from_f32` formats finite `F32`
+values with exact IEEE-754 bit-pattern round-trip precision (emitting decimal
+digits or hex bit patterns for out-of-range magnitudes).
+`text.from_f32_fixed places value` formats 0–6 fractional places rounded half
+away from zero and returns `$Nothing` for non-finite values or when the scaled
+result does not fit `U32`. `text.Format` is an ordinary trait: applications can
+provide `Format` implementations for their own types. Each `text.concat` copies
+both inputs, so repeatedly appending to a growing `Text` can take quadratic
+time. Build with `text.builder`, `text.push` or `text.append`, and `text.finish`
+to collect scalars in an owned `#[U32]` builder and return the final `Text`
+with zero copy. `text.join` uses this path.
 
 ## SIMD
 
@@ -1335,10 +1285,10 @@ and lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
   compile-time evaluation, which fuses. It uses the relaxed-SIMD instruction set
   and is never chosen implicitly.
 - `load index values` reads four consecutive U32, F32 or Bool elements from
-  an Array, GrowArray, ResizeArray or read-only slice. Indices start at the
+  an owned `#[T]` (`Array T`) or read-only slice (`&[T]`). Indices start at the
   beginning of the supplied collection. All four lanes must fit inside that
   collection, including when a slice ends before its underlying array.
-- `store index lanes values` replaces four elements of a fixed Array. The
+- `store index lanes values` replaces four elements of an owned array. The
   range check precedes index arithmetic for both operations.
 
 Explicit compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*`
@@ -1814,44 +1764,65 @@ can return the previous Wasm. A changed source definition currently goes
 through emission even when it is outside the recorded branch. [Project build
 inputs](../host/assets.md#files-read-by-run)
 
-`#if` is still pending. The initial scoped storage profile uses the same array
-literal for all length modes:
+Compile-time reflection supports `#for field in #fields T:`,
+`#for variant in #variants T:`, `#if ...:` / `#else:`, `val.(field)` field
+reads, `val.(field) := expr` reflected updates, field metadata (`field.name`,
+`field.index`, `field.has_default`, `field.default`, `field.has_tag`,
+`field.tag`), and expression-position reflected record builders (`let built: T =
+#for field in #fields T: ... break value`):
 
 ```blot
-#entry func answer () => return do:
-  let fixed: Array U32 = #[7]
-  let growing: GrowArray U32 = #[41]
-  let resizable: ResizeArray U32 = #[]
-  let score = 42
-  let _ = @storage.push growing 9
-  growing[0] := 42
-  let first: &U32 = &growing[0]
-  let local_ref: &U32 = &score
-  break @u32.add (@storage.load first) (@storage.load local_ref)
+type Config is data = $Config {
+  width: U32 = 800,
+  height: U32 = 600,
+}
+
+func default_record (): t =>
+  return #for field in #fields t:
+    #if field.has_default:
+      break field.default
+    #else:
+      break field.index
+
+#entry func area (): U32 =>
+  let cfg: Config = default_record ()
+  return cfg.width * cfg.height
 ```
 
-Without an expected type, `#[...]` means `Array`; `[...]` remains a list.
-Existing arrays do not coerce between modes. `&T` borrows one value
-(`&local`, `&record.field`, or `&items[index]`), `&[T]` borrows a range
-(`&items[start..end]`), and `^T` links to an element of a stable pool
-(`^items[index]`). The named forms are `Ref T`, `View T`, and `Link T`.
-`@storage.load` reads a reference/link and `@storage.read` reads a view/array.
-References, views, links, and shared handles (`*T`) are strictly read-only:
-none of them permit indexed `:=`, field `:=`, `@simd.store`, or length
-mutations. Updates use `:=` on a uniquely owned local or `own` parameter
-(and fail with `aliased_update` while any borrow or alias is live; rebinding
-a scalar/record local with `:=` produces a new version while existing `&local`
+All owned arrays share the unified `#[T]` (`Array T`) type and literal syntax,
+with in-place element writes and dynamic growth/truncation:
+
+```blot
+#entry func answer (): U32 =>
+  let items: #[U32] = #[41]
+  let score = 42
+  @storage.push items 9
+  items[0] := 42
+  let first: &U32 = &items[0]
+  let local_ref: &U32 = &score
+  return @u32.add (@storage.load first) (@storage.load local_ref)
+```
+
+`#[...]` constructs an owned `#[T]` (`Array T`); `#[N; T]` checks fixed-length
+arrays. `&T` borrows one value (`&local`, `&record.field`, or `&items[index]`),
+`&[T]` borrows a range (`&items[start..end]`), and `^T` links to an element of a
+stable pool (`^items[index]`). The named forms are `Ref T`, `View T`, and
+`Link T`. `@storage.load` reads a reference/link and `@storage.read` reads a
+view/array. References, views, links, and shared handles (`*T`) are strictly
+read-only: none of them permit indexed `:=`, field `:=`, `@simd.store`, or
+length mutations. Updates use `:=` on a uniquely owned local or `own` parameter
+(and fail with `aliased_update` while any borrow or alias is live; rebinding a
+scalar/record local with `:=` produces a new version while existing `&local`
 references keep reading the earlier value). `@storage.copy` (`values.copy`)
-makes an independent copy. `@storage.freeze` consumes an owned (or global)
-growable array's growth capability; `@simd.store` likewise requires unique
-ownership.
+makes an independent copy. `freeze value` creates a read-only `*T` shared
+handle; `@simd.store` likewise requires unique ownership.
 
 `@storage.reserve owner 1048576` requests a minimum planned capacity in elements
-for one `GrowArray` or `ResizeArray` owner. The count must be a U32 integer
-literal (parentheses are permitted); runtime values and constant-name aliases
-are rejected. `Ref`, `View`, `Link` and fixed `Array` values cannot reserve.
-This marker returns `Unit` and changes no data, logical length, identity or
-borrow epoch. It remains planning metadata even when its result is unused.
+for one owned `#[T]` array. The count must be a U32 integer literal
+(parentheses are permitted); runtime values and constant-name aliases are
+rejected. `Ref`, `View`, and `Link` values cannot reserve. This marker returns
+`Unit` and changes no data, logical length, identity or borrow epoch. It
+remains planning metadata even when its result is unused.
 
 An explicit request replaces that owner's fallback `growerBytes` requirement; it
 does not impose a logical-length limit or increase every pool of that type.
@@ -1942,10 +1913,12 @@ function.
 `let name = expression` initializes once at runtime when the module starts, if
 an entry reaches it. Compile-time expressions can build immutable values,
 closures, and builders, but cannot do foreign IO. `@panic "message"` fails const
-evaluation or traps in Wasm. String literals are also ordinary runtime text
-values; intrinsics that require a literal still read their argument as source
-syntax. There is no general type-valued/comptime reflection beyond the
-intrinsics.
+evaluation or traps in Wasm. String literals are also ordinary runtime Unicode `Text` (`#[U32]`) values such
+as `"é🙂"`; intrinsics that require a literal still read their argument as
+source syntax. Compile-time reflection is provided by `#for #fields` /
+`#variants`, `#if` / `#else`, `val.(field)` reads/updates, field defaults
+(`field.default`), `field.index`, `@[...]` data tags, and reflected record
+builders.
 
 Startup orders `let` initializers by their dependencies and rejects cycles.
 Dependency analysis includes referenced function bodies, even when a function is
@@ -1992,9 +1965,10 @@ func step count => return
 #entry func answer () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
-Not yet executable: collection patterns, general text, F64, general type-valued
-computation, and exposed continuation values. Do not infer availability from
-editor highlighting or design examples.
+Not yet executable: collection patterns, F64, arbitrary first-class
+type-valued computation outside `#for`/`#if`, and exposed multi-shot
+continuation values. Do not infer availability from editor highlighting or
+design examples.
 
 Hosts use `host/guest.ts`. The owned-storage integration uses guest ABI 8 and
 session protocol 2. Ordinary programs can still emit earlier profiles while the
@@ -2036,8 +2010,8 @@ default target when the context leaves it ambiguous.
 The existing witness rules apply: a constructor/function witness describes its
 final result type. Its body is not called; an ordinary witness expression is
 evaluated once. Type names belong in annotations, constructors in expressions
-and patterns. Constructors require `#` in declarations, expressions and
-patterns, including qualified names (`$time.Clock`). Boolean literals and
+and patterns. Constructors require `$` in declarations, expressions and patterns, including
+qualified names (`$time.Clock`). Boolean literals and
 patterns are the bare words `true` and `false`; they have primitive type `Bool`.
 Type names and explicit type arguments stay unmarked.
 
@@ -2124,7 +2098,7 @@ Blot provides three orthogonal, compiler-verified concurrency primitives:
 // Isolated stateful process:
 type PlannerState is data = $PlannerState { total: U32 }
 func planner_init (seed: U32): PlannerState => return $PlannerState { total: seed }
-func planner_step (own s: PlannerState) -> (delta: U32): (PlannerState, U32) =>
+func planner_step (s: own PlannerState) -> (delta: U32): (PlannerState, U32) =>
   let next = s.total + delta
   return ($PlannerState { total: next }, next)
 

@@ -72,6 +72,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     if at == 0 { container_core_ty = m.typeOf(info.root); }
     let address, error = elementAddress(g, f, container, index, id, container_core_ty, true);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
+    checkMutableOwner(g, f, container);
     var ty, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     var offset: u32 = 0;
@@ -241,7 +242,14 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
     if replacement.len == old.len {
         var same = true;
         for index in 0..(old.len as i64) { if g.s.words[replacement.start + index] != g.s.words[old.start + index] { same = false; } }
-        if same { return value, blot_direct_types::Error.none; }
+        if same {
+            if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
+                f.reuse_block = 0;
+            } else {
+                f.boxed_noop_alias = true;
+            }
+            return value, blot_direct_types::Error.none;
+        }
     }
     if f.reuse_block == w(g, value, 0) && f.reuse_ty == value.ty && consumeReuseNode(f, id) {
         f.reuse_block = 0;
@@ -364,6 +372,9 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
     if selectors.len != 0 { step = selectors[at]; } else { step.projection = path[at]; }
     let name, has_name = updateFieldName(g, f, m, step);
     if step.kind == blot_check_core::UpdateKind.comptime_field && has_name {
+        if isOpaqueOutsideUnit(g, m, value.ty) {
+            return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
+        }
         let frame = f.comptime_frames[findComptimeFrame(f, step.projection)];
         if !matchesComptimeFieldType(g, f, m, step.result_type, frame.field_ty) {
             return neverVal(), g.fail(m, id, "comptime update has the wrong field type");

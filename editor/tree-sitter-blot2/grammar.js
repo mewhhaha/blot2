@@ -48,6 +48,7 @@ export default grammar({
         $.array,
         $.spread,
         $.braced,
+        $.reflected_member,
         $.method_call,
         $.member,
         $.text_literal,
@@ -400,6 +401,7 @@ export default grammar({
     spread: (_) => "...",
     braced: ($) => seq("{", repeat(choice($.record_field, $._syntax)), "}"),
     record_field: ($) => prec(1, seq(field("name", $.identifier), ":")),
+    reflected_member: ($) => prec(2, seq(".", $.parenthesized)),
     method_call: ($) =>
       prec(2, seq(".", field("name", $.identifier), $.parenthesized)),
     member: ($) =>

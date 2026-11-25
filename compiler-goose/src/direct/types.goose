@@ -612,7 +612,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
     let n = m.types.node(ty);
     var result: Ty = 0;
     match n.tag {
-        variable, bound => {
+        variable, bound, rigid => {
             child_open = true;
             let bound_to, present = envGet(self_, env, m.unit, ty);
             if present { result = bound_to; }
@@ -852,7 +852,7 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
     let n = m.types.node(pattern);
     let have = self_.node(actual);
     match n.tag {
-        variable, bound => {
+        variable, bound, rigid => {
             sub_open = true;
             if actual != never { envBind(self_, env, m.unit, pattern, actual); }
         },

@@ -13,7 +13,7 @@ type Pool=blot_parse_symbols::Pool;
 type Code=u32;
 type Terminator=u32;
 let terminator_none: Terminator=0; let terminator_return: Terminator=1;
-let terminator_break: Terminator=2;
+let terminator_break: Terminator=2; let terminator_continue: Terminator=3;
 let record_target_record: u32=0; let record_target_other: u32=1; let record_target_missing: u32=2;
 struct Issue {
  code: Code=0, node: Id=0, point: u32=0, symbol: Symbol=0,
@@ -109,7 +109,8 @@ recursive fn suite<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,cont
  for index in 0..count {let child=tree.children(source)[index];
   if stopped(self_,tree,pool,context,locals) { deferred.deinit(); return; } let n=tree.node(child); var terminator=terminator_none;
   if n.tag==a_return_stmt||n.tag==a_function_return_stmt { terminator=terminator_return; }
-  else if n.tag==a_break_stmt||n.tag==a_continue_stmt { terminator=terminator_break; }
+  else if n.tag==a_break_stmt { terminator=terminator_break; }
+  else if n.tag==a_continue_stmt { terminator=terminator_continue; }
   if terminator!=terminator_none&&index+1<count { let following=tree.children(source)[index+1]; fail(self_,tree,pool,context,locals,c_unreachable_statement,following,tree.span(following).start,0); if self_.has_issue { self_.issue.terminator=terminator; } deferred.deinit(); return; }
   if n.tag==a_for_stmt {
    let body=tree.extra.items[n.c+1]; loop_scope(self_,tree,pool,context,locals,n.a,body,depth+1); deferred.push(Deferred {child,locals.len});

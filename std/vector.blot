@@ -15,10 +15,18 @@ func Vec2.lerp (a: Vec2) -> (b: Vec2) -> (weight: F32): Vec2 => return
 func Vec2.dot (a: Vec2) -> (b: Vec2): F32 => a.x * b.x + a.y * b.y
 func Vec2.length_squared (value: Vec2): F32 => Vec2.dot value value
 func Vec2.length (value: Vec2): F32 => sqrt (Vec2.length_squared value)
-// Zero normalizes to zero. Other inputs follow F32 arithmetic.
+// Zero normalizes to zero. Finite nonzero inputs scale before squaring to avoid overflow and underflow.
 func Vec2.normalized (value: Vec2): Vec2 =>
-  let length = Vec2.length value
-  return if length == 0.0 then value else value / length
+  if not (F32.is_finite value.x) or not (F32.is_finite value.y):
+    let length = Vec2.length value
+    return if length == 0.0 then value else value / length
+  let scale = F32.max (F32.abs value.x) (F32.abs value.y)
+  if scale == 0.0:
+    return value
+  let sx = value.x / scale
+  let sy = value.y / scale
+  let length = sqrt (sx * sx + sy * sy)
+  return $Vec2 { x: sx / length, y: sy / length }
 
 func Vec3.add (a: Vec3) -> (b: Vec3): Vec3 => return
   $Vec3 { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }
@@ -39,5 +47,14 @@ func Vec3.cross (a: Vec3) -> (b: Vec3): Vec3 => $Vec3 {
 func Vec3.length_squared (value: Vec3): F32 => Vec3.dot value value
 func Vec3.length (value: Vec3): F32 => sqrt (Vec3.length_squared value)
 func Vec3.normalized (value: Vec3): Vec3 =>
-  let length = Vec3.length value
-  return if length == 0.0 then value else value / length
+  if not (F32.is_finite value.x) or not (F32.is_finite value.y) or not (F32.is_finite value.z):
+    let length = Vec3.length value
+    return if length == 0.0 then value else value / length
+  let scale = F32.max (F32.max (F32.abs value.x) (F32.abs value.y)) (F32.abs value.z)
+  if scale == 0.0:
+    return value
+  let sx = value.x / scale
+  let sy = value.y / scale
+  let sz = value.z / scale
+  let length = sqrt (sx * sx + sy * sy + sz * sz)
+  return $Vec3 { x: sx / length, y: sy / length, z: sz / length }

@@ -1277,6 +1277,21 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     // as ordinary numeric results, even for scalar-only source exports.
     if (!exports.has("blot:memory")) declare("blot:memory", "memory");
   }
+  const trapsSections = WebAssembly.Module.customSections(
+    module,
+    "blot:traps",
+  );
+  if (trapsSections.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate traps section");
+  }
+  if (
+    trapsSections.length === 1 && !exports.has("blot:memory") &&
+    actualExports.some((entry) =>
+      entry.name === "blot:memory" && entry.kind === "memory"
+    )
+  ) {
+    declare("blot:memory", "memory");
+  }
   if (
     actualExports.length !== exports.size ||
     actualExports.some((entry) => exports.get(entry.name) !== entry.kind)
@@ -2475,10 +2490,12 @@ export async function instantiateGuest(
   const profiling =
     WebAssembly.Module.customSections(module, "blot:memory-profile").length ===
       1;
+  const hasTraps =
+    WebAssembly.Module.customSections(module, "blot:traps").length === 1;
   if (
     memory !== undefined &&
     (allocate !== undefined || reset !== undefined ||
-      (abi.taskDescriptorCount === undefined && !profiling))
+      (abi.taskDescriptorCount === undefined && !profiling && !hasTraps))
   ) {
     if (
       !(memory instanceof WebAssembly.Memory) ||

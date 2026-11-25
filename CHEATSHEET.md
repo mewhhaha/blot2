@@ -22,7 +22,7 @@ Quick, version-matched reference for humans and coding agents. Run `deno task bl
 - `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`), `F32` (`1.0`, `1e-5`).
 - Negative arguments need parens: `F32.abs (-2.0)`.
 - Arrays: `#[T]` (equivalent to `Array T`), fixed-length `#[N; T]`, borrowed read-only view `&[T]`, frozen shared handle `*T` (via `freeze x`).
-- No built-in `String` type; byte strings are `#[U8]` / `Array U8`.
+- Text: `Text` is a prelude alias for `#[U32]` Unicode scalar values; string literals (`"hi"`, `"é🙂"`) have type `Text` (see `std/text`).
 
 ## 3. Functions, Control Flow & Patterns
 
@@ -56,7 +56,7 @@ func step (ev: Event) -> (acc: U32): U32 => case ev of
   $Tick n => acc + n
   $Reset => 0
 
-func unwrap_or_zero (opt: Option U32): U32 =>
+func unwrap_or_zero (opt: Maybe U32): U32 =>
   let $Some v = opt else:
     return 0
   return v

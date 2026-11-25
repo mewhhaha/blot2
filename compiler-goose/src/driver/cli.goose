@@ -29,7 +29,7 @@ type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
 enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed FMA (f32x4.relaxed_madd/nmadd).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--check-only] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --check-only (check, check-project) stops after semantic checking and skips ownership/uniqueness lowering.\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed SIMD (FMA, min/max, trunc).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -114,9 +114,17 @@ struct SignatureSummary {kind:const u8[:]="signatures",filename:const u8[:],chec
 fn now()->u64 {return blot_native::clock_ns();}
 fn elapsed(start:u64)->i64 {let ended=now();if ended<start {return 0;}return ((ended-start)/1000) as i64;}
 struct SimpleRecord {kind:const u8[:]="compilation",filename:const u8[:],stage:const u8[:],success:bool,total_us:i64,stats:Stats,memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},memory_scope:const u8[:]="Requested bytes of the compiler's pooled owners; excludes arrays owned by a scope, pool capacity and process RSS. All owners released before this record."}
-fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text)->bool,Error {let meter=blot_runtime_memory::start();var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,memory:meter.counts(),..});return accepted,written;}
-fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&,include_private:bool=false)->bool,Error {
- var input=blot_reuse_project::FileInputs{..};var source:u8[>..<]=[];let read=input.read(filename,33554432,source);if read!=blot_error::Error.none {return false,read;}stats.source_bytes=source.len;
+fn formatIoError(out:u8[>..]&,action:const u8[:],path:const u8[:],error:Error) {
+ out.append("Failed to ");
+ out.append(action);
+ out.append(" '");
+ out.append(path);
+ out.append("': ");
+ out.append(blot_error::error_name(error));
+}
+fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,error_detail:u8[>..]&,check_only:bool=false)->bool,Error {let meter=blot_runtime_memory::start();var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats,error_detail,false,check_only);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,memory:meter.counts(),..});return accepted,written;}
+fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&,error_detail:u8[>..]&,include_private:bool=false,check_only:bool=false)->bool,Error {
+ var input=blot_reuse_project::FileInputs{..};var source:u8[>..<]=[];let read=input.read(filename,33554432,source);if read!=blot_error::Error.none {formatIoError(error_detail,"read",filename,read);return false,read;}stats.source_bytes=source.len;
  var names,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return false,error;}
  var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);let lex_start=now();let error=blot_parse_lexer::lex(source[..],lexed);if error!=blot_error::Error.none {names.deinit();return false,error;}stats.lex_us=elapsed(lex_start);stats.tokens=tokens.len;
  if diagnostics.len!=0 {let error=frontendDiagnostic(writer,filename,"lex",source[..],blot_parse_syntax_diagnostics::lexical(tokens[..],diagnostics[0]),diagnostics[..]);names.deinit();return false,error;}
@@ -134,15 +142,16 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  let check_start=now();var checked,error=blot_check_check::check(tree,names);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}
  stats.check_us=elapsed(check_start);stats.type_nodes=checked.types.nodes.len;stats.type_versions=checked.types.versions.len;stats.bindings=checked.bindings.len-1;stats.body_elaborations=checked.body_elaborations;stats.checker=checked.counters;
  if checked.diagnostics.len!=0 {let error=checkDiagnostics(writer,filename,source[..],names,checked.diagnostics);checked.deinit();tree.deinit();names.deinit();return false,error;}
- if command==Command.check {checked.deinit();tree.deinit();names.deinit();return true,blot_error::Error.none;}
+ if command==Command.check&&check_only {checked.deinit();tree.deinit();names.deinit();return true,blot_error::Error.none;}
  let lower_start=now();var lowered,error=blot_check_core_builder::lower(tree,names,checked);if error!=blot_error::Error.none {checked.deinit();tree.deinit();names.deinit();return false,error;}
  lowered.value.unit=1;stats.lower_us=elapsed(lower_start);stats.core_nodes=lowered.value.nodes.len-1;stats.body_lowerings=lowered.value.body_lowerings;
  if lowered.value.diagnostics.len!=0 {let error=lowerDiagnostics(writer,filename,lowered.value);lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,error;}
+ if command==Command.check {lowered.deinit();checked.deinit();tree.deinit();names.deinit();return true,blot_error::Error.none;}
  checked.deinit();tree.deinit();names.deinit();source.clear();tokens.clear();comments.clear();diagnostics.clear();
  let emit_start=now();var wasm:u8[>..<]=[];var detail:u8[>..<]=[];let units:blot_check_core::Module[1]=[lowered.value];
  let compiled=blot_compile::compile(units[..],1,wasm,detail);stats.emit_us=elapsed(emit_start);stats.emitted_functions=compiled.emitted_functions;
  if compiled.has_diagnostic {var message:u8[>..]=[];message.append(blot_compile::message(compiled.diagnostic,detail[..]));let error=diagnostic(writer,filename,"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,message[..]);lowered.deinit();return false,error;}
- stats.wasm_bytes=wasm.len;let written=blot_io::write_file(output.value,wasm[..]);lowered.deinit();if written!=blot_error::Error.none {return false,written;}return true,blot_error::Error.none;
+ stats.wasm_bytes=wasm.len;let written=blot_io::write_file(output.value,wasm[..]);lowered.deinit();if written!=blot_error::Error.none {formatIoError(error_detail,"write",output.value,written);return false,written;}return true,blot_error::Error.none;
 }
 fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}
 fn run(args:const Argument[:])->bool,Error {
@@ -156,8 +165,9 @@ fn run(args:const Argument[:])->bool,Error {
   for filename in args[start..] {
    if starts(filename,"--") {return false,blot_io::write_all(stderr,usage);}
    var stats=Stats{..};
-   let ok,error=processSingle(stdout,Command.check_exports,filename,blot_support::none<const u8[:]>(),stats,include_private);
-   if error!=blot_error::Error.none {return false,error;}
+   var error_detail:u8[>..]=[];
+   let ok,error=processSingle(stdout,Command.check_exports,filename,blot_support::none<const u8[:]>(),stats,error_detail,include_private);
+   if error!=blot_error::Error.none {var written=blot_error::Error.none;if error_detail.len!=0 {written=diagnostic(stdout,filename,"check-exports",blot_error::error_name(error),0,0,error_detail[..]);}else {written=diagnostic(stdout,filename,"check-exports",blot_error::error_name(error),0,0,"Compiler operation failed");}return false,written;}
    if !ok {accepted=false;}
   }
   return accepted,blot_error::Error.none;
@@ -187,10 +197,11 @@ fn run(args:const Argument[:])->bool,Error {
  if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
  if project_command||first_option<args.len {
   if command==Command.lex {return false,blot_error::Error.none;}
-  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var policy=Policy{..};var at=first_option;
+  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var check_only=false;var policy=Policy{..};var at=first_option;
   while at<args.len {
    let arg=args[at];
    // Boolean flags taking no value.
+   if arg=="--check-only" {if command!=Command.check&&command!=Command.check_project {return false,blot_error::Error.none;}check_only=true;at+=1;continue;}
    if arg=="--profile" {if !isBuild(command) {return false,blot_error::Error.none;}profile=true;at+=1;continue;}
    if arg=="--test" {if !isBuild(command) {return false,blot_error::Error.none;}test_mode=true;at+=1;continue;}
    if arg=="--relaxed-simd" {if !isBuild(command) {return false,blot_error::Error.none;}relaxed_simd=true;at+=1;continue;}
@@ -214,12 +225,13 @@ fn run(args:const Argument[:])->bool,Error {
   var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}
-   let accepted,error=processProject(stdout,selected,filename,options,profile,output,policy);
-   if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,"Compiler operation failed");return false,written;}
+   var error_detail:u8[>..]=[];
+   let accepted,error=processProject(stdout,selected,filename,options,profile,output,policy,error_detail,check_only);
+   if error!=blot_error::Error.none {var written=blot_error::Error.none;if error_detail.len!=0 {written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,error_detail[..]);}else {written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,"Compiler operation failed");}return false,written;}
    success=success&&accepted;}
   return success,blot_error::Error.none;
  }
  var success=true;var end=args.len;if command==Command.build {end=3;}
- for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=process(stdout,command,filename,output);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,"Compiler operation failed");if written!=blot_error::Error.none {return false,written;}success=false;}else if !accepted {success=false;}}
+ for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}var error_detail:u8[>..]=[];let accepted,error=process(stdout,command,filename,output,error_detail);if error!=blot_error::Error.none {var written=blot_error::Error.none;if error_detail.len!=0 {written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,error_detail[..]);}else {written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,"Compiler operation failed");}if written!=blot_error::Error.none {return false,written;}success=false;}else if !accepted {success=false;}}
  return success,blot_error::Error.none;
 }

@@ -909,7 +909,7 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     let list, present = bindGet(g, f, ref.binding);
     if !present { return neverVal(), false, blot_direct_types::Error.none; }
     if tagOf(g, list.ty) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
-    if uses(g, f, ref.binding) != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+    if uses(g, f, ref.binding) != 1 || !isUniqueOwned(g, f, ref.binding) || bindingCaptured(g, f, ref.binding) { return neverVal(), false, blot_direct_types::Error.none; }
     let value, error = expr(g, f, children[1]);
     if error != blot_direct_types::Error.none { return value, false, error; }
     let push_function = g.runtime_().push;
@@ -1255,12 +1255,107 @@ recursive fn aliasType(g: Generator&, f: Fn&, use: u32, id: u32, depth: u32) -> 
     }
     return 0, false, blot_direct_types::Error.none;
 }
+// Whether Core subtree `id` reads local `binding` (directly, via branch merge,
+// loop carry, or closure capture). Conservative on excessive depth.
+recursive fn nodeReadsBinding(m: const Module&, id: u32, binding: u32, depth: i64) -> bool {
+    if id == 0 || binding == 0 { return false; }
+    if depth > 64 { return true; }
+    let n = m.node(id);
+    match n.tag {
+        constant, panic => { return false; },
+        reference => { return localRef(m, id) == binding; },
+        suite, block_, product, record, array, array_op, storage, break_ => {
+            for child in m.children(id) {
+                if nodeReadsBinding(m, child, binding, depth + 1) { return true; }
+            }
+            return false;
+        },
+        bind => { return nodeReadsBinding(m, n.b, binding, depth + 1); },
+        pattern_bind => {
+            return nodeReadsBinding(m, n.b, binding, depth + 1) || nodeReadsBinding(m, n.c, binding, depth + 1);
+        },
+        if_stmt, if_value => {
+            if nodeReadsBinding(m, n.a, binding, depth + 1) ||
+                nodeReadsBinding(m, n.b, binding, depth + 1) ||
+                nodeReadsBinding(m, n.c, binding, depth + 1) { return true; }
+            for merge in m.branchMerges(id) {
+                if merge.then_binding == binding || merge.else_binding == binding { return true; }
+            }
+            return false;
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if nodeReadsBinding(m, inp, binding, depth + 1) { return true; }
+            }
+            for arm in m.matchArms(id) {
+                if nodeReadsBinding(m, arm.guard_, binding, depth + 1) ||
+                    nodeReadsBinding(m, arm.body, binding, depth + 1) { return true; }
+            }
+            for merge in m.branchMerges(id) {
+                if merge.then_binding == binding || merge.else_binding == binding { return true; }
+            }
+            return false;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            if nodeReadsBinding(m, linfo.first, binding, depth + 1) ||
+                nodeReadsBinding(m, linfo.end, binding, depth + 1) { return true; }
+            for carry in m.loopCarries(id) {
+                if carry.incoming == binding || carry.backedge == binding { return true; }
+            }
+            return nodeReadsBinding(m, linfo.body, binding, depth + 1);
+        },
+        return_, result_associated, fork_, project, flat_op => {
+            return nodeReadsBinding(m, n.a, binding, depth + 1);
+        },
+        construct => {
+            return nodeReadsBinding(m, n.b, binding, depth + 1);
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            if nodeReadsBinding(m, uinfo.root, binding, depth + 1) ||
+                nodeReadsBinding(m, uinfo.value, binding, depth + 1) { return true; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && nodeReadsBinding(m, sel.index, binding, depth + 1) { return true; }
+            }
+            return false;
+        },
+        scalar, logical, apply, associated => {
+            return nodeReadsBinding(m, n.a, binding, depth + 1) || nodeReadsBinding(m, n.b, binding, depth + 1);
+        },
+        call => {
+            for arg in m.call(id).arguments {
+                if nodeReadsBinding(m, arg, binding, depth + 1) { return true; }
+            }
+            return false;
+        },
+        closure => {
+            for cap in m.closureCaptures(id) {
+                if cap == binding { return true; }
+            }
+            return false;
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            return nodeReadsBinding(m, sinfo.source, binding, depth + 1) ||
+                nodeReadsBinding(m, sinfo.end, binding, depth + 1) ||
+                nodeReadsBinding(m, sinfo.body, binding, depth + 1);
+        },
+        _ => { return true; },
+    }
+}
 // Follow the version a loop gives to its next iteration. Only a terminal
 // rebinding in an actual arm may count as a use of the old list. Conditions,
 // guards, item expressions and earlier statements still count as ordinary
 // references. A statement case lowers to nested two-arm matches.
 recursive fn terminalAppends(m: const Module&, suite: u32, incoming: u32, outgoing: u32, depth: i64) -> u32 {
-    if incoming == 0 || incoming == outgoing || suite == 0 || depth >= 64 { return 0; }
+    if incoming == 0 || depth >= 64 { return 0; }
+    if incoming == outgoing {
+        if depth == 0 { return 0; }
+        if suite == 0 || !nodeReadsBinding(m, suite, incoming, 0) { return 1; }
+        return 0;
+    }
+    if suite == 0 { return 0; }
     if m.node(suite).tag != blot_check_core::Tag.suite { return 0; }
     let statements = m.children(suite);
     if statements.len == 0 { return 0; }
@@ -1292,7 +1387,9 @@ recursive fn terminalAppends(m: const Module&, suite: u32, incoming: u32, outgoi
 }
 // References to local `binding` in this unit, counted once. A loop exit
 // (`break_`) carrying a version is on a path exclusive with any later
-// rebinding of it, so it does not count.
+// rebinding of it, so it does not count. Implicit reads in branch merges
+// (`then_binding`/`else_binding`) and loop carries (`incoming`/`backedge`)
+// are included so aliases via merges or carries are never treated as single-use.
 fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
     let m .= g.units[f.unit - 1];
     let uid = (m.unit - 1) as i64;
@@ -1314,6 +1411,22 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
             let target = m.references[node.a];
             if target.unit != 0 && target.unit != m.unit { continue; }
             g.s.use_count_vals[(base as i64) + (target.binding as i64)] += 1;
+        }
+        for merge in m.merges {
+            if merge.then_binding != 0 && (merge.then_binding as i64) < m.bindings.len {
+                g.s.use_count_vals[(base as i64) + (merge.then_binding as i64)] += 1;
+            }
+            if merge.else_binding != 0 && (merge.else_binding as i64) < m.bindings.len {
+                g.s.use_count_vals[(base as i64) + (merge.else_binding as i64)] += 1;
+            }
+        }
+        for carry in m.loop_carries {
+            if carry.incoming != 0 && (carry.incoming as i64) < m.bindings.len {
+                g.s.use_count_vals[(base as i64) + (carry.incoming as i64)] += 1;
+            }
+            if carry.backedge != 0 && (carry.backedge as i64) < m.bindings.len {
+                g.s.use_count_vals[(base as i64) + (carry.backedge as i64)] += 1;
+            }
         }
         // Each arm hands its successor to the same carry, so only one of
         // these receivers can run before the old version is replaced.

@@ -9,7 +9,10 @@ stack/heap budgets, exact-cap active-only stack free lists, dedicated transport
 pool with Page-0 offset 640 `arena_oom_flag`, `live_flag` / `static_pool_flag`, inter-procedural `escape_min_slot`, and
 trap-safe `fork` / persistent staging), and on 24 November 2026 for Unified
 Dynamic Arrays Phase 5 (removed `Runtime.freeze` and the `GrowArray`/
-`ResizeArray` distinction; `runtime.expected` shrinks to 7707 bytes).
+`ResizeArray` distinction; `runtime.expected` shrinks to 7707 bytes), and on
+25 November 2026 for Audit Soundness + Trap Provenance (`r.create`
+`length > capacity_mask / stride` overflow guard and Page-0 offset `772`
+`trap_site_offset` zeroing in `r.reset`; `runtime.expected` is 7765 bytes).
 The output must equal the record, and Goose must not warn.
 
 Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]

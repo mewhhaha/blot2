@@ -156,6 +156,7 @@ struct Fn {
     reuse_nodes_len: i64 = 0,
     reuse_block: u32 = 0,
     reuse_ty: Ty = 0,
+    boxed_noop_alias: bool = false,
     // The module of this body, as `g.units[unit - 1]`.
     unit: u32,
     // The instance's type variables, refined as emission learns the concrete
@@ -899,6 +900,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         handle => { return handleNode(g, f, id); },
         break_ => { return breakNode(g, f, id); },
         panic => {
+            emitPanicTrap(g, f, id);
             op(g, OP_unreachable_);
             return neverVal(), blot_direct_types::Error.none;
         },
@@ -961,6 +963,7 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let grown, has_grown, error = linearAppend(g, f, n.b);
     if error != blot_direct_types::Error.none { return grown, error; }
     var value = grown;
+    var had_noop = false;
     if !has_grown {
         // A generalized local value is computed once: its uses decide the one
         // type it is computed at.
@@ -973,7 +976,11 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if n.c < 2 && m.types.node(m.binding(n.a).ty).tag == blot_check_types::Tag.floating32 && bindingIgnoresNanPayload(g, f, n.a) {
             f.elide_f32_nan_node = n.b;
         }
+        let prev_noop = f.boxed_noop_alias;
+        f.boxed_noop_alias = false;
         let evaluated, eval_err = stmt(g, f, n.b);
+        had_noop = f.boxed_noop_alias;
+        f.boxed_noop_alias = prev_noop;
         f.elide_f32_nan_node = 0;
         if eval_err != blot_direct_types::Error.none { return evaluated, eval_err; }
         value = evaluated;
@@ -991,10 +998,13 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             return unitVal(), blot_direct_types::Error.none;
         }
     }
+    if has_grown && value.ty != blot_direct_types::never {
+        blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
+    }
     if !has_grown && value.ty != blot_direct_types::never {
         refine(g, f, m.binding(n.a).ty, value.ty);
-        if isFreshBoxedRhs(g, f, m, n.b, value.ty) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, 1);
+        if !had_noop && isFreshBoxedRhs(g, f, m, n.b, value.ty) {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, f.loop_depth + 1);
         }
         if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
             blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
@@ -1027,9 +1037,72 @@ fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
     }
     return g.s.captured_vals[(base as i64) + (binding as i64)] != 0;
 }
-fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+fn isUniqueBoxedAt(g: const Generator&, f: const Fn&, binding: u32, loop_depth: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
-    return present && val != 0;
+    return present && val == loop_depth + 1;
+}
+fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+    return isUniqueBoxedAt(g, f, binding, f.loop_depth);
+}
+fn isOpaqueOutsideUnit(g: const Generator&, m: const Module&, ty: Ty) -> bool {
+    if tagOf(g, ty) != blot_direct_types::Tag.nominal { return false; }
+    let nom_id = g.types.nominalIdentity(ty);
+    if nom_id.unit == 0 || nom_id.unit == 0xffffffff || nom_id.unit == m.unit || !g.hasUnit(nom_id.unit) { return false; }
+    let owner .= g.units[nom_id.unit - 1];
+    for nom in owner.nominals {
+        if nom.identity.unit == nom_id.unit && nom.identity.decl == nom_id.decl {
+            return nom.is_opaque;
+        }
+    }
+    return false;
+}
+fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
+    if !g.module.has_memory {
+        g.module.has_memory = true;
+        g.module.memory_pages = 1;
+        g.module.memory_max_pages = 1;
+    }
+    var sp_start: u32 = 0;
+    var sp_end: u32 = 0;
+    if blot_direct_writer::testModeEnabled() {
+        let sp = blot_direct_emit::spanOf(g.units[f.unit - 1], id);
+        sp_start = sp.start;
+        sp_end = sp.end;
+    }
+    let msg_start = g.s.trap_text.len as u32;
+    g.s.trap_text.append(message);
+    let msg_len = (g.s.trap_text.len as u32) - msg_start;
+    g.s.traps.push(blot_direct_emit::TrapEntry { kind: kind, unit: g.units[f.unit - 1].unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: msg_len });
+    let trap_id = g.s.traps.len as u32;
+    i32Const(g, blot_direct_runtime::trap_site_offset);
+    i32Const(g, trap_id);
+    op(g, OP_i32_store);
+    uleb(g, 2);
+    uleb(g, 0);
+}
+fn emitPanicTrap(g: Generator&, f: Fn&, id: u32) {
+    if !g.module.has_memory {
+        g.module.has_memory = true;
+        g.module.memory_pages = 1;
+        g.module.memory_max_pages = 1;
+    }
+    var sp_start: u32 = 0;
+    var sp_end: u32 = 0;
+    if blot_direct_writer::testModeEnabled() {
+        let sp = blot_direct_emit::spanOf(g.units[f.unit - 1], id);
+        sp_start = sp.start;
+        sp_end = sp.end;
+    }
+    let msg_start = g.s.trap_text.len as u32;
+    g.s.trap_text.append(g.units[f.unit - 1].panicMessage(id));
+    let msg_len = (g.s.trap_text.len as u32) - msg_start;
+    g.s.traps.push(blot_direct_emit::TrapEntry { kind: 1, unit: g.units[f.unit - 1].unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: msg_len });
+    let trap_id = g.s.traps.len as u32;
+    i32Const(g, blot_direct_runtime::trap_site_offset);
+    i32Const(g, trap_id);
+    op(g, OP_i32_store);
+    uleb(g, 2);
+    uleb(g, 0);
 }
 fn isUniqueOwnedAt(g: const Generator&, f: const Fn&, binding: u32, loop_depth: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_owned, binding);
@@ -1455,13 +1528,48 @@ fn bindingIgnoresNanPayload(g: Generator&, f: Fn&, binding: u32) -> bool {
     if isNanObserved(g, f, 0xffffffff) { return false; }
     return !isNanObserved(g, f, binding);
 }
+recursive fn nodeReturnsBinding(m: const Module&, id: u32, binding: u32, depth: i64) -> bool {
+    if id == 0 || binding == 0 || depth > 16 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        reference => { return localRef(m, id) == binding; },
+        suite => {
+            let items = m.children(id);
+            if items.len == 0 { return false; }
+            return nodeReturnsBinding(m, items[items.len - 1], binding, depth + 1);
+        },
+        block_ => {
+            let items = m.children(id);
+            if items.len == 0 { return false; }
+            let ln = m.node(items[items.len - 1]);
+            return ln.tag == blot_check_core::Tag.return_ && ln.b == id && nodeReturnsBinding(m, ln.a, binding, depth + 1);
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            return nodeReturnsBinding(m, uinfo.root, binding, depth + 1) && updateCanNoopAlias(m, id, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+recursive fn updateCanNoopAlias(m: const Module&, id: u32, depth: i64) -> bool {
+    if depth > 16 { return true; }
+    let uinfo = m.updateInfo(id);
+    for sel in m.updateSelectors(id) {
+        if sel.kind == blot_check_core::UpdateKind.index { return true; }
+    }
+    if uinfo.self_binding != 0 && uinfo.value != 0 {
+        if nodeReturnsBinding(m, uinfo.value, uinfo.self_binding, depth + 1) { return true; }
+    }
+    return false;
+}
 fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
     if id == 0 { return false; }
     let boxed, error = g.types.boxed(ty);
     if error != blot_direct_types::Error.none || !boxed { return false; }
     let n = m.node(id);
     match n.tag {
-        construct, record, update => { return true; },
+        construct, record => { return true; },
+        update => { return !updateCanNoopAlias(m, id, 0); },
         reference => {
             let local_id = localRef(m, id);
             return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
@@ -1483,7 +1591,8 @@ recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
     if id == 0 || depth > 16 { return false; }
     let n = m.node(id);
     match n.tag {
-        construct, record, update => { return true; },
+        construct, record => { return true; },
+        update => { return !updateCanNoopAlias(m, id, 0); },
         suite => {
             let items = m.children(id);
             if items.len == 0 { return false; }
@@ -1746,7 +1855,7 @@ recursive fn holesUnused(g: Generator&, f: const Fn&, ty: TId, depth: i64) -> bo
             for variable in m.types.list(m.binding(instance.key.id).scheme.variables) { if variable == ty { return true; } }
             return false;
         },
-        bound => {
+        bound, rigid => {
             let bound_to, present = g.types.envGet(f.env, m.unit, ty);
             return present;
         },

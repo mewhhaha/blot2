@@ -201,7 +201,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
     lines.push(`#entry func run (value: U32): U32 => return ${sum}`);
     const entry = `${directory}/main.blot`;
     await Deno.writeTextFile(entry, lines.join("\n") + "\n");
-    for (const inferenceBudget of [18_133, 18_132]) {
+    for (const inferenceBudget of [18_136, 18_135]) {
       const outcomes = [];
       for (const frontendWorkers of [1, 4]) {
         const compiler = await createZigProjectCompiler({
@@ -214,7 +214,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
         });
         try {
           const result = await compiler.build();
-          assert.equal(result.success, inferenceBudget === 18_133);
+          assert.equal(result.success, inferenceBudget === 18_136);
           if (result.success) {
             if (frontendWorkers === 4 && Deno.build.os === "linux") {
               const profile = result.stats.phaseProfile as { checking: Record<string, number> };

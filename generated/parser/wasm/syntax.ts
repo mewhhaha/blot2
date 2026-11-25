@@ -674,7 +674,7 @@ export interface NamedFunctionDeclarationCursor extends RuleCursorBase<"named_fu
 }
 
 export interface NamedFunctionCursor extends RuleCursorBase<"named_function"> {
-  field(name: "body"): ExpressionCursor | SuiteCursor;
+  field(name: "body"): EffectStepCursor | ExpressionCursor | RebindingCursor | SuiteCursor;
   field(name: "name"): FunctionNameCursor;
   field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
@@ -806,7 +806,7 @@ export interface TypeArrayCursor extends RuleCursorBase<"type_array"> {
 }
 
 export interface TypeSymbolArrayCursor extends RuleCursorBase<"type_symbol_array"> {
-  field(name: "first"): TypeExpressionCursor;
+  field(name: "first"): TokenCursor<"named", "INTEGER"> | TypeExpressionCursor;
   field(name: "modifier"): TokenCursor<"literal", "+"> | TokenCursor<"literal", "~"> | null;
   field(name: "second"): TypeExpressionCursor | null;
   field(name: string): CursorFieldValue | undefined;
@@ -987,13 +987,13 @@ export interface TypeGroupCursor extends RuleCursorBase<"type_group"> {
 }
 
 export interface ExpressionCursor extends RuleCursorBase<"expression"> {
-  field(name: "value"): CaseExpressionCursor | DoBlockCursor | IfExpressionCursor | InfixExpressionCursor | LambdaCursor | PackagePackCursor | PackageUnpackCursor | ReceiveCursor;
+  field(name: "value"): CaseExpressionCursor | ComptimeForCursor | ComptimeIfCursor | DoBlockCursor | ForkStatementCursor | IfExpressionCursor | InfixExpressionCursor | LambdaCursor | PackagePackCursor | PackageUnpackCursor | ReceiveCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface LambdaCursor extends RuleCursorBase<"lambda"> {
-  field(name: "body"): ExpressionCursor | RebindingCursor | SuiteCursor;
+  field(name: "body"): EffectStepCursor | ExpressionCursor | RebindingCursor | SuiteCursor;
   field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
   field(name: string): CursorFieldValue | undefined;
@@ -1299,7 +1299,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ComptimeForCursor | ComptimeIfCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | ForkStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor | WithStatementCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor | WithStatementCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1362,7 +1362,7 @@ export interface BindingCursor extends RuleCursorBase<"binding"> {
 
 export interface RebindingCursor extends RuleCursorBase<"rebinding"> {
   field(name: "name"): SourceIdentifierCursor;
-  field(name: "path"): ReadonlyArray<IndexAccessCursor | MemberAccessCursor>;
+  field(name: "path"): ReadonlyArray<ComptimeAccessCursor | IndexAccessCursor | MemberAccessCursor>;
   field(name: "value"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];

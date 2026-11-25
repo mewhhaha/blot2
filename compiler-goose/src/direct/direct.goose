@@ -140,6 +140,23 @@ fn emitTestMetadata(module: blot_direct_writer::Module&, m: const Module&) {
     }
     module.custom("blot:tests", section[..]);
 }
+fn emitTrapMetadata(module: blot_direct_writer::Module&, state: const blot_direct_emit::State&) {
+    if state.traps.len == 0 { return; }
+    var section: u8[>..<] = [];
+    section.push(1);
+    blot_direct_writer::word(section, state.traps.len as u32);
+    for entry in state.traps {
+        section.push(entry.kind);
+        blot_direct_writer::word(section, entry.unit);
+        blot_direct_writer::word(section, entry.start);
+        blot_direct_writer::word(section, entry.end);
+        blot_direct_writer::word(section, entry.message_len);
+        let msg_start = entry.message_start as i64;
+        let msg_end = msg_start + (entry.message_len as i64);
+        blot_direct_writer::raw(section, state.trap_text[msg_start..msg_end]);
+    }
+    module.custom("blot:traps", section[..]);
+}
 fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_schema::ProgramInfo&, bytes: u8[>..<]&) -> Error {
     if !g.hasUnit(entry) { return blot_direct_types::Error.unsupported; }
     g.s.rt_flags_known = true;
@@ -188,7 +205,7 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     if perr != blot_direct_types::Error.none { r_exp.exit(); return perr; }
     count += process_exports;
     r_exp.exit();
-    if count == 0 && inits.len == 0 { return g.fail(m, 0, "the entry module exports nothing"); }
+    if count == 0 && inits.len == 0 { return g.failCode(m, 0, blot_check_diagnostic_code::Code.no_entry, "the entry module exports nothing"); }
     let r_emit = blot_phase_profile::region("direct.emit_all", entry, 0, 0);
     let emitted = g.emitAll();
     r_emit.exitWithItems(0, g.module.functions.len);
@@ -231,6 +248,10 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
     blot_direct_writer::raw(abi, constants[..]);
     g.module.custom("blot:abi", abi[..]);
     if blot_direct_writer::testModeEnabled() { emitTestMetadata(g.module, m); }
+    emitTrapMetadata(g.module, g.s);
+    if g.s.traps.len != 0 && !g.s.exported_storage && g.module.has_memory {
+        g.module.exportItem("blot:memory", blot_direct_writer::EXPORT_memory, 0);
+    }
     if count != 0 { blot_direct_function::emitInvocationFinish(g, m); }
     for si in 1..g.s.staged_dep_units.len {
         let key = g.s.staged_dep_units[si];

@@ -58,12 +58,6 @@ fn target(self_:Collector&,id:u32)->Error {
 recursive fn scope(self_:Collector&,body:u32,pat:u32,depth:i64)->Error {
  if body==0 {return blot_error::Error.none;}let mark=self_.trail.items.len;var error=self_.pattern(pat,depth+1);if error==blot_error::Error.none {error=self_.suite(body,depth+1);}self_.restore(mark);return error;
 }
-recursive fn caseScope(self_:Collector&,arm:blot_parse_ast::Node,body:u32,depth:i64)->Error {
- let mark=self_.trail.items.len;let error=self_.casePatterns(arm,body,depth);self_.restore(mark);return error;
-}
-recursive fn casePatterns(self_:Collector&,arm:blot_parse_ast::Node,body:u32,depth:i64)->Error {
- let rows=blot_parse_ast::List{arm.a,arm.b,..};let row_count=self_.tree.list(rows).len;for row_index in 0..row_count {let row=self_.tree.list(rows)[row_index];let child_count=self_.tree.children(row).len;for child_index in 0..child_count {let id=self_.tree.children(row)[child_index];{ let propagated_error = self_.pattern(id,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }}}return self_.suite(body,depth+1);
-}
 recursive fn withHandlerTargets(self_:Collector&,expr:u32,depth:i64)->Error {
  if expr==0||depth>=1024 {return blot_error::Error.none;}
  let node=self_.tree.node(expr);
@@ -94,12 +88,60 @@ recursive fn comptimeScope(self_:Collector&,node:blot_parse_ast::Node,depth:i64)
  self_.restore(mark);
  return error;
 }
+recursive fn caseArmTargets(self_:Collector&,arm:blot_parse_ast::Node,guard_source:u32,body:u32,depth:i64)->Error {
+ let mark=self_.trail.items.len;
+ let rows=blot_parse_ast::List{arm.a,arm.b,..};
+ let row_count=self_.tree.list(rows).len;
+ var error=blot_error::Error.none;
+ for row_index in 0..row_count {
+  let row=self_.tree.list(rows)[row_index];
+  let child_count=self_.tree.children(row).len;
+  for child_index in 0..child_count {
+   let id=self_.tree.children(row)[child_index];
+   error=self_.pattern(id,depth+1);
+   if error!=blot_error::Error.none { break; }
+  }
+  if error!=blot_error::Error.none { break; }
+ }
+ if error==blot_error::Error.none && guard_source!=0 {
+  error=self_.expressionTargets(guard_source,depth+1);
+ }
+ if error==blot_error::Error.none {
+  if self_.tree.node(body).tag==blot_parse_ast::tag_block && self_.tree.node(body).c==0 {
+   error=self_.suite(body,depth+1);
+  } else {
+   error=self_.expressionTargets(body,depth+1);
+  }
+ }
+ self_.restore(mark);
+ return error;
+}
+recursive fn caseExprTargets(self_:Collector&,value:blot_parse_ast::Node,depth:i64)->Error {
+ let inputs=blot_parse_ast::List{self_.tree.extra.items[value.a],self_.tree.extra.items[value.a+1],..};
+ let input_count=self_.tree.list(inputs).len;
+ for input_index in 0..input_count {
+  let error=self_.expressionTargets(self_.tree.list(inputs)[input_index],depth+1);
+  if error!=blot_error::Error.none { return error; }
+ }
+ let arms=blot_parse_ast::List{value.b,value.c,..};
+ let arm_count=self_.tree.list(arms).len;
+ for arm_index in 0..arm_count {
+  let id=self_.tree.list(arms)[arm_index];
+  let arm=self_.tree.node(id);
+  let guard_source=self_.tree.extra.items[arm.c];
+  let arm_body=self_.tree.extra.items[arm.c+1];
+  let error=self_.caseArmTargets(arm,guard_source,arm_body,depth);
+  if error!=blot_error::Error.none { return error; }
+ }
+ return blot_error::Error.none;
+}
 recursive fn expressionTargets(self_:Collector&,id:u32,depth:i64)->Error {
  if id==0 {return blot_error::Error.none;}
  if depth>=1024 {return blot_error::Error.target_limit;}
  let node=self_.tree.node(id);
  match node.tag {
   blot_parse_ast::tag_comptime_for=>{return self_.comptimeScope(node,depth+1);},
+  blot_parse_ast::tag_case_expr=>{return self_.caseExprTargets(node,depth+1);},
   blot_parse_ast::tag_group,blot_parse_ast::tag_field_access,blot_parse_ast::tag_comptime_project,
   blot_parse_ast::tag_type_witness,blot_parse_ast::tag_return_stmt,blot_parse_ast::tag_function_return_stmt=>{
    return self_.expressionTargets(node.a,depth+1);
@@ -133,14 +175,14 @@ recursive fn suite(self_:Collector&,body:u32,depth:i64)->Error {
  let child_count=self_.tree.children(body).len;for child_index in 0..child_count {let id=self_.tree.children(body)[child_index];
   let value=self_.tree.node(id);
   match value.tag {
-   blot_parse_ast::tag_rebind_stmt=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.target(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_let_stmt=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.pattern(value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_rebind_stmt=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.target(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_let_stmt=>{let binding=self_.tree.binding(id);let error=self_.expressionTargets(binding.value,depth+1);if error!=blot_error::Error.none {return error;}if binding.fallback!=0 {let error=self_.scope(binding.fallback,0,depth+1);if error!=blot_error::Error.none {return error;}}{ let propagated_error = self_.pattern(binding.pattern,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    blot_parse_ast::tag_use_stmt,blot_parse_ast::tag_iterator_bind=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.shadow(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_if_stmt=>{{ let propagated_error = self_.scope(value.b,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_if_let_stmt=>{let bodies=self_.tree.extra.items[value.c..value.c+2];let first_body=bodies[0];let second_body=bodies[1];{ let propagated_error = self_.scope(first_body,value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(second_body,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_case_expr=>{let arms=blot_parse_ast::List{value.b,value.c,..};let arm_count=self_.tree.list(arms).len;for arm_index in 0..arm_count {let id=self_.tree.list(arms)[arm_index];let arm=self_.tree.node(id);let arm_body=self_.tree.extra.items[arm.c+1];if self_.tree.node(arm_body).tag!=blot_parse_ast::tag_block||self_.tree.node(arm_body).c!=0 {continue;}{ let propagated_error = self_.caseScope(arm,arm_body,depth); if propagated_error != blot_error::Error.none { return propagated_error; } }}},
-   blot_parse_ast::tag_for_stmt=>{{ let propagated_error = self_.scope(self_.tree.extra.items[value.c+1],value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_range_stmt=>{{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_if_stmt=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(value.b,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_if_let_stmt=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}let bodies=self_.tree.extra.items[value.c..value.c+2];let first_body=bodies[0];let second_body=bodies[1];{ let propagated_error = self_.scope(first_body,value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(second_body,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_case_expr=>{let error=self_.caseExprTargets(value,depth+1);if error!=blot_error::Error.none {return error;}},
+   blot_parse_ast::tag_for_stmt=>{let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}let error=self_.expressionTargets(self_.tree.extra.items[value.c],depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(self_.tree.extra.items[value.c+1],value.a,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_range_stmt=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}let error=self_.expressionTargets(value.b,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    blot_parse_ast::tag_forever_stmt=>{{ let propagated_error = self_.scope(value.a,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    blot_parse_ast::tag_with_stmt=>{
     let entries=blot_parse_ast::List{value.a,value.b,..};
@@ -152,7 +194,7 @@ recursive fn suite(self_:Collector&,body:u32,depth:i64)->Error {
     { let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }
    },
    blot_parse_ast::tag_comptime_for=>{let error=self_.comptimeScope(value,depth+1);if error!=blot_error::Error.none {return error;}},
-   blot_parse_ast::tag_comptime_if=>{{ let propagated_error = self_.scope(value.b,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   blot_parse_ast::tag_comptime_if=>{let error=self_.expressionTargets(value.a,depth+1);if error!=blot_error::Error.none {return error;}{ let propagated_error = self_.scope(value.b,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.scope(value.c,0,depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    _=>{let error=self_.expressionTargets(id,depth+1);if error!=blot_error::Error.none {return error;}},
   }
  }

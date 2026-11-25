@@ -20,7 +20,7 @@ struct StageBinding { binding: u32, value: StageValue }
 // ranges so that bindings and calls can share values during evaluation.
 
 struct StagePart { name: u32 = 0, value: StageValue = StageValue {} }
-struct StageAggregate { kind: blot_check_core::Tag, start: u32, len: u32, tag: u32 }
+struct StageAggregate { kind: blot_check_core::Tag, start: u32, len: u32, tag: u32, nom_unit: u32 = 0, nom_decl: u32 = 0 }
 let stage_aggregate: u32 = 0xffffffff;
 struct Stage {
     parts: blot_support_pooled_buffer::Buffer<StagePart> = blot_support_pooled_buffer::Buffer<StagePart>{..},
@@ -29,10 +29,37 @@ struct Stage {
     functions: blot_support_pooled_buffer::Buffer<StageFunction> = blot_support_pooled_buffer::Buffer<StageFunction>{..},
     remaining: i64 = 65536,
     failure: Chars = "",
+    failure_buf: u8[256] = [0; 256],
+    failure_len: i64 = 0,
+}
+
+fn stageFailureText(s: const Stage&) -> Chars {
+    if s.failure_len != 0 { return s.failure_buf[..s.failure_len]; }
+    return s.failure;
 }
 
 fn stopStage(s: Stage&, message: Chars) -> StageValue {
     if s.failure.len == 0 { s.failure = message; }
+    return StageValue {};
+}
+
+fn stopStagePanic(s: Stage&, message: Chars) -> StageValue {
+    if s.failure.len == 0 {
+        let prefix: Chars = "#run trapped: ";
+        var at: i64 = 0;
+        for b in prefix {
+            if at >= 256 { break; }
+            s.failure_buf[at] = b;
+            at += 1;
+        }
+        for b in message {
+            if at >= 256 { break; }
+            s.failure_buf[at] = b;
+            at += 1;
+        }
+        s.failure_len = at;
+        s.failure = "#run trapped";
+    }
     return StageValue {};
 }
 
@@ -77,7 +104,8 @@ fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let value = evaluateStage(g, f, s, m, id, 0, 0);
     var result = neverVal();
     var error = blot_direct_types::Error.none;
-    if s.failure.len != 0 { error = g.fail(m, id, s.failure); }
+    let failed = stageFailureText(s);
+    if failed.len != 0 { error = g.fail(m, id, failed); }
     else {
         g.mixStagedDigest(((m.unit as u64) << 32) | (id as u64));
         hashStageValue(g, s, value, 0);
@@ -128,14 +156,19 @@ fn stageStringValue(s: Stage&, text: Chars) -> StageValue {
         p = next;
     }
     let index = s.aggregates.items.len as u32;
-    blot_support_pooled_buffer::push(s.aggregates, StageAggregate { blot_check_core::Tag.array, start, count as u32, 0 }, aggregate_runs);
+    blot_support_pooled_buffer::push(s.aggregates, StageAggregate { blot_check_core::Tag.array, start, count as u32, 0, 0, 0 }, aggregate_runs);
     return StageValue { index, stage_aggregate, 0 };
 }
 
 recursive fn stageValueEqual(s: const Stage&, a: StageValue, b: StageValue, depth: i64) -> bool {
     if depth >= 64 { return false; }
     if a.ty != b.ty { return false; }
-    if a.ty != stage_aggregate { return a.bits == b.bits; }
+    if a.ty != stage_aggregate {
+        if a.ty == blot_check_types::f32_type {
+            return blot_native::f32_from_bits(a.bits) == blot_native::f32_from_bits(b.bits);
+        }
+        return a.bits == b.bits;
+    }
     let aa = s.aggregates.items[a.bits];
     let ba = s.aggregates.items[b.bits];
     if aa.kind != ba.kind || aa.tag != ba.tag || aa.len != ba.len { return false; }
@@ -475,6 +508,124 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
     return value;
 }
 
+fn stageReceiverIdentity(s: const Stage&, v: StageValue) -> blot_check_types::NominalIdentity, bool {
+    if v.ty == stage_aggregate {
+        let agg = s.aggregates.items[v.bits];
+        if agg.kind == blot_check_core::Tag.construct && agg.nom_decl != 0 {
+            return blot_check_types::NominalIdentity { agg.nom_unit, agg.nom_decl }, true;
+        }
+        if agg.kind == blot_check_core::Tag.array {
+            return blot_check_types::NominalIdentity { 0, 0xffffffff }, true;
+        }
+        return blot_check_types::NominalIdentity { 0, 0 }, false;
+    }
+    if v.ty == blot_check_types::u32_type { return blot_check_types::NominalIdentity { 0, blot_check_types::u32_type }, true; }
+    if v.ty == blot_check_types::f32_type { return blot_check_types::NominalIdentity { 0, blot_check_types::f32_type }, true; }
+    if v.ty == blot_check_types::boolean { return blot_check_types::NominalIdentity { 0, blot_check_types::boolean }, true; }
+    if v.ty == blot_check_types::unit { return blot_check_types::NominalIdentity { 0, blot_check_types::unit }, true; }
+    return blot_check_types::NominalIdentity { 0, 0 }, false;
+}
+
+recursive fn callStageTarget(
+    g: Generator&,
+    f: const Fn&,
+    s: Stage&,
+    m: const Module&,
+    initial: BindingRef,
+    a: StageValue,
+    has_b: bool,
+    b: StageValue,
+    depth: i64,
+) -> StageValue {
+    var target = g.resolve(m, initial);
+    if !g.hasUnit(target.unit) { return stopStage(s, "#run has no body for this associated call"); }
+    for step in 0..8 {
+        let cur_owner .= g.units[target.unit - 1];
+        let cur_binding = cur_owner.binding(target.binding);
+        if target.unit == m.unit && (cur_binding.kind == blot_reuse_principal_interface::Kind.local || cur_binding.kind == blot_reuse_principal_interface::Kind.parameter) { break; }
+        let cur_body .= cur_owner.body(target.binding);
+        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != blot_check_core::Tag.reference { break; }
+        blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+        blot_direct_relocations::stagedRead(target.unit, 0);
+        g.recordStagedDepUnit(target.unit);
+        let next = g.resolve(cur_owner, cur_owner.reference(cur_body.root));
+        if next == target || !g.hasUnit(next.unit) { break; }
+        target = next;
+    }
+    let owner .= g.units[target.unit - 1];
+    blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+    g.recordStagedDepUnit(target.unit);
+    let arity: i64 = if has_b { 2 } else { 1 };
+    let alias, primitive = primitiveAlias(owner, target.binding);
+    if primitive {
+        let info = owner.primitive(alias);
+        if info.kind != blot_check_core::PrimitiveKind.scalar || info.arity != arity {
+            return stopStage(s, "#run requires a saturated scalar primitive");
+        }
+        return stageScalar(s, info.op, a, b);
+    }
+    let body .= owner.body(target.binding);
+    if !body || !body.is_function || body.runtime {
+        return stopStage(s, "#run requires a compile-time associated function");
+    }
+    let params = owner.bodyParameters(body);
+    if params.len == arity {
+        let base = s.bindings.items.len;
+        blot_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
+        if has_b {
+            blot_support_pooled_buffer::push(s.bindings, StageBinding { params[1].binding, b }, binding_runs);
+        }
+        let value = evaluateStage(g, f, s, owner, body.root, base, depth + 1);
+        blot_support_pooled_buffer::resize(s.bindings, base);
+        return value;
+    }
+    if has_b && params.len == 1 {
+        let base = s.bindings.items.len;
+        blot_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
+        let partial = evaluateStage(g, f, s, owner, body.root, base, depth + 1);
+        blot_support_pooled_buffer::resize(s.bindings, base);
+        if s.failure.len != 0 || partial.returning_to != 0 { return partial; }
+        return applyStage(g, f, s, partial, b, depth + 1);
+    }
+    return stopStage(s, "#run associated function arity mismatch");
+}
+
+recursive fn evalStageAssociated(
+    g: Generator&,
+    f: const Fn&,
+    s: Stage&,
+    m: const Module&,
+    op: blot_check_core::Op,
+    member: u32,
+    a: StageValue,
+    has_b: bool,
+    b: StageValue,
+    depth: i64,
+) -> StageValue {
+    let identity, has_id = stageReceiverIdentity(s, a);
+    let type_op, has_op = operatorOf(op);
+    if has_id && (a.ty == stage_aggregate || member != 0) && (member != 0 || has_op) {
+        var lookup_op = blot_check_types::Operator.none;
+        if member == 0 { lookup_op = type_op; }
+        let target, found = g.dispatchTarget(m, identity, member, lookup_op);
+        if found {
+            return callStageTarget(g, f, s, m, target, a, has_b, b, depth);
+        }
+        if member == 0 && op == blot_check_core::Op.not_equal {
+            let eq_target, eq_found = g.dispatchTarget(m, identity, 0, blot_check_types::Operator.equal);
+            if eq_found {
+                let eq_res = callStageTarget(g, f, s, m, eq_target, a, has_b, b, depth);
+                if s.failure.len != 0 || eq_res.returning_to != 0 { return eq_res; }
+                return stageBool(eq_res.bits == 0);
+            }
+        }
+    }
+    if op == blot_check_core::Op.equal { return stageBool(stageValueEqual(s, a, b, 0)); }
+    if op == blot_check_core::Op.not_equal { return stageBool(!stageValueEqual(s, a, b, 0)); }
+    if op != blot_check_core::Op.none { return stageScalar(s, op, a, b); }
+    return stopStage(s, "#run does not support this associated operator");
+}
+
 recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Module&, id: u32, frame: i64, depth: i64) -> StageValue {
     if s.failure.len != 0 || id == 0 { return StageValue {}; }
     if s.remaining == 0 || depth >= 256 { return stopStage(s, "#run exceeded its evaluation budget"); }
@@ -490,7 +641,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 // A captured input already owns immutable bytes. Keep a handle
                 // so reading one header does not expand an entire file.
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, 0, bytes.len as u32, key.bits}, aggregate_runs);
+                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, 0, bytes.len as u32, key.bits, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
             if n.c != blot_check_typed_staging::opCode(blot_check_typed_staging::Op.evaluate) { return stopStage(s, "typed code staging is not supported by the direct backend"); }
@@ -561,7 +712,16 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             let start = s.parts.items.len as u32;
             for at in 0..count { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
             var tag: u32 = 0;
-            if n.tag == blot_check_core::Tag.construct { tag = m.constructor(n.a).tag; }
+            var nom_unit: u32 = 0;
+            var nom_decl: u32 = 0;
+            if n.tag == blot_check_core::Tag.construct {
+                let ctor = m.constructor(n.a);
+                let nom = m.nominal(ctor.nominal);
+                tag = ctor.tag;
+                nom_unit = nom.identity.unit;
+                nom_decl = nom.identity.decl;
+                if nom_unit == 0 { nom_unit = m.unit; }
+            }
             for at in 0..count {
                 var child = n.b;
                 if n.tag != blot_check_core::Tag.construct { child = children[at]; }
@@ -577,7 +737,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 s.parts.items[start + at] = StagePart {name, value};
             }
             let index = s.aggregates.items.len as u32;
-            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {n.tag, start, count as u32, tag}, aggregate_runs);
+            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {n.tag, start, count as u32, tag, nom_unit, nom_decl}, aggregate_runs);
             return StageValue {index, stage_aggregate, 0};
         },
         project => {
@@ -631,7 +791,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                     s.parts.items[start + at].value = item;
                 }
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, start, value.bits, 0}, aggregate_runs);
+                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, start, value.bits, 0, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
             if value.ty != stage_aggregate || s.aggregates.items[value.bits].kind != blot_check_core::Tag.array { return stopStage(s, "#run requires an array"); }
@@ -657,6 +817,9 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             }
             let b = evaluateStage(g, f, s, m, n.b, frame, depth + 1);
             if s.failure.len != 0 || b.returning_to != 0 { return b; }
+            if n.c == 1 && (a.ty == stage_aggregate || b.ty == stage_aggregate) {
+                return evalStageAssociated(g, f, s, m, n.op, 0, a, n.b != 0, b, depth);
+            }
             return stageScalar(s, n.op, a, b);
         },
         associated => {
@@ -667,10 +830,9 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 b = evaluateStage(g, f, s, m, n.b, frame, depth + 1);
                 if s.failure.len != 0 || b.returning_to != 0 { return b; }
             }
-            if n.op == blot_check_core::Op.equal { return stageBool(stageValueEqual(s, a, b, 0)); }
-            if n.op == blot_check_core::Op.not_equal { return stageBool(!stageValueEqual(s, a, b, 0)); }
-            if n.op != blot_check_core::Op.none { return stageScalar(s, n.op, a, b); }
-            return stopStage(s, "#run does not support this associated operator");
+            var member: u32 = 0;
+            if n.op == blot_check_core::Op.none { member = n.c; }
+            return evalStageAssociated(g, f, s, m, n.op, member, a, n.b != 0, b, depth);
         },
         call => { return evaluateStageCall(g, f, s, m, id, frame, depth); },
         bind => {
@@ -710,7 +872,11 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             return result;
         },
         comptime_meta => { return evalComptimeMetaStage(g, f, s, m, id, frame, depth); },
-        panic => { return stopStage(s, "#run trapped"); },
+        panic => {
+            let msg = m.panicMessage(id);
+            if msg.len != 0 { return stopStagePanic(s, msg); }
+            return stopStage(s, "#run trapped");
+        },
         spark => {
             let info = m.sparkInfo(id);
             if info.is_range {
@@ -740,7 +906,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                     s.parts.items[parts_start + at].value = out;
                 }
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, count, 0}, aggregate_runs);
+                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, count, 0, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
             let src_v = evaluateStage(g, f, s, m, info.source, frame, depth + 1);
@@ -773,7 +939,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 s.parts.items[parts_start + at].value = out;
             }
             let index = s.aggregates.items.len as u32;
-            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, src_agg.len, 0}, aggregate_runs);
+            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, src_agg.len, 0, 0, 0}, aggregate_runs);
             return StageValue {index, stage_aggregate, 0};
         },
         fork_, with_handle, comptime_for, flat_op => { return stopStage(s, "#run does not support this construct"); },

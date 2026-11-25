@@ -22,7 +22,7 @@
       "use_expansions": 3
      },
      "core_nodes": 2805,
-     "effect_rows": 6415,
+     "effect_rows": 6419,
      "emitted_functions": 2078,
      "filename": "alias-project-fixtures/logical-long-2048.blot",
      "files": 2,
@@ -33,13 +33,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 8018,
-     "type_nodes": 6617,
+     "type_nodes": 6630,
      "type_versions": 2690,
-     "wasm_bytes": 87585
+     "wasm_bytes": 87614
     }
    ],
-   "wasm_bytes": 87585,
-   "wasm_sha256": "a4078263e35169d36d6bb532df64c1800e27813ca4ebe15a2dba82a1f78eb33d"
+   "wasm_bytes": 87614,
+   "wasm_sha256": "0600a0ea85ec287622e4c97d99ece3c06fb0b1559ac6427bc41f7cb40ec908dd"
   },
   "bottom_bindings.blot": {
    "exit": 0,
@@ -62,7 +62,7 @@
       "use_expansions": 3
      },
      "core_nodes": 847,
-     "effect_rows": 2429,
+     "effect_rows": 2433,
      "emitted_functions": 49,
      "filename": "bottom_bindings.blot",
      "files": 2,
@@ -73,13 +73,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2063,
-     "type_nodes": 4783,
+     "type_nodes": 4796,
      "type_versions": 693,
-     "wasm_bytes": 5356
+     "wasm_bytes": 5708
     }
    ],
-   "wasm_bytes": 5356,
-   "wasm_sha256": "9d505bfeb895e3a6607011469f6007c53c398e0c4b8ae1b7220a519078c1c121"
+   "wasm_bytes": 5708,
+   "wasm_sha256": "e312056fe8773c6fec4e109fff6ae7957ee1bd0686fd1fda6d6268612ffecb63"
   },
   "callback-fixtures/capture.blot": {
    "exit": 0,
@@ -102,7 +102,7 @@
       "use_expansions": 3
      },
      "core_nodes": 781,
-     "effect_rows": 2362,
+     "effect_rows": 2366,
      "emitted_functions": 35,
      "filename": "callback-fixtures/capture.blot",
      "files": 2,
@@ -113,13 +113,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1917,
-     "type_nodes": 4618,
+     "type_nodes": 4631,
      "type_versions": 650,
-     "wasm_bytes": 4530
+     "wasm_bytes": 4559
     }
    ],
-   "wasm_bytes": 4530,
-   "wasm_sha256": "f73033bc5d93b23b8950be5fb4916e876a3a4548e3d0b8b211dc9c2fa91560bd"
+   "wasm_bytes": 4559,
+   "wasm_sha256": "59d0c4561b8d4ce7cf2b28b151e1bf1f39f95ba1b1c9591323ebaf23fbd76485"
   },
   "callback-fixtures/parameter.blot": {
    "exit": 0,
@@ -142,7 +142,7 @@
       "use_expansions": 3
      },
      "core_nodes": 774,
-     "effect_rows": 2353,
+     "effect_rows": 2357,
      "emitted_functions": 34,
      "filename": "callback-fixtures/parameter.blot",
      "files": 2,
@@ -153,13 +153,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1908,
-     "type_nodes": 4608,
+     "type_nodes": 4621,
      "type_versions": 648,
-     "wasm_bytes": 4434
+     "wasm_bytes": 4463
     }
    ],
-   "wasm_bytes": 4434,
-   "wasm_sha256": "3dbd5eed94ef53cd509e9b97f56f21c911aa835ce8c710d6ecbd01fa636730ee"
+   "wasm_bytes": 4463,
+   "wasm_sha256": "157f6cd1cf6348df0b7ec5b2024b370e290693c70340a767a03d98479bab5668"
   },
   "callback-fixtures/record.blot": {
    "exit": 0,
@@ -182,7 +182,7 @@
       "use_expansions": 3
      },
      "core_nodes": 781,
-     "effect_rows": 2360,
+     "effect_rows": 2364,
      "emitted_functions": 34,
      "filename": "callback-fixtures/record.blot",
      "files": 2,
@@ -193,13 +193,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1925,
-     "type_nodes": 4617,
+     "type_nodes": 4630,
      "type_versions": 649,
-     "wasm_bytes": 4443
+     "wasm_bytes": 4472
     }
    ],
-   "wasm_bytes": 4443,
-   "wasm_sha256": "c709457f385937d3be537d6554e3ce584c571c0d2fe509f4fd9d3fa783fc3da4"
+   "wasm_bytes": 4472,
+   "wasm_sha256": "d3e7c85bc4a0aaf9bce0ff869411e33c39d3931248ae086be3d7e855025bf38c"
   },
   "captured-callable-fixtures/bound-cache-effects.blot": {
    "exit": 0,
@@ -222,7 +222,7 @@
       "use_expansions": 3
      },
      "core_nodes": 797,
-     "effect_rows": 2413,
+     "effect_rows": 2417,
      "emitted_functions": 41,
      "filename": "captured-callable-fixtures/bound-cache-effects.blot",
      "files": 2,
@@ -233,13 +233,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1944,
-     "type_nodes": 4695,
+     "type_nodes": 4708,
      "type_versions": 665,
-     "wasm_bytes": 4731
+     "wasm_bytes": 4760
     }
    ],
-   "wasm_bytes": 4731,
-   "wasm_sha256": "0362a7260429803b145e13514007b03ea6e6320c61e8327c209ddd72c48654d4"
+   "wasm_bytes": 4760,
+   "wasm_sha256": "7655dd33333fb2ba64fc7d1a9aef3bb1a3f6313ff2acedbe1c0bec40d98f5fd1"
   },
   "captured-callable-fixtures/bound-cache-missing.blot": {
    "exit": 1,
@@ -271,7 +271,7 @@
       "use_expansions": 3
      },
      "core_nodes": 779,
-     "effect_rows": 2371,
+     "effect_rows": 2375,
      "emitted_functions": 0,
      "filename": "captured-callable-fixtures/bound-cache-missing.blot",
      "files": 2,
@@ -282,7 +282,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1938,
-     "type_nodes": 4679,
+     "type_nodes": 4692,
      "type_versions": 660,
      "wasm_bytes": 0
     }
@@ -309,7 +309,7 @@
       "use_expansions": 3
      },
      "core_nodes": 785,
-     "effect_rows": 2399,
+     "effect_rows": 2403,
      "emitted_functions": 38,
      "filename": "captured-callable-fixtures/bound-cache-nominals.blot",
      "files": 2,
@@ -320,13 +320,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1953,
-     "type_nodes": 4724,
+     "type_nodes": 4737,
      "type_versions": 667,
-     "wasm_bytes": 4461
+     "wasm_bytes": 4490
     }
    ],
-   "wasm_bytes": 4461,
-   "wasm_sha256": "4ad4dc0d48c575555821d8cf1fe04d1ce4bfc0a7c1856751bec88f0fd591fa23"
+   "wasm_bytes": 4490,
+   "wasm_sha256": "81524300d74ee7386bd7a169f12af8b3eca40912ac6e438cd84a56c7a555fc53"
   },
   "captured-callable-fixtures/bound-method.blot": {
    "exit": 0,
@@ -349,7 +349,7 @@
       "use_expansions": 3
      },
      "core_nodes": 774,
-     "effect_rows": 2357,
+     "effect_rows": 2361,
      "emitted_functions": 36,
      "filename": "captured-callable-fixtures/bound-method.blot",
      "files": 2,
@@ -360,13 +360,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1921,
-     "type_nodes": 4652,
+     "type_nodes": 4665,
      "type_versions": 656,
-     "wasm_bytes": 4284
+     "wasm_bytes": 4313
     }
    ],
-   "wasm_bytes": 4284,
-   "wasm_sha256": "40f4e508c0f0da3eeca228ac6370c240972f1d60d4f3dec3eb739ce4555f1962"
+   "wasm_bytes": 4313,
+   "wasm_sha256": "4f836ecabd2d101c751e846ada92067fd397e069546bc69c871721b4a38aaac3"
   },
   "captured-callable-fixtures/captured-builtin.blot": {
    "exit": 0,
@@ -389,7 +389,7 @@
       "use_expansions": 3
      },
      "core_nodes": 789,
-     "effect_rows": 2431,
+     "effect_rows": 2435,
      "emitted_functions": 45,
      "filename": "captured-callable-fixtures/captured-builtin.blot",
      "files": 2,
@@ -400,13 +400,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1928,
-     "type_nodes": 4717,
+     "type_nodes": 4730,
      "type_versions": 664,
-     "wasm_bytes": 5040
+     "wasm_bytes": 5069
     }
    ],
-   "wasm_bytes": 5040,
-   "wasm_sha256": "ef227a1bad15daee8c108e7a1879c23f0c1ff8331dff66dbe855d53f02c15667"
+   "wasm_bytes": 5069,
+   "wasm_sha256": "89b51ba99dbda3a9b932429ff6820dc02588bd5d3a57096a3a5a80700bf7e69d"
   },
   "captured-callable-fixtures/captured-effect.blot": {
    "exit": 0,
@@ -429,7 +429,7 @@
       "use_expansions": 3
      },
      "core_nodes": 799,
-     "effect_rows": 2459,
+     "effect_rows": 2463,
      "emitted_functions": 46,
      "filename": "captured-callable-fixtures/captured-effect.blot",
      "files": 2,
@@ -440,23 +440,23 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1952,
-     "type_nodes": 4758,
+     "type_nodes": 4771,
      "type_versions": 669,
-     "wasm_bytes": 5050
+     "wasm_bytes": 5079
     }
    ],
-   "wasm_bytes": 5050,
-   "wasm_sha256": "1330e0941b27cba8ce9d56a4cd578697a70f0dcdf5d036bf2317f6a041d24096"
+   "wasm_bytes": 5079,
+   "wasm_sha256": "4c01d88c598b45c56b0d5b90ed5edba2537df8085e917954b91a960b9a8e9e9f"
   },
   "closure-fixtures/left.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "closure-fixtures/left.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -478,7 +478,7 @@
       "use_expansions": 4
      },
      "core_nodes": 789,
-     "effect_rows": 2495,
+     "effect_rows": 2499,
      "emitted_functions": 0,
      "filename": "closure-fixtures/left.blot",
      "files": 3,
@@ -489,7 +489,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1978,
-     "type_nodes": 4968,
+     "type_nodes": 4981,
      "type_versions": 678,
      "wasm_bytes": 0
     }
@@ -516,7 +516,7 @@
       "use_expansions": 4
      },
      "core_nodes": 796,
-     "effect_rows": 2641,
+     "effect_rows": 2645,
      "emitted_functions": 37,
      "filename": "closure-fixtures/main.blot",
      "files": 5,
@@ -527,23 +527,23 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2013,
-     "type_nodes": 5392,
+     "type_nodes": 5405,
      "type_versions": 688,
-     "wasm_bytes": 4486
+     "wasm_bytes": 4515
     }
    ],
-   "wasm_bytes": 4486,
-   "wasm_sha256": "5a022cd56eaf7901ee19ae5cd3c73905b2a0f3f338db96249b50248bb151d68b"
+   "wasm_bytes": 4515,
+   "wasm_sha256": "14c789f2d5bd3c21620955a31da9bdb39a380b4017ab2d5e66ec6f2020bcb53c"
   },
   "closure-fixtures/right.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "closure-fixtures/right.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -565,7 +565,7 @@
       "use_expansions": 3
      },
      "core_nodes": 776,
-     "effect_rows": 2465,
+     "effect_rows": 2469,
      "emitted_functions": 0,
      "filename": "closure-fixtures/right.blot",
      "files": 3,
@@ -576,7 +576,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1955,
-     "type_nodes": 4910,
+     "type_nodes": 4923,
      "type_versions": 667,
      "wasm_bytes": 0
     }
@@ -586,11 +586,11 @@
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "closure-fixtures/shared.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -612,7 +612,7 @@
       "use_expansions": 3
      },
      "core_nodes": 773,
-     "effect_rows": 2393,
+     "effect_rows": 2397,
      "emitted_functions": 0,
      "filename": "closure-fixtures/shared.blot",
      "files": 2,
@@ -623,7 +623,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1942,
-     "type_nodes": 4698,
+     "type_nodes": 4711,
      "type_versions": 661,
      "wasm_bytes": 0
     }
@@ -650,7 +650,7 @@
       "use_expansions": 5
      },
      "core_nodes": 1098,
-     "effect_rows": 2682,
+     "effect_rows": 2686,
      "emitted_functions": 43,
      "filename": "deferred_join.blot",
      "files": 2,
@@ -661,23 +661,23 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2377,
-     "type_nodes": 5213,
+     "type_nodes": 5226,
      "type_versions": 766,
-     "wasm_bytes": 7794
+     "wasm_bytes": 7912
     }
    ],
-   "wasm_bytes": 7794,
-   "wasm_sha256": "2ffdc6802413d632f15d146e5101733047f99e91524499085c6067b97129aef2"
+   "wasm_bytes": 7912,
+   "wasm_sha256": "abdd1b8df5cb5cc42b325c98d7b1e04c07ecc6810398054fbc58a6916ddfbf3f"
   },
   "dependency-fixtures/prelude.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "dependency-fixtures/prelude.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -699,7 +699,7 @@
       "use_expansions": 6
      },
      "core_nodes": 1445,
-     "effect_rows": 4556,
+     "effect_rows": 4568,
      "emitted_functions": 0,
      "filename": "dependency-fixtures/prelude.blot",
      "files": 2,
@@ -710,7 +710,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 3734,
-     "type_nodes": 8871,
+     "type_nodes": 8925,
      "type_versions": 1331,
      "wasm_bytes": 0
     }
@@ -720,11 +720,11 @@
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "dependency-prelude.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -746,7 +746,7 @@
       "use_expansions": 6
      },
      "core_nodes": 1445,
-     "effect_rows": 4556,
+     "effect_rows": 4568,
      "emitted_functions": 0,
      "filename": "dependency-prelude.blot",
      "files": 2,
@@ -757,7 +757,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 3734,
-     "type_nodes": 8871,
+     "type_nodes": 8925,
      "type_versions": 1331,
      "wasm_bytes": 0
     }
@@ -784,7 +784,7 @@
       "use_expansions": 3
      },
      "core_nodes": 916,
-     "effect_rows": 2542,
+     "effect_rows": 2546,
      "emitted_functions": 40,
      "filename": "direct/boxed_records.blot",
      "files": 2,
@@ -795,13 +795,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2162,
-     "type_nodes": 4896,
+     "type_nodes": 4909,
      "type_versions": 696,
-     "wasm_bytes": 6121
+     "wasm_bytes": 6180
     }
    ],
-   "wasm_bytes": 6121,
-   "wasm_sha256": "9310f44542fe83dce0ddbc38fd2f032d20eec186a1e6b028d98a385f306593e0"
+   "wasm_bytes": 6180,
+   "wasm_sha256": "74cd06769459255a951d1345d3d039ab6c890e6c57bdb6194108e8342dab4e3d"
   },
   "direct/branch_appends.blot": {
    "exit": 0,
@@ -824,7 +824,7 @@
       "use_expansions": 3
      },
      "core_nodes": 823,
-     "effect_rows": 2416,
+     "effect_rows": 2420,
      "emitted_functions": 31,
      "filename": "direct/branch_appends.blot",
      "files": 2,
@@ -835,13 +835,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1970,
-     "type_nodes": 4734,
+     "type_nodes": 4747,
      "type_versions": 672,
-     "wasm_bytes": 4596
+     "wasm_bytes": 4625
     }
    ],
-   "wasm_bytes": 4596,
-   "wasm_sha256": "ade6cf85fdcf9e5c41bce85d56077a1d4ad5b301bb201b68c91f50dabe04534b"
+   "wasm_bytes": 4625,
+   "wasm_sha256": "e560e0c24b899ce4ffe93339f75b716fb9daaa77f75ade36dc7a594da18dd792"
   },
   "direct/calls.blot": {
    "exit": 0,
@@ -864,7 +864,7 @@
       "use_expansions": 3
      },
      "core_nodes": 762,
-     "effect_rows": 2345,
+     "effect_rows": 2349,
      "emitted_functions": 31,
      "filename": "direct/calls.blot",
      "files": 2,
@@ -875,13 +875,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1891,
-     "type_nodes": 4612,
+     "type_nodes": 4625,
      "type_versions": 649,
-     "wasm_bytes": 3965
+     "wasm_bytes": 3994
     }
    ],
-   "wasm_bytes": 3965,
-   "wasm_sha256": "e384ca8059448b7a134b73ff369355808d2f205c676398359a50e26befe96ec4"
+   "wasm_bytes": 3994,
+   "wasm_sha256": "e79d7b8b838a8a0cc95b05b711e8171346ff2eee60621b9681c3001dbef57f86"
   },
   "direct/captured_generalized.blot": {
    "exit": 0,
@@ -904,7 +904,7 @@
       "use_expansions": 3
      },
      "core_nodes": 781,
-     "effect_rows": 2373,
+     "effect_rows": 2377,
      "emitted_functions": 37,
      "filename": "direct/captured_generalized.blot",
      "files": 2,
@@ -915,13 +915,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1925,
-     "type_nodes": 4696,
+     "type_nodes": 4709,
      "type_versions": 663,
-     "wasm_bytes": 4629
+     "wasm_bytes": 4658
     }
    ],
-   "wasm_bytes": 4629,
-   "wasm_sha256": "d2da86fc21b2fdaac05460f6d8c3b3e776baf5b6aacc4c20ee4ff436775e6d83"
+   "wasm_bytes": 4658,
+   "wasm_sha256": "a11db44ff6529fe020775d1244a430bdf22af2b8cae8e7afc07501ab1608863d"
   },
   "direct/carried_owners.blot": {
    "exit": 0,
@@ -944,7 +944,7 @@
       "use_expansions": 3
      },
      "core_nodes": 880,
-     "effect_rows": 2555,
+     "effect_rows": 2559,
      "emitted_functions": 38,
      "filename": "direct/carried_owners.blot",
      "files": 2,
@@ -955,13 +955,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2058,
-     "type_nodes": 4973,
+     "type_nodes": 4986,
      "type_versions": 706,
-     "wasm_bytes": 6404
+     "wasm_bytes": 6463
     }
    ],
-   "wasm_bytes": 6404,
-   "wasm_sha256": "c38bcc8b51f80298a939d01f3dc551cdb98a8e99f6f281299c4bafaa27a222ce"
+   "wasm_bytes": 6463,
+   "wasm_sha256": "cc2e51fc822d5a0f1294d2a0568c4ad81c36e34b6e448cbb14d6e513013ea8f1"
   },
   "direct/closures.blot": {
    "exit": 0,
@@ -984,7 +984,7 @@
       "use_expansions": 4
      },
      "core_nodes": 872,
-     "effect_rows": 2644,
+     "effect_rows": 2648,
      "emitted_functions": 53,
      "filename": "direct/closures.blot",
      "files": 2,
@@ -995,13 +995,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2097,
-     "type_nodes": 5104,
+     "type_nodes": 5117,
      "type_versions": 727,
-     "wasm_bytes": 5872
+     "wasm_bytes": 5901
     }
    ],
-   "wasm_bytes": 5872,
-   "wasm_sha256": "e2c7063571662369a219dc59e6dde670ba15a362729bee932455dabd5ee12b01"
+   "wasm_bytes": 5901,
+   "wasm_sha256": "dde566fea3953ae66d65948592cbe176d1e09445f892503ef27f1fbb3717b000"
   },
   "direct/closures_in_data.blot": {
    "exit": 0,
@@ -1024,7 +1024,7 @@
       "use_expansions": 3
      },
      "core_nodes": 786,
-     "effect_rows": 2355,
+     "effect_rows": 2359,
      "emitted_functions": 35,
      "filename": "direct/closures_in_data.blot",
      "files": 2,
@@ -1035,13 +1035,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1923,
-     "type_nodes": 4645,
+     "type_nodes": 4658,
      "type_versions": 657,
-     "wasm_bytes": 4203
+     "wasm_bytes": 4232
     }
    ],
-   "wasm_bytes": 4203,
-   "wasm_sha256": "90f22723f0473842a3d7bce7bab7197cddad8d4ce29fba0fe60df225592bf1f5"
+   "wasm_bytes": 4232,
+   "wasm_sha256": "f1a3e6a3c0068fbdff8e3484f558ddad0202ce8c3b82e75a5f39fe0f462e7c4e"
   },
   "direct/comprehensions.blot": {
    "exit": 0,
@@ -1064,7 +1064,7 @@
       "use_expansions": 4
      },
      "core_nodes": 978,
-     "effect_rows": 2634,
+     "effect_rows": 2638,
      "emitted_functions": 41,
      "filename": "direct/comprehensions.blot",
      "files": 2,
@@ -1075,13 +1075,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2293,
-     "type_nodes": 5205,
+     "type_nodes": 5218,
      "type_versions": 760,
-     "wasm_bytes": 7313
+     "wasm_bytes": 7581
     }
    ],
-   "wasm_bytes": 7313,
-   "wasm_sha256": "1de60e2aa510cc903926d0602f9297a8fc143f488f7ad86c41436e4f3d03c2d5"
+   "wasm_bytes": 7581,
+   "wasm_sha256": "384c1a79ff6b8a3ef89aa6fc0f2b972b64efe9bb3a40aa4e92247ac0b5448031"
   },
   "direct/constants.blot": {
    "exit": 0,
@@ -1104,7 +1104,7 @@
       "use_expansions": 3
      },
      "core_nodes": 772,
-     "effect_rows": 2359,
+     "effect_rows": 2363,
      "emitted_functions": 40,
      "filename": "direct/constants.blot",
      "files": 2,
@@ -1115,13 +1115,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1899,
-     "type_nodes": 4612,
+     "type_nodes": 4625,
      "type_versions": 653,
-     "wasm_bytes": 4413
+     "wasm_bytes": 4442
     }
    ],
-   "wasm_bytes": 4413,
-   "wasm_sha256": "66a100058cc0b243d6bc8c5f9c0cda0751975cd28a99ecf03461b27a105ed3f1"
+   "wasm_bytes": 4442,
+   "wasm_sha256": "bb443f3f06c34fe2e804a3ee7be9dd6ff7bf3176523751598e5126e749a63461"
   },
   "direct/data_and_control.blot": {
    "exit": 0,
@@ -1144,7 +1144,7 @@
       "use_expansions": 3
      },
      "core_nodes": 894,
-     "effect_rows": 2568,
+     "effect_rows": 2572,
      "emitted_functions": 45,
      "filename": "direct/data_and_control.blot",
      "files": 2,
@@ -1155,13 +1155,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2151,
-     "type_nodes": 4981,
+     "type_nodes": 4994,
      "type_versions": 722,
-     "wasm_bytes": 5387
+     "wasm_bytes": 5416
     }
    ],
-   "wasm_bytes": 5387,
-   "wasm_sha256": "16aaae50d8fc2663f5dbfdf65faffd540f17a948993f79d86b8ff76c659510bd"
+   "wasm_bytes": 5416,
+   "wasm_sha256": "cbcb3b5eada751b648616a6f1447a141a3c39ed0596403dad8628e7e533ce885"
   },
   "direct/dispatch.blot": {
    "exit": 0,
@@ -1169,11 +1169,11 @@
     {
      "body_elaborations": 166,
      "body_lowerings": 166,
-     "check_occurs_steps": 1632,
+     "check_occurs_steps": 1673,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3224,
-      "instantiations": 278,
+      "inference_steps": 3402,
+      "instantiations": 340,
       "memo_declined": 0,
       "memo_hits": 0,
       "memo_misses": 4,
@@ -1183,25 +1183,25 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1065,
-     "effect_rows": 3040,
+     "core_nodes": 1194,
+     "effect_rows": 3261,
      "emitted_functions": 36,
      "filename": "direct/dispatch.blot",
      "files": 3,
-     "imported_schemes": 57,
+     "imported_schemes": 60,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 14927,
+     "row_versions": 622,
+     "source_bytes": 15694,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2375,
-     "type_nodes": 5891,
-     "type_versions": 800,
-     "wasm_bytes": 4792
+     "syntax_nodes": 2532,
+     "type_nodes": 6169,
+     "type_versions": 838,
+     "wasm_bytes": 4821
     }
    ],
-   "wasm_bytes": 4792,
-   "wasm_sha256": "540b7239ff775088f0e5925194486337c9d4d307ed1034acd302c6803c72e8ba"
+   "wasm_bytes": 4821,
+   "wasm_sha256": "5b622073674145191ef26b41af890a4425e609305af7f43c2280b652e3512465"
   },
   "direct/empty_literals.blot": {
    "exit": 0,
@@ -1224,7 +1224,7 @@
       "use_expansions": 12
      },
      "core_nodes": 1293,
-     "effect_rows": 3154,
+     "effect_rows": 3158,
      "emitted_functions": 37,
      "filename": "direct/empty_literals.blot",
      "files": 3,
@@ -1235,13 +1235,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2700,
-     "type_nodes": 6748,
+     "type_nodes": 6761,
      "type_versions": 919,
-     "wasm_bytes": 5090
+     "wasm_bytes": 5211
     }
    ],
-   "wasm_bytes": 5090,
-   "wasm_sha256": "340c213fd596b5c862b8001c9d5b9ee99a8e4e4fb1f690f3fb199f60d8a7eb6a"
+   "wasm_bytes": 5211,
+   "wasm_sha256": "c434ad11472d166ce1cab8f5c50cec6189f519156ac76225d720382338937def"
   },
   "direct/generalized_values.blot": {
    "exit": 0,
@@ -1264,7 +1264,7 @@
       "use_expansions": 3
      },
      "core_nodes": 785,
-     "effect_rows": 2374,
+     "effect_rows": 2378,
      "emitted_functions": 35,
      "filename": "direct/generalized_values.blot",
      "files": 2,
@@ -1275,13 +1275,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1983,
-     "type_nodes": 4812,
+     "type_nodes": 4825,
      "type_versions": 674,
-     "wasm_bytes": 4301
+     "wasm_bytes": 4330
     }
    ],
-   "wasm_bytes": 4301,
-   "wasm_sha256": "e756d6aba02ab7a3ece922864179f3e0fef4110b02999214851ea9c04b9bc7d4"
+   "wasm_bytes": 4330,
+   "wasm_sha256": "c4e0af58c38c88d94cc9f90cd7e2121d9c3cbe0bdc9202ec2b51d5e5dcb50090"
   },
   "direct/generated_from_filter.blot": {
    "exit": 0,
@@ -1304,7 +1304,7 @@
       "use_expansions": 10
      },
      "core_nodes": 1318,
-     "effect_rows": 3153,
+     "effect_rows": 3157,
      "emitted_functions": 34,
      "filename": "direct/generated_from_filter.blot",
      "files": 3,
@@ -1315,13 +1315,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2728,
-     "type_nodes": 6713,
+     "type_nodes": 6726,
      "type_versions": 908,
-     "wasm_bytes": 4821
+     "wasm_bytes": 4850
     }
    ],
-   "wasm_bytes": 4821,
-   "wasm_sha256": "48ccf2ba213551a1dad6c3d5d765542e708ee5a403426fd9e3c989030c459cb1"
+   "wasm_bytes": 4850,
+   "wasm_sha256": "0c92fe9a9c713e6370799976ed85d3d7c9f86cafa4ea94bdbcad00f4f20ea263"
   },
   "direct/generic_comprehensions.blot": {
    "exit": 0,
@@ -1344,7 +1344,7 @@
       "use_expansions": 5
      },
      "core_nodes": 909,
-     "effect_rows": 2529,
+     "effect_rows": 2533,
      "emitted_functions": 39,
      "filename": "direct/generic_comprehensions.blot",
      "files": 2,
@@ -1355,13 +1355,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2105,
-     "type_nodes": 5096,
+     "type_nodes": 5109,
      "type_versions": 731,
-     "wasm_bytes": 6459
+     "wasm_bytes": 6966
     }
    ],
-   "wasm_bytes": 6459,
-   "wasm_sha256": "de1063fb69494af6dff591c2e2978845e3002d4533a6f2721de39b31c20e6e1a"
+   "wasm_bytes": 6966,
+   "wasm_sha256": "f856d4ddc0764d30c486ef50f3393c7cac034c898f3781dca5a2d5fd4aea3507"
   },
   "direct/host.blot": {
    "exit": 0,
@@ -1384,7 +1384,7 @@
       "use_expansions": 3
      },
      "core_nodes": 798,
-     "effect_rows": 2433,
+     "effect_rows": 2437,
      "emitted_functions": 35,
      "filename": "direct/host.blot",
      "files": 2,
@@ -1395,13 +1395,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1951,
-     "type_nodes": 4752,
+     "type_nodes": 4765,
      "type_versions": 674,
-     "wasm_bytes": 5279
+     "wasm_bytes": 5308
     }
    ],
-   "wasm_bytes": 5279,
-   "wasm_sha256": "69c9c34d8aad60a12d1e7df4d9c64ca93d576100786b14dc690e0f8f3a2b7b1a"
+   "wasm_bytes": 5308,
+   "wasm_sha256": "d69cadf5867149d1a2e332ca725479735753213d0e5a489b94f4063ceff101ec"
   },
   "direct/inferred_types.blot": {
    "exit": 0,
@@ -1424,7 +1424,7 @@
       "use_expansions": 11
      },
      "core_nodes": 1308,
-     "effect_rows": 3124,
+     "effect_rows": 3128,
      "emitted_functions": 37,
      "filename": "direct/inferred_types.blot",
      "files": 3,
@@ -1435,13 +1435,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2745,
-     "type_nodes": 6663,
+     "type_nodes": 6676,
      "type_versions": 900,
-     "wasm_bytes": 4919
+     "wasm_bytes": 4948
     }
    ],
-   "wasm_bytes": 4919,
-   "wasm_sha256": "8e5b3c694281a10fffa289d0dd6be95329c593d66126bb9dea7d10a5a7df7b27"
+   "wasm_bytes": 4948,
+   "wasm_sha256": "f8e3462786cfb1761e30e985164c1ed78a1b7681441cc325b013aee7de807dcb"
   },
   "direct/miscompiles.blot": {
    "exit": 0,
@@ -1464,7 +1464,7 @@
       "use_expansions": 3
      },
      "core_nodes": 827,
-     "effect_rows": 2418,
+     "effect_rows": 2422,
      "emitted_functions": 39,
      "filename": "direct/miscompiles.blot",
      "files": 2,
@@ -1475,13 +1475,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2004,
-     "type_nodes": 4721,
+     "type_nodes": 4734,
      "type_versions": 670,
-     "wasm_bytes": 4970
+     "wasm_bytes": 5116
     }
    ],
-   "wasm_bytes": 4970,
-   "wasm_sha256": "b910f6e44416c20cd272f3f26ad7bc9fac6b8de060a35298522b851f276296cc"
+   "wasm_bytes": 5116,
+   "wasm_sha256": "f13ab33836a0df06735ca09194b1d892f8e78bc8f8c20a4f54ea4607cd45d860"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
@@ -1504,7 +1504,7 @@
       "use_expansions": 3
      },
      "core_nodes": 820,
-     "effect_rows": 2384,
+     "effect_rows": 2388,
      "emitted_functions": 31,
      "filename": "direct/nested_updates.blot",
      "files": 2,
@@ -1515,13 +1515,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1977,
-     "type_nodes": 4689,
+     "type_nodes": 4702,
      "type_versions": 661,
-     "wasm_bytes": 4502
+     "wasm_bytes": 4591
     }
    ],
-   "wasm_bytes": 4502,
-   "wasm_sha256": "982fa5d2c9c45a035d77187383ecc7473ae65690f3f70b260d0e79e4a1e1fb0b"
+   "wasm_bytes": 4591,
+   "wasm_sha256": "24de30fe7aabf40d838e314d755344fc5a3de2ffd00bd779afbc75a3e753b38e"
   },
   "direct/nested_updates_indexed.blot": {
    "exit": 0,
@@ -1544,7 +1544,7 @@
       "use_expansions": 3
      },
      "core_nodes": 831,
-     "effect_rows": 2372,
+     "effect_rows": 2376,
      "emitted_functions": 33,
      "filename": "direct/nested_updates_indexed.blot",
      "files": 2,
@@ -1555,13 +1555,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1967,
-     "type_nodes": 4673,
+     "type_nodes": 4686,
      "type_versions": 669,
-     "wasm_bytes": 5230
+     "wasm_bytes": 5379
     }
    ],
-   "wasm_bytes": 5230,
-   "wasm_sha256": "7df2d7e0012e9503af0f9e1243eaf2dce7af29a4e13fa60a14bda9778910e38a"
+   "wasm_bytes": 5379,
+   "wasm_sha256": "44e72a6c5954673747c8612aba543952f203efa4e422fce470758c92c9086a30"
   },
   "direct/open_codec.blot": {
    "exit": 0,
@@ -1584,7 +1584,7 @@
       "use_expansions": 4
      },
      "core_nodes": 783,
-     "effect_rows": 2381,
+     "effect_rows": 2385,
      "emitted_functions": 39,
      "filename": "direct/open_codec.blot",
      "files": 2,
@@ -1595,13 +1595,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1936,
-     "type_nodes": 4721,
+     "type_nodes": 4734,
      "type_versions": 665,
-     "wasm_bytes": 4629
+     "wasm_bytes": 4658
     }
    ],
-   "wasm_bytes": 4629,
-   "wasm_sha256": "2a87e10e1b794944bce514cf24847708a5891498e8d0d09ca7d4194f4dc987ad"
+   "wasm_bytes": 4658,
+   "wasm_sha256": "7213335ec7d5519d4254c9995610a5d8fbed3ef8c5bef5378de2f317503eac89"
   },
   "direct/policy_record.blot": {
    "exit": 0,
@@ -1624,7 +1624,7 @@
       "use_expansions": 4
      },
      "core_nodes": 775,
-     "effect_rows": 2405,
+     "effect_rows": 2409,
      "emitted_functions": 36,
      "filename": "direct/policy_record.blot",
      "files": 2,
@@ -1635,13 +1635,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1922,
-     "type_nodes": 4730,
+     "type_nodes": 4743,
      "type_versions": 664,
-     "wasm_bytes": 4307
+     "wasm_bytes": 4336
     }
    ],
-   "wasm_bytes": 4307,
-   "wasm_sha256": "41df8544b23eb6228d92b71cbbef7de7a9cf679da926d525df4719638e11d815"
+   "wasm_bytes": 4336,
+   "wasm_sha256": "f82d1db7484f29a4250e4534fa9fd60d9349772331f3ff3745207ba893804e73"
   },
   "direct/pools.blot": {
    "exit": 0,
@@ -1664,7 +1664,7 @@
       "use_expansions": 3
      },
      "core_nodes": 784,
-     "effect_rows": 2367,
+     "effect_rows": 2371,
      "emitted_functions": 39,
      "filename": "direct/pools.blot",
      "files": 2,
@@ -1675,13 +1675,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1949,
-     "type_nodes": 4659,
+     "type_nodes": 4672,
      "type_versions": 660,
-     "wasm_bytes": 5080
+     "wasm_bytes": 5109
     }
    ],
-   "wasm_bytes": 5080,
-   "wasm_sha256": "b0a4b8df08148dc0d74b7145b06260a6f2139d587d4a5204a207318d136b8cfd"
+   "wasm_bytes": 5109,
+   "wasm_sha256": "f7afd40be419759a9c290b1630e26cc02b23a1afce99a9077e581609b5d78e4a"
   },
   "direct/providers.blot": {
    "exit": 0,
@@ -1704,7 +1704,7 @@
       "use_expansions": 3
      },
      "core_nodes": 874,
-     "effect_rows": 2537,
+     "effect_rows": 2541,
      "emitted_functions": 51,
      "filename": "direct/providers.blot",
      "files": 2,
@@ -1715,13 +1715,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2066,
-     "type_nodes": 4830,
+     "type_nodes": 4843,
      "type_versions": 692,
-     "wasm_bytes": 5894
+     "wasm_bytes": 5923
     }
    ],
-   "wasm_bytes": 5894,
-   "wasm_sha256": "6a1371a761d6827b0b1fc4f78c671e597f43da8910c24382d316686b42cc9345"
+   "wasm_bytes": 5923,
+   "wasm_sha256": "1966cb8f9dacfaf67a31d8243e812f75e9fd81d8c9ba0e8402227873199809f1"
   },
   "direct/recursive_data.blot": {
    "exit": 0,
@@ -1744,7 +1744,7 @@
       "use_expansions": 3
      },
      "core_nodes": 825,
-     "effect_rows": 2413,
+     "effect_rows": 2417,
      "emitted_functions": 36,
      "filename": "direct/recursive_data.blot",
      "files": 2,
@@ -1755,13 +1755,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2018,
-     "type_nodes": 4742,
+     "type_nodes": 4755,
      "type_versions": 677,
-     "wasm_bytes": 4820
+     "wasm_bytes": 4849
     }
    ],
-   "wasm_bytes": 4820,
-   "wasm_sha256": "e4fe1fd2c90ab5c907ad4c35fe96494d50a42ca1ca05efa003225b9f04daa24e"
+   "wasm_bytes": 4849,
+   "wasm_sha256": "ba6330cb20d92baf74dd1fcd78ca39cdcc29ccba8667a5549cd2dcabe8ff5b9f"
   },
   "direct/shared_field_update.blot": {
    "exit": 0,
@@ -1784,7 +1784,7 @@
       "use_expansions": 3
      },
      "core_nodes": 798,
-     "effect_rows": 2362,
+     "effect_rows": 2366,
      "emitted_functions": 31,
      "filename": "direct/shared_field_update.blot",
      "files": 2,
@@ -1795,13 +1795,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1947,
-     "type_nodes": 4650,
+     "type_nodes": 4663,
      "type_versions": 653,
-     "wasm_bytes": 4386
+     "wasm_bytes": 4415
     }
    ],
-   "wasm_bytes": 4386,
-   "wasm_sha256": "d8026e15aa55b433d429317374018b1d654227e7f141ae283d09c99bb9765419"
+   "wasm_bytes": 4415,
+   "wasm_sha256": "b1e90eb7ce239af1338df7ccc176582c60a019203a74a67d1a67444b77b66e94"
   },
   "direct/shared_fields.blot": {
    "exit": 0,
@@ -1824,7 +1824,7 @@
       "use_expansions": 3
      },
      "core_nodes": 791,
-     "effect_rows": 2362,
+     "effect_rows": 2366,
      "emitted_functions": 32,
      "filename": "direct/shared_fields.blot",
      "files": 2,
@@ -1835,13 +1835,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1937,
-     "type_nodes": 4653,
+     "type_nodes": 4666,
      "type_versions": 656,
-     "wasm_bytes": 4624
+     "wasm_bytes": 4653
     }
    ],
-   "wasm_bytes": 4624,
-   "wasm_sha256": "7225f86c10e735ecfedefac508f5947fc79ed04a4819df8c189fcbb2690780ca"
+   "wasm_bytes": 4653,
+   "wasm_sha256": "b434a17b36aca37935bb9c7a5342dc67174088e74dd2924ca803917562cf3e7e"
   },
   "direct/simd_conversions.blot": {
    "exit": 0,
@@ -1849,22 +1849,22 @@
     {
      "body_elaborations": 216,
      "body_lowerings": 216,
-     "check_occurs_steps": 2137,
+     "check_occurs_steps": 2141,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3949,
+      "inference_steps": 3950,
       "instantiations": 288,
       "memo_declined": 0,
       "memo_hits": 0,
       "memo_misses": 3,
-      "obligations_appended": 36,
+      "obligations_appended": 37,
       "pending_peak": 35,
       "projection_memo_hits": 0,
       "shared_uses": 3,
       "use_expansions": 3
      },
      "core_nodes": 1118,
-     "effect_rows": 3820,
+     "effect_rows": 3824,
      "emitted_functions": 33,
      "filename": "direct/simd_conversions.blot",
      "files": 3,
@@ -1875,13 +1875,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2808,
-     "type_nodes": 7417,
-     "type_versions": 1064,
-     "wasm_bytes": 4369
+     "type_nodes": 7449,
+     "type_versions": 1065,
+     "wasm_bytes": 4398
     }
    ],
-   "wasm_bytes": 4369,
-   "wasm_sha256": "67fe5cdc4f9c928a4408d88ec8ab0ca302cc5f4083d5f53dfa77a02728e19ef9"
+   "wasm_bytes": 4398,
+   "wasm_sha256": "a1746205e37b38e409ad6bdb26ef08df0e8ecdace0903e75d1123a3af6d97923"
   },
   "direct/simd_lanes.blot": {
    "exit": 0,
@@ -1889,22 +1889,22 @@
     {
      "body_elaborations": 218,
      "body_lowerings": 218,
-     "check_occurs_steps": 2173,
+     "check_occurs_steps": 2177,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4038,
+      "inference_steps": 4039,
       "instantiations": 308,
       "memo_declined": 0,
       "memo_hits": 0,
       "memo_misses": 3,
-      "obligations_appended": 36,
+      "obligations_appended": 37,
       "pending_peak": 35,
       "projection_memo_hits": 0,
       "shared_uses": 3,
       "use_expansions": 3
      },
      "core_nodes": 1173,
-     "effect_rows": 3932,
+     "effect_rows": 3936,
      "emitted_functions": 37,
      "filename": "direct/simd_lanes.blot",
      "files": 3,
@@ -1915,13 +1915,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2883,
-     "type_nodes": 7571,
-     "type_versions": 1094,
-     "wasm_bytes": 5400
+     "type_nodes": 7603,
+     "type_versions": 1095,
+     "wasm_bytes": 5429
     }
    ],
-   "wasm_bytes": 5400,
-   "wasm_sha256": "8cdd45e7cc0f993843745f1aa5dba8466a961babdf842bc11b7b68bafd75b358"
+   "wasm_bytes": 5429,
+   "wasm_sha256": "a99734e4703221904ac1a4c94f1e4b89721d34d4d2f4bb2d944eb6fbcde85455"
   },
   "direct/staged_scalar.blot": {
    "exit": 0,
@@ -1944,7 +1944,7 @@
       "use_expansions": 3
      },
      "core_nodes": 777,
-     "effect_rows": 2381,
+     "effect_rows": 2385,
      "emitted_functions": 33,
      "filename": "direct/staged_scalar.blot",
      "files": 2,
@@ -1955,13 +1955,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1920,
-     "type_nodes": 4653,
+     "type_nodes": 4666,
      "type_versions": 656,
-     "wasm_bytes": 4042
+     "wasm_bytes": 4071
     }
    ],
-   "wasm_bytes": 4042,
-   "wasm_sha256": "84579ced74059f68c1d8665fa5b76552b43a810170f998496f26afbc4d454148"
+   "wasm_bytes": 4071,
+   "wasm_sha256": "7c28abf1aec6fe2d97cc5ee9514f47053980c510d711eb74cea3637c583cec0c"
   },
   "direct/storage.blot": {
    "exit": 0,
@@ -1984,7 +1984,7 @@
       "use_expansions": 3
      },
      "core_nodes": 945,
-     "effect_rows": 2537,
+     "effect_rows": 2541,
      "emitted_functions": 44,
      "filename": "direct/storage.blot",
      "files": 2,
@@ -1995,13 +1995,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2226,
-     "type_nodes": 4867,
+     "type_nodes": 4880,
      "type_versions": 703,
-     "wasm_bytes": 6902
+     "wasm_bytes": 7021
     }
    ],
-   "wasm_bytes": 6902,
-   "wasm_sha256": "644eca2d5b491bfd6c45ffdcf4d8138e6e035fd9487532e80bb5153f492d8403"
+   "wasm_bytes": 7021,
+   "wasm_sha256": "5b1ae1cbf80bc003f8b0d8690ef3cd9d95b9e5377110288ece41d62dd2307e5f"
   },
   "direct/terminal_scratch_reads.blot": {
    "exit": 0,
@@ -2024,7 +2024,7 @@
       "use_expansions": 3
      },
      "core_nodes": 1185,
-     "effect_rows": 2865,
+     "effect_rows": 2869,
      "emitted_functions": 52,
      "filename": "direct/terminal_scratch_reads.blot",
      "files": 2,
@@ -2035,13 +2035,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2479,
-     "type_nodes": 5533,
+     "type_nodes": 5546,
      "type_versions": 831,
-     "wasm_bytes": 12765
+     "wasm_bytes": 12914
     }
    ],
-   "wasm_bytes": 12765,
-   "wasm_sha256": "3933d749e846c373d8b8952200e2bdf4222d2715e917e87372f735d01d8dce3d"
+   "wasm_bytes": 12914,
+   "wasm_sha256": "6498d5310a0646d6349b07c14801943575c685c485368201341de80c40736665"
   },
   "direct/unused_generic_fields.blot": {
    "exit": 0,
@@ -2064,7 +2064,7 @@
       "use_expansions": 3
      },
      "core_nodes": 778,
-     "effect_rows": 2395,
+     "effect_rows": 2399,
      "emitted_functions": 37,
      "filename": "direct/unused_generic_fields.blot",
      "files": 2,
@@ -2075,13 +2075,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1927,
-     "type_nodes": 4716,
+     "type_nodes": 4729,
      "type_versions": 660,
-     "wasm_bytes": 4459
+     "wasm_bytes": 4488
     }
    ],
-   "wasm_bytes": 4459,
-   "wasm_sha256": "0a702648cb08be5a0967d4bf147c91d6ca5031ff97e8baf7ec279cdd85d5cce6"
+   "wasm_bytes": 4488,
+   "wasm_sha256": "fd4abef0017a227ea826f58a222f2b6a1123067f8e28ed8c25c3ee0168872a96"
   },
   "direct/unused_stages.blot": {
    "exit": 0,
@@ -2104,7 +2104,7 @@
       "use_expansions": 3
      },
      "core_nodes": 805,
-     "effect_rows": 2485,
+     "effect_rows": 2489,
      "emitted_functions": 40,
      "filename": "direct/unused_stages.blot",
      "files": 2,
@@ -2115,13 +2115,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2014,
-     "type_nodes": 4874,
+     "type_nodes": 4887,
      "type_versions": 676,
-     "wasm_bytes": 5047
+     "wasm_bytes": 5107
     }
    ],
-   "wasm_bytes": 5047,
-   "wasm_sha256": "858b2b8277bc221e2d768a1fb08d825a0fb892344b6ac21fd8fff6cda2cc3bb0"
+   "wasm_bytes": 5107,
+   "wasm_sha256": "9a615648d7568c86caa7f123d5a6417cdb40be3301daf2784a50155a088c0992"
   },
   "direct/view_calls.blot": {
    "exit": 0,
@@ -2144,7 +2144,7 @@
       "use_expansions": 3
      },
      "core_nodes": 863,
-     "effect_rows": 2503,
+     "effect_rows": 2507,
      "emitted_functions": 36,
      "filename": "direct/view_calls.blot",
      "files": 2,
@@ -2155,13 +2155,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2092,
-     "type_nodes": 4890,
+     "type_nodes": 4903,
      "type_versions": 689,
-     "wasm_bytes": 5522
+     "wasm_bytes": 5551
     }
    ],
-   "wasm_bytes": 5522,
-   "wasm_sha256": "ce4c65551b4aa60f7f980969d2a0210d4aa2fc2b31c6cc0aec5b4a87ebcad0af"
+   "wasm_bytes": 5551,
+   "wasm_sha256": "94d85f53a7d0a0bcdaeb9bc71fda9a78a403e531442c6217109226e1a640f050"
   },
   "discard-fixtures/deferred-alias.blot": {
    "exit": 0,
@@ -2184,7 +2184,7 @@
       "use_expansions": 4
      },
      "core_nodes": 769,
-     "effect_rows": 2348,
+     "effect_rows": 2352,
      "emitted_functions": 33,
      "filename": "discard-fixtures/deferred-alias.blot",
      "files": 2,
@@ -2195,13 +2195,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1893,
-     "type_nodes": 4620,
+     "type_nodes": 4633,
      "type_versions": 646,
-     "wasm_bytes": 4158
+     "wasm_bytes": 4187
     }
    ],
-   "wasm_bytes": 4158,
-   "wasm_sha256": "21b3041c7ef5ea4513bad77811c4946cc34ec6be725ce5f20076579ef589d67e"
+   "wasm_bytes": 4187,
+   "wasm_sha256": "a123e78846c5f47d44d400831b5b40360e26a6a0c9963f4fd3f5abd121a1facb"
   },
   "discard-fixtures/deferred-anonymous.blot": {
    "exit": 1,
@@ -2256,7 +2256,7 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2329,
+     "effect_rows": 2333,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-anonymous.blot",
      "files": 2,
@@ -2267,7 +2267,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1887,
-     "type_nodes": 4587,
+     "type_nodes": 4600,
      "type_versions": 644,
      "wasm_bytes": 0
     }
@@ -2326,7 +2326,7 @@
       "use_expansions": 4
      },
      "core_nodes": 0,
-     "effect_rows": 2345,
+     "effect_rows": 2349,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-body.blot",
      "files": 2,
@@ -2337,7 +2337,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1896,
-     "type_nodes": 4611,
+     "type_nodes": 4624,
      "type_versions": 647,
      "wasm_bytes": 0
     }
@@ -2364,7 +2364,7 @@
       "use_expansions": 11
      },
      "core_nodes": 845,
-     "effect_rows": 2498,
+     "effect_rows": 2502,
      "emitted_functions": 48,
      "filename": "discard-fixtures/eager-order.blot",
      "files": 2,
@@ -2375,13 +2375,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2008,
-     "type_nodes": 4870,
+     "type_nodes": 4883,
      "type_versions": 684,
-     "wasm_bytes": 5467
+     "wasm_bytes": 5604
     }
    ],
-   "wasm_bytes": 5467,
-   "wasm_sha256": "437ab93c08f5c98d2b23a32814e006cd42db1f2d6eda4ffee886db0933d37c66"
+   "wasm_bytes": 5604,
+   "wasm_sha256": "f91ec96e5f7b31f4a98092883fe18a8090e167244671c04fa345c645473059a1"
   },
   "discard-fixtures/explicit-qualifier.blot": {
    "exit": 0,
@@ -2404,7 +2404,7 @@
       "use_expansions": 3
      },
      "core_nodes": 763,
-     "effect_rows": 2322,
+     "effect_rows": 2326,
      "emitted_functions": 31,
      "filename": "discard-fixtures/explicit-qualifier.blot",
      "files": 2,
@@ -2415,13 +2415,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1889,
-     "type_nodes": 4575,
+     "type_nodes": 4588,
      "type_versions": 643,
-     "wasm_bytes": 3966
+     "wasm_bytes": 3995
     }
    ],
-   "wasm_bytes": 3966,
-   "wasm_sha256": "51192f25cf9115f6ace37496f331cdb48de178f1c3301485dfad71ea4ec6417b"
+   "wasm_bytes": 3995,
+   "wasm_sha256": "ccb4f93820e9578c72df997d7e6a7d80f26c554ef0bfb137385e7792606a5278"
   },
   "discard-fixtures/generate-panic.blot": {
    "exit": 0,
@@ -2444,7 +2444,7 @@
       "use_expansions": 3
      },
      "core_nodes": 767,
-     "effect_rows": 2337,
+     "effect_rows": 2341,
      "emitted_functions": 32,
      "filename": "discard-fixtures/generate-panic.blot",
      "files": 2,
@@ -2455,13 +2455,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1897,
-     "type_nodes": 4614,
+     "type_nodes": 4627,
      "type_versions": 649,
-     "wasm_bytes": 4160
+     "wasm_bytes": 4258
     }
    ],
-   "wasm_bytes": 4160,
-   "wasm_sha256": "9d40524f72bfa01955b759d7387e62217610a3cf19eced9984d468a315cd446b"
+   "wasm_bytes": 4258,
+   "wasm_sha256": "11cf4a538dc04c08726d37d2a4234b14c1b5260efd200ffb9490041b2a32d65a"
   },
   "discard-fixtures/implicit-uses.blot": {
    "exit": 0,
@@ -2484,7 +2484,7 @@
       "use_expansions": 3
      },
      "core_nodes": 832,
-     "effect_rows": 2384,
+     "effect_rows": 2388,
      "emitted_functions": 38,
      "filename": "discard-fixtures/implicit-uses.blot",
      "files": 2,
@@ -2495,13 +2495,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2005,
-     "type_nodes": 4660,
+     "type_nodes": 4673,
      "type_versions": 658,
-     "wasm_bytes": 4635
+     "wasm_bytes": 4664
     }
    ],
-   "wasm_bytes": 4635,
-   "wasm_sha256": "d68735c986ff371e719e5a67c69cb7bbe9dee006cce362d2fb4fc38d62c499a8"
+   "wasm_bytes": 4664,
+   "wasm_sha256": "50430064770130a95dd0502f10a0f99d9a7dc014a41814b353b317a70de0a8a8"
   },
   "discard-fixtures/original.blot": {
    "exit": 1,
@@ -2533,7 +2533,7 @@
       "use_expansions": 3
      },
      "core_nodes": 782,
-     "effect_rows": 2383,
+     "effect_rows": 2387,
      "emitted_functions": 0,
      "filename": "discard-fixtures/original.blot",
      "files": 2,
@@ -2544,7 +2544,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1925,
-     "type_nodes": 4681,
+     "type_nodes": 4694,
      "type_versions": 660,
      "wasm_bytes": 0
     }
@@ -2571,7 +2571,7 @@
       "use_expansions": 3
      },
      "core_nodes": 770,
-     "effect_rows": 2338,
+     "effect_rows": 2342,
      "emitted_functions": 33,
      "filename": "discard-fixtures/runtime-panic.blot",
      "files": 2,
@@ -2582,13 +2582,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1898,
-     "type_nodes": 4606,
+     "type_nodes": 4619,
      "type_versions": 649,
-     "wasm_bytes": 4049
+     "wasm_bytes": 4150
     }
    ],
-   "wasm_bytes": 4049,
-   "wasm_sha256": "b9034fed25b1967b8d6b50e51bd3bc0fab6e9558f5ebb6601f7587052eb10df5"
+   "wasm_bytes": 4150,
+   "wasm_sha256": "18addef3ebe2249ee4f0be4eb93e47a318563a2159673a7127110ea70dbe4e43"
   },
   "fallbacks.blot": {
    "exit": 0,
@@ -2611,7 +2611,7 @@
       "use_expansions": 3
      },
      "core_nodes": 850,
-     "effect_rows": 2420,
+     "effect_rows": 2424,
      "emitted_functions": 47,
      "filename": "fallbacks.blot",
      "files": 2,
@@ -2622,13 +2622,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2043,
-     "type_nodes": 4777,
+     "type_nodes": 4790,
      "type_versions": 692,
-     "wasm_bytes": 5204
+     "wasm_bytes": 5548
     }
    ],
-   "wasm_bytes": 5204,
-   "wasm_sha256": "9856f6246517c6b5708bc42839acad524026ee4d7a845e9b42eac46dc115efd4"
+   "wasm_bytes": 5548,
+   "wasm_sha256": "0f8e25e155e78dac314e75e51870b4fce8c20dd8d3258d7a7982e7e98c946e02"
   },
   "fixed_scalar_spans.blot": {
    "exit": 0,
@@ -2651,7 +2651,7 @@
       "use_expansions": 3
      },
      "core_nodes": 1095,
-     "effect_rows": 2777,
+     "effect_rows": 2781,
      "emitted_functions": 47,
      "filename": "fixed_scalar_spans.blot",
      "files": 2,
@@ -2662,13 +2662,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2459,
-     "type_nodes": 5361,
+     "type_nodes": 5374,
      "type_versions": 785,
-     "wasm_bytes": 8717
+     "wasm_bytes": 8836
     }
    ],
-   "wasm_bytes": 8717,
-   "wasm_sha256": "1c5267b733a63c4ecb29ecb504497db1c339021040e00dd0e5beca25bc6a6c3d"
+   "wasm_bytes": 8836,
+   "wasm_sha256": "44b529bab530d335f36ac28fb9ab08d93662986b8d570c2a092374a819d1802a"
   },
   "fresh_owner_borrow_escape.blot": {
    "exit": 0,
@@ -2691,7 +2691,7 @@
       "use_expansions": 3
      },
      "core_nodes": 780,
-     "effect_rows": 2332,
+     "effect_rows": 2336,
      "emitted_functions": 32,
      "filename": "fresh_owner_borrow_escape.blot",
      "files": 2,
@@ -2702,13 +2702,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1917,
-     "type_nodes": 4604,
+     "type_nodes": 4617,
      "type_versions": 651,
-     "wasm_bytes": 4323
+     "wasm_bytes": 4352
     }
    ],
-   "wasm_bytes": 4323,
-   "wasm_sha256": "5c711ddeff56550a958469674db211e97c9d3d12fd1c7c222e17d52defd6f95e"
+   "wasm_bytes": 4352,
+   "wasm_sha256": "be504afd96d0cbbbe139633ae99f2b677e987537cf83930f69828e9d08232247"
   },
   "fresh_owner_cleanup.blot": {
    "exit": 0,
@@ -2731,7 +2731,7 @@
       "use_expansions": 3
      },
      "core_nodes": 854,
-     "effect_rows": 2445,
+     "effect_rows": 2449,
      "emitted_functions": 34,
      "filename": "fresh_owner_cleanup.blot",
      "files": 2,
@@ -2742,13 +2742,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2032,
-     "type_nodes": 4760,
+     "type_nodes": 4773,
      "type_versions": 684,
-     "wasm_bytes": 5364
+     "wasm_bytes": 5393
     }
    ],
-   "wasm_bytes": 5364,
-   "wasm_sha256": "ad91533faa24c882fea22f04c94d7ebd674e89c627adb7fe551205a39d6ed46b"
+   "wasm_bytes": 5393,
+   "wasm_sha256": "faea471fd4687750ff5f33f291b1dcfb8ded51f7c07c61aef08a29ac27ccb257"
   },
   "fresh_owner_stored_borrow_escape.blot": {
    "exit": 1,
@@ -2780,7 +2780,7 @@
       "use_expansions": 3
      },
      "core_nodes": 799,
-     "effect_rows": 2344,
+     "effect_rows": 2348,
      "emitted_functions": 0,
      "filename": "fresh_owner_stored_borrow_escape.blot",
      "files": 2,
@@ -2791,7 +2791,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1970,
-     "type_nodes": 4646,
+     "type_nodes": 4659,
      "type_versions": 655,
      "wasm_bytes": 0
     }
@@ -2818,7 +2818,7 @@
       "use_expansions": 3
      },
      "core_nodes": 775,
-     "effect_rows": 2339,
+     "effect_rows": 2343,
      "emitted_functions": 36,
      "filename": "global_call_borrow_escape.blot",
      "files": 2,
@@ -2829,13 +2829,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1915,
-     "type_nodes": 4615,
+     "type_nodes": 4628,
      "type_versions": 653,
-     "wasm_bytes": 4542
+     "wasm_bytes": 4571
     }
    ],
-   "wasm_bytes": 4542,
-   "wasm_sha256": "fb401189336f4c9fb6a26466558be114a2f36ae5077ce2341e3611661d605448"
+   "wasm_bytes": 4571,
+   "wasm_sha256": "5a5582115f36659ca6f0fc22bfee754171c12c511eddb8276acb12bb5e0e2152"
   },
   "global_call_conditional.blot": {
    "exit": 0,
@@ -2858,7 +2858,7 @@
       "use_expansions": 3
      },
      "core_nodes": 782,
-     "effect_rows": 2358,
+     "effect_rows": 2362,
      "emitted_functions": 35,
      "filename": "global_call_conditional.blot",
      "files": 2,
@@ -2869,13 +2869,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1923,
-     "type_nodes": 4625,
+     "type_nodes": 4638,
      "type_versions": 654,
-     "wasm_bytes": 4567
+     "wasm_bytes": 4596
     }
    ],
-   "wasm_bytes": 4567,
-   "wasm_sha256": "9d70fa8a66061198bf27caf2ad491d2791ed63fca5f63fa7bd020efba4f1da86"
+   "wasm_bytes": 4596,
+   "wasm_sha256": "d1561318ab91a9620883f458cf61a6d4f7d5baf9e198342fafec0d756af20fc3"
   },
   "global_call_freeze.blot": {
    "exit": 1,
@@ -2914,7 +2914,7 @@
       "use_expansions": 3
      },
      "core_nodes": 770,
-     "effect_rows": 2323,
+     "effect_rows": 2327,
      "emitted_functions": 0,
      "filename": "global_call_freeze.blot",
      "files": 2,
@@ -2925,7 +2925,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1893,
-     "type_nodes": 4578,
+     "type_nodes": 4591,
      "type_versions": 646,
      "wasm_bytes": 0
     }
@@ -2952,7 +2952,7 @@
       "use_expansions": 3
      },
      "core_nodes": 807,
-     "effect_rows": 2444,
+     "effect_rows": 2448,
      "emitted_functions": 41,
      "filename": "global_call_initialization.blot",
      "files": 2,
@@ -2963,13 +2963,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1992,
-     "type_nodes": 4771,
+     "type_nodes": 4784,
      "type_versions": 686,
-     "wasm_bytes": 6046
+     "wasm_bytes": 6075
     }
    ],
-   "wasm_bytes": 6046,
-   "wasm_sha256": "b8122765dccbba1daa6447f148713ce6a40217b168f8f46b8ede1e0464d125b6"
+   "wasm_bytes": 6075,
+   "wasm_sha256": "036ec8c71093663803f83703df1808737022bab796ef6606a35923ce74c4f15d"
   },
   "global_call_mutation.blot": {
    "exit": 0,
@@ -2992,7 +2992,7 @@
       "use_expansions": 3
      },
      "core_nodes": 865,
-     "effect_rows": 2501,
+     "effect_rows": 2505,
      "emitted_functions": 43,
      "filename": "global_call_mutation.blot",
      "files": 2,
@@ -3003,13 +3003,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2116,
-     "type_nodes": 4863,
+     "type_nodes": 4876,
      "type_versions": 698,
-     "wasm_bytes": 6231
+     "wasm_bytes": 6260
     }
    ],
-   "wasm_bytes": 6231,
-   "wasm_sha256": "f3b293bb5c91ca9145185561d0f14862ca5ce3019c19edfc7c0c10a3a0e59ec1"
+   "wasm_bytes": 6260,
+   "wasm_sha256": "e96ce4419fd906bd27f7cfa5a0cd658e769fe5caf7f76bd9325f60b593518bbd"
   },
   "global_call_read.blot": {
    "exit": 0,
@@ -3032,7 +3032,7 @@
       "use_expansions": 3
      },
      "core_nodes": 787,
-     "effect_rows": 2391,
+     "effect_rows": 2395,
      "emitted_functions": 37,
      "filename": "global_call_read.blot",
      "files": 2,
@@ -3043,13 +3043,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1941,
-     "type_nodes": 4677,
+     "type_nodes": 4690,
      "type_versions": 664,
-     "wasm_bytes": 5316
+     "wasm_bytes": 5345
     }
    ],
-   "wasm_bytes": 5316,
-   "wasm_sha256": "87081cabe6c4b6f04ebf33c5aaac3644acfd0d35acf4ba8f72c24ba3675e750f"
+   "wasm_bytes": 5345,
+   "wasm_sha256": "ab7f381e7553fecc03fee5dd84eb03da15efb82aa59722bb8416294460dc5bb4"
   },
   "identity_join.blot": {
    "exit": 0,
@@ -3072,7 +3072,7 @@
       "use_expansions": 3
      },
      "core_nodes": 994,
-     "effect_rows": 2706,
+     "effect_rows": 2710,
      "emitted_functions": 41,
      "filename": "identity_join.blot",
      "files": 2,
@@ -3083,13 +3083,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2236,
-     "type_nodes": 5195,
+     "type_nodes": 5208,
      "type_versions": 730,
-     "wasm_bytes": 7062
+     "wasm_bytes": 7301
     }
    ],
-   "wasm_bytes": 7062,
-   "wasm_sha256": "946f9fd3c2c5fcd869b1199c19a717cbca8f7cb59b1e791318ac6b52eb73d0d0"
+   "wasm_bytes": 7301,
+   "wasm_sha256": "27254ef71a35f70deeec885c5d4b62b359088ddd89521133ced33d4d3a54e28d"
   },
   "identity_join_address.blot": {
    "exit": 0,
@@ -3112,7 +3112,7 @@
       "use_expansions": 3
      },
      "core_nodes": 831,
-     "effect_rows": 2422,
+     "effect_rows": 2426,
      "emitted_functions": 34,
      "filename": "identity_join_address.blot",
      "files": 2,
@@ -3123,13 +3123,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1991,
-     "type_nodes": 4729,
+     "type_nodes": 4742,
      "type_versions": 668,
-     "wasm_bytes": 4979
+     "wasm_bytes": 5128
     }
    ],
-   "wasm_bytes": 4979,
-   "wasm_sha256": "16cdf467e7cfb77a364f4146823fc8360e122693623a8ac14356747a34a7f03f"
+   "wasm_bytes": 5128,
+   "wasm_sha256": "b02104ea924cbbe70cf34580708a052635cadd50ed7e446b0e96a231b10b2641"
   },
   "immutable_survivor.blot": {
    "exit": 0,
@@ -3152,7 +3152,7 @@
       "use_expansions": 3
      },
      "core_nodes": 848,
-     "effect_rows": 2429,
+     "effect_rows": 2433,
      "emitted_functions": 36,
      "filename": "immutable_survivor.blot",
      "files": 2,
@@ -3163,13 +3163,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2041,
-     "type_nodes": 4802,
+     "type_nodes": 4815,
      "type_versions": 678,
-     "wasm_bytes": 5279
+     "wasm_bytes": 5368
     }
    ],
-   "wasm_bytes": 5279,
-   "wasm_sha256": "ddb8c31a6aeed922b49291c23e2caa8088e35c93766d8788982a6bc4e74d3791"
+   "wasm_bytes": 5368,
+   "wasm_sha256": "0d4a8cfe9db966188ae3ed9fc780c8c3e633b9d9933c7b48b2f39d84adbeb3ed"
   },
   "input_alias_borrow_escape.blot": {
    "exit": 0,
@@ -3192,7 +3192,7 @@
       "use_expansions": 3
      },
      "core_nodes": 779,
-     "effect_rows": 2343,
+     "effect_rows": 2347,
      "emitted_functions": 31,
      "filename": "input_alias_borrow_escape.blot",
      "files": 2,
@@ -3203,13 +3203,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1930,
-     "type_nodes": 4620,
+     "type_nodes": 4633,
      "type_versions": 652,
-     "wasm_bytes": 4357
+     "wasm_bytes": 4386
     }
    ],
-   "wasm_bytes": 4357,
-   "wasm_sha256": "c8bbf58471e9895ec8037b6e3040fd48e1c3c091ccd14e012c0da47e211d30d1"
+   "wasm_bytes": 4386,
+   "wasm_sha256": "c2273bb3405bd1734187bf5cd1e1409f72e376fb35672b3a58109a64cd04597b"
   },
   "input_alias_descriptors.blot": {
    "exit": 0,
@@ -3232,7 +3232,7 @@
       "use_expansions": 3
      },
      "core_nodes": 954,
-     "effect_rows": 2614,
+     "effect_rows": 2618,
      "emitted_functions": 31,
      "filename": "input_alias_descriptors.blot",
      "files": 2,
@@ -3243,13 +3243,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2242,
-     "type_nodes": 5006,
+     "type_nodes": 5019,
      "type_versions": 719,
-     "wasm_bytes": 6471
+     "wasm_bytes": 6566
     }
    ],
-   "wasm_bytes": 6471,
-   "wasm_sha256": "092d9411963aae2306c477c8c29b10c32f6f99f005c3c69bc8984c984d6aae84"
+   "wasm_bytes": 6566,
+   "wasm_sha256": "0303b5aa6af5fc1ff4281769c1fd7b7cfd7e40d28b670d0b7e5a175abf7f455b"
   },
   "input_alias_partition.blot": {
    "exit": 0,
@@ -3272,7 +3272,7 @@
       "use_expansions": 3
      },
      "core_nodes": 830,
-     "effect_rows": 2421,
+     "effect_rows": 2425,
      "emitted_functions": 31,
      "filename": "input_alias_partition.blot",
      "files": 2,
@@ -3283,13 +3283,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2001,
-     "type_nodes": 4738,
+     "type_nodes": 4751,
      "type_versions": 670,
-     "wasm_bytes": 4531
+     "wasm_bytes": 4560
     }
    ],
-   "wasm_bytes": 4531,
-   "wasm_sha256": "0071d7e0b758e6697008c637c40d11f7b95cbe20850a08e55ecb4e5560be82c0"
+   "wasm_bytes": 4560,
+   "wasm_sha256": "3a41227377817cbf632bc40c39d9390ef88518ac913d83b3bc64126d07c04941"
   },
   "mutating_owner_return_fresh.blot": {
    "exit": 0,
@@ -3312,7 +3312,7 @@
       "use_expansions": 3
      },
      "core_nodes": 802,
-     "effect_rows": 2349,
+     "effect_rows": 2353,
      "emitted_functions": 32,
      "filename": "mutating_owner_return_fresh.blot",
      "files": 2,
@@ -3323,13 +3323,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1947,
-     "type_nodes": 4638,
+     "type_nodes": 4651,
      "type_versions": 658,
-     "wasm_bytes": 4682
+     "wasm_bytes": 4741
     }
    ],
-   "wasm_bytes": 4682,
-   "wasm_sha256": "ef783f49a3c03b91a046ed3c9a21b8138df637ed37f3b38f08001ba2de814735"
+   "wasm_bytes": 4741,
+   "wasm_sha256": "b53b43128b099619fb73af1f910fe6bce84a2a597e703fdb2c1bfdc2b59765e7"
   },
   "mutating_owner_return_truncate.blot": {
    "exit": 1,
@@ -3368,7 +3368,7 @@
       "use_expansions": 3
      },
      "core_nodes": 775,
-     "effect_rows": 2332,
+     "effect_rows": 2336,
      "emitted_functions": 0,
      "filename": "mutating_owner_return_truncate.blot",
      "files": 2,
@@ -3379,7 +3379,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1911,
-     "type_nodes": 4593,
+     "type_nodes": 4606,
      "type_versions": 647,
      "wasm_bytes": 0
     }
@@ -3406,7 +3406,7 @@
       "use_expansions": 3
      },
      "core_nodes": 778,
-     "effect_rows": 2375,
+     "effect_rows": 2379,
      "emitted_functions": 38,
      "filename": "named-closure-parameter-fixtures/applied-provider-capture.blot",
      "files": 2,
@@ -3417,13 +3417,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1914,
-     "type_nodes": 4633,
+     "type_nodes": 4646,
      "type_versions": 652,
-     "wasm_bytes": 4542
+     "wasm_bytes": 4571
     }
    ],
-   "wasm_bytes": 4542,
-   "wasm_sha256": "1a22919552308c24a8ab2f459dc9fee86a8ba73765b1cbfd0db094528d7ab0ef"
+   "wasm_bytes": 4571,
+   "wasm_sha256": "5767b94e80f3b8158656d5b48f11a8a3885cf9ab28f1723a2481a606bd31d25a"
   },
   "named-closure-parameter-fixtures/direct-cell-cycle.blot": {
    "exit": 0,
@@ -3446,7 +3446,7 @@
       "use_expansions": 3
      },
      "core_nodes": 758,
-     "effect_rows": 2321,
+     "effect_rows": 2325,
      "emitted_functions": 32,
      "filename": "named-closure-parameter-fixtures/direct-cell-cycle.blot",
      "files": 2,
@@ -3457,13 +3457,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1877,
-     "type_nodes": 4570,
+     "type_nodes": 4583,
      "type_versions": 643,
-     "wasm_bytes": 3984
+     "wasm_bytes": 4013
     }
    ],
-   "wasm_bytes": 3984,
-   "wasm_sha256": "611875a1b3163429f7ef0b6d81dfa24725b4dd0cfc876204141c181ddef59e1c"
+   "wasm_bytes": 4013,
+   "wasm_sha256": "b5813b688b13a4c5b5066302f786bfb5ec026bdf7a818816e1835fa3e9a7277a"
   },
   "named-closure-parameter-fixtures/generic-unit-captures.blot": {
    "exit": 0,
@@ -3486,7 +3486,7 @@
       "use_expansions": 3
      },
      "core_nodes": 769,
-     "effect_rows": 2372,
+     "effect_rows": 2376,
      "emitted_functions": 43,
      "filename": "named-closure-parameter-fixtures/generic-unit-captures.blot",
      "files": 2,
@@ -3497,13 +3497,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1900,
-     "type_nodes": 4645,
+     "type_nodes": 4658,
      "type_versions": 652,
-     "wasm_bytes": 4652
+     "wasm_bytes": 4681
     }
    ],
-   "wasm_bytes": 4652,
-   "wasm_sha256": "400d5549e8d714245fb008c8152b9713e7eefe9da86f8c4ba0cceffd8a11664f"
+   "wasm_bytes": 4681,
+   "wasm_sha256": "75f690400c06ae19cd5d2505c9d94db9820c23644ac78e9be9b3cc242a20ea72"
   },
   "named-closure-parameter-fixtures/lexical-generic-capture.blot": {
    "exit": 0,
@@ -3526,7 +3526,7 @@
       "use_expansions": 3
      },
      "core_nodes": 768,
-     "effect_rows": 2356,
+     "effect_rows": 2360,
      "emitted_functions": 35,
      "filename": "named-closure-parameter-fixtures/lexical-generic-capture.blot",
      "files": 2,
@@ -3537,13 +3537,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1895,
-     "type_nodes": 4613,
+     "type_nodes": 4626,
      "type_versions": 649,
-     "wasm_bytes": 4217
+     "wasm_bytes": 4246
     }
    ],
-   "wasm_bytes": 4217,
-   "wasm_sha256": "b1336755684fc3409be89811bb392dce7af5d31fc1117b01bb15daebac0a9019"
+   "wasm_bytes": 4246,
+   "wasm_sha256": "3a3288eddce70cc1a45360f0b87b5e943c2187fe5327876d317ad51a74ff6653"
   },
   "named-closure-parameter-fixtures/nonunit-applied-export.blot": {
    "exit": 0,
@@ -3566,7 +3566,7 @@
       "use_expansions": 3
      },
      "core_nodes": 763,
-     "effect_rows": 2350,
+     "effect_rows": 2354,
      "emitted_functions": 35,
      "filename": "named-closure-parameter-fixtures/nonunit-applied-export.blot",
      "files": 2,
@@ -3577,13 +3577,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1891,
-     "type_nodes": 4611,
+     "type_nodes": 4624,
      "type_versions": 649,
-     "wasm_bytes": 4208
+     "wasm_bytes": 4237
     }
    ],
-   "wasm_bytes": 4208,
-   "wasm_sha256": "d4d514831ed47f768c04fae3565ed3d7740de2e8916400ce9542d04b2139f7ad"
+   "wasm_bytes": 4237,
+   "wasm_sha256": "9f826a9e209fc43edb2a7f377c7c95db5fd1b822d44358605e0d59654671bd92"
   },
   "named-closure-parameter-fixtures/returned-closure-cycle.blot": {
    "exit": 0,
@@ -3606,7 +3606,7 @@
       "use_expansions": 3
      },
      "core_nodes": 764,
-     "effect_rows": 2335,
+     "effect_rows": 2339,
      "emitted_functions": 36,
      "filename": "named-closure-parameter-fixtures/returned-closure-cycle.blot",
      "files": 2,
@@ -3617,13 +3617,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1889,
-     "type_nodes": 4596,
+     "type_nodes": 4609,
      "type_versions": 647,
-     "wasm_bytes": 4251
+     "wasm_bytes": 4280
     }
    ],
-   "wasm_bytes": 4251,
-   "wasm_sha256": "edd65930c8eccfacb783be37078e9d0c223f5a85da884084db306c5159da6657"
+   "wasm_bytes": 4280,
+   "wasm_sha256": "7c544756e8e451bec302aca3510a672894c6291607fbe182ca034dd4d9255610"
   },
   "named-closure-parameter-fixtures/unit-applied-effect-row.blot": {
    "exit": 0,
@@ -3646,7 +3646,7 @@
       "use_expansions": 3
      },
      "core_nodes": 772,
-     "effect_rows": 2359,
+     "effect_rows": 2363,
      "emitted_functions": 37,
      "filename": "named-closure-parameter-fixtures/unit-applied-effect-row.blot",
      "files": 2,
@@ -3657,13 +3657,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1903,
-     "type_nodes": 4618,
+     "type_nodes": 4631,
      "type_versions": 648,
-     "wasm_bytes": 4425
+     "wasm_bytes": 4454
     }
    ],
-   "wasm_bytes": 4425,
-   "wasm_sha256": "d370745ad92f95390b9e2aef004866330c2ffd033d5cb455b2f1bd8fdb960d23"
+   "wasm_bytes": 4454,
+   "wasm_sha256": "bde614cfc051fc38622e48830e853f77bb9f98ebcaad58fce7af93096df29084"
   },
   "named-closure-parameter-fixtures/unit-applied-export.blot": {
    "exit": 0,
@@ -3686,7 +3686,7 @@
       "use_expansions": 3
      },
      "core_nodes": 763,
-     "effect_rows": 2350,
+     "effect_rows": 2354,
      "emitted_functions": 35,
      "filename": "named-closure-parameter-fixtures/unit-applied-export.blot",
      "files": 2,
@@ -3697,13 +3697,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1890,
-     "type_nodes": 4610,
+     "type_nodes": 4623,
      "type_versions": 648,
-     "wasm_bytes": 4177
+     "wasm_bytes": 4206
     }
    ],
-   "wasm_bytes": 4177,
-   "wasm_sha256": "b2582233aa89e879d1367f6a79f0057b9b5361f88fafc19f8c0e432bcb4a5f71"
+   "wasm_bytes": 4206,
+   "wasm_sha256": "f20430de90fb771e1411ead865334988214f2a667feb437b170308cefcffb15c"
   },
   "nominal/compiler-binary-type-call.blot": {
    "exit": 0,
@@ -3726,7 +3726,7 @@
       "use_expansions": 3
      },
      "core_nodes": 765,
-     "effect_rows": 2351,
+     "effect_rows": 2355,
      "emitted_functions": 31,
      "filename": "nominal/compiler-binary-type-call.blot",
      "files": 2,
@@ -3737,13 +3737,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1900,
-     "type_nodes": 4619,
+     "type_nodes": 4632,
      "type_versions": 649,
-     "wasm_bytes": 3903
+     "wasm_bytes": 3932
     }
    ],
-   "wasm_bytes": 3903,
-   "wasm_sha256": "711b31ebbaf62cf844727ec68aae5a652c96cd08876ca0c2f85675b726bbbcc2"
+   "wasm_bytes": 3932,
+   "wasm_sha256": "07478d4ed0066bcd57f5f6a501abcd9875bd0b28a0ac8b7534a1734dff822683"
   },
   "nominal/generic-fields-and-associated.blot": {
    "exit": 0,
@@ -3766,7 +3766,7 @@
       "use_expansions": 7
      },
      "core_nodes": 793,
-     "effect_rows": 2410,
+     "effect_rows": 2414,
      "emitted_functions": 37,
      "filename": "nominal/generic-fields-and-associated.blot",
      "files": 2,
@@ -3777,13 +3777,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1962,
-     "type_nodes": 4756,
+     "type_nodes": 4769,
      "type_versions": 675,
-     "wasm_bytes": 4267
+     "wasm_bytes": 4296
     }
    ],
-   "wasm_bytes": 4267,
-   "wasm_sha256": "efe4ecb7227f2262e1678af48657d3425f07c71832af5a0408439af86955a77d"
+   "wasm_bytes": 4296,
+   "wasm_sha256": "54204039ce6297c2348c1f9924661045bed99c7b129de061acda81a358fe7c28"
   },
   "nominal/left-result-conflict.blot": {
    "exit": 1,
@@ -3815,7 +3815,7 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2374,
+     "effect_rows": 2378,
      "emitted_functions": 0,
      "filename": "nominal/left-result-conflict.blot",
      "files": 2,
@@ -3826,7 +3826,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1925,
-     "type_nodes": 4673,
+     "type_nodes": 4686,
      "type_versions": 657,
      "wasm_bytes": 0
     }
@@ -3885,7 +3885,7 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2368,
+     "effect_rows": 2372,
      "emitted_functions": 0,
      "filename": "nominal/ordered-right-fallback.blot",
      "files": 2,
@@ -3896,7 +3896,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1924,
-     "type_nodes": 4667,
+     "type_nodes": 4680,
      "type_versions": 656,
      "wasm_bytes": 0
     }
@@ -3923,7 +3923,7 @@
       "use_expansions": 8
      },
      "core_nodes": 852,
-     "effect_rows": 2449,
+     "effect_rows": 2453,
      "emitted_functions": 32,
      "filename": "packed_input_oom.blot",
      "files": 2,
@@ -3934,23 +3934,23 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2014,
-     "type_nodes": 5023,
+     "type_nodes": 5036,
      "type_versions": 706,
-     "wasm_bytes": 5059
+     "wasm_bytes": 5088
     }
    ],
-   "wasm_bytes": 5059,
-   "wasm_sha256": "d054653e3c9f415071de8e02a42389a7fa73b33c215e43758df96413a3e77bdd"
+   "wasm_bytes": 5088,
+   "wasm_sha256": "1586bf1abe9e028669b500655f165c4c454dd6687a45afdf4019fd84450ebad2"
   },
   "partial-runtime-fixtures/a.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "partial-runtime-fixtures/a.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -3972,7 +3972,7 @@
       "use_expansions": 3
      },
      "core_nodes": 760,
-     "effect_rows": 2324,
+     "effect_rows": 2328,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/a.blot",
      "files": 2,
@@ -3983,7 +3983,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1883,
-     "type_nodes": 4575,
+     "type_nodes": 4588,
      "type_versions": 642,
      "wasm_bytes": 0
     }
@@ -3993,11 +3993,11 @@
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "partial-runtime-fixtures/b.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -4019,7 +4019,7 @@
       "use_expansions": 3
      },
      "core_nodes": 760,
-     "effect_rows": 2324,
+     "effect_rows": 2328,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/b.blot",
      "files": 2,
@@ -4030,7 +4030,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1883,
-     "type_nodes": 4575,
+     "type_nodes": 4588,
      "type_versions": 642,
      "wasm_bytes": 0
     }
@@ -4057,7 +4057,7 @@
       "use_expansions": 3
      },
      "core_nodes": 830,
-     "effect_rows": 2576,
+     "effect_rows": 2580,
      "emitted_functions": 49,
      "filename": "partial-runtime-fixtures/namespace-ab.blot",
      "files": 4,
@@ -4068,13 +4068,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1990,
-     "type_nodes": 5095,
+     "type_nodes": 5108,
      "type_versions": 667,
-     "wasm_bytes": 5443
+     "wasm_bytes": 5472
     }
    ],
-   "wasm_bytes": 5443,
-   "wasm_sha256": "035cbb5077848af3d311092150360087ab5912c47d040645f518a7311bfc5224"
+   "wasm_bytes": 5472,
+   "wasm_sha256": "a3f151dc73f30dc1268ba7437e483a383803d5466b671712c03036203398404a"
   },
   "primitive-aliases.blot": {
    "exit": 0,
@@ -4097,7 +4097,7 @@
       "use_expansions": 3
      },
      "core_nodes": 1233,
-     "effect_rows": 3825,
+     "effect_rows": 3829,
      "emitted_functions": 86,
      "filename": "primitive-aliases.blot",
      "files": 2,
@@ -4108,13 +4108,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2730,
-     "type_nodes": 6504,
+     "type_nodes": 6517,
      "type_versions": 947,
-     "wasm_bytes": 13138
+     "wasm_bytes": 13287
     }
    ],
-   "wasm_bytes": 13138,
-   "wasm_sha256": "850c5ddcd8e20803ee8b4f59075040f3e5dae5e078b31b08b9303788ce26cb6e"
+   "wasm_bytes": 13287,
+   "wasm_sha256": "a1582bbca528c7641bb5f2830f8809319cf90ad64fde6c5003e01469bb2090fa"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
@@ -4137,7 +4137,7 @@
       "use_expansions": 3
      },
      "core_nodes": 793,
-     "effect_rows": 2390,
+     "effect_rows": 2394,
      "emitted_functions": 37,
      "filename": "qualified-row-fixtures/associated-direct.blot",
      "files": 2,
@@ -4148,13 +4148,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1970,
-     "type_nodes": 4681,
+     "type_nodes": 4694,
      "type_versions": 661,
-     "wasm_bytes": 4396
+     "wasm_bytes": 4425
     }
    ],
-   "wasm_bytes": 4396,
-   "wasm_sha256": "8e354a2eb48405b4ee4c7b8f6d9f32a7d5635c570be966e5a515c4e0c348218e"
+   "wasm_bytes": 4425,
+   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
   },
   "qualified-row-fixtures/associated.blot": {
    "exit": 0,
@@ -4177,7 +4177,7 @@
       "use_expansions": 3
      },
      "core_nodes": 793,
-     "effect_rows": 2390,
+     "effect_rows": 2394,
      "emitted_functions": 37,
      "filename": "qualified-row-fixtures/associated.blot",
      "files": 2,
@@ -4188,13 +4188,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1966,
-     "type_nodes": 4681,
+     "type_nodes": 4694,
      "type_versions": 661,
-     "wasm_bytes": 4396
+     "wasm_bytes": 4425
     }
    ],
-   "wasm_bytes": 4396,
-   "wasm_sha256": "8e354a2eb48405b4ee4c7b8f6d9f32a7d5635c570be966e5a515c4e0c348218e"
+   "wasm_bytes": 4425,
+   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
   },
   "qualified-row-fixtures/reject-effectful.blot": {
    "exit": 0,
@@ -4217,7 +4217,7 @@
       "use_expansions": 3
      },
      "core_nodes": 796,
-     "effect_rows": 2396,
+     "effect_rows": 2400,
      "emitted_functions": 38,
      "filename": "qualified-row-fixtures/reject-effectful.blot",
      "files": 2,
@@ -4228,13 +4228,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1970,
-     "type_nodes": 4686,
+     "type_nodes": 4699,
      "type_versions": 662,
-     "wasm_bytes": 4445
+     "wasm_bytes": 4474
     }
    ],
-   "wasm_bytes": 4445,
-   "wasm_sha256": "fff6e1867b446d22e681c4507e54fef66d64246f8a62dd322fb7b3e1af93f89c"
+   "wasm_bytes": 4474,
+   "wasm_sha256": "7693754cd126c3753f21c38336cd15fa6b65ad8fba78dd2aea03df3de3916d56"
   },
   "qualified-row-fixtures/reject-pure.blot": {
    "exit": 0,
@@ -4257,7 +4257,7 @@
       "use_expansions": 3
      },
      "core_nodes": 793,
-     "effect_rows": 2391,
+     "effect_rows": 2395,
      "emitted_functions": 37,
      "filename": "qualified-row-fixtures/reject-pure.blot",
      "files": 2,
@@ -4268,13 +4268,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1967,
-     "type_nodes": 4681,
+     "type_nodes": 4694,
      "type_versions": 661,
-     "wasm_bytes": 4396
+     "wasm_bytes": 4425
     }
    ],
-   "wasm_bytes": 4396,
-   "wasm_sha256": "8e354a2eb48405b4ee4c7b8f6d9f32a7d5635c570be966e5a515c4e0c348218e"
+   "wasm_bytes": 4425,
+   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
   },
   "result_selected_operand.blot": {
    "exit": 0,
@@ -4297,7 +4297,7 @@
       "use_expansions": 11
      },
      "core_nodes": 817,
-     "effect_rows": 2523,
+     "effect_rows": 2527,
      "emitted_functions": 42,
      "filename": "result_selected_operand.blot",
      "files": 2,
@@ -4308,13 +4308,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1995,
-     "type_nodes": 4937,
+     "type_nodes": 4950,
      "type_versions": 709,
-     "wasm_bytes": 4861
+     "wasm_bytes": 4890
     }
    ],
-   "wasm_bytes": 4861,
-   "wasm_sha256": "72d6b1fe15b087be437b0d27936d271ab354abc17fd603611760050def977af6"
+   "wasm_bytes": 4890,
+   "wasm_sha256": "d23805f33826730ee482c6acc7ead272b3c3d4f318df36a2d4bb2e3a4b41268a"
   },
   "scoped-loop-cleanup.blot": {
    "exit": 0,
@@ -4337,7 +4337,7 @@
       "use_expansions": 3
      },
      "core_nodes": 1097,
-     "effect_rows": 2733,
+     "effect_rows": 2737,
      "emitted_functions": 56,
      "filename": "scoped-loop-cleanup.blot",
      "files": 2,
@@ -4348,13 +4348,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2441,
-     "type_nodes": 5260,
+     "type_nodes": 5273,
      "type_versions": 785,
-     "wasm_bytes": 9634
+     "wasm_bytes": 9813
     }
    ],
-   "wasm_bytes": 9634,
-   "wasm_sha256": "104b1d888fa76a46ab76bcbadcba0d588cb7ad352a60fe84ab629238b59b11c9"
+   "wasm_bytes": 9813,
+   "wasm_sha256": "e327e142e48cc6c1be1b661f93561b62b46697a4394c8700dad358a38301e5f5"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,
@@ -4362,11 +4362,11 @@
     {
      "body_elaborations": 195,
      "body_lowerings": 195,
-     "check_occurs_steps": 2312,
+     "check_occurs_steps": 2353,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4861,
-      "instantiations": 448,
+      "inference_steps": 5039,
+      "instantiations": 510,
       "memo_declined": 0,
       "memo_hits": 0,
       "memo_misses": 5,
@@ -4376,35 +4376,35 @@
       "shared_uses": 11,
       "use_expansions": 10
      },
-     "core_nodes": 1870,
-     "effect_rows": 4013,
+     "core_nodes": 1999,
+     "effect_rows": 4234,
      "emitted_functions": 46,
      "filename": "scoped-loop-refinement.blot",
      "files": 4,
-     "imported_schemes": 92,
+     "imported_schemes": 95,
      "kind": "compilation",
-     "row_versions": 780,
-     "source_bytes": 24277,
+     "row_versions": 847,
+     "source_bytes": 25044,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3719,
-     "type_nodes": 8373,
-     "type_versions": 1135,
-     "wasm_bytes": 10286
+     "syntax_nodes": 3876,
+     "type_nodes": 8651,
+     "type_versions": 1173,
+     "wasm_bytes": 10435
     }
    ],
-   "wasm_bytes": 10286,
-   "wasm_sha256": "a3cdaf4d640ceffd9971021a705e7e43386ee56558c9019921f2e8168d897137"
+   "wasm_bytes": 10435,
+   "wasm_sha256": "24d8a195d3c0b2db7feab91fdc669385ffd8dd3dfe7fb3068e8abc18085b3685"
   },
   "scoped-opaque/facade.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "scoped-opaque/facade.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -4426,7 +4426,7 @@
       "use_expansions": 3
      },
      "core_nodes": 781,
-     "effect_rows": 2410,
+     "effect_rows": 2414,
      "emitted_functions": 0,
      "filename": "scoped-opaque/facade.blot",
      "files": 3,
@@ -4437,7 +4437,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1961,
-     "type_nodes": 4900,
+     "type_nodes": 4913,
      "type_versions": 667,
      "wasm_bytes": 0
     }
@@ -4464,7 +4464,7 @@
       "use_expansions": 3
      },
      "core_nodes": 945,
-     "effect_rows": 2732,
+     "effect_rows": 2736,
      "emitted_functions": 38,
      "filename": "scoped-opaque/main.blot",
      "files": 4,
@@ -4475,23 +4475,23 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2253,
-     "type_nodes": 5670,
+     "type_nodes": 5683,
      "type_versions": 761,
-     "wasm_bytes": 6342
+     "wasm_bytes": 6371
     }
    ],
-   "wasm_bytes": 6342,
-   "wasm_sha256": "b8be27c695d20ddc6925907d1667597ff1f75b9fc2e4829b4261747c2e0f5153"
+   "wasm_bytes": 6371,
+   "wasm_sha256": "f0229d41e3af651d95bc4231a82dbafb471ce89b86c2f663f17227c49cd4bb60"
   },
   "scoped-opaque/tokens.blot": {
    "exit": 1,
    "records": [
     {
-     "code": "storage_unsupported",
+     "code": "no_entry",
      "end": 0,
      "filename": "scoped-opaque/tokens.blot",
      "kind": "diagnostic",
-     "message": "Direct backend: the entry module exports nothing",
+     "message": "A build requires at least one #entry, #kernel, or #process declaration",
      "stage": "emit",
      "start": 0
     },
@@ -4513,7 +4513,7 @@
       "use_expansions": 3
      },
      "core_nodes": 781,
-     "effect_rows": 2352,
+     "effect_rows": 2356,
      "emitted_functions": 0,
      "filename": "scoped-opaque/tokens.blot",
      "files": 2,
@@ -4524,7 +4524,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 1953,
-     "type_nodes": 4717,
+     "type_nodes": 4730,
      "type_versions": 667,
      "wasm_bytes": 0
     }
@@ -4551,7 +4551,7 @@
       "use_expansions": 3
      },
      "core_nodes": 778,
-     "effect_rows": 2349,
+     "effect_rows": 2353,
      "emitted_functions": 31,
      "filename": "staged_catalog.blot",
      "files": 2,
@@ -4562,13 +4562,13 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 1917,
-     "type_nodes": 4625,
+     "type_nodes": 4638,
      "type_versions": 652,
-     "wasm_bytes": 3949
+     "wasm_bytes": 3978
     }
    ],
-   "wasm_bytes": 3949,
-   "wasm_sha256": "c037dc323746a8bd282ea5f3b28e51be6a4c58e70ed0b386b8310a98a47b0605"
+   "wasm_bytes": 3978,
+   "wasm_sha256": "5d8a5448c033b3d4cef45b6cce3d9243858c5380d735967c92b4b55642347817"
   }
  }
 }

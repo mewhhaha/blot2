@@ -126,6 +126,9 @@ func near (label: Text) -> (tolerance: F32) -> (expected: F32) -> (actual: F32):
   return ()
 
 func near_array (label: Text) -> (tolerance: F32) -> (expected: #[F32]) -> (actual: #[F32]): Unit ! { Test } =>
+  if not (F32.ge tolerance 0.0):
+    use mismatch label "tolerance must be non-negative" ">= 0.0" (text.from_f32 tolerance)
+    return ()
   if expected.length != actual.length:
     use mismatch label "array lengths differ" (text.from_u32 expected.length) (text.from_u32 actual.length)
     return ()

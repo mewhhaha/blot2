@@ -164,6 +164,7 @@ struct HandleCell { cell: u32, outer: Val, ty: Ty, outer_is_cell: bool = false }
 struct Handle { saved: u32, depth: u32, cells_start: u32 = 0, cells_len: u32 = 0 }
 
 struct DepEntry { id: u32 }
+struct TrapEntry { kind: u8 = 0, unit: u32 = 0, start: u32 = 0, end: u32 = 0, message_start: u32 = 0, message_len: u32 = 0 }
 root struct State {
     instances: Instance[>..] = [],
     // Hash of a key to its newest index node (id + 1).
@@ -257,6 +258,7 @@ root struct State {
     dep_match: bool = true,
     inlined_callees: U64Map = U64Map {},
     persist_rec_helpers: U64Map = U64Map {},
+    deep_copy_helpers: U64Map = U64Map {},
     kernels: blot_check_wire_schema::KernelInfo[>..] = [],
     processes: blot_check_wire_schema::ProcessInfo[>..] = [],
     wire_word_tags: u8[>..] = [],
@@ -266,6 +268,9 @@ root struct State {
     staged_dep_units_valid: bool = false,
     staged_dep_units: u32[>..] = [],
     staged_value_digest: u64 = 0xcbf29ce484222325,
+    // Recorded runtime trap sites for the optional `blot:traps` v1 custom section.
+    traps: TrapEntry[>..] = [],
+    trap_text: u8[>..] = [],
 }
 
 fn recordStagedDepUnit(g: Generator&, unit: u32) {

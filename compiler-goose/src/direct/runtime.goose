@@ -33,10 +33,12 @@ let undo_bytes: u32 = 2097152;
 //   [512..640)  heap free lists (32 power-of-two classes)
 //   [640..644)  arena_oom_flag (1u32 on physical retained-chunk/free-list/alloc_raw OOM; zeroed on reset)
 //   [644..772)  transport free lists (32 power-of-two classes)
+//   [772..776)  trap_site_id (1-based index into blot:traps custom section; 0 = none; zeroed on reset)
 //   [1024..2048) 256-entry owner block directory
 //   [2048..65536) initial arena
 let arena_oom_offset: u32 = 640;
 let transport_free_lists_offset: u32 = 644;
+let trap_site_offset: u32 = 772;
 let owner_block_bytes: u32 = 4096;
 let arena_start: u32 = 2048;
 let initial_page_bytes: u32 = 65536;
@@ -56,6 +58,7 @@ struct Layout {
     free_lists: u32 = 512,
     arena_oom_offset: u32 = 640,
     transport_free_lists: u32 = 644,
+    trap_site_offset: u32 = 772,
     owner_table: u32 = 1024,
     owner_capacity: u32 = 0,
     persistent_split: u32 = 0,
@@ -1668,6 +1671,15 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         k(h, 0x04000000);
         op(h, blot_direct_writer::OP_i32_gt_u);
         trapIf(h);
+        get(h, 1);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, 0);
+        k(h, capacity_mask);
+        get(h, 1);
+        op(h, blot_direct_writer::OP_i32_div_u);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        trapIf(h);
+        op(h, blot_direct_writer::OP_end);
         get(h, 0);
         get(h, 1);
         op(h, blot_direct_writer::OP_i32_mul);
@@ -1914,10 +1926,13 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         finish(h, module, r.allocate);
     }
 
-    // reset(ignored) -> 0: zero arena_oom_flag and release active transport bank back to transport_free_lists.
+    // reset(ignored) -> 0: zero arena_oom_flag and trap_site_id, and release active transport bank back to transport_free_lists.
     {
         var h = H { parameters: 1, locals: 1, .. };
         k(h, layout.arena_oom_offset);
+        k(h, 0);
+        store(h, 0);
+        k(h, layout.trap_site_offset);
         k(h, 0);
         store(h, 0);
         gget(h, r.transport_cap);

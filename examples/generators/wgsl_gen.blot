@@ -48,7 +48,10 @@ func tokenize (source: Text): Result [#[Text], Text] =>
       let start = i
       i := self + 1
       for j in i..source.length:
-        if not (word_char source[j]):
+        let cur = source[j]
+        let prev = source[j - 1]
+        let exp_plus = cur == 43 and (prev == 101 or prev == 69)
+        if not (word_char cur or exp_plus):
           break
         i := self + 1
       @storage.push tokens (@array.generate (i - start) (func j => return source[start + j]))
@@ -61,6 +64,20 @@ func token (tokens: #[Text]) -> (i: U32): Text =>
 
 func is_token (tokens: #[Text]) -> (i: U32) -> (expected: Text): Bool =>
   return i < tokens.length and text.equal tokens[i] expected
+
+func is_reserved_keyword (name: Text): Bool =>
+  let reserved: #[Text] = #[
+    "and", "as", "break", "case", "const", "continue", "copy", "data", "do",
+    "effect", "else", "ever", "export", "false", "for", "fork", "freeze",
+    "froM", "func", "if", "impl", "import", "in", "infix", "infixl", "infixr",
+    "is", "let", "not", "of", "opaque", "or", "own", "private", "return",
+    "seal", "self", "spark", "test", "then", "true", "type", "use", "where",
+    "wherE", "with", "yield",
+  ]
+  for word in reserved:
+    if text.equal name word:
+      return true
+  return false
 
 func identifier (name: Text) -> (upper: Bool): Bool =>
   if name.length == 0 or text.equal name "_":
@@ -108,6 +125,8 @@ func read_struct (tokens: #[Text]) -> (start: U32): Result [(Text, U32), Text] =
     let field = token tokens i
     if not (identifier field false) or not (is_token tokens (i + 1) ":"):
       return $Err (text.concat "Expected a WGSL field and type in " name)
+    if is_reserved_keyword field:
+      return $Err (text.join "" #["WGSL field '", field, "' in ", name, " collides with a reserved Blot keyword"])
     let ty = field_type (token tokens (i + 2))
     if ty.length == 0:
       return $Err (text.concat "Unsupported WGSL field type in " name)
@@ -128,6 +147,39 @@ func read_struct (tokens: #[Text]) -> (start: U32): Result [(Text, U32), Text] =
     i := self + 1
   return $Ok (text.finish (text.append " }\n" out), i)
 
+func float_literal (raw: Text): Maybe Text =>
+  if raw.length == 0:
+    return $Nothing
+  let end = if raw[raw.length - 1] == 102 then raw.length - 1 else raw.length
+  if end == 0:
+    return $Nothing
+  let exp_at = end
+  for i in 0..end:
+    if raw[i] == 101 or raw[i] == 69:
+      exp_at := i
+      break
+  if exp_at == end:
+    let body = @array.generate end (func i => raw[i])
+    return decimal body
+  let mantissa = @array.generate exp_at (func i => raw[i])
+  let $Some canon = decimal mantissa else:
+    return $Nothing
+  let exp_start = exp_at + 1
+  if exp_start >= end:
+    return $Nothing
+  let digits_start = if raw[exp_start] == 43 or raw[exp_start] == 45 then exp_start + 1 else exp_start
+  if digits_start >= end:
+    return $Nothing
+  for i in digits_start..end:
+    if not (digit raw[i]):
+      return $Nothing
+  let out = text.builder ()
+  out := text.append canon self
+  out := text.push 101 self
+  for i in exp_start..end:
+    out := text.push raw[i] self
+  return $Some (text.finish out)
+
 func constant (raw: Text): Maybe (Text, Text) =>
   if text.equal raw "true" or text.equal raw "false":
     return $Some ("Bool", copy raw)
@@ -137,7 +189,16 @@ func constant (raw: Text): Maybe (Text, Text) =>
     let $Some value = text.parse_u32 (&raw[0..raw.length - 1]) else:
       return $Nothing
     return $Some ("U32", text.from_u32 value)
-  let $Some value = decimal raw else:
+  let is_float = raw[raw.length - 1] == 102
+  for scalar in raw:
+    if scalar == 46 or scalar == 101 or scalar == 69:
+      is_float := true
+      break
+  if not is_float:
+    let $Some int_value = text.parse_u32 raw else:
+      return $Nothing
+    return $Some ("U32", text.from_u32 int_value)
+  let $Some value = float_literal raw else:
     return $Nothing
   return $Some ("F32", value)
 
@@ -145,6 +206,8 @@ func read_const (tokens: #[Text]) -> (start: U32): Result [(Text, U32), Text] =>
   let name = token tokens (start + 1)
   if not (identifier name false) or not (is_token tokens (start + 2) "=") or not (is_token tokens (start + 4) ";"):
     return $Err "Expected WGSL const name = literal;"
+  if is_reserved_keyword name:
+    return $Err (text.join "" #["WGSL constant '", name, "' collides with a reserved Blot keyword"])
   let $Some (ty, literal) = constant (token tokens (start + 3)) else:
     return $Err (text.concat "Unsupported WGSL constant value for " name)
   return $Ok (text.join "" #["const ", name, ": ", ty, " = ", literal, "\n"], start + 5)

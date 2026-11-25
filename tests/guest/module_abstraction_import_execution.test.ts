@@ -344,7 +344,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
         "func read (n: U32): U32 => return (bridge.carry n).x",
       ].join("\n") + "\n",
     );
-    for (const inferenceBudget of [4074, 4075]) {
+    for (const inferenceBudget of [4077, 4078]) {
       const outputs = [];
       for (const frontendWorkers of [1, 8]) {
         const client = await createZigProjectCompiler({
@@ -356,7 +356,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
         });
         try {
           const result = await client.build();
-          assert.equal(result.success, inferenceBudget === 4075);
+          assert.equal(result.success, inferenceBudget === 4078);
           if (result.success) {
             const guest = await instantiateGuest(result.bytes);
             try {

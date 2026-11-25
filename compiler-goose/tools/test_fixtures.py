@@ -177,6 +177,19 @@ fixtures strictly shrank from redundant bounds-check removal
 13165->13138 B, `scoped-loop-cleanup.blot` 9643->9634 B) with zero exit-code,
 diagnostic, function-count, or frontend work-counter changes.
 
+Language Audit Waves 1-3 & Trap Provenance (25 November 2026) fixed type,
+trait associated-output, `traitIsReadOnly`, `is opaque` reflection, `fork`+`with`
+`Foreign`, uniqueness (loan undo trail, generic `#for`/freeze/copy, `with`
+record/cell/fork soundness), FBIP/linearAppend aliasing, SIMD incremental
+relocation (`unpatchableOperand`), `#run`/`#if` associated `eq`/`ne`,
+`defer_f32_nan`, `@simd.store` cache invalidation, `let ... else:`/`#for`
+carries, `std/text` exact `from_f32`, `r.create` overflow + `static_pool_flag`
+guards, `Code.no_entry` for entry-less builds, and `"blot:traps"` v1 / Page-0
+offset `772` trap metadata. Re-recorded `expected.json` (109 fixtures, zero
+exit-code changes; 9 library-only fixtures updated from `storage_unsupported`
+to `no_entry`; uniform `+4 effect_rows / +13 type_nodes` and `+29B` runtime
+guard deltas).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

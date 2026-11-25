@@ -274,8 +274,24 @@ root struct Analyzer {
     lent_constant: bool = false,
     // Blocks whose value is the function's result: `return do: ...`.
     tails: u32[>..<] = [],
-    // Outer locals currently owned by inline `with` handler cells.
-    with_cells: u32[>..<] = []
+    // Outer locals currently owned by inline `with` handler cells, and their saved facts.
+    with_cells: u32[>..<] = [],
+    with_cell_facts: Fact[>..<] = [],
+    with_cell_latest: u32[>..<] = [],
+    with_cell_aliases: u32[>..<] = [],
+    with_cell_alias_slots: i64[>..<] = [],
+    rebinding_cell_slot: i64 = -1,
+    // Handler closure node currently allowed to carry `with_cells`.
+    with_handler_node: u32 = 0,
+    // Undo trail and branch join stacks for `loan_ended` so exiting arms/returns
+    // and loop probes never prematurely end loans on surviving paths.
+    loan_trail_binding: u32[>..<] = [],
+    loan_trail_old: bool[>..<] = [],
+    loan_ended_changed: u32[>..<] = [],
+    join_loan_base: i64[>..<] = [],
+    join_loan_changed_start: i64[>..<] = [],
+    // Per binding: 0 unknown, 1 no comptime reflection, 2 has `#for` / `.(f)`.
+    comptime_reader: u8[>..] = []
 }
 
 // Appends one diagnostic per rejected `:=`, `own` argument and read of a
@@ -308,6 +324,7 @@ fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origi
         let binding_count = module.bindings.len;
         analyzer.reader_state.resize(binding_count, 0);
         analyzer.reader_arity.resize(binding_count, 0);
+        analyzer.comptime_reader.resize(binding_count, 0);
         analyzer.member_kind.resize(binding_count, 0);
         analyzer.non_escaping_params.resize(binding_count, 0);
         analyzer.non_escaping_arity.resize(binding_count, 0);
@@ -401,7 +418,7 @@ fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origi
         for parameter, position in module.bodyParameters(body) {
             if !local(analyzer, parameter.binding) { continue; }
             analyzer.home[parameter.binding] = body.root;
-            if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 {
+            if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 && !isNonUniqueStorage(module, module.binding(parameter.binding).ty) {
                 set(analyzer, parameter.binding, deep);
             }
         }
@@ -423,6 +440,7 @@ fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origi
         // The dry run: log the reads, judge nothing, keep no fact.
         {
             let mark = analyzer.trail.len;
+            let loan_mark = analyzer.loan_trail_binding.len;
             analyzer.dry = true;
             analyzer.probing += 1;
             analyzer.reads.resize(0);
@@ -431,11 +449,45 @@ fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origi
             analyzer.probing -= 1;
             analyzer.dry = false;
             undo(analyzer, mark);
+            undoLoanEnded(analyzer, loan_mark);
         }
         analyzer.result_node = body.root;
         let value = visit(analyzer, module, body.root);
         analyzer.result_node = 0;
         if analyzer.owned_result != 0 && !value.exits { ownedResult(analyzer, module, body.root, value); }
+        escape(analyzer, value);
+        analyzer.function_roots.resize(analyzer.function_roots.len - 1);
+    }
+    // Validate field default expressions declared on types in this module:
+    // `field.default` in `#for` builders treats them as fresh owned values, so
+    // an owning field default cannot alias an immutable module `const` pool.
+    for tt in module.type_tags {
+        if !tt.has_default || tt.value == 0 || tt.value >= module.nodes.len { continue; }
+        if tt.nominal.unit != 0 && tt.nominal.unit != module.unit { continue; }
+        if module.node(tt.value).tag == blot_check_core::Tag.invalid { continue; }
+        analyzer.in_fork = 0;
+        analyzer.owned_result = tt.value;
+        analyzer.exempt_root = 0;
+        analyzer.keeps_root = 0;
+        analyzer.lent_constant = false;
+        analyzer.function_roots.push(tt.value);
+        {
+            let mark = analyzer.trail.len;
+            let loan_mark = analyzer.loan_trail_binding.len;
+            analyzer.dry = true;
+            analyzer.probing += 1;
+            analyzer.reads.resize(0);
+            visit(analyzer, module, tt.value);
+            lastReads(analyzer, 0);
+            analyzer.probing -= 1;
+            analyzer.dry = false;
+            undo(analyzer, mark);
+            undoLoanEnded(analyzer, loan_mark);
+        }
+        analyzer.result_node = tt.value;
+        let value = visit(analyzer, module, tt.value);
+        analyzer.result_node = 0;
+        if !value.exits { ownedResult(analyzer, module, tt.value, value); }
         escape(analyzer, value);
         analyzer.function_roots.resize(analyzer.function_roots.len - 1);
     }
@@ -471,6 +523,18 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.trail.push(Change { binding: binding, old: self_.facts[binding] });
     self_.facts[binding] = fact;
     self_.touch[binding] += 1;
+    if self_.with_cell_aliases.len != 0 {
+        for wi in 0..self_.with_cell_latest.len {
+            if self_.with_cell_latest[wi] == binding {
+                let root = self_.with_cells[wi];
+                if root != binding && local(self_, root) && self_.facts[root] != fact {
+                    self_.trail.push(Change { binding: root, old: self_.facts[root] });
+                    self_.facts[root] = fact;
+                    self_.touch[root] += 1;
+                }
+            }
+        }
+    }
 }
 fn kill(self_: Analyzer&, binding: u32) {
     if !local(self_, binding) { return; }
@@ -519,7 +583,7 @@ fn borrow(self_: Analyzer&, holder: u32, source: u32, symbol: u32) {
         self_.borrow_holder[source] = holder;
     }
     self_.loan_holds[holder] += 1;
-    self_.loan_ended[holder] = false;
+    setLoanEnded(self_, holder, false);
 }
 // The first name that borrows the whole of `source`, as an index into the
 // loans, or -1. It holds the fact the local gets back.
@@ -624,6 +688,8 @@ fn lastReads(self_: Analyzer&, start: i64) {
 // local, is its last read, and runs once for each definition of it.
 fn moves(self_: const Analyzer&, m: const Module&, node: u32, binding: u32) -> bool {
     if self_.dry || !local(self_, binding) || m.node(node).tag != blot_check_core::Tag.reference || !self_.last_read[node] { return false; }
+    let wc_slot = withCellSlot(self_, binding);
+    if wc_slot >= 0 && wc_slot != self_.rebinding_cell_slot { return false; }
     var loop_id: u32 = 0;
     if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
     if self_.function_roots.len == 0 { return false; }
@@ -650,7 +716,7 @@ fn taken(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fact {
 // leaves with the function moves out of it: `return { rows: world.rows }`.
 // The field is spent from there on, so it cannot leave twice.
 fn takenPart(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fact {
-    if value.origin != 0 && !self_.dry && m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.facts[value.origin] != spent {
+    if value.origin != 0 && !self_.dry && !isWithCell(self_, value.origin) && m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.facts[value.origin] != spent {
         let target, found = place(self_, m, node);
         if found && target.len != 0 && target.binding == value.origin && self_.home[value.origin] == self_.function_roots[self_.function_roots.len - 1] {
             let fact = partFact(self_, self_.facts[value.origin], target.fields[..target.len]);
@@ -729,6 +795,22 @@ fn rejectSubject(self_: Analyzer&, m: const Module&, node: u32, code: blot_check
     self_.rejections.push(rec);
 }
 fn escape(self_: Analyzer&, value: Value) { if value.origin != 0 { kill(self_, value.origin); } }
+fn setLoanEnded(self_: Analyzer&, binding: u32, value: bool) {
+    if !local(self_, binding) || self_.loan_ended[binding] == value { return; }
+    self_.loan_trail_binding.push(binding);
+    self_.loan_trail_old.push(self_.loan_ended[binding]);
+    self_.loan_ended[binding] = value;
+}
+fn undoLoanEnded(self_: Analyzer&, mark: i64) {
+    while self_.loan_trail_binding.len > mark {
+        let at = self_.loan_trail_binding.len - 1;
+        let binding = self_.loan_trail_binding[at];
+        let old = self_.loan_trail_old[at];
+        self_.loan_trail_binding.resize(at);
+        self_.loan_trail_old.resize(at);
+        self_.loan_ended[binding] = old;
+    }
+}
 fn undo(self_: Analyzer&, mark: i64) {
     while self_.trail.len > mark {
         let change = self_.trail[self_.trail.len - 1];
@@ -737,6 +819,101 @@ fn undo(self_: Analyzer&, mark: i64) {
     }
 }
 fn unique(fact: Fact) -> bool { return fact == shell || fact == deep; }
+fn withCellSlot(self_: const Analyzer&, binding: u32) -> i64 {
+    for wi in 0..self_.with_cells.len { if self_.with_cells[wi] == binding { return wi; } }
+    for ai in 0..self_.with_cell_aliases.len { if self_.with_cell_aliases[ai] == binding { return self_.with_cell_alias_slots[ai]; } }
+    return -1;
+}
+fn isWithCell(self_: const Analyzer&, binding: u32) -> bool {
+    return withCellSlot(self_, binding) >= 0;
+}
+fn unwrapUsage(m: const Module&, ty: u32) -> u32 {
+    var cur = ty;
+    var steps: i64 = 0;
+    while steps < 16 && cur != 0 && cur < m.types.nodes.len && m.types.node(cur).tag == blot_check_types::Tag.usage {
+        cur = m.types.node(cur).a;
+        steps += 1;
+    }
+    return cur;
+}
+// Whether `ty` is an immutable shared handle (`*T`) or borrowed view/ref/link
+// handle (`&[T]`, `&T`, `Link`), which is never uniquely writable.
+fn isNonUniqueStorage(m: const Module&, ty: u32) -> bool {
+    let base = unwrapUsage(m, ty);
+    if base == 0 || base >= m.types.nodes.len { return false; }
+    let info = blot_check_storage_types::info(m.types, base);
+    if !info.present { return false; }
+    return info.value.kind == blot_check_storage_types::shared ||
+           info.value.kind == blot_check_storage_types::view ||
+           info.value.kind == blot_check_storage_types::ref ||
+           info.value.kind == blot_check_storage_types::link;
+}
+// Whether `fact` is unique or a record fact containing any unique field.
+recursive fn hasUnique(self_: const Analyzer&, fact: Fact) -> bool {
+    if unique(fact) { return true; }
+    if fact < first_record || fact >= spent { return false; }
+    let rec = record(self_, fact);
+    if hasUnique(self_, rec.default_) { return true; }
+    for at in 0..rec.len {
+        if hasUnique(self_, self_.entries[rec.start + at].fact) { return true; }
+    }
+    return false;
+}
+// Whether a `with`-shadowed outer cell that entered a handler with `saved`
+// still satisfies all ownership obligations upon handler exit (`current`).
+recursive fn factPreserved(self_: Analyzer&, m: const Module&, saved: Fact, current: Fact, ty: u32, depth: i64) -> bool {
+    if depth > 16 { return false; }
+    if partSpent(self_, current) { return false; }
+    if !holds(self_, m, ty) { return true; }
+    if saved == deep { return ownedAs(self_, m, current, ty, 0); }
+    if saved == shell { return unique(current); }
+    if saved < first_record || saved >= spent { return true; }
+    if !hasUnique(self_, saved) { return true; }
+    if ownedAs(self_, m, saved, ty, 0) { return ownedAs(self_, m, current, ty, 0); }
+    if current == deep { return true; }
+    if current < first_record || current >= spent { return false; }
+    let base_ty = unwrapUsage(m, ty);
+    if base_ty < m.types.nodes.len {
+        let shape = m.types.node(base_ty);
+        if shape.tag == blot_check_types::Tag.record {
+            for index in 0..shape.b {
+                let declared = m.types.recordField(shape, index);
+                if !factPreserved(self_, m, field(self_, saved, declared.name), field(self_, current, declared.name), declared.ty, depth + 1) { return false; }
+            }
+            return true;
+        }
+        if shape.tag == blot_check_types::Tag.nominal && !blot_check_storage_types::identity(shape.a, shape.b).present && shape.a != 0xffffffff {
+            let index, found = nominalIndex(self_, m, shape.a, shape.b);
+            if found {
+                let nominal = m.nominal(index);
+                let constructors = m.nominalConstructors(index);
+                if !nominal.is_opaque && nominal.variables.len == 0 && constructors.len != 0 {
+                    for constructor in constructors {
+                        let payload = m.constructor(constructor).payload;
+                        if payload == 0 || payload >= m.types.nodes.len { continue; }
+                        let fields = m.types.node(payload);
+                        if fields.tag != blot_check_types::Tag.record { continue; }
+                        for fi in 0..fields.b {
+                            let declared = m.types.recordField(fields, fi);
+                            if !factPreserved(self_, m, field(self_, saved, declared.name), field(self_, current, declared.name), declared.ty, depth + 1) { return false; }
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+    let rec = record(self_, saved);
+    if hasUnique(self_, rec.default_) && !hasUnique(self_, record(self_, current).default_) { return false; }
+    for at in 0..rec.len {
+        let entry = self_.entries[rec.start + at];
+        let cf = field(self_, current, entry.field);
+        if entry.fact == deep && cf != deep { return false; }
+        if entry.fact == shell && !unique(cf) { return false; }
+        if entry.fact >= first_record && entry.fact < spent && hasUnique(self_, entry.fact) && !hasUnique(self_, cf) { return false; }
+    }
+    return true;
+}
 // Whether some part of a value with `fact` was given away: the whole of
 // it, or a field that an `own` parameter took and nothing was put back in.
 recursive fn partSpent(self_: const Analyzer&, fact: Fact) -> bool {
@@ -1222,7 +1399,7 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
             self_.expanding.resize(self_.expanding.len - 1);
             return result;
         },
-        variable, rigid, bound => { return false; },
+        variable, rigid, bound => { return true; },
         _ => { return true; },
     }
 }
@@ -1454,7 +1631,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
         if !local(self_, target.binding) { return Value { .. }; }
         read(self_, target.binding, id);
-        if !self_.dry && self_.last_read[id] && self_.loan_holds[target.binding] != 0 { self_.loan_ended[target.binding] = true; }
+        if !self_.dry && self_.last_read[id] && self_.loan_holds[target.binding] != 0 { setLoanEnded(self_, target.binding, true); }
         if self_.facts[target.binding] == spent { rejectSubject(self_, m, id, blot_check_core::Code.spent_value, target.binding); return Value { .. }; }
         // Read as a whole while a field of it is given away.
         if !based && !self_.dry && partSpent(self_, self_.facts[target.binding]) { rejectSubject(self_, m, id, blot_check_core::Code.spent_value, target.binding); return Value { .. }; }
@@ -1472,6 +1649,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var afters: u32[16] = [0; 16];
         var saved_facts: Fact[16] = [0; 16];
         var saved_homes: u32[16] = [0; 16];
+        var rejected_unforked: bool[16] = [false; 16];
         var cell_count: i64 = 0;
         let kids = m.extra[n.b..n.b + n.c];
         for child in kids {
@@ -1479,15 +1657,26 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if cn.tag == blot_check_core::Tag.bind && cn.c == 1 && m.node(cn.b).tag == blot_check_core::Tag.reference {
                 let target = m.reference(cn.b);
                 if (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding) {
-                    if self_.facts[target.binding] == spent { rejectSubject(self_, m, child, blot_check_core::Code.spent_value, target.binding); }
+                    let ob = target.binding;
+                    if self_.facts[ob] == spent || partSpent(self_, self_.facts[ob]) { rejectSubject(self_, m, child, blot_check_core::Code.spent_value, ob); }
+                    let unforked_outer = self_.in_fork != 0 && self_.function_roots.len != 0 && self_.home[ob] != self_.function_roots[self_.function_roots.len - 1];
+                    let bad_fork_shadow = unforked_outer && (holds(self_, m, m.binding(ob).ty) || openType(m, m.binding(ob).ty, 0));
+                    if bad_fork_shadow && !self_.dry {
+                        rejectSubject(self_, m, child, blot_check_core::Code.aliased_update, ob);
+                    }
                     if cell_count < 16 {
-                        outers[cell_count] = target.binding;
+                        outers[cell_count] = ob;
                         afters[cell_count] = cn.a;
-                        saved_facts[cell_count] = self_.facts[target.binding];
-                        saved_homes[cell_count] = self_.home[target.binding];
+                        saved_facts[cell_count] = self_.facts[ob];
+                        saved_homes[cell_count] = self_.home[ob];
+                        rejected_unforked[cell_count] = bad_fork_shadow;
                         cell_count += 1;
                     }
-                    self_.with_cells.push(target.binding);
+                    if !bad_fork_shadow {
+                        self_.with_cells.push(ob);
+                        self_.with_cell_facts.push(self_.facts[ob]);
+                        self_.with_cell_latest.push(ob);
+                    }
                 }
             }
         }
@@ -1495,10 +1684,18 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let cn = m.node(child);
             if cn.tag == blot_check_core::Tag.effect_provider {
                 if m.node(cn.a).tag == blot_check_core::Tag.operation_value { self_.heads[cn.a] = true; }
+                let alias_mark = self_.with_cell_aliases.len;
+                for wi in mark..self_.with_cells.len { self_.with_cell_latest[wi] = self_.with_cells[wi]; }
+                let outer_with_handler = self_.with_handler_node;
+                self_.with_handler_node = cn.b;
                 let _ = visit(self_, m, child);
+                self_.with_handler_node = outer_with_handler;
+                self_.with_cell_aliases.resize(alias_mark);
+                self_.with_cell_alias_slots.resize(alias_mark);
+                for wi in mark..self_.with_cells.len { self_.with_cell_latest[wi] = self_.with_cells[wi]; }
                 for ci in 0..cell_count {
                     let ob = outers[ci];
-                    if !self_.dry && unique(saved_facts[ci]) && holds(self_, m, m.binding(ob).ty) && !ownedAs(self_, m, self_.facts[ob], m.binding(ob).ty, 0) {
+                    if !self_.dry && !rejected_unforked[ci] && !factPreserved(self_, m, saved_facts[ci], self_.facts[ob], m.binding(ob).ty, 0) {
                         rejectSubject(self_, m, child, blot_check_core::Code.spent_value, ob);
                     }
                     set(self_, ob, saved_facts[ci]);
@@ -1507,9 +1704,18 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
         }
         self_.with_cells.resize(mark);
+        self_.with_cell_facts.resize(mark);
+        self_.with_cell_latest.resize(mark);
         let body_val = visit(self_, m, n.a);
         for ci in 0..cell_count {
-            define(self_, afters[ci], saved_facts[ci]);
+            if rejected_unforked[ci] {
+                define(self_, afters[ci], none);
+                self_.home[afters[ci]] = saved_homes[ci];
+                if self_.in_fork != 0 { setForkTaint(self_, afters[ci], self_.in_fork); }
+            } else {
+                define(self_, afters[ci], saved_facts[ci]);
+                if self_.in_fork != 0 { setForkTaint(self_, afters[ci], getForkTaint(self_, outers[ci])); }
+            }
         }
         return Value { exits: body_val.exits, .. };
     }
@@ -1519,7 +1725,16 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let upd = update(self_, m, n.b, n.a);
             if n.c >= 2 {
                 let outer_b = n.c - 2;
-                if local(self_, outer_b) && local(self_, n.a) { set(self_, outer_b, self_.facts[n.a]); }
+                if local(self_, outer_b) && local(self_, n.a) {
+                    set(self_, outer_b, self_.facts[n.a]);
+                    let slot = withCellSlot(self_, outer_b);
+                    if slot >= 0 {
+                        self_.with_cell_aliases.push(n.a);
+                        self_.with_cell_alias_slots.push(slot);
+                        self_.with_cell_latest[slot] = n.a;
+                    }
+                    if self_.in_fork != 0 { setForkTaint(self_, outer_b, maxU32(getForkTaint(self_, outer_b), getForkTaint(self_, n.a))); }
+                }
             }
             return upd;
         }
@@ -1530,24 +1745,28 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let borrows = !self_.dry && n.c == 0 && local(self_, n.a) && !self_.flows[n.a];
         let outer_node = self_.let_node;
         let outer_holder = self_.let_holder;
+        let outer_rebind_slot = self_.rebinding_cell_slot;
         self_.let_node = 0;
         if borrows { self_.let_node = n.b; self_.let_holder = n.a; }
+        if n.c >= 2 { self_.rebinding_cell_slot = withCellSlot(self_, n.c - 2); } else { self_.rebinding_cell_slot = -1; }
         var result = Value { .. };
         if value.tag == blot_check_core::Tag.array_op { var to: u32 = 0; if borrows { to = n.a; } self_.let_node = 0; result = arrayOp(self_, m, n.b, true, false, to); } else { result = visit(self_, m, n.b); }
         self_.let_node = outer_node;
         self_.let_holder = outer_holder;
         if borrows && result.origin != 0 && !moves(self_, m, n.b, result.origin) {
+            self_.rebinding_cell_slot = outer_rebind_slot;
             define(self_, n.a, none);
             var symbol: u32 = 0;
             let target, found = place(self_, m, n.b);
             if found && target.binding == result.origin && target.len != 0 { symbol = target.fields[0]; }
             borrow(self_, n.a, result.origin, symbol);
-            if !self_.ever_read[n.a] && self_.loan_holds[n.a] != 0 { self_.loan_ended[n.a] = true; }
+            if !self_.ever_read[n.a] && self_.loan_holds[n.a] != 0 { setLoanEnded(self_, n.a, true); }
             if self_.in_fork != 0 { setForkTaint(self_, n.a, nodeTaint(self_, m, n.b, 0)); }
             if closureNonFreezable(self_, m, n.b) { setNonFreezable(self_, n.a, true); }
             return Value { exits: result.exits, .. };
         }
         let fact = taken(self_, m, n.b, result);
+        self_.rebinding_cell_slot = outer_rebind_slot;
         if n.c >= 2 {
             let outer_b = n.c - 2;
             if local(self_, outer_b) {
@@ -1555,9 +1774,18 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     rejectSubject(self_, m, culprit(self_, m, n.b), blot_check_core::Code.result_not_owned, result.origin);
                 }
                 set(self_, outer_b, fact);
+                if self_.in_fork != 0 { setForkTaint(self_, outer_b, maxU32(getForkTaint(self_, outer_b), nodeTaint(self_, m, n.b, 0))); }
             }
         }
         define(self_, n.a, fact);
+        if n.c >= 2 {
+            let slot = withCellSlot(self_, n.c - 2);
+            if slot >= 0 && local(self_, n.a) {
+                self_.with_cell_aliases.push(n.a);
+                self_.with_cell_alias_slots.push(slot);
+                self_.with_cell_latest[slot] = n.a;
+            }
+        }
         if local(self_, n.a) {
             self_.blame[n.a] = n.b;
             if self_.in_fork != 0 { setForkTaint(self_, n.a, nodeTaint(self_, m, n.b, 0)); }
@@ -1574,11 +1802,13 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if tail { self_.tails.push(n.a); }
         let logged = self_.reads.len;
         let outer_leaving = self_.leaving_root;
-        if leaves { self_.leaving_root = n.b; }
+        let outer_rebind_slot = self_.rebinding_cell_slot;
+        if leaves { self_.leaving_root = n.b; self_.rebinding_cell_slot = -1; }
         let outer_result = self_.result_node;
         self_.result_node = 0;
         if n.a != 0 && !tail && (leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b)) { self_.result_node = n.a; }
         let return_mark = self_.trail.len;
+        let return_loan_mark = self_.loan_trail_binding.len;
         var saved_bindings: u32[16] = [0; 16];
         var saved_touch: u32[16] = [0; 16];
         var saved_kills: u32[16] = [0; 16];
@@ -1610,7 +1840,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let ends = leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b);
         // So does a field of such a local: `return stream.output`.
         var part = Place { .. };
-        if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.project && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
+        if result.origin != 0 && ends && !self_.dry && !isWithCell(self_, result.origin) && m.node(n.a).tag == blot_check_core::Tag.project && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
             let target, found = place(self_, m, n.a);
             if found && target.len != 0 && target.binding == result.origin && local(self_, target.binding) { part = target; }
         }
@@ -1618,17 +1848,28 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // not marked as shared: on an early return inside a branch that
         // mark would outlive the branch and keep what names borrowed from
         // the local before it from ever being given back.
-        if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.reference && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
+        // A `with` handler cell outlives the handler's `return`, so it can
+        // never move out into the return value.
+        if result.origin != 0 && ends && !self_.dry && !isWithCell(self_, result.origin) && m.node(n.a).tag == blot_check_core::Tag.reference && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
             fact = self_.facts[result.origin];
             if !leaves { kill(self_, result.origin); }
         } else if part.len != 0 {
             fact = partFact(self_, self_.facts[result.origin], part.fields[..part.len]);
             if fact == spent { fact = none; }
             if !leaves { kill(self_, result.origin); }
+        } else if result.origin != 0 && ends && !self_.dry && isWithCell(self_, result.origin) {
+            kill(self_, result.origin);
+            fact = none;
         } else {
             fact = taken(self_, m, n.a, result);
         }
+        self_.rebinding_cell_slot = outer_rebind_slot;
         if leaves && n.a != 0 && !result.exits && resultChecked(self_, m, n.b, m.typeOf(n.a)) && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { rejectSubject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned, result.origin); }
+        if leaves && !self_.dry && n.a != 0 && !result.exits && m.node(n.a).tag == blot_check_core::Tag.comptime_meta && m.node(n.a).c == 0 && openType(m, m.typeOf(n.a), 0) && fact != deep {
+            if self_.exempt_root == 0 || n.b != self_.exempt_root {
+                rejectSubject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned, result.origin);
+            }
+        }
         if self_.in_fork != 0 && n.a != 0 && !result.exits {
             let taint = nodeTaint(self_, m, n.a, 0);
             if leaves && taint >= self_.in_fork && (holds(self_, m, m.typeOf(n.a)) || blot_check_storage_types::isShared(m.types, m.typeOf(n.a))) {
@@ -1638,7 +1879,16 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
         }
         if leaves {
+            if !self_.dry {
+                for ci in 0..self_.with_cells.len {
+                    let wc = self_.with_cells[ci];
+                    if self_.home[wc] == n.b && !factPreserved(self_, m, self_.with_cell_facts[ci], self_.facts[wc], m.binding(wc).ty, 0) {
+                        rejectSubject(self_, m, id, blot_check_core::Code.spent_value, wc);
+                    }
+                }
+            }
             undo(self_, return_mark);
+            undoLoanEnded(self_, return_loan_mark);
             for si in 0..saved_count {
                 let b = saved_bindings[si];
                 self_.touch[b] = saved_touch[si];
@@ -1646,9 +1896,16 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             return Value { exits: true, .. };
         }
-        let field_break = comptimeBreak(self_, m, id);
-        if field_break && !holds(self_, m, m.typeOf(n.a)) &&
-            m.types.node(m.typeOf(n.a)).tag != blot_check_types::Tag.variable { fact = deep; }
+        let builder_id = comptimeBreak(self_, m, id);
+        let field_break = builder_id != 0;
+        if field_break && n.a != 0 && !holds(self_, m, m.typeOf(n.a)) && !openType(m, m.typeOf(n.a), 0) { fact = deep; }
+        if field_break && !self_.dry && n.a != 0 && !result.exits && openType(m, m.typeOf(builder_id), 0) {
+            let elem_ty = m.typeOf(n.a);
+            let exempt = self_.function_roots.len != 0 && self_.exempt_root != 0 && self_.function_roots[self_.function_roots.len - 1] == self_.exempt_root;
+            if !exempt && ((openType(m, elem_ty, 0) && fact != deep) || (owns(self_, m, elem_ty) && !ownedAs(self_, m, fact, elem_ty, 0))) {
+                rejectSubject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned, result.origin);
+            }
+        }
         var at = self_.blocks.len;
         while at != 0 {
             at -= 1;
@@ -1666,6 +1923,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let base = visit(self_, m, n.a);
             return Value { origin: base.origin, exits: base.exits, .. };
         }
+        if n.c == 1 || n.c == 10 { return Value { fact: deep, .. }; }
         if n.c == 8 || n.c == 9 { return visit(self_, m, n.b); }
         return Value { .. };
     }
@@ -1685,10 +1943,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if n.c != 0 {
             let mark = self_.trail.len;
+            let loan_mark = self_.loan_trail_binding.len;
             self_.tentative += 1;
             let fallback = visit(self_, m, n.c);
             self_.tentative -= 1;
-            if fallback.exits { undo(self_, mark); }
+            if fallback.exits { undo(self_, mark); undoLoanEnded(self_, loan_mark); }
         }
         return Value { .. };
     }
@@ -1716,20 +1975,27 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // taken over cannot be given without the rest), so the inner one
         // runs once with what the outer one took: it keeps the fact.
         let link = self_.chain == id;
+        let is_with_handler = self_.with_handler_node == id;
         for captured in m.closureCaptures(id) {
             read(self_, captured, id);
             var carried = false;
             if link { for outer in self_.chained { if outer == captured { carried = true; } } }
-            for wc in self_.with_cells { if wc == captured { carried = true; } }
+            if is_with_handler { for wc in self_.with_cells { if wc == captured { carried = true; } } }
             if carried { self_.home[captured] = body; } else { kill(self_, captured); }
         }
         if local(self_, parameter) {
             self_.home[parameter] = body;
-            if typeTaking(m, n.ty) & 1 != 0 { define(self_, parameter, deep); self_.home[parameter] = body; }
+            if typeTaking(m, n.ty) & 1 != 0 && !isNonUniqueStorage(m, m.binding(parameter).ty) { define(self_, parameter, deep); self_.home[parameter] = body; }
         }
         var inner_closure = body;
         if m.node(inner_closure).tag == blot_check_core::Tag.return_ { inner_closure = m.node(inner_closure).a; }
         let outer_chain = self_.chain;
+        let outer_with_handler = self_.with_handler_node;
+        if is_with_handler && m.node(inner_closure).tag == blot_check_core::Tag.closure {
+            self_.with_handler_node = inner_closure;
+        } else {
+            self_.with_handler_node = 0;
+        }
         let chained_mark = self_.chained.len;
         if !link { self_.chained_base.push(chained_mark); }
         // The chain goes on through a parameter that is not taken over
@@ -1746,10 +2012,13 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let logged = self_.reads.len;
         // A body that is one expression is the function's result.
         let outer_result = self_.result_node;
+        let outer_rebind_slot = self_.rebinding_cell_slot;
         self_.result_node = body;
+        self_.rebinding_cell_slot = -1;
         let value = visit(self_, m, body);
         self_.result_node = outer_result;
         self_.chain = outer_chain;
+        self_.with_handler_node = outer_with_handler;
         if !link { self_.chained.resize(self_.chained_base[self_.chained_base.len - 1]); self_.chained_base.resize(self_.chained_base.len - 1); }
         // The closure's own locals end with its body. What it captured is
         // read again whenever it runs, so those reads are never the last.
@@ -1759,6 +2028,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if !value.exits { ownedResult(self_, m, body, value); }
         escape(self_, value);
+        self_.rebinding_cell_slot = outer_rebind_slot;
         self_.function_roots.resize(self_.function_roots.len - 1);
         return Value { .. };
     }
@@ -1777,7 +2047,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 if own_arity == 1 {
                     let arg_arr: u32[1] = [n.a];
                     let exits = ownArguments(self_, m, arg_arr[..], own_mask, n.ty, named, lends_to, brief);
-                    return Value { fact: deep, exits: exits, .. };
+                    var fact: Fact = deep;
+                    if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
+                    return Value { fact: fact, exits: exits, .. };
                 }
                 if (own_mask & 1) != 0 {
                     // `value.member` without its remaining arguments would hold
@@ -1880,8 +2152,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let found_cb .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
         if found_cb { let idx: u32 = found_cb; call_binding = idx; }
         let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, call_binding, lends_to, brief);
-        // Every return of the callee gave a value nothing else holds.
-        return Value { fact: deep, exits: exits, .. };
+        // Every return of the callee gave a value nothing else holds, unless
+        // the instantiated result is a shared handle or borrowing view/closure.
+        var fact: Fact = deep;
+        if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
+        return Value { fact: fact, exits: exits, .. };
     }
     if tag == blot_check_core::Tag.apply {
         // `f a b` and `a.f b` reach a function through its value: a
@@ -1931,8 +2206,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             let call_binding = calleeBinding(self_, m, callee);
             exits = ownArguments(self_, m, arguments[..count], mask, n.ty, call_binding, lends_to, brief) || exits;
-            // Every return of the callee gave a value nothing else holds.
-            return Value { fact: deep, exits: exits, .. };
+            // Every return of the callee gave a value nothing else holds, unless
+            // the instantiated result is a shared handle or borrowing view/closure.
+            var fact: Fact = deep;
+            if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
+            return Value { fact: fact, exits: exits, .. };
         }
         // Given a parameter it takes over but not all its arguments, the
         // function would hold the argument for any number of calls.
@@ -2366,6 +2644,7 @@ fn ownedInPlacePath(self_: Analyzer&, m: const Module&, node: u32, origin: u32) 
     var root: u32 = 0;
     loop {
         let n = m.node(cursor);
+        if isNonUniqueStorage(m, m.typeOf(cursor)) { return Place { .. }, false; }
         if n.tag == blot_check_core::Tag.reference {
             let target = m.reference(cursor);
             if target.unit != 0 && target.unit != m.unit { return Place { .. }, false; }
@@ -2610,6 +2889,42 @@ fn keeps(m: const Module&, root: u32, arity: i64, variable: u32) -> bool {
     }
     return occurs(m, variable, parameter, false, 0);
 }
+recursive fn nodeHasComptimeReflect(self_: Analyzer&, m: const Module&, id: u32, depth: i64) -> bool {
+    if id == 0 || id >= m.nodes.len || depth > 64 { return false; }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.comptime_for { return true; }
+    if n.tag == blot_check_core::Tag.comptime_meta && n.c == 0 { return true; }
+    if n.tag == blot_check_core::Tag.closure {
+        return nodeHasComptimeReflect(self_, m, m.closure(id).body, depth + 1);
+    }
+    let start = self_.children.len;
+    appendChildren(self_.children, m, id);
+    let end = self_.children.len;
+    var at = start;
+    while at < end {
+        let child = self_.children[at];
+        at += 1;
+        if nodeHasComptimeReflect(self_, m, child, depth + 1) {
+            self_.children.resize(start);
+            return true;
+        }
+    }
+    self_.children.resize(start);
+    return false;
+}
+fn hasComptimeReflect(self_: Analyzer&, m: const Module&, binding: u32) -> bool {
+    if binding == 0 || binding >= self_.comptime_reader.len { return false; }
+    if self_.comptime_reader[binding] != 0 { return self_.comptime_reader[binding] == 2; }
+    self_.comptime_reader[binding] = 1;
+    let body_id = m.bindings[binding].body_id;
+    if body_id != 0 && body_id < m.bodies.len && m.bodies[body_id].root != 0 {
+        if nodeHasComptimeReflect(self_, m, m.bodies[body_id].root, 0) {
+            self_.comptime_reader[binding] = 2;
+            return true;
+        }
+    }
+    return false;
+}
 // Whether `binding` is a generic function that may return what it was lent:
 // a type variable of its scheme occurs in its result and, as data, in a
 // parameter it does not take over. Also sets how many arguments its type
@@ -2628,14 +2943,25 @@ fn reader(self_: Analyzer&, m: const Module&, binding: u32) -> bool {
     self_.reader_arity[binding] = arity as! u8;
     let variables = m.types.list(scheme.variables);
     var found = false;
+    var has_param_var = false;
+    var has_result_var = false;
     for variable in variables {
-        if !keeps(m, scheme.root, arity as i64, variable) { continue; }
+        let in_result = keeps(m, scheme.root, arity as i64, variable);
+        if in_result { has_result_var = true; }
+        var in_lent_param = false;
         var parameter = scheme.root;
         for position in 0..(arity as i64) {
             let taken_over = position < 32 && (own >> (position as! u32)) & 1 != 0;
-            if !taken_over && occurs(m, variable, m.types.node(parameter).a, true, 0) { found = true; }
+            if !taken_over && occurs(m, variable, m.types.node(parameter).a, true, 0) { in_lent_param = true; }
             parameter = m.types.node(parameter).b;
         }
+        if in_lent_param { has_param_var = true; }
+        if in_result && in_lent_param { found = true; }
+    }
+    // Comptime reflection (`#for #fields` / `val.(f)`) can link distinct
+    // parameter and result type variables (e.g. `a -> t` or `t -> Maybe a`).
+    if !found && has_param_var && has_result_var && hasComptimeReflect(self_, m, binding) {
+        found = true;
     }
     if found { self_.reader_state[binding] = 2; }
     return found;
@@ -2706,8 +3032,10 @@ fn lentHere(self_: Analyzer&, m: const Module&, binding: u32, actual: u32) -> bo
     let arity = self_.reader_arity[binding] as i64;
     var result = scheme.root;
     for position in 0..arity { result = m.types.node(result).b; }
+    var lent_param_owns = false;
+    var result_var_owns = false;
     for variable in m.types.list(scheme.variables) {
-        if !keeps(m, scheme.root, arity, variable) { continue; }
+        let in_result = keeps(m, scheme.root, arity, variable);
         var lent = false;
         var parameter = scheme.root;
         for position in 0..arity {
@@ -2715,8 +3043,12 @@ fn lentHere(self_: Analyzer&, m: const Module&, binding: u32, actual: u32) -> bo
             if !taken_over && occurs(m, variable, m.types.node(parameter).a, true, 0) { lent = true; }
             parameter = m.types.node(parameter).b;
         }
-        if lent && instanceOwns(self_, m, scheme.root, actual, variable, 0) { return true; }
+        let var_owns = (in_result || lent) && instanceOwns(self_, m, scheme.root, actual, variable, 0);
+        if in_result && lent && var_owns { return true; }
+        if lent && var_owns { lent_param_owns = true; }
+        if in_result && var_owns { result_var_owns = true; }
     }
+    if lent_param_owns && result_var_owns && hasComptimeReflect(self_, m, binding) { return true; }
     return false;
 }
 // The function type a callee is used at: a reference's own type, or for
@@ -2788,7 +3120,7 @@ fn held(self_: Analyzer&, m: const Module&, child: u32, value: Value, lends_to: 
         let target, found = place(self_, m, child);
         if found && target.binding == value.origin && target.len != 0 { symbol = target.fields[0]; }
         borrow(self_, lends_to, value.origin, symbol);
-        if local(self_, lends_to) && !self_.ever_read[lends_to] && self_.loan_holds[lends_to] != 0 { self_.loan_ended[lends_to] = true; }
+        if local(self_, lends_to) && !self_.ever_read[lends_to] && self_.loan_holds[lends_to] != 0 { setLoanEnded(self_, lends_to, true); }
         return;
     }
     if brief && local(self_, value.origin) && self_.facts[value.origin] != spent {
@@ -3046,12 +3378,13 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
             rejectSubject(self_, m, child, blot_check_core::Code.own_argument, subject);
         }
         if accepted && named != 0 {
+            if holder && self_.loan_holds[named] != 0 { kill(self_, named); }
             set(self_, named, spent);
             if self_.collect_origins { if call_node != 0 { self_.killer[named] = call_node; } else { self_.killer[named] = child; } }
         } else if accepted && part.len != 0 && value.origin == part.binding {
             let given = replace(self_, self_.facts[part.binding], part.fields[..part.len], spent);
             set(self_, part.binding, given);
-            if self_.collect_origins { if call_node != 0 { self_.killer[part.binding] = call_node; } else { self_.killer[part.binding] = child; } }
+            if self_.collect_origins { self_.killer[part.binding] = child; }
         } else {
             escape(self_, value);
         }
@@ -3078,13 +3411,15 @@ fn ownedResult(self_: Analyzer&, m: const Module&, node: u32, value: Value) {
     var fact = value.fact;
     if value.origin != 0 {
         fact = none;
-        if m.node(node).tag == blot_check_core::Tag.reference {
-            fact = self_.facts[value.origin];
-        } else if m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.home[value.origin] == self_.function_roots[self_.function_roots.len - 1] {
-            // A field of a local of its own leaves with the function.
-            let target, found = place(self_, m, node);
-            if found && target.len != 0 && target.binding == value.origin { fact = partFact(self_, self_.facts[value.origin], target.fields[..target.len]); }
-            if fact == spent { fact = none; }
+        if !isWithCell(self_, value.origin) {
+            if m.node(node).tag == blot_check_core::Tag.reference {
+                fact = self_.facts[value.origin];
+            } else if m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.home[value.origin] == self_.function_roots[self_.function_roots.len - 1] {
+                // A field of a local of its own leaves with the function.
+                let target, found = place(self_, m, node);
+                if found && target.len != 0 && target.binding == value.origin { fact = partFact(self_, self_.facts[value.origin], target.fields[..target.len]); }
+                if fact == spent { fact = none; }
+            }
         }
     }
     if !owns(self_, m, m.typeOf(node)) { return; }
@@ -3242,7 +3577,17 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
         if local(self_, root.origin) && self_.facts[root.origin] != spent {
             leaf = self_.facts[root.origin];
             for step in selectors {
-                if step.kind == blot_check_core::UpdateKind.field { leaf = field(self_, leaf, m.projection(step.projection).field); } else if leaf != deep { leaf = none; }
+                if step.kind == blot_check_core::UpdateKind.field {
+                    leaf = field(self_, leaf, m.projection(step.projection).field);
+                } else if step.kind == blot_check_core::UpdateKind.comptime_field {
+                    if leaf >= first_record && leaf < spent && ownedAs(self_, m, leaf, step.source_type, 0) {
+                        leaf = deep;
+                    } else if leaf != deep {
+                        leaf = none;
+                    }
+                } else if leaf != deep {
+                    leaf = none;
+                }
             }
             if selectors.len == 0 { for projection in m.updatePath(id) { leaf = field(self_, leaf, m.projection(projection).field); } }
         }
@@ -3253,13 +3598,24 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     let replacement = taken(self_, m, info.value, value);
     var through_storage = false;
     var reflective = false;
+    var first_non_field_comptime = false;
+    var reflective_open = false;
+    var seen_non_field = false;
     for step in selectors {
-        through_storage = through_storage || step.kind == blot_check_core::UpdateKind.index;
-        reflective = reflective || step.kind == blot_check_core::UpdateKind.comptime_field;
+        if step.kind == blot_check_core::UpdateKind.index {
+            through_storage = true;
+            if !seen_non_field { seen_non_field = true; }
+        } else if step.kind == blot_check_core::UpdateKind.comptime_field {
+            reflective = true;
+            if openType(m, step.source_type, 0) { reflective_open = true; }
+            if !seen_non_field { seen_non_field = true; first_non_field_comptime = true; }
+        }
     }
     var leaf = m.typeOf(info.value);
     if selectors.len != 0 { leaf = selectors[selectors.len - 1].result_type; }
+    let val_ty = m.typeOf(info.value);
     let shared = holds(self_, m, leaf) && replacement != deep;
+    let reflective_shared = reflective && ((holds(self_, m, val_ty) && !ownedAs(self_, m, replacement, val_ty, 0)) || (openType(m, val_ty, 0) && replacement != deep));
     var old: Fact = none;
     if local(self_, root.origin) { old = self_.facts[root.origin]; }
     let mark = self_.fields.len;
@@ -3289,8 +3645,20 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
         self_.fields.push(m.projection(step.projection).field);
     }
     var next = old;
-    if shared || (reflective && replacement != deep && m.types.node(leaf).tag == blot_check_types::Tag.variable) {
-        next = weaken(self_, old, self_.fields[mark..]);
+    if (!reflective && shared) || reflective_shared {
+        if first_non_field_comptime {
+            if partFact(self_, old, self_.fields[mark..]) != spent {
+                next = replace(self_, old, self_.fields[mark..], none);
+            }
+        } else {
+            next = weaken(self_, old, self_.fields[mark..]);
+        }
+        if reflective_open && reflective_shared && !self_.dry {
+            let exempt = self_.function_roots.len != 0 && self_.exempt_root != 0 && self_.function_roots[self_.function_roots.len - 1] == self_.exempt_root;
+            if !exempt {
+                rejectSubject(self_, m, culprit(self_, m, info.value), blot_check_core::Code.aliased_update, value.origin);
+            }
+        }
     }
     var through: u32 = 0;
     if self_.fields.len > mark { through = self_.fields[mark]; }
@@ -3312,10 +3680,11 @@ fn accepts(self_: Analyzer&, m: const Module&, fact: Fact, selectors: const Upda
         if step.kind == blot_check_core::UpdateKind.field {
             current = field(self_, current, m.projection(step.projection).field);
         } else if step.kind == blot_check_core::UpdateKind.comptime_field {
-            if !ownedAs(self_, m, current, step.source_type, 0) { return false; }
-            if current != deep { current = none; }
+            if isNonUniqueStorage(m, step.source_type) || !ownedAs(self_, m, current, step.source_type, 0) { return false; }
+            if current >= first_record && current < spent { current = deep; }
+            else if current != deep { current = none; }
         } else {
-            if !unique(current) { return false; }
+            if !unique(current) || isNonUniqueStorage(m, step.source_type) { return false; }
             if current != deep { current = none; }
         }
     }
@@ -3527,13 +3896,45 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             // or freezes a closure/partial application into `*(A -> B)` (2B)
             // provided all captures are inline or `*T` (no linear/borrowed captures).
             let child = children[0];
-            let input_ty = m.typeOf(child);
-            if m.types.node(input_ty).tag == blot_check_types::Tag.function {
+            let input_ty = unwrapUsage(m, m.typeOf(child));
+            if input_ty < m.types.nodes.len && m.types.node(input_ty).tag == blot_check_types::Tag.function {
                 let container = visit(self_, m, child);
                 if closureNonFreezable(self_, m, child) { reject(self_, m, child, blot_check_core::Code.own_function_value); }
                 return Value { fact: none, exits: container.exits, .. };
             }
-            if blot_check_storage_types::isShared(m.types, input_ty) || !holds(self_, m, input_ty) {
+            if blot_check_storage_types::isShared(m.types, input_ty) {
+                let container = visit(self_, m, child);
+                return Value { fact: none, exits: container.exits, .. };
+            }
+            if openType(m, input_ty, 0) {
+                let container = visit(self_, m, child);
+                if !self_.dry {
+                    var is_owned = container.origin == 0 && container.fact == deep;
+                    if container.origin != 0 && local(self_, container.origin) {
+                        is_owned = unique(self_.facts[container.origin]) && !partShared(self_, self_.facts[container.origin]);
+                    }
+                    if !is_owned {
+                        rejectSubject(self_, m, child, blot_check_core::Code.own_argument, container.origin);
+                    } else {
+                        reject(self_, m, child, blot_check_core::Code.own_function_value);
+                    }
+                }
+                escape(self_, container);
+                return Value { fact: none, exits: container.exits, .. };
+            }
+            if lends(self_, m, input_ty) {
+                let container = visit(self_, m, child);
+                if !self_.dry {
+                    if calls(self_, m, input_ty) {
+                        reject(self_, m, child, blot_check_core::Code.own_function_value);
+                    } else {
+                        rejectSubject(self_, m, child, blot_check_core::Code.own_argument, container.origin);
+                    }
+                }
+                escape(self_, container);
+                return Value { fact: none, exits: container.exits, .. };
+            }
+            if !holds(self_, m, input_ty) {
                 let container = visit(self_, m, child);
                 return Value { fact: none, exits: container.exits, .. };
             }
@@ -3573,7 +3974,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             } else if accepted && part.len != 0 && value.origin == part.binding {
                 let given = replace(self_, self_.facts[part.binding], part.fields[..part.len], spent);
                 set(self_, part.binding, given);
-                if self_.collect_origins { self_.killer[part.binding] = id; }
+                if self_.collect_origins { self_.killer[part.binding] = child; }
             } else {
                 escape(self_, value);
             }
@@ -3652,9 +4053,11 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     } else {
         self_.probing += 1;
         let mark = self_.trail.len;
+        let loan_mark = self_.loan_trail_binding.len;
         let outer_start = self_.loop_outer.len;
         let _ = comptimeForPass(self_, m, id, carries, assumed);
         undo(self_, mark);
+        undoLoanEnded(self_, loan_mark);
         self_.probing -= 1;
         applyComptimeOuter(self_, outer_start);
         for at in 0..count {
@@ -3664,6 +4067,7 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var attempt: i64 = 0;
         loop {
             let checked = self_.trail.len;
+            let checked_loan = self_.loan_trail_binding.len;
             let rejected = self_.rejections.len;
             let outer_start = self_.loop_outer.len;
             fact = comptimeForPass(self_, m, id, carries, assumed);
@@ -3682,6 +4086,7 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 break;
             }
             undo(self_, checked);
+            undoLoanEnded(self_, checked_loan);
             applyComptimeOuter(self_, outer_start);
             self_.rejections.resize(rejected);
             attempt += 1;
@@ -3708,7 +4113,7 @@ fn applyComptimeOuter(self_: Analyzer&, start: i64) {
     self_.loop_outer.resize(start);
 }
 
-fn comptimeBreak(self_: Analyzer&, m: const Module&, id: u32) -> bool {
+fn comptimeBreak(self_: Analyzer&, m: const Module&, id: u32) -> u32 {
     let target = m.node(id).b;
     var at = self_.loops.len;
     while at != 0 {
@@ -3728,9 +4133,9 @@ fn comptimeBreak(self_: Analyzer&, m: const Module&, id: u32) -> bool {
             self_.carried[slot] = met;
         }
         recordLoopOuter(self_, frame);
-        return true;
+        return frame.id;
     }
-    return false;
+    return 0;
 }
 
 recursive fn comptimeForPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64) -> Fact {
@@ -3839,9 +4244,11 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     } else {
         self_.probing += 1;
         let mark = self_.trail.len;
+        let loan_mark = self_.loan_trail_binding.len;
         let probe_outer_start = self_.loop_outer.len;
         loopPass(self_, m, id, carries, assumed, probe_outer_start);
         undo(self_, mark);
+        undoLoanEnded(self_, loan_mark);
         self_.probing -= 1;
         for at in probe_outer_start..self_.loop_outer.len {
             let entry = self_.loop_outer[at];
@@ -3856,6 +4263,7 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var attempt: i64 = 0;
         loop {
             let checked = self_.trail.len;
+            let checked_loan = self_.loan_trail_binding.len;
             let rejected = self_.rejections.len;
             let check_outer_start = self_.loop_outer.len;
             loopPass(self_, m, id, carries, assumed, check_outer_start);
@@ -3892,6 +4300,7 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             // A probe that underestimated the carries or outer weakenings: check again.
             undo(self_, checked);
+            undoLoanEnded(self_, checked_loan);
             self_.rejections.resize(rejected);
             if outer_changed {
                 for at in check_outer_start..self_.loop_outer.len {
@@ -4021,10 +4430,13 @@ recursive fn breakNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
 
 fn joinInit(self_: Analyzer&, merges: const Merge[:]) -> Join {
     let join = Join { log: self_.reads.len, base: self_.trail.len, merges: merges, changed_start: self_.changed.len, merged_start: self_.merged.len, .. };
+    self_.join_loan_base.push(self_.loan_trail_binding.len);
+    self_.join_loan_changed_start.push(self_.loan_ended_changed.len);
     for at in 0..merges.len { self_.merged.push(top); }
     return join;
 }
 fn arm(self_: Analyzer&, join: Join&, index: i64, result: Value) {
+    let loan_base = self_.join_loan_base[self_.join_loan_base.len - 1];
     if self_.dry {
         // An arm that only leaves the function reads nothing afterwards.
         if result.exits { lastReads(self_, join.log); }
@@ -4069,10 +4481,20 @@ fn arm(self_: Analyzer&, join: Join&, index: i64, result: Value) {
                 self_.changed[slot].last = index;
             }
         }
+        var lat = loan_base;
+        while lat < self_.loan_trail_binding.len {
+            let lb = self_.loan_trail_binding[lat];
+            lat += 1;
+            if self_.loan_ended[lb] { self_.loan_ended_changed.push(lb); }
+        }
     }
     undo(self_, join.base);
+    undoLoanEnded(self_, loan_base);
 }
 fn finish(self_: Analyzer&, join: Join&) -> Value {
+    let loan_changed_start = self_.join_loan_changed_start[self_.join_loan_changed_start.len - 1];
+    self_.join_loan_base.resize(self_.join_loan_base.len - 1);
+    self_.join_loan_changed_start.resize(self_.join_loan_changed_start.len - 1);
     var at = join.changed_start;
     while at < self_.changed.len {
         let entry = self_.changed[at];
@@ -4082,6 +4504,15 @@ fn finish(self_: Analyzer&, join: Join&) -> Value {
         if entry.arms < join.falls { fact = meet(self_, fact, self_.facts[entry.binding]); }
         set(self_, entry.binding, fact);
     }
+    if !join.exits {
+        var lat = loan_changed_start;
+        while lat < self_.loan_ended_changed.len {
+            let lb = self_.loan_ended_changed[lat];
+            lat += 1;
+            setLoanEnded(self_, lb, true);
+        }
+    }
+    self_.loan_ended_changed.resize(loan_changed_start);
     for merge, index in join.merges {
         var fact = self_.merged[join.merged_start + index];
         if fact == top { fact = none; }
@@ -4255,8 +4686,10 @@ recursive fn closureNonFreezable(self_: Analyzer&, m: const Module&, id: u32) ->
         if m.dispatchSignature(id) != 0 {
             let recv_ty = m.typeOf(n.a);
             if holds(self_, m, recv_ty) || openType(m, recv_ty, 0) { return true; }
+            return false;
         }
-        return false;
+        let uty = unwrapUsage(m, n.ty);
+        return uty < m.types.nodes.len && m.types.node(uty).tag == blot_check_types::Tag.function;
     }
     if n.tag == blot_check_core::Tag.operation_value { return true; }
     if n.tag == blot_check_core::Tag.if_value {
@@ -4266,7 +4699,8 @@ recursive fn closureNonFreezable(self_: Analyzer&, m: const Module&, id: u32) ->
         for case_ in m.matchArms(id) { if closureNonFreezable(self_, m, case_.body) { return true; } }
         return false;
     }
-    return false;
+    let uty = unwrapUsage(m, n.ty);
+    return uty < m.types.nodes.len && m.types.node(uty).tag == blot_check_types::Tag.function;
 }
 recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     let n = m.node(id);
@@ -4281,10 +4715,19 @@ recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let is_local = (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding);
         if is_local { read(self_, target.binding, outer_ref); }
         if !self_.dry {
+            let outer_ty = m.typeOf(outer_ref);
             if is_local && self_.facts[target.binding] == spent {
                 rejectSubject(self_, m, outer_ref, blot_check_core::Code.spent_value, target.binding);
-            } else if holds(self_, m, m.typeOf(outer_ref)) {
-                if !is_local || !ownedAs(self_, m, self_.facts[target.binding], m.typeOf(outer_ref), 0) {
+            } else if isNonUniqueStorage(m, outer_ty) {
+                var subject: u32 = 0;
+                if is_local { subject = target.binding; }
+                rejectSubject(self_, m, outer_ref, blot_check_core::Code.aliased_update, subject);
+            } else if holds(self_, m, outer_ty) || openType(m, outer_ty, 0) {
+                let open = openType(m, outer_ty, 0);
+                var ok = is_local && ownedAs(self_, m, self_.facts[target.binding], outer_ty, 0);
+                if ok && open && !unique(self_.facts[target.binding]) && self_.facts[target.binding] < first_record { ok = false; }
+                if ok && open && partShared(self_, self_.facts[target.binding]) { ok = false; }
+                if !ok {
                     var subject: u32 = 0;
                     if is_local { subject = target.binding; }
                     rejectSubject(self_, m, outer_ref, blot_check_core::Code.aliased_update, subject);
@@ -4293,6 +4736,7 @@ recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
     }
     let mark = self_.trail.len;
+    let loan_ended_mark = self_.loan_trail_binding.len;
     let loan_mark = self_.loans.len;
     let outer_owned = self_.owned_result;
     let outer_exempt = self_.exempt_root;
@@ -4311,7 +4755,9 @@ recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     for at in 0..entry_count {
         let bind_node = m.node(children[at]);
         let inner = bind_node.a;
-        define(self_, inner, deep);
+        var init_fact = deep;
+        if isNonUniqueStorage(m, m.typeOf(bind_node.b)) { init_fact = none; }
+        define(self_, inner, init_fact);
         setForkTaint(self_, inner, depth_level);
     }
     for at in entry_count..children.len {
@@ -4340,8 +4786,9 @@ recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     self_.statement_roots = outer_roots;
     self_.statement_tentative = outer_tentative;
     undo(self_, mark);
+    undoLoanEnded(self_, loan_ended_mark);
     var fact: Fact = none;
-    if holds(self_, m, n.ty) { fact = deep; }
+    if holds(self_, m, n.ty) && !isNonUniqueStorage(m, n.ty) { fact = deep; }
     return Value { fact: fact, .. };
 }
 recursive fn sparkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {

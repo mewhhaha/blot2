@@ -602,7 +602,16 @@ fn isSafeU32LiteralUse(core:const Core&,id:u32,old_bits:u32,new_bits:u32)->bool 
      }
     }
    },
-   logical,apply,if_value,if_stmt,bind,pattern_bind,return_,project,associated,result_associated,product,record,construct,block_,suite,array,break_=>{},
+   associated=>{
+    if n.a==id || n.b==id {
+     match n.op {
+      none,equal,not_equal,less,less_equal,greater,greater_equal,bit_and,bit_or,bit_xor=>{},
+      add,sub,mul=>{ if old_bits<=1 || new_bits<=1 {return false;} },
+      _=>{return false;},
+     }
+    }
+   },
+   logical,apply,if_value,if_stmt,bind,pattern_bind,return_,project,result_associated,product,record,construct,block_,suite,array,break_=>{},
    call=>{
     let ci=core.call(i as u32);
     for arg in ci.arguments {

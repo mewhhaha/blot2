@@ -14,11 +14,17 @@ const wrappers = new Set([
   "collection_infix",
 ]);
 
+function isParenthesizedGroup(node: Cst, nested: readonly Cst[]): boolean {
+  return node.kind === "group" &&
+    nested.filter((child) => child.field === "value").length === 1 &&
+    !nested.some((child) => child.text === ",");
+}
+
 function expressionCore(node: Cst): Cst {
   const nested = children(node);
-  const values = nested.filter((child) => child.field === "value");
-  if (node.kind === "group" && values.length === 1) {
-    return expressionCore(values[0]);
+  if (isParenthesizedGroup(node, nested)) {
+    const value = nested.find((child) => child.field === "value")!;
+    return expressionCore(value);
   }
   return wrappers.has(node.kind) && nested.length === 1
     ? expressionCore(nested[0])
@@ -38,6 +44,9 @@ function needsGrouping(group: Cst, parents: Map<Cst, Cst>): boolean {
     "if_expression",
     "case_expression",
     "do_block",
+    "fork_statement",
+    "comptime_for",
+    "comptime_if",
   ].includes(kind);
   if (!compound) return false;
   for (let node = parents.get(group); node; node = parents.get(node)) {
@@ -65,8 +74,9 @@ function structure(node: Cst): unknown {
     !child.kind.startsWith("LAYOUT_") &&
     !(node.kind === "data_type" && child.text === "|")
   );
-  const values = nested.filter((child) => child.field === "value");
-  if (node.kind === "group" && values.length === 1) return structure(values[0]);
+  if (isParenthesizedGroup(node, nested)) {
+    return structure(nested.find((child) => child.field === "value")!);
+  }
   if (wrappers.has(node.kind) && nested.length === 1) {
     return structure(nested[0]);
   }
@@ -106,8 +116,115 @@ export async function formatSource(source: string): Promise<string> {
         return false;
       }
     };
-    // Break long data alternatives into one visible group per constructor.
-    const declarations: { start: number; end: number; text: string }[] = [];
+    const normalizeSpacing = (current: string): string => {
+      const root = frontend.parse(current).root;
+      const tightAfter = new Set<number>();
+      const tightBefore = new Set<number>();
+      const witness = new Set<number>();
+      const pending = [root];
+      for (let node = pending.pop(); node; node = pending.pop()) {
+        const nested = children(node);
+        pending.push(...nested);
+        if (["type_witness", "value_pattern"].includes(node.kind)) {
+          tightAfter.add(Number(node.offset));
+          witness.add(Number(node.offset));
+        }
+        if (
+          node.kind === "prefix_expression" || node.kind === "storage_type"
+        ) {
+          for (const child of nested) {
+            if (child.field === "operator") {
+              tightAfter.add(Number(child.offset));
+            }
+          }
+        }
+        if (node.kind === "named_operator") {
+          // Only the opening backtick hugs the name; the right operand keeps
+          // its space after the closing one.
+          const opening = nested.find((child) => child.text === "`");
+          if (opening) tightAfter.add(Number(opening.offset));
+        }
+        if (
+          node.kind === "receive" ||
+          (node.kind === "expression" && nested[0]?.text === "|" &&
+            nested.at(-1)?.text === "|")
+        ) {
+          const bars = nested.filter((child) => child.text === "|");
+          if (bars.length === 2) {
+            tightAfter.add(Number(bars[0].offset));
+            tightBefore.add(Number(bars[1].offset));
+          }
+        }
+      }
+      const lexed = frontend.lex(current);
+      const lines = current.replace(/\r\n|\r/g, "\n").split("\n");
+      const output: string[] = [];
+      let cursor = 0;
+      let line = 0;
+      let text = "";
+      let previous: { text: string; start: number; end: number } | undefined;
+      let backtick = false;
+      for (let index = 0; index < lexed.tokenTape.length; index++) {
+        const token = lexed.tokenTape.token(index)!;
+        if (
+          token.type === "eof" ||
+          (token.type === "named" && token.kind === "WHITESPACE")
+        ) continue;
+        const breaks =
+          (current.slice(cursor, token.span.start).match(/\r\n|\r|\n/g) ?? [])
+            .length;
+        if (breaks) {
+          if (text.trim()) output.push(text.trimEnd());
+          if (breaks > 1 && output.length && output.at(-1) !== "") {
+            output.push("");
+          }
+          line += breaks;
+          text = "";
+          previous = undefined;
+        }
+        if (!text) text = /^[ ]*/.exec(lines[line] ?? "")![0];
+        const value = token.text;
+        const comment = token.type === "named" && token.kind === "COMMENT";
+        let space = previous !== undefined;
+        if (previous) {
+          const adjacent = previous.end === token.span.start;
+          if (comment) {
+            text = text.trimEnd() + "  ";
+            space = false;
+          } else if ([")", "]", ",", ";"].includes(value)) space = false;
+          else if (value === ":" && !witness.has(token.span.start)) {
+            space = false;
+          } else if (["(", "["].includes(previous.text)) space = false;
+          else if (["(", "["].includes(value)) {
+            space = !adjacent ||
+              ["=", ":=", "=>", "->", "<-", ","].includes(previous.text);
+          } else if (value === ".") space = !adjacent;
+          else if (
+            previous.text === "." ||
+            previous.text === "#" || previous.text === "..." ||
+            (previous.text === "$" && adjacent && /^[A-Za-z_]/.test(value))
+          ) space = false;
+          else if (tightAfter.has(previous.start)) space = false;
+          else if (tightBefore.has(token.span.start)) space = false;
+          else if (value === "}" && previous.text === "{") space = false;
+          if (value === "`") {
+            if (backtick) space = false;
+            backtick = !backtick;
+          } else if (backtick) space = false;
+        }
+        if (space) text += " ";
+        text += value;
+        previous = {
+          text: value,
+          start: token.span.start,
+          end: token.span.end,
+        };
+        cursor = token.span.end;
+      }
+      if (text.trim()) output.push(text.trimEnd());
+      return output.join("\n").trimEnd() + "\n";
+    };
+    // Remove redundant parentheses before checking post-spacing wrap widths.
     const groups: [number, number][] = [];
     const work = [original];
     const parents = new Map<Cst, Cst>();
@@ -115,10 +232,7 @@ export async function formatSource(source: string): Promise<string> {
       const nested = children(node);
       for (const child of nested) parents.set(child, node);
       work.push(...nested);
-      if (
-        node.kind === "group" &&
-        nested.filter((child) => child.field === "value").length === 1
-      ) {
+      if (isParenthesizedGroup(node, nested)) {
         const [start, end] = span(node);
         if (
           !source.slice(start, end).includes("\n") &&
@@ -127,30 +241,6 @@ export async function formatSource(source: string): Promise<string> {
           groups.push([start, end - 1]);
         }
       }
-      if (node.kind !== "data_type") continue;
-      const variants = nested.filter((child) => child.field === "constructors");
-      const [start, end] = span(node);
-      const text = source.slice(start, end);
-      if (variants.length < 2 || (!text.includes("\n") && text.length <= 80)) {
-        continue;
-      }
-      const first = span(variants[0])[0];
-      const header = source.slice(start, first).replace(/\s*\|?\s*$/, "");
-      const lines = variants.map((variant) => {
-        const [a, b] = span(variant);
-        const base =
-          /^ */.exec(source.slice(source.lastIndexOf("\n", a - 1) + 1, a))![0]
-            .length;
-        const parts = source.slice(a, b).split("\n");
-        return "  | " + parts[0] +
-          parts.slice(1).map((line) =>
-            "\n" + "  " +
-            line.slice(Math.min(base, /^ */.exec(line)![0].length))
-          ).join("");
-      });
-      // Comments between variants retain their original placement.
-      if (text.includes("//")) continue;
-      declarations.push({ start, end, text: header + "\n" + lines.join("\n") });
     }
     // Try removals in batches. Failed batches split until only parentheses
     // that change the parsed expression are left, avoiding a parse per pair
@@ -180,119 +270,55 @@ export async function formatSource(source: string): Promise<string> {
       }
     };
     simplify(groups);
-    // Apply the edits against the same original offsets.
-    for (const edit of declarations.sort((a, b) => b.start - a.start)) {
-      for (const at of removed) {
-        if (at >= edit.start && at < edit.end) removed.delete(at);
-      }
+    if (removed.size > 0) {
+      const simplified = without(removed);
+      if (equivalent(simplified)) source = simplified;
     }
-    const edits = [
-      ...declarations,
-      ...[...removed].map((start) => ({ start, end: start + 1, text: "" })),
-    ];
-    let laidOut = source;
-    for (const edit of edits.sort((a, b) => b.start - a.start)) {
-      laidOut = laidOut.slice(0, edit.start) + edit.text +
-        laidOut.slice(edit.end);
-    }
-    if (equivalent(laidOut)) source = laidOut;
+    source = normalizeSpacing(source);
+    // Break long data alternatives using post-spacing line widths so pass 1
+    // reaches a fixed point without waiting for a second format pass.
     original = frontend.parse(source).root;
-    const tightAfter = new Set<number>();
-    const tightBefore = new Set<number>();
-    const witness = new Set<number>();
-    const pending = [original];
-    for (let node = pending.pop(); node; node = pending.pop()) {
+    const declarations: { start: number; end: number; text: string }[] = [];
+    const pendingData = [original];
+    for (let node = pendingData.pop(); node; node = pendingData.pop()) {
       const nested = children(node);
-      pending.push(...nested);
-      if (["type_witness", "value_pattern"].includes(node.kind)) {
-        tightAfter.add(Number(node.offset));
-        witness.add(Number(node.offset));
+      pendingData.push(...nested);
+      if (node.kind !== "data_type") continue;
+      const variants = nested.filter((child) => child.field === "constructors");
+      const [start, end] = span(node);
+      const text = source.slice(start, end);
+      if (variants.length < 2 || (!text.includes("\n") && text.length <= 80)) {
+        continue;
       }
-      if (node.kind === "prefix_expression" || node.kind === "storage_type") {
-        for (const child of nested) {
-          if (child.field === "operator") tightAfter.add(Number(child.offset));
-        }
+      const first = span(variants[0])[0];
+      const header = source.slice(start, first).replace(/\s*\|?\s*$/, "");
+      const lines = variants.map((variant) => {
+        const [a, b] = span(variant);
+        const base =
+          /^ */.exec(source.slice(source.lastIndexOf("\n", a - 1) + 1, a))![0]
+            .length;
+        const parts = source.slice(a, b).split("\n");
+        return "  | " + parts[0] +
+          parts.slice(1).map((line) =>
+            "\n" + "  " +
+            line.slice(Math.min(base, /^ */.exec(line)![0].length))
+          ).join("");
+      });
+      // Comments between variants retain their original placement.
+      if (text.includes("//")) continue;
+      declarations.push({ start, end, text: header + "\n" + lines.join("\n") });
+    }
+    let formatted = source;
+    if (declarations.length > 0) {
+      let laidOut = source;
+      for (const edit of declarations.sort((a, b) => b.start - a.start)) {
+        laidOut = laidOut.slice(0, edit.start) + edit.text +
+          laidOut.slice(edit.end);
       }
-      if (node.kind === "named_operator") {
-        // Only the opening backtick hugs the name; the right operand keeps
-        // its space after the closing one.
-        const opening = nested.find((child) => child.text === "`");
-        if (opening) tightAfter.add(Number(opening.offset));
-      }
-      if (
-        node.kind === "receive" ||
-        (node.kind === "expression" && nested[0]?.text === "|" &&
-          nested.at(-1)?.text === "|")
-      ) {
-        const bars = nested.filter((child) => child.text === "|");
-        if (bars.length === 2) {
-          tightAfter.add(Number(bars[0].offset));
-          tightBefore.add(Number(bars[1].offset));
-        }
+      if (laidOut !== source && equivalent(laidOut)) {
+        formatted = normalizeSpacing(laidOut);
       }
     }
-    const lexed = frontend.lex(source);
-    const lines = source.replace(/\r\n|\r/g, "\n").split("\n");
-    const output: string[] = [];
-    let cursor = 0;
-    let line = 0;
-    let text = "";
-    let previous: { text: string; start: number; end: number } | undefined;
-    let backtick = false;
-    for (let index = 0; index < lexed.tokenTape.length; index++) {
-      const token = lexed.tokenTape.token(index)!;
-      if (
-        token.type === "eof" ||
-        (token.type === "named" && token.kind === "WHITESPACE")
-      ) continue;
-      const breaks =
-        (source.slice(cursor, token.span.start).match(/\r\n|\r|\n/g) ?? [])
-          .length;
-      if (breaks) {
-        if (text.trim()) output.push(text.trimEnd());
-        if (breaks > 1 && output.length && output.at(-1) !== "") {
-          output.push("");
-        }
-        line += breaks;
-        text = "";
-        previous = undefined;
-      }
-      if (!text) text = /^[ ]*/.exec(lines[line] ?? "")![0];
-      const value = token.text;
-      const comment = token.type === "named" && token.kind === "COMMENT";
-      let space = previous !== undefined;
-      if (previous) {
-        const adjacent = previous.end === token.span.start;
-        if (comment) {
-          text = text.trimEnd() + "  ";
-          space = false;
-        } else if ([")", "]", ","].includes(value)) space = false;
-        else if (value === ":" && !witness.has(token.span.start)) space = false;
-        else if (["(", "["].includes(previous.text)) space = false;
-        else if (["(", "["].includes(value)) {
-          space = !adjacent ||
-            ["=", ":=", "=>", "->", "<-", ","].includes(previous.text);
-        } else if (value === ".") space = !adjacent;
-        else if (
-          previous.text === "." ||
-          previous.text === "#" || previous.text === "..." ||
-          (previous.text === "$" && adjacent && /^[A-Za-z_]/.test(value))
-        ) space = false;
-        else if (tightAfter.has(previous.start)) space = false;
-        else if (tightBefore.has(token.span.start)) space = false;
-        else if (value === "}" && previous.text === "{") space = false;
-        if (value === "`") {
-          if (backtick) space = false;
-          backtick = !backtick;
-        } else if (backtick) space = false;
-      }
-      if (space) text += " ";
-      text += value;
-      previous = { text: value, start: token.span.start, end: token.span.end };
-      cursor = token.span.end;
-    }
-    if (text.trim()) output.push(text.trimEnd());
-    const formatted = output.join("\n").trimEnd() + "\n";
     if (
       !equivalent(formatted)
     ) {

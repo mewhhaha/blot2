@@ -430,7 +430,9 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
   const repo = new URL("../../", import.meta.url).pathname;
   const formatted: Record<string, string> = {};
   const examples: string[] = [];
-  for (const directory of ["examples", "std"]) {
+  for (
+    const directory of ["examples", "examples/generators", "std", "tests/std"]
+  ) {
     for await (const entry of Deno.readDir(`${repo}${directory}`)) {
       if (!entry.isFile || !entry.name.endsWith(".blot")) continue;
       const path = `${repo}${directory}/${entry.name}`;
@@ -550,4 +552,59 @@ Deno.test("formatter preserves primitive boolean words and bare patterns", async
   equal(formatted.includes("left or right and false"), true);
   equal(formatted.includes("true => 1"), true);
   equal(await formatSource(formatted), formatted);
+});
+
+Deno.test("formatter handles expression #for/#if, reflected updates, fork expressions, fixed arrays, and trailing-comma tuples", async () => {
+  const source = `type Config is data = $Config { x: U32 = 10, y: #[4; F32] }
+func build (): t =>
+  return #for field in #fields t:
+    #if field.has_default:
+      break field.default
+    #else:
+      break 0
+func mutate (a: own t) -> (arr: own #[t]) -> (v: #[n; T]): U32 =>
+  let built = #for field in #fields t:
+    break a.(field)
+  let chosen = #if true:
+    1
+  #else:
+    2
+  #for field in #fields t:
+    a.(field) := built.(field)
+    arr[0].(field) := a.(f1).(f2)
+  let preview = fork arr:
+    arr[0] := a
+    return arr.length
+  use scoped <- fork a, arr:
+    return preview + chosen
+  let single = (1,)
+  let pair = (1, 2,)
+  let (first,) = single
+  let (left, right,) = pair
+  return scoped + first + left + right
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("#[4; F32]"), true);
+  equal(formatted.includes("#[n; T]"), true);
+  equal(formatted.includes("a.(field) := built.(field)"), true);
+  equal(formatted.includes("arr[0].(field) := a.(f1).(f2)"), true);
+  equal(formatted.includes("let preview = fork arr:"), true);
+  equal(formatted.includes("use scoped <- fork a, arr:"), true);
+  equal(formatted.includes("let single = (1,)"), true);
+  equal(formatted.includes("let pair = (1, 2,)"), true);
+  equal(formatted.includes("let (first,) = single"), true);
+  equal(formatted.includes("let (left, right,) = pair"), true);
+});
+
+Deno.test("formatter is strictly idempotent across the 80-char data declaration wrap threshold", async () => {
+  const source =
+    "type T is data = $First {a:U32,b:U32,c:U32} | $VAAAAAAAAAAAAAAAAAAAAAAAAAA\n";
+  const once = await formatSource(source);
+  const twice = await formatSource(once);
+  equal(once, twice);
+  equal(
+    once,
+    "type T is data =\n  | $First { a: U32, b: U32, c: U32 }\n  | $VAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+  );
 });

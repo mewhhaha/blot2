@@ -163,7 +163,7 @@ fn detailWrite(writer:Writer&,value:blot_parse_ast::NumericFault)->Error {writer
 fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContextKind)->Error {return writer.enumValue(value);}
 fn detailWrite(writer:Writer&,value:blot_reuse_dispatch_explanation::Explanation)->Error {return value.jsonStringify(writer);}
 fn detailWrite(writer:Writer&,value:blot_reuse_hole_diagnostics::Snapshot)->Error {return value.jsonStringify(writer);}
-fn terminatorName(value:blot_parse_source_operators::Terminator)->const u8[:] {if value==blot_parse_source_operators::terminator_return {return "return_";}if value==blot_parse_source_operators::terminator_break {return "break_";}return "none";}
+fn terminatorName(value:blot_parse_source_operators::Terminator)->const u8[:] {if value==blot_parse_source_operators::terminator_return {return "return_";}if value==blot_parse_source_operators::terminator_break {return "break_";}if value==blot_parse_source_operators::terminator_continue {return "continue_";}return "none";}
 // A checker diagnostic as the oracle's std.json renders it: every field in declaration order.
 fn detailWrite(writer:Writer&,value:blot_check_check::Diagnostic)->Error {
  writer.beginObject();detailField(writer,"origin_unit",value.origin_unit);writer.key("code");writer.enumValue(value.code);detailField(writer,"span",value.span);detailField(writer,"node",value.node);
@@ -174,7 +174,12 @@ fn detailWrite(writer:Writer&,value:blot_check_check::Diagnostic)->Error {
 }
 fn forwardedDetails<T>(details:const T[:])->bool {return false;}
 fn publishedDiagnostic<T>(unit:u32,stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,details:T)->Diagnostic,Error {
- let created,error=init(unit,stage,publication.code,publication.span,publication.message);if error!=blot_error::Error.none {return Diagnostic{},error;}var result=created;var published=false;
+ var formatted_message:u8[>..<]=[];
+ let has_formatted=blot_parse_syntax_diagnostics::format_publication_message(publication,formatted_message);
+ var created=Diagnostic{};var error=blot_error::Error.none;
+ if has_formatted {let c,e=init(unit,stage,publication.code,publication.span,formatted_message[..]);created=c;error=e;}
+ else {let c,e=init(unit,stage,publication.code,publication.span,publication.message);created=c;error=e;}
+ if error!=blot_error::Error.none {return Diagnostic{},error;}var result=created;var published=false;
  var bytes:u8[>..]=[];var writer=Writer{out:bytes,options:blot_json::Options{}};let error=detailWrite(writer,details);if error!=blot_error::Error.none {let __cleanup_result_1_0: Diagnostic = Diagnostic{}; let __cleanup_result_1_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}if writer.failure!=blot_error::Error.none {let __cleanup_result_2_0: Diagnostic = Diagnostic{}; let __cleanup_result_2_1: Error = writer.failure; {if !published {result.deinit();}} return __cleanup_result_2_0, __cleanup_result_2_1;}
  let span,has_span=blot_parse_syntax_diagnostics::utf16(publication,source);var snap=Publication{cause:publication.cause,details_json:ownBytes(bytes[..]),forwarded:forwardedDetails(details)};
  if has_span {snap.utf16=blot_support::some(span);}if publication.has_expected_token {snap.expected_token=blot_support::some(publication.expected_token);}if publication.has_actual_token {snap.actual_token=blot_support::some(publication.actual_token);}

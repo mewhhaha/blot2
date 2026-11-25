@@ -127,6 +127,16 @@ private func fork_report_checks (): Unit ! { test.Test } =>
     use test.near "negative tolerance rejected" (-1.0) 1.0 1.0
     return ())
   use test.eq "negative tolerance fails" 1 neg_tol[3]
+  let empty_f32: #[F32] = #[]
+  let neg_arr_tol = test.run (func () =>
+    use test.near_array "neg" (-1.0) empty_f32 empty_f32
+    return ())
+  use test.eq "near_array negative tolerance fails on empty arrays" 1 neg_arr_tol[3]
+  let nan_arr_tol = test.run (func () =>
+    use test.near_array "nan" (F32.div 0.0 0.0) empty_f32 empty_f32
+    return ())
+  use test.eq "near_array NaN tolerance fails on empty arrays" 1 nan_arr_tol[3]
+  use test.near_array "empty arrays with zero tolerance pass" 0.0 empty_f32 empty_f32
   return ()
 
 #entry func trap_div_zero (): Unit =>
