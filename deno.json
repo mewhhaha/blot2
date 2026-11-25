@@ -91,6 +91,7 @@
       "host/lsp_protocol.ts",
       "host/type_diagnostics.ts",
       "host/assets.ts",
+      "host/generators.ts",
       "host/native_assets.ts",
       "host/format.ts",
       "host/text.ts",

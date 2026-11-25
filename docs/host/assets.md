@@ -128,9 +128,100 @@ instance. IDs are deterministic for a complete build, but can change when the
 set of resources changes. Different nominal reference types distinguish APIs;
 the host still validates IDs against its manifest.
 
-This repository supplies the typed adapter interface and tests the shader
-boundary. It does not include a shader-language parser or infer shader inputs
-using regular expressions.
+## Stage-0 Blot generators
+
+Use `createBlotGenerator` as an asset parser to run a Blot function before the
+project compiles. The generated source becomes a virtual module, so builds, type
+checking and completion see ordinary Blot types, constructors and values.
+
+```ts
+import { createBlotGenerator, createCompiler } from "@mewhhaha/blot";
+
+const compiler = await createCompiler({
+  entry: "./main.blot",
+  assets: {
+    "./salt.wgsl": {
+      path: "./assets/salt.wgsl",
+      parser: createBlotGenerator({
+        generator: "./tools/wgsl_gen.blot",
+        inputMode: "text",
+        reference: { type: "Shader", export: "shader", mediaType: "text/wgsl" },
+      }),
+    },
+  },
+});
+try {
+  const build = await compiler.build();
+  // On success, build.assets holds the original shader bytes.
+} finally {
+  await compiler.dispose();
+}
+```
+
+The generator entry is `#entry func generate` by default. Set `exportName` to
+select another entry. Its single parameter accepts these shapes:
+
+- `#[U32]` in the default `"bytes"` mode, with one element per input byte.
+- `Text` in `"text"` mode, with strict UTF-8 decoding to Unicode scalar values.
+- `{ path: Text, bytes: #[U32] }` or `{ path: Text, text: Text }` in the
+  corresponding mode. `path` is the canonical input path.
+
+Return `Text` for Blot source or `Result [Text, Text]` to report an error.
+`$Ok source` supplies the virtual module, and `$Err message` produces an
+`asset_import` diagnostic at the input path. Generator compile failures and Wasm
+traps also produce asset diagnostics. Use `$Err` for a message about the input
+format. Stage 0 runs synchronously in a fresh Wasm instance with no host
+imports. The ABI 8 numeric packet limit applies to inputs and outputs, and the
+host does not impose a guest execution deadline.
+
+Stage 0 tracks the generator and its transitive Blot imports. Changing those
+sources recompiles the generator. Changing only the asset runs the existing
+compiled Wasm with the new bytes. Unchanged assets reuse their generated
+modules. Supply `assetSources` to `build` or `complete` to use unsaved input
+bytes. TypeScript parsers may also return raw Blot in `AssetModule.source`,
+optionally alongside `types`, `aliases` or `values`.
+
+In a manifest project, `blot check`, `blot build`, `blot test` and the Blot
+language server read `generators` from `blot.json`. These rules use paths
+relative to the project root and use the project's imports and prelude:
+
+```json
+{
+  "dependencies": { "std": { "path": "../blot" } },
+  "prelude": "std",
+  "generators": [
+    {
+      "module": "src/units.csv",
+      "input": "data/units.csv",
+      "generator": "tools/csv_gen.blot",
+      "inputMode": "text"
+    },
+    {
+      "match": "src/assets/*.wgsl",
+      "generator": "tools/wgsl_gen.blot",
+      "inputMode": "text",
+      "reference": {
+        "type": "Shader",
+        "export": "shader",
+        "mediaType": "text/wgsl"
+      }
+    }
+  ]
+}
+```
+
+A single-star pattern selects files immediately inside its directory, in sorted
+order. From `src/main.blot`, import `"./units.csv"` and `"./assets/salt.wgsl"`.
+For a custom host, use
+`expandGeneratorRules(projectRoot, rules, compilerOptions)` to build the
+`assets` map and share compiled generators across matching files.
+
+The [WGSL example](../../examples/generators/wgsl_gen.blot) reflects top-level
+structs with scalar and vector fields and constants with Boolean, unsigned
+integer or decimal literals. It skips shader bodies. The
+[CSV example](../../examples/generators/csv_gen.blot) reads `name,hp,speed`
+rows, including quoted fields and escaped quotes on one line, and emits a
+`#[UnitSpec]` table.
 
 ## Retained builds, ownership and limits
 
@@ -178,19 +269,21 @@ Grant an input by mapping a virtual module to its file when opening a project.
 ```ts
 const compiler = await createCompiler({
   entry: "./main.blot",
-  nativeAssets: { imports: [{ module: "./icon", path: "./icon.png", kind: "input" }] },
+  nativeAssets: {
+    imports: [{ module: "./icon", path: "./icon.png", kind: "input" }],
+  },
 });
 ```
 
 The generated module exports a session-local U32 named `file`.
 `std/build.include` takes this handle and returns the file bytes as an
-`Array U32` inside a staged computation. The evaluator opens a file on its
-first read. Repeated reads see one snapshot. Unsaved overlays use the same
-paths and take precedence over disk. The usual native input size limits apply.
+`Array U32` inside a staged computation. The evaluator opens a file on its first
+read. Repeated reads see one snapshot. Unsaved overlays use the same paths and
+take precedence over disk. The usual native input size limits apply.
 
 Successful builds report file hashes in `assetDependencies` and binding
-locations in `stats.stagedDefinitions`. The locations use UTF-8 byte offsets
-in the current source revision. `stats.reusedStagedWasm` reports whether the
+locations in `stats.stagedDefinitions`. The locations use UTF-8 byte offsets in
+the current source revision. `stats.reusedStagedWasm` reports whether the
 project reused the complete output. Reuse requires an unchanged checked graph
-and matching bytes for every previously selected input. A failed build
-preserves the last successful revision.
+and matching bytes for every previously selected input. A failed build preserves
+the last successful revision.

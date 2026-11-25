@@ -438,6 +438,9 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
                 if !blot_check_core::sameCoreType(a,sa[i].source_type,b,sb[i].source_type,0) || !blot_check_core::sameCoreType(a,sa[i].result_type,b,sb[i].result_type,0) { return false; }
                 if sa[i].kind==blot_check_core::UpdateKind.index {
                     if !sameCoreExpr(old_units,a,sa[i].index,new_units,b,sb[i].index,locals,blocks,depth+1) { return false; }
+                } else if sa[i].kind==blot_check_core::UpdateKind.comptime_field {
+                    let binder,found=lookupLocal(locals,sa[i].projection);
+                    if !found || binder!=sb[i].projection { return false; }
                 } else {
                     if !sameProjection(a,sa[i].projection,b,sb[i].projection) { return false; }
                 }

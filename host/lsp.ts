@@ -2,6 +2,8 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { analyzeDiagnostic, type RawDiagnosticRecord } from "./diagnostics.ts";
+import { expandGeneratorRules } from "./generators.ts";
+import { resolveGeneratorProject } from "./packages.ts";
 import {
   createZigProjectCompiler,
   type ZigProjectCompiler,
@@ -174,8 +176,14 @@ export class CompletionBridge {
   #snapshot = 0;
   #generation = 0;
   #child:
-    | { compiler: ZigProjectCompiler; filename: string; generation: number }
+    | {
+      compiler: ZigProjectCompiler;
+      filename: string;
+      generation: number;
+      assetInputs?: ReadonlySet<string>;
+    }
     | undefined;
+  #projectChanged = false;
   #work: Promise<unknown> = Promise.resolve();
   #watchers: Deno.FsWatcher[] = [];
   #roots = new Set<string>();
@@ -211,11 +219,26 @@ export class CompletionBridge {
       void (async () => {
         try {
           for await (const event of watcher) {
+            const projectChanged = recursive &&
+              event.paths.some((file) =>
+                file.endsWith("/blot.json") || file.endsWith("/blot.lock.json")
+              );
+            const assetChanged = event.paths.some((file) =>
+              this.#child?.assetInputs?.has(file)
+            );
+            const sourceChanged = event.paths.some((file) =>
+              file === root || (recursive && file.endsWith(".blot"))
+            );
+            if (projectChanged) this.#projectChanged = true;
             if (
-              event.paths.some((changed) =>
-                changed === root || (recursive && changed.endsWith(".blot"))
-              )
-            ) this.#invalidate();
+              projectChanged || assetChanged ||
+              (sourceChanged && this.#child?.assetInputs)
+            ) {
+              this.#diagnosticsCache.clear();
+            }
+            if (projectChanged || assetChanged || sourceChanged) {
+              this.#invalidate();
+            }
           }
         } catch (error) {
           if (!this.#closed) console.error(`blot: watcher: ${error}`);
@@ -227,6 +250,63 @@ export class CompletionBridge {
     const child = this.#child;
     this.#child = undefined;
     if (child) await child.compiler.dispose();
+  }
+  async #compilerFor(file: string, signal: AbortSignal, deadline?: number) {
+    signal.throwIfAborted();
+    if (this.#projectChanged || this.#child?.filename !== file) {
+      this.#projectChanged = false;
+      await this.#disposeChild();
+    }
+    signal.throwIfAborted();
+    if (!this.#child) {
+      const project = await resolveGeneratorProject(file);
+      const options: ZigProjectCompilerOptions = {
+        ...this.options,
+        entry: file,
+      };
+      let assetInputs: Set<string> | undefined;
+      if (project?.generators?.length) {
+        options.prelude = project.prelude;
+        options.stdRoot = project.stdRoot;
+        options.imports = { ...project.imports, ...this.options.imports };
+        options.assets = await expandGeneratorRules(
+          project.root,
+          project.generators,
+          options,
+        );
+        assetInputs = new Set(
+          Object.values(options.assets).map(({ path }) => path as string),
+        );
+        this.#watch(project.root);
+      }
+      signal.throwIfAborted();
+      if (deadline !== undefined) {
+        options.startupTimeoutMs = Math.max(
+          1,
+          Math.floor(deadline - performance.now()),
+        );
+      }
+      const compiler = await createZigProjectCompiler(options);
+      this.#child = {
+        compiler,
+        filename: file,
+        generation: ++this.#generation,
+        assetInputs,
+      };
+    }
+    return this.#child;
+  }
+  #overlays(
+    sources: Record<string, string>,
+    assetInputs?: ReadonlySet<string>,
+  ) {
+    if (!assetInputs) return { sources };
+    const blotSources: Record<string, string> = Object.create(null);
+    const assetSources: Record<string, string> = Object.create(null);
+    for (const [path, text] of Object.entries(sources)) {
+      (assetInputs.has(path) ? assetSources : blotSources)[path] = text;
+    }
+    return { sources: blotSources, assetSources };
   }
   async dispose() {
     if (this.#closed) return;
@@ -271,30 +351,14 @@ export class CompletionBridge {
       controller.signal.addEventListener("abort", abort, { once: true });
     });
     const operation = this.#work.then(async () => {
-      controller.signal.throwIfAborted();
-      if (this.#child?.filename !== file) await this.#disposeChild();
-      controller.signal.throwIfAborted();
-      if (!this.#child) {
-        const remaining = Math.max(1, Math.floor(deadline - performance.now()));
-        const compiler = await createZigProjectCompiler({
-          ...this.options,
-          entry: file,
-          startupTimeoutMs: remaining,
-        });
-        this.#child = {
-          compiler,
-          filename: file,
-          generation: ++this.#generation,
-        };
-      }
-      const child = this.#child;
+      const child = await this.#compilerFor(file, controller.signal, deadline);
       try {
         controller.signal.throwIfAborted();
         const result = await child.compiler.complete({
           filename: file,
           position,
           snapshot,
-          sources,
+          ...this.#overlays(sources, child.assetInputs),
           signal: controller.signal,
         });
         if (
@@ -374,24 +438,10 @@ export class CompletionBridge {
     const controller = new AbortController();
     if (id !== null) this.#requests.set(id, controller);
     const operation = this.#work.then(async () => {
-      controller.signal.throwIfAborted();
-      if (this.#child?.filename !== file) await this.#disposeChild();
-      controller.signal.throwIfAborted();
-      if (!this.#child) {
-        const compiler = await createZigProjectCompiler({
-          ...this.options,
-          entry: file,
-        });
-        this.#child = {
-          compiler,
-          filename: file,
-          generation: ++this.#generation,
-        };
-      }
-      const child = this.#child;
+      const child = await this.#compilerFor(file, controller.signal);
       try {
         const result = await child.compiler.build({
-          sources,
+          ...this.#overlays(sources, child.assetInputs),
           signal: controller.signal,
         });
         if (this.#documents.get(file) !== document) return [];
@@ -614,7 +664,9 @@ export class CompletionBridge {
             text: source(object(params.contentChanges[0]).text),
             version: next,
           });
-          this.#diagnosticsCache.delete(file);
+          if (this.#child?.assetInputs?.has(file)) {
+            this.#diagnosticsCache.clear();
+          } else this.#diagnosticsCache.delete(file);
           this.#invalidate();
         } else if (method === "textDocument/didSave") {
           this.#diagnosticsCache.delete(file);
@@ -633,7 +685,9 @@ export class CompletionBridge {
           }
         } else if (method === "textDocument/didClose") {
           this.#documents.delete(file);
-          this.#diagnosticsCache.delete(file);
+          if (this.#child?.assetInputs?.has(file)) {
+            this.#diagnosticsCache.clear();
+          } else this.#diagnosticsCache.delete(file);
           this.#invalidate();
           if (this.#child?.filename === file) await this.#disposeChild();
         }

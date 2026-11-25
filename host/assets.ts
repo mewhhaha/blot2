@@ -31,6 +31,8 @@ export interface AssetReference {
   readonly [referenceBrand]: true;
 }
 export interface AssetModule {
+  /** Raw Blot declarations, optionally followed by structured exports. */
+  readonly source?: string;
   /** Transparent names for scalar, array, tuple, or other described types. */
   readonly aliases?: Readonly<Record<string, AssetType>>;
   /** Record and reference types can be exported without a value (shader inputs). */
@@ -181,6 +183,18 @@ function prepareModule(
   result: AssetModule,
   references: WeakMap<object, Resource>,
 ): Pick<PreparedModule, "source" | "resources"> {
+  let raw = result.source;
+  if (raw !== undefined) {
+    if (typeof raw !== "string" || !raw.isWellFormed() || raw.includes("\0")) {
+      throw new TypeError(
+        "Generated asset source must be well-formed Blot text without NUL",
+      );
+    }
+    if (raw && !raw.endsWith("\n")) raw += "\n";
+    if (encoder.encode(raw).length > limit) {
+      throw new RangeError("Generated asset module exceeds 16 MiB");
+    }
+  }
   const declarations = new Map<string, string>();
   const active = new Set<object>();
   const resources = new Map<string, Resource>();
@@ -338,7 +352,7 @@ function prepareModule(
     first = index + 1;
   }
   template.push(chunks.slice(first).join(""));
-  const header = [...declarations.values()].join("");
+  const header = (raw ?? "") + [...declarations.values()].join("");
   const staticBytes = encoder.encode(header).length +
     template.reduce(
       (size, chunk) =>
@@ -358,6 +372,45 @@ function prepareModule(
         return String(id);
       }).join(""),
   };
+}
+
+function captureAssetSources(
+  overlays: ZigProjectBuildOptions["assetSources"],
+): ZigProjectBuildOptions["assetSources"] {
+  if (overlays === undefined) return;
+  if (!overlays || typeof overlays !== "object" || Array.isArray(overlays)) {
+    throw new TypeError("Asset overlays must be an object");
+  }
+  let overlayBytes = 0;
+  const assets = Object.entries(overlays);
+  if (assets.length > 4096) {
+    throw new RangeError("Too many asset overlays");
+  }
+  return Object.fromEntries(
+    assets.map(([path, value]) => {
+      if (
+        value !== null && typeof value !== "string" &&
+        !(value instanceof Uint8Array)
+      ) {
+        throw new TypeError(
+          "Asset overlays must contain bytes, strings, or null",
+        );
+      }
+      const size = value === null
+        ? 0
+        : typeof value === "string"
+        ? encoder.encode(value).length
+        : value.byteLength;
+      overlayBytes += size;
+      if (size > limit || overlayBytes > totalLimit) {
+        throw new RangeError("Asset overlay budget exceeded");
+      }
+      return [
+        path,
+        value instanceof Uint8Array ? new Uint8Array(value) : value,
+      ];
+    }),
+  );
 }
 
 /** Wrap the retained native compiler; each build owns an asset input snapshot. */
@@ -743,11 +796,6 @@ export async function withAssetImports(
             (!map || typeof map !== "object" || Array.isArray(map))
           ) throw new TypeError("Source overlays must be objects");
         }
-        let overlayBytes = 0;
-        const assets = Object.entries(options.assetSources ?? {});
-        if (assets.length > 4096) {
-          throw new RangeError("Too many asset overlays");
-        }
         const copied: ZigProjectBuildOptions = {
           ...options,
           signal,
@@ -762,31 +810,7 @@ export async function withAssetImports(
                 return [localPath(path, Deno.cwd()), contents];
               }),
             ),
-          assetSources: Object.fromEntries(
-            assets.map(([path, value]) => {
-              if (
-                value !== null && typeof value !== "string" &&
-                !(value instanceof Uint8Array)
-              ) {
-                throw new TypeError(
-                  "Asset overlays must contain bytes, strings, or null",
-                );
-              }
-              const size = value === null
-                ? 0
-                : typeof value === "string"
-                ? encoder.encode(value).length
-                : value.byteLength;
-              overlayBytes += size;
-              if (size > limit || overlayBytes > totalLimit) {
-                throw new RangeError("Asset overlay budget exceeded");
-              }
-              return [
-                path,
-                value instanceof Uint8Array ? new Uint8Array(value) : value,
-              ];
-            }),
-          ),
+          assetSources: captureAssetSources(options.assetSources),
         };
         // A parser can ignore cancellation. Reject the public request without
         // waiting for it; its eventual result still observes the aborted signal
@@ -812,8 +836,10 @@ export async function withAssetImports(
     complete(options) {
       try {
         if (closed) throw new Error("Asset compiler is closed");
+        const { assetSources, ...completion } = options;
+        const overlays = captureAssetSources(assetSources);
         const copied = captureCompletion(
-          options,
+          completion,
           (value) => localPath(value, Deno.cwd()),
         );
         let signal = lifetime.signal;
@@ -826,7 +852,12 @@ export async function withAssetImports(
         return new Promise<ZigProjectCompletionResult>((resolve, reject) => {
           const abort = () => reject(signal.reason);
           signal.addEventListener("abort", abort, { once: true });
-          enqueue(() => prepare({ sources: copied.sources, signal }, copied))
+          enqueue(() =>
+            prepare(
+              { sources: copied.sources, assetSources: overlays, signal },
+              copied,
+            )
+          )
             .then(
               (result) => {
                 signal.removeEventListener("abort", abort);

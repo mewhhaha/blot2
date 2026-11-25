@@ -23,6 +23,14 @@ import {
 
 export { createZigProjectCompiler } from "./host/zig_project_client.ts";
 export { jsonAssetParser } from "./host/assets.ts";
+export {
+  type BlotGeneratorInputMode,
+  type BlotGeneratorOptions,
+  type BlotGeneratorReference,
+  type BlotGeneratorRule,
+  createBlotGenerator,
+  expandGeneratorRules,
+} from "./host/generators.ts";
 export { decodeText, encodeText } from "./host/text.ts";
 export type {
   AssetBuildStats,

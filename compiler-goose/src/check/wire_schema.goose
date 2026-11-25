@@ -1453,7 +1453,10 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             for ch in m.children(id) { hashNode(ctx, units, m, ch, depth + 1); }
             hashNode(ctx, units, m, n.a, depth + 1);
         },
-        comptime_for => { hashNode(ctx, units, m, n.b, depth + 1); },
+        comptime_for => {
+            if m.extra[n.c + 2] == 2 { fnvByte(ctx.h, 2); }
+            hashNode(ctx, units, m, n.b, depth + 1);
+        },
         comptime_meta => {
             fnvU32Le(ctx.h, n.c);
             if n.c == 0 { hashNode(ctx, units, m, n.a, depth + 1); }

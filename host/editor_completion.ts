@@ -1,3 +1,4 @@
+import type { ZigProjectBuildOptions } from "./zig_project_client.ts";
 import { readTypedHole, type TypedHoleDiagnostic } from "./type_diagnostics.ts";
 import type { ZigProjectDiagnostic } from "./zig_project_client.ts";
 
@@ -6,6 +7,8 @@ export interface ZigProjectCompletionOptions {
   position: number;
   snapshot: number;
   sources?: Readonly<Record<string, string | null>>;
+  /** External overlays for compilers configured with asset parsers. */
+  assetSources?: ZigProjectBuildOptions["assetSources"];
   signal?: AbortSignal;
 }
 

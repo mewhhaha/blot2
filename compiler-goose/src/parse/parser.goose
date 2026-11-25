@@ -966,6 +966,11 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if t.tag==t_selector { advance(p,source,tokens); let __cleanup_result_49_0: Id = add(p,source,tokens,a_selector,member_qualified(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_49_0; }
  if t.tag==t_colon { advance(p,source,tokens); let value=atom(p,source,tokens); let __cleanup_result_50_0: Id = add(p,source,tokens,a_type_witness,value,0,0,start); { p.depth--; } return __cleanup_result_50_0; }
  if t.tag==t_hash {
+  if text(p,source,t)=="#" && peek(p,tokens,1)==t_kw_for {
+   let value=comptime_for(p,source,tokens,true);
+   p.depth--;
+   return value;
+  }
   advance(p,source,tokens);
   if text(p,source,t)=="#"&&word(p,source,tokens,"run")&&peek(p,tokens,1)!=t_dot { advance(p,source,tokens); p.tree.has_typed_staging=true; let value=expression(p,source,tokens); let __cleanup_result_51_0: Id = collection_intrinsic(p,source,tokens,"@code.evaluate",[value],start); { p.depth--; } return __cleanup_result_51_0; }
   if text(p,source,t)=="#"&&at(p,source,tokens,t_kw_do) { p.tree.has_typed_staging=true; let value=do_block(p,source,tokens); let __cleanup_result_52_0: Id = collection_intrinsic(p,source,tokens,"@code.evaluate",[value],start); { p.depth--; } return __cleanup_result_52_0; }
@@ -1266,7 +1271,7 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
  if eat(p,source,tokens,t_kw_continue) { return add(p,source,tokens,a_continue_stmt,0,0,0,start); }
  if at(p,source,tokens,t_kw_if) { return if_statement(p,source,tokens); } if at(p,source,tokens,t_kw_for) { return for_statement(p,source,tokens); } if at(p,source,tokens,t_kw_with) { return with_statement(p,source,tokens); }
  if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#" {
-  if peek(p,tokens,1)==t_kw_for { return comptime_for_statement(p,source,tokens); }
+  if peek(p,tokens,1)==t_kw_for { return comptime_for(p,source,tokens,false); }
   if peek(p,tokens,1)==t_kw_if { return comptime_if_statement(p,source,tokens); }
  }
  if eat(p,source,tokens,t_kw_use) {
@@ -1297,11 +1302,18 @@ fn has_use_binding(p: Parser&,tokens: const Token[:]) -> bool {
  }
  return false;
 }
-// The target of `:=`: a name followed by `.field` and `[index]` steps.
+// The target of `:=`: a name followed by field and index steps.
 recursive fn place(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
  var target: Id=0; if at(p,source,tokens,t_identifier) { let name=lower_identifier(p,source,tokens); target=add(p,source,tokens,a_name,name,0,0,start); } else { target=atom(p,source,tokens); }
  while p.failure==blot_error::Error.none&&(at(p,source,tokens,t_dot)||at(p,source,tokens,t_l_bracket)) {
-  if at(p,source,tokens,t_dot) { let dot=advance(p,source,tokens); let member=member_identifier(p,source,tokens); target=add(p,source,tokens,a_field_access,target,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
+  if at(p,source,tokens,t_dot) { let dot=advance(p,source,tokens);
+   if eat(p,source,tokens,t_l_paren) {
+    let binder=lower_identifier(p,source,tokens);
+    expect(p,source,tokens,t_r_paren);
+    target=add(p,source,tokens,a_comptime_project,target,binder,0,start);
+    continue;
+   }
+   let member=member_identifier(p,source,tokens); target=add(p,source,tokens,a_field_access,target,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
   else { advance(p,source,tokens); let index=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); target=add(p,source,tokens,a_index_access,target,index,0,start); }
  }
  return target;
@@ -1359,14 +1371,14 @@ recursive fn trailing_comptime_else(p: Parser&,source: const u8[:],tokens: const
  if !(at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#"&&peek(p,tokens,1)==t_kw_else) { p.index=saved; return 0; }
  advance(p,source,tokens); advance(p,source,tokens); expect(p,source,tokens,t_colon); return suite(p,source,tokens);
 }
-recursive fn comptime_for_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+recursive fn comptime_for(p: Parser&,source: const u8[:],tokens: const Token[:],builder: bool) -> Id {
  let start=advance(p,source,tokens).start; expect(p,source,tokens,t_kw_for);
  let name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_kw_in);
  if !(at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#") { return fail(p,source,tokens,c_expected_token); }
  advance(p,source,tokens);
  var mode: u32=0;
- if word(p,source,tokens,"fields") { advance(p,source,tokens); mode=0; }
- else if word(p,source,tokens,"variants") { advance(p,source,tokens); mode=1; }
+ if word(p,source,tokens,"fields") { advance(p,source,tokens); if builder { mode=2; } }
+ else if !builder && word(p,source,tokens,"variants") { advance(p,source,tokens); mode=1; }
  else { return fail(p,source,tokens,c_expected_token); }
  let target_type=type_atom(p,source,tokens);
  expect(p,source,tokens,t_colon);

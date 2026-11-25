@@ -226,7 +226,7 @@ struct MatchInfo {
     arms: List,
     statement: bool = false
 }
-enum UpdateKind { field, index }
+enum UpdateKind { field, index, comptime_field }
 struct UpdateStep {
     kind: UpdateKind,
     projection: u32 = 0,
@@ -807,12 +807,14 @@ fn updateKindCode(value: UpdateKind) -> u32 {
     match value {
         field => { return 0; },
         index => { return 1; },
+        comptime_field => { return 2; },
     }
 }
 fn updateKindFromCode(code: u32) -> UpdateKind, blot_error::Error {
     match code {
         0 => { return UpdateKind.field, blot_error::Error.none; },
         1 => { return UpdateKind.index, blot_error::Error.none; },
+        2 => { return UpdateKind.comptime_field, blot_error::Error.none; },
         _ => { return UpdateKind.field, blot_error::Error.core_limit; },
     }
 }

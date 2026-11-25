@@ -1,0 +1,84 @@
+import * as text from "std/text"
+import { decimal } from "./literals"
+
+func read_row (line: &[U32]): Result [#[Text], Text] =>
+  let fields: #[Text] = #[]
+  let i = 0
+  for ever:
+    let field = text.builder ()
+    if i < line.length and line[i] == 34:
+      i := self + 1
+      for ever:
+        if i == line.length:
+          return $Err "Unterminated quoted CSV field"
+        let ch = line[i]
+        i := self + 1
+        if ch == 34:
+          if i == line.length or line[i] != 34:
+            break
+          i := self + 1
+        field := text.push ch self
+    else:
+      for j in i..line.length:
+        let ch = line[j]
+        if ch == 44:
+          break
+        if ch == 34:
+          return $Err "Unexpected quote in CSV field"
+        field := text.push ch self
+        i := self + 1
+    @storage.push fields (text.finish field)
+    if i == line.length:
+      return $Ok fields
+    if line[i] != 44:
+      return $Err "Expected a comma after quoted CSV field"
+    i := self + 1
+
+func escaped (ch: U32): Text =>
+  if ch == 34 or ch == 92:
+    return #[92, ch]
+  if ch == 9:
+    return "\\t"
+  if ch == 13:
+    return "\\r"
+  return #[ch]
+
+func quote (value: Text): Text =>
+  let out = text.builder ()
+  out := text.push 34 self
+  for ch in value:
+    out := text.append (escaped ch) self
+  return text.finish (text.push 34 out)
+
+#entry func generate (source: Text): Result [Text, Text] =>
+  let out = text.builder ()
+  out := text.append "type UnitSpec is data = $UnitSpec { name: #[U32], hp: U32, speed: F32 }\nconst specs: #[UnitSpec] = #[" self
+  let header = false
+  for line in text.lines source:
+    let fields = case read_row line of
+      $Ok fields => fields
+      $Err message => do:
+        return $Err message
+    if fields.length != 3:
+      return $Err "Expected three CSV columns"
+    if not header:
+      if not (text.equal fields[0] "name" and text.equal fields[1] "hp" and text.equal fields[2] "speed"):
+        return $Err "Expected CSV header name,hp,speed"
+      header := true
+    else:
+      if fields[0].length == 0:
+        return $Err "Expected a unit name in CSV row"
+      let $Some hp = text.parse_u32 fields[1] else:
+        return $Err "Expected unsigned integer hp in CSV row"
+      let $Some speed = decimal fields[2] else:
+        return $Err "Expected decimal speed in CSV row"
+      out := text.append "$UnitSpec { name: " self
+      out := text.append (quote fields[0]) self
+      out := text.append ", hp: " self
+      out := text.append_u32 hp self
+      out := text.append ", speed: " self
+      out := text.append speed self
+      out := text.append " }, " self
+  if not header:
+    return $Err "Expected CSV header name,hp,speed"
+  return $Ok (text.finish (text.append "]\n" out))

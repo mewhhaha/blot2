@@ -6,7 +6,12 @@ import {
   formatExplanation,
   type RawDiagnosticRecord,
 } from "./diagnostics.ts";
-import { extractStandardLibrary } from "./packaged_native.ts";
+import { expandGeneratorRules } from "./generators.ts";
+import type { ZigProjectCompilerOptions } from "./zig_project_client.ts";
+import {
+  extractStandardLibrary,
+  findCheckoutCompiler,
+} from "./packaged_native.ts";
 import { resolveProject } from "./packages.ts";
 import {
   formatTestRunReport,
@@ -143,6 +148,118 @@ async function runTestCli(
     json ? JSON.stringify(report) : await formatTestRunReport(report),
   );
   return report.success ? 0 : 1;
+}
+
+async function runGeneratorProject(
+  executable: string | URL | undefined,
+  entry: string,
+  command: string,
+  destination: string | undefined,
+  args: string[],
+  root: string,
+  rules: Parameters<typeof expandGeneratorRules>[1],
+  json: boolean,
+): Promise<number> {
+  const { createCompiler } = await import("../mod.ts");
+  const imports: Record<string, string> = Object.create(null);
+  const config: Omit<ZigProjectCompilerOptions, "executable"> = {
+    entry,
+    stdRoot: null,
+    imports,
+  };
+  for (let index = 0; index < args.length; index++) {
+    switch (args[index]) {
+      case "--alias": {
+        const alias = args[++index];
+        const split = alias.indexOf("=");
+        const prefix = alias.slice(0, split);
+        const path = alias.slice(split + 1);
+        if (
+          split < 1 || !prefix.endsWith("/") || !path ||
+          Object.hasOwn(imports, prefix)
+        ) {
+          throw new Error(`Invalid or duplicate --alias: ${alias}`);
+        }
+        imports[prefix] = path;
+        break;
+      }
+      case "--prelude":
+        config.prelude = args[++index] === "none" ? null : args[index];
+        break;
+      case "--std-root":
+        config.stdRoot = args[++index];
+        break;
+      case "--dependencies":
+        config.dependencies = args[++index];
+        break;
+      case "--input-mode":
+        if (args[++index] !== "project") {
+          throw new Error("Generator projects require --input-mode project");
+        }
+        break;
+      case "--relaxed-simd":
+        config.relaxedSimd = true;
+        break;
+      case "--tail-calls":
+        config.tailCalls = true;
+        break;
+      case "--wasm3":
+        config.wasm3 = true;
+        break;
+      case "--test":
+        config.testMode = true;
+        break;
+    }
+  }
+  const assets = await expandGeneratorRules(root, rules, {
+    ...config,
+    executable,
+  });
+  const compiler = await createCompiler({ ...config, executable, assets });
+  try {
+    const result = await compiler.build();
+    const diagnostics = result.success
+      ? []
+      : result.diagnostics.map((diagnostic) => ({
+        kind: "diagnostic" as const,
+        ...diagnostic,
+      }));
+    if (result.success && destination) {
+      await Deno.writeFile(destination, result.bytes);
+    }
+    if (json) {
+      const records = [...diagnostics, {
+        ...(result.success
+          ? {
+            ...result.stats,
+            wasm_bytes: command === "build" ? result.bytes.length : 0,
+          }
+          : {}),
+        kind: "compilation",
+        filename: entry,
+        stage: command === "check" ? "check-project" : "build-project",
+        success: result.success,
+      }];
+      await Deno.stdout.write(
+        new TextEncoder().encode(
+          records.map((record) => JSON.stringify(record)).join("\n") + "\n",
+        ),
+      );
+    } else if (!result.success) {
+      console.error(
+        await formatDiagnosticReport(diagnostics as RawDiagnosticRecord[]),
+      );
+    } else {
+      console.log(
+        destination
+          ? `${destination}: ${result.bytes.length} bytes`
+          : `${entry}: checked`,
+      );
+    }
+    return result.success ? 0 : 1;
+  } finally {
+    await compiler.dispose();
+  }
 }
 
 export async function runCli(
@@ -304,6 +421,19 @@ export async function runCli(
     }
     if (destination) {
       await Deno.mkdir(dirname(destination), { recursive: true });
+    }
+    if (packageProject?.generators?.length && command !== "dependencies") {
+      return await runGeneratorProject(
+        executable ??
+          await findCheckoutCompiler(),
+        filename,
+        command,
+        destination,
+        options,
+        packageProject.root,
+        packageProject.generators,
+        json,
+      );
     }
     const result = await new Deno.Command(
       executable ?? new URL(

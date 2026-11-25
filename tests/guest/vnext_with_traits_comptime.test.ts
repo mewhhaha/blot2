@@ -1,3 +1,5 @@
+import { instantiateGuest } from "../../host/guest.ts";
+import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import {
   compileAndRun,
   compileExpectedFailure,
@@ -398,5 +400,416 @@ func encode_packet (p: Packet): Unit ! {Emit U32} =>
       // 10 + 1 + 5 = 16
       equal(guest.call("main", null), 16);
     },
+  );
+});
+
+Deno.test("comptime writes specialize self and preserve nested owned paths", async () => {
+  await compileAndRun(
+    `
+type Bump a is trait = { bump: a -> a }
+const U32.Bump: Bump U32 = { bump: func x => x + 1 }
+const F32.Bump: Bump F32 = { bump: func x => x + 0.5 }
+const Bool.Bump: Bump Bool = { bump: func x => not x }
+
+type Small is data = $Small { ratio: F32, flag: Bool, count: U32 }
+type Large is data = $Large {
+  a: U32, b: U32, c: U32, d: U32, e: U32, f: U32, g: U32, h: U32,
+  i: U32, j: U32, k: U32, l: U32, m: U32, n: U32, o: U32, p: U32,
+  ratio: F32, flag: Bool,
+}
+type Vec is data = $Vec { x: U32, y: U32 }
+type Pair = { right: Vec, left: Vec }
+
+func bump (value: t): t =>
+  let r = value
+  #for field in #fields t:
+    r.(field) := Bump.bump self
+  return r
+
+#entry func main (): Bool =>
+  let r: { n: U32, m: U32 } = { n: 3, m: 5 }
+  #for field in #fields { n: U32, m: U32 }:
+    r.(field) := self + 1
+  let tiny = bump ($Small { ratio: 1.5, flag: true, count: 7 })
+  let big = bump ($Large {
+    a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9,
+    j: 10, k: 11, l: 12, m: 13, n: 14, o: 15, p: 16, ratio: 2.0, flag: false,
+  })
+  let large_rows = #[big]
+  #for field in #fields Large:
+    large_rows[0].(field) := Bump.bump self
+  let outer = { inner: tiny }
+  let rows = #[tiny, tiny]
+  let pair: Pair = { right: $Vec { x: 8, y: 9 }, left: $Vec { x: 6, y: 7 } }
+  #for field in #fields Small:
+    rows[1].(field) := Bump.bump self
+    outer.inner.(field) := Bump.bump self
+  #for field in #fields Pair:
+    pair.(field).x := self + 3
+  return r.n == 4 and r.m == 6 and
+    tiny.ratio == 2.0 and not tiny.flag and tiny.count == 8 and
+    big.a == 2 and big.p == 17 and big.ratio == 2.5 and big.flag and
+    large_rows[0].a == 3 and large_rows[0].p == 18 and not large_rows[0].flag and
+    rows[0].count == 8 and rows[1].count == 9 and rows[1].flag and
+    outer.inner.count == 9 and outer.inner.ratio == 2.5 and
+    pair.right.x == 11 and pair.left.x == 9 and pair.left.y == 7
+`,
+    (guest) => equal(guest.call("main", null), true),
+  );
+});
+
+Deno.test("comptime builders decode heterogeneous lanes in declaration order", async () => {
+  await compileAndRun(
+    `
+type Skip is data = $Skip
+type Vec2 is data = $Vec2 { x: F32, y: F32 }
+type Packet is data = $Packet {
+  ratio: F32, flag: Bool, id: U32, position: Vec2,
+  @[$Skip]
+  revision: U32 = 42,
+}
+
+type LaneDecode a is trait = { from_lanes: #[F32] -> U32 -> Maybe (a, U32) }
+type LaneEncode a is trait = { to_lanes: a -> #[F32] }
+type Default a is trait = { default: Unit -> a }
+
+const U32.Default: Default U32 = { default: func () => 77 }
+const U32.LaneEncode: LaneEncode U32 = { to_lanes: func x => #[@u32.to_f32 x] }
+const F32.LaneEncode: LaneEncode F32 = { to_lanes: func x => #[x] }
+const Bool.LaneEncode: LaneEncode Bool = { to_lanes: func x => #[if x then 1.0 else 0.0] }
+const Vec2.LaneEncode: LaneEncode Vec2 = { to_lanes: func x => #[x.x, x.y] }
+
+func read_f32 (xs: #[F32]) -> (at: U32): Maybe (F32, U32) =>
+  if at >= xs.length:
+    return $Nothing
+  return $Some (xs[at], at + 1)
+
+func read_u32 (xs: #[F32]) -> (at: U32): Maybe (U32, U32) =>
+  let $Some (lane, next) = read_f32 xs at else:
+    return $Nothing
+  return $Some (@f32.to_u32 lane, next)
+
+func read_bool (xs: #[F32]) -> (at: U32): Maybe (Bool, U32) =>
+  let $Some (lane, next) = read_f32 xs at else:
+    return $Nothing
+  if lane != 0.0 and lane != 1.0:
+    return $Nothing
+  return $Some (lane == 1.0, next)
+
+func read_vec2 (xs: #[F32]) -> (at: U32): Maybe (Vec2, U32) =>
+  let $Some (x, next) = read_f32 xs at else:
+    return $Nothing
+  let $Some (y, end) = read_f32 xs next else:
+    return $Nothing
+  return $Some ($Vec2 { x, y }, end)
+
+const F32.LaneDecode: LaneDecode F32 = { from_lanes: read_f32 }
+const U32.LaneDecode: LaneDecode U32 = { from_lanes: read_u32 }
+const Bool.LaneDecode: LaneDecode Bool = { from_lanes: read_bool }
+const Vec2.LaneDecode: LaneDecode Vec2 = { from_lanes: read_vec2 }
+
+func encode (value: t): #[F32] =>
+  let lanes: #[F32] = #[]
+  #for field in #fields t:
+    #if not (field.has_tag $Skip):
+      let values = LaneEncode.to_lanes value.(field)
+      for i in 0..values.length:
+        @storage.push lanes values[i]
+  return lanes
+
+func decode (values: #[F32]): Maybe t =>
+  let at: U32 = 0
+  let built: t = #for field in #fields t:
+    #if field.has_tag $Skip:
+      #if field.has_default:
+        break field.default
+      #else:
+        break Default.default ()
+    #else:
+      let $Some (v, next) = LaneDecode.from_lanes values at else:
+        return $Nothing
+      at := next
+      break v
+  if at != values.length:
+    return $Nothing
+  return $Some built
+
+type WithFallback is data = $WithFallback { @[$Skip] cached: U32 }
+type Wrapped a is data = $Wrapped { item: a }
+type Row = { alpha: U32, beta: F32, flag: Bool }
+
+#entry func main (): Bool =>
+  let p = $Packet { ratio: 2.5, flag: true, id: 9, position: $Vec2 { x: 7.0, y: 8.0 }, revision: 1 }
+  let lanes = encode p
+  let result: Maybe Packet = decode lanes
+  let $Some restored = result else:
+    return false
+  let raw: Row = { alpha: 12, beta: 4.0, flag: false }
+  let decoded: Maybe Row = decode (encode raw)
+  let $Some structural = decoded else:
+    return false
+  let short: Maybe Packet = decode #[2.5, 1.0, 9.0, 7.0]
+  let invalid: Maybe Packet = decode #[2.5, 2.0, 9.0, 7.0, 8.0]
+  let extra: Maybe Packet = decode #[2.5, 1.0, 9.0, 7.0, 8.0, 0.0]
+  let generic: Maybe (Wrapped U32) = decode #[18.0]
+  let $Some wrapped = generic else:
+    return false
+  let fallback: Maybe WithFallback = decode #[]
+  let $Some cached = fallback else:
+    return false
+  let $Nothing = short else:
+    return false
+  let $Nothing = invalid else:
+    return false
+  let $Nothing = extra else:
+    return false
+  return lanes.length == 5 and lanes[0] == 2.5 and lanes[2] == 9.0 and
+    restored.flag and restored.id == p.id and restored.ratio == p.ratio and
+    restored.position.x == p.position.x and restored.position.y == p.position.y and
+    restored.revision == 42 and structural.alpha == 12 and structural.beta == 4.0 and
+    not structural.flag and cached.cached == 77 and wrapped.item == 18
+`,
+    (guest) => equal(guest.call("main", null), true),
+  );
+});
+
+Deno.test("comptime builders pack boxed and empty records and merge runtime break carries", async () => {
+  const fields = Array.from({ length: 20 }, (_, index) => `f${19 - index}: U32`)
+    .join(", ");
+  await compileAndRun(
+    `
+type Large is data = $Large { ${fields} }
+type FlatLarge = { ${fields} }
+type Empty is data = $Empty
+type Blank = {}
+type Pair = { a: U32, b: U32 }
+
+func indexed (): Large =>
+  return #for field in #fields Large:
+    #if field.index == 0:
+      break 100
+    #else:
+      break field.index
+
+func count_flat (): FlatLarge =>
+  return #for field in #fields FlatLarge:
+    break field.index
+
+func empty (): Empty =>
+  return #for field in #fields Empty:
+    break field.index
+
+func blank (): Blank =>
+  return #for field in #fields Blank:
+    break field.index
+
+func pair (start: U32): U32 =>
+  let at = start
+  let built = #for field in #fields Pair:
+    if at == 0:
+      at := 7
+      break field.index + 1
+    else:
+      at := at + 5
+      break field.index + 2
+  return 100 * built.a + 10 * built.b + at
+
+func unit_field (): U32 =>
+  let count = 0
+  let _ = #for field in #fields { empty: Unit }:
+    count := count + 1
+  return count
+
+func nested_loop (): U32 =>
+  let count = 0
+  for i in 0..3:
+    let _ = #for field in #fields Pair:
+      count := count + i + field.index
+      break count
+  return count
+
+#entry func main (): Bool =>
+  let large = indexed ()
+  let flat = count_flat ()
+  let $Empty = empty ()
+  let owned = #for field in #fields { left: #[U32], right: #[U32] }:
+    break #[field.index]
+  owned.left[0] := self + 6
+  let _ = blank ()
+  return owned.left[0] == 6 and owned.right[0] == 1 and
+    large.f19 == 100 and large.f18 == 1 and large.f0 == 19 and
+    flat.f0 == 0 and flat.f19 == 11 and pair 0 == 142 and pair 1 == 241 and unit_field () == 1 and nested_loop () == 9
+`,
+    (guest) => equal(guest.call("main", null), true),
+  );
+});
+
+Deno.test("comptime defaults use the defining module and update after retained edits", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const model = dir + "/model.blot";
+  const definition = `
+private func answer (): U32 => 37
+type Item is data = $Item { ready: Bool = true, amount: U32 = answer () }
+func amount (item: Item): U32 => if item.ready then item.amount else 0
+`;
+  try {
+    await Deno.writeTextFile(model, definition);
+    await Deno.writeTextFile(
+      dir + "/builder.blot",
+      `
+func build (): t =>
+  return #for field in #fields t:
+    break field.default
+`,
+    );
+    await Deno.writeTextFile(
+      entry,
+      `
+import * as model from "./model"
+import { build } from "./builder"
+#entry func main (): U32 =>
+  let item: model.Item = build ()
+  return model.amount item
+`,
+    );
+    const compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      prelude: null,
+    });
+    try {
+      async function verify(
+        expected: number,
+        sources?: Record<string, string>,
+      ) {
+        const output = await compiler.build({ sources });
+        if (!output.success) {
+          throw new Error(JSON.stringify(output.diagnostics));
+        }
+        const guest = await instantiateGuest(output.bytes);
+        try {
+          equal(guest.call("main", null), expected);
+        } finally {
+          guest.dispose();
+        }
+      }
+      await verify(37);
+      await verify(49, { [model]: definition.replace("37", "49") });
+    } finally {
+      await compiler.dispose();
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("comptime writes reject read-only receivers and unknown selectors", async () => {
+  for (const parameter of ["*Row", "&Row", "&[Row]"]) {
+    const receiver = parameter === "&[Row]" ? "r[0]" : "r";
+    await compileExpectedFailure(
+      `
+type Row = { count: U32 }
+func bad (r: ${parameter}): U32 =>
+  #for field in #fields Row:
+    ${receiver}.(field) := 3
+  return 0
+#entry func main (): U32 => 0
+`,
+      "type_mismatch",
+    );
+  }
+  await compileExpectedFailure(
+    `
+type Choice is data = $First { x: U32 } | $Second { x: U32 }
+#entry func main (): U32 =>
+  let value = $First { x: 1 }
+  #for variant in #variants Choice:
+    value.(variant) := 2
+  return value.x
+`,
+    "unknown_name",
+  );
+  await compileExpectedFailure(
+    `
+#entry func main (): U32 =>
+  let value = { x: 1 }
+  value.(field) := 2
+  return value.x
+`,
+    "unknown_value",
+  );
+});
+
+Deno.test("comptime writes preserve aliased_update and spent_value", async () => {
+  await compileExpectedFailure(
+    `
+type Row = { items: #[U32] }
+#entry func main (): U32 =>
+  let row: Row = { items: #[1] }
+  let alias = row
+  #for field in #fields Row:
+    row.(field) := #[2]
+  return row.items.length + alias.items.length
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `
+type Row = { x: U32 }
+#entry func main (): U32 =>
+  let rows: #[Row] = #[{ x: 1 }]
+  let alias = rows
+  #for field in #fields Row:
+    rows[0].(field) := self + 1
+  return rows[0].x + alias[0].x
+`,
+    "aliased_update",
+  );
+  await compileExpectedFailure(
+    `
+type Row = { items: #[U32] }
+func consume (row: own Row): U32 => row.items.length
+#entry func main (): U32 =>
+  let items: #[U32] = #[1, 2]
+  let row: Row = { items }
+  let size = consume (own row)
+  #for field in #fields Row:
+    row.(field) := self
+  return row.items.length + size
+`,
+    "spent_value",
+  );
+});
+
+Deno.test("comptime builders reject variants, missing defaults, and non-Unit fallthrough", async () => {
+  await compileExpectedFailure(
+    `
+type Choice is data = $First | $Second
+#entry func main (): U32 =>
+  let _ = #for variant in #variants Choice:
+    break variant.index
+  return 0
+`,
+    "GPU_FRONTEND_SYNTAX_ERROR",
+  );
+  await compileExpectedFailure(
+    `
+type Row is data = $Row { x: U32 }
+#entry func main (): U32 =>
+  let row = #for field in #fields Row:
+    break field.default
+  return row.x
+`,
+    "storage_unsupported",
+  );
+  await compileExpectedFailure(
+    `
+#entry func main (): U32 =>
+  let row = #for field in #fields { x: U32 }:
+    let _ = field.index
+  return row.x
+`,
+    "storage_unsupported",
   );
 });

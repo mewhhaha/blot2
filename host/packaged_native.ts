@@ -1,6 +1,17 @@
 import { gunzipSync } from "node:zlib";
 import { join } from "node:path";
 
+/** Prefer the already-built compiler in a source checkout. */
+export async function findCheckoutCompiler(): Promise<URL | undefined> {
+  if (Deno.build.standalone) return;
+  const url = new URL("../compiler-goose/build/blotc-goose", import.meta.url);
+  try {
+    if ((await Deno.stat(url)).isFile) return url;
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+}
+
 // JSR caches and compiled virtual filesystems do not promise an executable
 // file on disk, so expand the bundled Zig compiler before spawning it.
 export async function extractNativeCompiler(): Promise<{

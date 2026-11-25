@@ -4,11 +4,13 @@ import {
   formatDiagnosticReport,
   type RawDiagnosticRecord,
 } from "./diagnostics.ts";
+import { expandGeneratorRules } from "./generators.ts";
 import { readGuestAbi } from "./guest.ts";
 import { resolveProject } from "./packages.ts";
 import {
   extractNativeCompiler,
   extractStandardLibrary,
+  findCheckoutCompiler,
 } from "./packaged_native.ts";
 import { decodeText } from "./text.ts";
 import {
@@ -338,10 +340,6 @@ export async function discoverTestModules(
   return modules.sort((a, b) => compare(a.path, b.path));
 }
 
-const defaultExecutable = new URL(
-  "../compiler-goose/build/blotc-goose",
-  import.meta.url,
-);
 const defaultStdRoot = new URL("../std/", import.meta.url);
 const maxDeadline = 2_147_483_647 / 1000;
 const defaultJobs = () =>
@@ -589,7 +587,13 @@ async function compileModule(
   inputMode: TestRunOptions["inputMode"],
   tier: "development" | "optimized" | undefined,
 ): Promise<CompiledTestModule> {
-  if (inputMode !== "source" && tier === undefined) {
+  if (compiler.assets !== undefined && inputMode === "source") {
+    throw new Error("Generator projects require --input-mode project");
+  }
+  if (
+    compiler.assets !== undefined ||
+    inputMode !== "source" && tier === undefined
+  ) {
     // Sessions bind the entry path at open. An overlay would change the base
     // directory of relative imports if used to compile a different test file.
     const session = await createZigProjectCompiler(compiler);
@@ -686,15 +690,6 @@ function supportsTestMode(executable: string | URL): Promise<boolean> {
   return compilerAdvertises(executable, /--test\b/);
 }
 
-async function checkoutCompiler(): Promise<URL | undefined> {
-  if (Deno.build.standalone) return;
-  try {
-    if ((await Deno.stat(defaultExecutable)).isFile) return defaultExecutable;
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
-  }
-}
-
 export async function runBlotTests(
   options: TestRunOptions = {},
 ): Promise<TestRunReport> {
@@ -734,6 +729,10 @@ export async function runBlotTests(
     };
   }
   const workers = new TestWorkers(jobs);
+  const projectAssets = new Map<
+    string,
+    ReturnType<typeof expandGeneratorRules>
+  >();
   let native: Awaited<ReturnType<typeof extractNativeCompiler>> | undefined;
   let library:
     | Promise<Awaited<ReturnType<typeof extractStandardLibrary>>>
@@ -748,7 +747,7 @@ export async function runBlotTests(
         options.filter === undefined ? "No test modules found" : noTests,
       );
     }
-    const executable = options.executable ?? await checkoutCompiler() ??
+    const executable = options.executable ?? await findCheckoutCompiler() ??
       (native = await extractNativeCompiler()).path;
     const [codegenTier, testMode] = discovered.some((module) =>
         module.kind !== "rejected"
@@ -802,7 +801,7 @@ export async function runBlotTests(
             stdRoot = Object.hasOwn(imports, "std/") ? null : standardRoot;
           }
         }
-        const compiler = {
+        const compiler: ZigProjectCompilerOptions = {
           executable,
           entry: module.path,
           prelude,
@@ -814,15 +813,39 @@ export async function runBlotTests(
           tailCalls: options.tailCalls,
           testMode,
         };
+        if (project?.generators?.length) {
+          let assets = projectAssets.get(project.root);
+          if (!assets) {
+            assets = expandGeneratorRules(
+              project.root,
+              project.generators,
+              compiler,
+            );
+            projectAssets.set(project.root, assets);
+          }
+          compiler.assets = await assets;
+        }
         if (module.kind === "rejected") {
           const expected = module.expectedRejection!;
           // The driver's check command takes source options. Bundle and Wasm
           // options apply to code generation only.
-          const checked = await command(executable, [
-            "check-project",
-            module.path,
-            ...projectArguments(compiler, options.inputMode),
-          ]);
+          const checked = compiler.assets !== undefined
+            ? await compileModule(compiler, options.inputMode, tier).then((
+              result,
+            ) =>
+              "bytes" in result
+                ? { success: true, stderr: "", diagnostics: [] }
+                : {
+                  success: false,
+                  stderr: "",
+                  diagnostics: result.diagnostics,
+                }
+            )
+            : await command(executable, [
+              "check-project",
+              module.path,
+              ...projectArguments(compiler, options.inputMode),
+            ]);
           if (checked.success) {
             return [
               moduleResult(

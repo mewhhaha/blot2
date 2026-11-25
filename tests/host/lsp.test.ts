@@ -82,8 +82,12 @@ Deno.test("LSP positions preserve CRLF and supplementary Unicode boundaries", ()
   throws(() => utf16Position(text, 4));
 });
 
-async function setup(compiler = executable) {
+async function setup(
+  compiler = executable,
+  prepare?: (directory: string) => Promise<void>,
+) {
   const directory = await Deno.makeTempDir(), output = new Bytes();
+  await prepare?.(directory);
   const bridge = new CompletionBridge(new LspWriter(output), {
     executable: compiler,
     prelude: null,
@@ -467,5 +471,57 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
   } finally {
     await bridge.dispose();
     await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("LSP resolves manifest generators and completes fields from a live asset buffer", async () => {
+  const item = await setup(executable, async (directory) => {
+    await Promise.all([
+      Deno.writeTextFile(
+        directory + "/blot.json",
+        JSON.stringify({
+          generators: [{
+            module: "shape",
+            input: "shape.txt",
+            generator: "generator.blot",
+          }],
+        }),
+      ),
+      Deno.writeTextFile(
+        directory + "/generator.blot",
+        "#entry func generate (bytes: #[U32]): #[U32] => return bytes\n",
+      ),
+      Deno.writeTextFile(
+        directory + "/shape.txt",
+        "type Shape is data = $Shape { width: U32 }\n",
+      ),
+    ]);
+  });
+  try {
+    const asset = item.directory + "/shape.txt";
+    const line = "func size (shape: Shape) => return shape.";
+    await item.open('import { Shape } from "./shape"\n' + line);
+    await item.complete(1, line.length);
+    let messages = await item.output.messages();
+    ok(messages[0].result, JSON.stringify(messages));
+    equal(
+      messages[0].result.items.map(({ label }: { label: string }) => label),
+      ["width"],
+    );
+
+    await item.open(
+      "type Shape is data = $Shape { height: U32 }\n",
+      1,
+      pathToFileURL(asset).href,
+    );
+    await item.complete(1, line.length, 3);
+    messages = await item.output.messages();
+    ok(messages[0].result, JSON.stringify(messages));
+    equal(
+      messages[0].result.items.map(({ label }: { label: string }) => label),
+      ["height"],
+    );
+  } finally {
+    await item.cleanup();
   }
 });

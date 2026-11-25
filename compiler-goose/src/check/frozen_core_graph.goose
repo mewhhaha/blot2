@@ -72,7 +72,11 @@ fn edge(self_: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> 
         arm => { let v=m.match_arms[id]; if slot == 0 { return self_.to(Kind.node,v.guard_); } if slot == 1 { return self_.to(Kind.node,v.body); } if slot-2 < v.rows.len { return self_.to(Kind.pattern_row,v.rows.start+slot-2); } },
         pattern_row => { let list=m.pattern_rows[id].patterns; if slot < list.len { return self_.to(Kind.pattern,m.extra[list.start+slot]); } },
         update => { let v=m.updates[id]; if slot == 0 { return self_.to(Kind.node,v.root); } if slot == 1 { return self_.to(Kind.node,v.value); } let step=slot-2; if step < v.selectors.len { return self_.to(Kind.update_step,v.selectors.start+step); } },
-        update_step => { if slot == 0 && m.update_steps[id].kind == blot_check_core::UpdateKind.index { return self_.to(Kind.node,m.update_steps[id].index); } },
+        update_step => {
+            let step=m.update_steps[id];
+            // A comptime field references its binder, with no executable child.
+            if slot == 0 && step.kind == blot_check_core::UpdateKind.index { return self_.to(Kind.node,step.index); }
+        },
         loop_ => { let v=m.loops[id]; if slot == 0 { return self_.to(Kind.node,v.first); } if slot == 1 { return self_.to(Kind.node,v.end); } if slot == 2 { return self_.to(Kind.node,v.body); } if slot == 3 && v.pattern != 0 { return self_.to(Kind.pattern,v.pattern); } },
         spark => { let v=m.sparks[id]; if slot == 0 { return self_.to(Kind.node,v.source); } if slot == 1 { return self_.to(Kind.node,v.end); } if slot == 2 { return self_.to(Kind.node,v.body); } if slot == 3 && v.pattern != 0 { return self_.to(Kind.pattern,v.pattern); } },
         operation_value => { if slot == 0 { return self_.to(Kind.node,m.operation_values[id].witness); } if slot == 1 { return self_.to(Kind.node,m.operation_values[id].capability); } },

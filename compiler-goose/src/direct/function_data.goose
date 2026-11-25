@@ -103,8 +103,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
             if error != blot_direct_types::Error.none { return ignored, error; }
             return container, blot_direct_types::Error.none;
         }
-        let projection = m.projection(step.projection);
-        let name, has_name = g.types.fieldNameOf(m, projection.field, true);
+        let name, has_name = updateFieldName(g, f, m, step);
         if !has_name { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
         var record = ty;
         if tagOf(g, ty) == blot_direct_types::Tag.nominal {
@@ -119,6 +118,10 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         if foff_err != blot_direct_types::Error.none { return neverVal(), foff_err; }
         offset += foff;
         ty = g.types.recordField(record, position).ty;
+        if step.kind == blot_check_core::UpdateKind.comptime_field &&
+            !matchesComptimeFieldType(g, f, m, step.result_type, ty) {
+            return neverVal(), g.fail(m, id, "comptime update has the wrong field type");
+        }
     }
     if offset != 0 {
         let boxed, error = isBoxed(g, f, ty, id);
@@ -142,6 +145,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     let replacement, error = stmt(g, f, info.value);
     if error != blot_direct_types::Error.none { return replacement, error; }
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
+    if replacement.ty != ty && reflectiveUpdate(selectors) {
+        return neverVal(), g.fail(m, id, "comptime update changes the selected field's type");
+    }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), replacement);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
     // Only when `info.value` cannot resize storage (compile-time fixed-length
@@ -324,6 +330,20 @@ recursive fn updateBoxedShared(g: Generator&, f: Fn&, id: u32, value: Val, cases
     if written != blot_direct_types::Error.none { return neverVal(), written; }
     return valOf1(g, value.ty, memory_block), blot_direct_types::Error.none;
 }
+fn reflectiveUpdate(selectors: const blot_check_core::UpdateStep[:]) -> bool {
+    for step in selectors { if step.kind == blot_check_core::UpdateKind.comptime_field { return true; } }
+    return false;
+}
+
+fn updateFieldName(g: Generator&, f: const Fn&, m: const Module&, step: blot_check_core::UpdateStep) -> u32, bool {
+    if step.kind == blot_check_core::UpdateKind.comptime_field {
+        let index = findComptimeFrame(f, step.projection);
+        if index < 0 { return 0, false; }
+        return f.comptime_frames[index].name_id, true;
+    }
+    return g.types.fieldNameOf(m, m.projection(step.projection).field, true);
+}
+
 recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let info = m.updateInfo(id);
@@ -332,13 +352,23 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
     let steps = max(selectors.len, path.len);
     if at == steps {
         bindPut(g, f, info.self_binding, value);
-        return stmt(g, f, info.value);
+        let replacement, error = stmt(g, f, info.value);
+        if error != blot_direct_types::Error.none || replacement.ty == blot_direct_types::never { return replacement, error; }
+        if replacement.ty != value.ty && reflectiveUpdate(selectors) {
+            return neverVal(), g.fail(m, id, "comptime update changes the selected field's type");
+        }
+        return replacement, blot_direct_types::Error.none;
     }
     if selectors.len != 0 && selectors[at].kind == blot_check_core::UpdateKind.index { return indexedUpdate(g, f, id, value, at); }
-    var projection_id: u32 = 0;
-    if selectors.len != 0 { projection_id = selectors[at].projection; } else { projection_id = path[at]; }
-    let projection = m.projection(projection_id);
-    let name, has_name = g.types.fieldNameOf(m, projection.field, true);
+    var step = default<blot_check_core::UpdateStep>();
+    if selectors.len != 0 { step = selectors[at]; } else { step.projection = path[at]; }
+    let name, has_name = updateFieldName(g, f, m, step);
+    if step.kind == blot_check_core::UpdateKind.comptime_field && has_name {
+        let frame = f.comptime_frames[findComptimeFrame(f, step.projection)];
+        if !matchesComptimeFieldType(g, f, m, step.result_type, frame.field_ty) {
+            return neverVal(), g.fail(m, id, "comptime update has the wrong field type");
+        }
+    }
     if !has_name { return neverVal(), g.fail(m, id, "updated field without a spelling"); }
     let boxed, error = isBoxed(g, f, value.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -448,6 +478,30 @@ recursive fn product(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         ty = derived;
     }
     let shape = g.types.node(ty);
+    if shape.tag == blot_direct_types::Tag.record {
+        let ordered = g.reserveVals(shape.b);
+        for at in 0..(shape.b as i64) { g.s.vals[ordered.start + at] = Val { ty: absent_ty }; }
+        let source = m.types.node(m.typeOf(id));
+        if source.tag != blot_check_types::Tag.record { return neverVal(), g.fail(m, id, "record literal without a record type"); }
+        for index in 0..(values.len as i64) {
+            var destination = index;
+            if n.tag == blot_check_core::Tag.record { destination = m.recordDestinations(id)[index]; }
+            let field = m.types.recordField(source, destination);
+            let fname, has_fname = g.types.fieldNameOf(m, field.name, true);
+            if !has_fname { return neverVal(), g.fail(m, id, "record field without a spelling"); }
+            let position = g.types.findField(ty, fname);
+            if position < 0 { return neverVal(), g.fail(m, id, "record field missing from its type"); }
+            g.s.vals[ordered.start + position] = g.s.vals[values.start + index];
+        }
+        return packProduct(g, f, id, ty, ordered);
+    }
+    return packProduct(g, f, id, ty, values);
+}
+
+// `values` follows the canonical field order for records.
+fn packProduct(g: Generator&, f: Fn&, id: u32, ty: Ty, values: Vals) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let shape = g.types.node(ty);
     let boxed, error = isBoxed(g, f, ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     var memory_block: u32 = 0;
@@ -474,22 +528,8 @@ recursive fn product(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         },
         record => {
-            let ordered = g.reserveVals(shape.b);
-            for at in 0..(shape.b as i64) { g.s.vals[ordered.start + at] = Val { ty: absent_ty }; }
-            let source = m.types.node(m.typeOf(id));
-            if source.tag != blot_check_types::Tag.record { return neverVal(), g.fail(m, id, "record literal without a record type"); }
             for index in 0..(values.len as i64) {
-                var destination = index;
-                if n.tag == blot_check_core::Tag.record { destination = m.recordDestinations(id)[index]; }
-                let field = m.types.recordField(source, destination);
-                let fname, has_fname = g.types.fieldNameOf(m, field.name, true);
-                if !has_fname { return neverVal(), g.fail(m, id, "record field without a spelling"); }
-                let position = g.types.findField(ty, fname);
-                if position < 0 { return neverVal(), g.fail(m, id, "record field missing from its type"); }
-                g.s.vals[ordered.start + position] = g.s.vals[values.start + index];
-            }
-            for index in 0..(ordered.len as i64) {
-                let value = g.s.vals[ordered.start + index];
+                let value = g.s.vals[values.start + index];
                 if value.ty == absent_ty { s.scratch.resize(mark); return neverVal(), g.fail(m, id, "record literal misses a field"); }
                 if boxed {
                     let offset, error = fieldOffset(g, f, ty, index, id);

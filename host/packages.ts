@@ -1,11 +1,17 @@
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parse } from "jsr:@std/yaml@1.3.0";
+import {
+  type BlotGeneratorRule,
+  readGeneratorRules,
+  validateGeneratorRulePaths,
+} from "./generators.ts";
 
 type Dependency = string | { path: string };
 type Manifest = {
   dependencies: Record<string, Dependency>;
   prelude?: string | null;
   tests?: PackageTests;
+  generators?: readonly BlotGeneratorRule[];
 };
 type Pin = { source: string; ref: string; revision: string };
 type Lock = { version: 1; packages: Record<string, Pin> };
@@ -21,6 +27,7 @@ export type PackageProject = {
   prelude: string | null;
   stdRoot: null;
   tests?: PackageTests;
+  generators?: readonly BlotGeneratorRule[];
 };
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -89,7 +96,7 @@ async function manifest(
     return;
   }
   const value = object(JSON.parse(source), path);
-  fields(value, ["dependencies", "prelude", "tests"], path);
+  fields(value, ["dependencies", "prelude", "tests", "generators"], path);
   const dependencies: Record<string, Dependency> = Object.create(null);
   for (
     const [alias, input] of Object.entries(
@@ -105,6 +112,14 @@ async function manifest(
     }
   }
   const result: Manifest = { dependencies };
+  if (value.generators !== undefined) {
+    result.generators = readGeneratorRules(
+      value.generators,
+      root,
+      `${path} generators`,
+    );
+    await validateGeneratorRulePaths(root, result.generators);
+  }
   if (value.prelude !== undefined && value.prelude !== null) {
     result.prelude = text(value.prelude, "prelude");
     name(result.prelude);
@@ -510,6 +525,7 @@ async function graph(
       prelude,
       stdRoot: null,
       ...(input.tests && { tests: input.tests }),
+      ...(input.generators && { generators: input.generators }),
     } satisfies PackageProject,
     lock,
   };
@@ -531,21 +547,37 @@ function sameLock(current: Lock, previous: Lock | undefined): boolean {
   return true;
 }
 
-/** Resolve installed packages without network access. Manifest projects have no implicit prelude. */
-export async function resolveProject(
+async function findProject(
   entry: string,
-  options: PackageOptions = {},
+  options: PackageOptions,
+  generatorsOnly: boolean,
 ): Promise<PackageProject | undefined> {
   let root = dirname(resolve(entry));
   while (true) {
     const input = await manifest(root);
     if (input) {
+      if (generatorsOnly && !input.generators?.length) return;
       return (await graph(root, input, options, "resolve", false)).project;
     }
     const parent = dirname(root);
     if (parent === root) return;
     root = parent;
   }
+}
+
+/** Resolve installed packages without network access. Manifest projects have no implicit prelude. */
+export function resolveProject(
+  entry: string,
+  options: PackageOptions = {},
+): Promise<PackageProject | undefined> {
+  return findProject(entry, options, false);
+}
+
+/** Resolve editor compiler options only for projects that configure generators. */
+export function resolveGeneratorProject(
+  entry: string,
+): Promise<PackageProject | undefined> {
+  return findProject(entry, {}, true);
 }
 
 /** Populate Git packages and atomically publish their exact commit lock. Local packages stay live. */

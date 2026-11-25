@@ -1002,6 +1002,22 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     f.skip_fill_len = saved_skip;
     f.scratch_cut = saved;
+    let builder = findComptimeBlock(f, id);
+    if builder >= 0 && last.ty != blot_direct_types::never {
+        let frame = f.comptime_frames[builder];
+        if frame.field_ty != blot_direct_types::unit {
+            return neverVal(), g.fail(m, id, "#fields builder falls through for a non-Unit field");
+        }
+        let carry_node = m.node(frame.loop_node);
+        let start = m.extra[carry_node.c];
+        let len = m.extra[carry_node.c + 1];
+        for carry, at in m.loop_carries[start..start + len] {
+            let error = deliverComptimeCarry(g, f, carry.backedge, frame.carry_slots.start + at, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+        }
+        let error = deliver(g, f, unitVal(), result, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+    }
     s.labels.resize(mark);
     close(g, f);
     if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
@@ -1040,11 +1056,22 @@ recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return result, blot_direct_types::Error.none;
 }
 
+fn findComptimeBlock(f: const Fn&, block_: u32) -> i64 {
+    if block_ == 0 { return -1; }
+    var i = f.comptime_len;
+    while i > 0 {
+        i -= 1;
+        let frame = f.comptime_frames[i];
+        if frame.serial == f.serial && frame.block_ == block_ { return i; }
+    }
+    return -1;
+}
+
 fn findComptimeFrame(f: const Fn&, binder: u32) -> i64 {
     var i = f.comptime_len;
     while i > 0 {
         i -= 1;
-        if f.comptime_frames[i].binder == binder { return i; }
+        if f.comptime_frames[i].serial == f.serial && f.comptime_frames[i].binder == binder { return i; }
     }
     return -1;
 }
@@ -1066,6 +1093,8 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
                     recordProjVar(vars, count, n.ty);
                 }
                 collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+            } else if n.c == 10 && n.a == binder && m.types.node(n.ty).tag == blot_check_types::Tag.variable {
+                recordProjVar(vars, count, n.ty);
             } else if n.c == 8 || n.c == 9 {
                 collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
             }
@@ -1103,7 +1132,14 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
         update => {
             let u = m.updateInfo(id);
             collectComptimeProjectVars(m, u.root, binder, vars, count, depth + 1);
-            for step in m.updateSelectors(id) { collectComptimeProjectVars(m, step.index, binder, vars, count, depth + 1); }
+            for step in m.updateSelectors(id) {
+                if step.kind == blot_check_core::UpdateKind.comptime_field && step.projection == binder &&
+                    m.types.node(step.result_type).tag == blot_check_types::Tag.variable {
+                    recordProjVar(vars, count, step.result_type);
+                } else if step.kind == blot_check_core::UpdateKind.index {
+                    collectComptimeProjectVars(m, step.index, binder, vars, count, depth + 1);
+                }
+            }
             collectComptimeProjectVars(m, u.value, binder, vars, count, depth + 1);
         },
         loop_ => {
@@ -1166,9 +1202,15 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     var proj_vars: u32[64] = [0; 64];
     var proj_var_len: i64 = 0;
-    if mode == 0 { collectComptimeProjectVars(m, n.b, n.a, proj_vars, proj_var_len, 0); }
+    let builder = mode == 2;
+    if mode != 1 {
+        if builder && m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.variable {
+            recordProjVar(proj_vars, proj_var_len, m.typeOf(n.b));
+        }
+        collectComptimeProjectVars(m, n.b, n.a, proj_vars, proj_var_len, 0);
+    }
     let saved_env = f.env;
-    if mode == 0 {
+    if mode != 1 {
         var record_ty: Ty = 0;
         var nom_unit: u32 = 0;
         var nom_decl: u32 = 0;
@@ -1193,6 +1235,8 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         var field_count: i64 = 0;
         if record_ty != 0 { field_count = g.types.node(record_ty).b as i64; }
+        var field_vals = Vals {};
+        if builder { field_vals = g.reserveVals(field_count); }
         for fi in 0..field_count {
             let pos = comptimeFieldPos(g, record_ty, nom_unit, nom_decl, fi, field_count);
             let fld = g.types.recordField(record_ty, pos);
@@ -1200,16 +1244,33 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             for pi in 0..proj_var_len { g.types.envPut(f.env, f.unit, proj_vars[pi], fld.ty); }
             for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[current.start + at]); }
             if f.comptime_len >= 16 { f.env = saved_env; return neverVal(), g.fail(m, id, "#for nesting limit exceeded"); }
+            var carry_slots = Vals {};
+            var block_: u32 = 0;
+            if builder {
+                block_ = n.b;
+                carry_slots = g.reserveVals(carries.len);
+                for carry, at in carries {
+                    let slot, error = fresh(g, f, g.s.vals[current.start + at].ty, id);
+                    if error != blot_direct_types::Error.none { f.env = saved_env; return slot, error; }
+                    g.s.vals[carry_slots.start + at] = slot;
+                }
+            }
             f.comptime_frames[f.comptime_len] = ComptimeFrame {
                 binder: n.a, is_variants: false, target_ty: target_ty,
                 nominal_unit: nom_unit, nominal_decl: nom_decl,
                 index: fi as u32, ctor_tag: ctor_tag, name_id: fld.name, field_ty: fld.ty,
+                serial: f.serial, block_: block_, loop_node: id, carry_slots: carry_slots,
             };
             f.comptime_len += 1;
             let iter_val, ierr = stmt(g, f, n.b);
             f.comptime_len -= 1;
             if ierr != blot_direct_types::Error.none { f.env = saved_env; return iter_val, ierr; }
             if iter_val.ty == blot_direct_types::never { f.env = saved_env; return neverVal(), blot_direct_types::Error.none; }
+            if builder {
+                g.s.vals[field_vals.start + pos] = iter_val;
+                for at in 0..carries.len { g.s.vals[current.start + at] = g.s.vals[carry_slots.start + at]; }
+                continue;
+            }
             for carry, at in carries {
                 let bv, ok, berr = readBindingVal(g, f, carry.backedge, id);
                 if berr != blot_direct_types::Error.none { f.env = saved_env; return neverVal(), berr; }
@@ -1217,6 +1278,17 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
         f.env = saved_env;
+        if builder {
+            for carry, at in carries { bindPut(g, f, carry.outgoing, g.s.vals[current.start + at]); }
+            var payload = unitVal();
+            if record_ty != 0 {
+                let value, error = packProduct(g, f, id, record_ty, field_vals);
+                if error != blot_direct_types::Error.none { return value, error; }
+                payload = value;
+            }
+            if nom_unit != 0 { return wrapVariant(g, f, target_ty, ctor_tag, payload, id); }
+            return payload, blot_direct_types::Error.none;
+        }
     } else {
         if tagOf(g, target_ty) != blot_direct_types::Tag.nominal { return neverVal(), g.fail(m, id, "#variants requires a nominal data type"); }
         let nom_id = g.types.nominalIdentity(target_ty);
@@ -1235,7 +1307,7 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.comptime_frames[f.comptime_len] = ComptimeFrame {
                 binder: n.a, is_variants: true, target_ty: target_ty,
                 nominal_unit: nom_id.unit, nominal_decl: nom_id.decl,
-                index: ci as u32, ctor_tag: ctor.tag, name_id: name_id, field_ty: 0,
+                index: ci as u32, ctor_tag: ctor.tag, name_id: name_id, field_ty: 0, serial: f.serial,
             };
             f.comptime_len += 1;
             let iter_val, ierr = stmt(g, f, n.b);
@@ -1301,6 +1373,9 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         let pos = g.types.findField(rec.ty, cf.name_id);
         if pos < 0 { return neverVal(), g.fail(m, id, "comptime projected field missing"); }
+        if !matchesComptimeFieldType(g, f, m, n.ty, cf.field_ty) {
+            return neverVal(), g.fail(m, id, "comptime projection has the wrong field type");
+        }
         return recordField(g, f, rec, pos, id);
     }
     if n.c == 1 {
@@ -1323,6 +1398,7 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         return arrayFromValues(g, f, arr_ty, vals, id);
     }
+    if n.c == 10 { return comptimeDefaultNode(g, f, id); }
     var s = Stage {..};
     let v = evalComptimeMetaStage(g, f, s, m, id, 0, 0);
     var result = neverVal();
@@ -1342,6 +1418,62 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
     return result, error;
 }
+// Any concrete constraints inferred for a reflection site must agree with
+// the type of the field selected by this iteration.
+fn matchesComptimeFieldType(g: Generator&, f: const Fn&, m: const Module&, expected: TId, actual: Ty) -> bool {
+    let ty, error = g.types.lower(m, expected, f.env);
+    return error != blot_direct_types::Error.none || ty == actual;
+}
+
+recursive fn comptimeDefaultNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    let index = findComptimeFrame(f, n.a);
+    if index < 0 { return neverVal(), g.fail(m, id, "comptime field default outside #for"); }
+    let frame = f.comptime_frames[index];
+    let owner_unit = frame.nominal_unit;
+    if owner_unit != 0 && g.hasUnit(owner_unit) {
+        let owner .= g.units[owner_unit - 1];
+        let value_node = comptimeFieldDefault(g, frame, owner);
+        if value_node != 0 {
+            g.recordStagedDepUnit(owner_unit);
+            if !matchesComptimeFieldType(g, f, m, n.ty, frame.field_ty) {
+                return neverVal(), g.fail(m, id, "comptime default has the wrong field type");
+            }
+            let unit = f.unit;
+            let env = f.env;
+            let serial = f.serial;
+            let bindings = f.bindings;
+            let with_cells = f.with_cells;
+            g.s.serial += 1;
+            f.serial = g.s.serial;
+            f.bindings = blot_support_zigmap::Map {};
+            f.with_cells = blot_support_zigmap::Map {};
+            f.unit = owner_unit;
+            refine(g, f, owner.typeOf(value_node), frame.field_ty);
+            let value, error = stmt(g, f, value_node);
+            f.unit = unit;
+            f.serial = serial;
+            f.bindings = bindings;
+            f.with_cells = with_cells;
+            f.env = env;
+            if error != blot_direct_types::Error.none || value.ty == blot_direct_types::never { return value, error; }
+            if value.ty != frame.field_ty { return neverVal(), g.fail(m, id, "comptime default has the wrong field type"); }
+            return value, blot_direct_types::Error.none;
+        }
+    }
+    return neverVal(), g.fail(m, id, "comptime field has no default value");
+}
+
+fn deliverComptimeCarry(g: Generator&, f: Fn&, binding: u32, slot: i64, id: u32) -> Error {
+    let value, present, error = readBindingVal(g, f, binding, id);
+    if error != blot_direct_types::Error.none { return error; }
+    if !present { return g.fail(g.units[f.unit - 1], id, "#for carry without a value at field exit"); }
+    let dest = g.s.vals[slot];
+    if value.ty != dest.ty { return g.fail(g.units[f.unit - 1], id, "#for carry changes type at field exit"); }
+    return copy(g, f, value, dest, id);
+}
+
 // Copies `value` into a lazily allocated result slot.
 fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
@@ -1388,6 +1520,15 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     f.tail_call_node = prev_tail;
     if error != blot_direct_types::Error.none { return value, error; }
     if value.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+    let builder = findComptimeBlock(f, n.b);
+    if builder >= 0 {
+        let frame = f.comptime_frames[builder];
+        if value.ty != frame.field_ty { return neverVal(), g.fail(m, id, "#fields builder value has the wrong field type"); }
+        for merge, at in m.branchMerges(id) {
+            let error = deliverComptimeCarry(g, f, merge.then_binding, frame.carry_slots.start + at, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+        }
+    }
     var at = g.s.labels.len;
     while at != f.labels_base {
         at -= 1;

@@ -3128,6 +3128,11 @@
           "index",
           1,
           "index"
+        ],
+        [
+          "comptime_field",
+          2,
+          "comptime_field"
         ]
       ]
     },

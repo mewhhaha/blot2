@@ -159,6 +159,17 @@ recursive fn stageValueEqual(s: const Stage&, a: StageValue, b: StageValue, dept
     return true;
 }
 
+fn comptimeFieldDefault(g: Generator&, cf: ComptimeFrame, owner: const Module&) -> u32 {
+    for tt in owner.type_tags {
+        if tt.has_default && tt.nominal.unit == cf.nominal_unit && tt.nominal.decl == cf.nominal_decl &&
+            tt.constructor_tag == cf.ctor_tag && tt.field_name != 0 {
+            let spelling = owner.fieldSpelling(tt.field_name);
+            if spelling.present && g.types.fieldName(spelling.value) == cf.name_id { return tt.value; }
+        }
+    }
+    return 0;
+}
+
 recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: const Module&, id: u32, frame: i64, depth: i64) -> StageValue {
     let n = m.node(id);
     if n.c == 0 { return stopStage(s, "comptime field projection cannot be evaluated at compile time"); }
@@ -173,14 +184,8 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
     if n.c == 2 {
         if cf.nominal_unit == 0 { return stageBool(false); }
         let owner .= g.units[cf.nominal_unit - 1];
-    g.recordStagedDepUnit(owner.unit);
-        for tt in owner.type_tags {
-            if tt.has_default && tt.nominal.unit == cf.nominal_unit && tt.nominal.decl == cf.nominal_decl && tt.constructor_tag == cf.ctor_tag && tt.field_name != 0 {
-                let sp = owner.fieldSpelling(tt.field_name);
-                if sp.present && g.types.fieldName(sp.value) == cf.name_id { return stageBool(true); }
-            }
-        }
-        return stageBool(false);
+        g.recordStagedDepUnit(owner.unit);
+        return stageBool(comptimeFieldDefault(g, cf, owner) != 0);
     }
     let is_has = n.c == 3 || n.c == 6 || n.c == 8;
     if cf.nominal_unit == 0 {

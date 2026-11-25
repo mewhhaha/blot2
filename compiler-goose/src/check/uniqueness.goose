@@ -83,7 +83,7 @@ struct Value { fact: Fact = 0, origin: u32 = 0, exits: bool = false }
 // A loop being visited: its carries' continue facts, then their break facts,
 // at `start` in the shared `carried` stack, plus the trail mark and outer-
 // weakening slice for non-carried locals aliased inside the loop body.
-struct LoopFrame { id: u32, start: i64, len: i64, trail_mark: i64 = 0, outer_start: i64 = 0 }
+struct LoopFrame { id: u32, start: i64, len: i64, trail_mark: i64 = 0, outer_start: i64 = 0, comptime_block: u32 = 0 }
 struct BlockFrame { id: u32, fact: Fact = 0xffffffff, broken: bool = false }
 struct Rejection {
     node: u32,
@@ -1348,7 +1348,7 @@ fn sharedInto(self_: Analyzer&, m: const Module&, id: u32, selectors: const Upda
     var target, found = place(self_, m, id);
     if !found || !local(self_, target.binding) { return; }
     for step in selectors {
-        if step.kind == blot_check_core::UpdateKind.index { break; }
+        if step.kind != blot_check_core::UpdateKind.field { break; }
         if target.len == 8 { kill(self_, target.binding); return; }
         target.fields[target.len] = m.projection(step.projection).field;
         target.len += 1;
@@ -1646,6 +1646,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             return Value { exits: true, .. };
         }
+        let field_break = comptimeBreak(self_, m, id);
+        if field_break && !holds(self_, m, m.typeOf(n.a)) &&
+            m.types.node(m.typeOf(n.a)).tag != blot_check_types::Tag.variable { fact = deep; }
         var at = self_.blocks.len;
         while at != 0 {
             at -= 1;
@@ -1655,7 +1658,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             self_.blocks[at].broken = true;
             break;
         }
-        return Value { .. };
+        return Value { exits: field_break, .. };
     }
     if tag == blot_check_core::Tag.if_value || tag == blot_check_core::Tag.if_stmt || tag == blot_check_core::Tag.comptime_if { return conditional(self_, m, id); }
     if tag == blot_check_core::Tag.comptime_meta {
@@ -3249,14 +3252,21 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     let value = visit(self_, m, info.value);
     let replacement = taken(self_, m, info.value, value);
     var through_storage = false;
-    for step in selectors { through_storage = through_storage || step.kind == blot_check_core::UpdateKind.index; }
+    var reflective = false;
+    for step in selectors {
+        through_storage = through_storage || step.kind == blot_check_core::UpdateKind.index;
+        reflective = reflective || step.kind == blot_check_core::UpdateKind.comptime_field;
+    }
     var leaf = m.typeOf(info.value);
     if selectors.len != 0 { leaf = selectors[selectors.len - 1].result_type; }
     let shared = holds(self_, m, leaf) && replacement != deep;
     var old: Fact = none;
     if local(self_, root.origin) { old = self_.facts[root.origin]; }
     let mark = self_.fields.len;
-    if !through_storage {
+    if reflective && partSpent(self_, old) {
+        rejectSubject(self_, m, id, blot_check_core::Code.spent_value, root.origin);
+    }
+    if !through_storage && !reflective {
         // A value path rebuilds records; the replaced field takes the
         // value's fact and every other field keeps its storage.
         if selectors.len != 0 {
@@ -3275,11 +3285,13 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     }
     if !accepts(self_, m, old, selectors) || (self_.in_fork != 0 && local(self_, root.origin) && self_.function_roots.len != 0 && self_.home[root.origin] != self_.function_roots[self_.function_roots.len - 1]) { rejectSubject(self_, m, id, blot_check_core::Code.aliased_update, root.origin); }
     for step in selectors {
-        if step.kind == blot_check_core::UpdateKind.index { break; }
+        if step.kind != blot_check_core::UpdateKind.field { break; }
         self_.fields.push(m.projection(step.projection).field);
     }
     var next = old;
-    if shared { next = weaken(self_, old, self_.fields[mark..]); }
+    if shared || (reflective && replacement != deep && m.types.node(leaf).tag == blot_check_types::Tag.variable) {
+        next = weaken(self_, old, self_.fields[mark..]);
+    }
     var through: u32 = 0;
     if self_.fields.len > mark { through = self_.fields[mark]; }
     self_.fields.resize(mark);
@@ -3294,11 +3306,14 @@ recursive fn replace(self_: Analyzer&, fact: Fact, fields: const u32[:], replace
     return withField(self_, fact, fields[0], inner);
 }
 // Every storage the path writes through must be unique.
-fn accepts(self_: const Analyzer&, m: const Module&, fact: Fact, selectors: const UpdateStep[:]) -> bool {
+fn accepts(self_: Analyzer&, m: const Module&, fact: Fact, selectors: const UpdateStep[:]) -> bool {
     var current = fact;
     for step in selectors {
         if step.kind == blot_check_core::UpdateKind.field {
             current = field(self_, current, m.projection(step.projection).field);
+        } else if step.kind == blot_check_core::UpdateKind.comptime_field {
+            if !ownedAs(self_, m, current, step.source_type, 0) { return false; }
+            if current != deep { current = none; }
         } else {
             if !unique(current) { return false; }
             if current != deep { current = none; }
@@ -3629,14 +3644,19 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     for at in 0..count { let fact = self_.loop_facts[incoming + at]; self_.loop_facts.push(fact); }
     for at in 0..count * 2 { self_.loop_facts.push(none); }
+    var fact: Fact = none;
     if self_.probing != 0 {
-        comptimeForPass(self_, m, id, carries, assumed);
+        let outer_start = self_.loop_outer.len;
+        fact = comptimeForPass(self_, m, id, carries, assumed);
+        applyComptimeOuter(self_, outer_start);
     } else {
         self_.probing += 1;
         let mark = self_.trail.len;
-        comptimeForPass(self_, m, id, carries, assumed);
+        let outer_start = self_.loop_outer.len;
+        let _ = comptimeForPass(self_, m, id, carries, assumed);
         undo(self_, mark);
         self_.probing -= 1;
+        applyComptimeOuter(self_, outer_start);
         for at in 0..count {
             let met = meet(self_, self_.loop_facts[incoming + at], self_.loop_facts[result + at]);
             self_.loop_facts[assumed + at] = met;
@@ -3645,7 +3665,8 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         loop {
             let checked = self_.trail.len;
             let rejected = self_.rejections.len;
-            comptimeForPass(self_, m, id, carries, assumed);
+            let outer_start = self_.loop_outer.len;
+            fact = comptimeForPass(self_, m, id, carries, assumed);
             var stable = true;
             for at in 0..count {
                 let fact = self_.loop_facts[assumed + at];
@@ -3656,8 +3677,12 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 if attempt >= 2 && stored != spent { stored = none; }
                 self_.loop_facts[assumed + at] = stored;
             }
-            if stable { break; }
+            if stable {
+                applyComptimeOuter(self_, outer_start);
+                break;
+            }
             undo(self_, checked);
+            applyComptimeOuter(self_, outer_start);
             self_.rejections.resize(rejected);
             attempt += 1;
         }
@@ -3671,14 +3696,53 @@ recursive fn comptimeFor(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
     }
     self_.loop_facts.resize(incoming);
-    return Value { .. };
+    return Value { fact: fact, .. };
 }
-recursive fn comptimeForPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64) {
+
+fn applyComptimeOuter(self_: Analyzer&, start: i64) {
+    for at in start..self_.loop_outer.len {
+        let entry = self_.loop_outer[at];
+        let met = meet(self_, self_.facts[entry.binding], entry.fact);
+        if !same(self_, met, self_.facts[entry.binding]) { set(self_, entry.binding, met); }
+    }
+    self_.loop_outer.resize(start);
+}
+
+fn comptimeBreak(self_: Analyzer&, m: const Module&, id: u32) -> bool {
+    let target = m.node(id).b;
+    var at = self_.loops.len;
+    while at != 0 {
+        at -= 1;
+        let frame = self_.loops[at];
+        if frame.comptime_block == 0 || frame.comptime_block != target { continue; }
+        for merge, position in m.branchMerges(id) {
+            let binding = merge.then_binding;
+            read(self_, binding, id);
+            var fact: Fact = none;
+            if local(self_, binding) {
+                fact = self_.facts[binding];
+                if partSpent(self_, fact) { rejectSubject(self_, m, id, blot_check_core::Code.spent_value, binding); }
+            }
+            let slot = frame.start + position;
+            let met = meet(self_, self_.carried[slot], fact);
+            self_.carried[slot] = met;
+        }
+        recordLoopOuter(self_, frame);
+        return true;
+    }
+    return false;
+}
+
+recursive fn comptimeForPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64) -> Fact {
     let n = m.node(id);
     let count = carries.len;
     let start = self_.carried.len;
     for at in 0..count * 2 { self_.carried.push(top); }
-    self_.loops.push(LoopFrame { id: id, start: start, len: count });
+    let builder = m.extra[n.c + 2] == 2;
+    var block_: u32 = 0;
+    if builder { block_ = n.b; }
+    let frame = LoopFrame { id: id, start: start, len: count, trail_mark: self_.trail.len, outer_start: self_.loop_outer.len, comptime_block: block_ };
+    self_.loops.push(frame);
     for carry, at in carries {
         define(self_, carry.iteration, self_.loop_facts[assumed + at]);
         if self_.in_fork != 0 {
@@ -3686,17 +3750,30 @@ recursive fn comptimeForPass(self_: Analyzer&, m: const Module&, id: u32, carrie
             if ct != 0 { setForkTaint(self_, carry.iteration, maxU32(getForkTaint(self_, carry.iteration), ct)); }
         }
     }
-    let body = visit(self_, m, n.b);
+    var exits = false;
+    var fact: Fact = none;
+    if builder {
+        self_.blocks.push(BlockFrame { id: n.b, .. });
+        exits = statements(self_, m, n.b);
+        let body_frame = self_.blocks[self_.blocks.len - 1];
+        self_.blocks.resize(self_.blocks.len - 1);
+        // Only a deeply owned yield proves all reflected fields are owned.
+        if body_frame.fact == deep || (!body_frame.broken && !exits) { fact = deep; }
+        if !exits { recordLoopOuter(self_, frame); }
+    } else {
+        exits = visit(self_, m, n.b).exits;
+    }
     self_.loops.resize(self_.loops.len - 1);
     for carry, at in carries {
         var backedge: Fact = none;
         read(self_, carry.backedge, id);
-        if body.exits { backedge = top; } else if local(self_, carry.backedge) { backedge = self_.facts[carry.backedge]; }
+        if exits { backedge = top; } else if local(self_, carry.backedge) { backedge = self_.facts[carry.backedge]; }
         let next = meet(self_, backedge, self_.carried[start + at]);
         self_.loop_facts[assumed + count + at] = next;
         self_.loop_facts[assumed + count * 2 + at] = self_.carried[start + count + at];
     }
     self_.carried.resize(start);
+    return fact;
 }
 recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     let info = m.loopInfo(id);

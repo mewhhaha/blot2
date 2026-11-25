@@ -118,6 +118,10 @@ struct ComptimeFrame {
     ctor_tag: u32 = 0,
     name_id: u32 = 0,
     field_ty: Ty = 0,
+    serial: u32 = 0,
+    block_: u32 = 0,
+    loop_node: u32 = 0,
+    carry_slots: Vals = Vals {},
 }
 struct Fn {
     checked_range: CheckedRange = CheckedRange {},
