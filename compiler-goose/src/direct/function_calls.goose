@@ -1549,12 +1549,18 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             return true;
         },
         loop_ => {
-            if budget < 20 { return false; }
-            budget -= 16;
+            if budget < 8 { return false; }
+            budget -= 4;
             let linfo = tm.loopInfo(id);
             return canInlineBody(g, tm, linfo.first, target, budget) &&
                 canInlineBody(g, tm, linfo.end, target, budget) &&
                 canInlineBody(g, tm, linfo.body, target, budget);
+        },
+        break_ => {
+            for child in tm.breakValues(id) {
+                if !canInlineBody(g, tm, child, target, budget) { return false; }
+            }
+            return true;
         },
         spark => {
             if budget < 24 { return false; }
@@ -1592,9 +1598,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         let body .= tm.body(target.binding);
         if !body || !body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
         body_root = body.root;
-        var budget: i64 = 72;
-        if f.inline_depth == 1 { budget = 48; }
-        else if f.inline_depth >= 2 { budget = 28; }
+        var budget: i64 = 168;
+        if f.inline_depth == 1 { budget = 152; }
+        else if f.inline_depth >= 2 { budget = 32; }
         if !canInlineBody(g, tm, body_root, target, budget) {
             return neverVal(), false, blot_direct_types::Error.none;
         }
@@ -1674,6 +1680,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_unique_boxed = f.unique_boxed;
     let saved_unique_owned = f.unique_owned;
     let saved_loop_depth = f.loop_depth;
+    let saved_indirect_b = f.indirect_bound_binding;
+    let saved_indirect_l = f.indirect_bound_len;
     let saved_owned_computed = f.owned_uses_computed;
     let saved_owned_uses = f.owned_uses;
     let saved_owned_flows = f.owned_flows;
@@ -1710,6 +1718,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.unique_boxed = blot_support_zigmap::Map {};
     f.unique_owned = blot_support_zigmap::Map {};
     f.loop_depth = 0;
+    f.indirect_bound_binding = 0;
+    f.indirect_bound_len = 0;
     f.owned_uses_computed = false;
     f.owned_uses = blot_support_zigmap::Map {};
     f.owned_flows = blot_support_zigmap::Map {};
@@ -1750,6 +1760,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.unique_boxed = saved_unique_boxed;
     f.unique_owned = saved_unique_owned;
     f.loop_depth = saved_loop_depth;
+    f.indirect_bound_binding = saved_indirect_b;
+    f.indirect_bound_len = saved_indirect_l;
     f.owned_uses_computed = saved_owned_computed;
     f.owned_uses = saved_owned_uses;
     f.owned_flows = saved_owned_flows;

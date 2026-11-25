@@ -2652,7 +2652,7 @@
      },
      "core_nodes": 1095,
      "effect_rows": 2777,
-     "emitted_functions": 48,
+     "emitted_functions": 47,
      "filename": "fixed_scalar_spans.blot",
      "files": 2,
      "imported_schemes": 22,
@@ -2664,11 +2664,11 @@
      "syntax_nodes": 2459,
      "type_nodes": 5361,
      "type_versions": 785,
-     "wasm_bytes": 8764
+     "wasm_bytes": 8726
     }
    ],
-   "wasm_bytes": 8764,
-   "wasm_sha256": "c1de3459dc9502b56e0593ecf41cf4e504e58c339e022634b971fbc2ab6aebac"
+   "wasm_bytes": 8726,
+   "wasm_sha256": "71a1bd3aa1189245a8e09cb1dcf72e2ddb989f77c158436bbe141694f70775dc"
   },
   "fresh_owner_borrow_escape.blot": {
    "exit": 0,
@@ -4364,7 +4364,7 @@
      },
      "core_nodes": 1870,
      "effect_rows": 4013,
-     "emitted_functions": 47,
+     "emitted_functions": 46,
      "filename": "scoped-loop-refinement.blot",
      "files": 4,
      "imported_schemes": 92,
@@ -4376,11 +4376,11 @@
      "syntax_nodes": 3719,
      "type_nodes": 8373,
      "type_versions": 1135,
-     "wasm_bytes": 10393
+     "wasm_bytes": 10286
     }
    ],
-   "wasm_bytes": 10393,
-   "wasm_sha256": "43dfa8bcbd35fcfc8aba8a666e5c73c825a56fb9af34b4b8c3b02c42cc70dc41"
+   "wasm_bytes": 10286,
+   "wasm_sha256": "a3cdaf4d640ceffd9971021a705e7e43386ee56558c9019921f2e8168d897137"
   },
   "scoped-opaque/facade.blot": {
    "exit": 1,

@@ -12,6 +12,8 @@ let SIMD_v128_store: u32 = 11;
 let SIMD_v128_const: u32 = 12;
 let SIMD_i32x4_splat: u32 = 17;
 let SIMD_f32x4_splat: u32 = 19;
+let SIMD_i32x4_extract_lane: u32 = 27;
+let SIMD_i32x4_replace_lane: u32 = 28;
 let SIMD_i32x4_eq: u32 = 55;
 let SIMD_i32x4_ne: u32 = 56;
 let SIMD_i32x4_lt_s: u32 = 57;
@@ -34,6 +36,7 @@ let SIMD_v128_andnot: u32 = 79;
 let SIMD_v128_or: u32 = 80;
 let SIMD_v128_xor: u32 = 81;
 let SIMD_v128_bitselect: u32 = 82;
+let SIMD_v128_any_true: u32 = 83;
 let SIMD_v128_store32_lane: u32 = 90;
 let SIMD_v128_load32_zero: u32 = 92;
 let SIMD_i8x16_narrow_i16x8_u: u32 = 102;
@@ -65,6 +68,11 @@ let SIMD_f32x4_convert_i32x4_u: u32 = 251;
 fn simdOp(g: Generator&, sub: u32) {
     op(g, OP_prefix_fd);
     uleb(g, sub);
+}
+fn simdLaneOp(g: Generator&, sub: u32, lane: u8) {
+    op(g, OP_prefix_fd);
+    uleb(g, sub);
+    op(g, lane);
 }
 fn simdMemOp(g: Generator&, sub: u32, align: u32, offset: u32) {
     op(g, OP_prefix_fd);
@@ -1170,6 +1178,26 @@ recursive fn emitVecExpr(
             }
             if disp_target.binding != 0 { g.recordInlined(disp_target.unit, disp_target.binding); }
             let child_elide = a_tag == blot_direct_types::Tag.f32_ && isCanonicalF32Consumer(machine);
+            // Exact IEEE-754 peephole: `2.0 * x` == `x + x` (avoids v128.const + uses addps).
+            if machine == blot_check_core::Op.mul && a_tag == blot_direct_types::Tag.f32_ && n.b != 0 {
+                var doubled_id: u32 = 0;
+                if m.node(n.a).tag == blot_check_core::Tag.constant && m.node(n.a).a == 0x40000000 {
+                    blot_direct_relocations::unpatchableOperand(m.unit, n.a);
+                    doubled_id = n.b;
+                } else if m.node(n.b).tag == blot_check_core::Tag.constant && m.node(n.b).a == 0x40000000 {
+                    blot_direct_relocations::unpatchableOperand(m.unit, n.b);
+                    doubled_id = n.a;
+                }
+                if doubled_id != 0 {
+                    let derr = emitVecExpr(g, f, plan, m, env, doubled_id, child_elide);
+                    if derr != blot_direct_types::Error.none { return derr; }
+                    let dtmp = local(g, f, VT_v128);
+                    ltee(g, dtmp);
+                    lget(g, dtmp);
+                    emitSimdMachineOp(g, f, blot_check_core::Op.add, a_tag, elide_nan, plan.nan_vlocal);
+                    return blot_direct_types::Error.none;
+                }
+            }
             let lerr = emitVecExpr(g, f, plan, m, env, n.a, child_elide);
             if lerr != blot_direct_types::Error.none { return lerr; }
             if n.b != 0 {
@@ -2368,5 +2396,920 @@ fn tryEmitVectorForLoop(
     op(g, OP_i32_add);
     lset(g, index);
 
+    return blot_direct_types::Error.none;
+}
+
+// 5D: 16-wide Wasm `v128` SIMD reduction for counted `for i in start .. end:` loops:
+//   (A) Masked `#[Bool]` reduction:
+//         if flags[i]:
+//           c0 := c0 (+|^) rhs0
+//           [c1 := c1 (+|^) rhs1]
+//       where each rhs is `i`, constant `1`, or a loop-invariant `U32`.
+//   (B) Unmasked contiguous `#[U32]` reduction:
+//         acc := acc (+|^) arr[i]
+// Uses descending offsets (12,8,4,0 or 48,32,16,0) for 1 software bounds check per 16 elements,
+// eliminates unpredictable prime/mask branches, and advances `index` past the 16-wide prefix.
+fn tryEmitVectorReductionLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return blot_direct_types::Error.none;
+    }
+    var is_masked = false;
+    var arr_b: u32 = 0;
+    var red_count: i64 = 0;
+    var red_ci: i64[2] = [0; 2];
+    var red_is_xor: bool[2] = [false; 2];
+    // kind: 1 = iter index `i`, 2 = const `1`, 3 = other invariant U32 expr
+    var red_kind: i64[2] = [0; 2];
+    var red_rhs_id: u32[2] = [0; 2];
+    var matched = false;
+
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        let iter_b = pat.a;
+
+        let carries = m.loopCarries(loop_id);
+        if carries.len == 0 || carries.len > 64 { return blot_direct_types::Error.none; }
+        var red_iter: u32[2] = [0; 2];
+        var red_back: u32[2] = [0; 2];
+        for carry, ci in carries {
+            if carry_in_place[ci] { continue; }
+            if red_count >= 2 || carry.backedge == 0 { return blot_direct_types::Error.none; }
+            let iv = g.s.vals[iteration.start + ci];
+            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            red_ci[red_count] = ci;
+            red_iter[red_count] = carry.iteration;
+            red_back[red_count] = carry.backedge;
+            red_count += 1;
+        }
+        if red_count == 0 { return blot_direct_types::Error.none; }
+
+        let body_node = unwrapSingleBody(m, info.body);
+        if body_node == 0 { return blot_direct_types::Error.none; }
+        let bn = m.node(body_node);
+
+        if bn.tag == blot_check_core::Tag.if_stmt && bn.c == 0 {
+            // Variant A: masked `if flags[i]: ...`
+            let gok, fa_n, fi_n = matchArrayGet(m, bn.a);
+            if !gok || localRef(m, fi_n) != iter_b { return blot_direct_types::Error.none; }
+            arr_b = localRef(m, fa_n);
+            if arr_b == 0 { return blot_direct_types::Error.none; }
+            let av, aok = bindGet(g, f, arr_b);
+            if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.boolean {
+                return blot_direct_types::Error.none;
+            }
+
+            var t_ids: u32[2] = [0; 2];
+            var t_exprs: u32[2] = [0; 2];
+            var t_len: i64 = 0;
+            let tbn = m.node(bn.b);
+            if tbn.tag == blot_check_core::Tag.suite || tbn.tag == blot_check_core::Tag.block_ {
+                let tch = m.children(bn.b);
+                if tch.len != red_count { return blot_direct_types::Error.none; }
+                for ti in 0..tch.len {
+                    let cn = m.node(tch[ti]);
+                    if cn.tag != blot_check_core::Tag.bind || cn.c >= 2 { return blot_direct_types::Error.none; }
+                    t_ids[ti] = cn.a;
+                    t_exprs[ti] = cn.b;
+                }
+                t_len = tch.len;
+            } else if tbn.tag == blot_check_core::Tag.bind && tbn.c < 2 && red_count == 1 {
+                t_ids[0] = tbn.a;
+                t_exprs[0] = tbn.b;
+                t_len = 1;
+            } else {
+                return blot_direct_types::Error.none;
+            }
+
+            let merges = m.branchMerges(body_node);
+            if merges.len != red_count { return blot_direct_types::Error.none; }
+            var seen_r: bool[2] = [false; 2];
+            var seen_t: bool[2] = [false; 2];
+            for merge in merges {
+                var r_idx: i64 = -1;
+                for ri in 0..red_count {
+                    if merge.result == red_back[ri] && merge.else_binding == red_iter[ri] { r_idx = ri; break; }
+                }
+                if r_idx < 0 || seen_r[r_idx] { return blot_direct_types::Error.none; }
+                var t_idx: i64 = -1;
+                for ti in 0..t_len {
+                    if merge.then_binding == t_ids[ti] { t_idx = ti; break; }
+                }
+                if t_idx < 0 || seen_t[t_idx] { return blot_direct_types::Error.none; }
+                seen_r[r_idx] = true;
+                seen_t[t_idx] = true;
+
+                let en = m.node(t_exprs[t_idx]);
+                let is_op = en.tag == blot_check_core::Tag.scalar || (en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none);
+                if !is_op || (en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.bit_xor) {
+                    return blot_direct_types::Error.none;
+                }
+                var rhs: u32 = 0;
+                if localRef(m, en.a) == red_iter[r_idx] { rhs = en.b; }
+                else if localRef(m, en.b) == red_iter[r_idx] { rhs = en.a; }
+                else { return blot_direct_types::Error.none; }
+
+                red_is_xor[r_idx] = en.op == blot_check_core::Op.bit_xor;
+                let rref = localRef(m, rhs);
+                let rn = m.node(rhs);
+                if rref == iter_b {
+                    red_kind[r_idx] = 1;
+                } else if rn.tag == blot_check_core::Tag.constant && rn.a == 1 && !red_is_xor[r_idx] {
+                    red_kind[r_idx] = 2;
+                } else if rn.tag == blot_check_core::Tag.constant {
+                    red_kind[r_idx] = 3;
+                    red_rhs_id[r_idx] = rhs;
+                } else if rref != 0 {
+                    for ci2 in 0..red_count { if rref == red_iter[ci2] { return blot_direct_types::Error.none; } }
+                    let _, is_cell = withCellType(g, f, rref);
+                    if is_cell { return blot_direct_types::Error.none; }
+                    red_kind[r_idx] = 3;
+                    red_rhs_id[r_idx] = rhs;
+                } else {
+                    return blot_direct_types::Error.none;
+                }
+            }
+            is_masked = true;
+            matched = true;
+        } else if bn.tag == blot_check_core::Tag.bind && bn.c < 2 && red_count == 1 && bn.a == red_back[0] {
+            // Variant B: unmasked `acc := acc (+|^) arr[i]`
+            let en = m.node(bn.b);
+            let is_op = en.tag == blot_check_core::Tag.scalar || (en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none);
+            if !is_op || (en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.bit_xor) {
+                return blot_direct_types::Error.none;
+            }
+            var rhs: u32 = 0;
+            if localRef(m, en.a) == red_iter[0] { rhs = en.b; }
+            else if localRef(m, en.b) == red_iter[0] { rhs = en.a; }
+            else { return blot_direct_types::Error.none; }
+            let gok, aa_n, ai_n = matchArrayGet(m, rhs);
+            if !gok || localRef(m, ai_n) != iter_b { return blot_direct_types::Error.none; }
+            arr_b = localRef(m, aa_n);
+            if arr_b == 0 { return blot_direct_types::Error.none; }
+            let av, aok = bindGet(g, f, arr_b);
+            if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.u32_ {
+                return blot_direct_types::Error.none;
+            }
+            red_is_xor[0] = en.op == blot_check_core::Op.bit_xor;
+            is_masked = false;
+            matched = true;
+        }
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    let av, _ = bindGet(g, f, arr_b);
+    let arr_base, arr_len = ensureCheckedArray(g, f, av);
+
+    var rhs_vlocs: u32[2] = [0; 2];
+    if is_masked {
+        for ri in 0..red_count {
+            if red_kind[ri] == 3 {
+                let rv, rerr = expr(g, f, red_rhs_id[ri]);
+                if rerr != blot_direct_types::Error.none { return rerr; }
+                let vl = local(g, f, VT_v128);
+                lget(g, w(g, rv, 0));
+                simdOp(g, SIMD_i32x4_splat);
+                lset(g, vl);
+                rhs_vlocs[ri] = vl;
+            }
+        }
+    }
+
+    let simd_n = local32(g, f);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_gt_u);
+    let cnt_if = open(g, f, OP_if_);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_sub);
+    i32Const(g, 0xfffffff0);
+    op(g, OP_i32_and);
+    lset(g, simd_n);
+    popCheckedArraysAt(f, cnt_if);
+    op(g, OP_else_);
+    i32Const(g, 0);
+    lset(g, simd_n);
+    close(g, f);
+
+    // Guard: simd_n > 0 && end_local <= arr_len (exact OOB trap order preserved in scalar fallback!)
+    lget(g, simd_n);
+    i32Const(g, 0);
+    op(g, OP_i32_gt_u);
+    lget(g, end_local);
+    lget(g, arr_len);
+    op(g, OP_i32_le_u);
+    op(g, OP_i32_and);
+    let guard_if = open(g, f, OP_if_);
+
+    if is_masked {
+        let ptr = local32(g, f);
+        lget(g, arr_base);
+        lget(g, index);
+        op(g, OP_i32_add);
+        lset(g, ptr);
+
+        let rem = local32(g, f);
+        lget(g, simd_n);
+        lset(g, rem);
+
+        var need_idx = false;
+        var need_mask = false;
+        var vaccs: u32[2] = [0; 2];
+        for ri in 0..red_count {
+            vaccs[ri] = local(g, f, VT_v128);
+            v128Const4(g, 0);
+            lset(g, vaccs[ri]);
+            if red_kind[ri] == 1 { need_idx = true; need_mask = true; }
+            else if red_kind[ri] == 3 { need_mask = true; }
+        }
+
+        var v_idx: u32[4] = [0; 4];
+        var v16: u32 = 0;
+        if need_idx {
+            let v_start = local(g, f, VT_v128);
+            lget(g, index);
+            simdOp(g, SIMD_i32x4_splat);
+            lset(g, v_start);
+            for s in 0..4 {
+                let base_w = (s as u32) * 4;
+                v_idx[s] = local(g, f, VT_v128);
+                lget(g, v_start);
+                v128ConstWords(g, base_w, base_w + 1, base_w + 2, base_w + 3);
+                simdOp(g, SIMD_i32x4_add);
+                lset(g, v_idx[s]);
+            }
+            v16 = local(g, f, VT_v128);
+            v128Const4(g, 16);
+            lset(g, v16);
+        }
+        let w01 = local(g, f, VT_v128);
+        var vmask: u32 = 0;
+        if need_mask { vmask = local(g, f, VT_v128); }
+
+        let r_exit = open(g, f, OP_block);
+        let r_top = open(g, f, OP_loop);
+        lget(g, rem);
+        op(g, OP_i32_eqz);
+        br(g, f, OP_br_if, r_exit);
+
+        // Descending offsets 12, 8, 4, 0 => 1 software bounds check per 16 Bool elements!
+        for ustep in 0..4 {
+            let step = 3 - ustep;
+            lget(g, ptr);
+            simdMemOp(g, SIMD_v128_load32_zero, 0, (step as u32) * 4);
+            simdOp(g, SIMD_i16x8_extend_low_i8x16_u);
+            simdOp(g, SIMD_i32x4_extend_low_i16x8_u);
+            lset(g, w01);
+            if need_mask {
+                lget(g, w01);
+                simdOp(g, SIMD_i32x4_neg);
+                lset(g, vmask);
+            }
+            for ri in 0..red_count {
+                var vop = SIMD_i32x4_add;
+                if red_is_xor[ri] { vop = SIMD_v128_xor; }
+                lget(g, vaccs[ri]);
+                if red_kind[ri] == 2 {
+                    lget(g, w01);
+                } else if red_kind[ri] == 1 {
+                    lget(g, v_idx[step]);
+                    lget(g, vmask);
+                    simdOp(g, SIMD_v128_and);
+                } else {
+                    lget(g, rhs_vlocs[ri]);
+                    lget(g, vmask);
+                    simdOp(g, SIMD_v128_and);
+                }
+                simdOp(g, vop);
+                lset(g, vaccs[ri]);
+            }
+        }
+
+        if need_idx {
+            for s in 0..4 {
+                lget(g, v_idx[s]);
+                lget(g, v16);
+                simdOp(g, SIMD_i32x4_add);
+                lset(g, v_idx[s]);
+            }
+        }
+        lget(g, ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 16); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, r_top);
+        close(g, f);
+        close(g, f);
+
+        for ri in 0..red_count {
+            let cloc = w(g, g.s.vals[iteration.start + red_ci[ri]], 0);
+            var sop = OP_i32_add;
+            if red_is_xor[ri] { sop = OP_i32_xor; }
+            lget(g, cloc);
+            for lane in 0..4 {
+                lget(g, vaccs[ri]);
+                simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8);
+                op(g, sop);
+            }
+            lset(g, cloc);
+        }
+    } else {
+        // Variant B: unmasked 16-wide #[U32] reduction
+        let ptr = local32(g, f);
+        lget(g, arr_base);
+        lget(g, index);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        op(g, OP_i32_add);
+        lset(g, ptr);
+
+        let rem = local32(g, f);
+        lget(g, simd_n);
+        lset(g, rem);
+
+        let vacc0 = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vacc0);
+        let vacc1 = local(g, f, VT_v128); v128Const4(g, 0); lset(g, vacc1);
+        var vop = SIMD_i32x4_add;
+        var sop = OP_i32_add;
+        if red_is_xor[0] { vop = SIMD_v128_xor; sop = OP_i32_xor; }
+
+        let r_exit = open(g, f, OP_block);
+        let r_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, r_exit);
+
+        lget(g, vacc0); lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 48); simdOp(g, vop);
+        lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 16); simdOp(g, vop); lset(g, vacc0);
+        lget(g, vacc1); lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 32); simdOp(g, vop);
+        lget(g, ptr); simdMemOp(g, SIMD_v128_load, 2, 0); simdOp(g, vop); lset(g, vacc1);
+
+        lget(g, ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, ptr);
+        lget(g, rem); i32Const(g, 16); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, r_top);
+        close(g, f);
+        close(g, f);
+
+        let vtot = local(g, f, VT_v128);
+        lget(g, vacc0); lget(g, vacc1); simdOp(g, vop); lset(g, vtot);
+        let cloc = w(g, g.s.vals[iteration.start + red_ci[0]], 0);
+        lget(g, cloc);
+        for lane in 0..4 {
+            lget(g, vtot);
+            simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8);
+            op(g, sop);
+        }
+        lset(g, cloc);
+    }
+
+    lget(g, index);
+    lget(g, simd_n);
+    op(g, OP_i32_add);
+    lset(g, index);
+
+    popCheckedArraysAt(f, guard_if);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return blot_direct_types::Error.none;
+}
+
+// 5E: 4-wide `v128` outer-loop SIMD for pure escape-time accumulation loops:
+//   for px in start .. end:
+//     let prelude_0 = ... ; ... ; let it = 0
+//     for ever:
+//       if it >= limit: break
+//       ...
+//       if escape_cond: break
+//       ...
+//       it := it + 1
+//     total := total + it
+// Runs 4 pixels simultaneously in `v128` with monotone lane disable (`v128.andnot`),
+// `v128.any_true` early exit, exact `i32x4.sub(it_v, active_v)`, and scalar tail for `< 4` pixels.
+recursive fn exprHasBitsOp(m: const Module&, id: u32, budget: i64&) -> bool {
+    if id == 0 { return false; }
+    if budget <= 0 { return true; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, reference => { return false; },
+        scalar, associated => {
+            if n.op == blot_check_core::Op.bits || n.op == blot_check_core::Op.from_bits { return true; }
+            return exprHasBitsOp(m, n.a, budget) || exprHasBitsOp(m, n.b, budget);
+        },
+        logical => { return exprHasBitsOp(m, n.a, budget) || exprHasBitsOp(m, n.b, budget); },
+        if_value => { return exprHasBitsOp(m, n.a, budget) || exprHasBitsOp(m, n.b, budget) || exprHasBitsOp(m, n.c, budget); },
+        return_, project => { return exprHasBitsOp(m, n.a, budget); },
+        bind => { return exprHasBitsOp(m, n.b, budget); },
+        block_, suite => {
+            for c in m.children(id) { if exprHasBitsOp(m, c, budget) { return true; } }
+            return false;
+        },
+        call => {
+            for a in m.call(id).arguments { if exprHasBitsOp(m, a, budget) { return true; } }
+            return false;
+        },
+        _ => { return true; },
+    }
+}
+fn tryEmitVectorEscapeLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return blot_direct_types::Error.none;
+    }
+
+    var total_ci: i64 = -1;
+    var limit_id: u32 = 0;
+    var exit_cond_id: u32 = 0;
+    var pre_b: u32[8] = [0; 8];
+    var pre_expr: u32[8] = [0; 8];
+    var pre_skip: bool[8] = [false; 8];
+    var pre_len: i64 = 0;
+
+    var ic_count: i64 = 0;
+    var ic_incoming: u32[8] = [0; 8];
+    var ic_iter: u32[8] = [0; 8];
+    var ic_back: u32[8] = [0; 8];
+    var ic_tag: blot_direct_types::Tag[8] = [blot_direct_types::Tag.unit; 8];
+    var it_ci: i64 = -1;
+
+    var pre_exit_b: u32[8] = [0; 8];
+    var pre_exit_expr: u32[8] = [0; 8];
+    var pre_exit_len: i64 = 0;
+    var post_exit_b: u32[8] = [0; 8];
+    var post_exit_expr: u32[8] = [0; 8];
+    var post_exit_len: i64 = 0;
+
+    var plan = SparkVecPlan {};
+    var matched = false;
+
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        let iter_b = pat.a;
+
+        let carries = m.loopCarries(loop_id);
+        if carries.len == 0 || carries.len > 64 { return blot_direct_types::Error.none; }
+        for carry, ci in carries {
+            if carry_in_place[ci] { continue; }
+            if total_ci >= 0 || carry.backedge == 0 { return blot_direct_types::Error.none; }
+            let iv = g.s.vals[iteration.start + ci];
+            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            total_ci = ci;
+        }
+        if total_ci < 0 { return blot_direct_types::Error.none; }
+        let total_iter = carries[total_ci].iteration;
+        let total_back = carries[total_ci].backedge;
+
+        let bn = m.node(info.body);
+        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ {
+            return blot_direct_types::Error.none;
+        }
+        let ch = m.children(info.body);
+        if ch.len < 3 || ch.len > 10 { return blot_direct_types::Error.none; }
+
+        let inner_idx = ch.len - 2;
+        let inner_id = ch[inner_idx];
+        if m.node(inner_id).tag != blot_check_core::Tag.loop_ { return blot_direct_types::Error.none; }
+        let inner_info = m.loopInfo(inner_id);
+        if inner_info.kind != blot_check_core::LoopKind.forever || inner_info.body == 0 {
+            return blot_direct_types::Error.none;
+        }
+
+        plan = SparkVecPlan {
+            spark_unit: m.unit,
+            is_range: true,
+            iter_binding: iter_b,
+            iter_tag: blot_direct_types::Tag.u32_,
+            out_tag: blot_direct_types::Tag.u32_,
+            budget: 256,
+        };
+        plan.locals[0] = SparkVecLocal {
+            unit: m.unit,
+            binding: iter_b,
+            tag: blot_direct_types::Tag.u32_,
+            is_mask: false,
+            invariant: false,
+        };
+        plan.locals_len = 1;
+
+        // 1. Validate leading pure vectorizable prelude binds.
+        for pi in 0..inner_idx {
+            let cn = m.node(ch[pi]);
+            if cn.tag != blot_check_core::Tag.bind || cn.c >= 2 || m.binding(cn.a).scheme.variables.len != 0 {
+                return blot_direct_types::Error.none;
+            }
+            let bty, bok = lowerInEnv(g, m, m.typeOf(cn.b), f.env);
+            if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 || pre_len >= 8 {
+                return blot_direct_types::Error.none;
+            }
+            var bb: i64 = 64;
+            if exprHasBitsOp(m, cn.b, bb) { return blot_direct_types::Error.none; }
+            if !checkVecExpr(g, f, plan, m, f.env, cn.b, 0, 0, false) || plan.streams_len != 0 {
+                return blot_direct_types::Error.none;
+            }
+            let btag = tagOf(g, bty);
+            pre_b[pre_len] = cn.a;
+            pre_expr[pre_len] = cn.b;
+            pre_len += 1;
+            plan.locals[plan.locals_len] = SparkVecLocal {
+                unit: m.unit,
+                binding: cn.a,
+                tag: btag,
+                is_mask: btag == blot_direct_types::Tag.boolean,
+                invariant: isInvariantScalarExpr(g, f, plan, m, f.env, cn.b, btag, 0),
+            };
+            plan.locals_len += 1;
+        }
+
+        // 2. Validate inner `for ever` carries: exactly one outgoing U32 counter `it` initialized to 0.
+        let icarries = m.loopCarries(inner_id);
+        if icarries.len == 0 || icarries.len > 8 { return blot_direct_types::Error.none; }
+        ic_count = icarries.len;
+        for ic, ci in icarries {
+            if ic.backedge == 0 { return blot_direct_types::Error.none; }
+            let cty, cok = lowerInEnv(g, m, m.binding(ic.iteration).ty, f.env);
+            if !cok || !isScalarTag(tagOf(g, cty)) { return blot_direct_types::Error.none; }
+            let ctag = tagOf(g, cty);
+            ic_incoming[ci] = ic.incoming;
+            ic_iter[ci] = ic.iteration;
+            ic_back[ci] = ic.backedge;
+            ic_tag[ci] = ctag;
+            if uses(g, f, ic.outgoing) != 0 {
+                if it_ci >= 0 || ctag != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+                it_ci = ci;
+            }
+        }
+        if it_ci < 0 { return blot_direct_types::Error.none; }
+
+        // Verify `it` is initialized to constant 0 in the prelude!
+        var it_pre_idx: i64 = -1;
+        for pi in 0..pre_len {
+            if pre_b[pi] == ic_incoming[it_ci] {
+                let en = m.node(pre_expr[pi]);
+                if en.tag == blot_check_core::Tag.constant && en.a == 0 {
+                    it_pre_idx = pi;
+                    pre_skip[pi] = true;
+                }
+                break;
+            }
+        }
+        if it_pre_idx < 0 { return blot_direct_types::Error.none; }
+
+        // Register all non-`it` inner carry iterations in plan.locals (leaving `it` out so
+        // checkVecExpr automatically rejects any expression reading `it` inside the escape loop!).
+        for ci in 0..ic_count {
+            if ci == it_ci { continue; }
+            if findVecLocal(plan, m.unit, ic_incoming[ci]) < 0 {
+                let bv, bok = bindGet(g, f, ic_incoming[ci]);
+                if !bok || tagOf(g, bv.ty) != ic_tag[ci] { return blot_direct_types::Error.none; }
+                let _, is_cell = withCellType(g, f, ic_incoming[ci]);
+                if is_cell || ic_incoming[ci] == total_iter { return blot_direct_types::Error.none; }
+            }
+            if plan.locals_len >= 64 { return blot_direct_types::Error.none; }
+            plan.locals[plan.locals_len] = SparkVecLocal {
+                unit: m.unit,
+                binding: ic_iter[ci],
+                tag: ic_tag[ci],
+                is_mask: ic_tag[ci] == blot_direct_types::Tag.boolean,
+                invariant: false,
+            };
+            plan.locals_len += 1;
+        }
+
+        // 3. Validate inner `for ever` body:
+        //    ich[0]: `if it >= limit: break`
+        //    ich[1..]: pure binds + exactly 1 `if escape_cond: break` + `it := it + 1`
+        let ibn = m.node(inner_info.body);
+        if ibn.tag != blot_check_core::Tag.suite && ibn.tag != blot_check_core::Tag.block_ {
+            return blot_direct_types::Error.none;
+        }
+        let ich = m.children(inner_info.body);
+        if ich.len < 3 || ich.len > 16 { return blot_direct_types::Error.none; }
+
+        let s0 = m.node(ich[0]);
+        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) {
+            return blot_direct_types::Error.none;
+        }
+        let c0 = m.node(s0.a);
+        let c0_is_op = c0.tag == blot_check_core::Tag.scalar || (c0.tag == blot_check_core::Tag.associated && c0.op != blot_check_core::Op.none);
+        if !c0_is_op { return blot_direct_types::Error.none; }
+        if c0.op == blot_check_core::Op.greater_equal && localRef(m, c0.a) == ic_iter[it_ci] {
+            limit_id = c0.b;
+        } else if c0.op == blot_check_core::Op.less_equal && localRef(m, c0.b) == ic_iter[it_ci] {
+            limit_id = c0.a;
+        } else {
+            return blot_direct_types::Error.none;
+        }
+        let lim_ref = localRef(m, limit_id);
+        if lim_ref == 0 && m.node(limit_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
+        if lim_ref != 0 {
+            if lim_ref == iter_b || lim_ref == total_iter || findVecLocal(plan, m.unit, lim_ref) >= 0 {
+                return blot_direct_types::Error.none;
+            }
+            let _, is_cell = withCellType(g, f, lim_ref);
+            if is_cell { return blot_direct_types::Error.none; }
+        }
+
+        var found_exit = false;
+        var found_it_inc = false;
+        for si in 1..ich.len {
+            let sn = m.node(ich[si]);
+            if sn.tag == blot_check_core::Tag.if_stmt && sn.c == 0 && isBreakBody(m, sn.b) {
+                if found_exit { return blot_direct_types::Error.none; }
+                let cty, cok = lowerInEnv(g, m, m.typeOf(sn.a), f.env);
+                if !cok || tagOf(g, cty) != blot_direct_types::Tag.boolean { return blot_direct_types::Error.none; }
+                var bb: i64 = 64;
+                if exprHasBitsOp(m, sn.a, bb) { return blot_direct_types::Error.none; }
+                if !checkVecExpr(g, f, plan, m, f.env, sn.a, 0, 0, false) || plan.streams_len != 0 {
+                    return blot_direct_types::Error.none;
+                }
+                exit_cond_id = sn.a;
+                found_exit = true;
+            } else if sn.tag == blot_check_core::Tag.bind && sn.c < 2 && m.binding(sn.a).scheme.variables.len == 0 {
+                if sn.a == ic_back[it_ci] {
+                    if !found_exit || found_it_inc || !matchVarPlusConstOne(m, sn.b, ic_iter[it_ci]) {
+                        return blot_direct_types::Error.none;
+                    }
+                    found_it_inc = true;
+                } else {
+                    let bty, bok = lowerInEnv(g, m, m.typeOf(sn.b), f.env);
+                    if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 { return blot_direct_types::Error.none; }
+                    var bb: i64 = 64;
+                    if exprHasBitsOp(m, sn.b, bb) { return blot_direct_types::Error.none; }
+                    if !checkVecExpr(g, f, plan, m, f.env, sn.b, 0, 0, false) || plan.streams_len != 0 {
+                        return blot_direct_types::Error.none;
+                    }
+                    if !found_exit {
+                        if pre_exit_len >= 8 { return blot_direct_types::Error.none; }
+                        pre_exit_b[pre_exit_len] = sn.a;
+                        pre_exit_expr[pre_exit_len] = sn.b;
+                        pre_exit_len += 1;
+                    } else {
+                        if post_exit_len >= 8 { return blot_direct_types::Error.none; }
+                        post_exit_b[post_exit_len] = sn.a;
+                        post_exit_expr[post_exit_len] = sn.b;
+                        post_exit_len += 1;
+                    }
+                    let btag = tagOf(g, bty);
+                    plan.locals[plan.locals_len] = SparkVecLocal {
+                        unit: m.unit,
+                        binding: sn.a,
+                        tag: btag,
+                        is_mask: btag == blot_direct_types::Tag.boolean,
+                        invariant: false,
+                    };
+                    plan.locals_len += 1;
+                }
+            } else {
+                return blot_direct_types::Error.none;
+            }
+        }
+        if !found_exit || !found_it_inc { return blot_direct_types::Error.none; }
+        for ci in 0..ic_count {
+            if ci == it_ci { continue; }
+            if findVecLocal(plan, m.unit, ic_back[ci]) < 0 { return blot_direct_types::Error.none; }
+        }
+
+        // 4. Validate trailing `total_back := total_iter + it_out`
+        let last_n = m.node(ch[ch.len - 1]);
+        if last_n.tag != blot_check_core::Tag.bind || last_n.c >= 2 || last_n.a != total_back {
+            return blot_direct_types::Error.none;
+        }
+        let add_n = m.node(last_n.b);
+        let add_is_op = add_n.tag == blot_check_core::Tag.scalar || (add_n.tag == blot_check_core::Tag.associated && add_n.op != blot_check_core::Op.none);
+        if !add_is_op || add_n.op != blot_check_core::Op.add { return blot_direct_types::Error.none; }
+        let it_out = icarries[it_ci].outgoing;
+        let a_ref = localRef(m, add_n.a);
+        let b_ref = localRef(m, add_n.b);
+        if !((a_ref == total_iter && b_ref == it_out) || (a_ref == it_out && b_ref == total_iter)) {
+            return blot_direct_types::Error.none;
+        }
+
+        // 5. Ensure no hoisted outer scalar is the loop-carried `total_iter`.
+        for hi in 0..plan.hoisted_len {
+            if plan.hoisted[hi].node_id == total_iter { return blot_direct_types::Error.none; }
+        }
+        matched = true;
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    let lim_val, lerr = expr(g, f, limit_id);
+    if lerr != blot_direct_types::Error.none { return lerr; }
+    let limit_loc = w(g, lim_val, 0);
+
+    let simd_n = local32(g, f);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_gt_u);
+    let cnt_if = open(g, f, OP_if_);
+    lget(g, end_local);
+    lget(g, index);
+    op(g, OP_i32_sub);
+    i32Const(g, 0xfffffffc);
+    op(g, OP_i32_and);
+    lset(g, simd_n);
+    popCheckedArraysAt(f, cnt_if);
+    op(g, OP_else_);
+    i32Const(g, 0);
+    lset(g, simd_n);
+    close(g, f);
+
+    lget(g, simd_n);
+    i32Const(g, 0);
+    op(g, OP_i32_gt_u);
+    let run_if = open(g, f, OP_if_);
+
+    // Pre-splat all loop-invariant outer scalars (e.g., `inv`, `ci`) ONCE before the 4-pixel loop!
+    for hi in 0..plan.hoisted_len {
+        let h = plan.hoisted[hi];
+        let vl = local(g, f, VT_v128);
+        if h.tag == blot_direct_types::Tag.boolean {
+            i32Const(g, 0); lget(g, h.scalar_local); op(g, OP_i32_sub); simdOp(g, SIMD_i32x4_splat);
+        } else if h.tag == blot_direct_types::Tag.f32_ {
+            lget(g, h.scalar_local); simdOp(g, SIMD_f32x4_splat);
+        } else {
+            lget(g, h.scalar_local); simdOp(g, SIMD_i32x4_splat);
+        }
+        lset(g, vl);
+        plan.hoisted[hi].vlocal = vl;
+    }
+
+    // Allocate v128 locals for every entry in plan.locals!
+    let iter_vlocal = local(g, f, VT_v128);
+    plan.locals[0].vlocal = iter_vlocal;
+    for li in 1..plan.locals_len {
+        plan.locals[li].vlocal = local(g, f, VT_v128);
+    }
+
+    lget(g, index);
+    simdOp(g, SIMD_i32x4_splat);
+    v128ConstWords(g, 0, 1, 2, 3);
+    simdOp(g, SIMD_i32x4_add);
+    lset(g, iter_vlocal);
+
+    let v4_local = local(g, f, VT_v128);
+    v128Const4(g, 4);
+    lset(g, v4_local);
+
+    let k_loc = constLocal(g, f, 0);
+    let step_i = local32(g, f);
+    let it_v = local(g, f, VT_v128);
+    let active_v = local(g, f, VT_v128);
+    let total_loc = w(g, g.s.vals[iteration.start + total_ci], 0);
+
+    // Since only `it` escapes and no `bits` op is present, IEEE-754 comparisons treat all NaNs
+    // identically; deferring F32 NaN canonicalization inside the escape loop is 100% bit-exact!
+    let prev_defer = f.defer_f32_nan;
+    f.defer_f32_nan = true;
+
+    let out_exit = open(g, f, OP_block);
+    let out_top = open(g, f, OP_loop);
+    lget(g, k_loc);
+    lget(g, simd_n);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, out_exit);
+
+    // 1. Emit prelude binds (`cr`, `zr`, `zi`, ...).
+    for pi in 0..pre_len {
+        if pre_skip[pi] { continue; }
+        let m_e .= g.units[f.unit - 1];
+        let perr = emitVecExpr(g, f, plan, m_e, f.env, pre_expr[pi], false);
+        if perr != blot_direct_types::Error.none { f.defer_f32_nan = prev_defer; return perr; }
+        let lidx = findVecLocal(plan, m_e.unit, pre_b[pi]);
+        assert(lidx >= 0);
+        lset(g, plan.locals[lidx].vlocal);
+    }
+
+    // 2. Seed inner carry iteration vlocals from incoming values.
+    for ci in 0..ic_count {
+        if ci == it_ci { continue; }
+        let dst_idx = findVecLocal(plan, plan.spark_unit, ic_iter[ci]);
+        assert(dst_idx >= 0);
+        let src_idx = findVecLocal(plan, plan.spark_unit, ic_incoming[ci]);
+        if src_idx >= 0 {
+            lget(g, plan.locals[src_idx].vlocal);
+        } else {
+            let bv, _ = bindGet(g, f, ic_incoming[ci]);
+            if ic_tag[ci] == blot_direct_types::Tag.boolean {
+                i32Const(g, 0); lget(g, w(g, bv, 0)); op(g, OP_i32_sub); simdOp(g, SIMD_i32x4_splat);
+            } else if ic_tag[ci] == blot_direct_types::Tag.f32_ {
+                lget(g, w(g, bv, 0)); simdOp(g, SIMD_f32x4_splat);
+            } else {
+                lget(g, w(g, bv, 0)); simdOp(g, SIMD_i32x4_splat);
+            }
+        }
+        lset(g, plan.locals[dst_idx].vlocal);
+    }
+
+    v128Const4(g, 0); lset(g, it_v);
+    v128Const4(g, 0xffffffff); lset(g, active_v);
+    i32Const(g, 0); lset(g, step_i);
+
+    // 3. 4-pixel inner escape loop!
+    let in_exit = open(g, f, OP_block);
+    let in_top = open(g, f, OP_loop);
+    lget(g, step_i);
+    lget(g, limit_loc);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, in_exit);
+
+    for bi in 0..pre_exit_len {
+        let m_e .= g.units[f.unit - 1];
+        let berr = emitVecExpr(g, f, plan, m_e, f.env, pre_exit_expr[bi], false);
+        if berr != blot_direct_types::Error.none { f.defer_f32_nan = prev_defer; return berr; }
+        let lidx = findVecLocal(plan, m_e.unit, pre_exit_b[bi]);
+        assert(lidx >= 0);
+        lset(g, plan.locals[lidx].vlocal);
+    }
+
+    // active_v = active_v & ~escaped_v; if !any_true(active_v): break!
+    lget(g, active_v);
+    let cerr = emitVecExpr(g, f, plan, g.units[f.unit - 1], f.env, exit_cond_id, false);
+    if cerr != blot_direct_types::Error.none { f.defer_f32_nan = prev_defer; return cerr; }
+    simdOp(g, SIMD_v128_andnot);
+    ltee(g, active_v);
+    simdOp(g, SIMD_v128_any_true);
+    op(g, OP_i32_eqz);
+    br(g, f, OP_br_if, in_exit);
+
+    for bi in 0..post_exit_len {
+        let m_e .= g.units[f.unit - 1];
+        let berr = emitVecExpr(g, f, plan, m_e, f.env, post_exit_expr[bi], false);
+        if berr != blot_direct_types::Error.none { f.defer_f32_nan = prev_defer; return berr; }
+        let lidx = findVecLocal(plan, m_e.unit, post_exit_b[bi]);
+        assert(lidx >= 0);
+        lset(g, plan.locals[lidx].vlocal);
+    }
+    for ci in 0..ic_count {
+        if ci == it_ci { continue; }
+        let dst_idx = findVecLocal(plan, plan.spark_unit, ic_iter[ci]);
+        let src_idx = findVecLocal(plan, plan.spark_unit, ic_back[ci]);
+        if dst_idx >= 0 && src_idx >= 0 && dst_idx != src_idx {
+            lget(g, plan.locals[src_idx].vlocal);
+            lset(g, plan.locals[dst_idx].vlocal);
+        }
+    }
+
+    // Exact per-lane increment: active_v is 0xffffffff (-1) for active lanes, 0 for escaped lanes!
+    lget(g, it_v);
+    lget(g, active_v);
+    simdOp(g, SIMD_i32x4_sub);
+    lset(g, it_v);
+
+    lget(g, step_i);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    lset(g, step_i);
+    br(g, f, OP_br, in_top);
+    close(g, f);
+    close(g, f);
+
+    // 4. Horizontal sum of 4 lane iteration counts into `total_loc`.
+    lget(g, total_loc);
+    for lane in 0..4 {
+        lget(g, it_v);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8);
+        op(g, OP_i32_add);
+    }
+    lset(g, total_loc);
+
+    lget(g, iter_vlocal);
+    lget(g, v4_local);
+    simdOp(g, SIMD_i32x4_add);
+    lset(g, iter_vlocal);
+
+    lget(g, k_loc);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lset(g, k_loc);
+    br(g, f, OP_br, out_top);
+    close(g, f);
+    close(g, f);
+
+    f.defer_f32_nan = prev_defer;
+
+    lget(g, index);
+    lget(g, simd_n);
+    op(g, OP_i32_add);
+    lset(g, index);
+
+    popCheckedArraysAt(f, run_if);
+    close(g, f);
     return blot_direct_types::Error.none;
 }

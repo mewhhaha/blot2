@@ -162,11 +162,11 @@ def build_kernels_chart(data: dict) -> str:
     by_name = {row["name"]: row for row in data["kernels"]}
     specs = [
         ("particle_spark_simd", "65k × 32 · in-place spark SIMD"),
-        ("mandelbrot_f32", "256×256 FP · 2× unroll, 2*x→x+x"),
-        ("merge_sort", "100k U32 · hoisted bounds, ping-pong"),
-        ("lcg_recurrence", "1,000,000 U32 · 4× affine unroll"),
-        ("prime_sieve", "100k Bool · 4× strided fill + select"),
-        ("matmul_64", "64×64 F32 · 4×v128 k-blocked SIMD"),
+        ("mandelbrot_f32", "256×256 FP · 4-pixel v128 escape SIMD"),
+        ("merge_sort", "100k U32 · cmov + memcpy + inlined"),
+        ("lcg_recurrence", "1,000,000 U32 · 16-wide v128 LCG"),
+        ("prime_sieve", "100k Bool · strided fill + v128 reduce"),
+        ("matmul_64", "64×64 F32 · 2×16 (8×v128) blocked"),
     ]
 
     w, h = 920, 492
@@ -268,12 +268,15 @@ def build_ecs_chart(data: dict) -> str:
     ratio_spark = dense["bevy_native_ms"] / dense["ink_soa_spark_simd_ms"]
     els.append(pill(tx + tw - 14, ty + 24, f"Blot spark SoA {ratio_spark:.1f}× faster vs Bevy AoS", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
-    dense_rows = [
-        ("Blot SoA + spark SIMD", dense["ink_soa_spark_simd_ms"], C_SPARK),
-        ("Bevy ECS (native AoS)", dense["bevy_native_ms"], C_RUST_NAT),
-        ("Ink ECS (Pool direct)", dense["ink_pool_direct_ms"], C_BLOT),
-        ("Ink ECS (cached query)", dense["ink_cached_query_ms"], C_BLOT),
-    ]
+    dense_rows = sorted(
+        [
+            ("Blot SoA + spark SIMD", dense["ink_soa_spark_simd_ms"], C_SPARK),
+            ("Bevy ECS (native AoS)", dense["bevy_native_ms"], C_RUST_NAT),
+            ("Ink ECS (cached query)", dense["ink_cached_query_ms"], C_BLOT),
+            ("Ink ECS (Pool direct)", dense["ink_pool_direct_ms"], C_BLOT),
+        ],
+        key=lambda item: item[1],
+    )
     dmax = max(v for _, v, _ in dense_rows)
     dbx = tx + 196
     dbmax_w = 570.0
@@ -312,10 +315,17 @@ def build_ecs_chart(data: dict) -> str:
         (
             "Sparse filtered query (5% × 100)",
             "With Active, Without Frozen (500 of 10k)",
-            f"Bevy {sparse['ink_cached_query_ms'] / sparse['bevy_native_ms']:.1f}× faster",
-            PILL_RUST_BG,
-            PILL_RUST_FG,
+            f"Ink {sparse['bevy_native_ms'] / sparse['ink_cached_query_ms']:.2f}× faster"
+            if sparse["ink_cached_query_ms"] <= sparse["bevy_native_ms"]
+            else f"Bevy {sparse['ink_cached_query_ms'] / sparse['bevy_native_ms']:.2f}× faster",
+            PILL_WIN_BG if sparse["ink_cached_query_ms"] <= sparse["bevy_native_ms"] else PILL_RUST_BG,
+            PILL_WIN_FG if sparse["ink_cached_query_ms"] <= sparse["bevy_native_ms"] else PILL_RUST_FG,
             [
+                ("Ink ECS", sparse["ink_cached_query_ms"], C_BLOT, f"{sparse['ink_cached_query_ms']:.3f} ms"),
+                ("Bevy ECS", sparse["bevy_native_ms"], C_RUST_NAT, f"{sparse['bevy_native_ms']:.3f} ms"),
+            ]
+            if sparse["ink_cached_query_ms"] <= sparse["bevy_native_ms"]
+            else [
                 ("Bevy ECS", sparse["bevy_native_ms"], C_RUST_NAT, f"{sparse['bevy_native_ms']:.3f} ms"),
                 ("Ink ECS", sparse["ink_cached_query_ms"], C_BLOT, f"{sparse['ink_cached_query_ms']:.3f} ms"),
             ],
@@ -368,7 +378,7 @@ def build_ecs_chart(data: dict) -> str:
         text(
             28,
             h - 18,
-            "Archetype tables (Bevy) excel at AoS queries; entity-indexed owned columns (Ink) lead on spawn, tag churn, snapshots, and spark SoA.",
+            "Ink v128 AoS queries match native Bevy dense speed (~1%); entity-indexed owned columns lead on spawn, tag churn, snapshots & spark SoA.",
             size=10.9,
             fill=TEXT_MUTED,
         )

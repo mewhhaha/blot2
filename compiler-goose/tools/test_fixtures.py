@@ -140,6 +140,21 @@ fixtures changed Wasm bytes/SHA (6 smaller via `CheckedGrow` reuse/`2.0*x`,
 2 same-size SHA changes, `scoped-loop-cleanup.blot` +81 B from `CheckedLe`);
 all exit codes, diagnostics, and work counters are unchanged.
 
+Runtime performance Tier 5 (25 November 2026) added branchless `select` indexed
+updates, short-circuit `or`-break, `memory.copy` copy-tail loops, invariant
+2-way merge `k < dst_len` hoisting, and deeper loop-bearing helper inlining
+with interprocedural handle preservation (5A); intra-element `v128` SIMD for
+16-byte `Maybe Vec3` updates and pre-loop indirect-index bounds scans (5B);
+2-row × 16-col (`8 × v128`) register-blocked outer-row matmul tiling (5C);
+16-wide `v128` SIMD masked/unmasked `U32` reductions (5D); 4-pixel `v128`
+outer-loop escape-time SIMD with `v128.any_true` early exit and SIMD `2.0*x`
+strength reduction (5E); and 16-wide (`4 × v128`) SIMD affine LCG recurrence +
+8× scalar parallel-power unrolling (5F). Re-recorded `expected.json`: 107 of
+109 fixtures stayed byte-identical; 2 shrank from deeper inlining
+(`fixed_scalar_spans.blot` 48→47 funcs / 8764→8726 B;
+`scoped-loop-refinement.blot` 47→46 funcs / 10393→10286 B) with zero exit-code,
+diagnostic, or frontend work-counter changes.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

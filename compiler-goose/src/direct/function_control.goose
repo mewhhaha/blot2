@@ -205,10 +205,291 @@ fn tryIfSelectConvert(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     lset(g, out_loc);
     return valOf1(g, tv.ty, out_loc), true, blot_direct_types::Error.none;
 }
+// 5A: Short-circuit `if (a or b): break` without materializing a temporary Bool local.
+fn tryIfShortCircuitBreak(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
+    var lhs_id: u32 = 0;
+    var rhs_id: u32 = 0;
+    var body_id: u32 = 0;
+    var cond_id: u32 = 0;
+    {
+        let m .= g.units[f.unit - 1];
+        let n = m.node(id);
+        if n.tag != blot_check_core::Tag.if_stmt || n.c != 0 || m.branchMerges(id).len != 0 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        if !isBreakBody(m, n.b) { return neverVal(), false, blot_direct_types::Error.none; }
+        let cn = m.node(n.a);
+        if cn.tag != blot_check_core::Tag.logical || cn.op != blot_check_core::Op.or_ {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        cond_id = n.a;
+        lhs_id = cn.a;
+        rhs_id = cn.b;
+        body_id = n.b;
+    }
+    var saved_ce: CheckedElem[8] = [CheckedElem {}; 8];
+    let saved_ce_len = f.checked_elems_len;
+    for ci in 0..saved_ce_len { saved_ce[ci] = f.checked_elems[ci]; }
+
+    let lv, lerr = expr(g, f, lhs_id);
+    if lerr != blot_direct_types::Error.none { return lv, true, lerr; }
+    push(g, lv);
+    let if1 = open(g, f, OP_if_);
+    let _, b1err = stmt(g, f, body_id);
+    if b1err != blot_direct_types::Error.none { return neverVal(), true, b1err; }
+    popCheckedArraysAt(f, if1);
+    close(g, f);
+    f.checked_elems_len = saved_ce_len;
+    for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
+    recordCondBounds(g, f, g.units[f.unit - 1], lhs_id, true);
+
+    let rv, rerr = expr(g, f, rhs_id);
+    if rerr != blot_direct_types::Error.none { return rv, true, rerr; }
+    push(g, rv);
+    let if2 = open(g, f, OP_if_);
+    let _, b2err = stmt(g, f, body_id);
+    if b2err != blot_direct_types::Error.none { return neverVal(), true, b2err; }
+    popCheckedArraysAt(f, if2);
+    close(g, f);
+    f.checked_elems_len = saved_ce_len;
+    for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
+    recordCondBounds(g, f, g.units[f.unit - 1], cond_id, true);
+    return unitVal(), true, blot_direct_types::Error.none;
+}
+
+// 5A: Collect unconditional `arr[idx]` reads inside a pure comparison condition.
+recursive fn collectUncondCondReads(
+    m: const Module&,
+    id: u32,
+    arr_out: u32[4]&,
+    idx_out: u32[4]&,
+    len: i64&,
+    depth: i64,
+) {
+    if id == 0 || depth > 8 || len >= 4 { return; }
+    let ok, arr_n, idx_n = matchArrayGet(m, id);
+    if ok {
+        let ab = localRef(m, arr_n);
+        let ib = localRef(m, idx_n);
+        if ab != 0 && ib != 0 {
+            arr_out[len] = ab;
+            idx_out[len] = ib;
+            len += 1;
+        }
+        return;
+    }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
+        collectUncondCondReads(m, n.a, arr_out, idx_out, len, depth + 1);
+        collectUncondCondReads(m, n.b, arr_out, idx_out, len, depth + 1);
+    }
+}
+fn isCondCachedRead(m: const Module&, id: u32, cond_arrs: const u32[4]&, cond_idxs: const u32[4]&, cond_len: i64) -> bool {
+    let ok, arr_n, idx_n = matchArrayGet(m, id);
+    if !ok { return false; }
+    let ab = localRef(m, arr_n);
+    let ib = localRef(m, idx_n);
+    if ab == 0 || ib == 0 { return false; }
+    for i in 0..cond_len {
+        if cond_arrs[i] == ab && cond_idxs[i] == ib { return true; }
+    }
+    return false;
+}
+fn matchBranchIndexedStore(
+    g: const Generator&,
+    f: const Fn&,
+    m: const Module&,
+    body_id: u32,
+    cond_arrs: const u32[4]&,
+    cond_idxs: const u32[4]&,
+    cond_len: i64,
+    rest_out: u32[4]&,
+    rest_len: i64&,
+) -> bool, u32, u32, u32, u32, u32 {
+    if body_id == 0 { return false, 0, 0, 0, 0, 0; }
+    var stmts: u32[5] = [0; 5];
+    var slen: i64 = 0;
+    let bn = m.node(body_id);
+    if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+        let ch = m.children(body_id);
+        if ch.len == 0 || ch.len > 5 { return false, 0, 0, 0, 0, 0; }
+        for i in 0..ch.len { stmts[i] = ch[i]; }
+        slen = ch.len;
+    } else {
+        stmts[0] = body_id;
+        slen = 1;
+    }
+    var upd_id: u32 = 0;
+    var upd_bind_b: u32 = 0;
+    let s0 = m.node(stmts[0]);
+    if s0.tag == blot_check_core::Tag.update {
+        upd_id = stmts[0];
+    } else if s0.tag == blot_check_core::Tag.bind && s0.c < 2 && m.node(s0.b).tag == blot_check_core::Tag.update {
+        upd_id = s0.b;
+        upd_bind_b = s0.a;
+    } else {
+        return false, 0, 0, 0, 0, 0;
+    }
+    let uinfo = m.updateInfo(upd_id);
+    let sels = m.updateSelectors(upd_id);
+    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false, 0, 0, 0, 0, 0; }
+    if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, 0, 0, 0, 0, 0; }
+    let dst_b = localRef(m, uinfo.root);
+    let idx_b = localRef(m, sels[0].index);
+    if dst_b == 0 || idx_b == 0 { return false, 0, 0, 0, 0, 0; }
+    var val_ok = isCondCachedRead(m, uinfo.value, cond_arrs, cond_idxs, cond_len);
+    if !val_ok {
+        var vb: i64 = 12;
+        val_ok = isPureSelectExpr(g, f, m, uinfo.value, vb);
+    }
+    if !val_ok { return false, 0, 0, 0, 0, 0; }
+    rest_len = 0;
+    for i in 1..slen {
+        var rb: i64 = 16;
+        if !isPureSelectExpr(g, f, m, stmts[i], rb) { return false, 0, 0, 0, 0, 0; }
+        rest_out[rest_len] = stmts[i];
+        rest_len += 1;
+    }
+    return true, dst_b, idx_b, uinfo.value, upd_bind_b, uinfo.root;
+}
+// 5A: Branchless `select` (`cmov`) conversion for same-target scalar indexed updates:
+//   if cond: dst[k] := a; i += 1  else:  dst[k] := b; j += 1
+fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
+    if g.runtime_().has_fork { return neverVal(), false, blot_direct_types::Error.none; }
+    var cond_id: u32 = 0;
+    var dst_b: u32 = 0;
+    var dst_root_node: u32 = 0;
+    var idx_b: u32 = 0;
+    var t_val_node: u32 = 0;
+    var e_val_node: u32 = 0;
+    var t_rest: u32[4] = [0; 4];
+    var t_rest_len: i64 = 0;
+    var e_rest: u32[4] = [0; 4];
+    var e_rest_len: i64 = 0;
+    var merge_count: i64 = 0;
+    var m_then: u32[6] = [0; 6];
+    var m_else: u32[6] = [0; 6];
+    var m_res: u32[6] = [0; 6];
+    var m_is_dst: bool[6] = [false; 6];
+    var eligible = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let n = m.node(id);
+        if n.tag != blot_check_core::Tag.if_stmt || n.c == 0 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let merges = m.branchMerges(id);
+        if merges.len == 0 || merges.len > 6 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        var cond_arrs: u32[4] = [0; 4];
+        var cond_idxs: u32[4] = [0; 4];
+        var cond_len: i64 = 0;
+        collectUncondCondReads(m, n.a, cond_arrs, cond_idxs, cond_len, 0);
+        let tok, t_dst, t_idx, t_val, t_ub, t_root = matchBranchIndexedStore(g, f, m, n.b, cond_arrs, cond_idxs, cond_len, t_rest, t_rest_len);
+        if !tok { return neverVal(), false, blot_direct_types::Error.none; }
+        let eok, e_dst, e_idx, e_val, e_ub, _ = matchBranchIndexedStore(g, f, m, n.c, cond_arrs, cond_idxs, cond_len, e_rest, e_rest_len);
+        if !eok || t_dst != e_dst || t_idx != e_idx { return neverVal(), false, blot_direct_types::Error.none; }
+        let dv, dok = bindGet(g, f, t_dst);
+        let iv, iok = bindGet(g, f, t_idx);
+        if !dok || !iok || tagOf(g, dv.ty) != blot_direct_types::Tag.array || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let elem_tag = tagOf(g, g.types.node(dv.ty).a);
+        if !isScalarTag(elem_tag) { return neverVal(), false, blot_direct_types::Error.none; }
+        var all_ok = true;
+        for merge, at in merges {
+            let _, ct = withCellType(g, f, merge.then_binding);
+            let _, ce = withCellType(g, f, merge.else_binding);
+            if ct || ce { all_ok = false; break; }
+            let is_t_dst = merge.then_binding == t_dst || (t_ub != 0 && merge.then_binding == t_ub);
+            let is_e_dst = merge.else_binding == e_dst || (e_ub != 0 && merge.else_binding == e_ub);
+            if is_t_dst && is_e_dst {
+                m_is_dst[at] = true;
+            } else {
+                let mty = m.types.node(m.binding(merge.result).ty).tag;
+                if mty != blot_check_types::Tag.unsigned32 && mty != blot_check_types::Tag.floating32 && mty != blot_check_types::Tag.boolean {
+                    all_ok = false;
+                    break;
+                }
+                m_is_dst[at] = false;
+            }
+            m_then[at] = merge.then_binding;
+            m_else[at] = merge.else_binding;
+            m_res[at] = merge.result;
+        }
+        if !all_ok { return neverVal(), false, blot_direct_types::Error.none; }
+        cond_id = n.a;
+        dst_b = t_dst;
+        dst_root_node = t_root;
+        idx_b = t_idx;
+        t_val_node = t_val;
+        e_val_node = e_val;
+        merge_count = merges.len;
+        eligible = true;
+    }
+    if !eligible { return neverVal(), false, blot_direct_types::Error.none; }
+
+    let condition, cerr = expr(g, f, cond_id);
+    if cerr != blot_direct_types::Error.none { return condition, true, cerr; }
+    let vt, vterr = expr(g, f, t_val_node);
+    if vterr != blot_direct_types::Error.none { return vt, true, vterr; }
+    let ve, veerr = expr(g, f, e_val_node);
+    if veerr != blot_direct_types::Error.none { return ve, true, veerr; }
+
+    let dst_val, _ = bindGet(g, f, dst_b);
+    let idx_val, _ = bindGet(g, f, idx_b);
+    let elem_ty = g.types.node(dst_val.ty).a;
+    let sel_loc = local(g, f, localKindForScalar(g, elem_ty));
+    lget(g, w(g, vt, 0));
+    lget(g, w(g, ve, 0));
+    lget(g, w(g, condition, 0));
+    op(g, OP_select);
+    lset(g, sel_loc);
+
+    let addr, aerr = elementAddress(g, f, dst_val, w(g, idx_val, 0), id, g.units[f.unit - 1].typeOf(dst_root_node));
+    if aerr != blot_direct_types::Error.none { return neverVal(), true, aerr; }
+    let werr = writeElement(g, f, addr, 0, valOf1(g, elem_ty, sel_loc), id);
+    if werr != blot_direct_types::Error.none { return neverVal(), true, werr; }
+    f.checked_elems_len = 0;
+
+    for i in 0..t_rest_len {
+        let _, serr = stmt(g, f, t_rest[i]);
+        if serr != blot_direct_types::Error.none { return neverVal(), true, serr; }
+    }
+    for i in 0..e_rest_len {
+        let _, serr = stmt(g, f, e_rest[i]);
+        if serr != blot_direct_types::Error.none { return neverVal(), true, serr; }
+    }
+    for at in 0..merge_count {
+        if m_is_dst[at] {
+            bindPut(g, f, m_res[at], dst_val);
+        } else {
+            let tv, tok = bindGet(g, f, m_then[at]);
+            let ev, eok = bindGet(g, f, m_else[at]);
+            assert(tok && eok && tv.len == 1 && ev.len == 1);
+            let out_loc = local(g, f, localKindForScalar(g, ev.ty));
+            lget(g, w(g, tv, 0));
+            lget(g, w(g, ev, 0));
+            lget(g, w(g, condition, 0));
+            op(g, OP_select);
+            lset(g, out_loc);
+            bindPut(g, f, m_res[at], valOf1(g, ev.ty, out_loc));
+        }
+    }
+    return unitVal(), true, blot_direct_types::Error.none;
+}
+
 recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let sc_val, sc_done, sc_err = tryIfShortCircuitBreak(g, f, id);
+    if sc_err != blot_direct_types::Error.none { return sc_val, sc_err; }
+    if sc_done { return sc_val, blot_direct_types::Error.none; }
     let sel_val, converted, sel_err = tryIfSelectConvert(g, f, id);
     if sel_err != blot_direct_types::Error.none { return sel_val, sel_err; }
     if converted { return sel_val, blot_direct_types::Error.none; }
+    let bs_val, bs_done, bs_err = tryIfBranchlessStore(g, f, id);
+    if bs_err != blot_direct_types::Error.none { return bs_val, bs_err; }
+    if bs_done { return bs_val, blot_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     let result = g.newSlot();
@@ -958,6 +1239,342 @@ fn resolveLazyVariantArrayRead(g: Generator&, f: const Fn&, m: const Module&, in
     }
     return 0, 0, BindingRef { 0, 0 }, false;
 }
+// 5B-1: Extract 3 F32 field pattern bindings mapped to physical layout slots 0..2
+// from `$Some ($Pos { x, y, z })`-shaped single-constructor record patterns.
+fn extract3F32PayloadPat(
+    g: Generator&,
+    m: const Module&,
+    subpat: u32,
+    payload_ty: Ty,
+    out_bs: u32[3]&,
+) -> bool {
+    if subpat == 0 { return false; }
+    var rec_ty = payload_ty;
+    var pat_id = subpat;
+    if tagOf(g, payload_ty) == blot_direct_types::Tag.nominal {
+        let cases, cerr = g.types.variants(payload_ty);
+        if cerr != blot_direct_types::Error.none || cases.len != 1 { return false; }
+        let p = m.pattern(pat_id);
+        if p.tag != blot_check_core::PatternTag.constructor { return false; }
+        if m.constructor(p.a).tag != g.types.variant_tags[cases.tags] { return false; }
+        rec_ty = g.types.variant_payloads[cases.payloads];
+        pat_id = p.b;
+    }
+    if tagOf(g, rec_ty) != blot_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false; }
+    let layout, lerr = g.types.layout(rec_ty);
+    if lerr != blot_direct_types::Error.none || layout.len != 3 { return false; }
+    if layout[0] != VT_f32 || layout[1] != VT_f32 || layout[2] != VT_f32 { return false; }
+    let rp = m.pattern(pat_id);
+    var prod_id: u32 = 0;
+    if rp.tag == blot_check_core::PatternTag.record_payload {
+        if m.pattern(rp.b).tag != blot_check_core::PatternTag.product { return false; }
+        prod_id = rp.b;
+    } else if rp.tag == blot_check_core::PatternTag.product {
+        prod_id = pat_id;
+    } else {
+        return false;
+    }
+    let storage = m.types.node(rp.ty);
+    if storage.tag != blot_check_types::Tag.record || storage.b != 3 { return false; }
+    let ch = m.patternChildren(prod_id);
+    if ch.len != 3 { return false; }
+    var seen: bool[3] = [false; 3];
+    for idx in 0..3 {
+        let cp = m.pattern(ch[idx]);
+        if cp.tag != blot_check_core::PatternTag.bind { return false; }
+        let fsp = m.fieldSpelling(m.types.recordField(storage, idx).name);
+        if !fsp.present { return false; }
+        let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
+        if slot < 0 || slot >= 3 || seen[slot] { return false; }
+        seen[slot] = true;
+        out_bs[slot] = cp.a;
+    }
+    return seen[0] && seen[1] && seen[2];
+}
+fn isNoopWildcardArm(m: const Module&, arm: blot_check_core::MatchArm) -> bool {
+    if arm.guard_ != 0 { return false; }
+    let rows = m.armRows(arm);
+    if rows.len != 1 { return false; }
+    let pats = m.rowPatterns(rows[0]);
+    if pats.len != 1 || m.pattern(pats[0]).tag != blot_check_core::PatternTag.wildcard { return false; }
+    if arm.body == 0 { return true; }
+    let bn = m.node(arm.body);
+    return bn.tag == blot_check_core::Tag.constant ||
+        ((bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ || bn.tag == blot_check_core::Tag.product) && bn.b == 0);
+}
+fn match3F32CtorExpr(
+    g: Generator&,
+    m: const Module&,
+    val_id: u32,
+    outer_ty: Ty,
+    payload_ty: Ty,
+    p_bs: const u32[3]&,
+    v_bs: const u32[3]&,
+) -> bool, Op {
+    let vn = m.node(val_id);
+    if vn.tag != blot_check_core::Tag.construct || m.constructor(vn.a).tag != 0 { return false, blot_check_core::Op.none; }
+    var inner_id = vn.b;
+    var rec_ty = payload_ty;
+    var decl_storage_tid: TId = 0;
+    if tagOf(g, payload_ty) == blot_direct_types::Tag.nominal {
+        let cases, cerr = g.types.variants(payload_ty);
+        if cerr != blot_direct_types::Error.none || cases.len != 1 { return false, blot_check_core::Op.none; }
+        let in_n = m.node(inner_id);
+        if in_n.tag != blot_check_core::Tag.construct { return false, blot_check_core::Op.none; }
+        let ctor = m.constructor(in_n.a);
+        if ctor.tag != g.types.variant_tags[cases.tags] { return false, blot_check_core::Op.none; }
+        rec_ty = g.types.variant_payloads[cases.payloads];
+        if ctor.payload != 0 {
+            let dn = m.types.node(ctor.payload);
+            if dn.tag == blot_check_types::Tag.record && dn.b == 3 {
+                decl_storage_tid = ctor.payload;
+            }
+        }
+        inner_id = in_n.b;
+    }
+    if tagOf(g, rec_ty) != blot_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false, blot_check_core::Op.none; }
+    let rn = m.node(inner_id);
+    if rn.tag != blot_check_core::Tag.record && rn.tag != blot_check_core::Tag.product { return false, blot_check_core::Op.none; }
+    let ch = m.children(inner_id);
+    if ch.len != 3 { return false, blot_check_core::Op.none; }
+    var storage_tid: TId = 0;
+    if rn.tag == blot_check_core::Tag.record {
+        storage_tid = m.typeOf(inner_id);
+        let sn = m.types.node(storage_tid);
+        if sn.tag != blot_check_types::Tag.record || sn.b != 3 { return false, blot_check_core::Op.none; }
+    } else {
+        if decl_storage_tid == 0 { return false, blot_check_core::Op.none; }
+        storage_tid = decl_storage_tid;
+    }
+    let storage = m.types.node(storage_tid);
+    var lane_exprs: u32[3] = [0; 3];
+    var seen: bool[3] = [false; 3];
+    for idx in 0..3 {
+        var dest = idx;
+        if rn.tag == blot_check_core::Tag.record {
+            dest = m.recordDestinations(inner_id)[idx] as i64;
+            if dest < 0 || dest >= 3 { return false, blot_check_core::Op.none; }
+        }
+        let fsp = m.fieldSpelling(m.types.recordField(storage, dest).name);
+        if !fsp.present { return false, blot_check_core::Op.none; }
+        let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
+        if slot < 0 || slot >= 3 || seen[slot] { return false, blot_check_core::Op.none; }
+        seen[slot] = true;
+        lane_exprs[slot] = ch[idx];
+    }
+    if !seen[0] || !seen[1] || !seen[2] { return false, blot_check_core::Op.none; }
+    var want_op = blot_check_core::Op.none;
+    for slot in 0..3 {
+        let en = m.node(lane_exprs[slot]);
+        if en.tag != blot_check_core::Tag.scalar && !(en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none) {
+            return false, blot_check_core::Op.none;
+        }
+        if en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.sub { return false, blot_check_core::Op.none; }
+        if want_op == blot_check_core::Op.none { want_op = en.op; }
+        else if en.op != want_op { return false, blot_check_core::Op.none; }
+        let la = localRef(m, en.a);
+        let lb = localRef(m, en.b);
+        let exact = la == p_bs[slot] && lb == v_bs[slot];
+        let comm = want_op == blot_check_core::Op.add && la == v_bs[slot] && lb == p_bs[slot];
+        if !exact && !comm { return false, blot_check_core::Op.none; }
+    }
+    return want_op != blot_check_core::Op.none, want_op;
+}
+// 5B-1: Intra-element v128 SIMD for 16-byte `Maybe Vec3` updates:
+//   if let $Some ($Pos { x, y, z }) = pos[idx]:
+//     if let $Some ($Vel { vx, vy, vz }) = vel[idx]:
+//       pos[idx] := $Some ($Pos { x: x +- vx, y: y +- vy, z: z +- vz })
+// Since tag($Some) == 0 == IEEE-754 +0.0, `+0.0 +- +0.0 == +0.0 == 0x00000000`,
+// collapsing 11 scalar mem/FP ops to 2 v128.load + 1 f32x4.{add,sub} + 1 v128.store.
+fn tryEmitVec3MaybeSimdUpdate(
+    g: Generator&,
+    f: Fn&,
+    id: u32,
+    pos_arr_node: u32,
+    pos_idx_node: u32,
+    pos_input_id: u32,
+    pos_inlined: BindingRef,
+    pos_elem_ty: Ty,
+) -> Val, bool, Error {
+    if g.runtime_().has_fork { return neverVal(), false, blot_direct_types::Error.none; }
+    var vel_arr_node: u32 = 0;
+    var vel_idx_node: u32 = 0;
+    var vel_input_id: u32 = 0;
+    var vel_inlined = BindingRef { 0, 0 };
+    var vec_op = blot_check_core::Op.none;
+    var merge_count: i64 = 0;
+    var merge_res: u32[2] = [0; 2];
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let info = m.matchInfo(id);
+        if !info.statement { return neverVal(), false, blot_direct_types::Error.none; }
+        let arms = m.matchArms(id);
+        if arms.len != 2 || arms[0].guard_ != 0 || !isNoopWildcardArm(m, arms[1]) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let pos_b = localRef(m, pos_arr_node);
+        let idx_b = localRef(m, pos_idx_node);
+        if pos_b == 0 || idx_b == 0 { return neverVal(), false, blot_direct_types::Error.none; }
+        let pos_step, pserr = stride(g, f, pos_elem_ty, id);
+        if pserr != blot_direct_types::Error.none || pos_step != 16 { return neverVal(), false, blot_direct_types::Error.none; }
+        let p_cases, pcerr = g.types.variants(pos_elem_ty);
+        if pcerr != blot_direct_types::Error.none || p_cases.len <= 1 { return neverVal(), false, blot_direct_types::Error.none; }
+        let p_vpos, pvperr = variantPosition(g, f, p_cases, 0, id);
+        if pvperr != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+        let p_payload_ty = g.types.variant_payloads[p_cases.payloads + p_vpos];
+        let p_pat = m.pattern(m.rowPatterns(m.armRows(arms[0])[0])[0]);
+        if p_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        var p_bs: u32[3] = [0; 3];
+        if !extract3F32PayloadPat(g, m, p_pat.b, p_payload_ty, p_bs) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+
+        // Inner match on `vel[idx]`
+        let inner_id = unwrapSingleBody(m, arms[0].body);
+        if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.match_ {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let inner_info = m.matchInfo(inner_id);
+        let inner_inputs = m.matchInputs(inner_id);
+        let inner_arms = m.matchArms(inner_id);
+        if !inner_info.statement || inner_inputs.len != 1 || inner_arms.len != 2 ||
+            inner_arms[0].guard_ != 0 || !isNoopWildcardArm(m, inner_arms[1]) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let v_arr_n, v_idx_n, v_inl, v_ok = resolveLazyVariantArrayRead(g, f, m, inner_inputs[0]);
+        if !v_ok || localRef(m, v_idx_n) != idx_b { return neverVal(), false, blot_direct_types::Error.none; }
+        let vel_elem_ty, vierr = g.types.lower(m, m.typeOf(inner_inputs[0]), f.env);
+        if vierr != blot_direct_types::Error.none { g.dropFailure(); return neverVal(), false, blot_direct_types::Error.none; }
+        if tagOf(g, vel_elem_ty) != blot_direct_types::Tag.nominal { return neverVal(), false, blot_direct_types::Error.none; }
+        let v_boxed, vberr = isBoxed(g, f, vel_elem_ty, inner_id);
+        let v_step, vserr = stride(g, f, vel_elem_ty, inner_id);
+        if vberr != blot_direct_types::Error.none || v_boxed || vserr != blot_direct_types::Error.none || v_step != 16 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let v_cases, vcerr = g.types.variants(vel_elem_ty);
+        if vcerr != blot_direct_types::Error.none || v_cases.len <= 1 { return neverVal(), false, blot_direct_types::Error.none; }
+        let v_vpos, vvperr = variantPosition(g, f, v_cases, 0, inner_id);
+        if vvperr != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+        let v_payload_ty = g.types.variant_payloads[v_cases.payloads + v_vpos];
+        let v_rows = m.armRows(inner_arms[0]);
+        if v_rows.len != 1 || m.rowPatterns(v_rows[0]).len != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+        let v_pat = m.pattern(m.rowPatterns(v_rows[0])[0]);
+        if v_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(v_pat.a).tag != 0 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        var v_bs: u32[3] = [0; 3];
+        if !extract3F32PayloadPat(g, m, v_pat.b, v_payload_ty, v_bs) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+
+        // Inner body: single `pos[idx] := $Some ($Pos { ... })`
+        let body_stmt = unwrapSingleBody(m, inner_arms[0].body);
+        if body_stmt == 0 { return neverVal(), false, blot_direct_types::Error.none; }
+        var upd_id: u32 = 0;
+        var upd_bind_b: u32 = 0;
+        let bsn = m.node(body_stmt);
+        if bsn.tag == blot_check_core::Tag.update { upd_id = body_stmt; }
+        else if bsn.tag == blot_check_core::Tag.bind && bsn.c < 2 && m.node(bsn.b).tag == blot_check_core::Tag.update {
+            upd_id = bsn.b;
+            upd_bind_b = bsn.a;
+        } else {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let uinfo = m.updateInfo(upd_id);
+        let sels = m.updateSelectors(upd_id);
+        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        if localRef(m, uinfo.root) != pos_b || localRef(m, sels[0].index) != idx_b {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let op_ok, found_op = match3F32CtorExpr(g, m, uinfo.value, pos_elem_ty, p_payload_ty, p_bs, v_bs);
+        if !op_ok { return neverVal(), false, blot_direct_types::Error.none; }
+
+        // Check outer and inner merges only re-thread `pos_b` in place.
+        let imerges = m.branchMerges(inner_id);
+        if imerges.len > 1 { return neverVal(), false, blot_direct_types::Error.none; }
+        var inner_pos_res: u32 = 0;
+        for im in imerges {
+            let t_ok = im.then_binding == pos_b || (upd_bind_b != 0 && im.then_binding == upd_bind_b);
+            if !t_ok || im.else_binding != pos_b { return neverVal(), false, blot_direct_types::Error.none; }
+            inner_pos_res = im.result;
+        }
+        let omerges = m.branchMerges(id);
+        if omerges.len > 2 { return neverVal(), false, blot_direct_types::Error.none; }
+        for om, oi in omerges {
+            let t_ok = om.then_binding == pos_b || (inner_pos_res != 0 && om.then_binding == inner_pos_res) || (upd_bind_b != 0 && om.then_binding == upd_bind_b);
+            if !t_ok || om.else_binding != pos_b { return neverVal(), false, blot_direct_types::Error.none; }
+            merge_res[oi] = om.result;
+        }
+        merge_count = omerges.len;
+        vel_arr_node = v_arr_n;
+        vel_idx_node = v_idx_n;
+        vel_input_id = inner_inputs[0];
+        vel_inlined = v_inl;
+        vec_op = found_op;
+        matched = true;
+    }
+    if !matched { return neverVal(), false, blot_direct_types::Error.none; }
+
+    if pos_inlined.binding != 0 { g.recordInlined(pos_inlined.unit, pos_inlined.binding); }
+    if vel_inlined.binding != 0 { g.recordInlined(vel_inlined.unit, vel_inlined.binding); }
+
+    let pos_val, perr = expr(g, f, pos_arr_node);
+    if perr != blot_direct_types::Error.none { return pos_val, true, perr; }
+    let idx_val, ierr = expr(g, f, pos_idx_node);
+    if ierr != blot_direct_types::Error.none { return idx_val, true, ierr; }
+    let idx_loc, slerr = scalarLocal(g, f, idx_val, pos_input_id);
+    if slerr != blot_direct_types::Error.none { return neverVal(), true, slerr; }
+
+    let pos_addr, paerr = elementAddress(g, f, pos_val, idx_loc, pos_input_id, g.units[f.unit - 1].typeOf(pos_arr_node), true);
+    if paerr != blot_direct_types::Error.none { return neverVal(), true, paerr; }
+
+    let pv = local(g, f, VT_v128);
+    lget(g, pos_addr);
+    simdMemOp(g, SIMD_v128_load, 2, 0);
+    ltee(g, pv);
+    simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+    op(g, OP_i32_eqz);
+    let p_if = open(g, f, OP_if_);
+
+    let vel_val, verr = expr(g, f, vel_arr_node);
+    if verr != blot_direct_types::Error.none { return vel_val, true, verr; }
+    let vel_addr, vaerr = elementAddress(g, f, vel_val, idx_loc, vel_input_id, g.units[f.unit - 1].typeOf(vel_arr_node), true);
+    if vaerr != blot_direct_types::Error.none { return neverVal(), true, vaerr; }
+
+    let vv = local(g, f, VT_v128);
+    lget(g, vel_addr);
+    simdMemOp(g, SIMD_v128_load, 2, 0);
+    ltee(g, vv);
+    simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+    op(g, OP_i32_eqz);
+    let v_if = open(g, f, OP_if_);
+
+    lget(g, pos_addr);
+    lget(g, pv);
+    lget(g, vv);
+    if vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+    else { simdOp(g, SIMD_f32x4_sub); }
+    if !f.defer_f32_nan { canonicalizeF32x4(g, f, 0xffffffff); }
+    simdMemOp(g, SIMD_v128_store, 2, 0);
+
+    popCheckedArraysAt(f, v_if);
+    close(g, f);
+    popCheckedArraysAt(f, p_if);
+    close(g, f);
+    f.checked_elems_len = 0;
+
+    for mi in 0..merge_count { bindPut(g, f, merge_res[mi], pos_val); }
+    return unitVal(), true, blot_direct_types::Error.none;
+}
+
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     // Lazy variant payload fast path: when matching an unboxed multi-constructor
     // nominal directly from a `Tag.array` element read (`pos[i]`, `pool.at id`),
@@ -1008,6 +1625,9 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     if use_lazy_variant {
+        let v3_val, v3_done, v3_err = tryEmitVec3MaybeSimdUpdate(g, f, id, lazy_arr_node, lazy_idx_node, lazy_input_id, lazy_inlined, lazy_input_ty);
+        if v3_err != blot_direct_types::Error.none { return v3_val, v3_err; }
+        if v3_done { return v3_val, blot_direct_types::Error.none; }
         if lazy_inlined.binding != 0 { g.recordInlined(lazy_inlined.unit, lazy_inlined.binding); }
         let arr_val, aerr = expr(g, f, lazy_arr_node);
         if aerr != blot_direct_types::Error.none { return arr_val, aerr; }
@@ -1851,7 +2471,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
             if !g.hasUnit(target.unit) { return false; }
             let tm .= g.units[target.unit - 1];
             let body .= tm.body(target.binding);
-            if !body || !body.is_function || body.exported || body.scheme.obligations.len != 0 { return false; }
+            if !body || !body.is_function || body.exported { return false; }
             if tm.bodyParameters(body).len != call.arguments.len { return false; }
             return noStorageResize(g, tm, body.root, left);
         },
@@ -2162,7 +2782,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             if !g.hasUnit(target.unit) { return false; }
             let tm .= g.units[target.unit - 1];
             let body .= tm.body(target.binding);
-            if !body || !body.is_function || body.exported || body.scheme.obligations.len != 0 { return false; }
+            if !body || !body.is_function || body.exported { return false; }
             let params = tm.bodyParameters(body);
             if params.len != call.arguments.len { return false; }
             var ibudget: i64 = 72;
@@ -2262,7 +2882,118 @@ fn addBindingSet(set: u32[64]&, len: i64&, b: u32) {
     set[len] = b;
     len += 1;
 }
-recursive fn exprPreservesHandle(m: const Module&, id: u32, same: const u32[64]&, same_len: i64, depth: i64) -> bool {
+recursive fn scanCalleePreserves(
+    g: const Generator&,
+    m: const Module&,
+    id: u32,
+    same: u32[64]&,
+    same_len: i64&,
+    budget: i64&,
+    call_depth: i64,
+    saw_return: bool&,
+) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for child in m.children(id) {
+                if !scanCalleePreserves(g, m, child, same, same_len, budget, call_depth, saw_return) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if !scanCalleePreserves(g, m, n.b, same, same_len, budget, call_depth, saw_return) { return false; }
+            if n.c < 2 && exprPreservesHandle(g, m, n.b, same, same_len, 0, true, call_depth) {
+                addBindingSet(same, same_len, n.a);
+            }
+            return true;
+        },
+        if_stmt, if_value => {
+            if !scanCalleePreserves(g, m, n.a, same, same_len, budget, call_depth, saw_return) ||
+                !scanCalleePreserves(g, m, n.b, same, same_len, budget, call_depth, saw_return) ||
+                !scanCalleePreserves(g, m, n.c, same, same_len, budget, call_depth, saw_return) { return false; }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
+                    addBindingSet(same, same_len, merge.result);
+                }
+            }
+            return true;
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !scanCalleePreserves(g, m, inp, same, same_len, budget, call_depth, saw_return) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !scanCalleePreserves(g, m, arm.guard_, same, same_len, budget, call_depth, saw_return) ||
+                    !scanCalleePreserves(g, m, arm.body, same, same_len, budget, call_depth, saw_return) { return false; }
+            }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
+                    addBindingSet(same, same_len, merge.result);
+                }
+            }
+            return true;
+        },
+        loop_ => {
+            let ninfo = m.loopInfo(id);
+            if !scanCalleePreserves(g, m, ninfo.first, same, same_len, budget, call_depth, saw_return) ||
+                !scanCalleePreserves(g, m, ninfo.end, same, same_len, budget, call_depth, saw_return) { return false; }
+            for nc, nc_at in m.loopCarries(id) {
+                if inBindingSet(same, same_len, nc.incoming) {
+                    if carryStaysInPlace(g, m, id, nc_at, nc.iteration, nc.backedge, budget, call_depth) {
+                        addBindingSet(same, same_len, nc.iteration);
+                        addBindingSet(same, same_len, nc.outgoing);
+                    }
+                }
+            }
+            return scanCalleePreserves(g, m, ninfo.body, same, same_len, budget, call_depth, saw_return);
+        },
+        return_ => {
+            saw_return = true;
+            return exprPreservesHandle(g, m, n.a, same, same_len, 0, true, call_depth);
+        },
+        pattern_bind => {
+            return scanCalleePreserves(g, m, n.b, same, same_len, budget, call_depth, saw_return) &&
+                scanCalleePreserves(g, m, n.c, same, same_len, budget, call_depth, saw_return);
+        },
+        break_, constant, reference, panic, scalar, associated, logical, array_op, storage, update, call, apply, product, record, construct, project, result_associated => {
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn calleeReturnsParamHandle(g: const Generator&, m: const Module&, body_root: u32, param_b: u32, call_depth: i64) -> bool {
+    var same: u32[64] = [0; 64];
+    var same_len: i64 = 0;
+    addBindingSet(same, same_len, param_b);
+    var budget: i64 = 1024;
+    var saw_return = false;
+    if !scanCalleePreserves(g, m, body_root, same, same_len, budget, call_depth, saw_return) { return false; }
+    if saw_return {
+        // Verify tail statement is a return_ (no implicit fallthrough returning a different value).
+        var tail = body_root;
+        for step in 0..4 {
+            let tn = m.node(tail);
+            if (tn.tag == blot_check_core::Tag.suite || tn.tag == blot_check_core::Tag.block_) && tn.b > 0 {
+                tail = m.children(tail)[tn.b - 1];
+            } else { break; }
+        }
+        return m.node(tail).tag == blot_check_core::Tag.return_;
+    }
+    return exprPreservesHandle(g, m, body_root, same, same_len, 0, true, call_depth);
+}
+recursive fn exprPreservesHandle(
+    g: const Generator&,
+    m: const Module&,
+    id: u32,
+    same: const u32[64]&,
+    same_len: i64,
+    depth: i64,
+    allow_calls: bool = false,
+    call_depth: i64 = 0,
+) -> bool {
     if id == 0 || depth >= 32 { return false; }
     let n = m.node(id);
     match n.tag {
@@ -2274,29 +3005,67 @@ recursive fn exprPreservesHandle(m: const Module&, id: u32, same: const u32[64]&
             let info = m.updateInfo(id);
             let sels = m.updateSelectors(id);
             return sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index &&
-                exprPreservesHandle(m, info.root, same, same_len, depth + 1);
+                exprPreservesHandle(g, m, info.root, same, same_len, depth + 1, allow_calls, call_depth);
         },
         array_op => {
             if m.arrayOperation(id) != blot_backend_collection_ops::Op.simd_store { return false; }
             let ch = m.children(id);
-            return ch.len > 0 && exprPreservesHandle(m, ch[0], same, same_len, depth + 1);
+            return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
         block_, suite => {
             let ch = m.children(id);
-            if ch.len == 1 { return exprPreservesHandle(m, ch[0], same, same_len, depth + 1); }
+            if ch.len == 1 { return exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth); }
+            return false;
+        },
+        call => {
+            if !allow_calls || call_depth >= 2 { return false; }
+            let info = m.call(id);
+            let target = g.resolve(m, info.target);
+            if !g.hasUnit(target.unit) { return false; }
+            let tm .= g.units[target.unit - 1];
+            let body .= tm.body(target.binding);
+            if !body || !body.is_function || body.exported { return false; }
+            let params = tm.bodyParameters(body);
+            if params.len != info.arguments.len { return false; }
+            for arg, ai in info.arguments {
+                if exprPreservesHandle(g, m, arg, same, same_len, depth + 1, false, call_depth) {
+                    if calleeReturnsParamHandle(g, tm, body.root, params[ai].binding, call_depth + 1) {
+                        return true;
+                    }
+                }
+            }
             return false;
         },
         _ => { return false; },
     }
 }
-recursive fn carryStaysInPlace(m: const Module&, loop_id: u32, carry_at: i64, iter_binding: u32, backedge_binding: u32, budget: i64&) -> bool {
+recursive fn carryStaysInPlace(
+    g: const Generator&,
+    m: const Module&,
+    loop_id: u32,
+    carry_at: i64,
+    iter_binding: u32,
+    backedge_binding: u32,
+    budget: i64&,
+    call_depth: i64 = 0,
+) -> bool {
     var same: u32[64] = [0; 64];
     var same_len: i64 = 0;
     addBindingSet(same, same_len, iter_binding);
-    if !scanCarryInPlace(m, loop_id, carry_at, m.loopInfo(loop_id).body, same, same_len, budget) { return false; }
+    if !scanCarryInPlace(g, m, loop_id, carry_at, m.loopInfo(loop_id).body, same, same_len, budget, call_depth) { return false; }
     return backedge_binding == 0 || inBindingSet(same, same_len, backedge_binding);
 }
-recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id: u32, same: u32[64]&, same_len: i64&, budget: i64&) -> bool {
+recursive fn scanCarryInPlace(
+    g: const Generator&,
+    m: const Module&,
+    loop_id: u32,
+    carry_at: i64,
+    id: u32,
+    same: u32[64]&,
+    same_len: i64&,
+    budget: i64&,
+    call_depth: i64 = 0,
+) -> bool {
     if id == 0 { return true; }
     if budget <= 0 { return false; }
     budget -= 1;
@@ -2304,19 +3073,19 @@ recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id:
     match n.tag {
         suite, block_ => {
             for child in m.children(id) {
-                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, child, same, same_len, budget, call_depth) { return false; }
             }
             return true;
         },
         bind => {
-            if !scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) { return false; }
-            if exprPreservesHandle(m, n.b, same, same_len, 0) { addBindingSet(same, same_len, n.a); }
+            if !scanCarryInPlace(g, m, loop_id, carry_at, n.b, same, same_len, budget, call_depth) { return false; }
+            if exprPreservesHandle(g, m, n.b, same, same_len, 0, true, call_depth) { addBindingSet(same, same_len, n.a); }
             return true;
         },
         if_stmt, if_value => {
-            if !scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget) ||
-                !scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) ||
-                !scanCarryInPlace(m, loop_id, carry_at, n.c, same, same_len, budget) { return false; }
+            if !scanCarryInPlace(g, m, loop_id, carry_at, n.a, same, same_len, budget, call_depth) ||
+                !scanCarryInPlace(g, m, loop_id, carry_at, n.b, same, same_len, budget, call_depth) ||
+                !scanCarryInPlace(g, m, loop_id, carry_at, n.c, same, same_len, budget, call_depth) { return false; }
             for merge in m.branchMerges(id) {
                 if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
                     addBindingSet(same, same_len, merge.result);
@@ -2326,11 +3095,11 @@ recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id:
         },
         match_ => {
             for inp in m.matchInputs(id) {
-                if !scanCarryInPlace(m, loop_id, carry_at, inp, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, inp, same, same_len, budget, call_depth) { return false; }
             }
             for arm in m.matchArms(id) {
-                if !scanCarryInPlace(m, loop_id, carry_at, arm.guard_, same, same_len, budget) ||
-                    !scanCarryInPlace(m, loop_id, carry_at, arm.body, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, arm.guard_, same, same_len, budget, call_depth) ||
+                    !scanCarryInPlace(g, m, loop_id, carry_at, arm.body, same, same_len, budget, call_depth) { return false; }
             }
             for merge in m.branchMerges(id) {
                 if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
@@ -2341,59 +3110,59 @@ recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id:
         },
         loop_ => {
             let ninfo = m.loopInfo(id);
-            if !scanCarryInPlace(m, loop_id, carry_at, ninfo.first, same, same_len, budget) ||
-                !scanCarryInPlace(m, loop_id, carry_at, ninfo.end, same, same_len, budget) { return false; }
+            if !scanCarryInPlace(g, m, loop_id, carry_at, ninfo.first, same, same_len, budget, call_depth) ||
+                !scanCarryInPlace(g, m, loop_id, carry_at, ninfo.end, same, same_len, budget, call_depth) { return false; }
             let ncarries = m.loopCarries(id);
             for nc, nc_at in ncarries {
                 if inBindingSet(same, same_len, nc.incoming) {
-                    if carryStaysInPlace(m, id, nc_at, nc.iteration, nc.backedge, budget) {
+                    if carryStaysInPlace(g, m, id, nc_at, nc.iteration, nc.backedge, budget, call_depth) {
                         addBindingSet(same, same_len, nc.iteration);
                         addBindingSet(same, same_len, nc.outgoing);
                     }
                 }
             }
-            return scanCarryInPlace(m, loop_id, carry_at, ninfo.body, same, same_len, budget);
+            return scanCarryInPlace(g, m, loop_id, carry_at, ninfo.body, same, same_len, budget, call_depth);
         },
         break_ => {
             let vals = m.breakValues(id);
             for child in vals {
-                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, child, same, same_len, budget, call_depth) { return false; }
             }
             if n.a == loop_id {
-                if carry_at >= vals.len || !exprPreservesHandle(m, vals[carry_at], same, same_len, 0) { return false; }
+                if carry_at >= vals.len || !exprPreservesHandle(g, m, vals[carry_at], same, same_len, 0, true, call_depth) { return false; }
             }
             return true;
         },
         pattern_bind => {
-            return scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) &&
-                scanCarryInPlace(m, loop_id, carry_at, n.c, same, same_len, budget);
+            return scanCarryInPlace(g, m, loop_id, carry_at, n.b, same, same_len, budget, call_depth) &&
+                scanCarryInPlace(g, m, loop_id, carry_at, n.c, same, same_len, budget, call_depth);
         },
         update => {
             let info = m.updateInfo(id);
-            if !scanCarryInPlace(m, loop_id, carry_at, info.root, same, same_len, budget) ||
-                !scanCarryInPlace(m, loop_id, carry_at, info.value, same, same_len, budget) { return false; }
+            if !scanCarryInPlace(g, m, loop_id, carry_at, info.root, same, same_len, budget, call_depth) ||
+                !scanCarryInPlace(g, m, loop_id, carry_at, info.value, same, same_len, budget, call_depth) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !scanCarryInPlace(m, loop_id, carry_at, sel.index, same, same_len, budget) { return false; }
+                if sel.kind == blot_check_core::UpdateKind.index && !scanCarryInPlace(g, m, loop_id, carry_at, sel.index, same, same_len, budget, call_depth) { return false; }
             }
             return true;
         },
         call => {
             for arg in m.call(id).arguments {
-                if !scanCarryInPlace(m, loop_id, carry_at, arg, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, arg, same, same_len, budget, call_depth) { return false; }
             }
             return true;
         },
         product, record, array, array_op, storage => {
             for child in m.children(id) {
-                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+                if !scanCarryInPlace(g, m, loop_id, carry_at, child, same, same_len, budget, call_depth) { return false; }
             }
             return true;
         },
-        construct => { return scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget); },
-        return_, project, result_associated, fork_ => { return scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget); },
+        construct => { return scanCarryInPlace(g, m, loop_id, carry_at, n.b, same, same_len, budget, call_depth); },
+        return_, project, result_associated, fork_ => { return scanCarryInPlace(g, m, loop_id, carry_at, n.a, same, same_len, budget, call_depth); },
         scalar, associated, logical, apply => {
-            return scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget) &&
-                scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget);
+            return scanCarryInPlace(g, m, loop_id, carry_at, n.a, same, same_len, budget, call_depth) &&
+                scanCarryInPlace(g, m, loop_id, carry_at, n.b, same, same_len, budget, call_depth);
         },
         constant, reference, panic, closure => { return true; },
         _ => { return false; },
@@ -3072,7 +3841,8 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
         },
         call => {
             for arg in m.call(id).arguments {
-                if m.types.node(m.typeOf(arg)).tag == blot_check_types::Tag.array {
+                let atag = m.types.node(m.typeOf(arg)).tag;
+                if atag == blot_check_types::Tag.array || atag == blot_check_types::Tag.usage {
                     addHoistCandidate(out, len, localRef(m, arg));
                 }
                 collectLoopArrayUses(m, arg, out, len, left);
@@ -3165,7 +3935,7 @@ recursive fn scanCarryUniqueOwned(
         },
         bind => {
             if !scanCarryUniqueOwned(g, f, m, loop_id, carry_at, n.b, owned, owned_len, budget) { return false; }
-            if n.c < 2 && (isFreshOwnedArrayNode(g, m, n.b, 0) || exprPreservesHandle(m, n.b, owned, owned_len, 0)) {
+            if n.c < 2 && (isFreshOwnedArrayNode(g, m, n.b, 0) || exprPreservesHandle(g, m, n.b, owned, owned_len, 0, false, 0)) {
                 addBindingSet(owned, owned_len, n.a);
             }
             return true;
@@ -3314,9 +4084,48 @@ recursive fn matchAffineU32Step(m: const Module&, expr_id: u32, target_iter: u32
     }
     return false, 0, 0;
 }
-// Algebraically unrolls 4x a pure counted U32 loop containing an affine LCG
-// recurrence `s := s * A + C` (exact mod 2^32): computes s1..s4 in parallel from
-// s0 using precomputed (A^k, C_k), breaking the 4-cycle serial imul+add chain.
+// 5F: Algebraically vectorize (16-wide 4x v128 SIMD for associative single-accumulator
+// LCG recurrences like `s := s * A + C; acc := acc ^ (s >> 16)`) or 8x unroll pure
+// counted U32 loops containing an affine LCG recurrence `s := s * A + C` (exact mod 2^32).
+fn matchAffineTermOp(m: const Module&, id: u32, s_back: u32) -> bool, blot_check_core::Op, u32 {
+    if id == 0 { return false, blot_check_core::Op.none, 0; }
+    if localRef(m, id) == s_back { return true, blot_check_core::Op.none, 0; }
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
+        return false, blot_check_core::Op.none, 0;
+    }
+    match n.op {
+        shift_right, shift_right_signed, shift_left => {
+            if localRef(m, n.a) == s_back && m.node(n.b).tag == blot_check_core::Tag.constant {
+                return true, n.op, m.node(n.b).a;
+            }
+            return false, blot_check_core::Op.none, 0;
+        },
+        bit_and, bit_or, bit_xor => {
+            if localRef(m, n.a) == s_back && m.node(n.b).tag == blot_check_core::Tag.constant {
+                return true, n.op, m.node(n.b).a;
+            }
+            if localRef(m, n.b) == s_back && m.node(n.a).tag == blot_check_core::Tag.constant {
+                return true, n.op, m.node(n.a).a;
+            }
+            return false, blot_check_core::Op.none, 0;
+        },
+        _ => { return false, blot_check_core::Op.none, 0; },
+    }
+}
+fn emitAffineVecTerm(g: Generator&, vs: u32, term_op: blot_check_core::Op, term_const: u32, v_mask: u32) {
+    lget(g, vs);
+    match term_op {
+        none => {},
+        shift_right => { i32Const(g, term_const); simdOp(g, SIMD_i32x4_shr_u); },
+        shift_right_signed => { i32Const(g, term_const); simdOp(g, SIMD_i32x4_shr_s); },
+        shift_left => { i32Const(g, term_const); simdOp(g, SIMD_i32x4_shl); },
+        bit_and => { lget(g, v_mask); simdOp(g, SIMD_v128_and); },
+        bit_or => { lget(g, v_mask); simdOp(g, SIMD_v128_or); },
+        bit_xor => { lget(g, v_mask); simdOp(g, SIMD_v128_xor); },
+        _ => {},
+    }
+}
 fn tryEmitAffineUnrollLoop(
     g: Generator&,
     f: Fn&,
@@ -3336,6 +4145,11 @@ fn tryEmitAffineUnrollLoop(
     var a1: u32 = 0;
     var c1: u32 = 0;
     var start_is_zero = false;
+    var simd_acc_ok = false;
+    var acc_carry: i64 = -1;
+    var acc_is_xor = false;
+    var term_op = blot_check_core::Op.none;
+    var term_const: u32 = 0;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
@@ -3398,16 +4212,185 @@ fn tryEmitAffineUnrollLoop(
                 return blot_direct_types::Error.none;
             }
         }
+        // Detect single associative accumulator `acc := acc (^|+) term(s_new)` for 16-wide v128 SIMD!
+        if !g.runtime_().has_fork && carry_count == 2 && stmts_len == 2 {
+            let oc = 1 - affine_carry;
+            let os = 1 - affine_stmt;
+            let osn = m.node(stmts[os]);
+            if osn.a == carry_back[oc] {
+                let r = m.node(osn.b);
+                let is_op = r.tag == blot_check_core::Tag.scalar || (r.tag == blot_check_core::Tag.associated && r.op != blot_check_core::Op.none);
+                if is_op && (r.op == blot_check_core::Op.bit_xor || r.op == blot_check_core::Op.add) {
+                    var term_node: u32 = 0;
+                    if localRef(m, r.a) == carry_iter[oc] { term_node = r.b; }
+                    else if localRef(m, r.b) == carry_iter[oc] { term_node = r.a; }
+                    let tok, top, tconst = matchAffineTermOp(m, term_node, carry_back[affine_carry]);
+                    if tok {
+                        simd_acc_ok = true;
+                        acc_carry = oc;
+                        acc_is_xor = r.op == blot_check_core::Op.bit_xor;
+                        term_op = top;
+                        term_const = tconst;
+                    }
+                }
+            }
+        }
         start_is_zero = m.node(info.first).tag == blot_check_core::Tag.constant && m.node(info.first).a == 0;
         matched = true;
     }
     if !matched { return blot_direct_types::Error.none; }
 
-    var ak: u32[4] = [0; 4];
-    var ck: u32[4] = [0; 4];
+    let affine_loc = w(g, g.s.vals[iteration.start + affine_carry], 0);
+
+    // Fast path: 16-wide (4 x v128) SIMD LCG recurrence!
+    if simd_acc_ok {
+        var ak16: u32[16] = [0; 16];
+        var ck16: u32[16] = [0; 16];
+        ak16[0] = a1;
+        ck16[0] = c1;
+        for k in 1..16 {
+            ak16[k] = ak16[k - 1] * a1;
+            ck16[k] = ck16[k - 1] * a1 + c1;
+        }
+        let n16 = local32(g, f);
+        if start_is_zero {
+            lget(g, end_local);
+            i32Const(g, 0xfffffff0);
+            op(g, OP_i32_and);
+            lset(g, n16);
+        } else {
+            lget(g, end_local);
+            lget(g, index);
+            op(g, OP_i32_gt_u);
+            let cif = open(g, f, OP_if_);
+            lget(g, end_local);
+            lget(g, index);
+            op(g, OP_i32_sub);
+            i32Const(g, 0xfffffff0);
+            op(g, OP_i32_and);
+            lset(g, n16);
+            popCheckedArraysAt(f, cif);
+            op(g, OP_else_);
+            i32Const(g, 0);
+            lset(g, n16);
+            close(g, f);
+        }
+
+        lget(g, n16);
+        i32Const(g, 0);
+        op(g, OP_i32_gt_u);
+        let run_if = open(g, f, OP_if_);
+
+        let vs0 = local(g, f, VT_v128);
+        let vs1 = local(g, f, VT_v128);
+        let vs2 = local(g, f, VT_v128);
+        let vs3 = local(g, f, VT_v128);
+        let vA4 = local(g, f, VT_v128);
+        let vC4 = local(g, f, VT_v128);
+        let vA16 = local(g, f, VT_v128);
+        let vC16 = local(g, f, VT_v128);
+        let vacc0 = local(g, f, VT_v128);
+        let vacc1 = local(g, f, VT_v128);
+        var v_mask: u32 = 0;
+        if term_op == blot_check_core::Op.bit_and || term_op == blot_check_core::Op.bit_or || term_op == blot_check_core::Op.bit_xor {
+            v_mask = local(g, f, VT_v128);
+            v128Const4(g, term_const);
+            lset(g, v_mask);
+        }
+
+        // Seed vs0 = [s1, s2, s3, s4], vs1 = [s5..s8], vs2 = [s9..s12], vs3 = [s13..s16]
+        lget(g, affine_loc);
+        simdOp(g, SIMD_i32x4_splat);
+        v128ConstWords(g, ak16[0], ak16[1], ak16[2], ak16[3]);
+        simdOp(g, SIMD_i32x4_mul);
+        v128ConstWords(g, ck16[0], ck16[1], ck16[2], ck16[3]);
+        simdOp(g, SIMD_i32x4_add);
+        lset(g, vs0);
+
+        v128Const4(g, ak16[3]); lset(g, vA4);
+        v128Const4(g, ck16[3]); lset(g, vC4);
+        lget(g, vs0); lget(g, vA4); simdOp(g, SIMD_i32x4_mul); lget(g, vC4); simdOp(g, SIMD_i32x4_add); lset(g, vs1);
+        lget(g, vs1); lget(g, vA4); simdOp(g, SIMD_i32x4_mul); lget(g, vC4); simdOp(g, SIMD_i32x4_add); lset(g, vs2);
+        lget(g, vs2); lget(g, vA4); simdOp(g, SIMD_i32x4_mul); lget(g, vC4); simdOp(g, SIMD_i32x4_add); lset(g, vs3);
+
+        v128Const4(g, ak16[15]); lset(g, vA16);
+        v128Const4(g, ck16[15]); lset(g, vC16);
+        v128Const4(g, 0); lset(g, vacc0);
+        v128Const4(g, 0); lset(g, vacc1);
+
+        var v_acc_op = SIMD_i32x4_add;
+        var s_acc_op = OP_i32_add;
+        if acc_is_xor {
+            v_acc_op = SIMD_v128_xor;
+            s_acc_op = OP_i32_xor;
+        }
+        let rem = local32(g, f);
+        lget(g, n16);
+        lset(g, rem);
+
+        let s_exit = open(g, f, OP_block);
+        let s_top = open(g, f, OP_loop);
+
+        lget(g, vacc0); emitAffineVecTerm(g, vs0, term_op, term_const, v_mask); simdOp(g, v_acc_op);
+        emitAffineVecTerm(g, vs2, term_op, term_const, v_mask); simdOp(g, v_acc_op);
+        lset(g, vacc0);
+
+        lget(g, vacc1); emitAffineVecTerm(g, vs1, term_op, term_const, v_mask); simdOp(g, v_acc_op);
+        emitAffineVecTerm(g, vs3, term_op, term_const, v_mask); simdOp(g, v_acc_op);
+        lset(g, vacc1);
+
+        lget(g, rem);
+        i32Const(g, 16);
+        op(g, OP_i32_sub);
+        ltee(g, rem);
+        op(g, OP_i32_eqz);
+        br(g, f, OP_br_if, s_exit);
+
+        lget(g, vs0); lget(g, vA16); simdOp(g, SIMD_i32x4_mul); lget(g, vC16); simdOp(g, SIMD_i32x4_add); lset(g, vs0);
+        lget(g, vs1); lget(g, vA16); simdOp(g, SIMD_i32x4_mul); lget(g, vC16); simdOp(g, SIMD_i32x4_add); lset(g, vs1);
+        lget(g, vs2); lget(g, vA16); simdOp(g, SIMD_i32x4_mul); lget(g, vC16); simdOp(g, SIMD_i32x4_add); lset(g, vs2);
+        lget(g, vs3); lget(g, vA16); simdOp(g, SIMD_i32x4_mul); lget(g, vC16); simdOp(g, SIMD_i32x4_add); lset(g, vs3);
+        br(g, f, OP_br, s_top);
+        close(g, f);
+        close(g, f);
+
+        // On exit, lane 3 of vs3 holds exact state s_{n16}!
+        lget(g, vs3);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, 3);
+        lset(g, affine_loc);
+
+        // Horizontal reduction of vacc0 (op) vacc1 into acc_loc!
+        let vtot = local(g, f, VT_v128);
+        lget(g, vacc0);
+        lget(g, vacc1);
+        simdOp(g, v_acc_op);
+        lset(g, vtot);
+
+        let acc_loc = w(g, g.s.vals[iteration.start + acc_carry], 0);
+        lget(g, acc_loc);
+        for lane in 0..4 {
+            lget(g, vtot);
+            simdLaneOp(g, SIMD_i32x4_extract_lane, lane as u8);
+            op(g, s_acc_op);
+        }
+        lset(g, acc_loc);
+
+        lget(g, index);
+        lget(g, n16);
+        op(g, OP_i32_add);
+        lset(g, index);
+
+        popCheckedArraysAt(f, run_if);
+        close(g, f);
+        return blot_direct_types::Error.none;
+    }
+
+    // General path: 8x scalar parallel-power affine unrolling.
+    var ak: u32[8] = [0; 8];
+    var ck: u32[8] = [0; 8];
     ak[0] = a1;
     ck[0] = c1;
-    for k in 1..4 {
+    for k in 1..8 {
         ak[k] = ak[k - 1] * a1;
         ck[k] = ck[k - 1] * a1 + c1;
     }
@@ -3416,7 +4399,7 @@ fn tryEmitAffineUnrollLoop(
     if start_is_zero {
         unroll_end = local32(g, f);
         lget(g, end_local);
-        i32Const(g, 0xfffffffc);
+        i32Const(g, 0xfffffff8);
         op(g, OP_i32_and);
         lset(g, unroll_end);
     } else {
@@ -3437,13 +4420,12 @@ fn tryEmitAffineUnrollLoop(
         unroll_end = local32(g, f);
         lget(g, index);
         lget(g, count);
-        i32Const(g, 0xfffffffc);
+        i32Const(g, 0xfffffff8);
         op(g, OP_i32_and);
         op(g, OP_i32_add);
         lset(g, unroll_end);
     }
 
-    let affine_loc = w(g, g.s.vals[iteration.start + affine_carry], 0);
     let base_s = local32(g, f);
     let s_cur = local32(g, f);
 
@@ -3457,7 +4439,7 @@ fn tryEmitAffineUnrollLoop(
     lget(g, affine_loc);
     lset(g, base_s);
 
-    for step in 0..4 {
+    for step in 0..8 {
         lget(g, base_s);
         i32Const(g, ak[step]);
         op(g, OP_i32_mul);
@@ -3485,7 +4467,7 @@ fn tryEmitAffineUnrollLoop(
     lset(g, affine_loc);
 
     lget(g, index);
-    i32Const(g, 4);
+    i32Const(g, 8);
     op(g, OP_i32_add);
     lset(g, index);
     br(g, f, OP_br, u_top);
@@ -3974,6 +4956,435 @@ fn isPureScalarForeverBody(g: const Generator&, m: const Module&, body: u32) -> 
     return scanPureScalarForever(g, m, body, has_break, budget) && has_break;
 }
 
+// 5A: Contiguous `memory.copy` fast path for `for ever` copy-tail loops:
+//   for ever:
+//     if i >= lim: break
+//     dst[k] := src[i]
+//     i := i + 1
+//     k := k + 1
+fn matchVarPlusConstOne(m: const Module&, expr_id: u32, var_b: u32) -> bool {
+    let n = m.node(expr_id);
+    if (n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) ||
+        n.op != blot_check_core::Op.add { return false; }
+    if localRef(m, n.a) == var_b && m.node(n.b).tag == blot_check_core::Tag.constant && m.node(n.b).a == 1 { return true; }
+    if localRef(m, n.b) == var_b && m.node(n.a).tag == blot_check_core::Tag.constant && m.node(n.a).a == 1 { return true; }
+    return false;
+}
+fn tryEmitCopyTailLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    carry_in_place: const bool[64]&,
+) -> bool, Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.forever || info.body == 0 {
+        return false, blot_direct_types::Error.none;
+    }
+    var i_ci: i64 = -1;
+    var k_ci: i64 = -1;
+    var lim_id: u32 = 0;
+    var src_b: u32 = 0;
+    var dst_b: u32 = 0;
+    var elem_tag = blot_direct_types::Tag.unit;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let carries = m.loopCarries(loop_id);
+        if carries.len < 2 || carries.len > 64 { return false, blot_direct_types::Error.none; }
+        var u32_cis: i64[2] = [-1; 2];
+        var u32_count: i64 = 0;
+        for carry, ci in carries {
+            if !carry_in_place[ci] {
+                if u32_count >= 2 { return false, blot_direct_types::Error.none; }
+                let iv = g.s.vals[iteration.start + ci];
+                if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return false, blot_direct_types::Error.none; }
+                u32_cis[u32_count] = ci;
+                u32_count += 1;
+            }
+        }
+        if u32_count != 2 { return false, blot_direct_types::Error.none; }
+
+        let bn = m.node(info.body);
+        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false, blot_direct_types::Error.none; }
+        let ch = m.children(info.body);
+        if ch.len != 4 { return false, blot_direct_types::Error.none; }
+
+        // Stmt 0: `if i >= lim: break`
+        let s0 = m.node(ch[0]);
+        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, blot_direct_types::Error.none; }
+        let cn = m.node(s0.a);
+        if cn.tag != blot_check_core::Tag.scalar && !(cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none) {
+            return false, blot_direct_types::Error.none;
+        }
+        var guard_var_b: u32 = 0;
+        if cn.op == blot_check_core::Op.greater_equal {
+            guard_var_b = localRef(m, cn.a);
+            lim_id = cn.b;
+        } else if cn.op == blot_check_core::Op.less_equal {
+            guard_var_b = localRef(m, cn.b);
+            lim_id = cn.a;
+        } else {
+            return false, blot_direct_types::Error.none;
+        }
+        if guard_var_b == carries[u32_cis[0]].iteration {
+            i_ci = u32_cis[0];
+            k_ci = u32_cis[1];
+        } else if guard_var_b == carries[u32_cis[1]].iteration {
+            i_ci = u32_cis[1];
+            k_ci = u32_cis[0];
+        } else {
+            return false, blot_direct_types::Error.none;
+        }
+        let i_iter = carries[i_ci].iteration;
+        let k_iter = carries[k_ci].iteration;
+        let lim_ref = localRef(m, lim_id);
+        if lim_ref == 0 && m.node(lim_id).tag != blot_check_core::Tag.constant { return false, blot_direct_types::Error.none; }
+        if lim_ref == i_iter || lim_ref == k_iter { return false, blot_direct_types::Error.none; }
+
+        // Stmt 1: `dst[k] := src[i]`
+        var upd_id: u32 = 0;
+        let s1 = m.node(ch[1]);
+        if s1.tag == blot_check_core::Tag.update { upd_id = ch[1]; }
+        else if s1.tag == blot_check_core::Tag.bind && s1.c < 2 && m.node(s1.b).tag == blot_check_core::Tag.update { upd_id = s1.b; }
+        else { return false, blot_direct_types::Error.none; }
+        let uinfo = m.updateInfo(upd_id);
+        let sels = m.updateSelectors(upd_id);
+        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index || localRef(m, sels[0].index) != k_iter {
+            return false, blot_direct_types::Error.none;
+        }
+        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, blot_direct_types::Error.none; }
+        dst_b = localRef(m, uinfo.root);
+        let gok, src_n, src_idx_n = matchArrayGet(m, uinfo.value);
+        if !gok || localRef(m, src_idx_n) != i_iter { return false, blot_direct_types::Error.none; }
+        src_b = localRef(m, src_n);
+        if src_b == 0 || dst_b == 0 { return false, blot_direct_types::Error.none; }
+
+        // Stmts 2 & 3: `i_back := i + 1` and `k_back := k + 1` in either order.
+        let i_back = carries[i_ci].backedge;
+        let k_back = carries[k_ci].backedge;
+        var saw_i = false;
+        var saw_k = false;
+        for si in 2..4 {
+            let sn = m.node(ch[si]);
+            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 { return false, blot_direct_types::Error.none; }
+            if sn.a == i_back && matchVarPlusConstOne(m, sn.b, i_iter) { saw_i = true; }
+            else if sn.a == k_back && matchVarPlusConstOne(m, sn.b, k_iter) { saw_k = true; }
+            else { return false, blot_direct_types::Error.none; }
+        }
+        if !saw_i || !saw_k { return false, blot_direct_types::Error.none; }
+
+        let sv, sok = bindGet(g, f, src_b);
+        let dv, dok = bindGet(g, f, dst_b);
+        if !sok || !dok || tagOf(g, sv.ty) != blot_direct_types::Tag.array || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
+            return false, blot_direct_types::Error.none;
+        }
+        let s_et = tagOf(g, g.types.node(sv.ty).a);
+        let d_et = tagOf(g, g.types.node(dv.ty).a);
+        if s_et != d_et || !isScalarTag(s_et) { return false, blot_direct_types::Error.none; }
+        elem_tag = s_et;
+        matched = true;
+    }
+    if !matched { return false, blot_direct_types::Error.none; }
+
+    let sv, _ = bindGet(g, f, src_b);
+    let dv, _ = bindGet(g, f, dst_b);
+    let src_base, src_len = ensureCheckedArray(g, f, sv);
+    let dst_base, dst_len = ensureCheckedArray(g, f, dv);
+    let lim_v, lerr = expr(g, f, lim_id);
+    if lerr != blot_direct_types::Error.none { return false, lerr; }
+    let lim_loc = w(g, lim_v, 0);
+    let i_loc = w(g, g.s.vals[iteration.start + i_ci], 0);
+    let k_loc = w(g, g.s.vals[iteration.start + k_ci], 0);
+
+    // Guard: i < lim && lim <= src_len
+    lget(g, i_loc); lget(g, lim_loc); op(g, OP_i32_lt_u);
+    lget(g, lim_loc); lget(g, src_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    let g1 = open(g, f, OP_if_);
+
+    let count = local32(g, f);
+    lget(g, lim_loc); lget(g, i_loc); op(g, OP_i32_sub); lset(g, count);
+    let k_end = local32(g, f);
+    lget(g, k_loc); lget(g, count); op(g, OP_i32_add); lset(g, k_end);
+
+    let bytes = local32(g, f);
+    lget(g, count);
+    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    lset(g, bytes);
+
+    let src_ptr = local32(g, f);
+    lget(g, src_base); lget(g, i_loc);
+    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    op(g, OP_i32_add); lset(g, src_ptr);
+
+    let dst_ptr = local32(g, f);
+    lget(g, dst_base); lget(g, k_loc);
+    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    op(g, OP_i32_add); lset(g, dst_ptr);
+
+    let src_end = local32(g, f);
+    lget(g, src_ptr); lget(g, bytes); op(g, OP_i32_add); lset(g, src_end);
+    let dst_end = local32(g, f);
+    lget(g, dst_ptr); lget(g, bytes); op(g, OP_i32_add); lset(g, dst_end);
+
+    // Inner guard: k_end >= k && k_end <= dst_len && (dst_end <= src_ptr || src_end <= dst_ptr)
+    lget(g, k_end); lget(g, k_loc); op(g, OP_i32_ge_u);
+    lget(g, k_end); lget(g, dst_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, dst_end); lget(g, src_ptr); op(g, OP_i32_le_u);
+    lget(g, src_end); lget(g, dst_ptr); op(g, OP_i32_le_u);
+    op(g, OP_i32_or); op(g, OP_i32_and);
+    let g2 = open(g, f, OP_if_);
+
+    lget(g, dst_ptr);
+    lget(g, src_ptr);
+    lget(g, bytes);
+    memoryCopyOp(g);
+    lget(g, lim_loc);
+    lset(g, i_loc);
+    lget(g, k_end);
+    lset(g, k_loc);
+
+    popCheckedArraysAt(f, g2);
+    close(g, f);
+    popCheckedArraysAt(f, g1);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return true, blot_direct_types::Error.none;
+}
+
+// 5A: Prove `k < dst_len` across a 2-way merge loop via invariant `k + (mid - i) + (hi - j) <= dst_len`.
+fn matchBindPlusOneInBody(m: const Module&, body_id: u32, target_b: u32, src_b: u32) -> bool {
+    if body_id == 0 { return false; }
+    let bn = m.node(body_id);
+    if bn.tag == blot_check_core::Tag.bind && bn.c < 2 && bn.a == target_b {
+        return matchVarPlusConstOne(m, bn.b, src_b);
+    }
+    if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+        for ch in m.children(body_id) {
+            let cn = m.node(ch);
+            if cn.tag == blot_check_core::Tag.bind && cn.c < 2 && cn.a == target_b {
+                return matchVarPlusConstOne(m, cn.b, src_b);
+            }
+        }
+    }
+    return false;
+}
+fn tryEmitFastMergeLoop(
+    g: Generator&,
+    f: Fn&,
+    id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    outgoing: Vals,
+    slots: Words,
+    range: CheckedRange,
+    carry_in_place: const bool[64]&,
+) -> bool, Error {
+    if g.runtime_().has_fork || f.in_specialized_loop || info.kind != blot_check_core::LoopKind.forever || info.body == 0 {
+        return false, blot_direct_types::Error.none;
+    }
+    var i_ci: i64 = -1;
+    var j_ci: i64 = -1;
+    var k_ci: i64 = -1;
+    var mid_loc: u32 = 0;
+    var hi_loc: u32 = 0;
+    var src_len: u32 = 0;
+    var dst_len: u32 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let bn = m.node(info.body);
+        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false, blot_direct_types::Error.none; }
+        let ch = m.children(info.body);
+        if ch.len != 3 { return false, blot_direct_types::Error.none; }
+        let s0 = m.node(ch[0]);
+        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, blot_direct_types::Error.none; }
+        var idx_bs: u32[4] = [0; 4];
+        var lim_locs: u32[4] = [0; 4];
+        var gb_len: i64 = 0;
+        extractOrExitUpperBounds(g, f, m, id, s0.a, idx_bs, lim_locs, gb_len, 0);
+        if gb_len != 2 || idx_bs[0] == idx_bs[1] { return false, blot_direct_types::Error.none; }
+
+        let carries = m.loopCarries(id);
+        if carries.len < 3 || carries.len > 64 { return false, blot_direct_types::Error.none; }
+        for carry, ci in carries {
+            if carry.iteration == idx_bs[0] { i_ci = ci; }
+            else if carry.iteration == idx_bs[1] { j_ci = ci; }
+            else if !carry_in_place[ci] {
+                if k_ci >= 0 { return false, blot_direct_types::Error.none; }
+                let iv = g.s.vals[iteration.start + ci];
+                if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return false, blot_direct_types::Error.none; }
+                k_ci = ci;
+            }
+        }
+        if i_ci < 0 || j_ci < 0 || k_ci < 0 { return false, blot_direct_types::Error.none; }
+        let i_iter = carries[i_ci].iteration;
+        let j_iter = carries[j_ci].iteration;
+        let k_iter = carries[k_ci].iteration;
+        let k_back = carries[k_ci].backedge;
+
+        // Stmt 2: `k_back := k + 1`
+        let s2 = m.node(ch[2]);
+        if s2.tag != blot_check_core::Tag.bind || s2.c >= 2 || s2.a != k_back || !matchVarPlusConstOne(m, s2.b, k_iter) {
+            return false, blot_direct_types::Error.none;
+        }
+
+        // Stmt 1: `if cond: ... i += 1 else: ... j += 1` (not touching k)
+        let s1 = m.node(ch[1]);
+        if s1.tag != blot_check_core::Tag.if_stmt || s1.c == 0 { return false, blot_direct_types::Error.none; }
+        var i_adv_t = false;
+        var j_adv_e = false;
+        var i_adv_e = false;
+        var j_adv_t = false;
+        for merge in m.branchMerges(ch[1]) {
+            if merge.result == k_back || merge.then_binding == k_iter || merge.else_binding == k_iter {
+                return false, blot_direct_types::Error.none;
+            }
+            if merge.result == carries[i_ci].backedge {
+                if matchBindPlusOneInBody(m, s1.b, merge.then_binding, i_iter) && merge.else_binding == i_iter { i_adv_t = true; }
+                else if merge.then_binding == i_iter && matchBindPlusOneInBody(m, s1.c, merge.else_binding, i_iter) { i_adv_e = true; }
+                else { return false, blot_direct_types::Error.none; }
+            }
+            if merge.result == carries[j_ci].backedge {
+                if merge.then_binding == j_iter && matchBindPlusOneInBody(m, s1.c, merge.else_binding, j_iter) { j_adv_e = true; }
+                else if matchBindPlusOneInBody(m, s1.b, merge.then_binding, j_iter) && merge.else_binding == j_iter { j_adv_t = true; }
+                else { return false, blot_direct_types::Error.none; }
+            }
+        }
+        if !((i_adv_t && j_adv_e) || (i_adv_e && j_adv_t)) { return false, blot_direct_types::Error.none; }
+
+        // Resolve CheckedArray lengths for arrays indexed by i/j (src) and k (dst).
+        var src_arrs: u32[8] = [0; 8];
+        var src_len_c: i64 = 0;
+        var b1: i64 = 128;
+        collectIndexedByVar(m, ch[1], i_iter, src_arrs, src_len_c, b1);
+        collectIndexedByVar(m, ch[1], j_iter, src_arrs, src_len_c, b1);
+        var dst_arrs: u32[8] = [0; 8];
+        var dst_len_c: i64 = 0;
+        var b2: i64 = 128;
+        collectIndexedByVar(m, ch[1], k_iter, dst_arrs, dst_len_c, b2);
+        if src_len_c != 1 || dst_len_c != 1 { return false, blot_direct_types::Error.none; }
+        let sv, sok = bindGet(g, f, src_arrs[0]);
+        let dv, dok = bindGet(g, f, dst_arrs[0]);
+        if !sok || !dok || tagOf(g, sv.ty) != blot_direct_types::Tag.array || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
+            return false, blot_direct_types::Error.none;
+        }
+        let sca = findCheckedArray(f, w(g, sv, 0), w(g, sv, 1));
+        let dca = findCheckedArray(f, w(g, dv, 0), w(g, dv, 1));
+        if sca < 0 || dca < 0 { return false, blot_direct_types::Error.none; }
+        mid_loc = lim_locs[0];
+        hi_loc = lim_locs[1];
+        src_len = f.checked_arrays[sca].length;
+        dst_len = f.checked_arrays[dca].length;
+        matched = true;
+    }
+    if !matched { return false, blot_direct_types::Error.none; }
+
+    let i_loc = w(g, g.s.vals[iteration.start + i_ci], 0);
+    let j_loc = w(g, g.s.vals[iteration.start + j_ci], 0);
+    let k_loc = w(g, g.s.vals[iteration.start + k_ci], 0);
+
+    let rem_i = local32(g, f);
+    lget(g, mid_loc); lget(g, i_loc); op(g, OP_i32_sub); lset(g, rem_i);
+    let rem_j = local32(g, f);
+    lget(g, hi_loc); lget(g, j_loc); op(g, OP_i32_sub); lset(g, rem_j);
+    let rem = local32(g, f);
+    lget(g, rem_i); lget(g, rem_j); op(g, OP_i32_add); lset(g, rem);
+    let max_k = local32(g, f);
+    lget(g, k_loc); lget(g, rem); op(g, OP_i32_add); lset(g, max_k);
+
+    lget(g, i_loc); lget(g, mid_loc); op(g, OP_i32_le_u);
+    lget(g, j_loc); lget(g, hi_loc); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, mid_loc); lget(g, src_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, hi_loc); lget(g, src_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, rem); lget(g, rem_i); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, max_k); lget(g, k_loc); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, max_k); lget(g, dst_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+
+    let prev_spec = f.in_specialized_loop;
+    f.in_specialized_loop = true;
+    let spec_if = open(g, f, OP_if_);
+    recordCheckedLe(f, mid_loc, src_len);
+    recordCheckedLe(f, hi_loc, src_len);
+    recordCheckedBound(f, k_loc, dst_len);
+    let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
+    if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+    popCheckedArraysAt(f, spec_if);
+    op(g, OP_else_);
+    let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
+    f.in_specialized_loop = prev_spec;
+    if serr != blot_direct_types::Error.none { return false, serr; }
+    close(g, f);
+    return true, blot_direct_types::Error.none;
+}
+
+// 5B-2: Pre-loop indirect-index bounds validation for outer counted loops
+// (`for _ in 0..N: for k in 0..m: let id = idx_arr[k]; ... A[id] ...`):
+// Scans `idx_arr[0..m]` ONCE before the outer loop to verify every `id < min(A_r.len)`.
+fn tryMatchIndirectIndexScan(
+    g: const Generator&,
+    f: const Fn&,
+    m: const Module&,
+    outer_body: u32,
+    target_lens: u32[4]&,
+    target_len_count: i64&,
+) -> bool, u32, u32, u32 {
+    let inner_id = unwrapSingleBody(m, outer_body);
+    if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.loop_ { return false, 0, 0, 0; }
+    let inner = m.loopInfo(inner_id);
+    if inner.kind != blot_check_core::LoopKind.range || inner.pattern == 0 || inner.body == 0 { return false, 0, 0, 0; }
+    if m.node(inner.first).tag != blot_check_core::Tag.constant || m.node(inner.first).a != 0 { return false, 0, 0, 0; }
+    let pat = m.pattern(inner.pattern);
+    if pat.tag != blot_check_core::PatternTag.bind { return false, 0, 0, 0; }
+    let k_b = pat.a;
+
+    let ibn = m.node(inner.body);
+    if ibn.tag != blot_check_core::Tag.suite && ibn.tag != blot_check_core::Tag.block_ { return false, 0, 0, 0; }
+    let ich = m.children(inner.body);
+    if ich.len < 2 { return false, 0, 0, 0; }
+    let s0 = m.node(ich[0]);
+    if s0.tag != blot_check_core::Tag.bind || s0.c >= 2 { return false, 0, 0, 0; }
+    let id_b = s0.a;
+    let gok, idx_arr_n, idx_pos_n = matchArrayGet(m, s0.b);
+    if !gok || localRef(m, idx_pos_n) != k_b { return false, 0, 0, 0; }
+    let idx_arr_b = localRef(m, idx_arr_n);
+    if idx_arr_b == 0 { return false, 0, 0, 0; }
+    // Ensure idx_arr is a CheckedArray of U32 and NOT mutated in inner loop carries.
+    for ic in m.loopCarries(inner_id) {
+        if ic.incoming == idx_arr_b || ic.iteration == idx_arr_b { return false, 0, 0, 0; }
+    }
+    let idx_v, idx_ok = bindGet(g, f, idx_arr_b);
+    if !idx_ok || tagOf(g, idx_v.ty) != blot_direct_types::Tag.array || tagOf(g, g.types.node(idx_v.ty).a) != blot_direct_types::Tag.u32_ {
+        return false, 0, 0, 0;
+    }
+    if findCheckedArray(f, w(g, idx_v, 0), w(g, idx_v, 1)) < 0 { return false, 0, 0, 0; }
+    if localRef(m, inner.end) == 0 && m.node(inner.end).tag != blot_check_core::Tag.constant { return false, 0, 0, 0; }
+
+    var arr_bs: u32[8] = [0; 8];
+    var arr_len: i64 = 0;
+    var bud: i64 = 128;
+    for si in 1..ich.len {
+        collectIndexedByVar(m, ich[si], id_b, arr_bs, arr_len, bud);
+    }
+    target_len_count = 0;
+    for ai in 0..arr_len {
+        let ab = resolveInnerCarry(m, inner_id, arr_bs[ai]);
+        let av, aok = bindGet(g, f, ab);
+        if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+        let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
+        if ca < 0 { continue; }
+        let clen = f.checked_arrays[ca].length;
+        var dup = false;
+        for ti in 0..target_len_count { if target_lens[ti] == clen { dup = true; break; } }
+        if !dup && target_len_count < 4 {
+            target_lens[target_len_count] = clen;
+            target_len_count += 1;
+        }
+    }
+    if target_len_count == 0 { return false, 0, 0, 0; }
+    return true, idx_arr_b, inner.end, id_b;
+}
+
 // 4E-3: 4x unrolled strided scalar array-fill `for ever` loop (e.g. prime_sieve marking loop):
 //   for ever:
 //     if m >= limit: break
@@ -4227,6 +5638,194 @@ fn resolveInnerCarry(m: const Module&, inner_loop: u32, b: u32) -> u32 {
     }
     return b;
 }
+struct MatmulKMatch {
+    a_b: u32 = 0,
+    b_b: u32 = 0,
+    c_b: u32 = 0,
+    a_off_id: u32 = 0,
+    b_stride_id: u32 = 0,
+    c_off_id: u32 = 0,
+    m_end_id: u32 = 0,
+}
+fn matchMatmulKLoop(
+    g: const Generator&,
+    f: const Fn&,
+    m: const Module&,
+    k_loop_id: u32,
+    k_info: blot_check_core::LoopInfo,
+    resolve_k_carries: bool,
+    out: MatmulKMatch&,
+) -> bool {
+    if k_info.kind != blot_check_core::LoopKind.range || k_info.pattern == 0 || k_info.body == 0 { return false; }
+    if m.node(k_info.first).tag != blot_check_core::Tag.constant || m.node(k_info.first).a != 0 { return false; }
+    let pat = m.pattern(k_info.pattern);
+    if pat.tag != blot_check_core::PatternTag.bind { return false; }
+    let k_b = pat.a;
+
+    if resolve_k_carries {
+        let kcarries = m.loopCarries(k_loop_id);
+        if kcarries.len > 64 { return false; }
+        for kc, kci in kcarries {
+            let kv, kok = bindGet(g, f, kc.incoming);
+            if !kok || tagOf(g, kv.ty) != blot_direct_types::Tag.array { return false; }
+            var cb: i64 = 256;
+            if !carryStaysInPlace(g, m, k_loop_id, kci, kc.iteration, kc.backedge, cb) { return false; }
+        }
+    }
+
+    let bn = m.node(k_info.body);
+    if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false; }
+    let ch = m.children(k_info.body);
+    if ch.len != 3 { return false; }
+
+    // Stmt 0: `let aik = a[a_off + k]`
+    let s0 = m.node(ch[0]);
+    if s0.tag != blot_check_core::Tag.bind || s0.c >= 2 { return false; }
+    let aik_b = s0.a;
+    let g0_ok, a_node, a_idx = matchArrayGet(m, s0.b);
+    if !g0_ok { return false; }
+    var a_b = localRef(m, a_node);
+    if resolve_k_carries { a_b = resolveInnerCarry(m, k_loop_id, a_b); }
+    let a_ok, a_off = matchSumWithVar(m, a_idx, k_b);
+    if a_b == 0 || !a_ok { return false; }
+    if a_off != 0 && localRef(m, a_off) == 0 && m.node(a_off).tag != blot_check_core::Tag.constant { return false; }
+
+    // Stmt 1: `let k_off = k * b_stride`
+    let s1 = m.node(ch[1]);
+    if s1.tag != blot_check_core::Tag.bind || s1.c >= 2 { return false; }
+    let k_off_b = s1.a;
+    let mul_ok, b_str = matchMulWithVar(m, s1.b, k_b);
+    if !mul_ok || b_str == 0 { return false; }
+    if localRef(m, b_str) == 0 && m.node(b_str).tag != blot_check_core::Tag.constant { return false; }
+
+    // Stmt 2: `for col in 0 .. m:`
+    let col_loop = ch[2];
+    if m.node(col_loop).tag != blot_check_core::Tag.loop_ { return false; }
+    let col_info = m.loopInfo(col_loop);
+    if col_info.kind != blot_check_core::LoopKind.range || col_info.pattern == 0 || col_info.body == 0 { return false; }
+    if m.node(col_info.first).tag != blot_check_core::Tag.constant || m.node(col_info.first).a != 0 { return false; }
+    let col_pat = m.pattern(col_info.pattern);
+    if col_pat.tag != blot_check_core::PatternTag.bind { return false; }
+    let col_b = col_pat.a;
+    let m_end_id = col_info.end;
+    if localRef(m, m_end_id) == 0 && m.node(m_end_id).tag != blot_check_core::Tag.constant { return false; }
+
+    // Inner body: `[let dst = c_off + col] ; c[dst] := c[dst] + aik * b[k_off + col]`
+    var inner_stmts: u32[2] = [0; 2];
+    var inner_len: i64 = 0;
+    let ibn = m.node(col_info.body);
+    if ibn.tag == blot_check_core::Tag.suite || ibn.tag == blot_check_core::Tag.block_ {
+        let ich = m.children(col_info.body);
+        if ich.len == 0 || ich.len > 2 { return false; }
+        for ii in 0..ich.len { inner_stmts[ii] = ich[ii]; }
+        inner_len = ich.len;
+    } else {
+        inner_stmts[0] = col_info.body;
+        inner_len = 1;
+    }
+    var dst_alias_b: u32 = 0;
+    var dst_alias_off: u32 = 0;
+    if inner_len == 2 {
+        let d0 = m.node(inner_stmts[0]);
+        if d0.tag != blot_check_core::Tag.bind || d0.c >= 2 { return false; }
+        let dok, doff = matchSumWithVar(m, d0.b, col_b);
+        if !dok { return false; }
+        dst_alias_b = d0.a;
+        dst_alias_off = doff;
+    }
+    let last_id = inner_stmts[inner_len - 1];
+    let last_n = m.node(last_id);
+    var upd_id: u32 = 0;
+    if last_n.tag == blot_check_core::Tag.update { upd_id = last_id; }
+    else if last_n.tag == blot_check_core::Tag.bind && last_n.c < 2 && m.node(last_n.b).tag == blot_check_core::Tag.update { upd_id = last_n.b; }
+    else { return false; }
+
+    let uinfo = m.updateInfo(upd_id);
+    let sels = m.updateSelectors(upd_id);
+    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+    if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false; }
+    let raw_c_b = localRef(m, uinfo.root);
+    if raw_c_b == 0 { return false; }
+    var c_b = resolveInnerCarry(m, col_loop, raw_c_b);
+    if resolve_k_carries { c_b = resolveInnerCarry(m, k_loop_id, c_b); }
+
+    var c_idx_ok = false;
+    var c_off_id: u32 = 0;
+    if dst_alias_b != 0 && localRef(m, sels[0].index) == dst_alias_b {
+        c_idx_ok = true;
+        c_off_id = dst_alias_off;
+    } else {
+        let cok, coff = matchSumWithVar(m, sels[0].index, col_b);
+        c_idx_ok = cok;
+        c_off_id = coff;
+    }
+    if !c_idx_ok { return false; }
+    if c_off_id != 0 && localRef(m, c_off_id) == 0 && m.node(c_off_id).tag != blot_check_core::Tag.constant { return false; }
+
+    let rn = m.node(uinfo.value);
+    if (rn.tag != blot_check_core::Tag.scalar && !(rn.tag == blot_check_core::Tag.associated && rn.op != blot_check_core::Op.none)) ||
+        rn.op != blot_check_core::Op.add {
+        return false;
+    }
+    var c_read_node: u32 = 0;
+    var mul_node: u32 = 0;
+    let ra_get, _, _ = matchArrayGet(m, rn.a);
+    let rb_get, _, _ = matchArrayGet(m, rn.b);
+    if ra_get { c_read_node = rn.a; mul_node = rn.b; }
+    else if rb_get { c_read_node = rn.b; mul_node = rn.a; }
+    else { return false; }
+
+    let cr_ok, cr_arr, cr_idx = matchArrayGet(m, c_read_node);
+    if !cr_ok { return false; }
+    var cr_cb = resolveInnerCarry(m, col_loop, localRef(m, cr_arr));
+    if resolve_k_carries { cr_cb = resolveInnerCarry(m, k_loop_id, cr_cb); }
+    if cr_cb != c_b { return false; }
+    if dst_alias_b != 0 && localRef(m, cr_idx) == dst_alias_b {
+        // matches dst alias
+    } else {
+        let crok, croff = matchSumWithVar(m, cr_idx, col_b);
+        if !crok || !sameOffsetExpr(m, croff, c_off_id) { return false; }
+    }
+
+    let mn = m.node(mul_node);
+    if (mn.tag != blot_check_core::Tag.scalar && !(mn.tag == blot_check_core::Tag.associated && mn.op != blot_check_core::Op.none)) ||
+        mn.op != blot_check_core::Op.mul {
+        return false;
+    }
+    var b_read_node: u32 = 0;
+    if localRef(m, mn.a) == aik_b { b_read_node = mn.b; }
+    else if localRef(m, mn.b) == aik_b { b_read_node = mn.a; }
+    else { return false; }
+
+    let br_ok, br_arr, br_idx = matchArrayGet(m, b_read_node);
+    if !br_ok { return false; }
+    var b_b = resolveInnerCarry(m, col_loop, localRef(m, br_arr));
+    if resolve_k_carries { b_b = resolveInnerCarry(m, k_loop_id, b_b); }
+    if b_b == 0 { return false; }
+    let brok, broff = matchSumWithVar(m, br_idx, col_b);
+    if !brok || localRef(m, broff) != k_off_b { return false; }
+
+    let av, aok2 = bindGet(g, f, a_b);
+    let bv, bok2 = bindGet(g, f, b_b);
+    let cv, cok2 = bindGet(g, f, c_b);
+    if !aok2 || !bok2 || !cok2 { return false; }
+    if tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, bv.ty) != blot_direct_types::Tag.array || tagOf(g, cv.ty) != blot_direct_types::Tag.array {
+        return false;
+    }
+    if tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.f32_ ||
+        tagOf(g, g.types.node(bv.ty).a) != blot_direct_types::Tag.f32_ ||
+        tagOf(g, g.types.node(cv.ty).a) != blot_direct_types::Tag.f32_ {
+        return false;
+    }
+    out.a_b = a_b;
+    out.b_b = b_b;
+    out.c_b = c_b;
+    out.a_off_id = a_off;
+    out.b_stride_id = b_str;
+    out.c_off_id = c_off_id;
+    out.m_end_id = m_end_id;
+    return true;
+}
 fn tryEmitBlockedMatmulKLoop(
     g: Generator&,
     f: Fn&,
@@ -4239,178 +5838,23 @@ fn tryEmitBlockedMatmulKLoop(
     if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
         return blot_direct_types::Error.none;
     }
-    var a_b: u32 = 0;
-    var b_b: u32 = 0;
-    var c_b: u32 = 0;
-    var a_off_id: u32 = 0;
-    var b_stride_id: u32 = 0;
-    var c_off_id: u32 = 0;
-    var m_end_id: u32 = 0;
+    var km = MatmulKMatch {};
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
-        if m.node(info.first).tag != blot_check_core::Tag.constant || m.node(info.first).a != 0 {
-            return blot_direct_types::Error.none;
-        }
-        let pat = m.pattern(info.pattern);
-        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
-        let k_b = pat.a;
-
         let carries = m.loopCarries(loop_id);
         if carries.len > 64 { return blot_direct_types::Error.none; }
         for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
-
-        let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return blot_direct_types::Error.none; }
-        let ch = m.children(info.body);
-        if ch.len != 3 { return blot_direct_types::Error.none; }
-
-        // Stmt 0: `let aik = a[a_off + k]`
-        let s0 = m.node(ch[0]);
-        if s0.tag != blot_check_core::Tag.bind || s0.c >= 2 { return blot_direct_types::Error.none; }
-        let aik_b = s0.a;
-        let g0_ok, a_node, a_idx = matchArrayGet(m, s0.b);
-        if !g0_ok { return blot_direct_types::Error.none; }
-        a_b = localRef(m, a_node);
-        let a_ok, a_off = matchSumWithVar(m, a_idx, k_b);
-        if a_b == 0 || !a_ok { return blot_direct_types::Error.none; }
-        if a_off != 0 && localRef(m, a_off) == 0 && m.node(a_off).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-        a_off_id = a_off;
-
-        // Stmt 1: `let k_off = k * b_stride`
-        let s1 = m.node(ch[1]);
-        if s1.tag != blot_check_core::Tag.bind || s1.c >= 2 { return blot_direct_types::Error.none; }
-        let k_off_b = s1.a;
-        let mul_ok, b_str = matchMulWithVar(m, s1.b, k_b);
-        if !mul_ok || b_str == 0 { return blot_direct_types::Error.none; }
-        if localRef(m, b_str) == 0 && m.node(b_str).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-        b_stride_id = b_str;
-
-        // Stmt 2: `for col in 0 .. m:`
-        let col_loop = ch[2];
-        if m.node(col_loop).tag != blot_check_core::Tag.loop_ { return blot_direct_types::Error.none; }
-        let col_info = m.loopInfo(col_loop);
-        if col_info.kind != blot_check_core::LoopKind.range || col_info.pattern == 0 || col_info.body == 0 {
-            return blot_direct_types::Error.none;
-        }
-        if m.node(col_info.first).tag != blot_check_core::Tag.constant || m.node(col_info.first).a != 0 {
-            return blot_direct_types::Error.none;
-        }
-        let col_pat = m.pattern(col_info.pattern);
-        if col_pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
-        let col_b = col_pat.a;
-        m_end_id = col_info.end;
-        if localRef(m, m_end_id) == 0 && m.node(m_end_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-
-        // Inner body: `[let dst = c_off + col] ; c[dst] := c[dst] + aik * b[k_off + col]`
-        var inner_stmts: u32[2] = [0; 2];
-        var inner_len: i64 = 0;
-        let ibn = m.node(col_info.body);
-        if ibn.tag == blot_check_core::Tag.suite || ibn.tag == blot_check_core::Tag.block_ {
-            let ich = m.children(col_info.body);
-            if ich.len == 0 || ich.len > 2 { return blot_direct_types::Error.none; }
-            for ii in 0..ich.len { inner_stmts[ii] = ich[ii]; }
-            inner_len = ich.len;
-        } else {
-            inner_stmts[0] = col_info.body;
-            inner_len = 1;
-        }
-        var dst_alias_b: u32 = 0;
-        var dst_alias_off: u32 = 0;
-        if inner_len == 2 {
-            let d0 = m.node(inner_stmts[0]);
-            if d0.tag != blot_check_core::Tag.bind || d0.c >= 2 { return blot_direct_types::Error.none; }
-            let dok, doff = matchSumWithVar(m, d0.b, col_b);
-            if !dok { return blot_direct_types::Error.none; }
-            dst_alias_b = d0.a;
-            dst_alias_off = doff;
-        }
-        let last_id = inner_stmts[inner_len - 1];
-        let last_n = m.node(last_id);
-        var upd_id: u32 = 0;
-        if last_n.tag == blot_check_core::Tag.update { upd_id = last_id; }
-        else if last_n.tag == blot_check_core::Tag.bind && last_n.c < 2 && m.node(last_n.b).tag == blot_check_core::Tag.update { upd_id = last_n.b; }
-        else { return blot_direct_types::Error.none; }
-
-        let uinfo = m.updateInfo(upd_id);
-        let sels = m.updateSelectors(upd_id);
-        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return blot_direct_types::Error.none; }
-        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return blot_direct_types::Error.none; }
-        let raw_c_b = localRef(m, uinfo.root);
-        if raw_c_b == 0 { return blot_direct_types::Error.none; }
-        c_b = resolveInnerCarry(m, col_loop, raw_c_b);
-
-        // Match destination index (`dst_alias_b` or `c_off + col`)
-        var c_idx_ok = false;
-        if dst_alias_b != 0 && localRef(m, sels[0].index) == dst_alias_b {
-            c_idx_ok = true;
-            c_off_id = dst_alias_off;
-        } else {
-            let cok, coff = matchSumWithVar(m, sels[0].index, col_b);
-            c_idx_ok = cok;
-            c_off_id = coff;
-        }
-        if !c_idx_ok { return blot_direct_types::Error.none; }
-        if c_off_id != 0 && localRef(m, c_off_id) == 0 && m.node(c_off_id).tag != blot_check_core::Tag.constant {
-            return blot_direct_types::Error.none;
-        }
-
-        // Match RHS: `c[dst] + (aik * b[k_off + col])` (either operand order for + and *)
-        let rn = m.node(uinfo.value);
-        if (rn.tag != blot_check_core::Tag.scalar && !(rn.tag == blot_check_core::Tag.associated && rn.op != blot_check_core::Op.none)) ||
-            rn.op != blot_check_core::Op.add {
-            return blot_direct_types::Error.none;
-        }
-        var c_read_node: u32 = 0;
-        var mul_node: u32 = 0;
-        let ra_get, _, _ = matchArrayGet(m, rn.a);
-        let rb_get, _, _ = matchArrayGet(m, rn.b);
-        if ra_get { c_read_node = rn.a; mul_node = rn.b; }
-        else if rb_get { c_read_node = rn.b; mul_node = rn.a; }
-        else { return blot_direct_types::Error.none; }
-
-        let cr_ok, cr_arr, cr_idx = matchArrayGet(m, c_read_node);
-        if !cr_ok || resolveInnerCarry(m, col_loop, localRef(m, cr_arr)) != c_b { return blot_direct_types::Error.none; }
-        if dst_alias_b != 0 && localRef(m, cr_idx) == dst_alias_b {
-            // matches dst alias
-        } else {
-            let crok, croff = matchSumWithVar(m, cr_idx, col_b);
-            if !crok || !sameOffsetExpr(m, croff, c_off_id) { return blot_direct_types::Error.none; }
-        }
-
-        let mn = m.node(mul_node);
-        if (mn.tag != blot_check_core::Tag.scalar && !(mn.tag == blot_check_core::Tag.associated && mn.op != blot_check_core::Op.none)) ||
-            mn.op != blot_check_core::Op.mul {
-            return blot_direct_types::Error.none;
-        }
-        var b_read_node: u32 = 0;
-        if localRef(m, mn.a) == aik_b { b_read_node = mn.b; }
-        else if localRef(m, mn.b) == aik_b { b_read_node = mn.a; }
-        else { return blot_direct_types::Error.none; }
-
-        let br_ok, br_arr, br_idx = matchArrayGet(m, b_read_node);
-        if !br_ok { return blot_direct_types::Error.none; }
-        b_b = resolveInnerCarry(m, col_loop, localRef(m, br_arr));
-        if b_b == 0 { return blot_direct_types::Error.none; }
-        let brok, broff = matchSumWithVar(m, br_idx, col_b);
-        if !brok || localRef(m, broff) != k_off_b { return blot_direct_types::Error.none; }
-
-        // Verify a, b, c are all #[F32] arrays!
-        let av, aok2 = bindGet(g, f, a_b);
-        let bv, bok2 = bindGet(g, f, b_b);
-        let cv, cok2 = bindGet(g, f, c_b);
-        if !aok2 || !bok2 || !cok2 { return blot_direct_types::Error.none; }
-        if tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, bv.ty) != blot_direct_types::Tag.array || tagOf(g, cv.ty) != blot_direct_types::Tag.array {
-            return blot_direct_types::Error.none;
-        }
-        if tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.f32_ ||
-            tagOf(g, g.types.node(bv.ty).a) != blot_direct_types::Tag.f32_ ||
-            tagOf(g, g.types.node(cv.ty).a) != blot_direct_types::Tag.f32_ {
-            return blot_direct_types::Error.none;
-        }
-        matched = true;
+        matched = matchMatmulKLoop(g, f, m, loop_id, info, false, km);
     }
     if !matched { return blot_direct_types::Error.none; }
+    let a_b = km.a_b;
+    let b_b = km.b_b;
+    let c_b = km.c_b;
+    let a_off_id = km.a_off_id;
+    let b_stride_id = km.b_stride_id;
+    let c_off_id = km.c_off_id;
+    let m_end_id = km.m_end_id;
 
     let av, _ = bindGet(g, f, a_b);
     let bv, _ = bindGet(g, f, b_b);
@@ -4611,6 +6055,354 @@ fn tryEmitBlockedMatmulKLoop(
 
     // All `0..n` iterations completed: advance `index = n_loc` so original loop exits immediately!
     lget(g, n_loc);
+    lset(g, index);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return blot_direct_types::Error.none;
+}
+
+// 5C: 2-row x 16-col (8 x v128 accumulators) register-blocked outer-`row` matmul loop:
+//   for row in 0 .. rows:
+//     let row_off = row * stride       (or separate row_off_a = row * a_stride, row_off_c = row * c_stride)
+//     for k in 0 .. n:
+//       let aik = a[row_off + k]
+//       let k_off = k * b_stride
+//       for col in 0 .. m:
+//         c[row_off + col] := c[row_off + col] + aik * b[k_off + col]
+// Halves `b` loads & bounds checks (1 shared check per 8 FMA-style pairs across 2 rows) and
+// advances `index = rows & ~1` so any odd final row falls through cleanly to 4C.
+fn tryEmitBlockedMatmulRowLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return blot_direct_types::Error.none;
+    }
+    var km = MatmulKMatch {};
+    var a_stride_id: u32 = 0;
+    var c_stride_id: u32 = 0;
+    var n_end_id: u32 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        if m.node(info.first).tag != blot_check_core::Tag.constant || m.node(info.first).a != 0 {
+            return blot_direct_types::Error.none;
+        }
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        let row_b = pat.a;
+
+        let carries = m.loopCarries(loop_id);
+        if carries.len > 64 { return blot_direct_types::Error.none; }
+        for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
+
+        let bn = m.node(info.body);
+        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ {
+            return blot_direct_types::Error.none;
+        }
+        let ch = m.children(info.body);
+        if ch.len != 2 && ch.len != 3 { return blot_direct_types::Error.none; }
+
+        var off_bs: u32[2] = [0; 2];
+        var off_strides: u32[2] = [0; 2];
+        let off_count = ch.len - 1;
+        for oi in 0..off_count {
+            let sn = m.node(ch[oi]);
+            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 { return blot_direct_types::Error.none; }
+            let mok, str_id = matchMulWithVar(m, sn.b, row_b);
+            if !mok || str_id == 0 { return blot_direct_types::Error.none; }
+            let sref = localRef(m, str_id);
+            if sref == 0 && m.node(str_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
+            if sref == row_b { return blot_direct_types::Error.none; }
+            off_bs[oi] = sn.a;
+            off_strides[oi] = str_id;
+        }
+
+        let k_loop_id = ch[off_count];
+        if m.node(k_loop_id).tag != blot_check_core::Tag.loop_ { return blot_direct_types::Error.none; }
+        let k_info = m.loopInfo(k_loop_id);
+        if !matchMatmulKLoop(g, f, m, k_loop_id, k_info, true, km) { return blot_direct_types::Error.none; }
+
+        n_end_id = k_info.end;
+        let nref = localRef(m, n_end_id);
+        if nref == 0 && m.node(n_end_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
+        if nref == row_b { return blot_direct_types::Error.none; }
+
+        let a_off_ref = localRef(m, km.a_off_id);
+        let c_off_ref = localRef(m, km.c_off_id);
+        for oi in 0..off_count {
+            if a_off_ref != 0 && a_off_ref == off_bs[oi] { a_stride_id = off_strides[oi]; }
+            if c_off_ref != 0 && c_off_ref == off_bs[oi] { c_stride_id = off_strides[oi]; }
+            if nref == off_bs[oi] || localRef(m, km.b_stride_id) == off_bs[oi] || localRef(m, km.m_end_id) == off_bs[oi] {
+                return blot_direct_types::Error.none;
+            }
+        }
+        if a_stride_id == 0 || c_stride_id == 0 { return blot_direct_types::Error.none; }
+        if localRef(m, km.b_stride_id) == row_b || localRef(m, km.m_end_id) == row_b {
+            return blot_direct_types::Error.none;
+        }
+        matched = true;
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    let av, _ = bindGet(g, f, km.a_b);
+    let bv, _ = bindGet(g, f, km.b_b);
+    let cv, _ = bindGet(g, f, km.c_b);
+    let a_base, a_len = ensureCheckedArray(g, f, av);
+    let b_base, b_len = ensureCheckedArray(g, f, bv);
+    let c_base, c_len = ensureCheckedArray(g, f, cv);
+
+    let n_val, nerr = expr(g, f, n_end_id);
+    if nerr != blot_direct_types::Error.none { return nerr; }
+    let m_val, merr = expr(g, f, km.m_end_id);
+    if merr != blot_direct_types::Error.none { return merr; }
+    let a_str_val, aserr = expr(g, f, a_stride_id);
+    if aserr != blot_direct_types::Error.none { return aserr; }
+    let b_str_val, bserr = expr(g, f, km.b_stride_id);
+    if bserr != blot_direct_types::Error.none { return bserr; }
+    let c_str_val, cserr = expr(g, f, c_stride_id);
+    if cserr != blot_direct_types::Error.none { return cserr; }
+
+    let rows_loc = end_local;
+    let n_loc = w(g, n_val, 0);
+    let m_loc = w(g, m_val, 0);
+    let a_str_loc = w(g, a_str_val, 0);
+    let b_str_loc = w(g, b_str_val, 0);
+    let c_str_loc = w(g, c_str_val, 0);
+
+    let rows_even = local32(g, f);
+    lget(g, rows_loc); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, rows_even);
+
+    // Need counts (overflow-free when rows, n, m, strides <= 4096 and rows_even >= 2, n >= 1):
+    let a_need = local32(g, f);
+    lget(g, rows_even); i32Const(g, 1); op(g, OP_i32_sub); lget(g, a_str_loc); op(g, OP_i32_mul);
+    lget(g, n_loc); op(g, OP_i32_add); lset(g, a_need);
+
+    let b_need = local32(g, f);
+    lget(g, n_loc); i32Const(g, 1); op(g, OP_i32_sub); lget(g, b_str_loc); op(g, OP_i32_mul);
+    lget(g, m_loc); op(g, OP_i32_add); lset(g, b_need);
+
+    let c_need = local32(g, f);
+    lget(g, rows_even); i32Const(g, 1); op(g, OP_i32_sub); lget(g, c_str_loc); op(g, OP_i32_mul);
+    lget(g, m_loc); op(g, OP_i32_add); lset(g, c_need);
+
+    let a_byte_end = local32(g, f);
+    lget(g, a_base); lget(g, a_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, a_byte_end);
+    let b_byte_end = local32(g, f);
+    lget(g, b_base); lget(g, b_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, b_byte_end);
+    let c_byte_end = local32(g, f);
+    lget(g, c_base); lget(g, c_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, c_byte_end);
+
+    // Safety guard:
+    // rows >= 2 && rows <= 4096 && n > 0 && n <= 4096 && m >= 16 && m <= 4096
+    // && a_str <= 4096 && b_str <= 4096 && c_str <= 4096 && c_str >= m (non-overlapping C rows!)
+    // && a_need <= a_len && b_need <= b_len && c_need <= c_len
+    // && disjoint(c, a) && disjoint(c, b)
+    lget(g, rows_loc); i32Const(g, 2); op(g, OP_i32_ge_u);
+    lget(g, rows_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, n_loc); i32Const(g, 0); op(g, OP_i32_gt_u); op(g, OP_i32_and);
+    lget(g, n_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, m_loc); i32Const(g, 16); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, m_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, a_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, b_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_str_loc); lget(g, m_loc); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, a_need); lget(g, a_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, b_need); lget(g, b_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_need); lget(g, c_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_byte_end); lget(g, a_base); op(g, OP_i32_le_u);
+    lget(g, a_byte_end); lget(g, c_base); op(g, OP_i32_le_u);
+    op(g, OP_i32_or); op(g, OP_i32_and);
+    lget(g, c_byte_end); lget(g, b_base); op(g, OP_i32_le_u);
+    lget(g, b_byte_end); lget(g, c_base); op(g, OP_i32_le_u);
+    op(g, OP_i32_or); op(g, OP_i32_and);
+
+    let guard_if = open(g, f, OP_if_);
+
+    let a_str_bytes = local32(g, f);
+    lget(g, a_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, a_str_bytes);
+    let a_str2_bytes = local32(g, f);
+    lget(g, a_str_bytes); i32Const(g, 1); op(g, OP_i32_shl); lset(g, a_str2_bytes);
+    let b_str_bytes = local32(g, f);
+    lget(g, b_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, b_str_bytes);
+    let c_str_bytes = local32(g, f);
+    lget(g, c_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, c_str_bytes);
+    let c_str2_bytes = local32(g, f);
+    lget(g, c_str_bytes); i32Const(g, 1); op(g, OP_i32_shl); lset(g, c_str2_bytes);
+
+    let m_tile = local32(g, f);
+    lget(g, m_loc); i32Const(g, 0xfffffff0); op(g, OP_i32_and); lset(g, m_tile);
+    var nan_v: u32 = 0;
+    if !f.defer_f32_nan {
+        nan_v = local(g, f, VT_v128);
+        v128Const4(g, 0x7fc00000);
+        lset(g, nan_v);
+    }
+
+    let row_i = constLocal(g, f, 0);
+    let a_row0 = local32(g, f); lget(g, a_base); lset(g, a_row0);
+    let a_row1 = local32(g, f);
+    let c_row0 = local32(g, f); lget(g, c_base); lset(g, c_row0);
+    let c_row1 = local32(g, f);
+    let col_i = local32(g, f);
+    let col_byte = local32(g, f);
+    let c_tile0 = local32(g, f);
+    let c_tile1 = local32(g, f);
+    let a0_cur = local32(g, f);
+    let a1_cur = local32(g, f);
+    let b_cur = local32(g, f);
+    let k_i = local32(g, f);
+    let va0 = local(g, f, VT_v128);
+    let va1 = local(g, f, VT_v128);
+    let vb = local(g, f, VT_v128);
+    let r0_0 = local(g, f, VT_v128);
+    let r0_1 = local(g, f, VT_v128);
+    let r0_2 = local(g, f, VT_v128);
+    let r0_3 = local(g, f, VT_v128);
+    let r1_0 = local(g, f, VT_v128);
+    let r1_1 = local(g, f, VT_v128);
+    let r1_2 = local(g, f, VT_v128);
+    let r1_3 = local(g, f, VT_v128);
+    let sacc0 = local(g, f, VT_f32);
+    let sacc1 = local(g, f, VT_f32);
+    let sb = local(g, f, VT_f32);
+
+    // Outer 2-row loop: row = 0, 2, ..., rows_even - 2
+    let r_exit = open(g, f, OP_block);
+    let r_top = open(g, f, OP_loop);
+    lget(g, row_i); lget(g, rows_even); op(g, OP_i32_ge_u); br(g, f, OP_br_if, r_exit);
+
+    lget(g, a_row0); lget(g, a_str_bytes); op(g, OP_i32_add); lset(g, a_row1);
+    lget(g, c_row0); lget(g, c_str_bytes); op(g, OP_i32_add); lset(g, c_row1);
+
+    i32Const(g, 0); lset(g, col_i);
+    i32Const(g, 0); lset(g, col_byte);
+
+    // 16-column tile loop (8 x v128 accumulators held in XMM registers across all k!)
+    let tile_exit = open(g, f, OP_block);
+    let tile_top = open(g, f, OP_loop);
+    lget(g, col_i); lget(g, m_tile); op(g, OP_i32_ge_u); br(g, f, OP_br_if, tile_exit);
+
+    lget(g, c_row0); lget(g, col_byte); op(g, OP_i32_add); lset(g, c_tile0);
+    lget(g, c_row1); lget(g, col_byte); op(g, OP_i32_add); lset(g, c_tile1);
+
+    // Descending offset loads (48, 32, 16, 0) for single BCE check per row!
+    lget(g, c_tile0); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, r0_3);
+    lget(g, c_tile0); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, r0_2);
+    lget(g, c_tile0); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, r0_1);
+    lget(g, c_tile0); simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, r0_0);
+
+    lget(g, c_tile1); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, r1_3);
+    lget(g, c_tile1); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, r1_2);
+    lget(g, c_tile1); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, r1_1);
+    lget(g, c_tile1); simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, r1_0);
+
+    lget(g, a_row0); lset(g, a0_cur);
+    lget(g, a_row1); lset(g, a1_cur);
+    lget(g, b_base); lget(g, col_byte); op(g, OP_i32_add); lset(g, b_cur);
+    i32Const(g, 0); lset(g, k_i);
+
+    let k_exit = open(g, f, OP_block);
+    let k_top = open(g, f, OP_loop);
+    lget(g, k_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k_exit);
+
+    lget(g, a0_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va0);
+    lget(g, a1_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va1);
+
+    // Load b[k, col+48..0] ONCE in descending order and update BOTH rows (8 v128 mul+adds)!
+    lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, vb);
+    lget(g, r0_3); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_3);
+    lget(g, r1_3); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_3);
+
+    lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, vb);
+    lget(g, r0_2); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_2);
+    lget(g, r1_2); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_2);
+
+    lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb);
+    lget(g, r0_1); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_1);
+    lget(g, r1_1); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_1);
+
+    lget(g, b_cur); simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, vb);
+    lget(g, r0_0); lget(g, va0); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r0_0);
+    lget(g, r1_0); lget(g, va1); lget(g, vb); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, r1_0);
+
+    lget(g, a0_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a0_cur);
+    lget(g, a1_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a1_cur);
+    lget(g, b_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b_cur);
+    lget(g, k_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, k_i);
+    br(g, f, OP_br, k_top);
+    close(g, f);
+    close(g, f);
+
+    lget(g, c_tile0); lget(g, r0_3); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 48);
+    lget(g, c_tile0); lget(g, r0_2); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 32);
+    lget(g, c_tile0); lget(g, r0_1); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 16);
+    lget(g, c_tile0); lget(g, r0_0); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 0);
+
+    lget(g, c_tile1); lget(g, r1_3); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 48);
+    lget(g, c_tile1); lget(g, r1_2); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 32);
+    lget(g, c_tile1); lget(g, r1_1); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 16);
+    lget(g, c_tile1); lget(g, r1_0); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 0);
+
+    lget(g, col_i); i32Const(g, 16); op(g, OP_i32_add); lset(g, col_i);
+    lget(g, col_byte); i32Const(g, 64); op(g, OP_i32_add); lset(g, col_byte);
+    br(g, f, OP_br, tile_top);
+    close(g, f);
+    close(g, f);
+
+    // 2-row scalar column tail for any remaining `m % 16` columns:
+    let tail_exit = open(g, f, OP_block);
+    let tail_top = open(g, f, OP_loop);
+    lget(g, col_i); lget(g, m_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, tail_exit);
+
+    lget(g, c_row0); lget(g, col_byte); op(g, OP_i32_add); lset(g, c_tile0);
+    lget(g, c_row1); lget(g, col_byte); op(g, OP_i32_add); lset(g, c_tile1);
+    lget(g, c_tile0); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, sacc0);
+    lget(g, c_tile1); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, sacc1);
+
+    lget(g, a_row0); lset(g, a0_cur);
+    lget(g, a_row1); lset(g, a1_cur);
+    lget(g, b_base); lget(g, col_byte); op(g, OP_i32_add); lset(g, b_cur);
+    i32Const(g, 0); lset(g, k_i);
+
+    let tk_exit = open(g, f, OP_block);
+    let tk_top = open(g, f, OP_loop);
+    lget(g, k_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, tk_exit);
+    lget(g, b_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, sb);
+    lget(g, sacc0); lget(g, a0_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lget(g, sb); op(g, OP_f32_mul); op(g, OP_f32_add); lset(g, sacc0);
+    lget(g, sacc1); lget(g, a1_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lget(g, sb); op(g, OP_f32_mul); op(g, OP_f32_add); lset(g, sacc1);
+    lget(g, a0_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a0_cur);
+    lget(g, a1_cur); i32Const(g, 4); op(g, OP_i32_add); lset(g, a1_cur);
+    lget(g, b_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b_cur);
+    lget(g, k_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, k_i);
+    br(g, f, OP_br, tk_top);
+    close(g, f);
+    close(g, f);
+
+    lget(g, c_tile0); lget(g, sacc0); if !f.defer_f32_nan { canonicalizeF32Stack(g, f); } op(g, OP_f32_store); uleb(g, 2); uleb(g, 0);
+    lget(g, c_tile1); lget(g, sacc1); if !f.defer_f32_nan { canonicalizeF32Stack(g, f); } op(g, OP_f32_store); uleb(g, 2); uleb(g, 0);
+
+    lget(g, col_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, col_i);
+    lget(g, col_byte); i32Const(g, 4); op(g, OP_i32_add); lset(g, col_byte);
+    br(g, f, OP_br, tail_top);
+    close(g, f);
+    close(g, f);
+
+    lget(g, a_row0); lget(g, a_str2_bytes); op(g, OP_i32_add); lset(g, a_row0);
+    lget(g, c_row0); lget(g, c_str2_bytes); op(g, OP_i32_add); lset(g, c_row0);
+    lget(g, row_i); i32Const(g, 2); op(g, OP_i32_add); lset(g, row_i);
+    br(g, f, OP_br, r_top);
+    close(g, f);
+    close(g, f);
+
+    // Advance outer `index = rows_even` so any odd final row falls through cleanly to 4C!
+    lget(g, rows_even);
     lset(g, index);
     close(g, f);
     f.checked_elems_len = 0;
@@ -4841,8 +6633,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let ctag = tagOf(g, value.ty);
             var in_place = false;
             if !held && ctag == blot_direct_types::Tag.array {
-                var cbudget: i64 = 256;
-                in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
+                var cbudget: i64 = 512;
+                in_place = carryStaysInPlace(g, m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
             }
             if in_place {
                 if at < 64 { carry_in_place[at] = true; }
@@ -5098,16 +6890,26 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     if body_no_resize && info.kind == blot_check_core::LoopKind.range {
+        let matmul2_err = tryEmitBlockedMatmulRowLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
+        if matmul2_err != blot_direct_types::Error.none { return neverVal(), matmul2_err; }
         let matmul_err = tryEmitBlockedMatmulKLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if matmul_err != blot_direct_types::Error.none { return neverVal(), matmul_err; }
         let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+        let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+        if red_err != blot_direct_types::Error.none { return neverVal(), red_err; }
+        let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+        if esc_err != blot_direct_types::Error.none { return neverVal(), esc_err; }
         let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
         if aff_err != blot_direct_types::Error.none { return neverVal(), aff_err; }
     }
+    var copy_tail_done = false;
     if body_no_resize && info.kind == blot_check_core::LoopKind.forever {
         let sf_err = tryEmitStridedFillLoop(g, f, id, info, iteration, carry_in_place);
         if sf_err != blot_direct_types::Error.none { return neverVal(), sf_err; }
+        let ct_done, ct_err = tryEmitCopyTailLoop(g, f, id, info, iteration, carry_in_place);
+        if ct_err != blot_direct_types::Error.none { return neverVal(), ct_err; }
+        copy_tail_done = ct_done;
     }
     // Preserve CheckedArray entries for non-resizing in-place carries across OP_loop
     // (assignCarries at the loop backedge writes to the same handle locals and would
@@ -5155,16 +6957,104 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         close(g, f);
 
         f.defer_f32_nan = true;
-        let err1 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+        var ind_lens: u32[4] = [0; 4];
+        var ind_len_count: i64 = 0;
+        let has_ind, ind_arr_b, ind_m_node, ind_id_b = tryMatchIndirectIndexScan(g, f, g.units[f.unit - 1], info.body, ind_lens, ind_len_count);
+        if has_ind && !f.in_specialized_loop {
+            let ind_av, _ = bindGet(g, f, ind_arr_b);
+            let ind_ca = findCheckedArray(f, w(g, ind_av, 0), w(g, ind_av, 1));
+            let ind_base = f.checked_arrays[ind_ca].base;
+            let ind_arr_len = f.checked_arrays[ind_ca].length;
+            let ind_mv, imerr = expr(g, f, ind_m_node);
+            if imerr != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), imerr; }
+            let ind_m = w(g, ind_mv, 0);
+            let min_len = local32(g, f);
+            lget(g, ind_lens[0]);
+            lset(g, min_len);
+            for ti in 1..ind_len_count {
+                lget(g, min_len);
+                lget(g, ind_lens[ti]);
+                lget(g, min_len);
+                lget(g, ind_lens[ti]);
+                op(g, OP_i32_lt_u);
+                op(g, OP_select);
+                lset(g, min_len);
+            }
+            let all_ok = constLocal(g, f, 0);
+            lget(g, ind_m);
+            lget(g, ind_arr_len);
+            op(g, OP_i32_le_u);
+            let scan_if = open(g, f, OP_if_);
+            i32Const(g, 1);
+            lset(g, all_ok);
+            let scan_k = constLocal(g, f, 0);
+            let s_exit = open(g, f, OP_block);
+            let s_top = open(g, f, OP_loop);
+            lget(g, scan_k);
+            lget(g, ind_m);
+            op(g, OP_i32_ge_u);
+            br(g, f, OP_br_if, s_exit);
+            lget(g, ind_base);
+            lget(g, scan_k);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+            lget(g, min_len);
+            op(g, OP_i32_ge_u);
+            let bad_if = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, all_ok);
+            br(g, f, OP_br, s_exit);
+            close(g, f);
+            lget(g, scan_k);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lset(g, scan_k);
+            br(g, f, OP_br, s_top);
+            close(g, f);
+            close(g, f);
+            popCheckedArraysAt(f, scan_if);
+            close(g, f);
+
+            let prev_spec = f.in_specialized_loop;
+            let prev_ib = f.indirect_bound_binding;
+            let prev_il = f.indirect_bound_len;
+            f.in_specialized_loop = true;
+            lget(g, all_ok);
+            let ind_if = open(g, f, OP_if_);
+            for ti in 0..ind_len_count { recordCheckedLe(f, min_len, ind_lens[ti]); }
+            f.indirect_bound_binding = ind_id_b;
+            f.indirect_bound_len = min_len;
+            let err1a = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            f.indirect_bound_binding = prev_ib;
+            f.indirect_bound_len = prev_il;
+            if err1a != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.defer_f32_nan = false; return neverVal(), err1a; }
+            popCheckedArraysAt(f, ind_if);
+            op(g, OP_else_);
+            let err1b = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            f.in_specialized_loop = prev_spec;
+            if err1b != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1b; }
+            close(g, f);
+        } else {
+            let err1 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            if err1 != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1; }
+        }
         f.defer_f32_nan = false;
-        if err1 != blot_direct_types::Error.none { return neverVal(), err1; }
         let err2 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false);
         if err2 != blot_direct_types::Error.none { return neverVal(), err2; }
         emitted_loop = true;
     }
 
+    // 5A: 2-way merge loop with invariant `k < dst_len` + `mid, hi <= src_len` bounds hoisting.
+    if !emitted_loop && body_no_resize && info.kind == blot_check_core::LoopKind.forever && !copy_tail_done {
+        let fm_done, fm_err = tryEmitFastMergeLoop(g, f, id, info, iteration, outgoing, slots, range, carry_in_place);
+        if fm_err != blot_direct_types::Error.none { return neverVal(), fm_err; }
+        if fm_done { emitted_loop = true; }
+    }
+
     // 4B-2: Pre-loop `CheckedLe` bounds hoisting for small non-resizing range and `for ever` loops.
-    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop {
+    if !emitted_loop && body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && !copy_tail_done {
         var le_a: u32[4] = [0; 4];
         var le_b: u32[4] = [0; 4];
         var le_count: i64 = 0;

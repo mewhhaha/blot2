@@ -1,14 +1,85 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 4 Runtime Optimizations (4A–4E + BCE SIMD) (25 November 2026)
+## Current frontier: Direct-Backend Tier 5 Runtime Optimizations (5A–5F) (25 November 2026)
 
-Tier 4 direct-backend runtime optimizations (4A–4E plus descending `48,32,16,0`
-BCE-coalesced SIMD lanes) are complete and qualified, pushing Blot ahead of
-LLVM `-O3` Wasm on 3 of 6 kernels (`0.90×` geomean) and pushing Ink ECS ahead
-of native Bevy ECS `0.20.1` on 4 of 5 categories (including `batch_spawn_10k`)
-on **`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`)**:
+Tier 5 direct-backend runtime optimizations (5A–5F) are complete and qualified
+(`blotc-goose` SHA-256 `57a11e40cb50dbde5f229683eb7f94195b58b49637671fb89998ea818d22185b`,
+`8,454,552` B; `generated/compiler/blotc.gz` SHA-256
+`94228ddd853810402adcfd7681c7959d0c9c1304d40fe2b8e456dd7cef157810`, `3,657,175` B),
+sweeping **6 / 6 kernels vs Rust `-O3` Wasm (`0.48×` geomean)**, beating **native
+Rust `-O3` on 5 / 6 kernels (`0.59×` geomean)**, and bringing Ink ECS pure-Wasm
+AoS cached queries within **1.3%** of native Bevy ECS `0.20.1` (`1.39 ms` vs
+`1.37 ms`) on **`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`, `1201395`)**:
 
-- **Tier 4 direct-backend runtime optimizations (this commit, after `656371cd`):**
+- **Tier 5 direct-backend runtime optimizations (this commit, after `fc29d049`):**
+  - **5A (`merge_sort` branchless `select`, `memory.copy` tails, `k < dst_len` hoisting & deep inlining):**
+    Added `tryIfBranchlessStore` (branchless `select` / `cmov` for same-target
+    indexed updates), `tryIfShortCircuitBreak` (direct short-circuit `or`-break),
+    `tryEmitCopyTailLoop` (`memory.copy` fast path with disjointness & bounds
+    guards), `tryEmitFastMergeLoop` (invariant `k + (mid - i) + (hi - j) <= dst_len`
+    hoisting eliminating all inner bounds checks in 2-way merge loops),
+    interprocedural handle-preservation (`calleeReturnsParamHandle`), `Tag.usage`
+    hoist candidates in `collectLoopArrayUses`, and raised loop-bearing helper
+    inlining budgets (`168/152/32`, `break_` support in `canInlineBody`) so
+    `merge_pass` and `merge_range` inline completely into `merge_sort`
+    (`direct/function_control.goose`, `direct/function_calls.goose`).
+  - **5B (Intra-element `v128` SIMD for 16-byte `Maybe Vec3` & pre-loop indirect-index bounds scans):**
+    Added `tryEmitVec3MaybeSimdUpdate` (`direct/function_control.goose`) to
+    collapse `if let $Some ($Pos { x, y, z }) = pos[idx]: if let $Some ($Vel { ... }) = vel[idx]: pos[idx] := $Some ($Pos { x: x +- vx, ... })`
+    into `2 × v128.load + i32x4.extract_lane 0 + f32x4.{add,sub} + v128.store`
+    (preserving lane-0 `$Some` tag `0 == +0.0` and arbitrary record field orders
+    via `m.recordDestinations`), plus `tryMatchIndirectIndexScan` +
+    `Fn.indirect_bound_binding` / `Fn.indirect_bound_len` (`direct/function.goose`)
+    to scan read-only `dense_ids`/`sparse_ids` once before `4A` outer loops,
+    eliminating all inner bounds checks across Ink ECS `world_step` `cmd 1–3`.
+  - **5C (2-row × 16-col `8 × v128` register-blocked outer-row matmul):**
+    Factored `matchMatmulKLoop` and added `tryEmitBlockedMatmulRowLoop`
+    (`direct/function_control.goose`) to tile 2 rows × 16 columns (`8 × v128`
+    accumulators) sharing descending `48,32,16,0` `b` loads across both rows
+    with non-overlapping `c_stride >= m` + disjointness guards, 2-row scalar
+    tail, and clean odd-row fallback to `4C`.
+  - **5D (16-wide `v128` SIMD masked `#[Bool]` & unmasked `#[U32]` reductions):**
+    Added `tryEmitVectorReductionLoop` (`direct/function_spark.goose`) processing
+    16 `Bool` bytes (descending `12,8,4,0` `v128.load32_zero` + zero-extend) or
+    16 `U32` words (descending `48,32,16,0`) per iteration, eliminating branch
+    mispredicts in `prime_sieve`'s prime count/sum scan.
+  - **5E (4-pixel `v128` outer-loop escape-time SIMD + SIMD `2.0*x → x+x`):**
+    Added `tryEmitVectorEscapeLoop` and exact `2.0 * x → x + x` SIMD peephole
+    (`direct/function_spark.goose`) to run 4 escape-time pixels simultaneously
+    in `v128` with monotone lane disable (`v128.andnot`), `v128.any_true` early
+    exit, exact `i32x4.sub(it_v, active_v)`, and scalar tail for `< 4` pixels.
+  - **5F (16-wide `4 × v128` SIMD affine LCG recurrence + 8× scalar unrolling):**
+    Upgraded `tryEmitAffineUnrollLoop` (`direct/function_control.goose`) with a
+    16-wide (`4 × v128` streams advancing by `(A^16, C_16)` exact mod 2³²) SIMD
+    fast path for associative `^`/`+` single-accumulator LCG loops and 8× scalar
+    parallel-power unrolling for general affine loops.
+  - Regenerated adapters (`structural_adapters.goose`, `json_adapters.goose`),
+    added executed-Wasm regression coverage in `tests/guest/tier5_opt_execution.test.ts`
+    (all 6 passes + edge cases, NaN canonicalization, aliasing fallbacks, OOB
+    traps), re-recorded `compiler-goose/tests/fixtures/expected.json` (107 of
+    109 byte-identical; 2 shrank from deeper inlining, 0 diagnostic/counter
+    changes), and passed the full qualification gate (`deno task test:compiler`
+    with `1120 passed, 0 failed` guests, `109/109` fixtures, `206/206`
+    uniqueness, `test:editor` 6/6, Ink `pen test-blot` `427 passed, 0 failed`,
+    Pen `cargo test -p blot-host`, and `examples/bounce`).
+  - Measured results on AMD Ryzen 7 7800X3D (`wtime-aot 0.1.1 x64-v3`, bit-exact
+    checksum parity, [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json)):
+    `lcg_recurrence` `0.374 → 0.096 ms` (**3.9× faster; 0.26× Rust Wasm, 0.27× native!**),
+    `mandelbrot_f32` `3.344 → 0.992 ms` (**3.4× faster; 0.31× Rust Wasm, 0.29× native!**),
+    `prime_sieve` `0.112 → 0.063 ms` (**1.8× faster; 0.45× Rust Wasm, 0.90× native!**),
+    `particle_spark_simd` `0.448 ms` (**0.63× Rust Wasm, 0.67× native!**),
+    `merge_sort` `6.625 → 4.269 ms` (**1.55× faster; 0.72× Rust Wasm, 0.83× native!**),
+    `matmul_64` `0.025 → 0.023 ms` (**0.75× Rust Wasm, 1.14× native**),
+    Blot SoA + `spark` SIMD `0.348 ms` (**3.94× faster than Bevy AoS `1.369 ms`!**),
+    Ink ECS cached query `2.070 → 1.387 ms` (**1.49× faster; 1.01× Bevy!**),
+    Ink ECS Pool direct `1.652 → 1.489 ms` (**1.09× Bevy**),
+    Ink ECS sparse query `0.136 → 0.100 ms` (**1.36× faster; 1.45× Bevy**),
+    Ink ECS `batch_spawn_10k` `0.293 ms` (**1.12× faster than Bevy `0.329 ms`!**),
+    Ink ECS `structural_churn` `15.6 µs` (**5.8× faster than Bevy `90.1 µs`!**),
+    Ink ECS `world_snapshot_copy_10k` `23.5 µs` (**17.7× faster than Bevy `416.4 µs`**);
+    cold Wasm compile `12.9 ms` (`18,026` B, `7.6×` faster & `83×` smaller than `rustc -O3 wasm32`; `wtime-aot x64` AOT: `4.3 ms`).
+
+- **Tier 4 direct-backend runtime optimizations (`fc29d049`, after `656371cd`):**
   - **4A (Deferred NaN canonicalization on pure-FP counted loops):**
     Added `canDeferLoopF32Nan` / `bodyValidDeferF32Nan` (`direct/function_control.goose`,
     `direct/function_values.goose`, `direct/function_calls.goose`, `direct/function_spark.goose`)

@@ -48,6 +48,7 @@ import compile;
 import direct.direct;
 import direct.emit;
 import direct.function;
+import direct.function_control;
 import direct.function_entry;
 import direct.function_kernels;
 import direct.function_persist;
@@ -580,6 +581,7 @@ fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::C
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::ConstTag,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::CoreSubstEntry,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::Fn,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::MatmulKMatch,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::PersistRoot,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::ScratchCut,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::SparkAffineLocal,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}

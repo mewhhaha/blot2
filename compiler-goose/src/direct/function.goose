@@ -142,6 +142,8 @@ struct Fn {
     // Uniquely-owned local/own-param array/container bindings eligible for in-place spark reuse.
     unique_owned: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     loop_depth: u32 = 0,
+    indirect_bound_binding: u32 = 0,
+    indirect_bound_len: u32 = 0,
     owned_uses_computed: bool = false,
     owned_uses: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     owned_flows: blot_support_zigmap::Map = blot_support_zigmap::Map {},
@@ -927,6 +929,9 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     bindPut(g, f, n.a, value);
+    if f.indirect_bound_binding != 0 && n.a == f.indirect_bound_binding && tagOf(g, value.ty) == blot_direct_types::Tag.u32_ {
+        recordCheckedBound(f, w(g, value, 0), f.indirect_bound_len);
+    }
     if value.ty == blot_direct_types::never { return value, blot_direct_types::Error.none; }
     return unitVal(), blot_direct_types::Error.none;
 }
