@@ -894,15 +894,16 @@ fn emitSimdMachineOp(
     nan_vlocal: u32,
 ) {
     if operand_tag == blot_direct_types::Tag.f32_ {
+        let skip_nan = elide_nan || f.defer_f32_nan;
         match op_ {
-            add => { simdOp(g, SIMD_f32x4_add); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            sub => { simdOp(g, SIMD_f32x4_sub); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            mul => { simdOp(g, SIMD_f32x4_mul); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            div => { simdOp(g, SIMD_f32x4_div); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            sqrt => { simdOp(g, SIMD_f32x4_sqrt); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            floor => { simdOp(g, SIMD_f32x4_floor); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            ceil => { simdOp(g, SIMD_f32x4_ceil); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
-            trunc => { simdOp(g, SIMD_f32x4_trunc); if !elide_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            add => { simdOp(g, SIMD_f32x4_add); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            sub => { simdOp(g, SIMD_f32x4_sub); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            mul => { simdOp(g, SIMD_f32x4_mul); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            div => { simdOp(g, SIMD_f32x4_div); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            sqrt => { simdOp(g, SIMD_f32x4_sqrt); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            floor => { simdOp(g, SIMD_f32x4_floor); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            ceil => { simdOp(g, SIMD_f32x4_ceil); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
+            trunc => { simdOp(g, SIMD_f32x4_trunc); if !skip_nan { canonicalizeF32x4(g, f, nan_vlocal); } },
             neg => { simdOp(g, SIMD_f32x4_neg); },
             abs => { simdOp(g, SIMD_f32x4_abs); },
             bits => {},
@@ -1529,7 +1530,7 @@ fn tryEmitVectorSpark(
         lset(g, vl);
         plan.hoisted[hi].vlocal = vl;
     }
-    if plan.uses_f32_canon {
+    if plan.uses_f32_canon && !f.defer_f32_nan {
         let nl = local(g, f, VT_v128);
         v128Const4(g, 0x7fc00000);
         lset(g, nl);
@@ -1620,7 +1621,9 @@ fn tryEmitVectorSpark(
         plan.index_local = 0xffffffff;
         plan.byte_off_local = 0xffffffff;
 
-        for step in 0..4 {
+        for ustep in 0..4 {
+            var step = ustep;
+            if !need_iter_vlocal { step = 3 - ustep; }
             plan.unroll_step = step as u32;
             if !info.is_range && need_iter_vlocal {
                 if iter_tag == blot_direct_types::Tag.boolean {
@@ -2169,7 +2172,7 @@ fn tryEmitVectorForLoop(
         lset(g, vl);
         plan.hoisted[hi].vlocal = vl;
     }
-    if plan.uses_f32_canon {
+    if plan.uses_f32_canon && !f.defer_f32_nan {
         let nl = local(g, f, VT_v128);
         v128Const4(g, 0x7fc00000);
         lset(g, nl);
@@ -2253,7 +2256,9 @@ fn tryEmitVectorForLoop(
         plan.index_local = 0xffffffff;
         plan.byte_off_local = 0xffffffff;
 
-        for step in 0..4 {
+        for ustep in 0..4 {
+            var step = ustep;
+            if !need_iter_vlocal { step = 3 - ustep; }
             plan.unroll_step = step as u32;
             let m_step .= g.units[f.unit - 1];
             for li in 0..lead_bind_len {

@@ -82,11 +82,17 @@ struct CheckedElem {
     address: u32 = 0,
     val_local: u32 = 0xffffffff,
     val_ty: Ty = 0,
+    known_tag: u32 = 0xffffffff,
     depth: u32 = 0
 }
 struct CheckedBound {
     index: u32 = 0,
     bound: u32 = 0,
+    depth: u32 = 0
+}
+struct CheckedLeBound {
+    a: u32 = 0,
+    b: u32 = 0,
     depth: u32 = 0
 }
 struct ConstTag { local: u32 = 0, tag: u32 = 0, depth: u32 = 0 }
@@ -124,6 +130,8 @@ struct Fn {
     checked_elems_len: i64 = 0,
     checked_bounds: CheckedBound[8] = [CheckedBound {}; 8],
     checked_bounds_len: i64 = 0,
+    checked_le: CheckedLeBound[8] = [CheckedLeBound {}; 8],
+    checked_le_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -133,6 +141,7 @@ struct Fn {
     unique_boxed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     // Uniquely-owned local/own-param array/container bindings eligible for in-place spark reuse.
     unique_owned: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    loop_depth: u32 = 0,
     owned_uses_computed: bool = false,
     owned_uses: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     owned_flows: blot_support_zigmap::Map = blot_support_zigmap::Map {},
@@ -189,6 +198,13 @@ struct Fn {
     // Local F32 bindings statically proved finite and bounded (|x| <= 2^33).
     finite_f32: u32[32] = [0; 32],
     finite_f32_len: i64 = 0,
+    // Set on prefix iterations 0..end-2 of a pure-FP counted loop whose final
+    // iteration canonicalizes all overwritten F32 outputs to exact 0x7fc00000.
+    defer_f32_nan: bool = false,
+    // Non-zero while emitting an inlined function body via `inlineSmall`.
+    inlined_body_binding: u32 = 0,
+    // Prevents recursive loop-specialization cloning.
+    in_specialized_loop: bool = false,
 }
 
 fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {
@@ -251,6 +267,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.checked_bounds_len > 0 && f.checked_bounds[f.checked_bounds_len - 1].depth > max_depth {
         f.checked_bounds_len -= 1;
     }
+    while f.checked_le_len > 0 && f.checked_le[f.checked_le_len - 1].depth > max_depth {
+        f.checked_le_len -= 1;
+    }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth > max_depth {
         f.const_tags_len -= 1;
     }
@@ -270,6 +289,9 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.checked_bounds_len > 0 && f.checked_bounds[f.checked_bounds_len - 1].depth >= depth {
         f.checked_bounds_len -= 1;
+    }
+    while f.checked_le_len > 0 && f.checked_le[f.checked_le_len - 1].depth >= depth {
+        f.checked_le_len -= 1;
     }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth >= depth {
         f.const_tags_len -= 1;
@@ -346,7 +368,7 @@ fn findCheckedElem(f: const Fn&, slot: u32, generation: u32, index: u32, step: u
 fn recordCheckedElem(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, address: u32) {
     if findCheckedElem(f, slot, generation, index, step) >= 0 { return; }
     if f.checked_elems_len >= 8 { return; }
-    f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, val_local: 0xffffffff, val_ty: 0, depth: f.depth };
+    f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, val_local: 0xffffffff, val_ty: 0, known_tag: 0xffffffff, depth: f.depth };
     f.checked_elems_len += 1;
 }
 fn recordCheckedElemVal(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, val_local: u32, val_ty: Ty) {
@@ -356,6 +378,13 @@ fn recordCheckedElemVal(f: Fn&, slot: u32, generation: u32, index: u32, step: u3
         f.checked_elems[at].val_ty = val_ty;
     }
 }
+fn recordCheckedElemTag(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, tag: u32) -> i64, u32 {
+    let at = findCheckedElem(f, slot, generation, index, step);
+    if at < 0 { return -1, 0xffffffff; }
+    let prev = f.checked_elems[at].known_tag;
+    f.checked_elems[at].known_tag = tag;
+    return at, prev;
+}
 fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
     let slot = w(g, container, 0);
     let gen = w(g, container, 1);
@@ -364,7 +393,7 @@ fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
         for i in 0..f.checked_arrays_len {
             let entry = f.checked_arrays[i];
             if entry.slot == slot && entry.generation == gen {
-                // Also drop any CheckedBound referencing this owner's old cached length local.
+                // Also drop any CheckedBound/CheckedLe referencing this owner's old cached length local.
                 if f.checked_bounds_len != 0 {
                     var bout: i64 = 0;
                     for bi in 0..f.checked_bounds_len {
@@ -376,6 +405,17 @@ fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
                     }
                     f.checked_bounds_len = bout;
                 }
+                if f.checked_le_len != 0 {
+                    var lout: i64 = 0;
+                    for li in 0..f.checked_le_len {
+                        let lentry = f.checked_le[li];
+                        if lentry.a != entry.length && lentry.b != entry.length {
+                            f.checked_le[lout] = lentry;
+                            lout += 1;
+                        }
+                    }
+                    f.checked_le_len = lout;
+                }
             } else {
                 f.checked_arrays[out] = entry;
                 out += 1;
@@ -386,12 +426,28 @@ fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
     f.checked_views_len = 0;
     f.checked_elems_len = 0;
 }
+fn findCheckedLe(f: const Fn&, a: u32, b: u32) -> i64 {
+    var i = f.checked_le_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_le[i];
+        if entry.a == a && entry.b == b { return i; }
+    }
+    return -1;
+}
+fn recordCheckedLe(f: Fn&, a: u32, b: u32) {
+    if a == b || findCheckedLe(f, a, b) >= 0 { return; }
+    if f.checked_le_len >= 8 { return; }
+    f.checked_le[f.checked_le_len] = CheckedLeBound { a: a, b: b, depth: f.depth };
+    f.checked_le_len += 1;
+}
 fn findCheckedBound(f: const Fn&, index: u32, bound: u32) -> i64 {
     var i = f.checked_bounds_len;
     while i > 0 {
         i -= 1;
         let entry = f.checked_bounds[i];
         if entry.index == index && entry.bound == bound { return i; }
+        if entry.index == index && findCheckedLe(f, entry.bound, bound) >= 0 { return i; }
     }
     return -1;
 }
@@ -406,6 +462,7 @@ fn invalidateCheckedContainers(f: Fn&) {
     f.checked_views_len = 0;
     f.checked_elems_len = 0;
     f.checked_bounds_len = 0;
+    f.checked_le_len = 0;
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
@@ -503,6 +560,25 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             }
         }
         f.checked_bounds_len = out;
+    }
+    if f.checked_le_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_le_len {
+            let entry = f.checked_le[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.a || local_id == entry.b {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_le[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_le_len = out;
     }
     if f.const_tags_len != 0 {
         var out: i64 = 0;
@@ -602,6 +678,7 @@ fn lower(g: Generator&, f: Fn&, ty: TId, id: u32) -> Ty, Error {
 // The named body this instance's code belongs to (a lambda's enclosing named
 // instance), in this unit.
 fn enclosingBody(g: const Generator&, f: const Fn&) -> const blot_check_core::Body? {
+    if f.inlined_body_binding != 0 { return g.units[f.unit - 1].body(f.inlined_body_binding); }
     var key = g.s.instances[f.instance_id].key;
     for step in 0..64 {
         if key.unit != f.unit { return null; }
@@ -843,7 +920,7 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, 1);
         }
         if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, 1);
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
         }
         if n.c == 0 && tagOf(g, value.ty) == blot_direct_types::Tag.f32_ && isBoundedFiniteF32(g, f, m, n.b) {
             recordFiniteF32(f, n.a);
@@ -874,9 +951,12 @@ fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
     return present && val != 0;
 }
-fn isUniqueOwned(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+fn isUniqueOwnedAt(g: const Generator&, f: const Fn&, binding: u32, loop_depth: u32) -> bool {
     let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_owned, binding);
-    return present && val != 0;
+    return present && val == loop_depth + 1;
+}
+fn isUniqueOwned(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+    return isUniqueOwnedAt(g, f, binding, f.loop_depth);
 }
 fn incOwnedMap(g: Generator&, map: blot_support_zigmap::Map&, b: u32) {
     if b == 0 { return; }
@@ -1073,6 +1153,15 @@ fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u32, ty: Ty
         reference => {
             let local_id = localRef(m, id);
             return local_id != 0 && isUniqueOwned(g, f, local_id) && ownedTotalUses(g, f, local_id) == 1 && !bindingCaptured(g, f, local_id);
+        },
+        call => {
+            let target = g.resolve(m, m.call(id).target);
+            if !g.hasUnit(target.unit) { return false; }
+            let tm .= g.units[target.unit - 1];
+            let tbody .= tm.body(target.binding);
+            if !tbody || !tbody.is_function || tbody.exported { return false; }
+            let ret = returnedFreshArrayExpr(tm, tbody.root);
+            return isFreshOwnedArrayNode(g, tm, ret, 1);
         },
         _ => { return false; },
     }

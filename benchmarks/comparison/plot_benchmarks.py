@@ -161,12 +161,12 @@ def fmt_ms(v: float) -> str:
 def build_kernels_chart(data: dict) -> str:
     by_name = {row["name"]: row for row in data["kernels"]}
     specs = [
-        ("particle_spark_simd", "65k particles × 32 · spark v128"),
-        ("mandelbrot_f32", "256×256 scalar FP · 100 max iter"),
-        ("merge_sort", "100k U32 · owned ping-pong buffers"),
-        ("lcg_recurrence", "1,000,000 U32 steps · 4× affine unroll"),
-        ("prime_sieve", "100k Bool flags · branchless select"),
-        ("matmul_64", "64×64 F32 · 4× unrolled auto-SIMD"),
+        ("particle_spark_simd", "65k × 32 · in-place spark SIMD"),
+        ("mandelbrot_f32", "256×256 FP · 2× unroll, 2*x→x+x"),
+        ("merge_sort", "100k U32 · hoisted bounds, ping-pong"),
+        ("lcg_recurrence", "1,000,000 U32 · 4× affine unroll"),
+        ("prime_sieve", "100k Bool · 4× strided fill + select"),
+        ("matmul_64", "64×64 F32 · 4×v128 k-blocked SIMD"),
     ]
 
     w, h = 920, 492
@@ -219,7 +219,9 @@ def build_kernels_chart(data: dict) -> str:
         ratio_w = row_data["blot_vs_rust_wasm"]
         ratio_n = row_data["blot_vs_rust_native"]
         ratio_txt = f"Blot: {ratio_w:.2f}× Rust Wasm · {ratio_n:.2f}× native" if ratio_w < 10 else f"Blot: {ratio_w:.1f}× Rust Wasm · {ratio_n:.1f}× native"
-        els.append(text(cx + 14, cy + card_h - 12, ratio_txt, size=10.2, weight="500", fill=TEXT_MUTED))
+        rfill = PILL_WIN_FG if ratio_w < 1.0 else TEXT_MUTED
+        rweight = "600" if ratio_w < 1.0 else "500"
+        els.append(text(cx + 14, cy + card_h - 12, ratio_txt, size=10.2, weight=rweight, fill=rfill))
 
     els.append(
         text(
@@ -321,10 +323,17 @@ def build_ecs_chart(data: dict) -> str:
         (
             "Batch spawn (10,000 entities)",
             "Pos + Vel + 10% Active",
-            f"Bevy {spawn['ink_ms'] / spawn['bevy_native_ms']:.2f}× faster",
-            PILL_RUST_BG,
-            PILL_RUST_FG,
+            f"Ink {spawn['bevy_native_ms'] / spawn['ink_ms']:.2f}× faster"
+            if spawn["ink_ms"] <= spawn["bevy_native_ms"]
+            else f"Bevy {spawn['ink_ms'] / spawn['bevy_native_ms']:.2f}× faster",
+            PILL_WIN_BG if spawn["ink_ms"] <= spawn["bevy_native_ms"] else PILL_RUST_BG,
+            PILL_WIN_FG if spawn["ink_ms"] <= spawn["bevy_native_ms"] else PILL_RUST_FG,
             [
+                ("Ink ECS", spawn["ink_ms"], C_BLOT, f"{spawn['ink_ms']:.3f} ms"),
+                ("Bevy ECS", spawn["bevy_native_ms"], C_RUST_NAT, f"{spawn['bevy_native_ms']:.3f} ms"),
+            ]
+            if spawn["ink_ms"] <= spawn["bevy_native_ms"]
+            else [
                 ("Bevy ECS", spawn["bevy_native_ms"], C_RUST_NAT, f"{spawn['bevy_native_ms']:.3f} ms"),
                 ("Ink ECS", spawn["ink_ms"], C_BLOT, f"{spawn['ink_ms']:.3f} ms"),
             ],
@@ -359,7 +368,7 @@ def build_ecs_chart(data: dict) -> str:
         text(
             28,
             h - 18,
-            "Archetype tables (Bevy) excel at AoS queries & batch spawn; entity-indexed owned columns (Ink) excel at tag churn, snapshots, and spark SoA.",
+            "Archetype tables (Bevy) excel at AoS queries; entity-indexed owned columns (Ink) lead on spawn, tag churn, snapshots, and spark SoA.",
             size=10.9,
             fill=TEXT_MUTED,
         )

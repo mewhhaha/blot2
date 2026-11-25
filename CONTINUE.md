@@ -1,17 +1,72 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 3 Runtime Optimizations (3A–3F) & `wtime-aot x64` Benchmarks (25 November 2026)
+## Current frontier: Direct-Backend Tier 4 Runtime Optimizations (4A–4E + BCE SIMD) (25 November 2026)
 
-Tier 3 direct-backend runtime optimizations (3A–3F: 4× unrolled 16-element
-`v128` SIMD loops, `if`-to-`select` conversion & cross-loop/branch bounds,
-selective array invalidation with SSA alias propagation + expanded inlining +
-`CheckedElem` scalar value reuse, 4× algebraic parallel-power affine LCG
-unrolling, bounded-finite `F32` NaN-canon elision + lazy variant payload loads,
-and zero-allocation persistent process fast-commit) are complete and qualified,
-and the cross-language comparison benchmarks now execute on **`wtime-aot 0.1.1`
-(`--backend x64`, `x64-v3`)**:
+Tier 4 direct-backend runtime optimizations (4A–4E plus descending `48,32,16,0`
+BCE-coalesced SIMD lanes) are complete and qualified, pushing Blot ahead of
+LLVM `-O3` Wasm on 3 of 6 kernels (`0.90×` geomean) and pushing Ink ECS ahead
+of native Bevy ECS `0.20.1` on 4 of 5 categories (including `batch_spawn_10k`)
+on **`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`)**:
 
-- **Tier 3 direct-backend runtime optimizations (this commit, after `f2632136`):**
+- **Tier 4 direct-backend runtime optimizations (this commit, after `656371cd`):**
+  - **4A (Deferred NaN canonicalization on pure-FP counted loops):**
+    Added `canDeferLoopF32Nan` / `bodyValidDeferF32Nan` (`direct/function_control.goose`,
+    `direct/function_values.goose`, `direct/function_calls.goose`, `direct/function_spark.goose`)
+    to split pure-FP counted loops (`0..end-1` with `f.defer_f32_nan = true`, then
+    final iteration `end-1` with canonicalization restored) for both `spark` loops
+    (`step_soa`, `particle_spark_simd`) and strictly-monotone same-constructor
+    `if let` variant-update loops (`world_step` `cmd 1–3`), preserving bit-exact
+    `0x7fc00000` NaNs at every observable boundary.
+  - **4B (Variant tag-store elision & pre-loop `CheckedLe` bounds hoisting):**
+    Recorded `CheckedElem.known_tag` inside lazy variant `match_` arms and
+    `recordConstTag` in `wrapVariant` (`direct/function.goose`, `direct/function_data.goose`,
+    `direct/function_control.goose`) to skip redundant offset-0 tag `i32.store`s
+    on same-tag overwrites; added transitive `CheckedLeBound` + `collectLoopPreBounds`
+    pre-loop specialization (`if a <= b`) eliminating inner-loop bounds checks on
+    `world_step` `vel[i]` and `merge_range` `src[i]`/`src[j]`.
+  - **4C (Register-blocked 4×`v128` matmul `k`-loop + descending `48,32,16,0` BCE SIMD):**
+    Added `tryEmitBlockedMatmulKLoop` (`direct/function_control.goose`) to tile
+    16 columns (`4 × v128` accumulators) in registers across the entire `k` loop
+    with single post-`k` canonicalization, scalar tail for `m % 16 != 0`, and
+    runtime bounds/overflow/disjointness guards; reordered 4× unrolled SIMD loads
+    and stores in `function_spark.goose` and 4C to descending offsets (`48,32,16,0`)
+    so `wtime-aot` Pass 2 BCE coalesces 4 software bounds checks into 1 per stripe
+    (without modifying `../wtime`, which had active uncommitted user work).
+  - **4D (`CheckedGrow` reuse, depth-3/`spark` inlining & loop-depth-scoped `unique_owned`):**
+    Taught `ensureCheckedArray` (`direct/function_storage.goose`) to reuse cached
+    `CheckedGrow` entries, hoisted `ensureCheckedGrow` on resized loop arrays,
+    raised `inlineSmall` to depth 3 (budgets `72/48/28`) with `spark` bodies and
+    `enclosingBody` (`inlined_body_binding`), and scoped `f.unique_owned` by
+    `f.loop_depth` (`direct/function.goose`, `direct/function_calls.goose`,
+    `direct/function_control.goose`) so inlined `integrate_particles` reuses `out`
+    in place across all 32 iterations while never aliasing outer loop-invariant arrays.
+  - **4E (Exact `2.0*x → x+x`, 2× scalar `for ever` unroll & 4× strided fill):**
+    Strength-reduced exact IEEE-754 `2.0 * x` / `x * 2.0` to `x + x`
+    (`direct/function_values.goose`), 2×-unrolled small pure-scalar `for ever`
+    loops (`isPureScalarForeverBody`, `mandelbrot_f32`), and added 4×-unrolled
+    pointer-increment strided array fill (`tryEmitStridedFillLoop`, `prime_sieve`).
+  - Regenerated adapters (`structural_adapters.goose`, `json_adapters.goose`),
+    added executed-Wasm regression coverage in `tests/guest/tier4_opt_execution.test.ts`
+    (covering all 4A–4E edge cases, traps, NaNs, and loop-invariant alias safety),
+    and re-recorded `compiler-goose/tests/fixtures/expected.json` (8 of 109
+    fixtures changed Wasm bytes/SHA; 0 diagnostic or work-counter changes).
+  - Measured results on AMD Ryzen 7 7800X3D (`wtime-aot 0.1.1 x64-v3`, bit-exact
+    checksum parity, [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json)):
+    `particle_spark_simd` `0.718 → 0.390 ms` (**1.84× faster; 0.52× Rust `-O3` Wasm, 0.59× native Rust!**),
+    `matmul_64` `0.067 → 0.025 ms` (**2.66× faster; 0.85× Rust `-O3` Wasm, 1.29× native!**),
+    `prime_sieve` `0.148 → 0.112 ms` (**1.32× faster; 0.86× Rust `-O3` Wasm**),
+    `mandelbrot_f32` `3.49 → 3.34 ms` (**0.97× native Rust `3.45 ms`, 1.09× Wasm**),
+    `lcg_recurrence` `0.374 ms` (`1.05×` Wasm, `1.10×` native),
+    `merge_sort` `6.62 ms` (`1.16×` Wasm, `1.33×` native),
+    Blot SoA + `spark` SIMD `0.657 → 0.332 ms` (**1.98× faster; 3.67× faster than Bevy AoS `1.22 ms`!**),
+    Ink ECS Pool direct `2.22 → 1.65 ms` (**1.35× faster; 1.36× Bevy**),
+    Ink ECS cached query `2.47 → 2.07 ms` (**1.19× faster; 1.70× Bevy**),
+    Ink ECS sparse query `0.151 → 0.136 ms` (`2.01×` Bevy),
+    Ink ECS `batch_spawn_10k` `0.363 → 0.290 ms` (**1.25× faster; 1.10× faster than native Bevy `0.319 ms`!**),
+    Ink ECS `structural_churn` `18.9 → 15.6 µs` (**5.4× faster than native Bevy `83.9 µs`!**),
+    Ink ECS `world_snapshot_copy_10k` `17.1 µs` (**23.2× faster than Bevy `395.9 µs`**);
+    cold Wasm compile `12.9 ms` (6 kernels, `13,970` B, `6.8×` faster & `108×` smaller than `rustc -O3 wasm32`; `wtime-aot x64` AOT: `3.5 ms`).
+- **Tier 3 direct-backend runtime optimizations (`656371cd`):**
   - **3A (4× unrolled 16-element `v128` SIMD + streamlined prologues):**
     Unrolled `tryEmitVectorSpark` and `tryEmitVectorForLoop` (`direct/function_spark.goose`)
     to 16 elements (`64 B` cache line) per iteration using immediate
@@ -172,7 +227,7 @@ and the cross-language comparison benchmarks now execute on **`wtime-aot 0.1.1`
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `f2632136`) | Tier 3 direct-backend runtime optimizations 3A–3F & `wtime-aot x64` comparison benchmarks (`this commit`), Tier 2 direct-backend runtime optimizations 2A–2F & `runFixed` abort fix (`f2632136`), Tier 1 loop-hoist runtime optimizations (`58adc750`), README SVG benchmark charts (`9de59b4c`), Consumer README & Rust/Bevy ECS comparison benchmarks (`7d87b31a`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`) |
+| `blot2` | this commit (after `656371cd`) | Tier 4 direct-backend runtime optimizations 4A–4E & descending BCE SIMD (`this commit`), Tier 3 direct-backend runtime optimizations 3A–3F & `wtime-aot x64` comparison benchmarks (`656371cd`), Tier 2 direct-backend runtime optimizations 2A–2F & `runFixed` abort fix (`f2632136`), Tier 1 loop-hoist runtime optimizations (`58adc750`), README SVG benchmark charts (`9de59b4c`), Consumer README & Rust/Bevy ECS comparison benchmarks (`7d87b31a`), Phase 6 `purity.goose` retirement (`30899f4b`), Phase 5 owned length mutation & unified `#[T]` (`7da11d2d`) |
 | `../pen` | `08e1224` | Unified `#[T]` migration in `blot-host` + `kernels_law6_tests` (`08e1224`); HRTF/EQ/reverb/haptics/text/netplay, GTAO/SSGI/ribbons, Hi-Z occlusion, Session-2 double-restore |
 | `../ink` | `fc7259e` | Unified `#[T]` migration across `lib/`, `tests/`, `docs/` (`fc7259e`); Pen 250-lane bindings, SSGI/ribbons, terrain/water/foliage |
 | `../gdev` | `017f8cd` | Unified `#[T]` migration across `src/`, `devtools/`, `tests/`, `test_support/`, `performance/` + synced `pen/` bindings (`017f8cd`); Moebius look default |
@@ -206,21 +261,21 @@ and the cross-language comparison benchmarks now execute on **`wtime-aot 0.1.1`
 ### Verified Identities & Qualification Evidence
 - **Compiler & host identities:**
   - `compiler-goose/build/blotc-goose` SHA-256:
-    `e101febc0d012da5ca307d596fb1ab57b05a8420afbfb37f786377f64e188fec`
-    (`8,283,192` bytes)
+    `2f78ab22ff9ddeda70a2b52d70aaee5287bcf4e741feb2d8f35342f7ef36db35`
+    (`8,329,616` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `401c300991d15d917d98896c7ecc076761b822e6be7bb10d8fe754f97b8214b4`
-    (`3,591,713` bytes)
+    `c6fc85a22eb9df052d562e0c2e45b2d047cb99314f98e264850509dd8eb0b898`
+    (`3,612,254` bytes)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` SHA-256:
     `268d82af8ed6d858288df6f94cb4d37c7ab193f7ddf64fd27a1995f2a1e0a003`
 - **Qualification gates:**
-  - `blot2` (this commit): `deno task test:compiler` exit 0 — `harness` (2.47 s),
-    `release-build` (88.67 s), `reference-direct` **2/2** (`runtime` 7707 B,
+  - `blot2` (this commit): `deno task test:compiler` exit 0 — `harness` (2.81 s),
+    `release-build` (89.81 s), `reference-direct` **2/2** (`runtime` 7707 B,
     `writer` 352 B), `reference-uniqueness` **206/206**, `reference-fixtures`
-    **109/109**, `pack` OK, `guests` **1,109 passed, 0 failed, 75 ignored**
-    (15.67 s); `deno fmt --check` (85 files), `deno check`,
+    **109/109**, `pack` OK, `guests` **1,114 passed, 0 failed, 75 ignored**
+    (16.28 s); `deno fmt --check` (85 files), `deno check`,
     `deno task test:editor` (**6/6**).
   - `../pen`: `cargo test -p blot-host` **40/40 passed** (29 unit + 5 concurrency
     + 3 owned_storage + 3 processes), `examples/bounce` `pen check` clean (0.06 s).

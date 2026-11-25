@@ -1352,7 +1352,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             value = forwarded;
             has_value = was_forwarded;
         }
-        if !has_value && f.inline_depth < 2 && evidence_context == 0 {
+        if !has_value && f.inline_depth < 3 && evidence_context == 0 {
             let inlined, was_inlined, ierr = inlineSmall(g, f, target, direct, callee, after, id);
             if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
             if was_inlined {
@@ -1556,6 +1556,14 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
                 canInlineBody(g, tm, linfo.end, target, budget) &&
                 canInlineBody(g, tm, linfo.body, target, budget);
         },
+        spark => {
+            if budget < 24 { return false; }
+            budget -= 16;
+            let sinfo = tm.sparkInfo(id);
+            return canInlineBody(g, tm, sinfo.source, target, budget) &&
+                canInlineBody(g, tm, sinfo.end, target, budget) &&
+                canInlineBody(g, tm, sinfo.body, target, budget);
+        },
         _ => { return false; },
     }
 }
@@ -1585,7 +1593,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         if !body || !body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
         body_root = body.root;
         var budget: i64 = 72;
-        if f.inline_depth != 0 { budget = 24; }
+        if f.inline_depth == 1 { budget = 48; }
+        else if f.inline_depth >= 2 { budget = 28; }
         if !canInlineBody(g, tm, body_root, target, budget) {
             return neverVal(), false, blot_direct_types::Error.none;
         }
@@ -1629,6 +1638,33 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         param_count = parameters.len;
     }
 
+    // Forward single-use uniquely-owned array arguments from caller into the
+    // inlined callee so `spark` inside inlined helpers (e.g. `integrate_particles`)
+    // can reuse the caller's uniquely-owned buffer in place!
+    var unique_arg_mask: u32 = 0;
+    if id != 0 && param_count <= 16 {
+        let cm .= g.units[f.unit - 1];
+        if cm.node(id).tag == blot_check_core::Tag.call {
+            let call_info = cm.call(id);
+            if call_info.arguments.len == param_count {
+                var arg_bs: u32[16] = [0; 16];
+                for ai in 0..param_count { arg_bs[ai] = localRef(cm, call_info.arguments[ai]); }
+                for ai in 0..param_count {
+                    let ab = arg_bs[ai];
+                    if ab == 0 { continue; }
+                    var dup = false;
+                    for aj in 0..param_count {
+                        if aj != ai && arg_bs[aj] == ab { dup = true; break; }
+                    }
+                    if dup { continue; }
+                    if isUniqueOwned(g, f, ab) && ownedTotalUses(g, f, ab) == 1 && !bindingCaptured(g, f, ab) {
+                        unique_arg_mask |= ((1 as u32) << (ai as u32));
+                    }
+                }
+            }
+        }
+    }
+
     // Emit the callee body directly in the caller's Wasm function while keeping
     // the caller's CheckedArray/CheckedGrow/CheckedView descriptors live.
     let saved_unit = f.unit;
@@ -1637,6 +1673,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_with_cells = f.with_cells;
     let saved_unique_boxed = f.unique_boxed;
     let saved_unique_owned = f.unique_owned;
+    let saved_loop_depth = f.loop_depth;
     let saved_owned_computed = f.owned_uses_computed;
     let saved_owned_uses = f.owned_uses;
     let saved_owned_flows = f.owned_flows;
@@ -1644,6 +1681,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_nan_observed = f.nan_observed;
     let saved_finite_f32 = f.finite_f32;
     let saved_finite_f32_len = f.finite_f32_len;
+    let saved_inlined_body = f.inlined_body_binding;
     let saved_labels_base = f.labels_base;
     let saved_scratch_body = f.scratch_body;
     let saved_scratch_cut = f.scratch_cut;
@@ -1671,12 +1709,14 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.with_cells = blot_support_zigmap::Map {};
     f.unique_boxed = blot_support_zigmap::Map {};
     f.unique_owned = blot_support_zigmap::Map {};
+    f.loop_depth = 0;
     f.owned_uses_computed = false;
     f.owned_uses = blot_support_zigmap::Map {};
     f.owned_flows = blot_support_zigmap::Map {};
     f.nan_elide_computed = false;
     f.nan_observed = blot_support_zigmap::Map {};
     f.finite_f32_len = 0;
+    f.inlined_body_binding = target.binding;
     f.labels_base = labels_mark;
     f.scratch_body = 0;
     f.scratch_cut = ScratchCut {};
@@ -1688,6 +1728,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
 
     for at in 0..param_count {
         bindPut(g, f, param_bindings[at], g.s.vals[direct.start + at]);
+        if (unique_arg_mask & ((1 as u32) << (at as u32))) != 0 {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
+        }
     }
     let body_val, b_err = stmt(g, f, body_root);
     var final_err = b_err;
@@ -1706,6 +1749,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.with_cells = saved_with_cells;
     f.unique_boxed = saved_unique_boxed;
     f.unique_owned = saved_unique_owned;
+    f.loop_depth = saved_loop_depth;
     f.owned_uses_computed = saved_owned_computed;
     f.owned_uses = saved_owned_uses;
     f.owned_flows = saved_owned_flows;
@@ -1713,6 +1757,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.nan_observed = saved_nan_observed;
     f.finite_f32 = saved_finite_f32;
     f.finite_f32_len = saved_finite_f32_len;
+    f.inlined_body_binding = saved_inlined_body;
     f.labels_base = saved_labels_base;
     f.scratch_body = saved_scratch_body;
     f.scratch_cut = saved_scratch_cut;
@@ -1939,7 +1984,8 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false)
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         push(g, left);
         if has_right { push(g, right); }
-        let emitted = scalarOp(g, f, machine, left.ty, id, !elide_nan);
+        let skip_nan = elide_nan || (f.defer_f32_nan && isCanonicalF32Op(machine));
+        let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
         var popped_ty = scalarResult(machine, left.ty);
         if has_result { popped_ty = result; }

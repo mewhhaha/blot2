@@ -797,11 +797,11 @@
      "syntax_nodes": 2162,
      "type_nodes": 4896,
      "type_versions": 696,
-     "wasm_bytes": 6318
+     "wasm_bytes": 6312
     }
    ],
-   "wasm_bytes": 6318,
-   "wasm_sha256": "511b531a9f0dce244f770722f58615a6f9610ce1e3ee93aa6b9b1e5a8b40aa9b"
+   "wasm_bytes": 6312,
+   "wasm_sha256": "839aa3e2a133ebdf20259720ef8b65cb5524bfc5553d6e26ea06a7282d446ebf"
   },
   "direct/branch_appends.blot": {
    "exit": 0,
@@ -1121,7 +1121,7 @@
     }
    ],
    "wasm_bytes": 4413,
-   "wasm_sha256": "21ab28449ffb425a4a4f45055db6a1cdee6e7af2d107ea896f72226effa3ba73"
+   "wasm_sha256": "66a100058cc0b243d6bc8c5f9c0cda0751975cd28a99ecf03461b27a105ed3f1"
   },
   "direct/data_and_control.blot": {
    "exit": 0,
@@ -1997,11 +1997,11 @@
      "syntax_nodes": 2226,
      "type_nodes": 4867,
      "type_versions": 703,
-     "wasm_bytes": 6914
+     "wasm_bytes": 6902
     }
    ],
-   "wasm_bytes": 6914,
-   "wasm_sha256": "f407976bfd222d21a56aef6ed3d83d001a2ab3fcff5786871d75b375bf699841"
+   "wasm_bytes": 6902,
+   "wasm_sha256": "644eca2d5b491bfd6c45ffdcf4d8138e6e035fd9487532e80bb5153f492d8403"
   },
   "direct/terminal_scratch_reads.blot": {
    "exit": 0,
@@ -2037,11 +2037,11 @@
      "syntax_nodes": 2479,
      "type_nodes": 5533,
      "type_versions": 831,
-     "wasm_bytes": 12771
+     "wasm_bytes": 12765
     }
    ],
-   "wasm_bytes": 12771,
-   "wasm_sha256": "105492108baa1e5f462bb64f511afacdcb39580bbf16823ecba75615461c5a58"
+   "wasm_bytes": 12765,
+   "wasm_sha256": "3933d749e846c373d8b8952200e2bdf4222d2715e917e87372f735d01d8dce3d"
   },
   "direct/unused_generic_fields.blot": {
    "exit": 0,
@@ -2998,11 +2998,11 @@
      "syntax_nodes": 2116,
      "type_nodes": 4863,
      "type_versions": 698,
-     "wasm_bytes": 6251
+     "wasm_bytes": 6231
     }
    ],
-   "wasm_bytes": 6251,
-   "wasm_sha256": "8334f83f11734be371dc9bce0d909f0d20e3269dec3c853b1a59e1d69cbc8257"
+   "wasm_bytes": 6231,
+   "wasm_sha256": "f3b293bb5c91ca9145185561d0f14862ca5ce3019c19edfc7c0c10a3a0e59ec1"
   },
   "global_call_read.blot": {
    "exit": 0,
@@ -3238,11 +3238,11 @@
      "syntax_nodes": 2242,
      "type_nodes": 5006,
      "type_versions": 719,
-     "wasm_bytes": 6498
+     "wasm_bytes": 6471
     }
    ],
-   "wasm_bytes": 6498,
-   "wasm_sha256": "646703c520e6ed8a05d0ad962816f0215d6e2c2e1dcc5cb3da7f8df9bf56da9f"
+   "wasm_bytes": 6471,
+   "wasm_sha256": "092d9411963aae2306c477c8c29b10c32f6f99f005c3c69bc8984c984d6aae84"
   },
   "input_alias_partition.blot": {
    "exit": 0,
@@ -4100,7 +4100,7 @@
     }
    ],
    "wasm_bytes": 13165,
-   "wasm_sha256": "517cdd1b5e516bd7d8e5deb3e651f82d5a69c2873ced8440a8042e57aea0b91c"
+   "wasm_sha256": "d04745024bbe29137225817bc4df432bb8319ae1c9a875445ed6388a6e7c912b"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
@@ -4336,11 +4336,11 @@
      "syntax_nodes": 2441,
      "type_nodes": 5260,
      "type_versions": 785,
-     "wasm_bytes": 9562
+     "wasm_bytes": 9643
     }
    ],
-   "wasm_bytes": 9562,
-   "wasm_sha256": "804f97b42f5a4248be916ac8064949209759bf251616942abc15c42d63fd3f29"
+   "wasm_bytes": 9643,
+   "wasm_sha256": "533bb829eb351904a33e4189bc5a3b97d8fec370e6592b04e879bb1b9393461c"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,

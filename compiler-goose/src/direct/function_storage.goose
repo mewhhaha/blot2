@@ -285,14 +285,21 @@ fn ensureCheckedArray(g: Generator&, f: Fn&, container: Val) -> u32, u32 {
         let entry = f.checked_arrays[cached];
         return entry.base, entry.length;
     }
-    let check = g.runtime_().check;
-    let entry = local32(g, f);
+    let cg = findCheckedGrow(f, slot, generation);
+    var entry: u32 = 0;
+    if cg >= 0 {
+        entry = f.checked_grows[cg].entry;
+        lget(g, entry);
+    } else {
+        entry = local32(g, f);
+        lget(g, slot);
+        lget(g, generation);
+        callf(g, g.runtime_().check);
+        ltee(g, entry);
+        recordCheckedGrow(f, slot, generation, entry);
+    }
     let base = local32(g, f);
     let length = local32(g, f);
-    lget(g, slot);
-    lget(g, generation);
-    callf(g, check);
-    ltee(g, entry);
     op(g, OP_i32_load);
     uleb(g, 2);
     uleb(g, blot_direct_runtime::entry_base);
@@ -451,7 +458,7 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
         if index == range.index && !range.is_view {
             if range.slot != 0xffffffff && slot == range.slot && gen == range.generation {
                 in_bounds = true;
-            } else if range.end_local != 0xffffffff && len == range.end_local {
+            } else if range.end_local != 0xffffffff && (len == range.end_local || findCheckedLe(f, range.end_local, len) >= 0) {
                 in_bounds = true;
             } else if range.length_ty != 0 && container_core_ty != 0 {
                 let m .= g.units[f.unit - 1];

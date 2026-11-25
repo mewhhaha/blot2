@@ -129,6 +129,17 @@ module `const` pools are deeply immutable, unconditionally emitting `mode = 2`
 with module `const` pools changed only `wasm_sha256` (same byte sizes, exit
 codes, and records).
 
+Runtime performance Tier 4 (25 November 2026) added deferred F32 NaN
+canonicalization on pure-FP counted loops (4A), variant tag-store skip and
+pre-loop `CheckedLe` bounds hoisting (4B), 4×v128 register-blocked matmul
+k-loop tiling + descending `48,32,16,0` BCE-coalesced SIMD lanes (4C),
+`CheckedGrow` reuse + depth-3/`spark` inlining + loop-depth-scoped
+`unique_owned` forwarding (4D), and exact `2.0*x -> x+x`, 2× scalar `for ever`
+unrolling, and 4× strided fill (4E). Re-recorded `expected.json`: 8 of 109
+fixtures changed Wasm bytes/SHA (6 smaller via `CheckedGrow` reuse/`2.0*x`,
+2 same-size SHA changes, `scoped-loop-cleanup.blot` +81 B from `CheckedLe`);
+all exit codes, diagnostics, and work counters are unchanged.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

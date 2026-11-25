@@ -169,7 +169,29 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     }
     var written = blot_direct_types::Error.none;
     if whole_element {
-        written = writeElement(g, f, target, 0, replacement, id);
+        var skipped_tag = false;
+        if !g.runtime_().has_fork && tagOf(g, container.ty) == blot_direct_types::Tag.array &&
+            tagOf(g, replacement.ty) == blot_direct_types::Tag.nominal && replacement.len > 1 {
+            let boxed_r, berr = isBoxed(g, f, replacement.ty, id);
+            let cases_r, cerr = g.types.variants(replacement.ty);
+            if berr == blot_direct_types::Error.none && !boxed_r && cerr == blot_direct_types::Error.none && cases_r.len > 1 {
+                let elem_step, serr = stride(g, f, replacement.ty, id);
+                if serr == blot_direct_types::Error.none {
+                    let ce = findCheckedElem(f, w(g, container, 0), w(g, container, 1), index, elem_step);
+                    if ce >= 0 && f.checked_elems[ce].known_tag != 0xffffffff {
+                        let new_tag, has_nt = findConstTag(f, w(g, replacement, 0));
+                        if has_nt && new_tag == f.checked_elems[ce].known_tag {
+                            let payload_val = Val { replacement.ty, replacement.start + 1, replacement.len - 1 };
+                            storeAt(g, f, target, 4, payload_val);
+                            skipped_tag = true;
+                        }
+                    }
+                }
+            }
+        }
+        if !skipped_tag {
+            written = writeElement(g, f, target, 0, replacement, id);
+        }
     } else {
         written = writeFlat(g, f, target, offset, replacement, id);
     }
@@ -746,6 +768,7 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     if error != blot_direct_types::Error.none { return result, error; }
     i32Const(g, tag);
     lset(g, w(g, result, 0));
+    recordConstTag(f, w(g, result, 0), tag);
     let slots, error = g.types.layout(ty);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     let words, error = g.types.layout(declared);

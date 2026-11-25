@@ -200,14 +200,36 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> 
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         machine = member;
     }
-    push(g, left);
-    if has_right { push(g, right); }
     var skip_nan = elide_nan;
+    if !skip_nan && f.defer_f32_nan && tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && isCanonicalF32Op(machine) {
+        skip_nan = true;
+    }
     if !skip_nan && tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && has_right &&
         (machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub || machine == blot_check_core::Op.mul) &&
         isBoundedFiniteF32(g, f, m, n.a) && isBoundedFiniteF32(g, f, m, n.b) {
         skip_nan = true;
     }
+    // Strength-reduce exact IEEE-754 `2.0 * x` / `x * 2.0` to `x + x` (bit-identical for all F32 values).
+    if tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && has_right && machine == blot_check_core::Op.mul {
+        let na = m.node(n.a);
+        let nb = m.node(n.b);
+        if na.tag == blot_check_core::Tag.constant && na.a == 0x40000000 {
+            push(g, right);
+            push(g, right);
+            let emitted = scalarOp(g, f, blot_check_core::Op.add, left.ty, id, !skip_nan);
+            if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
+            return pop(g, f, result, id);
+        }
+        if nb.tag == blot_check_core::Tag.constant && nb.a == 0x40000000 {
+            push(g, left);
+            push(g, left);
+            let emitted = scalarOp(g, f, blot_check_core::Op.add, left.ty, id, !skip_nan);
+            if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
+            return pop(g, f, result, id);
+        }
+    }
+    push(g, left);
+    if has_right { push(g, right); }
     let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     return pop(g, f, result, id);
