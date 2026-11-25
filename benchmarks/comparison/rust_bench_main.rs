@@ -1,9 +1,9 @@
 use bevy_ecs::prelude::*;
+use std::ffi::{CString, c_void};
 use std::hint::black_box;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
-use wasmtime::{Config, Engine, Instance, Module, OptLevel, Store, TypedFunc};
 
 #[path = "rust_kernels.rs"]
 mod rust_kernels;
@@ -52,68 +52,197 @@ fn time_ms<F: FnMut() -> u32>(warmups: usize, samples: usize, mut f: F) -> (f64,
     (median(times), last)
 }
 
-fn new_wasmtime_engine() -> Engine {
-    let mut cfg = Config::new();
-    cfg.cranelift_opt_level(OptLevel::Speed);
-    cfg.wasm_simd(true);
-    Engine::new(&cfg).expect("wasmtime engine")
+type FnTrapMessage = unsafe extern "C" fn(u8, *mut *const u8, *mut usize) -> i32;
+type FnNew = unsafe extern "C" fn(*mut c_void, *const c_void, u64, *mut u8) -> *mut c_void;
+type FnDrop = unsafe extern "C" fn(*mut c_void);
+type FnCallExport =
+    unsafe extern "C" fn(*mut c_void, *const u8, usize, u64, *mut u64, *mut u8) -> i32;
+type FnCallFinish = unsafe extern "C" fn(*mut c_void, *mut i32, *mut u8) -> i32;
+
+fn resolve_wtime_aot(blot_root: &Path) -> PathBuf {
+    if let Ok(explicit) = std::env::var("WTIME_AOT_BIN") {
+        if !explicit.is_empty() {
+            return PathBuf::from(explicit);
+        }
+    }
+    if let Some(parent) = blot_root.parent() {
+        let sibling = parent.join("wtime/tools/wtime-aot/target/release/wtime-aot");
+        if sibling.is_file() {
+            return sibling;
+        }
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        let local = PathBuf::from(home).join(".local/bin/wtime-aot");
+        if local.is_file() {
+            return local;
+        }
+    }
+    PathBuf::from("wtime-aot")
 }
 
-struct WasmGuest {
-    store: Store<()>,
-    instance: Instance,
-    finish: Option<TypedFunc<(), ()>>,
+unsafe fn load_sym<T>(dl: *mut c_void, name: &str) -> T {
+    let cname = CString::new(name).expect("symbol name");
+    let ptr = unsafe { libc::dlsym(dl, cname.as_ptr()) };
+    assert!(!ptr.is_null(), "missing wtime-aot symbol {name}");
+    unsafe { std::mem::transmute_copy(&ptr) }
 }
 
-impl WasmGuest {
-    fn load(engine: &Engine, wasm_path: &Path) -> Self {
-        let module = Module::from_file(engine, wasm_path).expect("compile wasm");
-        let mut store = Store::new(engine, ());
-        let instance = Instance::new(&mut store, &module, &[]).expect("instantiate wasm");
-        let finish = instance
-            .get_typed_func::<(), ()>(&mut store, "blot:finish_invocation")
-            .ok();
-        Self {
-            store,
-            instance,
-            finish,
+struct WtimeAotModule {
+    dl: *mut c_void,
+    trap_message: FnTrapMessage,
+    new_fn: FnNew,
+    drop_fn: FnDrop,
+    call_export: FnCallExport,
+    call_finish: FnCallFinish,
+}
+
+impl WtimeAotModule {
+    fn compile_and_load(wtime_aot: &Path, wasm_path: &Path, so_path: &Path) -> (Self, f64) {
+        let t0 = Instant::now();
+        let status = Command::new(wtime_aot)
+            .args([
+                "--backend",
+                "x64",
+                "--target-cpu",
+                "native",
+                "--blot-cdylib",
+                wasm_path.to_str().unwrap(),
+                "-o",
+                so_path.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap_or_else(|e| panic!("failed to run {}: {e}", wtime_aot.display()));
+        assert!(
+            status.success(),
+            "wtime-aot failed compiling {}",
+            wasm_path.display()
+        );
+        let compile_ms = t0.elapsed().as_secs_f64() * 1000.0;
+
+        let c_so = CString::new(so_path.to_str().unwrap()).expect("so path");
+        let dl = unsafe { libc::dlopen(c_so.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
+        if dl.is_null() {
+            let err = unsafe {
+                let p = libc::dlerror();
+                if p.is_null() {
+                    "unknown dlopen error".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
+                }
+            };
+            panic!("dlopen({}) failed: {err}", so_path.display());
+        }
+
+        let module = unsafe {
+            Self {
+                dl,
+                trap_message: load_sym(dl, "blot_aot_trap_message"),
+                new_fn: load_sym(dl, "blot_aot_new"),
+                drop_fn: load_sym(dl, "blot_aot_drop"),
+                call_export: load_sym(dl, "blot_aot_call_export"),
+                call_finish: load_sym(dl, "blot_aot_call_finish_invocation"),
+            }
+        };
+        (module, compile_ms)
+    }
+
+    fn trap_text(&self, code: u8) -> String {
+        let mut ptr: *const u8 = std::ptr::null();
+        let mut len: usize = 0;
+        let rc = unsafe { (self.trap_message)(code, &mut ptr, &mut len) };
+        if rc == 0 && !ptr.is_null() && len > 0 {
+            let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+            String::from_utf8_lossy(bytes).into_owned()
+        } else {
+            format!("trap code {code}")
         }
     }
 
-    fn call_u32(&mut self, name: &str, arg: u32) -> u32 {
-        let f = self
-            .instance
-            .get_typed_func::<i32, i32>(&mut self.store, name)
-            .unwrap_or_else(|e| panic!("missing export {name}: {e}"));
-        let res = f
-            .call(&mut self.store, arg as i32)
-            .unwrap_or_else(|e| panic!("trap in {name}({arg}): {e}")) as u32;
-        if let Some(fin) = &self.finish {
-            fin.call(&mut self.store, ()).expect("finish_invocation");
+    fn instantiate(&self) -> WtimeAotGuest<'_> {
+        let mut trap: u8 = 0;
+        let handle = unsafe { (self.new_fn)(std::ptr::null_mut(), std::ptr::null(), 0, &mut trap) };
+        assert!(
+            !handle.is_null(),
+            "blot_aot_new failed: {}",
+            self.trap_text(trap)
+        );
+        WtimeAotGuest {
+            module: self,
+            handle,
         }
+    }
+}
+
+impl Drop for WtimeAotModule {
+    fn drop(&mut self) {
+        if !self.dl.is_null() {
+            unsafe {
+                libc::dlclose(self.dl);
+            }
+        }
+    }
+}
+
+struct WtimeAotGuest<'a> {
+    module: &'a WtimeAotModule,
+    handle: *mut c_void,
+}
+
+impl<'a> WtimeAotGuest<'a> {
+    fn call_raw(&mut self, name: &str, arg: u32) -> u32 {
+        let mut res: u64 = 0;
+        let mut trap: u8 = 0;
+        let rc = unsafe {
+            (self.module.call_export)(
+                self.handle,
+                name.as_ptr(),
+                name.len(),
+                arg as u64,
+                &mut res,
+                &mut trap,
+            )
+        };
+        assert_eq!(
+            rc,
+            0,
+            "call {name}({arg}) failed (rc={rc}): {}",
+            self.module.trap_text(trap)
+        );
+        res as u32
+    }
+
+    fn call_u32(&mut self, name: &str, arg: u32) -> u32 {
+        let res = self.call_raw(name, arg);
+        let mut fin_res: i32 = 0;
+        let mut trap: u8 = 0;
+        let rc = unsafe { (self.module.call_finish)(self.handle, &mut fin_res, &mut trap) };
+        assert!(
+            rc == 0 || rc == 3,
+            "finish_invocation after {name} failed (rc={rc}): {}",
+            self.module.trap_text(trap)
+        );
         res
     }
 
     fn call_proc_init(&mut self, proc_name: &str, arg: u32) {
         let name = format!("blot:proc_init:{proc_name}");
-        let f = self
-            .instance
-            .get_typed_func::<i32, i32>(&mut self.store, &name)
-            .unwrap_or_else(|e| panic!("missing {name}: {e}"));
-        let rc = f
-            .call(&mut self.store, arg as i32)
-            .unwrap_or_else(|e| panic!("trap in {name}({arg}): {e}"));
+        let rc = self.call_raw(&name, arg) as i32;
         assert_eq!(rc, 0, "{name}({arg}) returned error status {rc}");
     }
 
     fn call_proc_step(&mut self, proc_name: &str, cmd: u32) -> u32 {
         let name = format!("blot:proc_step:{proc_name}");
-        let f = self
-            .instance
-            .get_typed_func::<i32, i32>(&mut self.store, &name)
-            .unwrap_or_else(|e| panic!("missing {name}: {e}"));
-        f.call(&mut self.store, cmd as i32)
-            .unwrap_or_else(|e| panic!("trap in {name}({cmd}): {e}")) as u32
+        self.call_raw(&name, cmd)
+    }
+}
+
+impl<'a> Drop for WtimeAotGuest<'a> {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe {
+                (self.module.drop_fn)(self.handle);
+            }
+        }
     }
 }
 
@@ -168,24 +297,37 @@ fn bench_compile_ms(mut make_cmd: impl FnMut() -> Command, warmups: usize, sampl
     median(times)
 }
 
+fn git_short_rev(repo: &Path) -> String {
+    Command::new("git")
+        .args(["-C", repo.to_str().unwrap(), "rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
 fn main() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let blot_root = manifest_dir
         .parent()
         .and_then(|p| p.parent())
         .expect("blot2 repository root");
-    let ink_lib = blot_root
-        .parent()
-        .expect("workspace parent")
-        .join("ink/lib");
+    let workspace_parent = blot_root.parent().expect("workspace parent");
+    let ink_lib = workspace_parent.join("ink/lib");
     let ink_alias = format!("ink/={}", ink_lib.display());
     let blotc = blot_root.join("compiler-goose/build/blotc-goose");
+    let wtime_aot = resolve_wtime_aot(blot_root);
     let blot_kernels_src = blot_root.join("benchmarks/comparison/blot_kernels.blot");
     let ink_ecs_src = blot_root.join("benchmarks/comparison/ink_ecs_bench.blot");
     let rust_kernels_src = blot_root.join("benchmarks/comparison/rust_kernels.rs");
     let blot_kernels_wasm = Path::new("/tmp/blot_kernels.wasm");
     let rust_kernels_wasm = Path::new("/tmp/rust_kernels.wasm");
     let ink_ecs_wasm = Path::new("/tmp/ink_ecs_bench.wasm");
+    let blot_kernels_so = Path::new("/tmp/blot_kernels_wtime.so");
+    let rust_kernels_so = Path::new("/tmp/rust_kernels_wtime.so");
+    let ink_ecs_so = Path::new("/tmp/ink_ecs_bench_wtime.so");
 
     // 1. Compile speed comparison (cold single-file 6-kernel suite + Ink ECS app vs rustc -O3).
     let blot_compile_ms = bench_compile_ms(
@@ -266,11 +408,17 @@ fn main() {
         9,
     );
 
-    let engine = new_wasmtime_engine();
-    let mut blot_guest = WasmGuest::load(&engine, blot_kernels_wasm);
-    let mut rust_wasm_guest = WasmGuest::load(&engine, rust_kernels_wasm);
+    let (blot_mod, blot_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, blot_kernels_wasm, blot_kernels_so);
+    let (rust_wasm_mod, rust_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, rust_kernels_wasm, rust_kernels_so);
+    let (ink_ecs_mod, ink_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, ink_ecs_wasm, ink_ecs_so);
 
-    // 2. Language kernels: Blot (Wasmtime AOT) vs Rust -O3 (wasm32 Wasmtime AOT) vs Rust -O3 (native x86_64).
+    let mut blot_guest = blot_mod.instantiate();
+    let mut rust_wasm_guest = rust_wasm_mod.instantiate();
+
+    // 2. Language kernels: Blot (wtime-aot x64) vs Rust -O3 (wasm32 wtime-aot x64) vs Rust -O3 (native x86_64).
     let seed = 42u32;
     let kernel_specs: Vec<(&str, extern "C" fn(u32) -> u32)> = vec![
         ("lcg_recurrence", rust_kernels::lcg_recurrence),
@@ -286,7 +434,6 @@ fn main() {
         let (blot_ms, blot_chk) = time_ms(3, 15, || blot_guest.call_u32(name, seed));
         let (rust_wasm_ms, rwasm_chk) = time_ms(3, 15, || rust_wasm_guest.call_u32(name, seed));
         let (rust_native_ms, rnat_chk) = time_ms(3, 15, || native_fn(black_box(seed)));
-        // Allow tiny F32 summation rounding delta of <=1 ULP in scaled integer checksum if any, else exact!
         let exact_match = blot_chk == rwasm_chk && blot_chk == rnat_chk;
         let close_match = blot_chk.abs_diff(rwasm_chk) <= 2 && blot_chk.abs_diff(rnat_chk) <= 2;
         assert!(
@@ -295,8 +442,8 @@ fn main() {
         );
         kernel_rows.push(serde_json::json!({
             "name": name,
-            "blot_wasmtime_ms": blot_ms,
-            "rust_wasmtime_ms": rust_wasm_ms,
+            "blot_wtime_ms": blot_ms,
+            "rust_wtime_ms": rust_wasm_ms,
             "rust_native_ms": rust_native_ms,
             "blot_vs_rust_wasm": blot_ms / rust_wasm_ms,
             "blot_vs_rust_native": blot_ms / rust_native_ms,
@@ -306,29 +453,27 @@ fn main() {
         }));
     }
 
-    // 3. Ink ECS (Blot -> Wasmtime AOT) vs Bevy ECS 0.20.1 (native Rust -O3).
+    // 3. Ink ECS (Blot -> wtime-aot x64) vs Bevy ECS 0.20.1 (native Rust -O3).
     let n_entities = 10_000u32;
     let mut ecs_rows = Vec::new();
 
     // 3a. Dense iteration (10,000 entities x 100 ticks: Pos += Vel)
-    // Fresh persistent Ink worlds and fresh Bevy worlds so checksums match identically!
     let (ink_dense_direct_ms, ink_dense_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("ink_world", n_entities);
-        // Warmup on separate instance, then verify sample 1 checksum and time fresh-step steady state!
         let chk1 = g.call_proc_step("ink_world", 1);
         let (ms, _) = time_ms(2, 15, || g.call_proc_step("ink_world", 1));
         (ms, chk1)
     };
     let (ink_dense_query_ms, ink_query_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("ink_world", n_entities);
         let chk1 = g.call_proc_step("ink_world", 2);
         let (ms, _) = time_ms(2, 15, || g.call_proc_step("ink_world", 2));
         (ms, chk1)
     };
     let (ink_soa_spark_ms, ink_soa_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("soa_world", n_entities);
         let chk1 = g.call_proc_step("soa_world", 0);
         let (ms, _) = time_ms(2, 15, || g.call_proc_step("soa_world", 0));
@@ -351,7 +496,6 @@ fn main() {
         let (ms, _) = time_ms(2, 15, || run_100(&mut world));
         (ms, chk1)
     };
-    // Verify bit-exact checksum parity across all 4 engines on first 100-tick batch!
     assert_eq!(
         ink_dense_chk, bevy_dense_chk,
         "dense checksum mismatch: ink={ink_dense_chk} query={ink_query_chk} soa={ink_soa_chk} bevy={bevy_dense_chk}"
@@ -371,7 +515,7 @@ fn main() {
 
     // 3b. Sparse filtered iteration (With Active, Without Frozen => 500 of 10,000 entities x 100 ticks)
     let (ink_sparse_ms, ink_sparse_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("ink_world", n_entities);
         let chk1 = g.call_proc_step("ink_world", 3);
         let (ms, _) = time_ms(2, 15, || g.call_proc_step("ink_world", 3));
@@ -408,7 +552,7 @@ fn main() {
 
     // 3c. Batch spawn 10,000 entities (Pos + Vel + 10% Active)
     let (ink_spawn_ms, ink_spawn_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         time_ms(3, 15, || g.call_u32("ecs_spawn_batch", n_entities))
     };
     let (bevy_spawn_ms, bevy_spawn_chk) = time_ms(3, 15, || {
@@ -454,7 +598,7 @@ fn main() {
 
     // 3d. Structural churn: 2,000 balanced insert/remove Active tag ops on 10,000-entity world
     let (ink_churn_ms, ink_churn_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("ink_world", n_entities);
         time_ms(3, 15, || g.call_proc_step("ink_world", 4))
     };
@@ -488,7 +632,7 @@ fn main() {
 
     // 3e. Full world snapshot / checkpoint copy (10,000 entities: Pos + Vel + Active + Frozen)
     let (ink_snap_ms, ink_snap_chk) = {
-        let mut g = WasmGuest::load(&engine, ink_ecs_wasm);
+        let mut g = ink_ecs_mod.instantiate();
         g.call_proc_init("ink_world", n_entities);
         time_ms(3, 15, || g.call_proc_step("ink_world", 5))
     };
@@ -524,19 +668,13 @@ fn main() {
         "checksum_bevy": bevy_snap_chk,
     }));
 
-    let blot_commit = Command::new("git")
-        .args(["-C", blot_root.to_str().unwrap(), "rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".to_string());
+    let blot_commit = git_short_rev(blot_root);
+    let wtime_commit = git_short_rev(&workspace_parent.join("wtime"));
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
             "blot_commit": blot_commit,
-            "wasmtime": "49.0.7",
+            "wtime_aot": format!("0.1.1 (x64-v3, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
             "rustc": "1.96.0-nightly",
         },
@@ -545,6 +683,9 @@ fn main() {
             "blot_ink_ecs_app_ms": ink_ecs_compile_ms,
             "rust_wasm32_opt3_ms": rust_wasm_compile_ms,
             "rust_native_opt3_ms": rust_native_compile_ms,
+            "wtime_aot_blot_kernels_ms": blot_aot_ms,
+            "wtime_aot_ink_ecs_ms": ink_aot_ms,
+            "wtime_aot_rust_kernels_ms": rust_aot_ms,
             "blot_wasm_bytes": std::fs::metadata(blot_kernels_wasm).unwrap().len(),
             "rust_wasm_bytes": std::fs::metadata(rust_kernels_wasm).unwrap().len(),
             "ink_ecs_wasm_bytes": std::fs::metadata(ink_ecs_wasm).unwrap().len(),

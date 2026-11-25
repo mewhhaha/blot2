@@ -135,12 +135,14 @@ def build_compile_and_size(data: dict) -> str:
         els.append(text(sbar_x + bw + 8, ry + 14, fmt, size=11.5, weight="600", fill=TEXT_MAIN))
 
     # Footer
+    aot_k = c.get("wtime_aot_blot_kernels_ms", 0.0)
+    aot_e = c.get("wtime_aot_ink_ecs_ms", 0.0)
     els.append(
         text(
             28,
             304,
-            "Production scale: Gdev (307-module / 3.09 MB 3D game, 5,029 functions) compiles cold in 549.4 ms to 4.08 MB Wasm (pen check: 0.42 s).",
-            size=11.2,
+            f"wtime-aot x64 AOT-compiles Blot Wasm to native x86-64 in {aot_k:.1f} ms (6 kernels) / {aot_e:.1f} ms (Ink ECS). Gdev (307 mods, 5,029 fns): 549.4 ms cold.",
+            size=10.8,
             fill=TEXT_MUTED,
         )
     )
@@ -162,9 +164,9 @@ def build_kernels_chart(data: dict) -> str:
         ("particle_spark_simd", "65k particles × 32 · spark v128"),
         ("mandelbrot_f32", "256×256 scalar FP · 100 max iter"),
         ("merge_sort", "100k U32 · owned ping-pong buffers"),
-        ("lcg_recurrence", "1,000,000 tight integer steps"),
-        ("prime_sieve", "100k Bool flags · byte-packed"),
-        ("matmul_64", "64×64 F32 · auto-SIMD inner loop"),
+        ("lcg_recurrence", "1,000,000 U32 steps · 4× affine unroll"),
+        ("prime_sieve", "100k Bool flags · branchless select"),
+        ("matmul_64", "64×64 F32 · 4× unrolled auto-SIMD"),
     ]
 
     w, h = 920, 492
@@ -176,8 +178,8 @@ def build_kernels_chart(data: dict) -> str:
     # Legend
     lx = 28.0
     for color, label in [
-        (C_BLOT, "Blot (Wasmtime 49.0.7)"),
-        (C_RUST_WASM, "Rust -O3 (wasm32, Wasmtime 49.0.7)"),
+        (C_BLOT, "Blot (wtime-aot x64)"),
+        (C_RUST_WASM, "Rust -O3 (wasm32, wtime-aot x64)"),
         (C_RUST_NAT, "Rust -O3 (Native x86_64)"),
     ]:
         snippet, lx = legend_item(lx, 86, color, label)
@@ -199,8 +201,8 @@ def build_kernels_chart(data: dict) -> str:
         els.append(text(cx + 14, cy + 40, sub, size=10.5, fill=TEXT_MUTED))
 
         bars = [
-            ("Blot", row_data["blot_wasmtime_ms"], C_BLOT),
-            ("Rust Wasm", row_data["rust_wasmtime_ms"], C_RUST_WASM),
+            ("Blot", row_data["blot_wtime_ms"], C_BLOT),
+            ("Rust Wasm", row_data["rust_wtime_ms"], C_RUST_WASM),
             ("Rust Nat.", row_data["rust_native_ms"], C_RUST_NAT),
         ]
         vmax = max(v for _, v, _ in bars)
@@ -223,8 +225,8 @@ def build_kernels_chart(data: dict) -> str:
         text(
             28,
             h - 16,
-            "Each subplot uses its own linear 0..max scale. Blot enforces canonical 0x7fc00000 NaN semantics & bounds safety; spark and simple range loops emit v128 SIMD.",
-            size=10.6,
+            "Linear 0..max scale per card. Executed via wtime-aot 0.1.1 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
+            size=10.5,
             fill=TEXT_MUTED,
         )
     )
@@ -243,15 +245,15 @@ def build_ecs_chart(data: dict) -> str:
     w, h = 920, 580
     els = svg_header(w, h, "Ink ECS vs Bevy ECS 0.20.1 performance comparison")
 
-    els.append(text(28, 38, "Ink ECS (Blot → Wasmtime) vs Bevy ECS 0.20.1 (Native Rust)", size=20, weight="700"))
+    els.append(text(28, 38, "Ink ECS (Blot → wtime-aot x64) vs Bevy ECS 0.20.1 (Native Rust)", size=20, weight="700"))
     els.append(text(28, 60, "10,000-entity worlds · median of 15 runs (lower is better) · bit-exact checksum parity on dense, sparse & spawn", size=12.5, fill=TEXT_SUB))
 
     # Legend
     lx = 28.0
     ink_kib = data["compile_speed_ms"]["ink_ecs_wasm_bytes"] / 1024.0
     for color, label in [
-        (C_SPARK, "Blot SoA + spark SIMD (Wasmtime)"),
-        (C_BLOT, f"Ink ECS ({ink_kib:.1f} KiB Wasm, Wasmtime 49.0.7)"),
+        (C_SPARK, "Blot SoA + spark SIMD (wtime-aot x64)"),
+        (C_BLOT, f"Ink ECS ({ink_kib:.1f} KiB Wasm, wtime-aot x64)"),
         (C_RUST_NAT, "Bevy ECS 0.20.1 (Native x86_64 Rust -O3)"),
     ]:
         snippet, lx = legend_item(lx, 86, color, label)
@@ -319,7 +321,7 @@ def build_ecs_chart(data: dict) -> str:
         (
             "Batch spawn (10,000 entities)",
             "Pos + Vel + 10% Active",
-            f"Bevy {spawn['ink_ms'] / spawn['bevy_native_ms']:.1f}× faster",
+            f"Bevy {spawn['ink_ms'] / spawn['bevy_native_ms']:.2f}× faster",
             PILL_RUST_BG,
             PILL_RUST_FG,
             [

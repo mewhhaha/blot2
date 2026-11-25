@@ -80,6 +80,8 @@ struct CheckedElem {
     index: u32 = 0,
     step: u32 = 0,
     address: u32 = 0,
+    val_local: u32 = 0xffffffff,
+    val_ty: Ty = 0,
     depth: u32 = 0
 }
 struct CheckedBound {
@@ -184,6 +186,21 @@ struct Fn {
     // Lazily computed per-body map of local F32 bindings whose NaN payload may be observed.
     nan_elide_computed: bool = false,
     nan_observed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    // Local F32 bindings statically proved finite and bounded (|x| <= 2^33).
+    finite_f32: u32[32] = [0; 32],
+    finite_f32_len: i64 = 0,
+}
+
+fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {
+    for i in 0..f.finite_f32_len {
+        if f.finite_f32[i] == binding { return true; }
+    }
+    return false;
+}
+fn recordFiniteF32(f: Fn&, binding: u32) {
+    if binding == 0 || hasFiniteF32(f, binding) || f.finite_f32_len >= 32 { return; }
+    f.finite_f32[f.finite_f32_len] = binding;
+    f.finite_f32_len += 1;
 }
 
 fn op(g: Generator&, value: u8) { g.s.code.push(value); }
@@ -329,8 +346,45 @@ fn findCheckedElem(f: const Fn&, slot: u32, generation: u32, index: u32, step: u
 fn recordCheckedElem(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, address: u32) {
     if findCheckedElem(f, slot, generation, index, step) >= 0 { return; }
     if f.checked_elems_len >= 8 { return; }
-    f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, depth: f.depth };
+    f.checked_elems[f.checked_elems_len] = CheckedElem { slot: slot, generation: generation, index: index, step: step, address: address, val_local: 0xffffffff, val_ty: 0, depth: f.depth };
     f.checked_elems_len += 1;
+}
+fn recordCheckedElemVal(f: Fn&, slot: u32, generation: u32, index: u32, step: u32, val_local: u32, val_ty: Ty) {
+    let at = findCheckedElem(f, slot, generation, index, step);
+    if at >= 0 {
+        f.checked_elems[at].val_local = val_local;
+        f.checked_elems[at].val_ty = val_ty;
+    }
+}
+fn invalidateCheckedOwner(g: const Generator&, f: Fn&, container: Val) {
+    let slot = w(g, container, 0);
+    let gen = w(g, container, 1);
+    if f.checked_arrays_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_arrays_len {
+            let entry = f.checked_arrays[i];
+            if entry.slot == slot && entry.generation == gen {
+                // Also drop any CheckedBound referencing this owner's old cached length local.
+                if f.checked_bounds_len != 0 {
+                    var bout: i64 = 0;
+                    for bi in 0..f.checked_bounds_len {
+                        let bentry = f.checked_bounds[bi];
+                        if bentry.bound != entry.length && bentry.index != entry.length {
+                            f.checked_bounds[bout] = bentry;
+                            bout += 1;
+                        }
+                    }
+                    f.checked_bounds_len = bout;
+                }
+            } else {
+                f.checked_arrays[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_arrays_len = out;
+    }
+    f.checked_views_len = 0;
+    f.checked_elems_len = 0;
 }
 fn findCheckedBound(f: const Fn&, index: u32, bound: u32) -> i64 {
     var i = f.checked_bounds_len;
@@ -790,6 +844,9 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
             blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, 1);
+        }
+        if n.c == 0 && tagOf(g, value.ty) == blot_direct_types::Tag.f32_ && isBoundedFiniteF32(g, f, m, n.b) {
+            recordFiniteF32(f, n.a);
         }
     }
     bindPut(g, f, n.a, value);

@@ -538,11 +538,24 @@ fn scalarLocal(g: Generator&, f: const Fn&, value: Val, id: u32) -> u32, Error {
     return w(g, value, 0), blot_direct_types::Error.none;
 }
 fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0, cache_elem: bool = true) -> Val, Error {
-    let address, error = elementAddress(g, f, container, index, id, container_core_ty, cache_elem);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    return loadElement(g, f, address, 0, element, id);
+    let step, error = stride(g, f, element, id);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if cache_elem && tagOf(g, container.ty) == blot_direct_types::Tag.array && isScalarTag(tagOf(g, element)) {
+        let cached_elem = findCheckedElem(f, w(g, container, 0), w(g, container, 1), index, step);
+        if cached_elem >= 0 && f.checked_elems[cached_elem].val_local != 0xffffffff && f.checked_elems[cached_elem].val_ty == element {
+            return valOf1(g, element, f.checked_elems[cached_elem].val_local), blot_direct_types::Error.none;
+        }
+    }
+    let address, error = elementAddress(g, f, container, index, id, container_core_ty, cache_elem);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    let loaded, lerr = loadElement(g, f, address, 0, element, id);
+    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+    if cache_elem && tagOf(g, container.ty) == blot_direct_types::Tag.array && isScalarTag(tagOf(g, element)) && loaded.len == 1 {
+        recordCheckedElemVal(f, w(g, container, 0), w(g, container, 1), index, step, w(g, loaded, 0), element);
+    }
+    return loaded, blot_direct_types::Error.none;
 }
 fn constLocal(g: Generator&, f: const Fn&, value: u32) -> u32 {
     let made = local32(g, f);
@@ -1096,7 +1109,7 @@ recursive fn tryEmitGenerateInlineClosure(g: Generator&, f: Fn&, count: u32, clo
     close(g, f);
     return handle, true, blot_direct_types::Error.none;
 }
-fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32) -> Val, Error {
+fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, selective: bool = false) -> Val, Error {
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let step, error = stride(g, f, element, id);
@@ -1161,7 +1174,11 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     }
     let written = writeElement(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), written; }
-    invalidateCheckedContainers(f);
+    if selective && tagOf(g, container.ty) == blot_direct_types::Tag.array {
+        invalidateCheckedOwner(g, f, container);
+    } else {
+        invalidateCheckedContainers(f);
+    }
     return unitVal(), blot_direct_types::Error.none;
 }
 fn emitStorageViewVal(g: Generator&, f: Fn&, container: Val, start: u32, end: u32, ty: Ty, id: u32) -> Val, Error {
@@ -1308,13 +1325,15 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             return readElement(g, f, container, index, id, m.typeOf(children[0]));
         },
         push => {
+            let is_direct = localRef(m, children[0]) != 0;
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let value, error = expr(g, f, children[1]);
             if error != blot_direct_types::Error.none { return value, error; }
-            return emitStoragePushVal(g, f, container, value, id);
+            return emitStoragePushVal(g, f, container, value, id, is_direct);
         },
         pop => {
+            let is_direct = localRef(m, children[0]) != 0;
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let address = local32(g, f);
@@ -1327,10 +1346,15 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             i32Const(g, step);
             callf(g, g.runtime_().pop);
             lset(g, address);
-            invalidateCheckedContainers(f);
+            if is_direct && tagOf(g, container.ty) == blot_direct_types::Tag.array {
+                invalidateCheckedOwner(g, f, container);
+            } else {
+                invalidateCheckedContainers(f);
+            }
             return loadElement(g, f, address, 0, ty, id);
         },
         truncate => {
+            let is_direct = localRef(m, children[0]) != 0;
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let counted, error = expr(g, f, children[1]);
@@ -1341,7 +1365,11 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lget(g, w(g, container, 1));
             lget(g, count);
             callf(g, g.runtime_().truncate);
-            invalidateCheckedContainers(f);
+            if is_direct && tagOf(g, container.ty) == blot_direct_types::Tag.array {
+                invalidateCheckedOwner(g, f, container);
+            } else {
+                invalidateCheckedContainers(f);
+            }
             return unitVal(), blot_direct_types::Error.none;
         },
         share => {

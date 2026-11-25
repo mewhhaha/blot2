@@ -34,6 +34,52 @@ fn isF32CoreExpr(g: Generator&, f: const Fn&, m: const Module&, expr_id: u32) ->
     if err != blot_direct_types::Error.none { g.dropFailure(); return false; }
     return tagOf(g, ty) == blot_direct_types::Tag.f32_;
 }
+// Proves `expr_id` evaluates to a finite non-NaN F32 with |x| <= 2^33.
+// Closed under int->f32 conversions, small finite literals, neg/abs, and
+// multiplication by finite constants with |c| <= 1.0, so any add/sub/mul
+// of two bounded-finite operands has |res| <= 2^66 < FLT_MAX (never Inf/NaN).
+recursive fn isBoundedFiniteF32(g: const Generator&, f: const Fn&, m: const Module&, id: u32, depth: i64 = 0) -> bool {
+    if id == 0 || depth > 8 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        constant => {
+            return (n.a & 0x7f800000) < 0x50000000;
+        },
+        reference => {
+            let b = localRef(m, id);
+            return b != 0 && hasFiniteF32(f, b);
+        },
+        scalar => {
+            match n.op {
+                convert_u32_f32, convert_i32_f32 => { return true; },
+                neg, abs => { return isBoundedFiniteF32(g, f, m, n.a, depth + 1); },
+                mul => {
+                    let an = m.node(n.a);
+                    let bn = m.node(n.b);
+                    if bn.tag == blot_check_core::Tag.constant && (bn.a & 0x7fffffff) <= 0x3f800000 &&
+                        isBoundedFiniteF32(g, f, m, n.a, depth + 1) { return true; }
+                    if an.tag == blot_check_core::Tag.constant && (an.a & 0x7fffffff) <= 0x3f800000 &&
+                        isBoundedFiniteF32(g, f, m, n.b, depth + 1) { return true; }
+                    return false;
+                },
+                _ => { return false; },
+            }
+        },
+        associated => {
+            return n.op == blot_check_core::Op.convert_u32_f32 || n.op == blot_check_core::Op.convert_i32_f32;
+        },
+        call => {
+            let target = g.resolve(m, m.call(id).target);
+            if !g.hasUnit(target.unit) { return false; }
+            let tm .= g.units[target.unit - 1];
+            let pnode, has_alias = primitiveAlias(tm, target.binding);
+            if !has_alias { return false; }
+            let pop = tm.primitive(pnode).op;
+            return pop == blot_check_core::Op.convert_u32_f32 || pop == blot_check_core::Op.convert_i32_f32;
+        },
+        _ => { return false; },
+    }
+}
 recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -156,7 +202,13 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> 
     }
     push(g, left);
     if has_right { push(g, right); }
-    let emitted = scalarOp(g, f, machine, left.ty, id, !elide_nan);
+    var skip_nan = elide_nan;
+    if !skip_nan && tagOf(g, left.ty) == blot_direct_types::Tag.f32_ && has_right &&
+        (machine == blot_check_core::Op.add || machine == blot_check_core::Op.sub || machine == blot_check_core::Op.mul) &&
+        isBoundedFiniteF32(g, f, m, n.a) && isBoundedFiniteF32(g, f, m, n.b) {
+        skip_nan = true;
+    }
+    let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     return pop(g, f, result, id);
 }
@@ -486,6 +538,7 @@ recursive fn logical(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     // without making the whole expression diverge.
     if n.op == blot_check_core::Op.and_ {
         let opened = open(g, f, OP_if_);
+        recordCondBounds(g, f, g.units[f.unit - 1], n.a, false);
         let right, error = stmt(g, f, n.b);
         if error != blot_direct_types::Error.none { return right, error; }
         if right.ty != blot_direct_types::never {
@@ -502,6 +555,7 @@ recursive fn logical(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         lset(g, w(g, result, 0));
         popCheckedArraysAt(f, opened);
         op(g, OP_else_);
+        recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
         let right, error = stmt(g, f, n.b);
         if error != blot_direct_types::Error.none { return right, error; }
         if right.ty != blot_direct_types::never {

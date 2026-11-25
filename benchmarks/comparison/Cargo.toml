@@ -8,7 +8,7 @@ name = "blot_readme_bench"
 path = "rust_bench_main.rs"
 
 [dependencies]
-wasmtime = "49.0.3"
+libc = "0.2"
 bevy_ecs = "0.20.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

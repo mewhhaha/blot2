@@ -1482,7 +1482,7 @@ fn emitProcessExports(g: Generator&, m: const Module&, abi: u8[>..<]&) -> u32, E
                     }
                 }
 
-                let serr = emitStageRoot(g, f, root, next_state, has_reply_pin, reply_pin_slot, reply_base, reply_cap, reply_bytes);
+                let serr = emitStageRoot(g, f, root, next_state, has_reply_pin, reply_pin_slot, reply_base, reply_cap, reply_bytes, true);
                 if serr != blot_direct_types::Error.none { return 0, serr; }
                 if has_reply_pin { lget(g, reply_base); }
                 else if has_scalar_reply { lget(g, scalar_reply); }

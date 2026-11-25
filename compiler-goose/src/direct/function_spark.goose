@@ -79,18 +79,20 @@ fn simdLaneMemOp(g: Generator&, sub: u32, align: u32, offset: u32, lane: u8) {
     uleb(g, offset);
     op(g, lane);
 }
-// Loads 4 byte-packed Bool elements [0|1] at ptr + idx and widens to i32x4 masks [0|0xffffffff].
-fn emitLoadBool4Mask(g: Generator&, ptr_local: u32, idx_local: u32) {
+// Loads 4 byte-packed Bool elements [0|1] at ptr [+ idx] + mem_offset and widens to i32x4 masks [0|0xffffffff].
+fn emitLoadBool4Mask(g: Generator&, ptr_local: u32, idx_local: u32, mem_offset: u32 = 0) {
     lget(g, ptr_local);
-    lget(g, idx_local);
-    op(g, OP_i32_add);
-    simdMemOp(g, SIMD_v128_load32_zero, 0, 0);
+    if idx_local != 0xffffffff {
+        lget(g, idx_local);
+        op(g, OP_i32_add);
+    }
+    simdMemOp(g, SIMD_v128_load32_zero, 0, mem_offset);
     simdOp(g, SIMD_i16x8_extend_low_i8x16_u);
     simdOp(g, SIMD_i32x4_extend_low_i16x8_u);
     simdOp(g, SIMD_i32x4_neg);
 }
-// Expects [dst_addr, v128_mask] on stack; normalizes to [0|1] bytes and stores 4 bytes at dst_addr.
-fn emitStoreBool4Mask(g: Generator&, f: const Fn&) {
+// Expects [dst_addr, v128_mask] on stack; normalizes to [0|1] bytes and stores 4 bytes at dst_addr + mem_offset.
+fn emitStoreBool4Mask(g: Generator&, f: const Fn&, mem_offset: u32 = 0) {
     v128Const4(g, 1);
     simdOp(g, SIMD_v128_and);
     let tmp = local(g, f, VT_v128);
@@ -100,7 +102,7 @@ fn emitStoreBool4Mask(g: Generator&, f: const Fn&) {
     ltee(g, tmp);
     lget(g, tmp);
     simdOp(g, SIMD_i8x16_narrow_i16x8_u);
-    simdLaneMemOp(g, SIMD_v128_store32_lane, 0, 0, 0);
+    simdLaneMemOp(g, SIMD_v128_store32_lane, 0, mem_offset, 0);
 }
 fn v128ConstWords(g: Generator&, w0: u32, w1: u32, w2: u32, w3: u32) {
     op(g, OP_prefix_fd);
@@ -183,9 +185,18 @@ struct SparkVecPlan {
     hoisted_len: i64 = 0,
     index_local: u32 = 0,
     byte_off_local: u32 = 0,
+    unroll_step: u32 = 0,
     iter_value_used: bool = false,
     uses_f32_canon: bool = false,
     nan_vlocal: u32 = 0xffffffff,
+}
+
+fn sameOffsetExpr(m: const Module&, a: u32, b: u32) -> bool {
+    if a == b { return true; }
+    if a == 0 || b == 0 { return false; }
+    let la = localRef(m, a);
+    let lb = localRef(m, b);
+    return la != 0 && la == lb;
 }
 
 fn findHoistedScalar(plan: const SparkVecPlan&, unit: u32, binding: u32) -> i64 {
@@ -1284,12 +1295,14 @@ recursive fn emitVecExpr(
             let st = plan.streams[sidx];
             if st.elem_tag == blot_direct_types::Tag.boolean {
                 // Widen 4 byte-packed [0|1] Bool elements to full SIMD lane masks [0x00000000|0xffffffff].
-                emitLoadBool4Mask(g, st.ptr_local, plan.index_local);
+                emitLoadBool4Mask(g, st.ptr_local, plan.index_local, plan.unroll_step * 4);
             } else {
                 lget(g, st.ptr_local);
-                lget(g, plan.byte_off_local);
-                op(g, OP_i32_add);
-                simdMemOp(g, SIMD_v128_load, 2, 0);
+                if plan.byte_off_local != 0xffffffff {
+                    lget(g, plan.byte_off_local);
+                    op(g, OP_i32_add);
+                }
+                simdMemOp(g, SIMD_v128_load, 2, plan.unroll_step * 16);
             }
             return blot_direct_types::Error.none;
         },
@@ -1406,62 +1419,89 @@ fn tryEmitVectorSpark(
     //   base_idx + len <=_u arr.len
     // If any stream fails at runtime, set simd_end = 0 so execution falls
     // cleanly into the scalar loop preserving exact wrapping and trap order.
+    let start_is_zero = info.is_range && g.units[f.unit - 1].node(info.source).tag == blot_check_core::Tag.constant && g.units[f.unit - 1].node(info.source).a == 0;
     if plan.streams_len != 0 {
         for si in 0..plan.streams_len {
             let st = plan.streams[si];
+            var dup_ptr: u32 = 0xffffffff;
+            for sj in 0..si {
+                let prev = plan.streams[sj];
+                let pm .= g.units[f.unit - 1];
+                let cur_arr_b = localRef(pm, st.arr_id);
+                let prev_arr_b = localRef(pm, prev.arr_id);
+                if cur_arr_b != 0 && cur_arr_b == prev_arr_b && prev.elem_tag == st.elem_tag && sameOffsetExpr(pm, st.offset_id, prev.offset_id) {
+                    dup_ptr = prev.ptr_local;
+                    break;
+                }
+            }
+            if dup_ptr != 0xffffffff {
+                plan.streams[si].ptr_local = dup_ptr;
+                continue;
+            }
             let arr_val, aerr = expr(g, f, st.arr_id);
             if aerr != blot_direct_types::Error.none { return false, 0, aerr; }
             let arr_base, arr_len, blerr = containerBaseAndLen(g, f, arr_val, st.node_id);
             if blerr != blot_direct_types::Error.none { return false, 0, blerr; }
 
-            var offset_local: u32 = 0;
-            if st.offset_id != 0 {
-                let off_loc, oerr = emitInvariantU32(g, f, plan, m, f.env, st.offset_id);
-                if oerr != blot_direct_types::Error.none { return false, 0, oerr; }
-                offset_local = off_loc;
+            if start_is_zero && st.offset_id == 0 {
+                lget(g, count);
+                lget(g, arr_len);
+                op(g, OP_i32_gt_u);
+                let guard_if = open(g, f, OP_if_);
+                i32Const(g, 0);
+                lset(g, simd_end);
+                close(g, f);
+                plan.streams[si].ptr_local = arr_base;
             } else {
-                offset_local = constLocal(g, f, 0);
+                var offset_local: u32 = 0;
+                if st.offset_id != 0 {
+                    let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, st.offset_id);
+                    if oerr != blot_direct_types::Error.none { return false, 0, oerr; }
+                    offset_local = off_loc;
+                } else {
+                    offset_local = constLocal(g, f, 0);
+                }
+
+                let base_idx = local32(g, f);
+                lget(g, offset_local);
+                lget(g, start_local);
+                op(g, OP_i32_add);
+                ltee(g, base_idx);
+
+                let end_idx = local32(g, f);
+                lget(g, count);
+                op(g, OP_i32_add);
+                lset(g, end_idx);
+
+                // ok = (base_idx >=_u offset) & (end_idx >=_u base_idx) & (end_idx <=_u arr_len)
+                lget(g, base_idx);
+                lget(g, offset_local);
+                op(g, OP_i32_ge_u);
+                lget(g, end_idx);
+                lget(g, base_idx);
+                op(g, OP_i32_ge_u);
+                op(g, OP_i32_and);
+                lget(g, end_idx);
+                lget(g, arr_len);
+                op(g, OP_i32_le_u);
+                op(g, OP_i32_and);
+                op(g, OP_i32_eqz);
+                let guard_if = open(g, f, OP_if_);
+                i32Const(g, 0);
+                lset(g, simd_end);
+                close(g, f);
+
+                let stream_ptr = local32(g, f);
+                lget(g, arr_base);
+                lget(g, base_idx);
+                if st.elem_tag != blot_direct_types::Tag.boolean {
+                    i32Const(g, 2);
+                    op(g, OP_i32_shl);
+                }
+                op(g, OP_i32_add);
+                lset(g, stream_ptr);
+                plan.streams[si].ptr_local = stream_ptr;
             }
-
-            let base_idx = local32(g, f);
-            lget(g, offset_local);
-            lget(g, start_local);
-            op(g, OP_i32_add);
-            ltee(g, base_idx);
-
-            let end_idx = local32(g, f);
-            lget(g, count);
-            op(g, OP_i32_add);
-            lset(g, end_idx);
-
-            // ok = (base_idx >=_u offset) & (end_idx >=_u base_idx) & (end_idx <=_u arr_len)
-            lget(g, base_idx);
-            lget(g, offset_local);
-            op(g, OP_i32_ge_u);
-            lget(g, end_idx);
-            lget(g, base_idx);
-            op(g, OP_i32_ge_u);
-            op(g, OP_i32_and);
-            lget(g, end_idx);
-            lget(g, arr_len);
-            op(g, OP_i32_le_u);
-            op(g, OP_i32_and);
-            op(g, OP_i32_eqz);
-            let guard_if = open(g, f, OP_if_);
-            i32Const(g, 0);
-            lset(g, simd_end);
-            close(g, f);
-
-            let stream_ptr = local32(g, f);
-            lget(g, arr_base);
-            lget(g, base_idx);
-            if st.elem_tag != blot_direct_types::Tag.boolean {
-                i32Const(g, 2);
-                op(g, OP_i32_shl);
-            }
-            op(g, OP_i32_add);
-            lset(g, stream_ptr);
-            plan.streams[si].ptr_local = stream_ptr;
         }
     }
 
@@ -1498,6 +1538,7 @@ fn tryEmitVectorSpark(
 
     let need_iter_vlocal = iter_binding != 0 && plan.iter_value_used;
     var iter_vlocal: u32 = 0;
+    var v4_local: u32 = 0;
     if need_iter_vlocal {
         iter_vlocal = local(g, f, VT_v128);
         plan.locals[0].vlocal = iter_vlocal;
@@ -1507,7 +1548,124 @@ fn tryEmitVectorSpark(
             v128ConstWords(g, 0, 1, 2, 3);
             simdOp(g, SIMD_i32x4_add);
             lset(g, iter_vlocal);
+            v4_local = local(g, f, VT_v128);
+            v128Const4(g, 4);
+            lset(g, v4_local);
         }
+    }
+
+    // 4x unrolled 16-element SIMD loop (64-byte cache line per iteration) ahead of 4-element tail.
+    if plan.streams_len <= 8 && plan.budget >= 80 {
+        let simd16_end = local32(g, f);
+        lget(g, simd_end);
+        i32Const(g, 0xfffffff0);
+        op(g, OP_i32_and);
+        lset(g, simd16_end);
+
+        let cur_out = local32(g, f);
+        var cur_src: u32 = 0;
+        if !info.is_range && need_iter_vlocal { cur_src = local32(g, f); }
+        var orig_ptrs: u32[8] = [0; 8];
+        var cur_ptrs: u32[8] = [0; 8];
+        for si in 0..plan.streams_len {
+            orig_ptrs[si] = plan.streams[si].ptr_local;
+            var reused: u32 = 0xffffffff;
+            if orig_ptrs[si] == out_base && (plan.streams[si].elem_tag == blot_direct_types::Tag.boolean) == (out_tag == blot_direct_types::Tag.boolean) {
+                reused = cur_out;
+            } else {
+                for sj in 0..si {
+                    if orig_ptrs[sj] == orig_ptrs[si] && (plan.streams[sj].elem_tag == blot_direct_types::Tag.boolean) == (plan.streams[si].elem_tag == blot_direct_types::Tag.boolean) {
+                        reused = cur_ptrs[sj];
+                        break;
+                    }
+                }
+            }
+            if reused != 0xffffffff { cur_ptrs[si] = reused; } else { cur_ptrs[si] = local32(g, f); }
+        }
+
+        let u16_exit = open(g, f, OP_block);
+        let u16_top = open(g, f, OP_loop);
+        lget(g, index);
+        lget(g, simd16_end);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, u16_exit);
+
+        lget(g, out_base);
+        if out_tag == blot_direct_types::Tag.boolean { lget(g, index); } else { lget(g, byte_off); }
+        op(g, OP_i32_add);
+        lset(g, cur_out);
+
+        if !info.is_range && need_iter_vlocal {
+            lget(g, src_base);
+            if iter_tag == blot_direct_types::Tag.boolean { lget(g, index); } else { lget(g, byte_off); }
+            op(g, OP_i32_add);
+            lset(g, cur_src);
+        }
+
+        for si in 0..plan.streams_len {
+            var is_dup = cur_ptrs[si] == cur_out;
+            if !is_dup {
+                for sj in 0..si {
+                    if cur_ptrs[sj] == cur_ptrs[si] { is_dup = true; break; }
+                }
+            }
+            if !is_dup {
+                lget(g, orig_ptrs[si]);
+                if plan.streams[si].elem_tag == blot_direct_types::Tag.boolean { lget(g, index); } else { lget(g, byte_off); }
+                op(g, OP_i32_add);
+                lset(g, cur_ptrs[si]);
+            }
+            plan.streams[si].ptr_local = cur_ptrs[si];
+        }
+        plan.index_local = 0xffffffff;
+        plan.byte_off_local = 0xffffffff;
+
+        for step in 0..4 {
+            plan.unroll_step = step as u32;
+            if !info.is_range && need_iter_vlocal {
+                if iter_tag == blot_direct_types::Tag.boolean {
+                    emitLoadBool4Mask(g, cur_src, 0xffffffff, (step as u32) * 4);
+                    lset(g, iter_vlocal);
+                } else {
+                    lget(g, cur_src);
+                    simdMemOp(g, SIMD_v128_load, 2, (step as u32) * 16);
+                    lset(g, iter_vlocal);
+                }
+            }
+            lget(g, cur_out);
+            let step_err = emitVecExpr(g, f, plan, g.units[f.unit - 1], f.env, info.body, false);
+            if step_err != blot_direct_types::Error.none { return false, 0, step_err; }
+            if out_tag == blot_direct_types::Tag.boolean {
+                emitStoreBool4Mask(g, f, (step as u32) * 4);
+            } else {
+                simdMemOp(g, SIMD_v128_store, 2, (step as u32) * 16);
+            }
+            if info.is_range && need_iter_vlocal {
+                lget(g, iter_vlocal);
+                lget(g, v4_local);
+                simdOp(g, SIMD_i32x4_add);
+                lset(g, iter_vlocal);
+            }
+        }
+
+        for si in 0..plan.streams_len { plan.streams[si].ptr_local = orig_ptrs[si]; }
+        plan.index_local = index;
+        plan.byte_off_local = byte_off;
+        plan.unroll_step = 0;
+
+        lget(g, index);
+        i32Const(g, 16);
+        op(g, OP_i32_add);
+        lset(g, index);
+
+        lget(g, byte_off);
+        i32Const(g, 64);
+        op(g, OP_i32_add);
+        lset(g, byte_off);
+
+        br(g, f, OP_br, u16_top);
+        close(g, f);
+        close(g, f);
     }
 
     let simd_exit = open(g, f, OP_block);
@@ -1519,7 +1677,7 @@ fn tryEmitVectorSpark(
 
     if !info.is_range && need_iter_vlocal {
         if iter_tag == blot_direct_types::Tag.boolean {
-            emitLoadBool4Mask(g, src_base, index);
+            emitLoadBool4Mask(g, src_base, index, 0);
             lset(g, iter_vlocal);
         } else {
             lget(g, src_base);
@@ -1539,12 +1697,12 @@ fn tryEmitVectorSpark(
     }
     op(g, OP_i32_add);
 
-    let body_err = emitVecExpr(g, f, plan, m, f.env, info.body, false);
+    let body_err = emitVecExpr(g, f, plan, g.units[f.unit - 1], f.env, info.body, false);
     if body_err != blot_direct_types::Error.none { return false, 0, body_err; }
 
     if out_tag == blot_direct_types::Tag.boolean {
         // Normalize SIMD lane masks [0x00000000|0xffffffff] -> 4 packed [0|1] bytes and store!
-        emitStoreBool4Mask(g, f);
+        emitStoreBool4Mask(g, f, 0);
     } else {
         simdMemOp(g, SIMD_v128_store, 2, 0);
     }
@@ -1562,7 +1720,7 @@ fn tryEmitVectorSpark(
 
     if info.is_range && need_iter_vlocal {
         lget(g, iter_vlocal);
-        v128Const4(g, 4);
+        lget(g, v4_local);
         simdOp(g, SIMD_i32x4_add);
         lset(g, iter_vlocal);
     }
@@ -1743,25 +1901,34 @@ fn tryEmitVectorForLoop(
 
     if !matched { return blot_direct_types::Error.none; }
 
-    // Emit 4-wide SIMD loop guarded by bounds, non-wrapping, and strict alias/overlap safety!
-    let start_local = local32(g, f);
-    lget(g, index);
-    lset(g, start_local);
+    // Emit 4-wide (with 4x unrolled 16-element fast path) SIMD loop guarded by
+    // bounds, non-wrapping, and strict alias/overlap safety!
+    let start_is_zero = g.units[f.unit - 1].node(info.first).tag == blot_check_core::Tag.constant && g.units[f.unit - 1].node(info.first).a == 0;
+    var start_local: u32 = 0;
+    var count: u32 = 0;
+    if start_is_zero {
+        start_local = index;
+        count = end_local;
+    } else {
+        start_local = local32(g, f);
+        lget(g, index);
+        lset(g, start_local);
 
-    let count = local32(g, f);
-    lget(g, end_local);
-    lget(g, start_local);
-    op(g, OP_i32_gt_u);
-    let cnt_if = open(g, f, OP_if_);
-    lget(g, end_local);
-    lget(g, start_local);
-    op(g, OP_i32_sub);
-    lset(g, count);
-    popCheckedArraysAt(f, cnt_if);
-    op(g, OP_else_);
-    i32Const(g, 0);
-    lset(g, count);
-    close(g, f);
+        count = local32(g, f);
+        lget(g, end_local);
+        lget(g, start_local);
+        op(g, OP_i32_gt_u);
+        let cnt_if = open(g, f, OP_if_);
+        lget(g, end_local);
+        lget(g, start_local);
+        op(g, OP_i32_sub);
+        lset(g, count);
+        popCheckedArraysAt(f, cnt_if);
+        op(g, OP_else_);
+        i32Const(g, 0);
+        lset(g, count);
+        close(g, f);
+    }
 
     let simd_end = local32(g, f);
     lget(g, count);
@@ -1771,121 +1938,190 @@ fn tryEmitVectorForLoop(
 
     // Destination bounds and byte extent [dst_ptr .. dst_byte_end).
     let dst_base, dst_len = ensureCheckedArray(g, f, dst_val);
-    var dst_off_local: u32 = 0;
-    if dst_off_id != 0 {
-        let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, dst_off_id);
-        if oerr != blot_direct_types::Error.none { return oerr; }
-        dst_off_local = off_loc;
+    var dst_ptr: u32 = 0;
+    if start_is_zero && dst_off_id == 0 {
+        lget(g, count);
+        lget(g, dst_len);
+        op(g, OP_i32_gt_u);
+        let dst_guard = open(g, f, OP_if_);
+        i32Const(g, 0);
+        lset(g, simd_end);
+        close(g, f);
+        dst_ptr = dst_base;
     } else {
-        dst_off_local = constLocal(g, f, 0);
+        var dst_off_local: u32 = 0;
+        if dst_off_id != 0 {
+            let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, dst_off_id);
+            if oerr != blot_direct_types::Error.none { return oerr; }
+            dst_off_local = off_loc;
+        } else {
+            dst_off_local = constLocal(g, f, 0);
+        }
+
+        var dst_base_idx: u32 = dst_off_local;
+        if !start_is_zero {
+            dst_base_idx = local32(g, f);
+            lget(g, dst_off_local);
+            lget(g, start_local);
+            op(g, OP_i32_add);
+            lset(g, dst_base_idx);
+        }
+
+        let dst_end_idx = local32(g, f);
+        lget(g, dst_base_idx);
+        lget(g, count);
+        op(g, OP_i32_add);
+        lset(g, dst_end_idx);
+
+        if !start_is_zero {
+            lget(g, dst_base_idx);
+            lget(g, dst_off_local);
+            op(g, OP_i32_ge_u);
+        }
+        lget(g, dst_end_idx);
+        lget(g, dst_base_idx);
+        op(g, OP_i32_ge_u);
+        if !start_is_zero { op(g, OP_i32_and); }
+        lget(g, dst_end_idx);
+        lget(g, dst_len);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
+        op(g, OP_i32_eqz);
+        let dst_guard = open(g, f, OP_if_);
+        i32Const(g, 0);
+        lset(g, simd_end);
+        close(g, f);
+
+        dst_ptr = local32(g, f);
+        lget(g, dst_base);
+        lget(g, dst_base_idx);
+        i32Const(g, 2);
+        op(g, OP_i32_shl);
+        op(g, OP_i32_add);
+        lset(g, dst_ptr);
     }
 
-    let dst_base_idx = local32(g, f);
-    lget(g, dst_off_local);
-    lget(g, start_local);
-    op(g, OP_i32_add);
-    ltee(g, dst_base_idx);
-
-    let dst_end_idx = local32(g, f);
-    lget(g, count);
-    op(g, OP_i32_add);
-    lset(g, dst_end_idx);
-
-    lget(g, dst_base_idx);
-    lget(g, dst_off_local);
-    op(g, OP_i32_ge_u);
-    lget(g, dst_end_idx);
-    lget(g, dst_base_idx);
-    op(g, OP_i32_ge_u);
-    op(g, OP_i32_and);
-    lget(g, dst_end_idx);
-    lget(g, dst_len);
-    op(g, OP_i32_le_u);
-    op(g, OP_i32_and);
-    op(g, OP_i32_eqz);
-    let dst_guard = open(g, f, OP_if_);
-    i32Const(g, 0);
-    lset(g, simd_end);
-    close(g, f);
-
-    let dst_ptr = local32(g, f);
-    lget(g, dst_base);
-    lget(g, dst_base_idx);
-    i32Const(g, 2);
-    op(g, OP_i32_shl);
-    op(g, OP_i32_add);
-    lset(g, dst_ptr);
-
-    let dst_byte_end = local32(g, f);
-    lget(g, dst_ptr);
-    lget(g, count);
-    i32Const(g, 2);
-    op(g, OP_i32_shl);
-    op(g, OP_i32_add);
-    lset(g, dst_byte_end);
+    var dst_byte_end: u32 = 0xffffffff;
 
     // Every source stream must satisfy bounds + non-wrapping + overlap safety:
     //   either (stream_ptr == dst_ptr && non-Bool) OR disjoint byte ranges.
     for si in 0..plan.streams_len {
         let st = plan.streams[si];
+        // Fast path 1: stream is identical to dst (e.g. `c[dst] := c[dst] + ...`)!
+        {
+            let pm .= g.units[f.unit - 1];
+            let st_arr_b = localRef(pm, st.arr_id);
+            if st_arr_b != 0 && st_arr_b == dst_b && st.elem_tag == out_tag && sameOffsetExpr(pm, st.offset_id, dst_off_id) {
+                plan.streams[si].ptr_local = dst_ptr;
+                continue;
+            }
+            var dup_ptr: u32 = 0xffffffff;
+            for sj in 0..si {
+                let prev = plan.streams[sj];
+                let prev_arr_b = localRef(pm, prev.arr_id);
+                if st_arr_b != 0 && st_arr_b == prev_arr_b && prev.elem_tag == st.elem_tag && sameOffsetExpr(pm, st.offset_id, prev.offset_id) {
+                    dup_ptr = prev.ptr_local;
+                    break;
+                }
+            }
+            if dup_ptr != 0xffffffff {
+                plan.streams[si].ptr_local = dup_ptr;
+                continue;
+            }
+        }
+        if dst_byte_end == 0xffffffff {
+            dst_byte_end = local32(g, f);
+            lget(g, dst_ptr);
+            lget(g, count);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            lset(g, dst_byte_end);
+        }
+
         let arr_val, aerr = expr(g, f, st.arr_id);
         if aerr != blot_direct_types::Error.none { return aerr; }
         let arr_base, arr_len, blerr = containerBaseAndLen(g, f, arr_val, st.node_id);
         if blerr != blot_direct_types::Error.none { return blerr; }
 
-        var offset_local: u32 = 0;
-        if st.offset_id != 0 {
-            let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, st.offset_id);
-            if oerr != blot_direct_types::Error.none { return oerr; }
-            offset_local = off_loc;
+        var stream_ptr: u32 = 0;
+        var stream_byte_end: u32 = 0;
+        if start_is_zero && st.offset_id == 0 {
+            stream_ptr = arr_base;
+            plan.streams[si].ptr_local = stream_ptr;
+            stream_byte_end = local32(g, f);
+            lget(g, stream_ptr);
+            lget(g, count);
+            if st.elem_tag != blot_direct_types::Tag.boolean {
+                i32Const(g, 2);
+                op(g, OP_i32_shl);
+            }
+            op(g, OP_i32_add);
+            lset(g, stream_byte_end);
+            lget(g, count);
+            lget(g, arr_len);
+            op(g, OP_i32_le_u);
         } else {
-            offset_local = constLocal(g, f, 0);
+            var offset_local: u32 = 0;
+            if st.offset_id != 0 {
+                let off_loc, oerr = emitInvariantU32(g, f, plan, g.units[f.unit - 1], f.env, st.offset_id);
+                if oerr != blot_direct_types::Error.none { return oerr; }
+                offset_local = off_loc;
+            } else {
+                offset_local = constLocal(g, f, 0);
+            }
+
+            var base_idx: u32 = offset_local;
+            if !start_is_zero {
+                base_idx = local32(g, f);
+                lget(g, offset_local);
+                lget(g, start_local);
+                op(g, OP_i32_add);
+                lset(g, base_idx);
+            }
+
+            let end_idx = local32(g, f);
+            lget(g, base_idx);
+            lget(g, count);
+            op(g, OP_i32_add);
+            lset(g, end_idx);
+
+            stream_ptr = local32(g, f);
+            lget(g, arr_base);
+            lget(g, base_idx);
+            if st.elem_tag != blot_direct_types::Tag.boolean {
+                i32Const(g, 2);
+                op(g, OP_i32_shl);
+            }
+            op(g, OP_i32_add);
+            lset(g, stream_ptr);
+            plan.streams[si].ptr_local = stream_ptr;
+
+            stream_byte_end = local32(g, f);
+            lget(g, stream_ptr);
+            lget(g, count);
+            if st.elem_tag != blot_direct_types::Tag.boolean {
+                i32Const(g, 2);
+                op(g, OP_i32_shl);
+            }
+            op(g, OP_i32_add);
+            lset(g, stream_byte_end);
+
+            // bounds_ok = [base_idx >=_u offset &] (end_idx >=_u base_idx) & (end_idx <=_u arr_len)
+            if !start_is_zero {
+                lget(g, base_idx);
+                lget(g, offset_local);
+                op(g, OP_i32_ge_u);
+            }
+            lget(g, end_idx);
+            lget(g, base_idx);
+            op(g, OP_i32_ge_u);
+            if !start_is_zero { op(g, OP_i32_and); }
+            lget(g, end_idx);
+            lget(g, arr_len);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
         }
-
-        let base_idx = local32(g, f);
-        lget(g, offset_local);
-        lget(g, start_local);
-        op(g, OP_i32_add);
-        ltee(g, base_idx);
-
-        let end_idx = local32(g, f);
-        lget(g, count);
-        op(g, OP_i32_add);
-        lset(g, end_idx);
-
-        let stream_ptr = local32(g, f);
-        lget(g, arr_base);
-        lget(g, base_idx);
-        if st.elem_tag != blot_direct_types::Tag.boolean {
-            i32Const(g, 2);
-            op(g, OP_i32_shl);
-        }
-        op(g, OP_i32_add);
-        lset(g, stream_ptr);
-        plan.streams[si].ptr_local = stream_ptr;
-
-        let stream_byte_end = local32(g, f);
-        lget(g, stream_ptr);
-        lget(g, count);
-        if st.elem_tag != blot_direct_types::Tag.boolean {
-            i32Const(g, 2);
-            op(g, OP_i32_shl);
-        }
-        op(g, OP_i32_add);
-        lset(g, stream_byte_end);
-
-        // bounds_ok = (base_idx >=_u offset) & (end_idx >=_u base_idx) & (end_idx <=_u arr_len)
-        lget(g, base_idx);
-        lget(g, offset_local);
-        op(g, OP_i32_ge_u);
-        lget(g, end_idx);
-        lget(g, base_idx);
-        op(g, OP_i32_ge_u);
-        op(g, OP_i32_and);
-        lget(g, end_idx);
-        lget(g, arr_len);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_and);
 
         // overlap_ok = (stream_byte_end <=_u dst_ptr) | (dst_byte_end <=_u stream_ptr) [| (stream_ptr == dst_ptr)]
         lget(g, stream_byte_end);
@@ -1942,14 +2178,128 @@ fn tryEmitVectorForLoop(
 
     let need_iter_vlocal = plan.iter_value_used;
     var iter_vlocal: u32 = 0;
+    var v4_local: u32 = 0;
     if need_iter_vlocal {
         iter_vlocal = local(g, f, VT_v128);
         plan.locals[0].vlocal = iter_vlocal;
-        lget(g, start_local);
-        simdOp(g, SIMD_i32x4_splat);
-        v128ConstWords(g, 0, 1, 2, 3);
-        simdOp(g, SIMD_i32x4_add);
+        if start_is_zero {
+            v128ConstWords(g, 0, 1, 2, 3);
+        } else {
+            lget(g, start_local);
+            simdOp(g, SIMD_i32x4_splat);
+            v128ConstWords(g, 0, 1, 2, 3);
+            simdOp(g, SIMD_i32x4_add);
+        }
         lset(g, iter_vlocal);
+        v4_local = local(g, f, VT_v128);
+        v128Const4(g, 4);
+        lset(g, v4_local);
+    }
+
+    // 4x unrolled 16-element SIMD loop (64-byte cache line per iteration) ahead of 4-element tail.
+    if plan.streams_len <= 8 && plan.budget >= 80 {
+        let simd16_end = local32(g, f);
+        lget(g, simd_end);
+        i32Const(g, 0xfffffff0);
+        op(g, OP_i32_and);
+        lset(g, simd16_end);
+
+        let cur_dst = local32(g, f);
+        var orig_ptrs: u32[8] = [0; 8];
+        var cur_ptrs: u32[8] = [0; 8];
+        for si in 0..plan.streams_len {
+            orig_ptrs[si] = plan.streams[si].ptr_local;
+            var reused: u32 = 0xffffffff;
+            if orig_ptrs[si] == dst_ptr && plan.streams[si].elem_tag != blot_direct_types::Tag.boolean {
+                reused = cur_dst;
+            } else {
+                for sj in 0..si {
+                    if orig_ptrs[sj] == orig_ptrs[si] && (plan.streams[sj].elem_tag == blot_direct_types::Tag.boolean) == (plan.streams[si].elem_tag == blot_direct_types::Tag.boolean) {
+                        reused = cur_ptrs[sj];
+                        break;
+                    }
+                }
+            }
+            if reused != 0xffffffff { cur_ptrs[si] = reused; } else { cur_ptrs[si] = local32(g, f); }
+        }
+
+        let u16_exit = open(g, f, OP_block);
+        let u16_top = open(g, f, OP_loop);
+        lget(g, k);
+        lget(g, simd16_end);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, u16_exit);
+
+        lget(g, dst_ptr);
+        lget(g, byte_off);
+        op(g, OP_i32_add);
+        lset(g, cur_dst);
+
+        for si in 0..plan.streams_len {
+            var is_dup = cur_ptrs[si] == cur_dst;
+            if !is_dup {
+                for sj in 0..si {
+                    if cur_ptrs[sj] == cur_ptrs[si] { is_dup = true; break; }
+                }
+            }
+            if !is_dup {
+                lget(g, orig_ptrs[si]);
+                if plan.streams[si].elem_tag == blot_direct_types::Tag.boolean { lget(g, k); } else { lget(g, byte_off); }
+                op(g, OP_i32_add);
+                lset(g, cur_ptrs[si]);
+            }
+            plan.streams[si].ptr_local = cur_ptrs[si];
+        }
+        plan.index_local = 0xffffffff;
+        plan.byte_off_local = 0xffffffff;
+
+        for step in 0..4 {
+            plan.unroll_step = step as u32;
+            let m_step .= g.units[f.unit - 1];
+            for li in 0..lead_bind_len {
+                let lerr = emitVecExpr(g, f, plan, m_step, f.env, lead_bind_exprs[li], false);
+                if lerr != blot_direct_types::Error.none { return lerr; }
+                let vl = local(g, f, VT_v128);
+                lset(g, vl);
+                let lidx = findVecLocal(plan, m_step.unit, lead_bind_ids[li]);
+                assert(lidx >= 0);
+                plan.locals[lidx].vlocal = vl;
+                if lead_bind_tags[li] == blot_direct_types::Tag.u32_ && plan.locals[lidx].invariant {
+                    let sloc, serr = emitInvariantU32(g, f, plan, m_step, f.env, lead_bind_exprs[li]);
+                    if serr != blot_direct_types::Error.none { return serr; }
+                    plan.locals[lidx].scalar_local = sloc;
+                }
+            }
+            lget(g, cur_dst);
+            let rhs_err = emitVecExpr(g, f, plan, m_step, f.env, rhs_id, false);
+            if rhs_err != blot_direct_types::Error.none { return rhs_err; }
+            simdMemOp(g, SIMD_v128_store, 2, (step as u32) * 16);
+            if need_iter_vlocal {
+                lget(g, iter_vlocal);
+                lget(g, v4_local);
+                simdOp(g, SIMD_i32x4_add);
+                lset(g, iter_vlocal);
+            }
+        }
+
+        for si in 0..plan.streams_len { plan.streams[si].ptr_local = orig_ptrs[si]; }
+        plan.index_local = k;
+        plan.byte_off_local = byte_off;
+        plan.unroll_step = 0;
+
+        lget(g, k);
+        i32Const(g, 16);
+        op(g, OP_i32_add);
+        lset(g, k);
+
+        lget(g, byte_off);
+        i32Const(g, 64);
+        op(g, OP_i32_add);
+        lset(g, byte_off);
+
+        br(g, f, OP_br, u16_top);
+        close(g, f);
+        close(g, f);
     }
 
     let simd_exit = open(g, f, OP_block);
@@ -1998,7 +2348,7 @@ fn tryEmitVectorForLoop(
 
     if need_iter_vlocal {
         lget(g, iter_vlocal);
-        v128Const4(g, 4);
+        lget(g, v4_local);
         simdOp(g, SIMD_i32x4_add);
         lset(g, iter_vlocal);
     }

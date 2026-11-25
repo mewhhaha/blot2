@@ -16,16 +16,19 @@ Reproducible cross-language benchmark suite backing the numbers in the root
   guests, plus an idiomatic Blot/Ink SoA + `spark` SIMD process.
 - [rust_bench_main.rs](rust_bench_main.rs) + [Cargo.toml](Cargo.toml): Unified
   benchmark runner executing Blot Wasm and Rust Wasm on the same
-  `wasmtime 49.0.7` engine (`OptLevel::Speed`, `wasm_simd(true)`), native Rust
-  `-O3` kernels, and `bevy_ecs 0.20.1` native worlds with bit-exact checksum
-  verification on every matching workload.
+  `wtime-aot 0.1.1` (`--backend x64 --target-cpu native --blot-cdylib`,
+  `x64-v3` with AVX2/BMI2, zero external deps, explicit software bounds checks),
+  native Rust `-O3` kernels, and `bevy_ecs 0.20.1` native worlds with bit-exact
+  checksum verification on every matching workload.
 - [plot_benchmarks.py](plot_benchmarks.py): Generates the SVG graphs embedded in
   [README.md](../../README.md) directly from the recorded JSON evidence.
 
 ## Running
 
-Prerequisites: built `compiler-goose/build/blotc-goose`, sibling `../ink`
-checkout, and Rust with `wasm32-unknown-unknown` target installed.
+Prerequisites: built `compiler-goose/build/blotc-goose`, `wtime-aot` (resolved
+via `WTIME_AOT_BIN`, sibling `../wtime/tools/wtime-aot/target/release/wtime-aot`,
+or `PATH`), sibling `../ink` checkout, and Rust with `wasm32-unknown-unknown`
+target installed.
 
 ```sh
 CARGO_TARGET_DIR=/tmp/blot_bench_target \
@@ -36,5 +39,6 @@ CARGO_TARGET_DIR=/tmp/blot_bench_target \
 
 - [2026-11-24-rust-and-bevy-ecs.json](../evidence/measurements/2026-11-24-rust-and-bevy-ecs.json):
   Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
-  AMD Ryzen 7 7800X3D with `blotc-goose` (`30899f4b`), `rustc 1.96.0-nightly`,
-  `wasmtime 49.0.7`, and `bevy_ecs 0.20.1`.
+  AMD Ryzen 7 7800X3D with `blotc-goose` (Tier 3 `3A–3F`), `wtime-aot 0.1.1`
+  (`--backend x64`, `x64-v3`, `35850f9`), `rustc 1.96.0-nightly`, and
+  `bevy_ecs 0.20.1`.

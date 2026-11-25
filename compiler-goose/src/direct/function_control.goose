@@ -9,7 +9,206 @@ fn newSlots(g: Generator&, count: i64) -> u32 {
     for at in 0..count { g.s.slots.push(blot_direct_emit::Slot {}); }
     return first;
 }
+fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32) -> u32, bool {
+    let b = localRef(m, node_id);
+    if b != 0 {
+        let _, is_cell = withCellType(g, f, b);
+        if !is_cell {
+            let v, ok = bindGet(g, f, b);
+            if ok && tagOf(g, v.ty) == blot_direct_types::Tag.u32_ {
+                return w(g, v, 0), true;
+            }
+        }
+    }
+    let n = m.node(node_id);
+    var owner: u32 = 0;
+    if n.tag == blot_check_core::Tag.project {
+        let spelling = m.fieldSpelling(m.projection(n.b).field);
+        if spelling.present && spelling.value == "length" {
+            owner = localRef(m, n.a);
+        }
+    } else {
+        owner = lengthReceiver(m, node_id);
+    }
+    if owner != 0 {
+        let _, is_cell = withCellType(g, f, owner);
+        if !is_cell {
+            let hv, hok = bindGet(g, f, owner);
+            if hok && tagOf(g, hv.ty) == blot_direct_types::Tag.array {
+                let ca = findCheckedArray(f, w(g, hv, 0), w(g, hv, 1));
+                if ca >= 0 {
+                    return f.checked_arrays[ca].length, true;
+                }
+            }
+        }
+    }
+    return 0, false;
+}
+recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: u32, invert: bool, depth: i64 = 0) {
+    if cond_id == 0 || depth > 8 { return; }
+    let cond = m.node(cond_id);
+    if cond.tag == blot_check_core::Tag.logical {
+        if !invert && cond.op == blot_check_core::Op.and_ {
+            recordCondBounds(g, f, m, cond.a, false, depth + 1);
+            recordCondBounds(g, f, m, cond.b, false, depth + 1);
+        } else if invert && cond.op == blot_check_core::Op.or_ {
+            recordCondBounds(g, f, m, cond.a, true, depth + 1);
+            recordCondBounds(g, f, m, cond.b, true, depth + 1);
+        }
+        return;
+    }
+    if cond.tag == blot_check_core::Tag.scalar {
+        var idx_node: u32 = 0;
+        var bnd_node: u32 = 0;
+        if !invert && cond.op == blot_check_core::Op.less {
+            idx_node = cond.a; bnd_node = cond.b;
+        } else if !invert && cond.op == blot_check_core::Op.greater {
+            idx_node = cond.b; bnd_node = cond.a;
+        } else if invert && cond.op == blot_check_core::Op.greater_equal {
+            idx_node = cond.a; bnd_node = cond.b;
+        } else if invert && cond.op == blot_check_core::Op.less_equal {
+            idx_node = cond.b; bnd_node = cond.a;
+        } else {
+            return;
+        }
+        let idx_b = localRef(m, idx_node);
+        if idx_b == 0 { return; }
+        let _, ic = withCellType(g, f, idx_b);
+        if ic { return; }
+        let iv, iok = bindGet(g, f, idx_b);
+        if !iok || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return; }
+        let bnd_loc, bok = resolveBoundLocal(g, f, m, bnd_node);
+        if bok {
+            recordCheckedBound(f, w(g, iv, 0), bnd_loc);
+        }
+    }
+}
+fn isPureSelectOp(op_: Op) -> bool {
+    match op_ {
+        add, sub, mul, equal, not_equal, less, less_equal, greater, greater_equal,
+        bit_and, bit_or, bit_xor, shift_left, shift_right, shift_right_signed,
+        neg, abs, ceil, floor, trunc, sqrt, min, max,
+        convert_u32_f32, convert_f32_u32, convert_f32_i32, convert_i32_f32,
+        bit_andnot, bit_not, not_ => { return true; },
+        _ => { return false; },
+    }
+}
+recursive fn isPureSelectExpr(g: const Generator&, f: const Fn&, m: const Module&, id: u32, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return true; },
+        reference => {
+            let b = localRef(m, id);
+            if b == 0 { return false; }
+            let _, is_cell = withCellType(g, f, b);
+            return !is_cell;
+        },
+        scalar => {
+            if !isPureSelectOp(n.op) { return false; }
+            return isPureSelectExpr(g, f, m, n.a, budget) && isPureSelectExpr(g, f, m, n.b, budget);
+        },
+        bind => {
+            if n.c >= 2 || m.binding(n.a).scheme.variables.len != 0 { return false; }
+            return isPureSelectExpr(g, f, m, n.b, budget);
+        },
+        suite, block_ => {
+            for child in m.children(id) {
+                if !isPureSelectExpr(g, f, m, child, budget) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+fn tryIfSelectConvert(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
+    var cond_id: u32 = 0;
+    var then_id: u32 = 0;
+    var else_id: u32 = 0;
+    var is_stmt = false;
+    var merge_count: i64 = 0;
+    var m_then: u32[4] = [0; 4];
+    var m_else: u32[4] = [0; 4];
+    var m_res: u32[4] = [0; 4];
+    var eligible = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let n = m.node(id);
+        cond_id = n.a;
+        then_id = n.b;
+        else_id = n.c;
+        is_stmt = n.tag == blot_check_core::Tag.if_stmt;
+        let merges = m.branchMerges(id);
+        if is_stmt && else_id == 0 && merges.len >= 1 && merges.len <= 4 {
+            var budget: i64 = 24;
+            if isPureSelectExpr(g, f, m, then_id, budget) {
+                var all_ok = true;
+                for merge, at in merges {
+                    let _, ct = withCellType(g, f, merge.then_binding);
+                    let _, ce = withCellType(g, f, merge.else_binding);
+                    if ct || ce { all_ok = false; break; }
+                    let ev, eok = bindGet(g, f, merge.else_binding);
+                    if !eok || ev.len != 1 || !isScalarTag(tagOf(g, ev.ty)) { all_ok = false; break; }
+                    m_then[at] = merge.then_binding;
+                    m_else[at] = merge.else_binding;
+                    m_res[at] = merge.result;
+                }
+                if all_ok {
+                    merge_count = merges.len;
+                    eligible = true;
+                }
+            }
+        } else if !is_stmt && else_id != 0 && merges.len == 0 {
+            var b1: i64 = 12;
+            var b2: i64 = 12;
+            if isPureSelectExpr(g, f, m, then_id, b1) && isPureSelectExpr(g, f, m, else_id, b2) {
+                let rty, rerr = g.types.lower(m, m.typeOf(id), f.env);
+                if rerr == blot_direct_types::Error.none && isScalarTag(tagOf(g, rty)) {
+                    eligible = true;
+                } else if rerr != blot_direct_types::Error.none {
+                    g.dropFailure();
+                }
+            }
+        }
+    }
+    if !eligible { return neverVal(), false, blot_direct_types::Error.none; }
+    let condition, cerr = expr(g, f, cond_id);
+    if cerr != blot_direct_types::Error.none { return condition, true, cerr; }
+    if is_stmt {
+        let then_val, terr = stmt(g, f, then_id);
+        if terr != blot_direct_types::Error.none { return then_val, true, terr; }
+        for at in 0..merge_count {
+            let tv, tok = bindGet(g, f, m_then[at]);
+            let ev, eok = bindGet(g, f, m_else[at]);
+            assert(tok && eok && tv.len == 1 && ev.len == 1);
+            let out_loc = local(g, f, localKindForScalar(g, ev.ty));
+            lget(g, w(g, tv, 0));
+            lget(g, w(g, ev, 0));
+            lget(g, w(g, condition, 0));
+            op(g, OP_select);
+            lset(g, out_loc);
+            bindPut(g, f, m_res[at], valOf1(g, ev.ty, out_loc));
+        }
+        return unitVal(), true, blot_direct_types::Error.none;
+    }
+    let tv, terr = expr(g, f, then_id);
+    if terr != blot_direct_types::Error.none { return tv, true, terr; }
+    let ev, eerr = expr(g, f, else_id);
+    if eerr != blot_direct_types::Error.none { return ev, true, eerr; }
+    let out_loc = local(g, f, localKindForScalar(g, tv.ty));
+    lget(g, w(g, tv, 0));
+    lget(g, w(g, ev, 0));
+    lget(g, w(g, condition, 0));
+    op(g, OP_select);
+    lset(g, out_loc);
+    return valOf1(g, tv.ty, out_loc), true, blot_direct_types::Error.none;
+}
 recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let sel_val, converted, sel_err = tryIfSelectConvert(g, f, id);
+    if sel_err != blot_direct_types::Error.none { return sel_val, sel_err; }
+    if converted { return sel_val, blot_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     let result = g.newSlot();
@@ -18,7 +217,11 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let condition, error = expr(g, f, n.a);
     if error != blot_direct_types::Error.none { return condition, error; }
     push(g, condition);
+    var saved_ce: CheckedElem[8] = [CheckedElem {}; 8];
+    let saved_ce_len = f.checked_elems_len;
+    for ci in 0..saved_ce_len { saved_ce[ci] = f.checked_elems[ci]; }
     let opened = open(g, f, OP_if_);
+    recordCondBounds(g, f, g.units[f.unit - 1], n.a, false);
     let then, error = stmt(g, f, n.b);
     if error != blot_direct_types::Error.none { return then, error; }
     let then_diverges = then.ty == blot_direct_types::never;
@@ -37,9 +240,12 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     popCheckedArraysAt(f, opened);
+    f.checked_elems_len = saved_ce_len;
+    for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
     op(g, OP_else_);
     var else_falls = false;
     if n.c != 0 {
+        recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
         let otherwise, error = stmt(g, f, n.c);
         if error != blot_direct_types::Error.none { return otherwise, error; }
         if otherwise.ty != blot_direct_types::never {
@@ -69,31 +275,14 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     close(g, f);
+    if n.c == 0 && then_diverges {
+        f.checked_elems_len = saved_ce_len;
+        for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
+    } else {
+        f.checked_elems_len = 0;
+    }
     if n.tag == blot_check_core::Tag.if_stmt && n.c == 0 && then_diverges {
-        let pm .= g.units[f.unit - 1];
-        let cond = pm.node(n.a);
-        if cond.tag == blot_check_core::Tag.scalar &&
-            (cond.op == blot_check_core::Op.greater_equal || cond.op == blot_check_core::Op.less_equal) {
-            var idx_node = cond.a;
-            var bnd_node = cond.b;
-            if cond.op == blot_check_core::Op.less_equal {
-                idx_node = cond.b;
-                bnd_node = cond.a;
-            }
-            let idx_b = localRef(pm, idx_node);
-            let bnd_b = localRef(pm, bnd_node);
-            if idx_b != 0 && bnd_b != 0 {
-                let _, ic = withCellType(g, f, idx_b);
-                let _, bc = withCellType(g, f, bnd_b);
-                if !ic && !bc {
-                    let iv, iok = bindGet(g, f, idx_b);
-                    let bv, bok = bindGet(g, f, bnd_b);
-                    if iok && bok && tagOf(g, iv.ty) == blot_direct_types::Tag.u32_ && tagOf(g, bv.ty) == blot_direct_types::Tag.u32_ {
-                        recordCheckedBound(f, w(g, iv, 0), w(g, bv, 0));
-                    }
-                }
-            }
-        }
+        recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
     }
     for merge, at in merges {
         let slot = g.s.slots[merged + at];
@@ -714,7 +903,225 @@ fn sameWords(g: const Generator&, left: Val, right: Val) -> bool {
     for at in 0..(left.len as i64) { if g.s.words[left.start + at] != g.s.words[right.start + at] { return false; } }
     return true;
 }
+fn resolveLazyVariantArrayRead(g: Generator&, f: const Fn&, m: const Module&, input_id: u32) -> u32, u32, BindingRef, bool {
+    let n = m.node(input_id);
+    if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(input_id) == blot_backend_collection_ops::Op.get {
+        let ch = m.children(input_id);
+        if ch.len == 2 && m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+            return ch[0], ch[1], BindingRef { 0, 0 }, true;
+        }
+    } else if n.tag == blot_check_core::Tag.storage {
+        let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+        let ch = m.children(input_id);
+        if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 &&
+            m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+            return ch[0], ch[1], BindingRef { 0, 0 }, true;
+        }
+    } else if n.tag == blot_check_core::Tag.apply && m.node(n.a).tag == blot_check_core::Tag.project {
+        let proj_n = m.node(n.a);
+        let sp = m.fieldSpelling(m.projection(proj_n.b).field);
+        if sp.present && sp.value == "at" && m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+            let recv_ty, rerr = g.types.lower(m, m.typeOf(proj_n.a), f.env);
+            if rerr == blot_direct_types::Error.none && tagOf(g, recv_ty) == blot_direct_types::Tag.array {
+                let identity, has_id = g.receiverIdentity(recv_ty);
+                if has_id {
+                    let target, has_t = g.dispatchTarget(m, identity, m.projection(proj_n.b).field, blot_check_types::Operator.none);
+                    if has_t && g.hasUnit(target.unit) {
+                        let tm .= g.units[target.unit - 1];
+                        let body .= tm.body(target.binding);
+                        if body && body.is_function {
+                            let params = tm.bodyParameters(body);
+                            let inner = scratchReturned(tm, unwrapSingleBody(tm, body.root));
+                            if params.len == 2 && inner != 0 {
+                                let in_n = tm.node(inner);
+                                if in_n.tag == blot_check_core::Tag.array_op && tm.arrayOperation(inner) == blot_backend_collection_ops::Op.get {
+                                    let ich = tm.children(inner);
+                                    if ich.len == 2 && localRef(tm, ich[0]) == params[0].binding && localRef(tm, ich[1]) == params[1].binding {
+                                        return proj_n.a, n.b, target, true;
+                                    }
+                                } else if in_n.tag == blot_check_core::Tag.storage {
+                                    let op_k, ok = blot_check_storage_ops::opFromCode(in_n.c);
+                                    let ich = tm.children(inner);
+                                    if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read &&
+                                        ich.len == 2 && localRef(tm, ich[0]) == params[0].binding && localRef(tm, ich[1]) == params[1].binding {
+                                        return proj_n.a, n.b, target, true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if rerr != blot_direct_types::Error.none {
+                g.dropFailure();
+            }
+        }
+    }
+    return 0, 0, BindingRef { 0, 0 }, false;
+}
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    // Lazy variant payload fast path: when matching an unboxed multi-constructor
+    // nominal directly from a `Tag.array` element read (`pos[i]`, `pool.at id`),
+    // load ONLY the 4-byte tag before branching and load payload words only inside
+    // matching non-wildcard constructor arms.
+    var lazy_arr_node: u32 = 0;
+    var lazy_idx_node: u32 = 0;
+    var lazy_input_id: u32 = 0;
+    var lazy_inlined = BindingRef { 0, 0 };
+    var lazy_input_ty: Ty = 0;
+    var use_lazy_variant = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let inputs = m.matchInputs(id);
+        if inputs.len == 1 {
+            let arr_n, idx_n, inl_t, ok = resolveLazyVariantArrayRead(g, f, m, inputs[0]);
+            if ok {
+                let in_ty, ierr = g.types.lower(m, m.typeOf(inputs[0]), f.env);
+                if ierr == blot_direct_types::Error.none && tagOf(g, in_ty) == blot_direct_types::Tag.nominal {
+                    let boxed, berr = isBoxed(g, f, in_ty, id);
+                    let cases, cerr = g.types.variants(in_ty);
+                    if berr == blot_direct_types::Error.none && !boxed && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                        var arms_ok = true;
+                        for arm in m.matchArms(id) {
+                            let rows = m.armRows(arm);
+                            if rows.len != 1 { arms_ok = false; break; }
+                            let pats = m.rowPatterns(rows[0]);
+                            if pats.len != 1 { arms_ok = false; break; }
+                            let ptag = m.pattern(pats[0]).tag;
+                            if ptag != blot_check_core::PatternTag.wildcard && ptag != blot_check_core::PatternTag.constructor {
+                                arms_ok = false;
+                                break;
+                            }
+                        }
+                        if arms_ok {
+                            lazy_arr_node = arr_n;
+                            lazy_idx_node = idx_n;
+                            lazy_input_id = inputs[0];
+                            lazy_inlined = inl_t;
+                            lazy_input_ty = in_ty;
+                            use_lazy_variant = true;
+                        }
+                    }
+                } else if ierr != blot_direct_types::Error.none {
+                    g.dropFailure();
+                }
+            }
+        }
+    }
+    if use_lazy_variant {
+        if lazy_inlined.binding != 0 { g.recordInlined(lazy_inlined.unit, lazy_inlined.binding); }
+        let arr_val, aerr = expr(g, f, lazy_arr_node);
+        if aerr != blot_direct_types::Error.none { return arr_val, aerr; }
+        let pos_val, perr = expr(g, f, lazy_idx_node);
+        if perr != blot_direct_types::Error.none { return pos_val, perr; }
+        let idx_local, serr = scalarLocal(g, f, pos_val, lazy_input_id);
+        if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+        let elem_addr, eerr = elementAddress(g, f, arr_val, idx_local, lazy_input_id, g.units[f.unit - 1].typeOf(lazy_arr_node), true);
+        if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+        let tag_local = local32(g, f);
+        lget(g, elem_addr);
+        op(g, OP_i32_load);
+        uleb(g, 2);
+        uleb(g, 0);
+        lset(g, tag_local);
+
+        let info = g.units[f.unit - 1].matchInfo(id);
+        let merges_len = g.units[f.unit - 1].branchMerges(id).len;
+        let result = g.newSlot();
+        let merged = newSlots(g, merges_len);
+        var falls = false;
+        let done = open(g, f, OP_block);
+        let arms_len = g.units[f.unit - 1].matchArms(id).len;
+        let cases, verr = g.types.variants(lazy_input_ty);
+        if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        for arm_index in 0..arms_len {
+            let next = open(g, f, OP_block);
+            var pat_tag = blot_check_core::PatternTag.wildcard;
+            var ctor_tag: u32 = 0;
+            var subpat: u32 = 0;
+            var subpat_is_wild = true;
+            var guard_id: u32 = 0;
+            var body_id: u32 = 0;
+            {
+                let pm .= g.units[f.unit - 1];
+                let arm = pm.matchArms(id)[arm_index];
+                guard_id = arm.guard_;
+                body_id = arm.body;
+                let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
+                pat_tag = pat.tag;
+                if pat_tag == blot_check_core::PatternTag.constructor {
+                    ctor_tag = pm.constructor(pat.a).tag;
+                    subpat = pat.b;
+                    if subpat != 0 && pm.pattern(subpat).tag != blot_check_core::PatternTag.wildcard {
+                        subpat_is_wild = false;
+                    }
+                }
+            }
+            if pat_tag == blot_check_core::PatternTag.constructor {
+                lget(g, tag_local);
+                i32Const(g, ctor_tag);
+                op(g, OP_i32_ne);
+                failIf(g, f, true, next);
+                if !subpat_is_wild {
+                    let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
+                    if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
+                    let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
+                    let payload_val, lerr = loadAt(g, f, elem_addr, 4, payload_ty, id);
+                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    let tested = test_(g, f, subpat, payload_val, true, next, id);
+                    if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                }
+            }
+            if guard_id != 0 {
+                let guard_value, gerr = expr(g, f, guard_id);
+                if gerr != blot_direct_types::Error.none { return guard_value, gerr; }
+                push(g, guard_value);
+                op(g, OP_i32_eqz);
+                br(g, f, OP_br_if, next);
+            }
+            let body, berr = stmt(g, f, body_id);
+            if berr != blot_direct_types::Error.none { return body, berr; }
+            if body.ty != blot_direct_types::never {
+                falls = true;
+                if !info.statement {
+                    let delivered = deliver(g, f, body, result, id);
+                    if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                }
+                if merges_len != 0 && arm_index < 2 {
+                    for at in 0..merges_len {
+                        let merge = g.units[f.unit - 1].branchMerges(id)[at];
+                        var binding = merge.else_binding;
+                        if arm_index == 0 { binding = merge.then_binding; }
+                        let value, present = bindGet(g, f, binding);
+                        if present {
+                            let delivered = deliver(g, f, value, merged + (at as u32), id);
+                            if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                        }
+                    }
+                }
+            }
+            br(g, f, OP_br, done);
+            close(g, f);
+        }
+        op(g, OP_unreachable_);
+        close(g, f);
+        let pm .= g.units[f.unit - 1];
+        for merge, at in pm.branchMerges(id) {
+            let slot = g.s.slots[merged + at];
+            if slot.present {
+                bindPut(g, f, merge.result, slot.value);
+                let ct1, ok1 = withCellType(g, f, merge.then_binding);
+                if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+                else {
+                    let ct2, ok2 = withCellType(g, f, merge.else_binding);
+                    if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+                }
+            }
+        }
+        if !falls { return neverVal(), blot_direct_types::Error.none; }
+        if info.statement { return unitVal(), blot_direct_types::Error.none; }
+        if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
+        return neverVal(), blot_direct_types::Error.none;
+    }
     let m .= g.units[f.unit - 1];
     let info = m.matchInfo(id);
     let inputs = m.matchInputs(id);
@@ -1423,11 +1830,27 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
         },
         call => {
             let call = m.call(id);
-            if !scratchScalarCallee(g, m, call) { return false; }
             for arg in call.arguments {
                 if !noStorageResize(g, m, arg, left) { return false; }
             }
-            return true;
+            if scratchScalarCallee(g, m, call) { return true; }
+            let target = g.resolve(m, call.target);
+            if !g.hasUnit(target.unit) { return false; }
+            let tm .= g.units[target.unit - 1];
+            let body .= tm.body(target.binding);
+            if !body || !body.is_function || body.exported || body.scheme.obligations.len != 0 { return false; }
+            if tm.bodyParameters(body).len != call.arguments.len { return false; }
+            return noStorageResize(g, tm, body.root, left);
+        },
+        apply => {
+            // Allow `arr.at idx` (method call forwarding to array get/storage read).
+            if m.node(n.a).tag == blot_check_core::Tag.project {
+                let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
+                if sp.present && sp.value == "at" {
+                    return noStorageResize(g, m, m.node(n.a).a, left) && noStorageResize(g, m, n.b, left);
+                }
+            }
+            return false;
         },
         array_op => {
             match m.arrayOperation(id) {
@@ -1453,10 +1876,327 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
                 _ => { return false; },
             }
         },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            return noStorageResize(g, m, sinfo.source, left) &&
+                noStorageResize(g, m, sinfo.end, left) &&
+                noStorageResize(g, m, sinfo.body, left);
+        },
         _ => { return false; },
     }
 }
-fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> Val, bool {
+fn inResizedSet(set: const u32[16]&, len: i64, b: u32) -> bool {
+    for i in 0..len { if set[i] == b { return true; } }
+    return false;
+}
+fn addResizedSet(set: u32[16]&, len: i64&, b: u32) -> bool {
+    if b == 0 { return false; }
+    if inResizedSet(set, len, b) { return true; }
+    if len >= 16 { return false; }
+    set[len] = b;
+    len += 1;
+    return true;
+}
+fn addResizedSetTracked(set: u32[16]&, len: i64&, b: u32, changed: bool&) -> bool {
+    if b == 0 { return true; }
+    if inResizedSet(set, len, b) { return true; }
+    if len >= 16 { return false; }
+    set[len] = b;
+    len += 1;
+    changed = true;
+    return true;
+}
+recursive fn patternContainsResized(m: const Module&, pid: u32, resized: const u32[16]&, resized_len: i64) -> bool {
+    if pid == 0 { return false; }
+    let pat = m.pattern(pid);
+    match pat.tag {
+        bind => { return inResizedSet(resized, resized_len, pat.a); },
+        constructor => { return patternContainsResized(m, pat.b, resized, resized_len); },
+        product => {
+            for ch in m.patternChildren(pid) {
+                if patternContainsResized(m, ch, resized, resized_len) { return true; }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+// Propagates resized-array status across all SSA handle-preserving aliases
+// (bind of reference/update, nested loop carries, and if/match branch merges).
+// Returns false conservatively if a resized binding originates from an untracked
+// expression shape or overflows the 16-entry set.
+recursive fn propagateResizedAliases(m: const Module&, id: u32, resized: u32[16]&, resized_len: i64&, changed: bool&, left: i64&) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for child in m.children(id) {
+                if !propagateResizedAliases(m, child, resized, resized_len, changed, left) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if inResizedSet(resized, resized_len, n.a) {
+                let rhs = m.node(n.b);
+                if rhs.tag == blot_check_core::Tag.reference {
+                    let rb = localRef(m, n.b);
+                    if rb == 0 { return false; }
+                    if !addResizedSetTracked(resized, resized_len, rb, changed) { return false; }
+                } else if rhs.tag == blot_check_core::Tag.update {
+                    let rb = localRef(m, m.updateInfo(n.b).root);
+                    if rb == 0 { return false; }
+                    if !addResizedSetTracked(resized, resized_len, rb, changed) { return false; }
+                } else if rhs.tag != blot_check_core::Tag.array {
+                    return false;
+                }
+            }
+            return propagateResizedAliases(m, n.b, resized, resized_len, changed, left);
+        },
+        pattern_bind => {
+            if patternContainsResized(m, n.a, resized, resized_len) { return false; }
+            return propagateResizedAliases(m, n.b, resized, resized_len, changed, left) &&
+                propagateResizedAliases(m, n.c, resized, resized_len, changed, left);
+        },
+        if_value, if_stmt => {
+            for mg in m.branchMerges(id) {
+                if inResizedSet(resized, resized_len, mg.result) ||
+                    inResizedSet(resized, resized_len, mg.then_binding) ||
+                    inResizedSet(resized, resized_len, mg.else_binding) {
+                    if !addResizedSetTracked(resized, resized_len, mg.result, changed) ||
+                        !addResizedSetTracked(resized, resized_len, mg.then_binding, changed) ||
+                        !addResizedSetTracked(resized, resized_len, mg.else_binding, changed) {
+                        return false;
+                    }
+                }
+            }
+            return propagateResizedAliases(m, n.a, resized, resized_len, changed, left) &&
+                propagateResizedAliases(m, n.b, resized, resized_len, changed, left) &&
+                propagateResizedAliases(m, n.c, resized, resized_len, changed, left);
+        },
+        match_ => {
+            for mg in m.branchMerges(id) {
+                if inResizedSet(resized, resized_len, mg.result) ||
+                    inResizedSet(resized, resized_len, mg.then_binding) ||
+                    inResizedSet(resized, resized_len, mg.else_binding) {
+                    if !addResizedSetTracked(resized, resized_len, mg.result, changed) ||
+                        !addResizedSetTracked(resized, resized_len, mg.then_binding, changed) ||
+                        !addResizedSetTracked(resized, resized_len, mg.else_binding, changed) {
+                        return false;
+                    }
+                }
+            }
+            for inp in m.matchInputs(id) {
+                if !propagateResizedAliases(m, inp, resized, resized_len, changed, left) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                for row in m.armRows(arm) {
+                    for pat in m.rowPatterns(row) {
+                        if patternContainsResized(m, pat, resized, resized_len) { return false; }
+                    }
+                }
+                if !propagateResizedAliases(m, arm.guard_, resized, resized_len, changed, left) ||
+                    !propagateResizedAliases(m, arm.body, resized, resized_len, changed, left) {
+                    return false;
+                }
+            }
+            return true;
+        },
+        loop_ => {
+            for ic in m.loopCarries(id) {
+                if inResizedSet(resized, resized_len, ic.incoming) ||
+                    inResizedSet(resized, resized_len, ic.iteration) ||
+                    inResizedSet(resized, resized_len, ic.backedge) ||
+                    inResizedSet(resized, resized_len, ic.outgoing) {
+                    if !addResizedSetTracked(resized, resized_len, ic.incoming, changed) ||
+                        !addResizedSetTracked(resized, resized_len, ic.iteration, changed) ||
+                        !addResizedSetTracked(resized, resized_len, ic.backedge, changed) ||
+                        !addResizedSetTracked(resized, resized_len, ic.outgoing, changed) {
+                        return false;
+                    }
+                }
+            }
+            let linfo = m.loopInfo(id);
+            return propagateResizedAliases(m, linfo.first, resized, resized_len, changed, left) &&
+                propagateResizedAliases(m, linfo.end, resized, resized_len, changed, left) &&
+                propagateResizedAliases(m, linfo.body, resized, resized_len, changed, left);
+        },
+        _ => { return true; },
+    }
+}
+// Selective loop-resize scan: returns `true` when `id` contains no opaque
+// non-inlined resizing calls or untracked field-array resizes, collecting into
+// `resized` every direct local `Tag.array` binding that may be pushed/popped/truncated.
+recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resized: u32[16]&, resized_len: i64&, left: i64&) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, reference, panic => { return true; },
+        suite, block_, product, record, array, break_ => {
+            for child in m.children(id) {
+                if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
+            }
+            return true;
+        },
+        bind => { return scanLoopResize(g, m, n.b, resized, resized_len, left); },
+        construct => { return scanLoopResize(g, m, n.b, resized, resized_len, left); },
+        return_ => { return scanLoopResize(g, m, n.a, resized, resized_len, left); },
+        if_value, if_stmt => {
+            return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
+                scanLoopResize(g, m, n.b, resized, resized_len, left) &&
+                scanLoopResize(g, m, n.c, resized, resized_len, left);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !scanLoopResize(g, m, inp, resized, resized_len, left) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !scanLoopResize(g, m, arm.guard_, resized, resized_len, left) ||
+                    !scanLoopResize(g, m, arm.body, resized, resized_len, left) { return false; }
+            }
+            return true;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            return scanLoopResize(g, m, linfo.first, resized, resized_len, left) &&
+                scanLoopResize(g, m, linfo.end, resized, resized_len, left) &&
+                scanLoopResize(g, m, linfo.body, resized, resized_len, left);
+        },
+        pattern_bind => {
+            return scanLoopResize(g, m, n.b, resized, resized_len, left) &&
+                scanLoopResize(g, m, n.c, resized, resized_len, left);
+        },
+        update => {
+            let change = m.updateInfo(id);
+            if !scanLoopResize(g, m, change.root, resized, resized_len, left) ||
+                !scanLoopResize(g, m, change.value, resized, resized_len, left) { return false; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && !scanLoopResize(g, m, sel.index, resized, resized_len, left) { return false; }
+            }
+            return true;
+        },
+        project => {
+            let proj = m.projection(n.b);
+            let variants = m.projectionVariants(n.b);
+            if variants.len != 0 { return scanLoopResize(g, m, n.a, resized, resized_len, left); }
+            let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
+            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+                return scanLoopResize(g, m, n.a, resized, resized_len, left);
+            }
+            let receiver_local = localRef(m, n.a);
+            if receiver_local != 0 {
+                let spelling = m.fieldSpelling(proj.field);
+                if spelling.present && spelling.value == "length" { return true; }
+            }
+            return false;
+        },
+        scalar, associated, logical => {
+            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
+                scanLoopResize(g, m, n.b, resized, resized_len, left);
+        },
+        array_op => {
+            match m.arrayOperation(id) {
+                length, get => {
+                    for child in m.children(id) {
+                        if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok != blot_error::Error.none { return false; }
+            let ch = m.children(id);
+            match op_kind {
+                length, read, view => {
+                    for child in ch {
+                        if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
+                    }
+                    return true;
+                },
+                push, pop, truncate => {
+                    if ch.len == 0 { return false; }
+                    let target_b = localRef(m, ch[0]);
+                    if target_b == 0 || m.types.node(m.typeOf(ch[0])).tag != blot_check_types::Tag.array { return false; }
+                    if !addResizedSet(resized, resized_len, target_b) { return false; }
+                    for child in ch {
+                        if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            return scanLoopResize(g, m, sinfo.source, resized, resized_len, left) &&
+                scanLoopResize(g, m, sinfo.end, resized, resized_len, left) &&
+                scanLoopResize(g, m, sinfo.body, resized, resized_len, left);
+        },
+        call => {
+            let call = m.call(id);
+            for arg in call.arguments {
+                if !scanLoopResize(g, m, arg, resized, resized_len, left) { return false; }
+            }
+            if scratchScalarCallee(g, m, call) { return true; }
+            let target = g.resolve(m, call.target);
+            if !g.hasUnit(target.unit) { return false; }
+            let tm .= g.units[target.unit - 1];
+            let body .= tm.body(target.binding);
+            if !body || !body.is_function || body.exported || body.scheme.obligations.len != 0 { return false; }
+            let params = tm.bodyParameters(body);
+            if params.len != call.arguments.len { return false; }
+            var ibudget: i64 = 72;
+            if !canInlineBody(g, tm, body.root, target, ibudget) { return false; }
+            var cbudget: i64 = 128;
+            if noStorageResize(g, tm, body.root, cbudget) { return true; }
+            // Callee has no effects/closures and may only resize its `own` parameters.
+            let own_mask = tm.binding(body.binding).capability_parameters.own;
+            for pi in 0..params.len {
+                if pi >= 64 { return false; }
+                if (own_mask & ((1 as u64) << (pi as u64))) != 0 {
+                    let arg_id = call.arguments[pi];
+                    let arg_b = localRef(m, arg_id);
+                    if arg_b == 0 || m.types.node(m.typeOf(arg_id)).tag != blot_check_types::Tag.array { return false; }
+                    if !addResizedSet(resized, resized_len, arg_b) { return false; }
+                }
+            }
+            return true;
+        },
+        apply => {
+            if m.node(n.a).tag == blot_check_core::Tag.project {
+                let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
+                if sp.present && sp.value == "at" {
+                    return scanLoopResize(g, m, m.node(n.a).a, resized, resized_len, left) &&
+                        scanLoopResize(g, m, n.b, resized, resized_len, left);
+                }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+fn bindingResizedInLoop(m: const Module&, loop_id: u32, b: u32, resized: const u32[16]&, resized_len: i64) -> bool {
+    if inResizedSet(resized, resized_len, b) { return true; }
+    for carry in m.loopCarries(loop_id) {
+        if carry.incoming == b || carry.iteration == b || carry.backedge == b || carry.outgoing == b {
+            if inResizedSet(resized, resized_len, carry.incoming) ||
+                inResizedSet(resized, resized_len, carry.iteration) ||
+                inResizedSet(resized, resized_len, carry.backedge) ||
+                inResizedSet(resized, resized_len, carry.outgoing) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, selective_resize: bool, resized: const u32[16]&, resized_len: i64) -> Val, bool {
     let m .= g.units[f.unit - 1];
     if info.pattern == 0 { return neverVal(), false; }
     let pattern = m.pattern(info.pattern);
@@ -1491,8 +2231,12 @@ fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -
     if n.tag == blot_check_core::Tag.project { receiver_node = n.a; }
     else { receiver_node = m.children(info.end)[0]; }
     if coreSizedLength(m, m.typeOf(receiver_node)) == 0 {
-        var budget: i64 = 256;
-        if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
+        if !selective_resize {
+            var budget: i64 = 256;
+            if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
+        } else if bindingResizedInLoop(m, id, owner, resized, resized_len) {
+            return neverVal(), false;
+        }
     }
     return handle, false;
 }
@@ -2314,7 +3058,18 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
             collectLoopArrayUses(m, n.b, out, len, left);
         },
         call => {
-            for arg in m.call(id).arguments { collectLoopArrayUses(m, arg, out, len, left); }
+            for arg in m.call(id).arguments {
+                if m.types.node(m.typeOf(arg)).tag == blot_check_types::Tag.array {
+                    addHoistCandidate(out, len, localRef(m, arg));
+                }
+                collectLoopArrayUses(m, arg, out, len, left);
+            }
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            collectLoopArrayUses(m, sinfo.source, out, len, left);
+            collectLoopArrayUses(m, sinfo.end, out, len, left);
+            collectLoopArrayUses(m, sinfo.body, out, len, left);
         },
         _ => {},
     }
@@ -2460,6 +3215,242 @@ recursive fn carryBackedgeIsUniqueOwned(
     return true;
 }
 
+fn isPureU32Op(op_: Op) -> bool {
+    match op_ {
+        add, sub, mul, bit_and, bit_or, bit_xor, shift_left, shift_right, shift_right_signed, bit_andnot, bit_not, neg => { return true; },
+        _ => { return false; },
+    }
+}
+recursive fn isPureU32Expr(g: const Generator&, f: const Fn&, m: const Module&, id: u32, forbid_binding: u32, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return m.types.node(m.typeOf(id)).tag == blot_check_types::Tag.unsigned32; },
+        reference => {
+            let b = localRef(m, id);
+            if b == 0 || b == forbid_binding { return false; }
+            let _, is_cell = withCellType(g, f, b);
+            return !is_cell && m.types.node(m.typeOf(id)).tag == blot_check_types::Tag.unsigned32;
+        },
+        scalar => {
+            if !isPureU32Op(n.op) || m.types.node(m.typeOf(id)).tag != blot_check_types::Tag.unsigned32 { return false; }
+            return isPureU32Expr(g, f, m, n.a, forbid_binding, budget) &&
+                isPureU32Expr(g, f, m, n.b, forbid_binding, budget);
+        },
+        _ => { return false; },
+    }
+}
+recursive fn matchAffineU32Step(m: const Module&, expr_id: u32, target_iter: u32) -> bool, u32, u32 {
+    if expr_id == 0 { return false, 0, 0; }
+    let n = m.node(expr_id);
+    if n.tag != blot_check_core::Tag.scalar { return false, 0, 0; }
+    if n.op == blot_check_core::Op.add {
+        let an = m.node(n.a);
+        let bn = m.node(n.b);
+        if bn.tag == blot_check_core::Tag.constant {
+            let ok, a_mul, _ = matchAffineU32Step(m, n.a, target_iter);
+            if ok { return true, a_mul, bn.a; }
+        }
+        if an.tag == blot_check_core::Tag.constant {
+            let ok, a_mul, _ = matchAffineU32Step(m, n.b, target_iter);
+            if ok { return true, a_mul, an.a; }
+        }
+        return false, 0, 0;
+    }
+    if n.op == blot_check_core::Op.mul {
+        let an = m.node(n.a);
+        let bn = m.node(n.b);
+        if localRef(m, n.a) == target_iter && bn.tag == blot_check_core::Tag.constant {
+            return true, bn.a, 0;
+        }
+        if localRef(m, n.b) == target_iter && an.tag == blot_check_core::Tag.constant {
+            return true, an.a, 0;
+        }
+    }
+    return false, 0, 0;
+}
+// Algebraically unrolls 4x a pure counted U32 loop containing an affine LCG
+// recurrence `s := s * A + C` (exact mod 2^32): computes s1..s4 in parallel from
+// s0 using precomputed (A^k, C_k), breaking the 4-cycle serial imul+add chain.
+fn tryEmitAffineUnrollLoop(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    iteration: Vals,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    var stmts: u32[8] = [0; 8];
+    var stmts_len: i64 = 0;
+    var carry_count: i64 = 0;
+    var carry_iter: u32[4] = [0; 4];
+    var carry_back: u32[4] = [0; 4];
+    var affine_carry: i64 = -1;
+    var affine_stmt: i64 = -1;
+    var a1: u32 = 0;
+    var c1: u32 = 0;
+    var start_is_zero = false;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return blot_direct_types::Error.none; }
+        if info.pattern != 0 {
+            let pat = m.pattern(info.pattern);
+            if pat.tag == blot_check_core::PatternTag.bind {
+                if uses(g, f, pat.a) != 0 { return blot_direct_types::Error.none; }
+            } else if pat.tag != blot_check_core::PatternTag.wildcard {
+                return blot_direct_types::Error.none;
+            }
+        }
+        let carries = m.loopCarries(loop_id);
+        if carries.len == 0 || carries.len > 4 { return blot_direct_types::Error.none; }
+        for carry, ci in carries {
+            if carry.backedge == 0 { return blot_direct_types::Error.none; }
+            let iv = g.s.vals[iteration.start + ci];
+            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            carry_iter[ci] = carry.iteration;
+            carry_back[ci] = carry.backedge;
+        }
+        carry_count = carries.len;
+        let bn = m.node(info.body);
+        if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+            let ch = m.children(info.body);
+            if ch.len == 0 || ch.len > 8 { return blot_direct_types::Error.none; }
+            for si in 0..ch.len { stmts[si] = ch[si]; }
+            stmts_len = ch.len;
+        } else {
+            stmts[0] = info.body;
+            stmts_len = 1;
+        }
+        for si in 0..stmts_len {
+            let sn = m.node(stmts[si]);
+            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 || m.binding(sn.a).scheme.variables.len != 0 {
+                return blot_direct_types::Error.none;
+            }
+            if affine_carry < 0 {
+                for ci in 0..carry_count {
+                    if sn.a == carry_back[ci] {
+                        let ok, ma, mc = matchAffineU32Step(m, sn.b, carry_iter[ci]);
+                        if ok {
+                            affine_carry = ci;
+                            affine_stmt = si;
+                            a1 = ma;
+                            c1 = mc;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if affine_carry < 0 { return blot_direct_types::Error.none; }
+        // Verify every other statement is pure U32 and does not read the old affine carry.
+        for si in 0..stmts_len {
+            if si == affine_stmt { continue; }
+            let sn = m.node(stmts[si]);
+            var b: i64 = 32;
+            if !isPureU32Expr(g, f, m, sn.b, carry_iter[affine_carry], b) {
+                return blot_direct_types::Error.none;
+            }
+        }
+        start_is_zero = m.node(info.first).tag == blot_check_core::Tag.constant && m.node(info.first).a == 0;
+        matched = true;
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    var ak: u32[4] = [0; 4];
+    var ck: u32[4] = [0; 4];
+    ak[0] = a1;
+    ck[0] = c1;
+    for k in 1..4 {
+        ak[k] = ak[k - 1] * a1;
+        ck[k] = ck[k - 1] * a1 + c1;
+    }
+
+    var unroll_end: u32 = 0;
+    if start_is_zero {
+        unroll_end = local32(g, f);
+        lget(g, end_local);
+        i32Const(g, 0xfffffffc);
+        op(g, OP_i32_and);
+        lset(g, unroll_end);
+    } else {
+        let count = local32(g, f);
+        lget(g, end_local);
+        lget(g, index);
+        op(g, OP_i32_gt_u);
+        let cif = open(g, f, OP_if_);
+        lget(g, end_local);
+        lget(g, index);
+        op(g, OP_i32_sub);
+        lset(g, count);
+        popCheckedArraysAt(f, cif);
+        op(g, OP_else_);
+        i32Const(g, 0);
+        lset(g, count);
+        close(g, f);
+        unroll_end = local32(g, f);
+        lget(g, index);
+        lget(g, count);
+        i32Const(g, 0xfffffffc);
+        op(g, OP_i32_and);
+        op(g, OP_i32_add);
+        lset(g, unroll_end);
+    }
+
+    let affine_loc = w(g, g.s.vals[iteration.start + affine_carry], 0);
+    let base_s = local32(g, f);
+    let s_cur = local32(g, f);
+
+    let u_exit = open(g, f, OP_block);
+    let u_top = open(g, f, OP_loop);
+    lget(g, index);
+    lget(g, unroll_end);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, u_exit);
+
+    lget(g, affine_loc);
+    lset(g, base_s);
+
+    for step in 0..4 {
+        lget(g, base_s);
+        i32Const(g, ak[step]);
+        op(g, OP_i32_mul);
+        if ck[step] != 0 {
+            i32Const(g, ck[step]);
+            op(g, OP_i32_add);
+        }
+        lset(g, s_cur);
+        bindPut(g, f, carry_back[affine_carry], valOf1(g, blot_direct_types::u32_, s_cur));
+        for si in 0..stmts_len {
+            if si == affine_stmt { continue; }
+            let _, serr = stmt(g, f, stmts[si]);
+            if serr != blot_direct_types::Error.none { return serr; }
+        }
+        for ci in 0..carry_count {
+            if ci == affine_carry { continue; }
+            let bv, bok = bindGet(g, f, carry_back[ci]);
+            assert(bok && bv.len == 1);
+            lget(g, w(g, bv, 0));
+            lset(g, w(g, g.s.vals[iteration.start + ci], 0));
+            bindPut(g, f, carry_iter[ci], g.s.vals[iteration.start + ci]);
+        }
+    }
+    lget(g, s_cur);
+    lset(g, affine_loc);
+
+    lget(g, index);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lset(g, index);
+    br(g, f, OP_br, u_top);
+    close(g, f);
+    close(g, f);
+
+    return blot_direct_types::Error.none;
+}
 recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let info = g.units[f.unit - 1].loopInfo(id);
     if info.kind == blot_check_core::LoopKind.array && info.carries.len == 0 {
@@ -2552,7 +3543,64 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var range = CheckedRange {};
     var body_no_resize_budget: i64 = 512;
     let body_no_resize = noStorageResize(g, m, info.body, body_no_resize_budget);
-    if !body_no_resize { invalidateCheckedContainers(f); }
+    var resized_bindings: u32[16] = [0; 16];
+    var resized_len: i64 = 0;
+    var selective_resize = body_no_resize;
+    if !body_no_resize {
+        var sel_budget: i64 = 512;
+        selective_resize = scanLoopResize(g, m, info.body, resized_bindings, resized_len, sel_budget);
+        if selective_resize && resized_len > 0 {
+            var prop_iter: i64 = 0;
+            var prop_changed = true;
+            while prop_changed && selective_resize && prop_iter < 16 {
+                prop_changed = false;
+                var pbudget: i64 = 512;
+                selective_resize = propagateResizedAliases(m, info.body, resized_bindings, resized_len, prop_changed, pbudget);
+                if selective_resize {
+                    for carry in carries {
+                        if inResizedSet(resized_bindings, resized_len, carry.incoming) ||
+                            inResizedSet(resized_bindings, resized_len, carry.iteration) ||
+                            inResizedSet(resized_bindings, resized_len, carry.backedge) ||
+                            inResizedSet(resized_bindings, resized_len, carry.outgoing) {
+                            if !addResizedSetTracked(resized_bindings, resized_len, carry.incoming, prop_changed) ||
+                                !addResizedSetTracked(resized_bindings, resized_len, carry.iteration, prop_changed) ||
+                                !addResizedSetTracked(resized_bindings, resized_len, carry.backedge, prop_changed) ||
+                                !addResizedSetTracked(resized_bindings, resized_len, carry.outgoing, prop_changed) {
+                                selective_resize = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                prop_iter += 1;
+            }
+            if prop_changed { selective_resize = false; }
+        }
+        if selective_resize {
+            for ri in 0..resized_len {
+                let rv, rok = bindGet(g, f, resized_bindings[ri]);
+                if rok && tagOf(g, rv.ty) == blot_direct_types::Tag.array {
+                    invalidateCheckedOwner(g, f, rv);
+                }
+            }
+            for carry, ci in carries {
+                if bindingResizedInLoop(m, id, carry.iteration, resized_bindings, resized_len) {
+                    let iv = g.s.vals[iteration.start + ci];
+                    if tagOf(g, iv.ty) == blot_direct_types::Tag.array {
+                        invalidateCheckedOwner(g, f, iv);
+                    }
+                    let inv, inok = bindGet(g, f, carry.incoming);
+                    if inok && tagOf(g, inv.ty) == blot_direct_types::Tag.array {
+                        invalidateCheckedOwner(g, f, inv);
+                    }
+                }
+            }
+            f.checked_views_len = 0;
+            f.checked_elems_len = 0;
+        } else {
+            invalidateCheckedContainers(f);
+        }
+    }
     match info.kind {
         forever => {},
         range => {
@@ -2562,7 +3610,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return first, error; }
             let copied = copy(g, f, first, valOf1(g, blot_direct_types::u32_, index), id);
             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
-            let handle, is_view = rangeOwner(g, f, id, info);
+            let handle, is_view = rangeOwner(g, f, id, info, selective_resize, resized_bindings, resized_len);
             if handle.ty != blot_direct_types::never && !is_view {
                 let base, len = ensureCheckedArray(g, f, handle);
                 end = valOf1(g, blot_direct_types::u32_, len);
@@ -2665,7 +3713,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         },
     }
-    if body_no_resize && f.checked_arrays_len < 14 {
+    if selective_resize && f.checked_arrays_len < 14 {
         var hoist_ids: u32[8] = [0; 8];
         var hoist_len: i64 = 0;
         var hoist_budget: i64 = 512;
@@ -2673,6 +3721,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         for hi in 0..hoist_len {
             if f.checked_arrays_len >= 14 { break; }
             let b = hoist_ids[hi];
+            if bindingResizedInLoop(m, id, b, resized_bindings, resized_len) { continue; }
             var mutating_carry = false;
             for carry, ci in carries {
                 if carry.iteration == b && (ci >= 64 || !carry_in_place[ci]) {
@@ -2690,6 +3739,32 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if body_no_resize && info.kind == blot_check_core::LoopKind.range {
         let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+        let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
+        if aff_err != blot_direct_types::Error.none { return neverVal(), aff_err; }
+    }
+    // Preserve CheckedArray entries for non-resizing in-place carries across OP_loop
+    // (assignCarries at the loop backedge writes to the same handle locals and would
+    // otherwise clear pre-loop CheckedArray descriptors after loop exit).
+    var saved_ca_slot: u32[16] = [0; 16];
+    var saved_ca_gen: u32[16] = [0; 16];
+    var saved_ca_base: u32[16] = [0; 16];
+    var saved_ca_len: u32[16] = [0; 16];
+    var saved_ca_count: i64 = 0;
+    if selective_resize {
+        for at in 0..carries.len {
+            if at >= 64 || !carry_in_place[at] || saved_ca_count >= 16 { continue; }
+            if bindingResizedInLoop(m, id, carries[at].iteration, resized_bindings, resized_len) { continue; }
+            let ov = g.s.vals[outgoing.start + at];
+            if tagOf(g, ov.ty) != blot_direct_types::Tag.array { continue; }
+            let ca = findCheckedArray(f, w(g, ov, 0), w(g, ov, 1));
+            if ca >= 0 {
+                saved_ca_slot[saved_ca_count] = w(g, ov, 0);
+                saved_ca_gen[saved_ca_count] = w(g, ov, 1);
+                saved_ca_base[saved_ca_count] = f.checked_arrays[ca].base;
+                saved_ca_len[saved_ca_count] = f.checked_arrays[ca].length;
+                saved_ca_count += 1;
+            }
+        }
     }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
@@ -2838,6 +3913,9 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     close(g, f);
     close(g, f);
+    for sci in 0..saved_ca_count {
+        recordCheckedArray(f, saved_ca_slot[sci], saved_ca_gen[sci], saved_ca_base[sci], saved_ca_len[sci]);
+    }
     for carry, at in carries { bindPut(g, f, carry.outgoing, g.s.vals[outgoing.start + at]); }
     if info.kind == blot_check_core::LoopKind.forever && !info.can_exit { return neverVal(), blot_direct_types::Error.none; }
     return unitVal(), blot_direct_types::Error.none;

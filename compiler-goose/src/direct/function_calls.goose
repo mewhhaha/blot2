@@ -178,6 +178,7 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32) -> V
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     opIndex(g, OP_call_indirect, signature);
     uleb(g, 0);
+    f.checked_elems_len = 0;
     return received(g, f, arrow.b, id);
 }
 recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -910,7 +911,7 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     }
     let written = writeElement(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), false, written; }
-    invalidateCheckedContainers(f);
+    invalidateCheckedOwner(g, f, list);
     return list, true, blot_direct_types::Error.none;
 }
 // The value a closure captures for `binding`. Deferred polymorphic local
@@ -1385,6 +1386,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             }
             for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
             callf(g, g.s.instances[instance].function);
+            f.checked_elems_len = 0;
             let returned, error = received(g, f, g.s.instances[instance].result, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             value = returned;
@@ -1534,6 +1536,26 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             }
             return true;
         },
+        apply => {
+            return canInlineBody(g, tm, n.a, target, budget) && canInlineBody(g, tm, n.b, target, budget);
+        },
+        update => {
+            let uinfo = tm.updateInfo(id);
+            if !canInlineBody(g, tm, uinfo.root, target, budget) ||
+                !canInlineBody(g, tm, uinfo.value, target, budget) { return false; }
+            for sel in tm.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && !canInlineBody(g, tm, sel.index, target, budget) { return false; }
+            }
+            return true;
+        },
+        loop_ => {
+            if budget < 20 { return false; }
+            budget -= 16;
+            let linfo = tm.loopInfo(id);
+            return canInlineBody(g, tm, linfo.first, target, budget) &&
+                canInlineBody(g, tm, linfo.end, target, budget) &&
+                canInlineBody(g, tm, linfo.body, target, budget);
+        },
         _ => { return false; },
     }
 }
@@ -1620,6 +1642,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_owned_flows = f.owned_flows;
     let saved_nan_computed = f.nan_elide_computed;
     let saved_nan_observed = f.nan_observed;
+    let saved_finite_f32 = f.finite_f32;
+    let saved_finite_f32_len = f.finite_f32_len;
     let saved_labels_base = f.labels_base;
     let saved_scratch_body = f.scratch_body;
     let saved_scratch_cut = f.scratch_cut;
@@ -1652,6 +1676,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.owned_flows = blot_support_zigmap::Map {};
     f.nan_elide_computed = false;
     f.nan_observed = blot_support_zigmap::Map {};
+    f.finite_f32_len = 0;
     f.labels_base = labels_mark;
     f.scratch_body = 0;
     f.scratch_cut = ScratchCut {};
@@ -1686,6 +1711,8 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.owned_flows = saved_owned_flows;
     f.nan_elide_computed = saved_nan_computed;
     f.nan_observed = saved_nan_observed;
+    f.finite_f32 = saved_finite_f32;
+    f.finite_f32_len = saved_finite_f32_len;
     f.labels_base = saved_labels_base;
     f.scratch_body = saved_scratch_body;
     f.scratch_cut = saved_scratch_cut;

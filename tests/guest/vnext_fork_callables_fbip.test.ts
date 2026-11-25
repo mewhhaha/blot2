@@ -460,7 +460,8 @@ func dot (a: #[U32]) -> (b: #[U32]): U32 =>
 entry func main (): U32 =>
   let a = #[1, 2, 3, 4]
   let b = #[10, 20, 30, 40]
-  return dot a b
+  let f = dot
+  return f a b
 `,
     (guest, bytes) => {
       equal(guest.call("main", null), 300);
@@ -524,7 +525,8 @@ func dot (a: #[U32]) -> (b: #[U32]): U32 =>
 entry func main (): U32 =>
   let a = #[1, 2, 3, 4]
   let b = #[10, 20, 30, 40]
-  return dot a b
+  let f = dot
+  return f a b
 `,
     (_guest, bytes) => { unlinkedTraps = trapsInDot(bytes); },
   );

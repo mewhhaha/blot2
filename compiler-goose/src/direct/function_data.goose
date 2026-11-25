@@ -174,6 +174,8 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         written = writeFlat(g, f, target, offset, replacement, id);
     }
     if written != blot_direct_types::Error.none { return neverVal(), written; }
+    // Any element mutation invalidates cached scalar element values.
+    f.checked_elems_len = 0;
     return container, blot_direct_types::Error.none;
 }
 fn byteWidth(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> u32, Error { return flatBytes(g, f, ty, id); }

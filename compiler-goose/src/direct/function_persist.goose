@@ -320,9 +320,151 @@ fn emitPushFlatChild(g: Generator&, f: Fn&, work_slot: u32, base_addr: u32, offs
     return blot_direct_types::Error.none;
 }
 
+fn emitCommitReplyPin(
+    g: Generator&,
+    f: Fn&,
+    has_reply_pin: bool,
+    reply_pin_slot: u32,
+    reply_base: u32,
+    reply_cap: u32,
+    reply_bytes: u32,
+) {
+    if !has_reply_pin { return; }
+    let rt = g.runtime_();
+    lget(g, reply_pin_slot);
+    callf(g, rt.detach_temp_slot);
+    gget(g, rt.transport_cap);
+    let old_t = open(g, f, OP_if_);
+    gget(g, rt.transport_base);
+    gget(g, rt.transport_cap);
+    callf(g, rt.free_transport);
+    close(g, f);
+    lget(g, reply_base);
+    gset(g, rt.transport_base);
+    lget(g, reply_cap);
+    gset(g, rt.transport_cap);
+    lget(g, reply_base);
+    lget(g, reply_bytes);
+    op(g, OP_i32_add);
+    gset(g, rt.transport_top);
+}
+// Collect flat byte offsets of every plain-element `Tag.array` handle inside a
+// non-recursive boxed root (e.g. EcsWorld). Returns false if any nested-owner
+// array, multi-variant sum, view/ref/link, closure, or >32 owners exist.
+recursive fn collectPersistFlatArrayOffsets(g: Generator&, ty: Ty, base_off: u32, out: u32[32]&, out_len: i64&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != blot_direct_types::Error.none { return false, error; }
+    if !holds { return true, blot_direct_types::Error.none; }
+    let rec, rerr = g.types.isRecursive(ty);
+    if rerr != blot_direct_types::Error.none { return false, rerr; }
+    if rec { return false, blot_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array => {
+            let elem_holds, herr = g.contentsHoldMemory(n.a);
+            if herr != blot_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 32 { return false, blot_direct_types::Error.none; }
+            out[out_len] = base_off;
+            out_len += 1;
+            return true, blot_direct_types::Error.none;
+        },
+        tuple => {
+            var off = base_off;
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let ok, oerr = collectPersistFlatArrayOffsets(g, item, off, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let bytes, berr = g.types.flatBytes(item);
+                if berr != blot_direct_types::Error.none { return false, berr; }
+                off += bytes;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        record => {
+            var off = base_off;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let ok, oerr = collectPersistFlatArrayOffsets(g, field, off, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let bytes, berr = g.types.flatBytes(field);
+                if berr != blot_direct_types::Error.none { return false, berr; }
+                off += bytes;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != blot_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectPersistFlatArrayOffsets(g, payload, base_off, out, out_len);
+        },
+        _ => { return false, blot_direct_types::Error.none; },
+    }
+}
+// Collect word indices of every plain-element `Tag.array` handle inside an
+// unboxed root (e.g. SoaWorld).
+recursive fn collectPersistRegArrayWords(g: Generator&, ty: Ty, base_word: u32, out: u32[32]&, out_len: i64&) -> bool, Error {
+    let holds, error = g.contentsHoldMemory(ty);
+    if error != blot_direct_types::Error.none { return false, error; }
+    if !holds { return true, blot_direct_types::Error.none; }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != blot_direct_types::Error.none { return false, berr; }
+    if boxed { return false, blot_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array => {
+            let elem_holds, herr = g.contentsHoldMemory(n.a);
+            if herr != blot_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 32 { return false, blot_direct_types::Error.none; }
+            out[out_len] = base_word;
+            out_len += 1;
+            return true, blot_direct_types::Error.none;
+        },
+        tuple => {
+            var cur = base_word;
+            for index in 0..(n.b as i64) {
+                let item = g.types.words[n.a + index];
+                let ok, oerr = collectPersistRegArrayWords(g, item, cur, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let layout, lerr = g.types.layout(item);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                cur += layout.len as u32;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        record => {
+            var cur = base_word;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let ok, oerr = collectPersistRegArrayWords(g, field, cur, out, out_len);
+                if oerr != blot_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, blot_direct_types::Error.none; }
+                let layout, lerr = g.types.layout(field);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                cur += layout.len as u32;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, verr = g.types.variants(ty);
+            if verr != blot_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return collectPersistRegArrayWords(g, payload, base_word, out, out_len);
+        },
+        _ => { return false, blot_direct_types::Error.none; },
+    }
+}
 // Emits complete 100% iterative two-phase staging for `root` given `next_val`.
 // When `has_reply_pin` is true (proc_step array/multi-word reply), commits the
 // transport-pinned reply buffer into `rt.transport_*` during Phase 2 before `releaseEntry()`.
+// When `is_step` is true and every plain-element array handle in `next_val` matches
+// the already-committed persistent root handle set unchanged, commits in O(fields)
+// with zero scratch vector / hashmap allocations.
 // Ends with `releaseEntry(g)` while `status == 2` and sets `status = 1` as final step.
 fn emitStageRoot(
     g: Generator&,
@@ -333,36 +475,119 @@ fn emitStageRoot(
     reply_pin_slot: u32,
     reply_base: u32,
     reply_cap: u32,
-    reply_bytes: u32
+    reply_bytes: u32,
+    is_step: bool = false,
 ) -> Error {
     let rt = g.runtime_();
     // Fast path: pure scalar state with zero memory ownership.
     if !root.holds_mem {
         i32Const(g, 2);
         gset(g, root.status_global);
-        if has_reply_pin {
-            lget(g, reply_pin_slot);
-            callf(g, rt.detach_temp_slot);
-            gget(g, rt.transport_cap);
-            let old_t = open(g, f, OP_if_);
-            gget(g, rt.transport_base);
-            gget(g, rt.transport_cap);
-            callf(g, rt.free_transport);
-            close(g, f);
-            lget(g, reply_base);
-            gset(g, rt.transport_base);
-            lget(g, reply_cap);
-            gset(g, rt.transport_cap);
-            lget(g, reply_base);
-            lget(g, reply_bytes);
-            op(g, OP_i32_add);
-            gset(g, rt.transport_top);
-        }
+        emitCommitReplyPin(g, f, has_reply_pin, reply_pin_slot, reply_base, reply_cap, reply_bytes);
         storePersistRootVal(g, f, root, next_val);
         releaseEntry(g);
         i32Const(g, 1);
         gset(g, root.status_global);
         return blot_direct_types::Error.none;
+    }
+
+    // Zero-allocation fast-path commit for `blot:proc_step` when every plain-element
+    // array handle in `next_val` is bit-identical to the currently committed persistent root!
+    var has_fast_branch = false;
+    if is_step {
+        let root_boxed, rberr = isBoxed(g, f, root.state_ty, 0);
+        if rberr != blot_direct_types::Error.none { return rberr; }
+        if !root_boxed {
+            var owner_words: u32[32] = [0; 32];
+            var owner_count: i64 = 0;
+            let fok, ferr = collectPersistRegArrayWords(g, root.state_ty, 0, owner_words, owner_count);
+            if ferr != blot_direct_types::Error.none { return ferr; }
+            if fok && owner_count > 0 {
+                let fast_ok = local32(g, f);
+                gget(g, root.live_blocks_len);
+                op(g, OP_i32_eqz);
+                lset(g, fast_ok);
+                for oi in 0..owner_count {
+                    let wi = owner_words[oi] as i64;
+                    lget(g, fast_ok);
+                    lget(g, w(g, next_val, wi));
+                    gget(g, g.s.words[root.state_globals_start + wi]);
+                    op(g, OP_i32_eq);
+                    op(g, OP_i32_and);
+                    lget(g, w(g, next_val, wi + 1));
+                    gget(g, g.s.words[root.state_globals_start + wi + 1]);
+                    op(g, OP_i32_eq);
+                    op(g, OP_i32_and);
+                    lset(g, fast_ok);
+                }
+                lget(g, fast_ok);
+                let fast_if = open(g, f, OP_if_);
+                emitCommitReplyPin(g, f, has_reply_pin, reply_pin_slot, reply_base, reply_cap, reply_bytes);
+                storePersistRootVal(g, f, root, next_val);
+                releaseEntry(g);
+                i32Const(g, 1);
+                gset(g, root.status_global);
+                popCheckedArraysAt(f, fast_if);
+                op(g, OP_else_);
+                has_fast_branch = true;
+            }
+        } else {
+            var owner_offs: u32[32] = [0; 32];
+            var owner_count: i64 = 0;
+            let fok, ferr = collectPersistFlatArrayOffsets(g, root.state_ty, 0, owner_offs, owner_count);
+            if ferr != blot_direct_types::Error.none { return ferr; }
+            if fok && owner_count > 0 && root.state_globals_len == 1 {
+                let logical_bytes, berr = blockBytes(g, f, root.state_ty, 0);
+                if berr != blot_direct_types::Error.none { return berr; }
+                let old_ptr = local32(g, f);
+                let new_ptr = w(g, next_val, 0);
+                gget(g, g.s.words[root.state_globals_start]);
+                lset(g, old_ptr);
+                let fast_ok = local32(g, f);
+                gget(g, root.live_blocks_len);
+                i32Const(g, 1);
+                op(g, OP_i32_eq);
+                lget(g, old_ptr);
+                i32Const(g, 0);
+                op(g, OP_i32_ne);
+                op(g, OP_i32_and);
+                lget(g, new_ptr);
+                i32Const(g, 0);
+                op(g, OP_i32_ne);
+                op(g, OP_i32_and);
+                ltee(g, fast_ok);
+                let chk_if = open(g, f, OP_if_);
+                for oi in 0..owner_count {
+                    let off = owner_offs[oi];
+                    lget(g, fast_ok);
+                    lget(g, new_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+                    lget(g, old_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, off);
+                    op(g, OP_i32_eq);
+                    op(g, OP_i32_and);
+                    lget(g, new_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, off + 4);
+                    lget(g, old_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, off + 4);
+                    op(g, OP_i32_eq);
+                    op(g, OP_i32_and);
+                    lset(g, fast_ok);
+                }
+                close(g, f);
+                lget(g, fast_ok);
+                let fast_if = open(g, f, OP_if_);
+                lget(g, new_ptr);
+                lget(g, old_ptr);
+                op(g, OP_i32_ne);
+                let cp_if = open(g, f, OP_if_);
+                memoryCopy(g, old_ptr, 0, new_ptr, logical_bytes);
+                close(g, f);
+                emitCommitReplyPin(g, f, has_reply_pin, reply_pin_slot, reply_base, reply_cap, reply_bytes);
+                releaseEntry(g);
+                i32Const(g, 1);
+                gset(g, root.status_global);
+                popCheckedArraysAt(f, fast_if);
+                op(g, OP_else_);
+                has_fast_branch = true;
+            }
+        }
     }
 
     // Collect every memory-holding Ty reachable from root.state_ty.
@@ -1185,5 +1410,6 @@ fn emitStageRoot(
     releaseEntry(g);
     i32Const(g, 1);
     gset(g, root.status_global);
+    if has_fast_branch { close(g, f); }
     return blot_direct_types::Error.none;
 }
