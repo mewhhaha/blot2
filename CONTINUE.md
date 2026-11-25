@@ -1,17 +1,80 @@
 # Working on Blot and Gdev
 
-## Current frontier: Direct-Backend Tier 5 Runtime Optimizations (5A–5F) (25 November 2026)
+## Current frontier: Direct-Backend Tier 6 Runtime Optimizations (6A–6C) (25 November 2026)
 
-Tier 5 direct-backend runtime optimizations (5A–5F) are complete and qualified
-(`blotc-goose` SHA-256 `57a11e40cb50dbde5f229683eb7f94195b58b49637671fb89998ea818d22185b`,
-`8,454,552` B; `generated/compiler/blotc.gz` SHA-256
-`94228ddd853810402adcfd7681c7959d0c9c1304d40fe2b8e456dd7cef157810`, `3,657,175` B),
-sweeping **6 / 6 kernels vs Rust `-O3` Wasm (`0.48×` geomean)**, beating **native
-Rust `-O3` on 5 / 6 kernels (`0.59×` geomean)**, and bringing Ink ECS pure-Wasm
-AoS cached queries within **1.3%** of native Bevy ECS `0.20.1` (`1.39 ms` vs
-`1.37 ms`) on **`wtime-aot 0.1.1` (`--backend x64`, `x64-v3`, `1201395`)**:
+Tier 6 direct-backend runtime optimizations (6A–6C) are complete and qualified
+(`blotc-goose` SHA-256 `cc6640fc5c4eab7129fcfb1e20248bb804e7f8b91af98801254e869cf38af012`,
+`8,504,056` B; `generated/compiler/blotc.gz` SHA-256
+`d2d340ba703eeddaa13af610b3f4f76a15ad15472a37a4052eb778ccc5def187`, `3,674,983` B),
+sweeping **6 / 6 kernels vs Rust `-O3` Wasm (`0.44×` geomean — 2.29× faster)**,
+beating **native Rust `-O3` on 5 / 6 kernels with a 1.1% dead heat on `matmul_64`
+(`0.54×` geomean — 1.85× faster)**, and pushing Ink ECS pure-Wasm AoS dense loops
+**2.20×–2.57× faster than native Bevy ECS `0.20.1`** (`0.47 ms` Pool direct /
+`0.55 ms` cached query vs `1.22 ms` Bevy) on **`wtime-aot 0.1.1` (`--backend x64`,
+`x64-v3`, `1201395`)**:
 
-- **Tier 5 direct-backend runtime optimizations (this commit, after `fc29d049`):**
+- **Tier 6 direct-backend runtime optimizations (this commit, after `a6fe57b1`):**
+  - **6A (4× coalesced `v128` loops for 16-byte `Maybe Vec3` + dynamic `ids` monotonicity classification):**
+    Factored `Vec3MaybeMatch` / `matchVec3MaybeSimdUpdate` and added
+    `tryEmitVec3MaybeLoop4x` (`direct/function_control.goose`,
+    `direct/function.goose`, `direct/function_calls.goose`) to unroll 16-byte
+    `Maybe Vec3` updates 4× with descending `48,32,16,0` loads/stores (4× fewer
+    `wtime` software bounds checks) and ONE combined `v128.or` + `extract_lane 0`
+    tag check across all 4 entities (falling back per-lane when any of the 4 is
+    `$Nothing`). Extended `5B-2`'s pre-loop scan (`Fn.indirect_bound_distinct_local`)
+    to dynamically classify indirect `ids` into `2` (strictly contiguous
+    `ids[k] == ids[0] + k` → zero-`ids`-load contiguous 4× descending `v128`),
+    `1` (strictly increasing distinct IDs + `pos_base != vel_base` → 4×
+    descending `ids` loads `12,8,4,0` + 4-way pipelined gather/scatter with 1
+    combined tag check), or `0` (duplicate/unsorted/self-aliased → sequential
+    4× unrolled fallback).
+  - **6B (4×8 `2×k`-unrolled matmul + 4-wide `v128` SIMD affine-LCG array-init + `isFiniteVecF32`):**
+    Upgraded `tryEmitBlockedMatmulRowLoop` (`direct/function_control.goose`)
+    with a 4-row × 8-col (`8 × v128` accumulators) `2×k`-unrolled fast path
+    sharing descending `16,0` `b` loads across 4 rows (with descending `4,0` `a`
+    loads, odd-`n` `k` tail, 4-row `m % 8` scalar col tail, and fallback to `5C`
+    2-row × 16-col / `4C` single-row). Added `tryEmitAffineInitLoop` and exact
+    IEEE-754 `isFiniteVecF32` NaN-elision (`convert_{u32,i32}_f32` × finite F32
+    constant can never produce NaN) in `direct/function_spark.goose`,
+    vectorizing both `matmul_64`'s 2-step matrix init and `merge_sort`'s 1-step
+    array init in 4-wide `v128` with exact lane-3 state extraction.
+  - **6C (Dual-stream 8-pixel `v128` escape SIMD + `prep_swap`-safe FP comparisons):**
+    Upgraded `tryEmitVectorEscapeLoop` (`direct/function_spark.goose`) to emit
+    a dual-stream 8-pixel `v128` escape loop executing Stream A then Stream B
+    sequentially per step so temporary `pre_exit`/`post_exit` vectors share
+    locals (keeping peak live XMM ≤ 14), checking `v128.any_true(v128.or(act_a, act_b))`,
+    and combining `it_a + it_b` for 4 lane extracts per 8 pixels (falling through
+    to 4-pixel + scalar tails). Lowered `f32x4` `>` / `>=` as operand-swapped
+    `f32x4.lt` / `f32x4.le` and escape mask updates as `v128.not` + `v128.and`
+    (100% IEEE-754 exact on both V8 and `wtime-aot`, avoiding `wtime-aot x64`'s
+    `prep_swap` spill clobber bug when operand `b` reloads into `SFP2`).
+  - Regenerated adapters (`structural_adapters.goose`, `json_adapters.goose`),
+    added executed-Wasm regression coverage in `tests/guest/tier6_opt_execution.test.ts`
+    (all 6A–6C fast paths, tails, NaN canonicalization, duplicate/unsorted/self-aliased
+    IDs, aliasing fallbacks, and OOB traps), and passed the full qualification gate
+    (`deno task test:compiler` with `1124 passed, 0 failed` guests, `109/109`
+    fixtures byte-identical, `206/206` uniqueness, `test:editor` 6/6, Pen
+    `cargo test -p blot-host` 40/40 + `examples/bounce`; sibling `../ink` had
+    unrelated active user WIP in `lib/audio/acoustics.blot`, with all 241 other
+    Ink tests passing).
+  - Measured results on AMD Ryzen 7 7800X3D (`wtime-aot 0.1.1 x64-v3`, bit-exact
+    checksum parity, [2026-11-24-rust-and-bevy-ecs.json](benchmarks/evidence/measurements/2026-11-24-rust-and-bevy-ecs.json)):
+    `mandelbrot_f32` `0.992 → 0.611 ms` (**1.62× faster; 0.20× Rust Wasm, 0.18× native!**),
+    `matmul_64` `0.0227 → 0.0199 ms` (**1.14× faster; 0.67× Rust Wasm, 1.01× native dead heat!**),
+    `merge_sort` `4.269 → 3.972 ms` (**0.70× Rust Wasm, 0.80× native!**),
+    `particle_spark_simd` `0.400 ms` (**0.55× Rust Wasm, 0.58× native!**),
+    `prime_sieve` `0.062 ms` (**0.46× Rust Wasm, 0.93× native!**),
+    `lcg_recurrence` `0.115 ms` (**0.30× Rust Wasm, 0.34× native!**),
+    Ink ECS Pool direct `1.489 → 0.474 ms` (**3.14× faster; 2.57× faster than native Bevy `1.219 ms`!**),
+    Ink ECS cached query `1.387 → 0.553 ms` (**2.51× faster; 2.20× faster than native Bevy!**),
+    Blot SoA + `spark` SIMD `0.327 ms` (**3.72× faster than native Bevy!**),
+    Ink ECS sparse query `0.100 → 0.079 ms` (**1.27× faster; 1.14× Bevy `0.069 ms`**),
+    Ink ECS `batch_spawn_10k` `0.301 ms` (**1.07× faster than Bevy `0.322 ms`!**),
+    Ink ECS `structural_churn` `15.7 µs` (**5.3× faster than Bevy `83.5 µs`!**),
+    Ink ECS `world_snapshot_copy_10k` `16.5 µs` (**24.6× faster than Bevy `405.4 µs`**);
+    cold Wasm compile `12.3 ms` (`21,355` B, `7.3×` faster & `70×` smaller than `rustc -O3 wasm32`; `wtime-aot x64` AOT: `4.1 ms`).
+
+- **Tier 5 direct-backend runtime optimizations (`a6fe57b1`, after `fc29d049`):**
   - **5A (`merge_sort` branchless `select`, `memory.copy` tails, `k < dst_len` hoisting & deep inlining):**
     Added `tryIfBranchlessStore` (branchless `select` / `cmov` for same-target
     indexed updates), `tryIfShortCircuitBreak` (direct short-circuit `or`-break),

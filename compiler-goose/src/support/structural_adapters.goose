@@ -1047,6 +1047,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StagePa
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StagePart,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageValue)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageValue,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Vec3MaybeMatch)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::Vec3MaybeMatch,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_map::U64Map)->bool {return equalFields(left,right);}
 fn blot_direct_map::blotStructuralHash<StructuralSink>(value:blot_direct_map::U64Map,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::BodySite)->bool {return equalFields(left,right);}

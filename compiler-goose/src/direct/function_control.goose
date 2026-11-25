@@ -1380,6 +1380,134 @@ fn match3F32CtorExpr(
     }
     return want_op != blot_check_core::Op.none, want_op;
 }
+struct Vec3MaybeMatch {
+    pos_b: u32 = 0,
+    vel_b: u32 = 0,
+    idx_b: u32 = 0,
+    pos_arr_node: u32 = 0,
+    pos_idx_node: u32 = 0,
+    pos_input_id: u32 = 0,
+    pos_inlined: BindingRef = BindingRef { 0, 0 },
+    vel_arr_node: u32 = 0,
+    vel_idx_node: u32 = 0,
+    vel_input_id: u32 = 0,
+    vel_inlined: BindingRef = BindingRef { 0, 0 },
+    vec_op: blot_check_core::Op = blot_check_core::Op.none,
+    merge_count: i64 = 0,
+    merge_res: u32[2] = [0; 2],
+}
+fn matchVec3MaybeSimdUpdate(
+    g: Generator&,
+    f: Fn&,
+    m: const Module&,
+    id: u32,
+    pos_arr_node: u32,
+    pos_idx_node: u32,
+    pos_input_id: u32,
+    pos_inlined: BindingRef,
+    pos_elem_ty: Ty,
+    out: Vec3MaybeMatch&,
+) -> bool {
+    let info = m.matchInfo(id);
+    if !info.statement { return false; }
+    let arms = m.matchArms(id);
+    if arms.len != 2 || arms[0].guard_ != 0 || !isNoopWildcardArm(m, arms[1]) { return false; }
+    let pos_b = localRef(m, pos_arr_node);
+    let idx_b = localRef(m, pos_idx_node);
+    if pos_b == 0 || idx_b == 0 { return false; }
+    let pos_step, pserr = stride(g, f, pos_elem_ty, id);
+    if pserr != blot_direct_types::Error.none || pos_step != 16 { return false; }
+    let p_cases, pcerr = g.types.variants(pos_elem_ty);
+    if pcerr != blot_direct_types::Error.none || p_cases.len <= 1 { return false; }
+    let p_vpos, pvperr = variantPosition(g, f, p_cases, 0, id);
+    if pvperr != blot_direct_types::Error.none { return false; }
+    let p_payload_ty = g.types.variant_payloads[p_cases.payloads + p_vpos];
+    let p_rows = m.armRows(arms[0]);
+    if p_rows.len != 1 || m.rowPatterns(p_rows[0]).len != 1 { return false; }
+    let p_pat = m.pattern(m.rowPatterns(p_rows[0])[0]);
+    if p_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 { return false; }
+    var p_bs: u32[3] = [0; 3];
+    if !extract3F32PayloadPat(g, m, p_pat.b, p_payload_ty, p_bs) { return false; }
+
+    let inner_id = unwrapSingleBody(m, arms[0].body);
+    if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.match_ { return false; }
+    let inner_info = m.matchInfo(inner_id);
+    let inner_inputs = m.matchInputs(inner_id);
+    let inner_arms = m.matchArms(inner_id);
+    if !inner_info.statement || inner_inputs.len != 1 || inner_arms.len != 2 ||
+        inner_arms[0].guard_ != 0 || !isNoopWildcardArm(m, inner_arms[1]) { return false; }
+    let v_arr_n, v_idx_n, v_inl, v_ok = resolveLazyVariantArrayRead(g, f, m, inner_inputs[0]);
+    if !v_ok || localRef(m, v_idx_n) != idx_b { return false; }
+    let vel_b = localRef(m, v_arr_n);
+    if vel_b == 0 { return false; }
+    let vel_elem_ty, vierr = g.types.lower(m, m.typeOf(inner_inputs[0]), f.env);
+    if vierr != blot_direct_types::Error.none { g.dropFailure(); return false; }
+    if tagOf(g, vel_elem_ty) != blot_direct_types::Tag.nominal { return false; }
+    let v_boxed, vberr = isBoxed(g, f, vel_elem_ty, inner_id);
+    let v_step, vserr = stride(g, f, vel_elem_ty, inner_id);
+    if vberr != blot_direct_types::Error.none || v_boxed || vserr != blot_direct_types::Error.none || v_step != 16 {
+        return false;
+    }
+    let v_cases, vcerr = g.types.variants(vel_elem_ty);
+    if vcerr != blot_direct_types::Error.none || v_cases.len <= 1 { return false; }
+    let v_vpos, vvperr = variantPosition(g, f, v_cases, 0, inner_id);
+    if vvperr != blot_direct_types::Error.none { return false; }
+    let v_payload_ty = g.types.variant_payloads[v_cases.payloads + v_vpos];
+    let v_rows = m.armRows(inner_arms[0]);
+    if v_rows.len != 1 || m.rowPatterns(v_rows[0]).len != 1 { return false; }
+    let v_pat = m.pattern(m.rowPatterns(v_rows[0])[0]);
+    if v_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(v_pat.a).tag != 0 { return false; }
+    var v_bs: u32[3] = [0; 3];
+    if !extract3F32PayloadPat(g, m, v_pat.b, v_payload_ty, v_bs) { return false; }
+
+    let body_stmt = unwrapSingleBody(m, inner_arms[0].body);
+    if body_stmt == 0 { return false; }
+    var upd_id: u32 = 0;
+    var upd_bind_b: u32 = 0;
+    let bsn = m.node(body_stmt);
+    if bsn.tag == blot_check_core::Tag.update { upd_id = body_stmt; }
+    else if bsn.tag == blot_check_core::Tag.bind && bsn.c < 2 && m.node(bsn.b).tag == blot_check_core::Tag.update {
+        upd_id = bsn.b;
+        upd_bind_b = bsn.a;
+    } else { return false; }
+    let uinfo = m.updateInfo(upd_id);
+    let sels = m.updateSelectors(upd_id);
+    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+    if localRef(m, uinfo.root) != pos_b || localRef(m, sels[0].index) != idx_b { return false; }
+    if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false; }
+    let op_ok, found_op = match3F32CtorExpr(g, m, uinfo.value, pos_elem_ty, p_payload_ty, p_bs, v_bs);
+    if !op_ok { return false; }
+
+    let imerges = m.branchMerges(inner_id);
+    if imerges.len > 1 { return false; }
+    var inner_pos_res: u32 = 0;
+    for im in imerges {
+        let t_ok = im.then_binding == pos_b || (upd_bind_b != 0 && im.then_binding == upd_bind_b);
+        if !t_ok || im.else_binding != pos_b { return false; }
+        inner_pos_res = im.result;
+    }
+    let omerges = m.branchMerges(id);
+    if omerges.len > 2 { return false; }
+    for om, oi in omerges {
+        let t_ok = om.then_binding == pos_b || (inner_pos_res != 0 && om.then_binding == inner_pos_res) || (upd_bind_b != 0 && om.then_binding == upd_bind_b);
+        if !t_ok || om.else_binding != pos_b { return false; }
+        out.merge_res[oi] = om.result;
+    }
+    out.pos_b = pos_b;
+    out.vel_b = vel_b;
+    out.idx_b = idx_b;
+    out.pos_arr_node = pos_arr_node;
+    out.pos_idx_node = pos_idx_node;
+    out.pos_input_id = pos_input_id;
+    out.pos_inlined = pos_inlined;
+    out.vel_arr_node = v_arr_n;
+    out.vel_idx_node = v_idx_n;
+    out.vel_input_id = inner_inputs[0];
+    out.vel_inlined = v_inl;
+    out.vec_op = found_op;
+    out.merge_count = omerges.len;
+    return true;
+}
 // 5B-1: Intra-element v128 SIMD for 16-byte `Maybe Vec3` updates:
 //   if let $Some ($Pos { x, y, z }) = pos[idx]:
 //     if let $Some ($Vel { vx, vy, vz }) = vel[idx]:
@@ -1397,143 +1525,25 @@ fn tryEmitVec3MaybeSimdUpdate(
     pos_elem_ty: Ty,
 ) -> Val, bool, Error {
     if g.runtime_().has_fork { return neverVal(), false, blot_direct_types::Error.none; }
-    var vel_arr_node: u32 = 0;
-    var vel_idx_node: u32 = 0;
-    var vel_input_id: u32 = 0;
-    var vel_inlined = BindingRef { 0, 0 };
-    var vec_op = blot_check_core::Op.none;
-    var merge_count: i64 = 0;
-    var merge_res: u32[2] = [0; 2];
+    var vm = Vec3MaybeMatch {};
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
-        let info = m.matchInfo(id);
-        if !info.statement { return neverVal(), false, blot_direct_types::Error.none; }
-        let arms = m.matchArms(id);
-        if arms.len != 2 || arms[0].guard_ != 0 || !isNoopWildcardArm(m, arms[1]) {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let pos_b = localRef(m, pos_arr_node);
-        let idx_b = localRef(m, pos_idx_node);
-        if pos_b == 0 || idx_b == 0 { return neverVal(), false, blot_direct_types::Error.none; }
-        let pos_step, pserr = stride(g, f, pos_elem_ty, id);
-        if pserr != blot_direct_types::Error.none || pos_step != 16 { return neverVal(), false, blot_direct_types::Error.none; }
-        let p_cases, pcerr = g.types.variants(pos_elem_ty);
-        if pcerr != blot_direct_types::Error.none || p_cases.len <= 1 { return neverVal(), false, blot_direct_types::Error.none; }
-        let p_vpos, pvperr = variantPosition(g, f, p_cases, 0, id);
-        if pvperr != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
-        let p_payload_ty = g.types.variant_payloads[p_cases.payloads + p_vpos];
-        let p_pat = m.pattern(m.rowPatterns(m.armRows(arms[0])[0])[0]);
-        if p_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        var p_bs: u32[3] = [0; 3];
-        if !extract3F32PayloadPat(g, m, p_pat.b, p_payload_ty, p_bs) {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-
-        // Inner match on `vel[idx]`
-        let inner_id = unwrapSingleBody(m, arms[0].body);
-        if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.match_ {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let inner_info = m.matchInfo(inner_id);
-        let inner_inputs = m.matchInputs(inner_id);
-        let inner_arms = m.matchArms(inner_id);
-        if !inner_info.statement || inner_inputs.len != 1 || inner_arms.len != 2 ||
-            inner_arms[0].guard_ != 0 || !isNoopWildcardArm(m, inner_arms[1]) {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let v_arr_n, v_idx_n, v_inl, v_ok = resolveLazyVariantArrayRead(g, f, m, inner_inputs[0]);
-        if !v_ok || localRef(m, v_idx_n) != idx_b { return neverVal(), false, blot_direct_types::Error.none; }
-        let vel_elem_ty, vierr = g.types.lower(m, m.typeOf(inner_inputs[0]), f.env);
-        if vierr != blot_direct_types::Error.none { g.dropFailure(); return neverVal(), false, blot_direct_types::Error.none; }
-        if tagOf(g, vel_elem_ty) != blot_direct_types::Tag.nominal { return neverVal(), false, blot_direct_types::Error.none; }
-        let v_boxed, vberr = isBoxed(g, f, vel_elem_ty, inner_id);
-        let v_step, vserr = stride(g, f, vel_elem_ty, inner_id);
-        if vberr != blot_direct_types::Error.none || v_boxed || vserr != blot_direct_types::Error.none || v_step != 16 {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let v_cases, vcerr = g.types.variants(vel_elem_ty);
-        if vcerr != blot_direct_types::Error.none || v_cases.len <= 1 { return neverVal(), false, blot_direct_types::Error.none; }
-        let v_vpos, vvperr = variantPosition(g, f, v_cases, 0, inner_id);
-        if vvperr != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
-        let v_payload_ty = g.types.variant_payloads[v_cases.payloads + v_vpos];
-        let v_rows = m.armRows(inner_arms[0]);
-        if v_rows.len != 1 || m.rowPatterns(v_rows[0]).len != 1 { return neverVal(), false, blot_direct_types::Error.none; }
-        let v_pat = m.pattern(m.rowPatterns(v_rows[0])[0]);
-        if v_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(v_pat.a).tag != 0 {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        var v_bs: u32[3] = [0; 3];
-        if !extract3F32PayloadPat(g, m, v_pat.b, v_payload_ty, v_bs) {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-
-        // Inner body: single `pos[idx] := $Some ($Pos { ... })`
-        let body_stmt = unwrapSingleBody(m, inner_arms[0].body);
-        if body_stmt == 0 { return neverVal(), false, blot_direct_types::Error.none; }
-        var upd_id: u32 = 0;
-        var upd_bind_b: u32 = 0;
-        let bsn = m.node(body_stmt);
-        if bsn.tag == blot_check_core::Tag.update { upd_id = body_stmt; }
-        else if bsn.tag == blot_check_core::Tag.bind && bsn.c < 2 && m.node(bsn.b).tag == blot_check_core::Tag.update {
-            upd_id = bsn.b;
-            upd_bind_b = bsn.a;
-        } else {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let uinfo = m.updateInfo(upd_id);
-        let sels = m.updateSelectors(upd_id);
-        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        if localRef(m, uinfo.root) != pos_b || localRef(m, sels[0].index) != idx_b {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 {
-            return neverVal(), false, blot_direct_types::Error.none;
-        }
-        let op_ok, found_op = match3F32CtorExpr(g, m, uinfo.value, pos_elem_ty, p_payload_ty, p_bs, v_bs);
-        if !op_ok { return neverVal(), false, blot_direct_types::Error.none; }
-
-        // Check outer and inner merges only re-thread `pos_b` in place.
-        let imerges = m.branchMerges(inner_id);
-        if imerges.len > 1 { return neverVal(), false, blot_direct_types::Error.none; }
-        var inner_pos_res: u32 = 0;
-        for im in imerges {
-            let t_ok = im.then_binding == pos_b || (upd_bind_b != 0 && im.then_binding == upd_bind_b);
-            if !t_ok || im.else_binding != pos_b { return neverVal(), false, blot_direct_types::Error.none; }
-            inner_pos_res = im.result;
-        }
-        let omerges = m.branchMerges(id);
-        if omerges.len > 2 { return neverVal(), false, blot_direct_types::Error.none; }
-        for om, oi in omerges {
-            let t_ok = om.then_binding == pos_b || (inner_pos_res != 0 && om.then_binding == inner_pos_res) || (upd_bind_b != 0 && om.then_binding == upd_bind_b);
-            if !t_ok || om.else_binding != pos_b { return neverVal(), false, blot_direct_types::Error.none; }
-            merge_res[oi] = om.result;
-        }
-        merge_count = omerges.len;
-        vel_arr_node = v_arr_n;
-        vel_idx_node = v_idx_n;
-        vel_input_id = inner_inputs[0];
-        vel_inlined = v_inl;
-        vec_op = found_op;
-        matched = true;
+        matched = matchVec3MaybeSimdUpdate(g, f, m, id, pos_arr_node, pos_idx_node, pos_input_id, pos_inlined, pos_elem_ty, vm);
     }
     if !matched { return neverVal(), false, blot_direct_types::Error.none; }
 
-    if pos_inlined.binding != 0 { g.recordInlined(pos_inlined.unit, pos_inlined.binding); }
-    if vel_inlined.binding != 0 { g.recordInlined(vel_inlined.unit, vel_inlined.binding); }
+    if vm.pos_inlined.binding != 0 { g.recordInlined(vm.pos_inlined.unit, vm.pos_inlined.binding); }
+    if vm.vel_inlined.binding != 0 { g.recordInlined(vm.vel_inlined.unit, vm.vel_inlined.binding); }
 
-    let pos_val, perr = expr(g, f, pos_arr_node);
+    let pos_val, perr = expr(g, f, vm.pos_arr_node);
     if perr != blot_direct_types::Error.none { return pos_val, true, perr; }
-    let idx_val, ierr = expr(g, f, pos_idx_node);
+    let idx_val, ierr = expr(g, f, vm.pos_idx_node);
     if ierr != blot_direct_types::Error.none { return idx_val, true, ierr; }
-    let idx_loc, slerr = scalarLocal(g, f, idx_val, pos_input_id);
+    let idx_loc, slerr = scalarLocal(g, f, idx_val, vm.pos_input_id);
     if slerr != blot_direct_types::Error.none { return neverVal(), true, slerr; }
 
-    let pos_addr, paerr = elementAddress(g, f, pos_val, idx_loc, pos_input_id, g.units[f.unit - 1].typeOf(pos_arr_node), true);
+    let pos_addr, paerr = elementAddress(g, f, pos_val, idx_loc, vm.pos_input_id, g.units[f.unit - 1].typeOf(vm.pos_arr_node), true);
     if paerr != blot_direct_types::Error.none { return neverVal(), true, paerr; }
 
     let pv = local(g, f, VT_v128);
@@ -1544,9 +1554,9 @@ fn tryEmitVec3MaybeSimdUpdate(
     op(g, OP_i32_eqz);
     let p_if = open(g, f, OP_if_);
 
-    let vel_val, verr = expr(g, f, vel_arr_node);
+    let vel_val, verr = expr(g, f, vm.vel_arr_node);
     if verr != blot_direct_types::Error.none { return vel_val, true, verr; }
-    let vel_addr, vaerr = elementAddress(g, f, vel_val, idx_loc, vel_input_id, g.units[f.unit - 1].typeOf(vel_arr_node), true);
+    let vel_addr, vaerr = elementAddress(g, f, vel_val, idx_loc, vm.vel_input_id, g.units[f.unit - 1].typeOf(vm.vel_arr_node), true);
     if vaerr != blot_direct_types::Error.none { return neverVal(), true, vaerr; }
 
     let vv = local(g, f, VT_v128);
@@ -1560,7 +1570,7 @@ fn tryEmitVec3MaybeSimdUpdate(
     lget(g, pos_addr);
     lget(g, pv);
     lget(g, vv);
-    if vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+    if vm.vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
     else { simdOp(g, SIMD_f32x4_sub); }
     if !f.defer_f32_nan { canonicalizeF32x4(g, f, 0xffffffff); }
     simdMemOp(g, SIMD_v128_store, 2, 0);
@@ -1571,8 +1581,425 @@ fn tryEmitVec3MaybeSimdUpdate(
     close(g, f);
     f.checked_elems_len = 0;
 
-    for mi in 0..merge_count { bindPut(g, f, merge_res[mi], pos_val); }
+    for mi in 0..vm.merge_count { bindPut(g, f, vm.merge_res[mi], pos_val); }
     return unitVal(), true, blot_direct_types::Error.none;
+}
+
+// 6A: 4x unrolled coalesced `v128` loop for 16-byte `Maybe Vec3` updates:
+//   Shape 1 (contiguous pool): descending `48,32,16,0` loads/stores (4x fewer wtime
+//   bounds checks) + single `v128.or` + `extract_lane 0` branch across all 4 entities!
+//   Shape 2 (indirect `let id = ids[k]`): 4x descending `ids` loads (`12,8,4,0`) +
+//   single combined `(pv|vv)` tag check per entity (or 4-way coalesced when pre-scanned
+//   `indirect_bound_distinct_local` proves all target IDs are strictly increasing & pos != vel).
+fn emitVec3SimdAddSub(g: Generator&, f: Fn&, vec_op: blot_check_core::Op, nan_v: u32) {
+    if vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+    else { simdOp(g, SIMD_f32x4_sub); }
+    if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); }
+}
+fn tryEmitVec3MaybeLoop4x(
+    g: Generator&,
+    f: Fn&,
+    loop_id: u32,
+    info: blot_check_core::LoopInfo,
+    carry_in_place: const bool[64]&,
+    index: u32,
+    end_local: u32,
+) -> Error {
+    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return blot_direct_types::Error.none;
+    }
+    var vm = Vec3MaybeMatch {};
+    var is_indirect = false;
+    var ids_arr_b: u32 = 0;
+    var ind_id_b: u32 = 0;
+    var matched = false;
+    {
+        let m .= g.units[f.unit - 1];
+        let pat = m.pattern(info.pattern);
+        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        let iter_b = pat.a;
+
+        let carries = m.loopCarries(loop_id);
+        if carries.len > 64 { return blot_direct_types::Error.none; }
+        for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
+
+        var match_id: u32 = 0;
+        var target_idx_b: u32 = iter_b;
+        let single = unwrapSingleBody(m, info.body);
+        if single != 0 && m.node(single).tag == blot_check_core::Tag.match_ {
+            match_id = single;
+        } else {
+            let bn = m.node(info.body);
+            if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+                let ch = m.children(info.body);
+                if ch.len == 2 {
+                    let s0 = m.node(ch[0]);
+                    if s0.tag == blot_check_core::Tag.bind && s0.c < 2 && m.node(ch[1]).tag == blot_check_core::Tag.match_ {
+                        let gok, ia_n, ip_n = matchArrayGet(m, s0.b);
+                        if gok && localRef(m, ip_n) == iter_b {
+                            let iab = localRef(m, ia_n);
+                            if iab != 0 {
+                                let iav, iaok = bindGet(g, f, iab);
+                                if iaok && tagOf(g, iav.ty) == blot_direct_types::Tag.array &&
+                                    tagOf(g, g.types.node(iav.ty).a) == blot_direct_types::Tag.u32_ {
+                                    is_indirect = true;
+                                    ids_arr_b = iab;
+                                    ind_id_b = s0.a;
+                                    target_idx_b = s0.a;
+                                    match_id = ch[1];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if match_id == 0 { return blot_direct_types::Error.none; }
+        let inputs = m.matchInputs(match_id);
+        if inputs.len != 1 { return blot_direct_types::Error.none; }
+        let p_arr_n, p_idx_n, p_inl, p_ok = resolveLazyVariantArrayRead(g, f, m, inputs[0]);
+        if !p_ok || localRef(m, p_idx_n) != target_idx_b { return blot_direct_types::Error.none; }
+        let p_elem_ty, pierr = g.types.lower(m, m.typeOf(inputs[0]), f.env);
+        if pierr != blot_direct_types::Error.none { g.dropFailure(); return blot_direct_types::Error.none; }
+        if tagOf(g, p_elem_ty) != blot_direct_types::Tag.nominal { return blot_direct_types::Error.none; }
+        let p_boxed, pberr = isBoxed(g, f, p_elem_ty, match_id);
+        if pberr != blot_direct_types::Error.none || p_boxed { return blot_direct_types::Error.none; }
+        if !matchVec3MaybeSimdUpdate(g, f, m, match_id, p_arr_n, p_idx_n, inputs[0], p_inl, p_elem_ty, vm) {
+            return blot_direct_types::Error.none;
+        }
+        // Ensure `pos` and `vel` are bound in `f` as arrays (resolving outer loop carries).
+        let pv, pok = bindGet(g, f, vm.pos_b);
+        let vv, vok = bindGet(g, f, vm.vel_b);
+        if !pok || !vok || tagOf(g, pv.ty) != blot_direct_types::Tag.array || tagOf(g, vv.ty) != blot_direct_types::Tag.array {
+            return blot_direct_types::Error.none;
+        }
+        matched = true;
+    }
+    if !matched { return blot_direct_types::Error.none; }
+
+    if vm.pos_inlined.binding != 0 { g.recordInlined(vm.pos_inlined.unit, vm.pos_inlined.binding); }
+    if vm.vel_inlined.binding != 0 { g.recordInlined(vm.vel_inlined.unit, vm.vel_inlined.binding); }
+
+    let pos_val, _ = bindGet(g, f, vm.pos_b);
+    let vel_val, _ = bindGet(g, f, vm.vel_b);
+    let pos_base, pos_len = ensureCheckedArray(g, f, pos_val);
+    let vel_base, vel_len = ensureCheckedArray(g, f, vel_val);
+
+    let n4 = local32(g, f);
+    lget(g, end_local); lget(g, index); op(g, OP_i32_gt_u);
+    let cnt_if = open(g, f, OP_if_);
+    lget(g, end_local); lget(g, index); op(g, OP_i32_sub);
+    i32Const(g, 0xfffffffc); op(g, OP_i32_and); lset(g, n4);
+    popCheckedArraysAt(f, cnt_if);
+    op(g, OP_else_);
+    i32Const(g, 0); lset(g, n4);
+    close(g, f);
+
+    var nan_v: u32 = 0xffffffff;
+    if !f.defer_f32_nan {
+        nan_v = local(g, f, VT_v128);
+        v128Const4(g, 0x7fc00000);
+        lset(g, nan_v);
+    }
+
+    if !is_indirect {
+        // Shape 1: Contiguous 4x coalesced `Maybe Vec3` loop (descending 48,32,16,0).
+        lget(g, n4); i32Const(g, 0); op(g, OP_i32_gt_u);
+        lget(g, end_local); lget(g, pos_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        lget(g, end_local); lget(g, vel_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+        let run_if = open(g, f, OP_if_);
+
+        let p_ptr = local32(g, f);
+        lget(g, pos_base); lget(g, index); i32Const(g, 4); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, p_ptr);
+        let v_ptr = local32(g, f);
+        lget(g, vel_base); lget(g, index); i32Const(g, 4); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, v_ptr);
+        let rem = local32(g, f);
+        lget(g, n4); lset(g, rem);
+
+        var pv: u32[4] = [0; 4];
+        var vv: u32[4] = [0; 4];
+        for s in 0..4 {
+            pv[s] = local(g, f, VT_v128);
+            vv[s] = local(g, f, VT_v128);
+        }
+
+        let l_exit = open(g, f, OP_block);
+        let l_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, l_exit);
+
+        // Descending loads (48, 32, 16, 0) => 1 wtime bounds check per 4 entities on pos & vel!
+        lget(g, p_ptr); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, pv[3]);
+        lget(g, p_ptr); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, pv[2]);
+        lget(g, p_ptr); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, pv[1]);
+        lget(g, p_ptr); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, pv[0]);
+
+        lget(g, v_ptr); simdMemOp(g, SIMD_v128_load, 2, 48); lset(g, vv[3]);
+        lget(g, v_ptr); simdMemOp(g, SIMD_v128_load, 2, 32); lset(g, vv[2]);
+        lget(g, v_ptr); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vv[1]);
+        lget(g, v_ptr); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vv[0]);
+
+        // Coalesce all 8 lane-0 tags via v128.or => ONE movd + ONE branch for 4 entities!
+        lget(g, pv[0]); lget(g, vv[0]); simdOp(g, SIMD_v128_or);
+        lget(g, pv[1]); lget(g, vv[1]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        lget(g, pv[2]); lget(g, vv[2]); simdOp(g, SIMD_v128_or);
+        lget(g, pv[3]); lget(g, vv[3]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        simdOp(g, SIMD_v128_or);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+        op(g, OP_i32_eqz);
+        let all_if = open(g, f, OP_if_);
+        for ustep in 0..4 {
+            let s = 3 - ustep;
+            lget(g, p_ptr);
+            lget(g, pv[s]);
+            lget(g, vv[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, (s as u32) * 16);
+        }
+        popCheckedArraysAt(f, all_if);
+        op(g, OP_else_);
+        for ustep in 0..4 {
+            let s = 3 - ustep;
+            lget(g, pv[s]); lget(g, vv[s]); simdOp(g, SIMD_v128_or);
+            simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+            op(g, OP_i32_eqz);
+            let s_if = open(g, f, OP_if_);
+            lget(g, p_ptr);
+            lget(g, pv[s]);
+            lget(g, vv[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, (s as u32) * 16);
+            popCheckedArraysAt(f, s_if);
+            close(g, f);
+        }
+        close(g, f);
+
+        lget(g, p_ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, p_ptr);
+        lget(g, v_ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, v_ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, l_top);
+        close(g, f);
+        close(g, f);
+
+        lget(g, index); lget(g, n4); op(g, OP_i32_add); lset(g, index);
+        popCheckedArraysAt(f, run_if);
+        close(g, f);
+        f.checked_elems_len = 0;
+        return blot_direct_types::Error.none;
+    }
+
+    // Shape 2: Indirect `let id = ids[k]` 4x coalesced `Maybe Vec3` loop!
+    // Only fires when pre-scanned `5B-2` already proved every `ids[k] < min(pos_len, vel_len)`!
+    if f.indirect_bound_binding != ind_id_b || f.indirect_bound_len == 0 {
+        return blot_direct_types::Error.none;
+    }
+    if !(f.indirect_bound_len == pos_len || findCheckedLe(f, f.indirect_bound_len, pos_len) >= 0) ||
+        !(f.indirect_bound_len == vel_len || findCheckedLe(f, f.indirect_bound_len, vel_len) >= 0) {
+        return blot_direct_types::Error.none;
+    }
+
+    let ids_val, _ = bindGet(g, f, ids_arr_b);
+    let ids_base, ids_len = ensureCheckedArray(g, f, ids_val);
+
+    lget(g, n4); i32Const(g, 0); op(g, OP_i32_gt_u);
+    lget(g, end_local); lget(g, ids_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    let run_if = open(g, f, OP_if_);
+
+    let ids_ptr = local32(g, f);
+    lget(g, ids_base); lget(g, index); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, ids_ptr);
+    let rem = local32(g, f);
+    lget(g, n4); lset(g, rem);
+
+    var id_l: u32[4] = [0; 4];
+    var pa_l: u32[4] = [0; 4];
+    var va_l: u32[4] = [0; 4];
+    var pv_l: u32[4] = [0; 4];
+    var vv_l: u32[4] = [0; 4];
+    for s in 0..4 {
+        id_l[s] = local32(g, f);
+        pa_l[s] = local32(g, f);
+        va_l[s] = local32(g, f);
+        pv_l[s] = local(g, f, VT_v128);
+        vv_l[s] = local(g, f, VT_v128);
+    }
+
+    // Tiered fast paths based on pre-scanned `ids` monotonicity:
+    //   2 => contiguous `ids[k] == ids[0] + k` -> ZERO `ids[]` loads, 4x descending contiguous `v128` (1 bounds check / 4 entities!)
+    //   1 (and pos_base != vel_base) => strictly increasing distinct IDs -> 4-way pipelined gather/scatter with 1 coalesced branch / 4 entities!
+    //   else => sequential-per-entity 4x unrolled indirect loop (safe even for duplicate IDs and pos == vel!).
+    var can_contig = false;
+    var can_pipe = false;
+    if f.indirect_bound_distinct_local != 0xffffffff {
+        can_contig = true;
+        lget(g, f.indirect_bound_distinct_local);
+        i32Const(g, 2);
+        op(g, OP_i32_eq);
+        let contig_if = open(g, f, OP_if_);
+
+        let base_off = local32(g, f);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+        i32Const(g, 4); op(g, OP_i32_shl); lset(g, base_off);
+        let cp_ptr = local32(g, f);
+        lget(g, pos_base); lget(g, base_off); op(g, OP_i32_add); lset(g, cp_ptr);
+        let cv_ptr = local32(g, f);
+        lget(g, vel_base); lget(g, base_off); op(g, OP_i32_add); lset(g, cv_ptr);
+
+        let c_exit = open(g, f, OP_block);
+        let c_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, c_exit);
+
+        var s: i64 = 4;
+        while s > 0 {
+            s -= 1;
+            let off = (s as u32) * 16;
+            lget(g, cp_ptr); simdMemOp(g, SIMD_v128_load, 2, off); lset(g, pv_l[s]);
+            lget(g, cv_ptr); simdMemOp(g, SIMD_v128_load, 2, off); lset(g, vv_l[s]);
+        }
+        lget(g, pv_l[0]); lget(g, vv_l[0]); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[1]); lget(g, vv_l[1]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[2]); lget(g, vv_l[2]); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[3]); lget(g, vv_l[3]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        simdOp(g, SIMD_v128_or);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+        op(g, OP_i32_eqz);
+        let call_if = open(g, f, OP_if_);
+        s = 4;
+        while s > 0 {
+            s -= 1;
+            lget(g, cp_ptr); lget(g, pv_l[s]); lget(g, vv_l[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, (s as u32) * 16);
+        }
+        popCheckedArraysAt(f, call_if);
+        op(g, OP_else_);
+        s = 4;
+        while s > 0 {
+            s -= 1;
+            lget(g, pv_l[s]); lget(g, vv_l[s]); simdOp(g, SIMD_v128_or);
+            simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+            op(g, OP_i32_eqz);
+            let cs_if = open(g, f, OP_if_);
+            lget(g, cp_ptr); lget(g, pv_l[s]); lget(g, vv_l[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, (s as u32) * 16);
+            popCheckedArraysAt(f, cs_if);
+            close(g, f);
+        }
+        close(g, f);
+
+        lget(g, cp_ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, cp_ptr);
+        lget(g, cv_ptr); i32Const(g, 64); op(g, OP_i32_add); lset(g, cv_ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, c_top);
+        close(g, f);
+        close(g, f);
+
+        popCheckedArraysAt(f, contig_if);
+        op(g, OP_else_);
+
+        can_pipe = true;
+        lget(g, f.indirect_bound_distinct_local);
+        i32Const(g, 1);
+        op(g, OP_i32_eq);
+        lget(g, pos_base); lget(g, vel_base); op(g, OP_i32_ne);
+        op(g, OP_i32_and);
+        let pipe_if = open(g, f, OP_if_);
+
+        let p_exit = open(g, f, OP_block);
+        let p_top = open(g, f, OP_loop);
+        lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, p_exit);
+
+        // Descending `ids` loads (12, 8, 4, 0) => 1 wtime bounds check per 4 IDs!
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 12); i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[3]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 8);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[2]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[1]);
+        lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[0]);
+
+        for s in 0..4 {
+            lget(g, pos_base); lget(g, id_l[s]); op(g, OP_i32_add); ltee(g, pa_l[s]);
+            simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, pv_l[s]);
+            lget(g, vel_base); lget(g, id_l[s]); op(g, OP_i32_add);
+            simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, vv_l[s]);
+        }
+
+        // ONE combined tag check across all 4 entities!
+        lget(g, pv_l[0]); lget(g, vv_l[0]); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[1]); lget(g, vv_l[1]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[2]); lget(g, vv_l[2]); simdOp(g, SIMD_v128_or);
+        lget(g, pv_l[3]); lget(g, vv_l[3]); simdOp(g, SIMD_v128_or); simdOp(g, SIMD_v128_or);
+        simdOp(g, SIMD_v128_or);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+        op(g, OP_i32_eqz);
+        let all_if = open(g, f, OP_if_);
+        for s in 0..4 {
+            lget(g, pa_l[s]); lget(g, pv_l[s]); lget(g, vv_l[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, 0);
+        }
+        popCheckedArraysAt(f, all_if);
+        op(g, OP_else_);
+        for s in 0..4 {
+            lget(g, pv_l[s]); lget(g, vv_l[s]); simdOp(g, SIMD_v128_or);
+            simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+            op(g, OP_i32_eqz);
+            let s_if = open(g, f, OP_if_);
+            lget(g, pa_l[s]); lget(g, pv_l[s]); lget(g, vv_l[s]);
+            emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+            simdMemOp(g, SIMD_v128_store, 2, 0);
+            popCheckedArraysAt(f, s_if);
+            close(g, f);
+        }
+        close(g, f);
+
+        lget(g, ids_ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ids_ptr);
+        lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+        br(g, f, OP_br, p_top);
+        close(g, f);
+        close(g, f);
+
+        popCheckedArraysAt(f, pipe_if);
+        op(g, OP_else_);
+    }
+
+    // Sequential-per-entity 4x unrolled indirect loop (safe even for duplicate IDs and pos == vel!).
+    let s_exit = open(g, f, OP_block);
+    let s_top = open(g, f, OP_loop);
+    lget(g, rem); op(g, OP_i32_eqz); br(g, f, OP_br_if, s_exit);
+
+    lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 12); i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[3]);
+    lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 8);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[2]);
+    lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[1]);
+    lget(g, ids_ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);  i32Const(g, 4); op(g, OP_i32_shl); lset(g, id_l[0]);
+
+    for s in 0..4 {
+        lget(g, pos_base); lget(g, id_l[s]); op(g, OP_i32_add); ltee(g, pa_l[0]);
+        simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, pv_l[0]);
+        lget(g, vel_base); lget(g, id_l[s]); op(g, OP_i32_add);
+        simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, vv_l[0]);
+        lget(g, pv_l[0]); lget(g, vv_l[0]); simdOp(g, SIMD_v128_or);
+        simdLaneOp(g, SIMD_i32x4_extract_lane, 0);
+        op(g, OP_i32_eqz);
+        let u_if = open(g, f, OP_if_);
+        lget(g, pa_l[0]); lget(g, pv_l[0]); lget(g, vv_l[0]);
+        emitVec3SimdAddSub(g, f, vm.vec_op, nan_v);
+        simdMemOp(g, SIMD_v128_store, 2, 0);
+        popCheckedArraysAt(f, u_if);
+        close(g, f);
+    }
+
+    lget(g, ids_ptr); i32Const(g, 16); op(g, OP_i32_add); lset(g, ids_ptr);
+    lget(g, rem); i32Const(g, 4); op(g, OP_i32_sub); lset(g, rem);
+    br(g, f, OP_br, s_top);
+    close(g, f);
+    close(g, f);
+
+    if can_pipe { close(g, f); }
+    if can_contig { close(g, f); }
+
+    lget(g, index); lget(g, n4); op(g, OP_i32_add); lset(g, index);
+    popCheckedArraysAt(f, run_if);
+    close(g, f);
+    f.checked_elems_len = 0;
+    return blot_direct_types::Error.none;
 }
 
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -6175,6 +6602,232 @@ fn tryEmitBlockedMatmulRowLoop(
     let b_str_loc = w(g, b_str_val, 0);
     let c_str_loc = w(g, c_str_val, 0);
 
+    let a_str_bytes = local32(g, f);
+    lget(g, a_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, a_str_bytes);
+    let b_str_bytes = local32(g, f);
+    lget(g, b_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, b_str_bytes);
+    let c_str_bytes = local32(g, f);
+    lget(g, c_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, c_str_bytes);
+
+    let b_need = local32(g, f);
+    lget(g, n_loc); i32Const(g, 1); op(g, OP_i32_sub); lget(g, b_str_loc); op(g, OP_i32_mul);
+    lget(g, m_loc); op(g, OP_i32_add); lset(g, b_need);
+    let b_byte_end = local32(g, f);
+    lget(g, b_base); lget(g, b_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, b_byte_end);
+
+    var nan_v: u32 = 0xffffffff;
+    if !f.defer_f32_nan {
+        nan_v = local(g, f, VT_v128);
+        v128Const4(g, 0x7fc00000);
+        lset(g, nan_v);
+    }
+
+    // 6B-1 Fast Path A: 4-row x 8-col (8 x v128 accumulators) + 2x k-unrolling!
+    // Shares each b[k, col+16..0] across 4 rows (halving b loads & wtime checks vs 5C)
+    // and coalesces pairs of a[r, k+1..k] loads with descending offsets (4, 0).
+    let rows_4 = local32(g, f);
+    lget(g, rows_loc); i32Const(g, 0xfffffffc); op(g, OP_i32_and); lset(g, rows_4);
+    let a_need4 = local32(g, f);
+    lget(g, rows_4); i32Const(g, 1); op(g, OP_i32_sub); lget(g, a_str_loc); op(g, OP_i32_mul);
+    lget(g, n_loc); op(g, OP_i32_add); lset(g, a_need4);
+    let c_need4 = local32(g, f);
+    lget(g, rows_4); i32Const(g, 1); op(g, OP_i32_sub); lget(g, c_str_loc); op(g, OP_i32_mul);
+    lget(g, m_loc); op(g, OP_i32_add); lset(g, c_need4);
+    let a4_byte_end = local32(g, f);
+    lget(g, a_base); lget(g, a_need4); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, a4_byte_end);
+    let c4_byte_end = local32(g, f);
+    lget(g, c_base); lget(g, c_need4); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, c4_byte_end);
+
+    lget(g, rows_loc); i32Const(g, 4); op(g, OP_i32_ge_u);
+    lget(g, rows_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, n_loc); i32Const(g, 0); op(g, OP_i32_gt_u); op(g, OP_i32_and);
+    lget(g, n_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, m_loc); i32Const(g, 8); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, m_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, a_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, b_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_str_loc); i32Const(g, 4096); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_str_loc); lget(g, m_loc); op(g, OP_i32_ge_u); op(g, OP_i32_and);
+    lget(g, a_need4); lget(g, a_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, b_need); lget(g, b_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c_need4); lget(g, c_len); op(g, OP_i32_le_u); op(g, OP_i32_and);
+    lget(g, c4_byte_end); lget(g, a_base); op(g, OP_i32_le_u);
+    lget(g, a4_byte_end); lget(g, c_base); op(g, OP_i32_le_u);
+    op(g, OP_i32_or); op(g, OP_i32_and);
+    lget(g, c4_byte_end); lget(g, b_base); op(g, OP_i32_le_u);
+    lget(g, b_byte_end); lget(g, c_base); op(g, OP_i32_le_u);
+    op(g, OP_i32_or); op(g, OP_i32_and);
+
+    let g4_if = open(g, f, OP_if_);
+    let a_str4_bytes = local32(g, f);
+    lget(g, a_str_bytes); i32Const(g, 2); op(g, OP_i32_shl); lset(g, a_str4_bytes);
+    let c_str4_bytes = local32(g, f);
+    lget(g, c_str_bytes); i32Const(g, 2); op(g, OP_i32_shl); lset(g, c_str4_bytes);
+    let m_tile8 = local32(g, f);
+    lget(g, m_loc); i32Const(g, 0xfffffff8); op(g, OP_i32_and); lset(g, m_tile8);
+    let n_even = local32(g, f);
+    lget(g, n_loc); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, n_even);
+
+    let r4_i = constLocal(g, f, 0);
+    var ar4: u32[4] = [0; 4];
+    var cr4: u32[4] = [0; 4];
+    var ac4: u32[4] = [0; 4];
+    var ct4: u32[4] = [0; 4];
+    var ak0_4: u32[4] = [0; 4];
+    var ak1_4: u32[4] = [0; 4];
+    var acc4_0: u32[4] = [0; 4];
+    var acc4_1: u32[4] = [0; 4];
+    var sc4: u32[4] = [0; 4];
+    for r in 0..4 {
+        ar4[r] = local32(g, f);
+        cr4[r] = local32(g, f);
+        ac4[r] = local32(g, f);
+        ct4[r] = local32(g, f);
+        ak0_4[r] = local(g, f, VT_f32);
+        ak1_4[r] = local(g, f, VT_f32);
+        acc4_0[r] = local(g, f, VT_v128);
+        acc4_1[r] = local(g, f, VT_v128);
+        sc4[r] = local(g, f, VT_f32);
+    }
+    lget(g, a_base); lset(g, ar4[0]);
+    lget(g, c_base); lset(g, cr4[0]);
+    let col4_i = local32(g, f);
+    let col4_byte = local32(g, f);
+    let b4_cur = local32(g, f);
+    let k4_i = local32(g, f);
+    let va4 = local(g, f, VT_v128);
+    let vb4_0 = local(g, f, VT_v128);
+    let vb4_1 = local(g, f, VT_v128);
+    let sb4 = local(g, f, VT_f32);
+
+    let r4_exit = open(g, f, OP_block);
+    let r4_top = open(g, f, OP_loop);
+    lget(g, r4_i); lget(g, rows_4); op(g, OP_i32_ge_u); br(g, f, OP_br_if, r4_exit);
+
+    for r in 1..4 {
+        lget(g, ar4[r - 1]); lget(g, a_str_bytes); op(g, OP_i32_add); lset(g, ar4[r]);
+        lget(g, cr4[r - 1]); lget(g, c_str_bytes); op(g, OP_i32_add); lset(g, cr4[r]);
+    }
+    i32Const(g, 0); lset(g, col4_i);
+    i32Const(g, 0); lset(g, col4_byte);
+
+    let t4_exit = open(g, f, OP_block);
+    let t4_top = open(g, f, OP_loop);
+    lget(g, col4_i); lget(g, m_tile8); op(g, OP_i32_ge_u); br(g, f, OP_br_if, t4_exit);
+
+    for r in 0..4 {
+        lget(g, cr4[r]); lget(g, col4_byte); op(g, OP_i32_add); ltee(g, ct4[r]);
+        simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, acc4_1[r]);
+        lget(g, ct4[r]); simdMemOp(g, SIMD_v128_load, 2, 0); lset(g, acc4_0[r]);
+        lget(g, ar4[r]); lset(g, ac4[r]);
+    }
+    lget(g, b_base); lget(g, col4_byte); op(g, OP_i32_add); lset(g, b4_cur);
+    i32Const(g, 0); lset(g, k4_i);
+
+    // 2x unrolled k loop (descending a offsets 4,0 + descending b offsets 16,0)
+    let k4_exit = open(g, f, OP_block);
+    let k4_top = open(g, f, OP_loop);
+    lget(g, k4_i); lget(g, n_even); op(g, OP_i32_ge_u); br(g, f, OP_br_if, k4_exit);
+
+    for r in 0..4 {
+        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 4); lset(g, ak1_4[r]);
+        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, ak0_4[r]);
+    }
+    // Step k
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
+    for r in 0..4 {
+        lget(g, ak0_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
+        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
+        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+    }
+    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
+    // Step k + 1
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
+    for r in 0..4 {
+        lget(g, ak1_4[r]); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
+        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
+        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+        lget(g, ac4[r]); i32Const(g, 8); op(g, OP_i32_add); lset(g, ac4[r]);
+    }
+    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
+    lget(g, k4_i); i32Const(g, 2); op(g, OP_i32_add); lset(g, k4_i);
+    br(g, f, OP_br, k4_top);
+    close(g, f);
+    close(g, f);
+
+    // Odd n single-k tail
+    lget(g, k4_i); lget(g, n_loc); op(g, OP_i32_lt_u);
+    let oddk_if = open(g, f, OP_if_);
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 16); lset(g, vb4_1);
+    lget(g, b4_cur); simdMemOp(g, SIMD_v128_load, 2, 0);  lset(g, vb4_0);
+    for r in 0..4 {
+        lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); simdOp(g, SIMD_f32x4_splat); lset(g, va4);
+        lget(g, acc4_1[r]); lget(g, va4); lget(g, vb4_1); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_1[r]);
+        lget(g, acc4_0[r]); lget(g, va4); lget(g, vb4_0); simdOp(g, SIMD_f32x4_mul); simdOp(g, SIMD_f32x4_add); lset(g, acc4_0[r]);
+    }
+    popCheckedArraysAt(f, oddk_if);
+    close(g, f);
+
+    // Store all 4 rows in descending offset order (16, 0) with canonical NaN check!
+    for r in 0..4 {
+        lget(g, ct4[r]); lget(g, acc4_1[r]); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 16);
+        lget(g, ct4[r]); lget(g, acc4_0[r]); if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); } simdMemOp(g, SIMD_v128_store, 2, 0);
+    }
+
+    lget(g, col4_i); i32Const(g, 8); op(g, OP_i32_add); lset(g, col4_i);
+    lget(g, col4_byte); i32Const(g, 32); op(g, OP_i32_add); lset(g, col4_byte);
+    br(g, f, OP_br, t4_top);
+    close(g, f);
+    close(g, f);
+
+    // 4-row scalar column tail for `m % 8 != 0`:
+    let st4_exit = open(g, f, OP_block);
+    let st4_top = open(g, f, OP_loop);
+    lget(g, col4_i); lget(g, m_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, st4_exit);
+    for r in 0..4 {
+        lget(g, cr4[r]); lget(g, col4_byte); op(g, OP_i32_add); ltee(g, ct4[r]);
+        op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, sc4[r]);
+        lget(g, ar4[r]); lset(g, ac4[r]);
+    }
+    lget(g, b_base); lget(g, col4_byte); op(g, OP_i32_add); lset(g, b4_cur);
+    i32Const(g, 0); lset(g, k4_i);
+    let tk4_exit = open(g, f, OP_block);
+    let tk4_top = open(g, f, OP_loop);
+    lget(g, k4_i); lget(g, n_loc); op(g, OP_i32_ge_u); br(g, f, OP_br_if, tk4_exit);
+    lget(g, b4_cur); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lset(g, sb4);
+    for r in 0..4 {
+        lget(g, sc4[r]); lget(g, ac4[r]); op(g, OP_f32_load); uleb(g, 2); uleb(g, 0); lget(g, sb4); op(g, OP_f32_mul); op(g, OP_f32_add); lset(g, sc4[r]);
+        lget(g, ac4[r]); i32Const(g, 4); op(g, OP_i32_add); lset(g, ac4[r]);
+    }
+    lget(g, b4_cur); lget(g, b_str_bytes); op(g, OP_i32_add); lset(g, b4_cur);
+    lget(g, k4_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, k4_i);
+    br(g, f, OP_br, tk4_top);
+    close(g, f);
+    close(g, f);
+    for r in 0..4 {
+        lget(g, ct4[r]); lget(g, sc4[r]); if !f.defer_f32_nan { canonicalizeF32Stack(g, f); } op(g, OP_f32_store); uleb(g, 2); uleb(g, 0);
+    }
+    lget(g, col4_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, col4_i);
+    lget(g, col4_byte); i32Const(g, 4); op(g, OP_i32_add); lset(g, col4_byte);
+    br(g, f, OP_br, st4_top);
+    close(g, f);
+    close(g, f);
+
+    lget(g, ar4[0]); lget(g, a_str4_bytes); op(g, OP_i32_add); lset(g, ar4[0]);
+    lget(g, cr4[0]); lget(g, c_str4_bytes); op(g, OP_i32_add); lset(g, cr4[0]);
+    lget(g, r4_i); i32Const(g, 4); op(g, OP_i32_add); lset(g, r4_i);
+    br(g, f, OP_br, r4_top);
+    close(g, f);
+    close(g, f);
+
+    lget(g, rows_4);
+    lset(g, index);
+    popCheckedArraysAt(f, g4_if);
+    op(g, OP_else_);
+
+    // 5C Fast Path B: 2-row x 16-col (for rows == 2..3 or fallback when 4-row guard skipped)
     let rows_even = local32(g, f);
     lget(g, rows_loc); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, rows_even);
 
@@ -6183,18 +6836,12 @@ fn tryEmitBlockedMatmulRowLoop(
     lget(g, rows_even); i32Const(g, 1); op(g, OP_i32_sub); lget(g, a_str_loc); op(g, OP_i32_mul);
     lget(g, n_loc); op(g, OP_i32_add); lset(g, a_need);
 
-    let b_need = local32(g, f);
-    lget(g, n_loc); i32Const(g, 1); op(g, OP_i32_sub); lget(g, b_str_loc); op(g, OP_i32_mul);
-    lget(g, m_loc); op(g, OP_i32_add); lset(g, b_need);
-
     let c_need = local32(g, f);
     lget(g, rows_even); i32Const(g, 1); op(g, OP_i32_sub); lget(g, c_str_loc); op(g, OP_i32_mul);
     lget(g, m_loc); op(g, OP_i32_add); lset(g, c_need);
 
     let a_byte_end = local32(g, f);
     lget(g, a_base); lget(g, a_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, a_byte_end);
-    let b_byte_end = local32(g, f);
-    lget(g, b_base); lget(g, b_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, b_byte_end);
     let c_byte_end = local32(g, f);
     lget(g, c_base); lget(g, c_need); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, c_byte_end);
 
@@ -6225,25 +6872,13 @@ fn tryEmitBlockedMatmulRowLoop(
 
     let guard_if = open(g, f, OP_if_);
 
-    let a_str_bytes = local32(g, f);
-    lget(g, a_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, a_str_bytes);
     let a_str2_bytes = local32(g, f);
     lget(g, a_str_bytes); i32Const(g, 1); op(g, OP_i32_shl); lset(g, a_str2_bytes);
-    let b_str_bytes = local32(g, f);
-    lget(g, b_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, b_str_bytes);
-    let c_str_bytes = local32(g, f);
-    lget(g, c_str_loc); i32Const(g, 2); op(g, OP_i32_shl); lset(g, c_str_bytes);
     let c_str2_bytes = local32(g, f);
     lget(g, c_str_bytes); i32Const(g, 1); op(g, OP_i32_shl); lset(g, c_str2_bytes);
 
     let m_tile = local32(g, f);
     lget(g, m_loc); i32Const(g, 0xfffffff0); op(g, OP_i32_and); lset(g, m_tile);
-    var nan_v: u32 = 0;
-    if !f.defer_f32_nan {
-        nan_v = local(g, f, VT_v128);
-        v128Const4(g, 0x7fc00000);
-        lset(g, nan_v);
-    }
 
     let row_i = constLocal(g, f, 0);
     let a_row0 = local32(g, f); lget(g, a_base); lset(g, a_row0);
@@ -6404,6 +7039,7 @@ fn tryEmitBlockedMatmulRowLoop(
     // Advance outer `index = rows_even` so any odd final row falls through cleanly to 4C!
     lget(g, rows_even);
     lset(g, index);
+    close(g, f);
     close(g, f);
     f.checked_elems_len = 0;
     return blot_direct_types::Error.none;
@@ -6894,8 +7530,12 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if matmul2_err != blot_direct_types::Error.none { return neverVal(), matmul2_err; }
         let matmul_err = tryEmitBlockedMatmulKLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if matmul_err != blot_direct_types::Error.none { return neverVal(), matmul_err; }
+        let v3_err = tryEmitVec3MaybeLoop4x(g, f, id, info, carry_in_place, index, w(g, end, 0));
+        if v3_err != blot_direct_types::Error.none { return neverVal(), v3_err; }
         let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
         if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+        let ainit_err = tryEmitAffineInitLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
+        if ainit_err != blot_direct_types::Error.none { return neverVal(), ainit_err; }
         let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
         if red_err != blot_direct_types::Error.none { return neverVal(), red_err; }
         let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
@@ -6981,12 +7621,18 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 lset(g, min_len);
             }
             let all_ok = constLocal(g, f, 0);
+            // 0 = unsorted/duplicate, 1 = strictly increasing (distinct), 2 = strictly contiguous (ids[k] == ids[0] + k)
+            let all_distinct = constLocal(g, f, 0);
+            let prev_id = constLocal(g, f, 0);
+            let cur_id = local32(g, f);
             lget(g, ind_m);
             lget(g, ind_arr_len);
             op(g, OP_i32_le_u);
             let scan_if = open(g, f, OP_if_);
             i32Const(g, 1);
             lset(g, all_ok);
+            i32Const(g, 2);
+            lset(g, all_distinct);
             let scan_k = constLocal(g, f, 0);
             let s_exit = open(g, f, OP_block);
             let s_top = open(g, f, OP_loop);
@@ -7000,13 +7646,48 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_i32_shl);
             op(g, OP_i32_add);
             op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+            ltee(g, cur_id);
             lget(g, min_len);
             op(g, OP_i32_ge_u);
             let bad_if = open(g, f, OP_if_);
             i32Const(g, 0);
             lset(g, all_ok);
+            i32Const(g, 0);
+            lset(g, all_distinct);
             br(g, f, OP_br, s_exit);
             close(g, f);
+            // Classify monotonicity for 6A Shape 2:
+            // - if cur_id <= prev_id => 0 (unsorted/duplicate)
+            // - else if cur_id - prev_id != 1 => demote 2 -> 1 (strictly increasing, non-contiguous)
+            lget(g, scan_k);
+            i32Const(g, 0);
+            op(g, OP_i32_gt_u);
+            let cmp_if = open(g, f, OP_if_);
+            lget(g, cur_id);
+            lget(g, prev_id);
+            op(g, OP_i32_le_u);
+            let dup_if = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, all_distinct);
+            popCheckedArraysAt(f, dup_if);
+            op(g, OP_else_);
+            lget(g, cur_id);
+            lget(g, prev_id);
+            op(g, OP_i32_sub);
+            i32Const(g, 1);
+            op(g, OP_i32_ne);
+            lget(g, all_distinct);
+            i32Const(g, 2);
+            op(g, OP_i32_eq);
+            op(g, OP_i32_and);
+            let gap_if = open(g, f, OP_if_);
+            i32Const(g, 1);
+            lset(g, all_distinct);
+            close(g, f);
+            close(g, f);
+            close(g, f);
+            lget(g, cur_id);
+            lset(g, prev_id);
             lget(g, scan_k);
             i32Const(g, 1);
             op(g, OP_i32_add);
@@ -7020,15 +7701,18 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let prev_spec = f.in_specialized_loop;
             let prev_ib = f.indirect_bound_binding;
             let prev_il = f.indirect_bound_len;
+            let prev_id_loc = f.indirect_bound_distinct_local;
             f.in_specialized_loop = true;
             lget(g, all_ok);
             let ind_if = open(g, f, OP_if_);
             for ti in 0..ind_len_count { recordCheckedLe(f, min_len, ind_lens[ti]); }
             f.indirect_bound_binding = ind_id_b;
             f.indirect_bound_len = min_len;
+            f.indirect_bound_distinct_local = all_distinct;
             let err1a = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
             f.indirect_bound_binding = prev_ib;
             f.indirect_bound_len = prev_il;
+            f.indirect_bound_distinct_local = prev_id_loc;
             if err1a != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.defer_f32_nan = false; return neverVal(), err1a; }
             popCheckedArraysAt(f, ind_if);
             op(g, OP_else_);

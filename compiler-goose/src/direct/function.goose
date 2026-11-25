@@ -207,6 +207,8 @@ struct Fn {
     inlined_body_binding: u32 = 0,
     // Prevents recursive loop-specialization cloning.
     in_specialized_loop: bool = false,
+    // 6A: Local holding 1 iff the pre-scanned indirect index array is strictly increasing.
+    indirect_bound_distinct_local: u32 = 0xffffffff,
 }
 
 fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {

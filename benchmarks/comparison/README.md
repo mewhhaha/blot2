@@ -39,6 +39,6 @@ CARGO_TARGET_DIR=/tmp/blot_bench_target \
 
 - [2026-11-24-rust-and-bevy-ecs.json](../evidence/measurements/2026-11-24-rust-and-bevy-ecs.json):
   Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
-  AMD Ryzen 7 7800X3D with `blotc-goose` (Tier 5 `5A–5F`), `wtime-aot 0.1.1`
+  AMD Ryzen 7 7800X3D with `blotc-goose` (Tier 6 `6A–6C`), `wtime-aot 0.1.1`
   (`--backend x64`, `x64-v3`, `1201395`), `rustc 1.96.0-nightly`, and
   `bevy_ecs 0.20.1`.

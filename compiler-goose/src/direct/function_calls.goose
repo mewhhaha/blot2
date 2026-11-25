@@ -1682,6 +1682,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_loop_depth = f.loop_depth;
     let saved_indirect_b = f.indirect_bound_binding;
     let saved_indirect_l = f.indirect_bound_len;
+    let saved_indirect_d = f.indirect_bound_distinct_local;
     let saved_owned_computed = f.owned_uses_computed;
     let saved_owned_uses = f.owned_uses;
     let saved_owned_flows = f.owned_flows;
@@ -1720,6 +1721,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.loop_depth = 0;
     f.indirect_bound_binding = 0;
     f.indirect_bound_len = 0;
+    f.indirect_bound_distinct_local = 0xffffffff;
     f.owned_uses_computed = false;
     f.owned_uses = blot_support_zigmap::Map {};
     f.owned_flows = blot_support_zigmap::Map {};
@@ -1762,6 +1764,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.loop_depth = saved_loop_depth;
     f.indirect_bound_binding = saved_indirect_b;
     f.indirect_bound_len = saved_indirect_l;
+    f.indirect_bound_distinct_local = saved_indirect_d;
     f.owned_uses_computed = saved_owned_computed;
     f.owned_uses = saved_owned_uses;
     f.owned_flows = saved_owned_flows;

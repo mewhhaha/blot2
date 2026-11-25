@@ -162,11 +162,11 @@ def build_kernels_chart(data: dict) -> str:
     by_name = {row["name"]: row for row in data["kernels"]}
     specs = [
         ("particle_spark_simd", "65k × 32 · in-place spark SIMD"),
-        ("mandelbrot_f32", "256×256 FP · 4-pixel v128 escape SIMD"),
-        ("merge_sort", "100k U32 · cmov + memcpy + inlined"),
+        ("mandelbrot_f32", "256×256 FP · 8-pixel dual-v128 SIMD"),
+        ("merge_sort", "100k U32 · SIMD init + cmov + memcpy"),
         ("lcg_recurrence", "1,000,000 U32 · 16-wide v128 LCG"),
         ("prime_sieve", "100k Bool · strided fill + v128 reduce"),
-        ("matmul_64", "64×64 F32 · 2×16 (8×v128) blocked"),
+        ("matmul_64", "64×64 F32 · 4×8 2×k-unroll + SIMD init"),
     ]
 
     w, h = 920, 492
@@ -266,7 +266,8 @@ def build_ecs_chart(data: dict) -> str:
     els.append(f'  <rect x="{tx}" y="{ty}" width="{tw}" height="{th}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(tx + 16, ty + 25, "Dense iteration: Pos += Vel (10,000 entities × 100 ticks)", size=13.5, weight="700"))
     ratio_spark = dense["bevy_native_ms"] / dense["ink_soa_spark_simd_ms"]
-    els.append(pill(tx + tw - 14, ty + 24, f"Blot spark SoA {ratio_spark:.1f}× faster vs Bevy AoS", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    ratio_aos = dense["bevy_native_ms"] / dense["ink_cached_query_ms"]
+    els.append(pill(tx + tw - 14, ty + 24, f"Ink AoS {ratio_aos:.1f}× · SoA {ratio_spark:.1f}× faster vs Bevy", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
     dense_rows = sorted(
         [
@@ -378,7 +379,7 @@ def build_ecs_chart(data: dict) -> str:
         text(
             28,
             h - 18,
-            "Ink v128 AoS queries match native Bevy dense speed (~1%); entity-indexed owned columns lead on spawn, tag churn, snapshots & spark SoA.",
+            "Ink 4× coalesced v128 AoS queries beat native Bevy 2.2–2.6× on dense loops and lead on spawn, tag churn, snapshots & spark SoA.",
             size=10.9,
             fill=TEXT_MUTED,
         )
