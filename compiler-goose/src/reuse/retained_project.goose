@@ -531,6 +531,166 @@ fn revisedCallLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,u3
  return 0,0;
 }
 
+fn sameSymbolPrefix(old:const blot_parse_symbols::Pool&,next:const blot_parse_symbols::Pool&)->bool {
+ if old.entries.len>next.entries.len || old.bytes.len>next.bytes.len {return false;}
+ if old.bytes.items!=next.bytes.items[..old.bytes.len] {return false;}
+ for i in 0..old.entries.len {
+  let ea=old.entries.items[i];
+  let eb=next.entries.items[i];
+  if ea.offset!=eb.offset || ea.len!=eb.len || ea.hash!=eb.hash {return false;}
+ }
+ return true;
+}
+
+fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const blot_parse_symbols::Pool&,next_syms:const blot_parse_symbols::Pool&)->bool {
+ let ot:const Tree& =old.tree;
+ let nt:const Tree& =next.tree;
+ if ot.diagnostics.len!=0 || nt.diagnostics.len!=0 {return false;}
+ if ot.has_typed_staging!=nt.has_typed_staging {return false;}
+ if ot.nodes.len!=nt.nodes.len || !sameWords(ot.roots.items,nt.roots.items) || !sameWords(ot.extra.items,nt.extra.items) {return false;}
+ if !sameSymbolPrefix(old_syms,next_syms) {return false;}
+ for i in 0..ot.nodes.len {
+  let a=ot.nodes.items[i];
+  let b=nt.nodes.items[i];
+  if a.tag!=b.tag || a.a!=b.a || a.b!=b.b || a.c!=b.c {return false;}
+  if a.tag==blot_parse_ast::tag_string {
+   let sa=ot.spans.items[i];
+   let sb=nt.spans.items[i];
+   if sa.end>old.source.len || sb.end>next.source.len || old.source[sa.start..sa.end]!=next.source[sb.start..sb.end] {return false;}
+  }
+ }
+ return true;
+}
+
+fn spanInFunctionDecl(tree:const Tree&,span:blot_parse_ast::Span)->bool {
+ for root in tree.roots.items {
+  let rs=tree.span(root);
+  if span.start<rs.start || span.end>rs.end {continue;}
+  if tree.node(root).tag!=blot_parse_ast::tag_value_decl {return false;}
+  let decl=tree.value_decl(root);
+  if !decl.function_declaration || decl.where.len!=0 || decl.attributes.len!=0 {return false;}
+  let bs=tree.span(decl.body);
+  return span.start>=bs.start && span.end<=bs.end;
+ }
+ return false;
+}
+
+fn isSafeU32LiteralUse(core:const Core&,id:u32,old_bits:u32,new_bits:u32)->bool {
+ for n,i in core.nodes {
+  let tag=n.tag;
+  match tag {
+   invalid,constant,reference,constructor_function,primitive_function,panic,type_constructor,operation_value,contract_method,closure=>{},
+   scalar=>{
+    if n.a==id || n.b==id {
+     match n.op {
+      equal,not_equal,less,less_equal,greater,greater_equal,bit_and,bit_or,bit_xor=>{},
+      add,sub,mul=>{ if old_bits<=1 || new_bits<=1 {return false;} },
+      _=>{return false;},
+     }
+    }
+   },
+   logical,apply,if_value,if_stmt,bind,pattern_bind,return_,project,associated,result_associated,product,record,construct,block_,suite,array,break_=>{},
+   call=>{
+    let ci=core.call(i as u32);
+    for arg in ci.arguments {
+     if arg==id {
+      if ci.target.unit==0 && (ci.target.binding as i64)<core.bindings.len {
+       if core.bindings[ci.target.binding].kind==blot_reuse_principal_interface::Kind.external && core.bindings[ci.target.binding].target.binding==0 {return false;}
+      }
+     }
+    }
+   },
+   loop_=>{
+    let li=core.loopInfo(i as u32);
+    if li.first==id || li.end==id {return false;}
+   },
+   spark=>{
+    let si=core.sparkInfo(i as u32);
+    if si.source==id || si.end==id {return false;}
+   },
+   update=>{
+    let ui=core.updateInfo(i as u32);
+    if ui.root==id || ui.value==id {return false;}
+    for st in core.updateSelectors(i as u32) {if st.index==id {return false;}}
+   },
+   match_=>{
+    for inp in core.matchInputs(i as u32) {if inp==id {return false;}}
+   },
+   array_op,storage=>{
+    for child in core.children(i as u32) {if child==id {return false;}}
+   },
+   _=>{
+    if n.a==id || n.b==id || n.c==id {return false;}
+    for child in core.children(i as u32) {if child==id {return false;}}
+   },
+  }
+ }
+ return true;
+}
+
+fn isSafeF32LiteralPatch(old_bits:u32,new_bits:u32)->bool {
+ // Reject NaN/Inf, special peephole constants (0, -0, 1, 2, -2), or bounded-finite class changes.
+ if (old_bits & 0x7f800000)==0x7f800000 || (new_bits & 0x7f800000)==0x7f800000 {return false;}
+ if old_bits==0 || old_bits==0x80000000 || old_bits==0x3f800000 || old_bits==0x40000000 || old_bits==0xc0000000 {return false;}
+ if new_bits==0 || new_bits==0x80000000 || new_bits==0x3f800000 || new_bits==0x40000000 || new_bits==0xc0000000 {return false;}
+ let old_le1=(old_bits & 0x7fffffff)<=0x3f800000;
+ let new_le1=(new_bits & 0x7fffffff)<=0x3f800000;
+ if old_le1!=new_le1 {return false;}
+ let old_bf=(old_bits & 0x7f800000)<0x50000000;
+ let new_bf=(new_bits & 0x7f800000)<0x50000000;
+ return old_bf==new_bf;
+}
+
+fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,u32 {
+ let ot:const Tree& =old.tree;
+ let nt:const Tree& =next.tree;
+ if ot.has_typed_staging || nt.has_typed_staging {return 0,0;}
+ if old.source.len!=next.source.len || ot.nodes.len!=nt.nodes.len {return 0,0;}
+ if !sameWords(ot.roots.items,nt.roots.items) || !sameWords(ot.extra.items,nt.extra.items) {return 0,0;}
+ var first:i64=0;
+ while first<old.source.len && old.source[first]==next.source[first] {first++;}
+ if first==old.source.len {return 0,0;}
+ var lit:u32=0;
+ for i in 0..nt.nodes.len {
+  let a=ot.nodes.items[i];
+  let b=nt.nodes.items[i];
+  let sa=ot.spans.items[i];
+  let sb=nt.spans.items[i];
+  if sa.start!=sb.start || sa.end!=sb.end {return 0,0;}
+  if a.tag!=b.tag || a.b!=b.b || a.c!=b.c {return 0,0;}
+  if a.a!=b.a {
+   if lit!=0 {return 0,0;}
+   if a.tag!=blot_parse_ast::tag_integer && a.tag!=blot_parse_ast::tag_float {return 0,0;}
+   if (sb.start as i64)>first || (sb.end as i64)<=first {return 0,0;}
+   lit=i as u32;
+  }
+ }
+ if lit==0 {return 0,0;}
+ let span=nt.spans.items[lit];
+ if old.source[span.end..]!=next.source[span.end..] {return 0,0;}
+ if !spanInFunctionDecl(nt,span) {return 0,0;}
+ for pat in core.patterns {
+  if pat.span.start==span.start && pat.span.end==span.end {return 0,0;}
+ }
+ let old_bits=ot.nodes.items[lit].a;
+ let new_bits=nt.nodes.items[lit].a;
+ let is_float=nt.nodes.items[lit].tag==blot_parse_ast::tag_float;
+ if is_float && !isSafeF32LiteralPatch(old_bits,new_bits) {return 0,0;}
+ var want_ty=blot_check_types::u32_type;
+ if is_float {want_ty=blot_check_types::f32_type;}
+ var id:u32=0;
+ for node,i in core.nodes {
+  let site=core.spans[i];
+  if site.start==span.start && site.end==span.end {
+   if id!=0 || node.tag!=blot_check_core::Tag.constant || node.ty!=want_ty || node.a!=old_bits {return 0,0;}
+   id=i as u32;
+  }
+ }
+ if id==0 {return 0,0;}
+ if !is_float && !isSafeU32LiteralUse(core,id,old_bits,new_bits) {return 0,0;}
+ return id,new_bits;
+}
+
 fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
  let cache .= engine.persistentCache();
@@ -551,8 +711,15 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   var literal:u32=0;
   var bits:u32=0;
   if changed[index] && !inherited && !affected[index] {
-   literal,bits=revisedCallLiteral(previous.source.unit(unit),engine.source.unit(unit),previous_core.units[index]);
-   if literal!=0 {changed[index]=false;}
+   if sameTriviaSyntax(previous.source.unit(unit),engine.source.unit(unit),previous.source.symbols,engine.source.symbols) {
+    changed[index]=false;
+   } else {
+    literal,bits=revisedCallLiteral(previous.source.unit(unit),engine.source.unit(unit),previous_core.units[index]);
+    if literal==0 {
+     literal,bits=revisedScalarLiteral(previous.source.unit(unit),engine.source.unit(unit),previous_core.units[index]);
+    }
+    if literal!=0 {changed[index]=false;}
+   }
   }
   if !changed[index] {
    let debit=previous.debits[index];

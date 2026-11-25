@@ -730,3 +730,93 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("persistent trivia and single U32/F32 literal edits skip check and lower with byte-exact oracle match", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const calc = dir + "/calc.blot";
+  const baseCalc = [
+    "func mix (n: U32): U32 => return do:",
+    "  let acc: U32 = 0",
+    "  for i in 0..n:",
+    "    if i == 1:",
+    "      acc := @u32.add acc 5",
+    "    else:",
+    "      acc := @u32.add acc i",
+    "  return acc",
+    "func gain (x: F32): F32 => return @f32.mul x 0.25",
+    "",
+  ].join("\n");
+  const dummyImports: string[] = [];
+  for (let i = 0; i < 15; i++) {
+    await Deno.writeTextFile(dir + `/m${i}.blot`, "const tag: U32 = 1\n");
+    dummyImports.push(`import * as m${i} from "./m${i}"`);
+  }
+  const mainSource = [
+    ...dummyImports,
+    'import * as c from "./calc"',
+    "entry func run_u32 (n: U32): U32 => return c.mix n",
+    "entry func run_f32 (x: F32): F32 => return c.gain x",
+    "",
+  ].join("\n");
+  await Deno.writeTextFile(calc, baseCalc);
+  await Deno.writeTextFile(entry, mainSource);
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    frontendWorkers: 8,
+  };
+  const session = await createZigProjectCompiler(options);
+  try {
+    const checkEdit = async (
+      src: string,
+      wantU32: number,
+      wantF32: number,
+      expectZeroElab: boolean,
+    ) => {
+      const actual = await session.build({ sources: { [calc]: src } });
+      assert(actual.success, JSON.stringify(actual));
+      if (expectZeroElab) {
+        assert.equal(actual.stats.frontend.body_elaborations, 0);
+      }
+      const oracle = await createZigProjectCompiler(options);
+      try {
+        const fresh = await oracle.build({ sources: { [calc]: src } });
+        assert(fresh.success, JSON.stringify(fresh));
+        assert.deepEqual(actual.bytes, fresh.bytes);
+      } finally {
+        await oracle.dispose();
+      }
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("run_u32", 4), wantU32);
+        assert.equal(guest.call("run_f32", 8.0), wantF32);
+      } finally {
+        guest.dispose();
+      }
+    };
+    // Initial cold build: i=0..3, i==1 adds 5 -> 0+5+2+3 = 10; gain(8) = 2.0.
+    await checkEdit(baseCalc, 10, 2.0, false);
+    // Comment-only edit skips check and lower completely.
+    const commented = baseCalc + "// trailing note\n";
+    await checkEdit(commented, 10, 2.0, true);
+    // Single same-length U32 literal edit in comparison (1 -> 0 -> 2): 0->5+1+2+3=11, 2->0+1+5+3=9.
+    const u32Zero = commented.replace("if i == 1:", "if i == 0:");
+    await checkEdit(u32Zero, 11, 2.0, true);
+    const u32Edited = u32Zero.replace("if i == 0:", "if i == 2:");
+    await checkEdit(u32Edited, 9, 2.0, true);
+    // Single same-length F32 literal edit (0.25 -> 0.50): gain(8) = 4.0.
+    const f32Edited = u32Edited.replace("0.25", "0.50");
+    await checkEdit(f32Edited, 9, 4.0, true);
+    // Special F32 peephole constant (2.00) must fall back cleanly and match oracle.
+    const specialF32 = f32Edited.replace("0.50", "2.00");
+    await checkEdit(specialF32, 9, 16.0, false);
+    // Restoring from 2.00 back to 0.25 must not relocate the strength-reduced f32.add.
+    await checkEdit(baseCalc, 10, 2.0, false);
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});

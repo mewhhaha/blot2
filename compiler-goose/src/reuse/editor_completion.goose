@@ -54,6 +54,7 @@ struct Provider {ordinary:blot_reuse_revision_inputs::Provider,filename:const u8
 fn canonical(self_:Provider&,path:const u8[:],out:u8[>..<]&)->Error {return self_.ordinary.canonical(path,out);}
 fn recordProbedCanonical(self_:Provider&,path:const u8[:],canonical:const u8[:])->Error {return self_.ordinary.recordProbedCanonical(path,canonical);}
 fn read(self_:Provider&,path:const u8[:],limit:i64,out:u8[>..<]&)->Error {if self_.replacement.present && self_.filename==path {if self_.replacement.value.len>limit {return blot_error::Error.source_limit;}out.append(self_.replacement.value);return blot_error::Error.none;}return self_.ordinary.read(path,limit,out);}
+fn readView(self_:Provider&,path:const u8[:],limit:i64,scratch:u8[>..<]&)->const u8[:],Error {if self_.replacement.present && self_.filename==path {if self_.replacement.value.len>limit {return default<const u8[:]>(),blot_error::Error.source_limit;}return self_.replacement.value,blot_error::Error.none;}return self_.ordinary.readView(path,limit,scratch);}
 fn recordProbedRead(self_:Provider&,path:const u8[:],source:const u8[:],limit:i64)->Error {return self_.ordinary.recordProbedRead(path,source,limit);}
 fn resolve(self_:Provider&,source:const u8[:],request:const u8[:],options:blot_reuse_project::Options,out:u8[>..<]&)->Error {return self_.ordinary.resolve(source,request,options,out);}
 fn cause(self_:const Provider&,error:Error)->const u8[:] {return self_.ordinary.cause(error);}

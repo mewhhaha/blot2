@@ -106,6 +106,18 @@ fn encode(out:u8[>..<]&,opcode:u8,value:u32)->bool {
     return false;
 }
 
+fn isSafeF32Relocation(old_bits:u32,new_bits:u32)->bool {
+    if (old_bits & 0x7f800000)==0x7f800000 || (new_bits & 0x7f800000)==0x7f800000 { return false; }
+    if old_bits==0 || old_bits==0x80000000 || old_bits==0x3f800000 || old_bits==0x40000000 || old_bits==0xc0000000 { return false; }
+    if new_bits==0 || new_bits==0x80000000 || new_bits==0x3f800000 || new_bits==0x40000000 || new_bits==0xc0000000 { return false; }
+    let old_le1=(old_bits & 0x7fffffff)<=0x3f800000;
+    let new_le1=(new_bits & 0x7fffffff)<=0x3f800000;
+    if old_le1!=new_le1 { return false; }
+    let old_bf=(old_bits & 0x7f800000)<0x50000000;
+    let new_bf=(new_bits & 0x7f800000)<0x50000000;
+    return old_bf==new_bf;
+}
+
 fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&)->u8[:],i64 {
     if image.bytes.len==0 || previous.entry!=next.entry || previous.units.len!=next.units.len { return default<u8[:]>(),-1; }
     var changed=blot_direct_map::U64Map{};
@@ -115,6 +127,7 @@ fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,rep
         if previous.paths[i]!=next.paths[i] || !blot_reuse_body_shape::same_check_core_Module(old,unit) { return default<u8[:]>(),-1; }
         for node,id in unit.nodes {
             if node.tag==blot_check_core::Tag.constant && node.a!=old.nodes[id].a {
+                if node.ty==blot_check_types::f32_type && !isSafeF32Relocation(old.nodes[id].a,node.a) { return default<u8[:]>(),-1; }
                 changed.put(((unit.unit as u64)<<32) | id as u32,0);
             }
         }
@@ -130,9 +143,12 @@ fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,rep
         if !found { continue; }
         if site.offset<0 || site.offset>=image.bytes.len { return default<u8[:]>(),-1; }
         let opcode=image.bytes[site.offset];
+        let old_val=previous.units[site.unit-1].nodes[site.node].a;
+        let new_val=next.units[site.unit-1].nodes[site.node].a;
+        if opcode==blot_direct_writer::OP_f32_const && !isSafeF32Relocation(old_val,new_val) { return default<u8[:]>(),-1; }
         old_bytes.clear();new_bytes.clear();
-        if !encode(old_bytes,opcode,previous.units[site.unit-1].nodes[site.node].a) { return default<u8[:]>(),-1; }
-        let encoded=encode(new_bytes,opcode,next.units[site.unit-1].nodes[site.node].a);
+        if !encode(old_bytes,opcode,old_val) { return default<u8[:]>(),-1; }
+        let encoded=encode(new_bytes,opcode,new_val);
         let start=site.offset+1;
         if new_bytes.len!=old_bytes.len || start+old_bytes.len>image.bytes.len || image.bytes[start..start+old_bytes.len]!=old_bytes[..] { return default<u8[:]>(),-1; }
         edits.push(i as u32);

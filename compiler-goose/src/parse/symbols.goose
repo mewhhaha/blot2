@@ -62,17 +62,91 @@ fn restrictView(pool:Pool&,end:i64) {
 fn outsideView(pool:const Pool&)->bool {return states[pool.lease-1].outside_view;}
 fn wyhash(text: const u8[:]) -> u64 { return blot_support_wyhash::hash(0,text); }
 fn find(pool: const Pool&, text: const u8[:], hash: u64) -> Symbol,bool {
- if pool.buckets.len==0 { return absent,false; }
- var slot=(hash & ((pool.buckets.len-1) as u64)) as i64;
- while pool.buckets.items[slot] != absent {
-  let symbol=pool.buckets.items[slot]; let entry=pool.entries.items[symbol-1];
-  if symbol<=pool.visible && entry.hash==hash && get(pool,symbol)==text { return symbol,true; }
-  slot=(slot+1)&(pool.buckets.len-1);
+ let items = pool.buckets.items;
+ if items.len==0 { return absent,false; }
+ let entries = pool.entries.items;
+ let bytes = pool.bytes.items;
+ let mask = items.len-1;
+ var slot=(hash & (mask as u64)) as i64;
+ while items[slot] != absent {
+  let symbol=items[slot]; let entry=entries[symbol-1];
+  if symbol<=pool.visible && entry.hash==hash && (entry.len as i64)==text.len && bytes[entry.offset..entry.offset+entry.len]==text { return symbol,true; }
+  slot=(slot+1)&mask;
  }
  return absent,false;
 }
 fn lookup(pool: const Pool&, text: const u8[:]) -> Symbol,bool { return find(pool,text,wyhash(text)); }
-fn reserve_buckets(pool: Pool&,count: i64) -> Error { if count<=pool.buckets.len/2 { return blot_error::Error.none; } var capacity: i64=16; if pool.buckets.len!=0 { if pool.buckets.len>0x3fffffffffffffff { return blot_error::Error.symbol_limit; } capacity=pool.buckets.len*2; } let grown=pool_Buckets.alloc_slice(capacity); for &symbol in grown { symbol=absent; } for entry,index in pool.entries.items { var slot=(entry.hash&((capacity-1) as u64)) as i64; while grown[slot]!=absent { slot=(slot+1)&(capacity-1); } grown[slot]=(index+1) as u32; } pool.buckets.deinit(); pool.buckets.storage=grown; pool.buckets.items=grown; pool.buckets.len=capacity; return blot_error::Error.none; }
+let zero_buckets: Symbol[64] = [0; 64];
+fn zeroBuckets(slice: Symbol[:]) {
+ var off: i64 = 0;
+ while off + 64 <= slice.len {
+  slice[off..off+64].move_from(zero_buckets[..]);
+  off += 64;
+ }
+ if off < slice.len { slice[off..].move_from(zero_buckets[..slice.len-off]); }
+}
+fn reserve_buckets(pool: Pool&,count: i64) -> Error {
+ if count<=pool.buckets.len/2 { return blot_error::Error.none; }
+ var capacity: i64=16;
+ if pool.buckets.len!=0 { capacity=pool.buckets.len; }
+ while count>capacity/2 {
+  if capacity>0x3fffffffffffffff { return blot_error::Error.symbol_limit; }
+  capacity=capacity*2;
+ }
+ let grown=pool_Buckets.alloc_slice(capacity);
+ zeroBuckets(grown);
+ let mask = capacity-1;
+ for entry,index in pool.entries.items {
+  var slot=(entry.hash&(mask as u64)) as i64;
+  while grown[slot]!=absent { slot=(slot+1)&mask; }
+  grown[slot]=(index+1) as u32;
+ }
+ pool.buckets.deinit(); pool.buckets.storage=grown; pool.buckets.items=grown; pool.buckets.len=capacity;
+ return blot_error::Error.none;
+}
+fn reserve(pool: Pool&, count: i64, byte_hint: i64) -> Error {
+ assert(valid(pool));
+ if count > 0 {
+  let e_err = pool.entries.ensure(count);
+  if e_err != blot_error::Error.none { return e_err; }
+  let b_err = reserve_buckets(pool, count);
+  if b_err != blot_error::Error.none { return b_err; }
+ }
+ if byte_hint > 0 {
+  let s_err = pool.bytes.ensure(byte_hint);
+  if s_err != blot_error::Error.none { return s_err; }
+ }
+ return blot_error::Error.none;
+}
+// Append known-unique symbols `src[start..end]` directly at `dest.entries.len == start`.
+fn appendUniqueSlice(dest: Pool&, src: const Pool&, start: i64, end: i64) -> Error {
+ assert(valid(dest));
+ if end <= start { return blot_error::Error.none; }
+ assert(dest.entries.len == start && end <= src.entries.len);
+ if dest.read_only { dest.missing_name = true; return blot_error::Error.symbol_limit; }
+ let src_entries = src.entries.items;
+ let byte_start = src_entries[start].offset as i64;
+ let last = src_entries[end - 1];
+ let byte_end = (last.offset as i64) + (last.len as i64);
+ let byte_count = byte_end - byte_start;
+ if end > 0xffffffff || dest.bytes.len > 0xffffffff - byte_count { return blot_error::Error.symbol_limit; }
+ let err = reserve(dest, end, dest.bytes.len + byte_count);
+ if err != blot_error::Error.none { return err; }
+ let delta = dest.bytes.len - byte_start;
+ if byte_count > 0 { dest.bytes.append(src.bytes.items[byte_start..byte_end]); }
+ if dest.bytes.failure != blot_error::Error.none { return dest.bytes.failure; }
+ let buckets = dest.buckets.items;
+ let mask = buckets.len - 1;
+ for i in start..end {
+  let e = src_entries[i];
+  dest.entries.push(Entry { ((e.offset as i64) + delta) as u32, e.len, e.hash });
+  let symbol = (i + 1) as Symbol;
+  var slot = (e.hash & (mask as u64)) as i64;
+  while buckets[slot] != absent { slot = (slot + 1) & mask; }
+  buckets[slot] = symbol;
+ }
+ return dest.entries.failure;
+}
 fn intern(pool: Pool&, text: const u8[:]) -> Symbol,blot_error::Error { return intern_hashed(pool,text,wyhash(text)); }
 reusable[] var intern_bytes: u8[>..]=[];
 fn intern_hashed(pool: Pool&,text: const u8[:],hash: u64) -> Symbol,Error {

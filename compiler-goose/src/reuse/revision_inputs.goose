@@ -123,6 +123,7 @@ struct Provider {snapshot:Snapshot=Snapshot{}}
 fn provider(self_:Snapshot&)->Provider {assert(self_.valid());return Provider{self_};}
 fn canonical(self_:Provider&,path:const u8[:],output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.canonical(path);if error!=blot_error::Error.none {return error;}output.append(bytes);return blot_error::Error.none;}
 fn read(self_:Provider&,path:const u8[:],limit:i64,output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.read(path);if error!=blot_error::Error.none {return error;}if bytes.len>limit {self_.snapshot.setCause("StreamTooLong");return blot_error::Error.stream_too_long;}output.append(bytes);return blot_error::Error.none;}
+fn readView(self_:Provider&,path:const u8[:],limit:i64,scratch:u8[>..<]&)->const u8[:],Error {let bytes,error=self_.snapshot.read(path);if error!=blot_error::Error.none {return default<const u8[:]>(),error;}if bytes.len>limit {self_.snapshot.setCause("StreamTooLong");return default<const u8[:]>(),blot_error::Error.stream_too_long;}return bytes,blot_error::Error.none;}
 fn resolve(self_:Provider&,source:const u8[:],request:const u8[:],options:Options,output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.resolve(source,request);if error!=blot_error::Error.none {return error;}output.append(bytes);return blot_error::Error.none;}
 // Discovery borrows overlay bytes and samples ordinary files. The loader
 // alone records canonical names, reads, import decisions and error causes.

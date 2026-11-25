@@ -248,6 +248,11 @@ fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error 
     let fd=blot_native::open_read(terminated[0]);if fd<0 {return self_.ioFailure(fd);}
     return self_.readOpen(fd,maximum,output);
 }
+fn readView(self_:FileInputs&,path:const u8[:],maximum:i64,scratch:u8[>..<]&)->const u8[:],Error {
+    let err=self_.read(path,maximum,scratch);
+    if err!=blot_error::Error.none {return default<const u8[:]>(),err;}
+    return scratch[..],blot_error::Error.none;
+}
 fn readOpen(self_:FileInputs&,fd:i32,maximum:i64,output:u8[>..<]&)->Error {
     let before=output.len;var chunk:u8[65536];var failure=blot_error::Error.none;
     loop {
@@ -343,12 +348,8 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
         loader.project.reused_syntax++;
         return true,recorded.failure;
     }
-    for i in old.parse_start..old.parse_end {
-        let id=(i+1) as Symbol;
-        let actual,error=symbols.intern_hashed(parserSymbols(previous).get(id),parserSymbols(previous).entries.items[i].hash);
-        if error!=blot_error::Error.none {return false,error;}
-        assert(actual==id);
-    }
+    let replay_err=symbols.appendUniqueSlice(parserSymbols(previous),old.parse_start,old.parse_end);
+    if replay_err!=blot_error::Error.none {return false,replay_err;}
     recorded.append(old.parse_names);
     loader.verified_symbols=old.parse_end;
     if old.parser_tree.lease!=0 {
@@ -427,13 +428,13 @@ fn readCanonical<P>(self_:Loader<P>&,canonical:const u8[:],origin:Origin,has_pro
         return readSource(self_,filename,reserved,canonical,probed_source,allowed,origin);
     }
     var source_buf:u8[>..<]=[];
-    let source_error=self_.inputs.read(canonical,allowed+1,source_buf);
+    let source_view,source_error=self_.inputs.readView(canonical,allowed+1,source_buf);
     if source_error!=blot_error::Error.none {
         if source_error==blot_error::Error.out_of_memory {return no,source_error;}
         var code=Code.io_error;if source_error==blot_error::Error.stream_too_long {code=Code.source_limit;}else if source_error==blot_error::Error.file_not_found {code=Code.missing_file;}
         let reported=self_.report(origin,code,canonical,blot_support::some(self_.inputs.cause(source_error)));return no,reported;
     }
-    return readSource(self_,filename,reserved,canonical,source_buf[..],allowed,origin);
+    return readSource(self_,filename,reserved,canonical,source_view,allowed,origin);
 }
 fn readSource<P>(self_:Loader<P>&,filename:Symbol,reserved:blot_support::Option<UnitId>,canonical:const u8[:],source:const u8[:],allowed:i64,origin:Origin)->blot_support::Option<UnitId>,Error {
     let no=blot_support::none<UnitId>();
@@ -621,6 +622,17 @@ fn checkingOrder(project:const Project&,order:u32[>..]&) {
     }
 }
 
+fn sameSymbolPool(a:const blot_parse_symbols::Pool&,b:const blot_parse_symbols::Pool&)->bool {
+    if a.entries.len!=b.entries.len || a.bytes.len!=b.bytes.len {return false;}
+    if a.bytes.items!=b.bytes.items {return false;}
+    for i in 0..a.entries.len {
+        let ea=a.entries.items[i];
+        let eb=b.entries.items[i];
+        if ea.offset!=eb.offset || ea.len!=eb.len || ea.hash!=eb.hash {return false;}
+    }
+    return true;
+}
+
 // A producer sees its entire dependency chain, including generated names.
 // Keep parser coordinates separately so unchanged syntax can serve both views.
 fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?)->Error {
@@ -629,6 +641,53 @@ fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?
     let original .= projects[project.lease-1].parser_symbols;
     original=blot_parse_symbols::canonical(project.symbols);
     project.symbols=blot_parse_symbols::canonical(pool);
+    if previous && previous.units.len==project.units.len && previous.entry==entry &&
+       previous.imports.len==project.imports.len && previous.order.items==project.order.items &&
+       projects[previous.lease-1].parser_symbols.lease!=0 {
+        let prev_ps .= parserSymbols(previous);
+        let old_map=projects[previous.lease-1].checking_ids;
+        let prev_end=previous.unit(entry).parse_start;
+        if old_map.len==original.entries.len+1 && prev_end>0 && prev_end<=previous.symbols.entries.len &&
+           sameSymbolPool(original,prev_ps) {
+            var all_same=true;
+            for id in 1..project.units.len+1 {
+                if id as u32==entry {continue;}
+                let u .= project.units.items[id-1];
+                let pu .= previous.units.items[id-1];
+                if pu.parser_tree.lease!=u.tree.lease || pu.parser_tree.lease==0 ||
+                   u.imports.start!=pu.imports.start || u.imports.len!=pu.imports.len ||
+                   old_map[u.filename]!=pu.filename {
+                    all_same=false;break;
+                }
+            }
+            if all_same {
+                let cerr=project.symbols.appendUniqueSlice(previous.symbols,0,prev_end);
+                if cerr!=blot_error::Error.none {return cerr;}
+                for &unit in project.units.items {unit.filename=old_map[unit.filename];}
+                for &edge in project.imports.items {edge.path=old_map[edge.path];}
+                for id in 1..project.units.len+1 {
+                    if id as u32==entry {continue;}
+                    let unit .= project.units.items[id-1];
+                    let prev_u .= previous.units.items[id-1];
+                    let linked,rerr=prev_u.tree.retainParsed();
+                    if rerr!=blot_error::Error.none {return rerr;}
+                    unit.parser_tree=blot_parse_ast::canonical(unit.tree);
+                    unit.tree=blot_parse_ast::canonical(linked);
+                    let range=unit.imports;
+                    for &edge in project.imports.items[range.start..range.start+range.len] {
+                        edge.namespace_=unit.tree.import_decl(edge.declaration.node).namespace_;
+                    }
+                    unit.visible_names=prev_u.visible_names;
+                }
+                projects[project.lease-1].checking_ids=blot_reuse_project_check::copyOwned(old_map);
+                return blot_error::Error.none;
+            }
+        }
+    }
+    if previous {
+        let rerr=project.symbols.reserve(previous.symbols.entries.len,previous.symbols.bytes.len);
+        if rerr!=blot_error::Error.none {return rerr;}
+    }
     var names:u32[>..]=[];names.resize(original.entries.len+1,0);
     for i in 1..seed+1 {
         let error=linkSymbol(original,project.symbols,names[..],i as u32);

@@ -139,10 +139,14 @@ fn readInput(candidate: Candidate&,filename: const u8[:],path: const u8[:]) -> c
     loop {fd = blot_native::open_read(terminated[0]);if fd >= 0 {break;}let errno = blot_native::last_errno();if errno == 4 {continue;}let error = inputFailure(candidate,filename,errno,false);return default<const u8[:]>(),false,error;}
     var bytes: u8[>..<] = [];
     fn capture() -> const u8[:],bool,Error {
+        var chunk: u8[65536];
         loop {
-            let start = bytes.len;let amount = min(65536,maximum_file + 1 - start);bytes.resize(start + amount,0);let count = blot_native::read(fd,bytes[start],amount as u64);
-            if count < 0 {let errno = blot_native::last_errno();bytes.resize(start);if errno == 4 || errno == 110 {continue;}let error = inputFailure(candidate,filename,errno,true);return default<const u8[:]>(),false,error;}
-            bytes.resize(start + count);if bytes.len > maximum_file {candidate.fail(filename,"asset_limit","Asset input exceeds 16 MiB");return default<const u8[:]>(),false,blot_error::Error.none;}if count == 0 {break;}
+            let amount = min(65536,maximum_file + 1 - bytes.len);
+            let count = blot_native::read(fd,chunk[0],amount as u64);
+            if count < 0 {let errno = blot_native::last_errno();if errno == 4 || errno == 110 {continue;}let error = inputFailure(candidate,filename,errno,true);return default<const u8[:]>(),false,error;}
+            if count == 0 {break;}
+            bytes.append(chunk[..count]);
+            if bytes.len > maximum_file {candidate.fail(filename,"asset_limit","Asset input exceeds 16 MiB");return default<const u8[:]>(),false,blot_error::Error.none;}
         }
         let owned,error = candidate.own(bytes);return owned,error == blot_error::Error.none,error;
     }

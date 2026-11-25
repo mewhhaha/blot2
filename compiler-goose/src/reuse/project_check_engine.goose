@@ -154,9 +154,12 @@ fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDe
 }
 
 fn replaySymbols(pool:blot_parse_symbols::Pool&,original:const blot_parse_symbols::Pool&,end:i64)->Error {
+ if pool.entries.len==0 && end<=original.entries.len {
+  return pool.appendUniqueSlice(original,0,end);
+ }
  for index in pool.entries.len..end {
   let symbol=(index+1) as u32;
-  let actual,error=pool.intern(original.get(symbol));
+  let actual,error=pool.intern_hashed(original.get(symbol),original.entries.items[index].hash);
   if error!=blot_error::Error.none {return error;}
   if actual!=symbol {return blot_error::Error.invalid_artifact;}
  }
