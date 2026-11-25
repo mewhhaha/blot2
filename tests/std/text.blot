@@ -1,0 +1,80 @@
+import * as text from "std/text"
+import * as test from "std/test"
+import * as simd from "std/simd"
+
+private type Item is data = $Item { z: U32, value: F32, active: Bool }
+
+private func number_checks (): Unit ! { test.Test } =>
+  use test.eq_text "decimal zero" "0" (text.from_u32 0)
+  use test.eq_text "maximum U32" "4294967295" (text.from_u32 0xffff_ffff)
+  use test.eq_text "fraction" "0.5" (text.from_f32 0.5)
+  use test.eq_text "two places" "3.25" (text.from_f32 3.25)
+  use test.eq_text "negative fraction" "-2.75" (text.from_f32 (-2.75))
+  use test.eq_text "leading fractional zero" "0.03125" (text.from_f32 0.03125)
+  use test.eq_text "integer keeps decimal" "42.0" (text.from_f32 42.0)
+  use test.eq_text "large decimal integer" "4294967040.0" (text.from_f32 4294967040.0)
+  use test.eq_text "positive zero" "0.0" (text.from_f32 0.0)
+  use test.eq_text "positive infinity" "inf" (text.from_f32 (F32.div 1.0 0.0))
+  use test.eq_text "negative infinity" "-inf" (text.from_f32 (F32.div (-1.0) 0.0))
+  use test.eq_text "nan" "NaN" (text.from_f32 (F32.div 0.0 0.0))
+  let (negative_zero, tiny, huge, _) = simd.f32_from_bits (0x8000_0000, 1, 0x7f7f_ffff, 0)
+  use test.eq_text "negative zero" "-0.0" (text.from_f32 negative_zero)
+  use test.eq_text "subnormal bits" "0x00000001" (text.from_f32 tiny)
+  use test.eq_text "maximum finite bits" "0x7f7fffff" (text.from_f32 huge)
+  use test.eq_text "upper decimal boundary" "0x4f800000" (text.from_f32 4294967296.0)
+  use test.eq_text "F32.Format" "1.5" (text.format 1.5)
+  use test.eq "fixed formatting" ($Some "2.50") (text.from_f32_fixed 2 2.5)
+  use test.is_nothing "invalid fixed precision" (text.from_f32_fixed 7 1.0)
+  return ()
+
+entry func test_numbers (): test.Report => test.run number_checks
+
+private func format_checks (): Unit ! { test.Test } =>
+  use test.eq_text "escaped scalars" "\"世界🙂\\\\\\\"\\n\\r\\t\"" (text.quote "世界🙂\\\"\n\r\t")
+  use test.eq_text "quoted empty" "\"\"" (text.quote "")
+  use test.eq_text "nominal field order" "{ z: 7, value: 1.5, active: true }"
+    (text.format_struct ($Item { z: 7, value: 1.5, active: true }))
+  use test.eq_text "structural fields" "{ a: 3, b: false }" (text.format_struct { a: 3, b: false })
+  let nothing: Maybe U32 = $Nothing
+  let ok: Result [Maybe U32, Bool] = $Ok ($Some 7)
+  let err: Result [Maybe U32, Bool] = $Err false
+  use test.eq_text "Some format" "$Some 1.5" (text.format ($Some 1.5))
+  use test.eq_text "Nothing format" "$Nothing" (text.format nothing)
+  use test.eq_text "nested Ok format" "$Ok $Some 7" (text.format ok)
+  use test.eq_text "Err format" "$Err false" (text.format err)
+  use test.eq_text "Text uses array format" "[233, 128578]" (text.format "é🙂")
+  return ()
+
+entry func test_formats (): test.Report => test.run format_checks
+
+private func copy_tokens tokens: #[Text] =>
+  let result: #[Text] = #[]
+  for token in tokens:
+    let owned = @array.generate (View.length token) (View.at token)
+    @storage.push result owned
+  return result
+
+private func collection_checks (): Unit ! { test.Test } =>
+  let words: Text = "  hi　世界🙂\tthere "
+  use test.eq "Unicode whitespace splits words" #["hi", "世界🙂", "there"]
+    (copy_tokens (text.split_whitespace words))
+  use test.eq "CRLF and interior empty lines" #["one", "", "三"]
+    (copy_tokens (text.lines "one\r\n\n三\n"))
+  use test.eq "parse max" ($Some 0xffff_ffff) (text.parse_u32 "4294967295")
+  use test.is_nothing "parse overflow" (text.parse_u32 "4294967296")
+  use test.is_nothing "parse rejects signs" (text.parse_u32 "+1")
+  use test.eq_text "join Unicode" "a /  / 世界🙂" (text.join " / " #["a", "", "世界🙂"])
+  use test.eq_text "empty join" "" (text.join "," #[])
+  use test.eq_text "concat" "ab" (text.concat "a" "b")
+  use test.eq "scalar length" 2 (text.length "雪🙂")
+  use test.eq "scalar at" 0x1f642 (text.at 1 "雪🙂")
+  use test.holds "empty text" (text.is_empty text.empty)
+  use test.holds "whitespace scalar" (text.is_whitespace 0x3000)
+  use test.holds_not "invalid scalar" (text.valid_scalar 0xd800)
+  use test.eq "valid scalar array" ($Some "雪") (text.from_scalars #[0x96ea])
+  use test.is_nothing "surrogate array" (text.from_scalars #[0xd800])
+  let owned: Text = @array.generate 1 (func _ => 0x96ea)
+  use test.eq "text as scalars" #[0x96ea] (text.scalars owned)
+  return ()
+
+entry func test_collections (): test.Report => test.run collection_checks

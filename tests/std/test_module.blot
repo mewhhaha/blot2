@@ -1,0 +1,136 @@
+import * as text from "std/text"
+import * as test from "std/test"
+import * as simd from "std/simd"
+
+private type Point is data = $Point { x: U32, y: F32 }
+
+private func passing (): Unit ! { test.Test } =>
+  use test.holds "truth" true
+  use test.holds_not "falsehood" false
+  use test.eq "equal arrays" #[1, 2] #[1, 2]
+  use test.ne "unequal integers" 1 2
+  use test.eq_text "equal scalars" "世界🙂" "世界🙂"
+  use test.eq_struct "nominal record" ($Point { x: 1, y: 2.5 }) ($Point { x: 1, y: 2.5 })
+  use test.eq_struct "structural record" { x: 1, y: false } { x: 1, y: false }
+  use test.near "exact with zero tolerance" 0.0 1.5 1.5
+  use test.near "on tolerance" 0.25 1.5 1.75
+  use test.near_array "equal lengths and close elements" 0.25 #[1.5, 4.0] #[1.75, 4.0]
+  use test.within "inclusive low" 1.0 2.0 1.0
+  use test.within "inclusive high" 1.0 2.0 2.0
+  let (nan, negative_zero, _, _) = simd.f32_from_bits (0x7fc0_0001, 0x8000_0000, 0, 0)
+  use test.bits_eq "same NaN payload" nan nan
+  use test.bits_eq "same negative zero" negative_zero negative_zero
+  let some: Maybe U32 = $Some 1
+  let nothing: Maybe U32 = $Nothing
+  let ok: Result [U32, Bool] = $Ok 1
+  let err: Result [U32, Bool] = $Err false
+  use test.is_some "Some" some
+  use test.is_nothing "Nothing" nothing
+  use test.is_ok "Ok" ok
+  use test.is_err "Err" err
+  return ()
+
+entry func test_assertions (): test.Report => test.run passing
+
+private func failure_cases (): Unit ! { test.Test } =>
+  use test.fail "explicit" "雪🙂"
+  use test.group "outer" (func () =>
+    use test.holds "truth" false
+    use test.group "inner" (func () =>
+      use test.holds_not "falsehood" true
+      use test.eq "equal" 7 8
+      use test.ne "different" 7 7
+      use test.eq_text "quoted" "x\n" "x\t"
+      use test.eq_struct "nominal" ($Point { x: 1, y: 2.5 }) ($Point { x: 2, y: 3.5 })
+      use test.eq_struct "structural" { x: 1, y: false } { x: 1, y: true }
+      return ())
+    use test.near "NaN" 10.0 (F32.div 0.0 0.0) (F32.div 0.0 0.0)
+    use test.near_array "length" 1.0 #[1.0] #[1.0, 2.0]
+    use test.near_array "first mismatch" 0.25 #[1.0, 2.0, 3.0] #[1.0, 2.5, 9.0]
+    return ())
+  use test.within "outside" 1.0 2.0 3.0
+  let (negative_zero, nan_a, nan_b, _) = simd.f32_from_bits (0x8000_0000, 0x7fc0_0001, 0x7fc0_0002, 0)
+  use test.bits_eq "signed zero" negative_zero 0.0
+  use test.bits_eq "NaN payload" nan_a nan_b
+  let some: Maybe U32 = $Some 1
+  let nothing: Maybe U32 = $Nothing
+  let ok: Result [U32, Bool] = $Ok 1
+  let err: Result [U32, Bool] = $Err false
+  use test.is_some "Some" nothing
+  use test.is_nothing "Nothing" some
+  use test.is_ok "Ok" err
+  use test.is_err "Err" ok
+  use test.holds "still running" true
+  return ()
+
+private func wire_record (group: Text) -> (label: Text) -> (message: Text) -> (expected: Text) -> (actual: Text): #[U32] =>
+  let words: #[U32] = #[]
+  for field in #[group, label, message, expected, actual]:
+    @storage.push words field.length
+    for scalar in field:
+      @storage.push words scalar
+  return words
+
+private func empty_suite (): Unit ! { test.Test } => ()
+
+private func wire_checks (): Unit ! { test.Test } =>
+  use test.eq "report magic" 0x4254_5354 test.report_magic
+  use test.eq "report version" 1 test.report_version
+  use test.eq "empty report" #[0x4254_5354, 1, 0, 0] (test.run empty_suite)
+  let inner = "outer / inner"
+  let prefix: Text = #[0x4254_5354, 1, 1, 18,
+    0, 8, 101, 120, 112, 108, 105, 99, 105, 116, 2, 0x96ea, 0x1f642, 0, 0]
+  let expected = text.join "" #[prefix,
+    (wire_record "outer" "truth" "expected condition to hold" "true" "false"),
+    (wire_record inner "falsehood" "expected condition to be false" "false" "true"),
+    (wire_record inner "equal" "expected equal values" "7" "8"),
+    (wire_record inner "different" "expected different values" "7" "7"),
+    (wire_record inner "quoted" "expected equal text" "\"x\\n\"" "\"x\\t\""),
+    (wire_record inner "nominal" "fields differ: x, y" "{ x: 1, y: 2.5 }" "{ x: 2, y: 3.5 }"),
+    (wire_record inner "structural" "fields differ: y" "{ x: 1, y: false }" "{ x: 1, y: true }"),
+    (wire_record "outer" "NaN" "values differ beyond tolerance" "NaN" "NaN"),
+    (wire_record "outer" "length" "array lengths differ" "1" "2"),
+    (wire_record "outer" "first mismatch" "values differ beyond tolerance at index 1" "2.0" "2.5"),
+    (wire_record "" "outside" "value outside inclusive range" "[1.0, 2.0]" "3.0"),
+    (wire_record "" "signed zero" "IEEE-754 bit patterns differ" "2147483648" "0"),
+    (wire_record "" "NaN payload" "IEEE-754 bit patterns differ" "2143289345" "2143289346"),
+    (wire_record "" "Some" "expected Some" "$Some" "$Nothing"),
+    (wire_record "" "Nothing" "expected Nothing" "$Nothing" "$Some"),
+    (wire_record "" "Ok" "expected Ok" "$Ok" "$Err"),
+    (wire_record "" "Err" "expected Err" "$Err" "$Ok")]
+  use test.eq "exact BTST v1 packet" expected (test.run failure_cases)
+  return ()
+
+entry func test_wire (): test.Report => test.run wire_checks
+
+private func fork_checks (): Unit ! { test.Test } =>
+  let values = #[1, 2]
+  use preview <- fork values:
+    values[0] := 99
+    use test.holds "discarded assertion" false
+    use test.holds "discarded pass" true
+    return values[0]
+  use test.eq "preview value" 99 preview
+  use test.eq "original values restored" #[1, 2] values
+  return ()
+
+private func fork_report_checks (): Unit ! { test.Test } =>
+  use test.eq "fork rolls back report writes and counters" #[0x4254_5354, 1, 2, 0] (test.run fork_checks)
+  return ()
+
+entry func test_fork (): test.Report => test.run fork_report_checks
+
+@[test.suite]
+entry const test_suite_decorator = func (): Unit ! { test.Test } =>
+  use test.eq "decorator runs" 42 (40 + 2)
+  let neg_tol = test.run (func () =>
+    use test.near "negative tolerance rejected" (-1.0) 1.0 1.0
+    return ())
+  use test.eq "negative tolerance fails" 1 neg_tol[3]
+  return ()
+
+entry func trap_div_zero (): Unit =>
+  let values = #[0]
+  if 1 / values[0] == 0:
+    return ()
+  return ()

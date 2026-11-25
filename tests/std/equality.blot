@@ -1,0 +1,37 @@
+import * as equality from "std/equality"
+import * as test from "std/test"
+
+private type Point is data = $Point { x: U32, y: F32 }
+
+private func equality_checks (): Unit ! { test.Test } =>
+  use test.holds "Bool Eq" (equality.eq true true)
+  use test.holds_not "Bool mismatch" (equality.eq true false)
+  use test.holds "U32 Eq" (equality.eq 42 42)
+  use test.holds_not "U32 mismatch" (equality.eq 41 42)
+  use test.holds "F32 Eq" (equality.eq 1.25 1.25)
+  let nan = F32.div 0.0 0.0
+  use test.holds_not "NaN is unequal to itself" (equality.eq nan nan)
+  use test.holds "Array Eq" (equality.eq #[true, false] #[true, false])
+  use test.holds_not "different array lengths" (equality.equal_array #[1, 2] #[1])
+  use test.holds_not "different array elements" (equality.equal_array #[1, 2] #[1, 3])
+  let none: Maybe F32 = $Nothing
+  use test.holds "Nothing Eq" (equality.eq none none)
+  use test.holds "Some Eq" (equality.eq ($Some 1.5) ($Some 1.5))
+  use test.holds_not "Some mismatch" (equality.eq ($Some 1.5) ($Some 1.25))
+  use test.holds_not "Maybe constructor mismatch" (equality.eq none ($Some 1.5))
+  let ok: Result [U32, Bool] = $Ok 7
+  let err: Result [U32, Bool] = $Err false
+  let other_ok: Result [U32, Bool] = $Ok 8
+  let other_err: Result [U32, Bool] = $Err true
+  use test.holds "Ok Eq" (equality.eq ok ok)
+  use test.holds "Err Eq" (equality.eq err err)
+  use test.holds_not "Ok payload mismatch" (equality.eq ok other_ok)
+  use test.holds_not "Err payload mismatch" (equality.eq err other_err)
+  use test.holds_not "Result constructor mismatch" (equality.eq ok err)
+  use test.holds "nominal record Eq" (equality.eq_struct ($Point { x: 7, y: 1.5 }) ($Point { x: 7, y: 1.5 }))
+  use test.holds_not "nominal record mismatch" (equality.eq_struct ($Point { x: 7, y: 1.5 }) ($Point { x: 7, y: 2.5 }))
+  use test.holds "structural record Eq" (equality.eq_struct { a: true, b: 7 } { a: true, b: 7 })
+  use test.holds_not "structural record mismatch" (equality.eq_struct { a: true, b: 7 } { a: false, b: 7 })
+  return ()
+
+entry func test_equality (): test.Report => test.run equality_checks

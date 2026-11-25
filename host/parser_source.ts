@@ -139,6 +139,11 @@ export function parserSource(
       replace(token.span.start + 3, token.span.start + 4, "M");
     }
     if (token.text === ".") {
+      const next = prepared.tokens[index + 1];
+      if (next?.text === "(" && token.span.end === next.span.start) {
+        replace(token.span.start, token.span.end, "·");
+        continue;
+      }
       const previous = prepared.tokens[index - 1];
       const adjacent = previous?.span.end === token.span.start;
       let chainContinuation = false;

@@ -1,0 +1,2 @@
+// rejects: type_mismatch
+entry func test_bad_type (): U32 => true

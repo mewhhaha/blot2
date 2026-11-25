@@ -1,3 +1,5 @@
+import * as simd from "./simd"
+
 // Text is a #[U32] of Unicode scalar values. Equality compares scalar
 // sequences exactly; it does not normalize Unicode.
 const empty: Text = ""
@@ -165,3 +167,89 @@ func format_sequence (values: #[a]): Text where { Format a } =>
 const Array.Format: Format #[a] where { Format a } = {
   format: func values => format_sequence values,
 }
+
+func quote (value: Text): Text =>
+  let out = push 34 (builder ())
+  for scalar in value:
+    let escape = case scalar of
+      92 => 92
+      34 => 34
+      10 => 110
+      13 => 114
+      9 => 116
+      _ => 0
+    if escape == 0:
+      out := push scalar self
+    else:
+      out := push 92 self
+      out := push escape self
+  return finish (push 34 out)
+
+private func hex_bits (bits: U32): Text =>
+  let digits: Text = "0123456789abcdef"
+  let hex = @array.generate 8 (func index => digits[(bits >> (28 - index * 4)) & 15])
+  return concat "0x" hex
+
+private func decimal_f32 (negative: Bool) -> (whole: U32) -> (digits: U32) -> (factor: U32): Text =>
+  let out = builder ()
+  if negative:
+    out := push 45 self
+  out := append_u32 whole self
+  out := push 46 self
+  let divisor = factor / 10
+  for ever:
+    out := push (48 + (digits / divisor) % 10) self
+    if divisor == 1:
+      return finish out
+    divisor := self / 10
+
+func from_f32 (value: F32): Text =>
+  if not (F32.eq value value):
+    return "NaN"
+  let (bits, _, _, _) = simd.f32_bits (value, 0.0, 0.0, 0.0)
+  let negative = bits >= 0x8000_0000
+  if not (F32.is_finite value):
+    return if negative then "-inf" else "inf"
+  let magnitude = F32.abs value
+  if magnitude >= 4294967296.0 or (magnitude > 0.0 and magnitude < 1e-6):
+    return hex_bits bits
+  let whole = F32.to_u32 magnitude
+  let fraction = magnitude - F32.from whole
+  let factor = 1
+  // Stop at the first precision that recovers the original F32.
+  for places in 0..9:
+    factor := self * 10
+    let scale = F32.from factor
+    let scaled = fraction * scale
+    let lower = F32.to_u32 scaled
+    let digits = if scaled - F32.from lower >= 0.5 then lower + 1 else lower
+    if F32.from whole + F32.from digits / scale == magnitude:
+      return decimal_f32 negative (whole + digits / factor) (digits % factor) factor
+  return hex_bits bits
+
+const F32.Format: Format F32 = { format: func value => from_f32 value }
+
+private func format_maybe (candidate: Maybe a): Text where { Format a } =>
+  case candidate of
+    $Nothing => "$Nothing"
+    $Some value => concat "$Some " (Format.format value)
+
+const Maybe.Format: Format (Maybe a) where { Format a } = { format: format_maybe }
+
+private func format_result (candidate: Result [a, e]): Text where { Format a, Format e } =>
+  case candidate of
+    $Ok value => concat "$Ok " (Format.format value)
+    $Err error => concat "$Err " (Format.format error)
+
+const Result.Format: Format (Result [a, e]) where { Format a, Format e } = { format: format_result }
+
+func format_struct (value: t): Text =>
+  let out = append "{" (builder ())
+  let first = true
+  #for field in #fields t:
+    out := append (if first then " " else ", ") self
+    out := append field.name self
+    out := append ": " self
+    out := append (Format.format value.(field)) self
+    first := false
+  return finish (append (if first then "}" else " }") out)

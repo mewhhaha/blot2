@@ -5,17 +5,22 @@ type Dependency = string | { path: string };
 type Manifest = {
   dependencies: Record<string, Dependency>;
   prelude?: string | null;
+  tests?: PackageTests;
 };
 type Pin = { source: string; ref: string; revision: string };
 type Lock = { version: 1; packages: Record<string, Pin> };
 type Workspace = { exports: Record<string, string>; prelude?: string };
 type Package = { identity: string; root: string; workspace: Workspace };
 export type PackageOptions = { cacheDirectory?: string };
+export interface PackageTests {
+  files?: string[];
+}
 export type PackageProject = {
   root: string;
   imports: Record<string, string>;
   prelude: string | null;
   stdRoot: null;
+  tests?: PackageTests;
 };
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -84,7 +89,7 @@ async function manifest(
     return;
   }
   const value = object(JSON.parse(source), path);
-  fields(value, ["dependencies", "prelude"], path);
+  fields(value, ["dependencies", "prelude", "tests"], path);
   const dependencies: Record<string, Dependency> = Object.create(null);
   for (
     const [alias, input] of Object.entries(
@@ -103,6 +108,34 @@ async function manifest(
   if (value.prelude !== undefined && value.prelude !== null) {
     result.prelude = text(value.prelude, "prelude");
     name(result.prelude);
+  }
+  if (value.tests !== undefined) {
+    const label = `${path} tests`;
+    const tests = object(value.tests, label);
+    fields(tests, ["files"], label);
+    result.tests = {};
+    if (tests.files !== undefined) {
+      if (!Array.isArray(tests.files)) {
+        throw new Error(`${label}.files must be an array`);
+      }
+      result.tests.files = tests.files.map((item, index) => {
+        const field = `${label}.files[${index}]`;
+        const file = text(item, field);
+        const invalid = () =>
+          new Error(`${field} must be a relative path within the project`);
+        if (
+          !file.trim() || file.includes("\\") || isAbsolute(file) ||
+          /^[A-Za-z]:/.test(file)
+        ) throw invalid();
+        let depth = 0;
+        for (const part of file.split("/")) {
+          if (part === "..") depth--;
+          else if (part && part !== ".") depth++;
+          if (depth < 0) throw invalid();
+        }
+        return file;
+      });
+    }
   }
   return result;
 }
@@ -471,7 +504,13 @@ async function graph(
     }
   }
   return {
-    project: { root, imports, prelude, stdRoot: null } satisfies PackageProject,
+    project: {
+      root,
+      imports,
+      prelude,
+      stdRoot: null,
+      ...(input.tests && { tests: input.tests }),
+    } satisfies PackageProject,
     lock,
   };
 }

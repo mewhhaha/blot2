@@ -186,12 +186,12 @@ export type LiteralKind =
   | "borrow_mut"
   | "and"
   | "or"
+  | "·"
   | "spark"
   | "<-"
   | ".."
   | "true"
   | "false"
-  | "·"
   | "if"
   | "then"
   | "else"
@@ -970,7 +970,7 @@ export interface ExpressionCursor extends RuleCursorBase<"expression"> {
 }
 
 export interface LambdaCursor extends RuleCursorBase<"lambda"> {
-  field(name: "body"): ExpressionCursor | SuiteCursor;
+  field(name: "body"): ExpressionCursor | RebindingCursor | SuiteCursor;
   field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
   field(name: string): CursorFieldValue | undefined;

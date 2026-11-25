@@ -1,0 +1,182 @@
+import { Eq } from "./equality"
+import { Format } from "./text"
+import * as text from "./text"
+import * as simd from "./simd"
+
+type Failure is data = $Failure { label: Text, message: Text, expected: Text, actual: Text }
+type Test is effect = {
+  pass: Unit -> Unit,
+  fail: Failure -> Unit,
+  push_group: Text -> Unit,
+  pop_group: Unit -> Unit,
+}
+type Report = #[U32]
+const report_magic: U32 = 0x4254_5354
+const report_version: U32 = 1
+
+// BTST v1 stores a four-word header followed by five length-prefixed fields per failure.
+
+private func append_field (value: Text) -> (out: own Report): Report =>
+  return text.append value (text.push value.length out)
+
+private func append_failure (group: Text) -> (failure: Failure) -> (out: own Report): Report =>
+  let packet = append_field group out
+  packet[3] := packet[3] + 1
+  packet := append_field failure.label self
+  packet := append_field failure.message self
+  packet := append_field failure.expected self
+  return append_field failure.actual packet
+
+func run (body: Unit -> Unit ! { Test }): Report =>
+  let passed = 0
+  let groups: #[Text] = #[]
+  let packet: Report = #[report_magic, report_version, 0, 0]
+  with Test = {
+    pass: func () => passed := self + 1,
+    fail: func failure => packet := append_failure (text.join " / " groups) failure self,
+    push_group: func name => groups := Array.push self name,
+    pop_group: func () => groups := if self.length > 0 then Array.truncate self (self.length - 1) else self,
+  }:
+    use body ()
+  packet[2] := passed
+  return packet
+
+func suite (body: Unit -> Unit ! { Test }): (Unit -> Report) =>
+  func () => run body
+
+func group (name: Text) -> (body: Unit -> Unit ! { Test }): Unit ! { Test } =>
+  use Test.push_group name.copy
+  use body ()
+  use Test.pop_group ()
+  return ()
+
+private func mismatch (label: Text) -> (message: Text) -> (expected: Text) -> (actual: Text): Unit ! { Test } =>
+  // Effect operations keep their arguments, so give the handler independent owners.
+  use Test.fail ($Failure {
+    label: label.copy,
+    message: message.copy,
+    expected: expected.copy,
+    actual: actual.copy,
+  })
+  return ()
+
+func holds (label: Text) -> (condition: Bool): Unit ! { Test } =>
+  if condition:
+    use Test.pass ()
+  else:
+    use mismatch label "expected condition to hold" "true" "false"
+  return ()
+
+func holds_not (label: Text) -> (condition: Bool): Unit ! { Test } =>
+  if condition:
+    use mismatch label "expected condition to be false" "false" "true"
+  else:
+    use Test.pass ()
+  return ()
+
+func fail (label: Text) -> (message: Text): Unit ! { Test } =>
+  use mismatch label message "" ""
+  return ()
+
+func eq (label: Text) -> (expected: a) -> (actual: a): Unit ! { Test } where { Eq a, Format a } =>
+  if Eq.eq expected actual:
+    use Test.pass ()
+  else:
+    use mismatch label "expected equal values" (Format.format expected) (Format.format actual)
+  return ()
+
+func ne (label: Text) -> (unexpected: a) -> (actual: a): Unit ! { Test } where { Eq a, Format a } =>
+  if Eq.eq unexpected actual:
+    use mismatch label "expected different values" (Format.format unexpected) (Format.format actual)
+  else:
+    use Test.pass ()
+  return ()
+
+func eq_text (label: Text) -> (expected: Text) -> (actual: Text): Unit ! { Test } =>
+  if text.equal expected actual:
+    use Test.pass ()
+  else:
+    use mismatch label "expected equal text" (text.quote expected) (text.quote actual)
+  return ()
+
+func eq_struct (label: Text) -> (expected: t) -> (actual: t): Unit ! { Test } =>
+  let fields: text.Builder = text.builder ()
+  #for field in #fields t:
+    if not (Eq.eq expected.(field) actual.(field)):
+      if fields.length > 0:
+        fields := text.append ", " self
+      fields := text.append field.name self
+  if fields.length == 0:
+    use Test.pass ()
+  else:
+    let message = text.concat "fields differ: " (text.finish fields)
+    use mismatch label message (text.format_struct expected) (text.format_struct actual)
+  return ()
+
+private func close (tolerance: F32) -> (expected: F32) -> (actual: F32): Bool =>
+  F32.ge tolerance 0.0 and
+    (F32.eq expected actual or
+      (F32.is_finite expected and F32.is_finite actual and F32.abs (expected - actual) <= tolerance))
+
+func near (label: Text) -> (tolerance: F32) -> (expected: F32) -> (actual: F32): Unit ! { Test } =>
+  if close tolerance expected actual:
+    use Test.pass ()
+  else:
+    use mismatch label "values differ beyond tolerance" (text.from_f32 expected) (text.from_f32 actual)
+  return ()
+
+func near_array (label: Text) -> (tolerance: F32) -> (expected: #[F32]) -> (actual: #[F32]): Unit ! { Test } =>
+  if expected.length != actual.length:
+    use mismatch label "array lengths differ" (text.from_u32 expected.length) (text.from_u32 actual.length)
+    return ()
+  for index in 0..expected.length:
+    if not (close tolerance expected[index] actual[index]):
+      let message = text.concat "values differ beyond tolerance at index " (text.from_u32 index)
+      use mismatch label message (text.from_f32 expected[index]) (text.from_f32 actual[index])
+      return ()
+  use Test.pass ()
+  return ()
+
+func within (label: Text) -> (low: F32) -> (high: F32) -> (value: F32): Unit ! { Test } =>
+  if low <= value and value <= high:
+    use Test.pass ()
+  else:
+    let range = text.join "" #["[", text.from_f32 low, ", ", text.from_f32 high, "]"]
+    use mismatch label "value outside inclusive range" range (text.from_f32 value)
+  return ()
+
+func bits_eq (label: Text) -> (expected: F32) -> (actual: F32): Unit ! { Test } =>
+  let (left, right, _, _) = simd.f32_bits (expected, actual, 0.0, 0.0)
+  if left == right:
+    use Test.pass ()
+  else:
+    use mismatch label "IEEE-754 bit patterns differ" (text.from_u32 left) (text.from_u32 right)
+  return ()
+
+func is_some (label: Text) -> (value: Maybe a): Unit ! { Test } =>
+  if Maybe.is_some value:
+    use Test.pass ()
+  else:
+    use mismatch label "expected Some" "$Some" "$Nothing"
+  return ()
+
+func is_nothing (label: Text) -> (value: Maybe a): Unit ! { Test } =>
+  if Maybe.is_some value:
+    use mismatch label "expected Nothing" "$Nothing" "$Some"
+  else:
+    use Test.pass ()
+  return ()
+
+func is_ok (label: Text) -> (value: Result [a, e]): Unit ! { Test } =>
+  if let $Ok _ = value:
+    use Test.pass ()
+  else:
+    use mismatch label "expected Ok" "$Ok" "$Err"
+  return ()
+
+func is_err (label: Text) -> (value: Result [a, e]): Unit ! { Test } =>
+  if let $Err _ = value:
+    use Test.pass ()
+  else:
+    use mismatch label "expected Err" "$Err" "$Ok"
+  return ()

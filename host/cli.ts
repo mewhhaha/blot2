@@ -8,21 +8,145 @@ import {
 } from "./diagnostics.ts";
 import { extractStandardLibrary } from "./packaged_native.ts";
 import { resolveProject } from "./packages.ts";
+import {
+  formatTestRunReport,
+  runBlotTests,
+  type TestRunOptions,
+} from "./test_runner.ts";
 
 const usage =
   `Usage: blot guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
        blot check ENTRY [project options]
        blot build ENTRY [OUTPUT.wasm] [project options]
        blot dependencies ENTRY OUTPUT.blotdep [project options]
+       blot test [PATHS...] [--filter TEXT] [--jobs N] [--bail] [--release]
+                 [--deadline SEC] [--json] [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source,
                  --relaxed-simd, --tail-calls, --wasm3, --json`;
 
+async function runTestCli(
+  executable: string | URL | undefined,
+  args: string[],
+): Promise<number> {
+  const paths: string[] = [];
+  const imports: Record<string, string> = Object.create(null);
+  const options: TestRunOptions = { executable, paths, imports };
+  let json = false;
+  const invalid = (message: string) => {
+    console.error(message);
+    return 2;
+  };
+  for (let i = 0; i < args.length; i++) {
+    const argument = args[i];
+    if (argument === "--") {
+      paths.push(...args.slice(i + 1));
+      break;
+    }
+    switch (argument) {
+      case "--help":
+      case "-h":
+        console.log(usage);
+        return 0;
+      case "--bail":
+        options.bail = true;
+        continue;
+      case "--release":
+        options.release = true;
+        continue;
+      case "--json":
+        json = true;
+        continue;
+      case "--wasm3":
+        options.wasm3 = true;
+        continue;
+      case "--relaxed-simd":
+        options.relaxedSimd = true;
+        continue;
+      case "--tail-calls":
+        options.tailCalls = true;
+        continue;
+    }
+    if (!argument.startsWith("-")) {
+      paths.push(argument);
+      continue;
+    }
+    if (
+      ![
+        "--filter",
+        "--jobs",
+        "--deadline",
+        "--prelude",
+        "--std-root",
+        "--alias",
+        "--dependencies",
+        "--input-mode",
+      ].includes(argument)
+    ) return invalid(`Unexpected argument: ${argument}\n${usage}`);
+    const value = args[++i];
+    if (!value || value.startsWith("--")) {
+      return invalid(`Missing value for ${argument}`);
+    }
+    switch (argument) {
+      case "--filter":
+        options.filter = value;
+        break;
+      case "--jobs":
+        options.jobs = Number(value);
+        if (
+          !/^\d+$/.test(value) || !Number.isSafeInteger(options.jobs) ||
+          options.jobs < 1
+        ) {
+          return invalid("--jobs must be a positive integer");
+        }
+        break;
+      case "--deadline":
+        options.deadline = Number(value);
+        if (
+          !Number.isFinite(options.deadline) || options.deadline <= 0 ||
+          options.deadline * 1000 > 2_147_483_647
+        ) {
+          return invalid(
+            "--deadline must be positive seconds within the timer limit",
+          );
+        }
+        break;
+      case "--prelude":
+        options.prelude = value === "none" ? null : value;
+        break;
+      case "--std-root":
+        options.stdRoot = value;
+        break;
+      case "--dependencies":
+        options.dependencies = value;
+        break;
+      case "--alias": {
+        const separator = value.indexOf("=");
+        const prefix = value.slice(0, separator);
+        const path = value.slice(separator + 1);
+        if (separator < 1 || !prefix.endsWith("/") || !path) {
+          return invalid("--alias must be PREFIX/=DIR");
+        }
+        imports[prefix] = path;
+        break;
+      }
+      case "--input-mode":
+        if (value !== "project" && value !== "source") {
+          return invalid("--input-mode must be project or source");
+        }
+        options.inputMode = value;
+        break;
+    }
+  }
+  const report = await runBlotTests(options);
+  console.log(
+    json ? JSON.stringify(report) : await formatTestRunReport(report),
+  );
+  return report.success ? 0 : 1;
+}
+
 export async function runCli(
-  executable: string | URL = new URL(
-    "../compiler-goose/build/blotc-goose",
-    import.meta.url,
-  ),
+  executable?: string | URL,
   args: string[] = Deno.args,
 ): Promise<number> {
   const [command, filename, ...rest] = args;
@@ -71,6 +195,7 @@ export async function runCli(
   }
   let library: Awaited<ReturnType<typeof extractStandardLibrary>> | undefined;
   try {
+    if (command === "test") return await runTestCli(executable, args.slice(1));
     if (
       command === "fmt" && filename &&
       (rest.length === 0 || rest.length === 1 && rest[0] === "--check")
@@ -180,16 +305,22 @@ export async function runCli(
     if (destination) {
       await Deno.mkdir(dirname(destination), { recursive: true });
     }
-    const result = await new Deno.Command(executable, {
-      args: [
-        command === "check" ? "check-project" : command,
-        filename,
-        ...(destination ? [destination] : []),
-        ...options,
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
+    const result = await new Deno.Command(
+      executable ?? new URL(
+        "../compiler-goose/build/blotc-goose",
+        import.meta.url,
+      ),
+      {
+        args: [
+          command === "check" ? "check-project" : command,
+          filename,
+          ...(destination ? [destination] : []),
+          ...options,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+      },
+    ).output();
     const stdout = new TextDecoder().decode(result.stdout);
     const stderr = new TextDecoder().decode(result.stderr);
     if (json) await Deno.stdout.write(result.stdout);

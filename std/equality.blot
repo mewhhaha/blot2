@@ -24,3 +24,26 @@ func equal_array (left: #[a]) -> (right: #[a]): Bool where { Eq a } =>
 const Array.Eq: Eq #[a] where { Eq a } = {
   eq: func left -> right => equal_array left right,
 }
+
+private func equal_maybe (left: Maybe a) -> (right: Maybe a): Bool where { Eq a } =>
+  case left, right of
+    $Nothing, $Nothing => true
+    $Some a, $Some b => Eq.eq a b
+    _, _ => false
+
+const Maybe.Eq: Eq (Maybe a) where { Eq a } = { eq: equal_maybe }
+
+private func equal_result (left: Result [a, e]) -> (right: Result [a, e]): Bool where { Eq a, Eq e } =>
+  case left, right of
+    $Ok a, $Ok b => Eq.eq a b
+    $Err a, $Err b => Eq.eq a b
+    _, _ => false
+
+const Result.Eq: Eq (Result [a, e]) where { Eq a, Eq e } = { eq: equal_result }
+
+func eq_struct (left: t) -> (right: t): Bool =>
+  let same = true
+  #for field in #fields t:
+    if not (Eq.eq left.(field) right.(field)):
+      same := false
+  return same

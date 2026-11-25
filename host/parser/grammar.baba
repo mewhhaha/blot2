@@ -92,14 +92,14 @@ type_binder = ("(" name:source_identifier ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
 expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | receive | infix_expression)) ;
-lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:suite | body:expression)) ;
+lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:suite | body:rebinding | body:expression)) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
 infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "|" | "and" | "or" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
 prefix_expression = (operator:(SYMBOL | "+" | "~" | "&" | "*" | "^")? value:application) ;
 named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | comptime_access | member_access | slice_access)*) ;
-comptime_access = ("." "(" name:source_identifier ")") ;
+comptime_access = ("·" "(" name:source_identifier ")") ;
 member_access = ("." name:(source_identifier | TYPE_IDENT)) ;
 atom = (boolean | FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | spark_expression | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
 spark_expression = ("spark" "#" "[" body:collection_expression "|" pattern:pattern "<-" source:expression (".." end:expression)? "]") ;
