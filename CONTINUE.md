@@ -1,104 +1,100 @@
 # Working on Blot and Gdev
 
-## Current frontier: Structural Edit Localization (`fresh=1`), Expanded FBIP Reuse, `wtime-aot 0.1.3` Qualification, Comptime `#for` Codecs & Dead-Subsystem Prune (25 November 2026)
+## Current frontier: `#entry`/`#kernel`/`#process`, First-Class Tests (`std/test` & Unified `pen test-blot`), `goosew` Dev Loop, Per-Declaration Single-File Reuse & Expanded Comptime Codecs (25 November 2026)
 
-All five follow-up tracks and full cross-repo qualification (including live
-NVIDIA Vulkan Gdev hardware frame and Save Schema 26 rewind determinism) are
-complete and verified at `blotc-goose` SHA-256
-`7d608127020fe12e5bea6b3ee58ab5ceac90fe31b31c8354d1f57bad56d25e46` (`9,273,424` B;
-`generated/compiler/blotc.gz` SHA-256
-`abcf1875115b6fd2dec56a1a9d03feb0b7ad32b8b567012b3eb1d9fb70595fbe`, `3,935,874` B):
+All six follow-up tracks, the `#entry`/`#kernel`/`#process` surface migration,
+local toolchain & Helix reinstall, and fresh live NVIDIA Vulkan Gdev hardware
+frame qualification are complete and verified at `blotc-goose` SHA-256
+`ec2673434aee6442dc926e766fe8059b2d3e20f09a1f165d0fbb90f2598374ea`
+(`9,522,656` B; `generated/compiler/blotc.gz` SHA-256
+`fb7f7e4a9d953b04272c82e9b66944ff79e28640b5a608d68b1542e455ba1db5`,
+`4,048,426` B):
 
-- **Track 1 — Single-file structural edit localization (`389ecb87`):**
-  - Switched `Nominal`, `Constructor`, `EffectFamily`, and `EffectTemplate`
-    identities in `check/check.goose` from raw AST node IDs to stable
-    declaration-order ordinals (updating AST lookup sites in `check.goose`,
-    `core_builder.goose`, and `editor_completion.goose`).
-  - Compacted lazily-materialized external `callee_use` and imported
-    `associated` bindings after header bindings in canonical `(unit, binding)`
-    order in `reuse/dependency_snapshot.goose` so body-local binding shifts and
-    call encounter order never perturb persistent interface packets.
-  - Preserved existing project symbols verbatim in `project.goose`
-    `linkCheckingNames` and appended new symbols from edited non-entry units
-    without shifting downstream units; split `symbol_shifted` from `affected`
-    in `reuse/retained_project.goose`.
-  - Broadened `reuse/body_image.goose` `sameCoreExpr` (`type_constructor`,
-    `type_same`, `operation_value`, `flat_op`) and `findEditedBindings`
-    (global-only binding index check + resolved `associated` targets) so
-    `replayEdits` handles new local bindings cleanly.
-  - **Measured on 319-module / 6.19 MB Gdev (`blotc-goose -O2`, `frontendWorkers=8`):**
-    single-file structural edits in `116 KB` `src/actors/robots.blot` (including
-    edits before `type` declarations and adding a `let` with an existing or
-    brand-new identifier) dropped from **`237–254 ms`** (`fresh=11–28`, backend
-    `208 ms`) to **`61.5–90.4 ms`** (**`fresh=1, cached=318`**, backend
-    **`3.1–6.0 ms`** — up to **67× backend speedup**), 100% byte-exact against
-    cold oracle. Covered in
+- **Unified `#entry` / `#kernel` / `#process` declaration modifiers (`c482fccb`, `../pen` `ff7beed`, `../ink` `7edbfcc`, `../gdev` `9e569e7`):**
+  - Replaced bare `entry` declarations with explicit `#entry`, `#kernel`, and
+    `#process` modifiers across the compiler, fixtures, Tree-sitter/Helix
+    grammar, stdlib, docs, tests, benchmarks, Pen, Ink, and Gdev.
+  - Preserved `private #entry`, required `const` for prepared `#kernel` and
+    isolated `#process` descriptors, and rejected bare `entry`, `pub`, and
+    misplaced `private` with `unknown_modifier`.
+
+- **First-class `test "..."`, `std/test` (`BTST` v1), and unified `pen test-blot` (`7b1468cb`, `91a06cbe`, `../pen` `eb8f575`):**
+  - Added `std/test` effect library (`Check`, `check.*` assertions, `BTST` v1
+    packet encoding) and the `blot test` CLI runner, plus first-class
+    `test "name" => ...` / `test expect_trap "name" => ...` declarations,
+    `--test` compilation mode, and `blot:tests` v1 Wasm custom section metadata.
+  - Unified `../pen`'s `pen test-blot` and `plugins/blot` on `--test` +
+    `blot:tests` v1 + `BTST` v1 (`Unit`, `Bool`, `BTST`, `check.report`, and
+    `expect_trap`) alongside legacy `#entry func test_*`/`trap_*` without
+    duplicate execution.
+
+- **Track 1 — `goosew` fast dev/check wiring (`9df8c3ab`):**
+  - Wired `../goose-to-wasm/build/bin/goosew` (with upstream `d5ae5bb` stdlib
+    and `--cflag=-Wno-parentheses-equality`) as the default backend for
+    `compiler-goose/build.sh` dev builds (`~4.5 s` emit, `~48 s` total dev
+    build) and `compiler-goose/tools/check_source.py` (`--reachable-program`,
+    full compiler source check in **2.76 s**).
+  - Kept `--release` and `--pgo` on patched upstream C++ Goose by default for
+    peak runtime speed (`421.5 ms` Gdev build) and runtime allocation observer
+    hooks, with `GOOSE_USE_UPSTREAM=1` / `GOOSE_USE_GOOSEW=1` overrides.
+
+- **Track 5 — Per-declaration single-file check & lower reuse (`9df8c3ab`):**
+  - Added structural declaration diffing (`retained_project.goose`), selective
+    checking and retained scheme seeding (`check.goose`, `check_factory.goose`,
+    `check_scheme_import.goose`, `source_operators.goose`,
+    `project_check_module.goose`), and selective Core splicing with full
+    uniqueness verification (`core.goose`, `core_builder.goose`,
+    `body_image.goose`, `declaration_dependencies.goose`,
+    `partial_dependency.goose`).
+  - **Measured on 319-module Gdev `src/actors/robots.blot` (`116 KB`, `117`
+    top-level bodies, optimized `blotc-goose`):** single-body structural edits
+    dropped from **`117` elaborations / `117` lowerings** to **`1` / `1`**
+    (`fresh=1, cached=318`), cutting `check` from **`25.0 → 5.6 ms`**, `lower`
+    from **`7.3 → 5.5 ms`** (including full spliced uniqueness validation),
+    compiler total from **`57.2 → 34.1 ms`**, and wall time from
+    **`70.5 → 45.8 ms`**, 100% byte-exact against cold Wasm across all 7 paired
+    runs and behavior-changing edits. Covered in
     [retained_project_execution.test.ts](tests/guest/retained_project_execution.test.ts).
 
-- **Track 2 — Compiler dead-subsystem prune & `goose-to-wasm` fast dev loop (`0d0dbe69`):**
-  - Removed 7 dead `.goose` modules (`407` LOC), 12 dead AST tags, 5 dead parse
-    codes, and `Fixity`, and resolved Goose §5.2 recursive-storage lifetimes so
-    `../goose-to-wasm` compiles the entire Blot2 compiler to Wasm64 in **3.7 s**.
+- **Track 6 — Expanded comptime `#for` codecs & lane decode helpers (`../ink` `d0611db`, `../gdev` `b35ce22`):**
+  - Added `LaneDecode`, typed/generic cursor readers, and comptime `lane_count`
+    to `../ink/lib/codec.blot`, documented comptime field-write reflection
+    limits in `../ink/docs/blot.md`, and migrated 16 flat lane encoders across
+    Ink (`app`, `render`, `timeline`, `menu`) and Gdev (`meals`, `frog_shop`,
+    `access`, `reports`, `cursor`, `god_hand`, `hand_gesture`, `hover_state`,
+    `goals`, `menu`, `arena`) to `codec.encode_lanes`, preserving Save Schema
+    26 bit-for-bit.
 
-- **Track 3 — Comptime `#for #fields` / `#variants` codecs (`36232076`, `../ink` `d611e63`, `../gdev` `80f5ee4`):**
-  - Fixed `#for field in #fields T` (`direct/function_control.goose`
-    `comptimeFieldPos`) to iterate nominal single-constructor data types in
-    **declared field order** (matching `#variants T` and positional
-    constructors), with regression coverage in
-    [vnext_with_traits_comptime.test.ts](tests/guest/vnext_with_traits_comptime.test.ts).
-  - Added generic comptime codec primitives to `../ink/lib/codec.blot`:
-    `FieldId`/`Skip`/`VariantTag` tags, `LaneEncode` trait + `encode_lanes`,
-    `encode_record`, `check_header`, `read_field`, `record_field_count`,
-    `record_field_ids`, `describe_record_parts`, `variant_tags`, and
-    `variant_count`, with 4 new tests in `../ink/tests/comptime_codec.blot`.
-  - Migrated `../ink/lib/{orbit,view,transform}.blot` and
-    `../gdev/src/{ui/loading,effects/electricity,ui/build_bar}.blot` to
-    `codec.encode_lanes`, preserving Save Schema 26 bit-for-bit.
+- **Track 2 — Local toolchain & Helix reinstall:**
+  - Atomically installed `~/.local/bin/blot` (standalone CLI bundling
+    `blotc.gz`, parser Wasm, `std/`, `guide.md`, `CHEATSHEET.md`, and
+    `test_worker.ts`), `~/.local/bin/blotc`, `~/.local/lib/pen-runtime/`
+    (`pen`, `player/`, `plugins/blot.wasm`, `web/`, `wtime-aot v0.1.5`) via
+    `../pen` `just install`, and Helix Tree-sitter grammar/queries/LSP via
+    `deno task helix:install` (`hx --health blot` green).
 
-- **Track 4 — Expanded FBIP boxed-block reuse & `wtime-aot 0.1.3` benchmarks (`e4d768ce`, `b9f013d7`):**
-  - Broadened direct-backend FBIP in-place reuse (`function.goose`,
-    `function_control.goose`, `function_data.goose`) to support up to 4
-    mutually-exclusive tail constructs (`collectTailConstructs` across `suite`,
-    `return_`, `block_` → `return_`, statement-match tail `bind`, `if_value`,
-    and `if_stmt`), statement matches, and `copiedBox` loop carries; shrank
-    `direct/boxed_records.blot` from `6,312 → 6,121` Wasm bytes (`-191 B`,
-    identical outputs) and added zero-allocation + alias-soundness coverage in
-    [fbip_reuse_execution.test.ts](tests/guest/fbip_reuse_execution.test.ts).
-  - Qualified and recorded fresh comparison benchmarks on **`wtime-aot 0.1.3`**
-    (`1125fd5`, native 256-opcode register SIMD + `--wasm3`) in
-    [2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json](benchmarks/evidence/measurements/2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json):
-    - `particle_spark_simd`: **`0.3327 ms`** (`1.32×` faster than `0.1.2`, **`2.02×` faster** than native Rust `-O3`).
-    - `aos_vec4_euler_65k_x32`: **`1.9446 ms`** (`1.44×` faster than native Rust `-O3`); `aos_vec2_euler` (`--wasm3`): **`0.6439 ms`**.
-    - 8-thread Mandelbrot: **`1.021 ms`** (**`5.52×` scaling**, **`4.24×` faster** than 8-thread native Rust).
-    - Ink ECS `dense_iter_10k_x100`: `ink_soa_spark_simd` **`0.3233 ms`** (**`3.81×` faster** than Bevy `0.20.1` native), `ink_cached_query` **`0.5393 ms`**, `ink_pool_direct` **`0.4680 ms`**.
-    - All 6 kernels beat both Rust `wasm32 -O3` (`0.20×–0.73×`) and native Rust `-O3` (`0.18×–0.91×`) with bit-exact checksum parity.
-
-- **Track 5 — Pre-existing `../gdev` test fixes & Pen qualification (`../gdev` `e2e6714`):**
-  - Fixed pre-existing `lighting_look.blot`, `tutorial.blot`, and `gdev-tech`
-    test assertions so the entire Gdev suite passes cleanly (`1,431/1,431` Blot
-    + `16/16` Rust).
-
-- **Recent preceding milestones (full narratives in pinned Git history `git show 7c06d4e6:CONTINUE.md` and `git show 98f277f2:CONTINUE.md`):**
-  - Retained-edit fast paths (`sameTriviaSyntax`, `revisedScalarLiteral`,
-    `body_image::relocate` F32 soundness fix), `timeline::contract_tests` rewind
-    determinism (`../pen` `9fbfa0c`, `../gdev` `877af8a`), Track 3 compile-speed
-    & `canSkipWireSchema` (`98f277f2`), `--wasm3`/BCE/AoS SIMD (`68e5b886`),
-    Solid-2 agent diagnostics (`b254444b`, `b54f4c03`), Direct Backend Tiers
-    1–7 (`58adc750`..`3ef81d12`), and Storage & Purity Rewrite Phases 1–6
-    (`ebf2f026`..`30899f4b`).
+- **Recent preceding milestones (full narratives in pinned Git history `git show c482fccb:CONTINUE.md` and `git show 7c06d4e6:CONTINUE.md`):**
+  - Structural edit localization (`fresh=1`, `389ecb87`), FBIP boxed-block
+    reuse & `wtime-aot 0.1.3` benchmarks (`e4d768ce`, `b9f013d7`), declared-order
+    nominal `#fields` (`36232076`), dead-subsystem prune (`0d0dbe69`),
+    retained-edit fast paths (`7c06d4e6`), `timeline::contract_tests` rewind
+    determinism (`../pen` `9fbfa0c`, `../gdev` `877af8a`), Solid-2 diagnostics
+    (`b254444b`, `b54f4c03`), Direct Backend Tiers 1–7 (`58adc750`..`3ef81d12`),
+    and Storage & Purity Rewrite Phases 1–6 (`ebf2f026`..`30899f4b`).
 
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `b9f013d7`) | `Tag.block_` FBIP fix (`b9f013d7`), declared-order nominal `#fields` (`36232076`), FBIP reuse & `wtime-aot 0.1.3` benchmarks (`e4d768ce`), structural edit `fresh=1` localization (`389ecb87`), dead-subsystem prune & `goose-to-wasm` (`0d0dbe69`), retained-edit fast paths (`7c06d4e6`) |
-| `../pen` | `c3e1d01` | Rebuilt release binary, Thin G-Buffer & ReSTIR DI/GI (`0acf665`), `wtime-aot v0.1.3` (`3327481`), resolved retained-frame hashing (`9fbfa0c`), Pen blame spans (`6d15e26`) |
-| `../ink` | `d611e63` | Comptime `#for #fields`/`#variants` codecs & `orbit`/`view`/`transform` migration (`d611e63`), map/frozen & nav hot-path opts + fuzz suite (`9227732`) |
-| `../gdev` | `80f5ee4` | Migrate `loading`/`electricity`/`build_bar` to `codec.encode_lanes` (`80f5ee4`), Ink feature lab (`35ecab7`), Moebius/tech test fixes (`e2e6714`), Save 26 key `157` (`877af8a`) |
+| `blot2` | this commit (after `9df8c3ab`) | `goosew` dev/check wiring & per-declaration single-file reuse (`9df8c3ab`), `#entry`/`#kernel`/`#process` modifiers (`c482fccb`), first-class `test "..."` & `blot:tests` v1 (`91a06cbe`), `std/test` & `blot test` (`7b1468cb`), README refresh (`64f8a32b`) |
+| `../pen` | `eb8f575` | Unified `pen test-blot` on `test "..."` & `blot:tests` v1 (`eb8f575`), `wtime-aot v0.1.5` & no-fallback host (`b31666d`), 2D/Hi-Z/ViewportOverlay (`b6e3f71`), `#entry`/`#kernel`/`#process` (`ff7beed`) |
+| `../ink` | `d0611db` | Comptime `#for` codecs & `LaneDecode` helpers (`d0611db`), typed Pen 2D render extensions (`b50894f`), `#entry`/`#kernel`/`#process` (`7edbfcc`), accessible UI/i18n (`7081e49`) |
+| `../gdev` | `642ad53` | >8192 rad trig NaN fix & physical brick counts (`642ad53`), 11 flat lane encoders migrated to `codec.encode_lanes` (`b35ce22`), `#entry`/`#kernel`/`#process` (`9e569e7`) |
 
 ### Hard Invariants Preserved
 - **Guest ABI 8:** `blot:abi` v8 and `blot:invocation` v1 unchanged (zero extra
-  exports; Page-0 offset `640` carries `arena_oom_flag`; optional
-  `blot:finish_invocation` / `blot:kernels` / `blot:processes`).
+  runtime exports; Page-0 offset `640` carries `arena_oom_flag`; optional
+  `blot:finish_invocation` / `blot:kernels` / `blot:processes`; optional
+  `blot:tests` v1 custom section in `--test` builds only).
 - **Session Protocol 2:** `Operation 0..=6` unchanged; `service::KERNEL = 15`
   uses unambiguous `request == 0` host→guest provenance (`CAP`, `CTL`,
   `BATCH_ERR`, `BATCH_OK`), strips live-only unrecorded `CAP` before `Recorded`,
@@ -114,72 +110,86 @@ complete and verified at `blotc-goose` SHA-256
 - **Unified dynamic arrays, single update `:=`, value restriction, and read-only references:**
   `#[T]` (`Array T`) is the sole dynamic array type (`#[N; T]` for fixed-length);
   local `let` generalizes only on syntactic `func` values; `&T`, `&[T]`, `^T`,
-  and `*T` are strictly read-only; `:=`, `@simd.store`, `@storage.push`,
-  `@storage.pop`, and `@storage.truncate` enforce unique ownership
+  and `*T` are strictly read-only; `:=`, `@storage.push`, `@storage.pop`,
+  `@storage.truncate`, and `@simd.store` enforce unique ownership
   (`ownedInPlacePath`), guaranteeing all module `const` pools are deeply
   immutable (`mode = 2`).
 
 ### Verified Identities & Qualification Evidence
-- **Compiler & host identities:**
-  - `compiler-goose/build/blotc-goose` SHA-256:
-    `7d608127020fe12e5bea6b3ee58ab5ceac90fe31b31c8354d1f57bad56d25e46`
-    (`9,273,424` bytes)
+- **Compiler, CLI & host identities:**
+  - `compiler-goose/build/blotc-goose` & `~/.local/bin/blotc` SHA-256:
+    `ec2673434aee6442dc926e766fe8059b2d3e20f09a1f165d0fbb90f2598374ea`
+    (`9,522,656` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `abcf1875115b6fd2dec56a1a9d03feb0b7ad32b8b567012b3eb1d9fb70595fbe`
-    (`3,935,874` bytes)
+    `fb7f7e4a9d953b04272c82e9b66944ff79e28640b5a608d68b1542e455ba1db5`
+    (`4,048,426` bytes; decompressed byte-identical to `blotc-goose`)
+  - `~/.local/bin/blot` SHA-256:
+    `14fad9ea1c955e3d471b74a46a9cce6a09671de8ec5de6804bc8fe9f51d61ddd`
+    (`144,720,264` bytes)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
-  - `../pen/target/release/pen` SHA-256:
-    `dee6ce6ff099f21fe43b47d90831b85c7ae66e0942f18f47c7b7b7bedc076c5e`
-    (`46,472,064` bytes)
+  - `../pen/target/release/pen` & `~/.local/lib/pen-runtime/pen` SHA-256:
+    `cd4283cb6e2dd474aa3688d9da431decd297950ca41c7a0befea426fbfdb1fd5`
+    (`47,063,168` bytes; `plugins/blot.wasm` SHA-256
+    `e769b973bfea90703964f0a362b36121949f79d824d06423fdafb7d8d11c44a6`,
+    `234,030` bytes)
 - **Qualification gates:**
-  - `blot2` (`b9f013d7`): `deno task test:compiler` exit 0 (`run-ae030dc2844afba9`) —
-    `harness` (`2.46 s`), `release-build` (`101.31 s`), `reference-direct`
-    **2/2**, `reference-uniqueness` **206/206**, `reference-fixtures`
-    **109/109**, `pack` OK, `guests` exit 0 (`23.27 s`, incl. new
-    `retained_project_execution`, `fbip_reuse_execution`, and declared-order
-    `vnext_with_traits_comptime`); `deno task test:editor` (**6/6**).
-  - `../pen` (`c3e1d01`): `cargo test -q -p blot-host` **42 passed, 0 failed,
-    1 ignored**; `examples/bounce` `pen check` clean (`0.13 s`);
-    `PEN_TEST_BUNDLE=<fresh gdev export>` `cargo test --locked -p pen
-    timeline::contract_tests` **6/6 passed** (`8.22 s`) & `diverge::tests`
-    **3/3 passed** (`0.22 s`).
-  - `../ink` (`d611e63`): `pen tool ink -- fmt --check` OK, `pen tool ink --
-    generate tools/generate.json` OK, `pen test-blot` exit 0 — **446 passed, 0
-    failed** in 104 Blot modules (`2.2 s`, incl. 4 new `comptime_codec` tests &
-    `4/4` must-not-compile) + **249 passed, 0 failed** native f64-reference Rust
-    tests (`26.89 s`).
-  - `../gdev` (`80f5ee4`): `pen test-blot` exit 0 — **1,431 passed, 0 failed**
-    in 224 Blot modules (`55.3 s`, incl. `148` must-trap & `7` must-not-compile)
-    + **16 passed, 0 failed** `gdev-tech` Rust tests (`0.13 s`); fresh
-    `pen export` (`0.46 s`).
-  - `../gdev` (`80f5ee4`) live NVIDIA Vulkan hardware frame:
+  - `blot2` (`9df8c3ab`): `deno task check && deno task check:editor` exit 0
+    (`run-81630d808df18398`) — `fmt --check` (90 files), `deno check`,
+    `test:editor` (**6/6**), `harness` (`2.48 s`), `release-build` (`93.26 s`),
+    `reference-direct` (**2/2**), `reference-uniqueness` (**206/206**),
+    `reference-fixtures` (**109/109**), `pack` OK, `guests` exit 0 (`16.95 s`,
+    incl. new `retained declaration splices` coverage), `test:std` (**6 modules,
+    17 tests, 115 assertions, 0 failed**, `89.1 ms`), `check:editor` (**10/10**
+    corpus + **19/19** highlight suites); `check_source.py --phase check` via
+    `goosew` exit 0 (`2.76 s`, 0 errors).
+  - External-directory installed binary verification (`/tmp`): `blot --help`,
+    `blot guide --cheatsheet`, `blot explain SPENT_VALUE`, `blot fmt --check`,
+    `blot check`, `blot build` (byte-identical to `blotc build-project`),
+    `blot test tests/std` (**17/17 tests, 115 assertions**, `130.3 ms`),
+    `pen test-blot --project ../pen/examples/bounce` (**7/7 passed**, `0.1 s`),
+    and `hx --health blot` (parser/highlights/rainbows/LSP ✓).
+  - `../pen` (`eb8f575`): plugin tests **29/29**, `pen-runtime` +
+    `pen-plugins` **225/225** (2 ignored), `pen` `blot_test` **15/15**,
+    `just install` exit 0 (plugins, `pen-web` `wasm-opt -O1`, glibc 2.28
+    shipping `player`, `wtime-aot v0.1.5`, release `pen --features steam`).
+  - `../ink` (`d0611db`): installed `pen test-blot --project ../ink` exit 0 —
+    **462 passed, 0 failed** in 106 Blot modules (`1.5 s`, `405` checks, `53`
+    must-trap, `4` must-not-compile) + **257 passed, 0 failed** native
+    f64-reference Rust tests (`8.53 s`).
+  - `../gdev` (`b35ce22` / `642ad53`): Track 6 verified **1,431 passed, 0
+    failed** in 224 Blot modules + **16 passed, 0 failed** `gdev-tech` Rust
+    tests; live NVIDIA Vulkan hardware frame qualified on `642ad53`:
     - Compiled via `scripts/integration/build_gdev.ts --frontend-workers 8 --profile`
-      (`build/gdev-first-frame/main-5403bdbdda67f406/main.wasm`, `6,195,437` B,
-      SHA-256 `fc7be554a1900013dee988fc81cf1917b1528801edd871310814ffaf4ee5ae01`,
-      `319` modules / `4,523` functions, `631.9 ms` build, `parallel_retries=0`,
-      `parallel_batches=1`).
-    - Executed via `VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json
-      python3 scripts/integration/run_pen.py --launch --hardware` →
-      `build/storage-integration/gdev-one-frame/attempt-yjwlx_gw/frame.png`
+      (`build/gdev-first-frame/main-7d7de05bd6133469/main.wasm`, `6,236,804` B,
+      SHA-256 `ace582e966fd2ec7b103af77c24c663f6fbb4dee6e84cb316fd5e9cd3f3c990b`,
+      `319` modules / `4,535` functions, **`421.5 ms`** build,
+      `parallel_retries=0`, `parallel_batches=1`).
+    - Executed on **`NVIDIA GeForce RTX 4080 SUPER (Vulkan)`** via
+      `LD_LIBRARY_PATH="$HOME/.local/lib/pen-runtime"
+      VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json python3
+      scripts/integration/run_pen.py --launch --hardware` →
+      `build/storage-integration/gdev-one-frame/attempt-janh1l_p/frame.png`
       (inspected `640×480` PNG, SHA-256
       `19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8`,
-      `frames.trace`: `0 7062536994385978 eaf61059c134506c`, all 6 runner checks
-      `true`, `compiled_wasm_unchanged: true`).
+      `frames.trace`: `0 7062536994385978 eaf61059c134506c`, `guest 9.308 ms`,
+      `render 1.513 ms`, `total 13.348 ms`, all 6 runner checks `true`,
+      `compiled_wasm_unchanged: true`).
 
 ## Remaining work
 
-All planned frontier tracks are complete and green across `blot2`, `../pen`,
-`../ink`, and `../gdev`. Optional future directions:
+All planned frontier tracks are complete, installed, and green across `blot2`,
+`../pen`, `../ink`, and `../gdev`. Optional future directions:
 
-1. **Per-declaration check/lower reuse inside a single edited unit:** Structural
-   edits inside large files like `robots.blot` (`116 KB`, `117` bodies) now stay
-   localized to `fresh=1` (`61.5–90.4 ms` wall, `3.1–6.0 ms` backend); skipping
-   check/lower of the unchanged ~116 bodies inside the edited unit itself would
-   push structural edits under `25 ms`.
-2. **Broader comptime codec adoption:** Extend `ink/codec.encode_lanes` /
-   `encode_record` across remaining handwritten `$lanes.Codec` modules in `../ink`
-   and `../gdev`, or explore comptime record decoding/construction.
+1. **Incremental uniqueness validation & backend replay for Track 5:** Track 5
+   already cut `robots.blot` `check` from `25.0 → 5.6 ms` (`elabs=1, lowers=1`);
+   scoping uniqueness validation to the spliced binding's dependency cone and
+   broadening backend body-image replay on behavior-changing edits would push
+   single-body structural edits below `20 ms`.
+2. **Comptime record construction / decode ergonomics:** Extending comptime
+   reflection to support field-wise record construction alongside `value.(field)`
+   reads would let `ink/codec` eliminate remaining handwritten `LaneDecode`
+   constructors.
 3. **`benchmarks/checked-grid` microbenchmark tail:** Continue tuning
    tree/string-heavy workloads in
    [benchmarks/language/NATIVE_ROUTES.md](benchmarks/language/NATIVE_ROUTES.md).
@@ -189,6 +199,7 @@ All planned frontier tracks are complete and green across `blot2`, `../pen`,
 Superseded checkpoint narratives are preserved in pinned Git history and in
 their dedicated task and measurement records:
 
+- Structural edit localization (`fresh=1`), FBIP reuse & `wtime-aot 0.1.3`: `git show c482fccb:CONTINUE.md`
 - Retained-edit fast paths & timeline rewind determinism: `git show 7c06d4e6:CONTINUE.md`
 - Tier 1–7, Tracks 1–4, Solid-2 diagnostics & Phases 1–6: `git show 98f277f2:CONTINUE.md`
 - Concurrency vNext Phases 1–5: `git show 67fc95b8:CONTINUE.md`
