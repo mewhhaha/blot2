@@ -142,6 +142,21 @@ fn probeSource(self_:Provider&,path:const u8[:],maximum:i64,name:u8[>..<]&,bytes
     var disk=blot_reuse_project::FileInputs{};
     return disk.probeSource(path,maximum,name,bytes);
 }
+fn probeSourceOwned(self_:Provider&,path:const u8[:],maximum:i64,dir_map:dictionary<const u8[:],const u8[:]>&,dir_owned:const u8[:][>..<]&,name:u8[>..<]&)->const u8[:],bool {
+    let empty=default<const u8[:]>();
+    let overlays=self_.snapshot.state().sources;
+    if overlays.present {
+        if blot_reuse_source_overlays::canonicalPath(path,name)!=blot_error::Error.none {return empty,false;}
+        let file .= overlays.value.files().get(name[..]);
+        if file {
+            if !file.present || file.value.len>maximum {return empty,false;}
+            return blot_reuse_project::copySource(file.value),true;
+        }
+        name.clear();
+    }
+    var disk=blot_reuse_project::FileInputs{};
+    return disk.probeSourceOwned(path,maximum,dir_map,dir_owned,name);
+}
 fn recordProbedCanonical(self_:Provider&,path:const u8[:],canonical:const u8[:])->Error {
     if !self_.snapshot.valid() {return blot_error::Error.invalid_artifact;}
     let old=lookup(self_.snapshot.state().paths.items,self_.snapshot.state().path_index,path);

@@ -43,9 +43,11 @@ fn fail<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,loc
 fn numeric_failure<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) { if stopped(self_,tree,pool,context,locals) { return; } self_.issue=numeric_issue(tree,id,context.source_literal_point(id)); self_.has_issue=true; }
 fn local<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol) -> bool {
  var end=locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
- for item in locals.items[..end] { if item==symbol { return true; } }
+ if end==0 { return false; }
+ var i=end;
+ while i!=0 { i--; if locals.items[i]==symbol { return true; } }
  let text=pool.get(symbol);
- for index in 0..text.len {if text[index]=='.' { let root,found=pool.lookup(text[..index]); if found { for item in locals.items[..end] { if item==root { return true; } } } break; } }
+ for index in 0..text.len {if text[index]=='.' { let root,found=pool.lookup(text[..index]); if found { var j=end; while j!=0 { j--; if locals.items[j]==root { return true; } } } break; } }
  return false;
 }
 fn name<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,id: Id,point: u32) {
@@ -139,17 +141,38 @@ recursive fn primitive<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,
  if argument_count!=arity||argument_count>4 { fail(self_,tree,pool,context,locals,c_call_arity,head,tree.span(head).start,0); return; }
  var arguments: Id[4]=[0,0,0,0]; var current=id; var index=argument_count;
  while tree.node(current).tag==a_apply { index--; arguments[index]=tree.node(current).b; current=tree.node(current).a; }
- let descriptor=pool.get(symbol)=="@type.call"||pool.get(symbol)=="@type.result"||pool.get(symbol)=="@panic";
+ var maybe_special=false;
+ var descriptor=false;
+ var selectors=0;
+ var is_product_get=false;
+ var is_eff_desc=false;
+ var is_eff_has=false;
+ {
+  let text=pool.get(symbol);
+  if text.len>=2 && (text[1]=='t' || text[1]=='p' || text[1]=='e') {
+   maybe_special=true;
+   descriptor=text=="@type.call"||text=="@type.result"||text=="@panic";
+   if text=="@effect.state"||text=="@effect.run" { selectors=2; } else if text=="@effect.provider"||text=="@effect.reader"||text=="@effect.writer" { selectors=1; }
+   is_product_get=text=="@product.get";
+   is_eff_desc=text=="@effect.descriptor";
+   is_eff_has=text=="@effect.has";
+  }
+ }
+ if !maybe_special {
+  for i in 0..arity {
+   walk(self_,tree,pool,context,locals,arguments[i],depth); if stopped(self_,tree,pool,context,locals) { return; }
+  }
+  return;
+ }
  if descriptor&&tree.node(arguments[0]).tag!=a_string { fail(self_,tree,pool,context,locals,c_literal_required,arguments[0],tree.span(arguments[0]).start,0); return; }
- var selectors=0; if pool.get(symbol)=="@effect.state"||pool.get(symbol)=="@effect.run" { selectors=2; } else if pool.get(symbol)=="@effect.provider"||pool.get(symbol)=="@effect.reader"||pool.get(symbol)=="@effect.writer" { selectors=1; }
  for i in 0..selectors { let arg=arguments[i]; if tree.node(arg).tag==a_name&&pool.get(tree.node(arg).a)=="Foreign" { fail(self_,tree,pool,context,locals,c_sealed_effect,arg,tree.span(arg).start,0); return; } }
  for i in 0..arity {
   let arg=arguments[i]; if i==0&&descriptor { continue; }
-  if pool.get(symbol)=="@product.get"&&i==1 {
+  if is_product_get&&i==1 {
    if tree.node(arg).tag==a_numeric_error&&tree.numeric_fault(arg).code==blot_parse_ast::numericcode_integer_range { numeric_failure(self_,tree,pool,context,locals,arg); }
    else if tree.node(arg).tag!=a_integer { fail(self_,tree,pool,context,locals,c_product_index_literal,arg,tree.span(arg).start,0); } return;
   }
-  let foreign_descriptor=(pool.get(symbol)=="@effect.descriptor"&&i==0)||(pool.get(symbol)=="@effect.has"&&i==1);
+  let foreign_descriptor=(is_eff_desc&&i==0)||(is_eff_has&&i==1);
   if foreign_descriptor&&tree.node(arg).tag==a_name&&pool.get(tree.node(arg).a)=="Foreign" { continue; }
   walk(self_,tree,pool,context,locals,arg,depth); if stopped(self_,tree,pool,context,locals) { return; }
  }
@@ -282,147 +305,177 @@ let a_spark_expr=blot_parse_ast::tag_spark_expr;
 let a_entry_kernel_decl=blot_parse_ast::tag_entry_kernel_decl;
 let a_entry_process_decl=blot_parse_ast::tag_entry_process_decl;
 recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
- if id!=0 { let tag=tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&context.source_editor_probe(id) { return; } }
- if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
+ if id==0 { return; }
  let n=tree.node(id);
- if n.tag==a_numeric_error { numeric_failure(self_,tree,pool,context,locals,id); }
- else if n.tag==a_string {}
- else if n.tag==a_name {
-  if validate_controls(self_,tree,pool,context,locals)&&!local(self_,tree,pool,context,locals,n.a)&&context.source_non_callable_effect(n.a) { fail(self_,tree,pool,context,locals,c_effect_member,id,tree.span(id).start,0); }
-  else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); }
- } else if n.tag==a_intrinsic {
-  if !context.source_intrinsic_known(n.a) { fail(self_,tree,pool,context,locals,c_unknown_intrinsic,id,tree.span(id).start,n.a); }
-  else { let arity,found=context.source_intrinsic_arity(n.a); if found&&arity!=0 { fail(self_,tree,pool,context,locals,c_call_arity,id,tree.span(id).start,0); } }
- } else if n.tag==a_constructor_ref {
-  let exists,err=context.source_operator_target_exists(n.a); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start+1,n.a); }
- } else if n.tag==a_type_witness {
-  walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; } let constructor,found=pool.lookup("Type"); var exists=false;
-  if found { let value,err=context.source_operator_target_exists(constructor); self_.failure=err; exists=value; }
-  if self_.failure==blot_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
- } else if n.tag==a_group||n.tag==a_return_stmt||n.tag==a_function_return_stmt { walk(self_,tree,pool,context,locals,n.a,depth+1); }
- else if n.tag==a_break_stmt { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_break_scope,id,tree.span(id).start,0); } }
- else if n.tag==a_continue_stmt { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_continue_scope,id,tree.span(id).start,0); } }
- else if n.tag==a_forever_stmt { loop_scope(self_,tree,pool,context,locals,0,n.a,depth+1); }
- else if n.tag==a_field_access {
-  var base=n.a; while tree.node(base).tag==a_group { base=tree.node(base).a; } let source=tree.node(base);
-  if source.tag==a_name&&!local(self_,tree,pool,context,locals,source.a)&&context.source_qualified_exists(source.a,n.b) { return; } walk(self_,tree,pool,context,locals,n.a,depth+1);
- } else if n.tag==a_field { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } }
- else if n.tag==a_unary { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } }
- else if n.tag==a_binary {
-  walk(self_,tree,pool,context,locals,n.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } operator(self_,tree,pool,context,locals,n.a,named(pool,n.a),id); walk(self_,tree,pool,context,locals,n.c,depth+1);
- } else if n.tag==a_infix_chain {
-  walk(self_,tree,pool,context,locals,n.a,depth+1); let tails=blot_parse_ast::List {n.b,n.c};let ast_tails_count=tree.list(tails).len;
-  let ast_visit_7_source=tails;let ast_visit_7_count=tree.list(ast_visit_7_source).len;for ast_visit_7_index in 0..ast_visit_7_count {let tail=tree.list(ast_visit_7_source)[ast_visit_7_index]; if stopped(self_,tree,pool,context,locals) { return; } let op=tree.node(tail); operator(self_,tree,pool,context,locals,op.a,(op.c&1)!=0,tail); walk(self_,tree,pool,context,locals,op.b,depth+1); }
-  if stopped(self_,tree,pool,context,locals) { return; } var stack=ScratchIdBuffer {};
-  let ast_visit_8_source=tails;let ast_visit_8_count=tree.list(ast_visit_8_source).len;for ast_visit_8_index in 0..ast_visit_8_count {let tail=tree.list(ast_visit_8_source)[ast_visit_8_index];
-   let flags=tree.node(tail).c; let power=flags>>4; let association=(flags>>2)&3;
-   while stack.len!=0 {
-    let previous=tree.node(stack.items[stack.len-1]).c; if previous>>4<power { break; }
-    if previous>>4==power { if ((previous>>2)&3)!=association||association==2 { fail(self_,tree,pool,context,locals,c_operator_associativity,tail,origin(tree,tail),0); stack.deinit(); return; } if association==1 { break; } }
-    stack.resize(stack.len-1);
+ if (n.tag==a_name||n.tag==a_constructor_ref||n.tag==a_intrinsic)&&context.source_editor_probe(id) { return; }
+ if stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
+ match n.tag {
+  blot_parse_ast::tag_integer, blot_parse_ast::tag_float, blot_parse_ast::tag_boolean, blot_parse_ast::tag_unit, blot_parse_ast::tag_string => {},
+  blot_parse_ast::tag_numeric_error => { numeric_failure(self_,tree,pool,context,locals,id); },
+  blot_parse_ast::tag_name => {
+   if validate_controls(self_,tree,pool,context,locals)&&!local(self_,tree,pool,context,locals,n.a)&&context.source_non_callable_effect(n.a) { fail(self_,tree,pool,context,locals,c_effect_member,id,tree.span(id).start,0); }
+   else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); }
+  },
+  blot_parse_ast::tag_intrinsic => {
+   if !context.source_intrinsic_known(n.a) { fail(self_,tree,pool,context,locals,c_unknown_intrinsic,id,tree.span(id).start,n.a); }
+   else { let arity,found=context.source_intrinsic_arity(n.a); if found&&arity!=0 { fail(self_,tree,pool,context,locals,c_call_arity,id,tree.span(id).start,0); } }
+  },
+  blot_parse_ast::tag_constructor_ref => {
+   let exists,err=context.source_operator_target_exists(n.a); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start+1,n.a); }
+  },
+  blot_parse_ast::tag_type_witness => {
+   walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; } let constructor,found=pool.lookup("Type"); var exists=false;
+   if found { let value,err=context.source_operator_target_exists(constructor); self_.failure=err; exists=value; }
+   if self_.failure==blot_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
+  },
+  blot_parse_ast::tag_group, blot_parse_ast::tag_return_stmt, blot_parse_ast::tag_function_return_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); },
+  blot_parse_ast::tag_break_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_break_scope,id,tree.span(id).start,0); } },
+  blot_parse_ast::tag_continue_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_continue_scope,id,tree.span(id).start,0); } },
+  blot_parse_ast::tag_forever_stmt => { loop_scope(self_,tree,pool,context,locals,0,n.a,depth+1); },
+  blot_parse_ast::tag_field_access => {
+   var base=n.a; while tree.node(base).tag==a_group { base=tree.node(base).a; } let source=tree.node(base);
+   if source.tag==a_name&&!local(self_,tree,pool,context,locals,source.a)&&context.source_qualified_exists(source.a,n.b) { return; } walk(self_,tree,pool,context,locals,n.a,depth+1);
+  },
+  blot_parse_ast::tag_field => { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } },
+  blot_parse_ast::tag_unary => { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } },
+  blot_parse_ast::tag_binary => {
+   walk(self_,tree,pool,context,locals,n.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } operator(self_,tree,pool,context,locals,n.a,named(pool,n.a),id); walk(self_,tree,pool,context,locals,n.c,depth+1);
+  },
+  blot_parse_ast::tag_infix_chain => {
+   walk(self_,tree,pool,context,locals,n.a,depth+1); let tails=blot_parse_ast::List {n.b,n.c};let ast_tails_count=tree.list(tails).len;
+   let ast_visit_7_source=tails;let ast_visit_7_count=tree.list(ast_visit_7_source).len;for ast_visit_7_index in 0..ast_visit_7_count {let tail=tree.list(ast_visit_7_source)[ast_visit_7_index]; if stopped(self_,tree,pool,context,locals) { return; } let op=tree.node(tail); operator(self_,tree,pool,context,locals,op.a,(op.c&1)!=0,tail); walk(self_,tree,pool,context,locals,op.b,depth+1); }
+   if stopped(self_,tree,pool,context,locals) { return; } var stack=ScratchIdBuffer {};
+   let ast_visit_8_source=tails;let ast_visit_8_count=tree.list(ast_visit_8_source).len;for ast_visit_8_index in 0..ast_visit_8_count {let tail=tree.list(ast_visit_8_source)[ast_visit_8_index];
+    let flags=tree.node(tail).c; let power=flags>>4; let association=(flags>>2)&3;
+    while stack.len!=0 {
+     let previous=tree.node(stack.items[stack.len-1]).c; if previous>>4<power { break; }
+     if previous>>4==power { if ((previous>>2)&3)!=association||association==2 { fail(self_,tree,pool,context,locals,c_operator_associativity,tail,origin(tree,tail),0); stack.deinit(); return; } if association==1 { break; } }
+     stack.resize(stack.len-1);
+    }
+    stack.push(tail);
    }
-   stack.push(tail);
-  }
-  stack.deinit(); } else if n.tag==a_apply {
-  var head=id; var argument_count=0;
-  loop { let current=tree.node(head); if current.tag==a_apply { argument_count++; head=current.a; } else { break; } }
-  let callee=tree.node(head);
-  if validate_controls(self_,tree,pool,context,locals)&&callee.tag==a_name&&tree.node(n.b).tag==a_record&&context.source_constructor_exists(callee.a)&&!local(self_,tree,pool,context,locals,callee.a) { fail(self_,tree,pool,context,locals,c_constructor_marker,id,tree.span(id).start,0); return; }
-  if callee.tag==a_intrinsic { primitive(self_,tree,pool,context,locals,id,head,argument_count,depth+1); return; }
-  if callee.tag==a_name&&!local(self_,tree,pool,context,locals,callee.a) { let text=pool.get(callee.a); if text=="freeze"||text=="copy" { let exists,err=context.source_value_exists(callee.a); self_.failure=err; if err==blot_error::Error.none&&!exists { var current=id; while tree.node(current).tag==a_apply { walk(self_,tree,pool,context,locals,tree.node(current).b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } current=tree.node(current).a; } return; } } }
-  walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
-  var type_argument=type_application(self_,tree,pool,context,locals,n.a);
-  if type_argument&&validate_controls(self_,tree,pool,context,locals) { let is_type,err=context.source_argument_is_type(n.a,n.b); self_.failure=err; type_argument=is_type; }
-  if !type_argument { walk(self_,tree,pool,context,locals,n.b,depth+1); }
- } else if n.tag==a_index_access { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); }
- else if n.tag==a_record {
-  if n.a!=0&&!record_target(self_,tree,pool,context,locals,id,n.a) { return; } let ast_fields_source=id;let ast_fields_count=tree.children(ast_fields_source).len;
-  let ast_visit_9_source=ast_fields_source;let ast_visit_9_count=tree.children(ast_visit_9_source).len;for index in 0..ast_visit_9_count {let child=tree.children(ast_visit_9_source)[index];
-   let field=tree.node(child).a;
-   if n.a!=0 { let known,has_known=context.source_record_field_exists(n.a,field); if has_known&&!known { fail(self_,tree,pool,context,locals,c_unknown_record_field,child,tree.span(child).start,field); return; } }
-   let ast_visit_10_source=ast_fields_source;let ast_visit_10_start=0;let ast_visit_10_count=tree.children(ast_visit_10_source)[ast_visit_10_start..index].len;for ast_visit_10_index in 0..ast_visit_10_count {let earlier=tree.children(ast_visit_10_source)[ast_visit_10_start+ast_visit_10_index]; if tree.node(earlier).a==field { fail(self_,tree,pool,context,locals,c_duplicate_record_field,child,tree.span(child).start,field); return; } }
-   walk(self_,tree,pool,context,locals,child,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
-  }
-  if n.a!=0 { let field,missing=context.source_missing_record_field(n.a,tree.children(ast_fields_source)); if missing { fail(self_,tree,pool,context,locals,c_missing_record_field,id,tree.span(id).start+1,field); } }
- } else if n.tag==a_product||n.tag==a_array { let ast_visit_11_source=id;let ast_visit_11_count=tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,tree,pool,context,locals,child,depth+1); } }
- else if n.tag==a_lambda {
-  self_.failure=context.source_expression_annotations(id); if annotations_stopped(self_,tree,pool,context,locals) { return; }
-  let saved_loops=self_.loops; self_.loops=0;
-  if pool.get(tree.parameter(n.a).name)=="own" { fail(self_,tree,pool,context,locals,c_own_name,id,tree.span(id).start,0); return; }
-  let saved=locals.len; bind(self_,tree,pool,context,locals,tree.parameter(n.a).name); walk(self_,tree,pool,context,locals,n.b,depth+1);
-  locals.resize(saved); self_.loops=saved_loops;
- } else if n.tag==a_block {
-  let saved=locals.len; suite(self_,tree,pool,context,locals,id,depth+1); locals.resize(saved); walk(self_,tree,pool,context,locals,n.c,depth+1);
- } else if n.tag==a_fork_expr {
-  let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
-  for i in 0..count { let entry=tree.node(tree.list(entries)[i]); walk(self_,tree,pool,context,locals,entry.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } }
-  let saved=locals.len; let saved_loops=self_.loops; self_.loops=0;
-  for i in 0..count { let entry=tree.node(tree.list(entries)[i]); bind(self_,tree,pool,context,locals,entry.a); }
-  walk(self_,tree,pool,context,locals,n.c,depth+1);
-  locals.resize(saved); self_.loops=saved_loops;
- } else if n.tag==a_with_stmt {
-  let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
-  for i in 0..count {
-   let entry=tree.node(tree.list(entries)[i]);
-   if entry.c==1 { walk(self_,tree,pool,context,locals,entry.b,depth+1); }
-   else { walk(self_,tree,pool,context,locals,entry.a,depth+1); }
-   if stopped(self_,tree,pool,context,locals) { return; }
-  }
-  scope(self_,tree,pool,context,locals,0,n.c,depth+1);
- } else if n.tag==a_comptime_for {
-  let body=tree.extra.items[n.c];
-  let saved=locals.len;
-  bind(self_,tree,pool,context,locals,n.a);
-  walk(self_,tree,pool,context,locals,body,depth+1);
-  locals.resize(saved);
- } else if n.tag==a_comptime_if {
-  walk(self_,tree,pool,context,locals,n.a,depth+1);
-  scope(self_,tree,pool,context,locals,0,n.b,depth+1);
-  scope(self_,tree,pool,context,locals,0,n.c,depth+1);
- } else if n.tag==a_comptime_project {
-  walk(self_,tree,pool,context,locals,n.a,depth+1);
-  if !local(self_,tree,pool,context,locals,n.b) { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start,n.b); }
- } else if n.tag==a_spark_expr {
-  walk(self_,tree,pool,context,locals,tree.spark_source(id),depth+1);
-  walk(self_,tree,pool,context,locals,tree.spark_end(id),depth+1);
-  let saved_loops=self_.loops; self_.loops=0;
-  scope(self_,tree,pool,context,locals,n.b,n.a,depth+1);
-  self_.loops=saved_loops;
- } else if n.tag==a_let_stmt {
-  let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
+   stack.deinit();
+  },
+  blot_parse_ast::tag_apply => {
+   var head=id; var argument_count=0;
+   loop { let current=tree.node(head); if current.tag==a_apply { argument_count++; head=current.a; } else { break; } }
+   let callee=tree.node(head);
+   if callee.tag==a_intrinsic { primitive(self_,tree,pool,context,locals,id,head,argument_count,depth+1); return; }
+   if validate_controls(self_,tree,pool,context,locals)&&callee.tag==a_name&&tree.node(n.b).tag==a_record&&context.source_constructor_exists(callee.a)&&!local(self_,tree,pool,context,locals,callee.a) { fail(self_,tree,pool,context,locals,c_constructor_marker,id,tree.span(id).start,0); return; }
+   if callee.tag==a_name&&!local(self_,tree,pool,context,locals,callee.a) { let text=pool.get(callee.a); if text=="freeze"||text=="copy" { let exists,err=context.source_value_exists(callee.a); self_.failure=err; if err==blot_error::Error.none&&!exists { var current=id; while tree.node(current).tag==a_apply { walk(self_,tree,pool,context,locals,tree.node(current).b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } current=tree.node(current).a; } return; } } }
+   walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
+   var type_argument=type_application(self_,tree,pool,context,locals,n.a);
+   if type_argument&&validate_controls(self_,tree,pool,context,locals) { let is_type,err=context.source_argument_is_type(n.a,n.b); self_.failure=err; type_argument=is_type; }
+   if !type_argument { walk(self_,tree,pool,context,locals,n.b,depth+1); }
+  },
+  blot_parse_ast::tag_index_access => { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); },
+  blot_parse_ast::tag_record => {
+   if n.a!=0&&!record_target(self_,tree,pool,context,locals,id,n.a) { return; } let ast_fields_source=id;let ast_fields_count=tree.children(ast_fields_source).len;
+   let ast_visit_9_source=ast_fields_source;let ast_visit_9_count=tree.children(ast_visit_9_source).len;for index in 0..ast_visit_9_count {let child=tree.children(ast_visit_9_source)[index];
+    let field=tree.node(child).a;
+    if n.a!=0 { let known,has_known=context.source_record_field_exists(n.a,field); if has_known&&!known { fail(self_,tree,pool,context,locals,c_unknown_record_field,child,tree.span(child).start,field); return; } }
+    let ast_visit_10_source=ast_fields_source;let ast_visit_10_start=0;let ast_visit_10_count=tree.children(ast_visit_10_source)[ast_visit_10_start..index].len;for ast_visit_10_index in 0..ast_visit_10_count {let earlier=tree.children(ast_visit_10_source)[ast_visit_10_start+ast_visit_10_index]; if tree.node(earlier).a==field { fail(self_,tree,pool,context,locals,c_duplicate_record_field,child,tree.span(child).start,field); return; } }
+    walk(self_,tree,pool,context,locals,child,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
+   }
+   if n.a!=0 { let field,missing=context.source_missing_record_field(n.a,tree.children(ast_fields_source)); if missing { fail(self_,tree,pool,context,locals,c_missing_record_field,id,tree.span(id).start+1,field); } }
+  },
+  blot_parse_ast::tag_product, blot_parse_ast::tag_array => { let ast_visit_11_source=id;let ast_visit_11_count=tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,tree,pool,context,locals,child,depth+1); } },
+  blot_parse_ast::tag_lambda => {
+   self_.failure=context.source_expression_annotations(id); if annotations_stopped(self_,tree,pool,context,locals) { return; }
+   let saved_loops=self_.loops; self_.loops=0;
+   if pool.get(tree.parameter(n.a).name)=="own" { fail(self_,tree,pool,context,locals,c_own_name,id,tree.span(id).start,0); return; }
+   let saved=locals.len; bind(self_,tree,pool,context,locals,tree.parameter(n.a).name); walk(self_,tree,pool,context,locals,n.b,depth+1);
+   locals.resize(saved); self_.loops=saved_loops;
+  },
+  blot_parse_ast::tag_block => {
+   let saved=locals.len; suite(self_,tree,pool,context,locals,id,depth+1); locals.resize(saved); walk(self_,tree,pool,context,locals,n.c,depth+1);
+  },
+  blot_parse_ast::tag_fork_expr => {
+   let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
+   for i in 0..count { let entry=tree.node(tree.list(entries)[i]); walk(self_,tree,pool,context,locals,entry.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } }
+   let saved=locals.len; let saved_loops=self_.loops; self_.loops=0;
+   for i in 0..count { let entry=tree.node(tree.list(entries)[i]); bind(self_,tree,pool,context,locals,entry.a); }
+   walk(self_,tree,pool,context,locals,n.c,depth+1);
+   locals.resize(saved); self_.loops=saved_loops;
+  },
+  blot_parse_ast::tag_with_stmt => {
+   let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
+   for i in 0..count {
+    let entry=tree.node(tree.list(entries)[i]);
+    if entry.c==1 { walk(self_,tree,pool,context,locals,entry.b,depth+1); }
+    else { walk(self_,tree,pool,context,locals,entry.a,depth+1); }
+    if stopped(self_,tree,pool,context,locals) { return; }
+   }
+   scope(self_,tree,pool,context,locals,0,n.c,depth+1);
+  },
+  blot_parse_ast::tag_comptime_for => {
+   let body=tree.extra.items[n.c];
+   let saved=locals.len;
+   bind(self_,tree,pool,context,locals,n.a);
+   walk(self_,tree,pool,context,locals,body,depth+1);
+   locals.resize(saved);
+  },
+  blot_parse_ast::tag_comptime_if => {
+   walk(self_,tree,pool,context,locals,n.a,depth+1);
+   scope(self_,tree,pool,context,locals,0,n.b,depth+1);
+   scope(self_,tree,pool,context,locals,0,n.c,depth+1);
+  },
+  blot_parse_ast::tag_comptime_project => {
+   walk(self_,tree,pool,context,locals,n.a,depth+1);
+   if !local(self_,tree,pool,context,locals,n.b) { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start,n.b); }
+  },
+  blot_parse_ast::tag_spark_expr => {
+   walk(self_,tree,pool,context,locals,tree.spark_source(id),depth+1);
+   walk(self_,tree,pool,context,locals,tree.spark_end(id),depth+1);
+   let saved_loops=self_.loops; self_.loops=0;
+   scope(self_,tree,pool,context,locals,n.b,n.a,depth+1);
+   self_.loops=saved_loops;
+  },
+  blot_parse_ast::tag_let_stmt => {
+   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
 
-  pattern_names(self_,tree,pool,context,locals,binding.pattern,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
-  self_.failure=context.source_binding_annotation(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
-  walk(self_,tree,pool,context,locals,binding.value,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
-  self_.failure=context.source_binding_finish(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
-  walk(self_,tree,pool,context,locals,binding.fallback,depth+1); pattern(self_,tree,pool,context,locals,binding.pattern,depth+1);
-  { context.source_binding_end(scope); } } else if n.tag==a_use_stmt||n.tag==a_iterator_bind {
-  self_.failure=context.source_expression_annotations(id); walk(self_,tree,pool,context,locals,n.b,depth+1); bind(self_,tree,pool,context,locals,n.a);
- } else if n.tag==a_rebind_stmt {
-  var root=n.a; while tree.node(root).tag==a_field_access||tree.node(root).tag==a_index_access { root=tree.node(root).a; } let target=tree.node(root);
-  if target.tag==a_name&&!local(self_,tree,pool,context,locals,target.a) { fail(self_,tree,pool,context,locals,c_unknown_rebinding,id,tree.span(root).start,target.a); return; }
-  let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
- } else if n.tag==a_if_expr||n.tag==a_if_stmt||n.tag==a_range_stmt { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); }
- else if n.tag==a_if_let_stmt {
-  pattern_names(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); let body=tree.extra.items[n.c]; let fallback=tree.extra.items[n.c+1]; scope(self_,tree,pool,context,locals,n.a,body,depth+1); scope(self_,tree,pool,context,locals,0,fallback,depth+1);
- } else if n.tag==a_for_stmt {
-  walk(self_,tree,pool,context,locals,n.b,depth+1); let end=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,end,depth+1); scope(self_,tree,pool,context,locals,n.a,body,depth+1);
- } else if n.tag==a_case_expr {
-  let input=blot_parse_ast::List {tree.extra.items[n.a],tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
-  let ast_visit_13_source=blot_parse_ast::List {n.b,n.c};let ast_visit_13_count=tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
- } else if n.tag==a_case_arm {
-  let saved=locals.len;
-  let rows=blot_parse_ast::List {n.a,n.b};let ast_rows_count=tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,tree,pool,context,locals,tree.list(rows)[0],depth+1); }
-  let canonical_end=locals.len; var index=0; if ast_rows_count!=0 { index=1; }
-  while index<ast_rows_count {
-   let row=tree.list(rows)[index]; let previous=self_.pattern_scope; self_.pattern_scope=saved; pattern(self_,tree,pool,context,locals,row,depth+1); self_.pattern_scope=previous; if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; }
-   var same=canonical_end-saved==locals.len-canonical_end;
-   for name in locals.items[saved..canonical_end] { var found=false; for other in locals.items[canonical_end..] { if name==other { found=true; break; } } same=same&&found; }
-   if !same { fail(self_,tree,pool,context,locals,c_alternative_bindings,row,tree.span(row).start,0); }
-   locals.resize(canonical_end); if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; } index++;
-  }
-  let guard_=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,body,depth+1); walk(self_,tree,pool,context,locals,guard_,depth+1);
-  { locals.resize(saved); } }
+   pattern_names(self_,tree,pool,context,locals,binding.pattern,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+   self_.failure=context.source_binding_annotation(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+   walk(self_,tree,pool,context,locals,binding.value,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+   self_.failure=context.source_binding_finish(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+   walk(self_,tree,pool,context,locals,binding.fallback,depth+1); pattern(self_,tree,pool,context,locals,binding.pattern,depth+1);
+   { context.source_binding_end(scope); }
+  },
+  blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind => {
+   self_.failure=context.source_expression_annotations(id); walk(self_,tree,pool,context,locals,n.b,depth+1); bind(self_,tree,pool,context,locals,n.a);
+  },
+  blot_parse_ast::tag_rebind_stmt => {
+   var root=n.a; while tree.node(root).tag==a_field_access||tree.node(root).tag==a_index_access { root=tree.node(root).a; } let target=tree.node(root);
+   if target.tag==a_name&&!local(self_,tree,pool,context,locals,target.a) { fail(self_,tree,pool,context,locals,c_unknown_rebinding,id,tree.span(root).start,target.a); return; }
+   let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
+  },
+  blot_parse_ast::tag_if_expr, blot_parse_ast::tag_if_stmt, blot_parse_ast::tag_range_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); },
+  blot_parse_ast::tag_if_let_stmt => {
+   pattern_names(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); let body=tree.extra.items[n.c]; let fallback=tree.extra.items[n.c+1]; scope(self_,tree,pool,context,locals,n.a,body,depth+1); scope(self_,tree,pool,context,locals,0,fallback,depth+1);
+  },
+  blot_parse_ast::tag_for_stmt => {
+   walk(self_,tree,pool,context,locals,n.b,depth+1); let end=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,end,depth+1); scope(self_,tree,pool,context,locals,n.a,body,depth+1);
+  },
+  blot_parse_ast::tag_case_expr => {
+   let input=blot_parse_ast::List {tree.extra.items[n.a],tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+   let ast_visit_13_source=blot_parse_ast::List {n.b,n.c};let ast_visit_13_count=tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+  },
+  blot_parse_ast::tag_case_arm => {
+   let saved=locals.len;
+   let rows=blot_parse_ast::List {n.a,n.b};let ast_rows_count=tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,tree,pool,context,locals,tree.list(rows)[0],depth+1); }
+   let canonical_end=locals.len; var index=0; if ast_rows_count!=0 { index=1; }
+   while index<ast_rows_count {
+    let row=tree.list(rows)[index]; let previous=self_.pattern_scope; self_.pattern_scope=saved; pattern(self_,tree,pool,context,locals,row,depth+1); self_.pattern_scope=previous; if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; }
+    var same=canonical_end-saved==locals.len-canonical_end;
+    for name in locals.items[saved..canonical_end] { var found=false; for other in locals.items[canonical_end..] { if name==other { found=true; break; } } same=same&&found; }
+    if !same { fail(self_,tree,pool,context,locals,c_alternative_bindings,row,tree.span(row).start,0); }
+    locals.resize(canonical_end); if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; } index++;
+   }
+   let guard_=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,body,depth+1); walk(self_,tree,pool,context,locals,guard_,depth+1);
+   { locals.resize(saved); }
+  },
+  _ => {},
+ }
 }
 fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const bool[:]=default<const bool[:]>()) -> Issue,bool,Error {
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;

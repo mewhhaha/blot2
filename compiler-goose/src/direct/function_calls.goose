@@ -1730,7 +1730,7 @@ fn restType(g: Generator&, f: const Fn&, ty: Ty, count: i64, id: u32) -> Ty, Err
 // loop-free, closure-free, non-allocating Core bodies so caller CheckedArray/
 // CheckedView descriptors remain live across the call and Cranelift can fold
 // constant arguments and match dispatch.
-recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, target: BindingRef, budget: i64&) -> bool {
+recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32, target: BindingRef, budget: i64&, margin: i64&) -> bool {
     if id == 0 { return true; }
     if budget <= 0 { return false; }
     budget -= 1;
@@ -1742,44 +1742,44 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             return !(resolved == target);
         },
         scalar, logical, associated => {
-            return canInlineBody(g, tm, n.a, target, budget) && canInlineBody(g, tm, n.b, target, budget);
+            return canInlineBodyMargin(g, tm, n.a, target, budget, margin) && canInlineBodyMargin(g, tm, n.b, target, budget, margin);
         },
         if_value, if_stmt => {
-            return canInlineBody(g, tm, n.a, target, budget) &&
-                canInlineBody(g, tm, n.b, target, budget) &&
-                canInlineBody(g, tm, n.c, target, budget);
+            return canInlineBodyMargin(g, tm, n.a, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, n.b, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, n.c, target, budget, margin);
         },
         block_, suite => {
             for child in tm.children(id) {
-                if !canInlineBody(g, tm, child, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
         bind => {
             if n.c >= 2 || tm.binding(n.a).scheme.variables.len != 0 { return false; }
-            return canInlineBody(g, tm, n.b, target, budget);
+            return canInlineBodyMargin(g, tm, n.b, target, budget, margin);
         },
         pattern_bind => {
-            return canInlineBody(g, tm, n.b, target, budget) && canInlineBody(g, tm, n.c, target, budget);
+            return canInlineBodyMargin(g, tm, n.b, target, budget, margin) && canInlineBodyMargin(g, tm, n.c, target, budget, margin);
         },
-        return_ => { return canInlineBody(g, tm, n.a, target, budget); },
+        return_ => { return canInlineBodyMargin(g, tm, n.a, target, budget, margin); },
         product, record => {
             let children = tm.children(id);
             if children.len > 8 { return false; }
             for child in children {
-                if !canInlineBody(g, tm, child, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
-        construct => { return canInlineBody(g, tm, n.b, target, budget); },
-        project => { return canInlineBody(g, tm, n.a, target, budget); },
+        construct => { return canInlineBodyMargin(g, tm, n.b, target, budget, margin); },
+        project => { return canInlineBodyMargin(g, tm, n.a, target, budget, margin); },
         match_ => {
             for inp in tm.matchInputs(id) {
-                if !canInlineBody(g, tm, inp, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, inp, target, budget, margin) { return false; }
             }
             for arm in tm.matchArms(id) {
-                if !canInlineBody(g, tm, arm.guard_, target, budget) ||
-                    !canInlineBody(g, tm, arm.body, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, arm.guard_, target, budget, margin) ||
+                    !canInlineBodyMargin(g, tm, arm.body, target, budget, margin) { return false; }
             }
             return true;
         },
@@ -1787,7 +1787,7 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             let op = tm.arrayOperation(id);
             if op != blot_backend_collection_ops::Op.length && op != blot_backend_collection_ops::Op.get { return false; }
             for child in tm.children(id) {
-                if !canInlineBody(g, tm, child, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
@@ -1796,7 +1796,7 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             if ok != blot_error::Error.none { return false; }
             if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate { return false; }
             for child in tm.children(id) {
-                if !canInlineBody(g, tm, child, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
@@ -1805,46 +1805,52 @@ recursive fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, targ
             let callee_ref = g.resolve(tm, info.target);
             if callee_ref == target { return false; }
             for arg in info.arguments {
-                if !canInlineBody(g, tm, arg, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, arg, target, budget, margin) { return false; }
             }
             return true;
         },
         apply => {
-            return canInlineBody(g, tm, n.a, target, budget) && canInlineBody(g, tm, n.b, target, budget);
+            return canInlineBodyMargin(g, tm, n.a, target, budget, margin) && canInlineBodyMargin(g, tm, n.b, target, budget, margin);
         },
         update => {
             let uinfo = tm.updateInfo(id);
-            if !canInlineBody(g, tm, uinfo.root, target, budget) ||
-                !canInlineBody(g, tm, uinfo.value, target, budget) { return false; }
+            if !canInlineBodyMargin(g, tm, uinfo.root, target, budget, margin) ||
+                !canInlineBodyMargin(g, tm, uinfo.value, target, budget, margin) { return false; }
             for sel in tm.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !canInlineBody(g, tm, sel.index, target, budget) { return false; }
+                if sel.kind == blot_check_core::UpdateKind.index && !canInlineBodyMargin(g, tm, sel.index, target, budget, margin) { return false; }
             }
             return true;
         },
         loop_ => {
             if budget < 8 { return false; }
+            if budget - 8 < margin { margin = budget - 8; }
             budget -= 4;
             let linfo = tm.loopInfo(id);
-            return canInlineBody(g, tm, linfo.first, target, budget) &&
-                canInlineBody(g, tm, linfo.end, target, budget) &&
-                canInlineBody(g, tm, linfo.body, target, budget);
+            return canInlineBodyMargin(g, tm, linfo.first, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, linfo.end, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, linfo.body, target, budget, margin);
         },
         break_ => {
             for child in tm.breakValues(id) {
-                if !canInlineBody(g, tm, child, target, budget) { return false; }
+                if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
         spark => {
             if budget < 24 { return false; }
+            if budget - 24 < margin { margin = budget - 24; }
             budget -= 16;
             let sinfo = tm.sparkInfo(id);
-            return canInlineBody(g, tm, sinfo.source, target, budget) &&
-                canInlineBody(g, tm, sinfo.end, target, budget) &&
-                canInlineBody(g, tm, sinfo.body, target, budget);
+            return canInlineBodyMargin(g, tm, sinfo.source, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, sinfo.end, target, budget, margin) &&
+                canInlineBodyMargin(g, tm, sinfo.body, target, budget, margin);
         },
         _ => { return false; },
     }
+}
+fn canInlineBody(g: const Generator&, tm: const Module&, id: u32, target: BindingRef, budget: i64&) -> bool {
+    var margin: i64 = budget;
+    return canInlineBodyMargin(g, tm, id, target, budget, margin);
 }
 
 fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool {
@@ -1864,16 +1870,12 @@ fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool
         let body .= tm.body(target.binding);
         if body && body.is_function && !body.exported {
             var b168: i64 = 168;
-            if canInlineBody(g, tm, body.root, target, b168) {
+            var margin: i64 = 168;
+            if canInlineBodyMargin(g, tm, body.root, target, b168, margin) {
                 mask |= 1;
-                var b152: i64 = 152;
-                if canInlineBody(g, tm, body.root, target, b152) {
-                    mask |= 2;
-                    var b32: i64 = 32;
-                    if canInlineBody(g, tm, body.root, target, b32) {
-                        mask |= 4;
-                    }
-                }
+                let slack = min(b168, margin);
+                if slack >= 16 { mask |= 2; }
+                if slack >= 136 { mask |= 4; }
             }
         }
         g.s.inline_ok_vals[slot] = mask;

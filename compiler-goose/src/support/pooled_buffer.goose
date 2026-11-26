@@ -10,6 +10,12 @@ fn ensure<T,B>(buffer: B&,minimum: i64,pool: T[>..]&) -> Error {
     let replacement = pool.realloc_slice(buffer.storage,capacity);
     buffer.storage = replacement; buffer.items = replacement[..length]; return blot_error::Error.none;
 }
+fn ensureExact<T,B>(buffer: B&,minimum: i64,pool: T[>..]&) -> Error {
+    if minimum <= buffer.storage.len { return blot_error::Error.none; } if minimum > 0x5555555555555540 { return blot_error::Error.out_of_memory; }
+    let length = buffer.items.len;
+    let replacement = pool.realloc_slice(buffer.storage,minimum);
+    buffer.storage = replacement; buffer.items = replacement[..length]; return blot_error::Error.none;
+}
 fn push<T,B>(buffer: B&,value: T,pool: T[>..]&) -> Error { let length = buffer.items.len; let error = ensure(buffer,length + 1,pool); if error != blot_error::Error.none { return error; } buffer.storage[length] = value; buffer.items = buffer.storage[..length + 1]; return blot_error::Error.none; }
 fn append<T,B>(buffer: B&,values: const T[:],pool: T[>..]&) -> Error { let length = buffer.items.len; if values.len > 0x7fffffffffffffff - length { return blot_error::Error.out_of_memory; } let error = ensure(buffer,length + values.len,pool); if error != blot_error::Error.none { return error; } if values.len != 0 { buffer.storage[length..length + values.len].move_from(values); } buffer.items = buffer.storage[..length + values.len]; return blot_error::Error.none; }
 fn resize<B>(buffer: B&,length: i64) { assert(length >= 0 && length <= buffer.items.len); buffer.items = buffer.storage[..length]; }

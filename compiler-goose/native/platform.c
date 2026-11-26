@@ -89,6 +89,36 @@ int32_t blot_open_regular(const uint8_t *path, uint64_t maximum) {
     }
     return fd;
 }
+int32_t blot_open_regular_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+    int fd;
+    do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY); }
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return -errno;
+    struct stat status;
+    if (fstat(fd, &status) || !S_ISREG(status.st_mode) || status.st_size < 0 ||
+        (uint64_t)status.st_size > maximum) {
+        close(fd);
+        return -EINVAL;
+    }
+    int64_t sz = (int64_t)status.st_size;
+    memcpy(size_out, &sz, sizeof(sz));
+    return fd;
+}
+int32_t blot_open_regular_nofollow_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+    int fd;
+    do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY); }
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return -errno;
+    struct stat status;
+    if (fstat(fd, &status) || !S_ISREG(status.st_mode) || status.st_size < 0 ||
+        (uint64_t)status.st_size > maximum) {
+        close(fd);
+        return -EINVAL;
+    }
+    int64_t sz = (int64_t)status.st_size;
+    memcpy(size_out, &sz, sizeof(sz));
+    return fd;
+}
 int32_t blot_open_write(const uint8_t *path, _Bool exclusive) {
     int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
     if (exclusive) flags |= O_EXCL;

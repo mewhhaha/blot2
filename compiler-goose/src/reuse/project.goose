@@ -218,9 +218,35 @@ fn decodePath(path:const u8[:],decoded:u8[>..<]&)->Error {
     if !blot_support_path::validUtf8(decoded[before..]) {decoded.resize(before);return blot_error::Error.invalid_path;}
     return blot_error::Error.none;
 }
+fn isCleanAbsoluteRoot(root:const u8[:])->bool {
+    if root.len==0 || root[0]!='/' {return false;}
+    if root.len==1 {return true;}
+    if root[root.len-1]=='/' {return false;}
+    for i in 0..root.len {
+        let c=root[i];
+        if c==0 {return false;}
+        if c=='/' && i+1<root.len && (root[i+1]=='/' || root[i+1]=='.') {return false;}
+    }
+    return true;
+}
 fn resolveImportPath(source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {
     if raw.len==0||contains(raw,'?')||contains(raw,'#') {return blot_error::Error.invalid_path;}
     let root,tail,selection_error=selectedImportParts(source_filename,raw,options);if selection_error!=blot_error::Error.none {return selection_error;}
+    // Fast path for clean sibling/alias imports without percent-encoding.
+    if !contains(tail,'%') && !contains(tail,0) && tail.len!=0 && tail[0]!='/' {
+        if tail.len>=3 && tail[0]=='.' && tail[1]=='/' && !contains(tail[2..],'/') && tail[2..] != "." && tail[2..] != ".." && isCleanAbsoluteRoot(root) && blot_support_path::validUtf8(tail[2..]) {
+            output.append(root);
+            if root.len>1 {output.push('/');}
+            output.append(tail[2..]);
+            if !ends(tail,".blot") {output.append(".blot");}
+            return blot_error::Error.none;
+        }
+        if blot_support_path::validUtf8(tail) {
+            var joined:u8[>..<]=[];joined.append(root);joined.push('/');joined.append(tail);
+            if !ends(tail,".blot") {joined.append(".blot");}
+            return blot_support_path::normalize(joined,output);
+        }
+    }
     var decoded:u8[>..<]=[];let decoded_error=decodePath(tail,decoded);if decoded_error!=blot_error::Error.none {return decoded_error;}
     if decoded.len!=0&&decoded[0]=='/' {return blot_error::Error.invalid_path;}
     if !ends(decoded,".blot") {decoded.append(".blot");}
@@ -288,12 +314,74 @@ fn readOpen(self_:FileInputs&,fd:i32,maximum:i64,output:u8[>..<]&)->Error {
     let closed=blot_native::close(fd);
     if failure!=blot_error::Error.none {output.resize(before);}return failure;
 }
+fn readOwnedFd(self_:FileInputs&,fd:i32,size:i64)->const u8[:],bool {
+    if size==0 {let closed=blot_native::close(fd);return default<const u8[:]>(),true;}
+    let buf=owned_source.alloc_slice(size);
+    var got:i64=0;
+    while got<size {
+        let count=blot_native::read(fd,buf[got],(size-got) as u64);
+        if count<=0 {let closed=blot_native::close(fd);owned_source.free_slice(buf);return default<const u8[:]>(),false;}
+        got+=count;
+    }
+    let closed=blot_native::close(fd);
+    return buf,true;
+}
 fn probeSource(self_:FileInputs&,path:const u8[:],maximum:i64,name:u8[>..<]&,bytes:u8[>..<]&)->bool {
     if self_.canonical(path,name)!=blot_error::Error.none {return false;}
     var terminated:u8[>..<]=[];terminated.append(name[..]);terminated.push(0);
     let fd=blot_native::open_regular(terminated[0],maximum as u64);
     if fd<0 {return false;}
     return self_.readOpen(fd,maximum,bytes)==blot_error::Error.none;
+}
+fn probeSourceOwned(self_:FileInputs&,path:const u8[:],maximum:i64,dir_map:dictionary<const u8[:],const u8[:]>&,dir_owned:const u8[:][>..<]&,name:u8[>..<]&)->const u8[:],bool {
+    let empty=default<const u8[:]>();
+    var slash:i64=-1;
+    var i=path.len;
+    while i>0 {i--;if path[i]=='/' {slash=i;break;}}
+    if slash>0 && slash+1<path.len {
+        let dir=path[..slash];
+        let leaf=path[slash+1..];
+        if leaf!="." && leaf!=".." && !contains(leaf,0) && !contains(dir,0) {
+            var have_dir=false;
+            name.clear();
+            let cached .= dir_map.get(dir);
+            if cached {
+                name.append(cached);
+                have_dir=true;
+            } else {
+                var tmp_dir:u8[>..<]=[];
+                if self_.canonical(dir,tmp_dir)==blot_error::Error.none && tmp_dir.len!=0 {
+                    let k=copySource(dir);
+                    let v=copySource(tmp_dir[..]);
+                    dir_owned.push(k);
+                    dir_owned.push(v);
+                    dir_map.insert(k,v);
+                    name.append(tmp_dir[..]);
+                    have_dir=true;
+                }
+            }
+            if have_dir {
+                if name.len>1 || name[0]!='/' {name.push('/');}
+                name.append(leaf);
+                name.push(0);
+                var size:i64=0;
+                let fd=blot_native::open_regular_nofollow_sized(name[0],maximum as u64,size);
+                name.resize(name.len-1);
+                if fd>=0 {
+                    return self_.readOwnedFd(fd,size);
+                }
+                if fd!=-40 {return empty,false;}
+                name.clear();
+            }
+        }
+    }
+    if self_.canonical(path,name)!=blot_error::Error.none {return empty,false;}
+    name.push(0);
+    var size:i64=0;
+    let fd=blot_native::open_regular_sized(name[0],maximum as u64,size);
+    name.resize(name.len-1);
+    if fd<0 {return empty,false;}
+    return self_.readOwnedFd(fd,size);
 }
 fn recordProbedCanonical(self_:FileInputs&,path:const u8[:],canonical:const u8[:])->Error {self_.last_cause=default<const u8[:]>();return blot_error::Error.none;}
 fn recordProbedRead(self_:FileInputs&,canonical:const u8[:],bytes:const u8[:],limit:i64)->Error {self_.last_cause=default<const u8[:]>();if bytes.len>limit {self_.last_cause="StreamTooLong";return blot_error::Error.stream_too_long;}return blot_error::Error.none;}
@@ -462,21 +550,29 @@ fn readCanonical<P>(self_:Loader<P>&,canonical:const u8[:],origin:Origin,has_pro
 fn readSource<P>(self_:Loader<P>&,filename:Symbol,reserved:blot_support::Option<UnitId>,canonical:const u8[:],source:const u8[:],allowed:i64,origin:Origin)->blot_support::Option<UnitId>,Error {
     let no=blot_support::none<UnitId>();
     if source.len>allowed {let reported=self_.report(origin,Code.source_limit,canonical,blot_support::none<const u8[:]>());return no,reported;}
-    let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {return no,tree_error;}var tree=initialized;
+    var tree=blot_parse_ast::Tree{..};
     var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
     let parse_start=self_.project.symbols.entries.len;
     var recorded=blot_parse_parser::ScratchIdBuffer{};
     var cached=false;var reuse_error=blot_error::Error.none;
     if self_.reading_entry {cached=readEntryPacket(self_,filename,source,tree);}
-    else {cached,reuse_error=self_.reuseSyntax(filename,source,tree,recorded);}
+    else if self_.previous!=null {
+        let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {recorded.deinit();return no,tree_error;}
+        tree=initialized;
+        cached,reuse_error=self_.reuseSyntax(filename,source,tree,recorded);
+    }
     if reuse_error!=blot_error::Error.none {recorded.deinit();tree.deinit();return no,reuse_error;}
     if !cached && !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree,recorded) {
+        if tree.lease==0 {
+            let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {recorded.deinit();return no,tree_error;}
+            tree=initialized;
+        }
         var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
         let lex_scope=blot_phase_profile::enter(blot_phase_profile::Phase.lex);let lex_error=blot_parse_lexer::lex(source,lexed);lex_scope.exit();
         if lex_error!=blot_error::Error.none {
-            if lex_error==blot_error::Error.out_of_memory {tree.deinit();return no,lex_error;}
-            if lex_error!=blot_error::Error.source_limit {tree.deinit();return no,lex_error;}
-            let reported=self_.report(origin,Code.source_limit,canonical,blot_support::some(blot_error::error_name(lex_error)));tree.deinit();return no,reported;
+            if lex_error==blot_error::Error.out_of_memory {recorded.deinit();tree.deinit();return no,lex_error;}
+            if lex_error!=blot_error::Error.source_limit {recorded.deinit();tree.deinit();return no,lex_error;}
+            let reported=self_.report(origin,Code.source_limit,canonical,blot_support::some(blot_error::error_name(lex_error)));recorded.deinit();tree.deinit();return no,reported;
         }
         if diagnostics.len==0 {
             let parse_scope=blot_phase_profile::enter(blot_phase_profile::Phase.parse);

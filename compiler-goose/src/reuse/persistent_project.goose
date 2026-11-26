@@ -77,6 +77,7 @@ fn runPersistent(source:Project&,handle:u64,packets:const u8[:][:],debits:Module
  let names,error=blot_reuse_project_check::preparePersistentNames(source);
  if error!=blot_error::Error.none || !names {return Preparation.inactive,error;}
  let width=min(16,min(source.units.len,source.checking.workers as i64));
+ let need_interface=packets.len!=0;
  var pids:i64[16]=[0;16];
  let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);
  var children:u64=0;
@@ -84,13 +85,13 @@ fn runPersistent(source:Project&,handle:u64,packets:const u8[:][:],debits:Module
   let pid=blot_native::fork_process();
   if pid==0 {
    blot_phase_profile::installTrace(null);
-   let error=runPersistentLane(source,handle);
+   let error=runPersistentLane(source,handle,need_interface);
    if error!=blot_error::Error.none {blot_native::persist_fail(handle);blot_native::job_exit(1);}
    blot_native::job_exit(0);
   }
   if pid>0 {pids[index]=pid;children++;}
  }
- let mine=runPersistentLane(source,handle);
+ let mine=runPersistentLane(source,handle,need_interface);
  if mine!=blot_error::Error.none {
   blot_native::persist_fail(handle);
   for pid in pids {if pid>0 {blot_native::persist_kill_child(pid as u32);}}
@@ -116,7 +117,7 @@ fn runPersistent(source:Project&,handle:u64,packets:const u8[:][:],debits:Module
  return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
 }
 
-fn runPersistentLane(source:Project,handle:u64)->Error {
+fn runPersistentLane(source:Project,handle:u64,need_interface:bool=true)->Error {
  var engine,error=blot_reuse_project_check::initPersistentWorker(source);
  if error!=blot_error::Error.none {return error;}
  var packet:u8[>..<]=[];
@@ -125,7 +126,7 @@ fn runPersistentLane(source:Project,handle:u64)->Error {
   let claimed=blot_native::persist_claim(handle);
   if claimed==0 {break;}
   if claimed<0 {result=blot_error::Error.invalid_artifact;break;}
-  result=blot_reuse_project_check::persistentUnit(engine,claimed as u32,handle,packet);
+  result=blot_reuse_project_check::persistentUnit(engine,claimed as u32,handle,packet,need_interface);
   if result!=blot_error::Error.none {blot_native::persist_fail(handle);break;}
  }
  engine.deinit();

@@ -72,25 +72,21 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
     let id=index+1;
     let size=blot_native::persist_size(batch.shared,id,2);
     if size<=1 {return false;}
-    if size>batch.scratch.len {
-        let next_cap=max(size,batch.scratch.len*2);
-        if batch.scratch.len!=0 {owned_source.free_slice(batch.scratch);}
-        batch.scratch=owned_source.alloc_slice(next_cap);
-    }
-    if !blot_native::persist_read(batch.shared,id,2,batch.scratch[0],size as u64) {return false;}
-    return blot_reuse_parse_packet::decode(batch.scratch[..size],symbols,tree,recorded);
+    var tail_scratch:u8[>..<]=[];
+    return blot_reuse_parse_packet::decodeFromPersist(batch.shared,id,2,size,symbols,tree,tail_scratch,recorded);
 }
-fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],name:u8[>..<]&,source:u8[>..<]&) {
+fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],dir_map:dictionary<const u8[:],const u8[:]>&,dir_owned:const u8[:][>..<]&,name:u8[>..<]&) {
     let batch .= loader.parse_batch;
     if batch.inputs.items.len>=min(16384,loader.options.max_files) {return;}
     if batch.raw_paths.contains(path) || batch.paths.contains(path) {return;}
     let limit=min(loader.options.max_source_bytes,loader.options.max_total_source_bytes-batch.total-loader.project.source_bytes);
     if limit<=0 {return;}
     name.clear();
-    source.clear();
-    if !loader.inputs.probeSource(path,limit,name,source) {return;}
+    let owned_src,probed_ok=loader.inputs.probeSourceOwned(path,limit,dir_map,dir_owned,name);
+    if !probed_ok {return;}
     let existing .= batch.paths.get(name[..]);
     if existing {
+        releaseSource(owned_src);
         if path!=name[..] {
             let existing_idx:u32=existing;
             let owned_raw=copySource(path);
@@ -101,8 +97,8 @@ fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],name:u8[>..<]&,source:u8[
         return;
     }
     let sym,present=loader.project.symbols.lookup(name[..]);
-    if present && loader.files.get(sym)!=null {return;}
-    let input=ParseInput{copySource(name[..]),copySource(source[..]),false};
+    if present && loader.files.get(sym)!=null {releaseSource(owned_src);return;}
+    let input=ParseInput{copySource(name[..]),owned_src,false};
     let error=batch.inputs.push(input,parse_inputs);
     if error!=blot_error::Error.none {releaseSource(input.path);releaseSource(input.source);return;}
     let idx=(batch.inputs.items.len-1) as u32;
@@ -113,11 +109,11 @@ fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],name:u8[>..<]&,source:u8[
             batch.raw_paths.insert(owned_raw,idx,parse_paths);
         } else {releaseSource(owned_raw);}
     }
-    batch.total+=source.len;
+    batch.total+=owned_src.len;
 }
 // Discover literal imports cheaply. Unsupported spellings are left to the
 // normal loader. Only a successful parse of the exact source can be adopted.
-fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput,name:u8[>..<]&,source:u8[>..<]&,path:u8[>..<]&) {
+fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput,dir_map:dictionary<const u8[:],const u8[:]>&,dir_owned:const u8[:][>..<]&,name:u8[>..<]&,path:u8[>..<]&) {
     let src=input.source;
     var at:i64=0;
     while at<src.len {
@@ -136,7 +132,7 @@ fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput,name:u8[>..<]&,sour
         while end<line.len && line[end]!='"' {end++;}
         if end==line.len {break;}
         path.clear();
-        if resolveImportPath(input.path,line[quote+1..end],loader.options,path)==blot_error::Error.none {addParseInput(loader,path[..],name,source);}
+        if resolveImportPath(input.path,line[quote+1..end],loader.options,path)==blot_error::Error.none {addParseInput(loader,path[..],dir_map,dir_owned,name);}
     }
 }
 fn runParseLane<P>(loader:Loader<P>&)->bool {
@@ -146,36 +142,43 @@ fn runParseLane<P>(loader:Loader<P>&)->bool {
     var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
     var local,pool_err=blot_parse_symbols::initPooled();
     if pool_err!=blot_error::Error.none {return false;}
+    var tree,tree_err=blot_parse_ast::initPooled();
+    if tree_err!=blot_error::Error.none {local.deinit();return false;}
     var bytes:u8[>..<]=[];
     loop {
         let job=blot_native::persist_claim(batch.shared);
-        if job==0 {local.deinit();return true;}
-        if job<0 {local.deinit();return false;}
-        let ok=blot_reuse_parse_packet::encodeWithScratch(batch.inputs.items[job-1].source,loader.project.symbols,tokens,comments,diagnostics,local,bytes);
+        if job==0 {tree.deinit();local.deinit();return true;}
+        if job<0 {tree.deinit();local.deinit();return false;}
+        let ok=blot_reuse_parse_packet::encodeWithScratch(batch.inputs.items[job-1].source,loader.project.symbols,tokens,comments,diagnostics,local,tree,bytes);
         if !ok || bytes.len==0 {bytes.clear();bytes.push(0);}
         let id=job as u32;
-        if !blot_native::persist_publish(batch.shared,id,2,bytes[0],bytes.len as u64) {local.deinit();return false;}
+        if !blot_native::persist_publish(batch.shared,id,2,bytes[0],bytes.len as u64) {tree.deinit();local.deinit();return false;}
     }
 }
 fn prepareParseBatch<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {
     if workers==1 || blot_native::platform_is_linux()==0 {return;}
     let batch .= loader.parse_batch;
-    var name_buf:u8[>..<]=[];
-    var source_buf:u8[>..<]=[];
-    var path_buf:u8[>..<]=[];
-    if loader.project.entry==0 {
-        addParseInput(loader,entry,name_buf,source_buf);
-    } else {
-        let root=loader.project.entry;
-        for edge in loader.project.unitImports(root) {
-            path_buf.clear();
-            if resolveImportPath(loader.project.filename(root),loader.project.symbols.get(edge.path),loader.options,path_buf)==blot_error::Error.none {
-                addParseInput(loader,path_buf[..],name_buf,source_buf);
+    var dir_owned:const u8[:][>..<]=[];
+    {
+        var dir_map:dictionary<const u8[:],const u8[:]> = dictionary<const u8[:],const u8[:]>{};
+        var name_buf:u8[>..<]=[];
+        var path_buf:u8[>..<]=[];
+        if loader.project.entry==0 {
+            addParseInput(loader,entry,dir_map,dir_owned,name_buf);
+        } else {
+            let root=loader.project.entry;
+            for edge in loader.project.unitImports(root) {
+                path_buf.clear();
+                if resolveImportPath(loader.project.filename(root),loader.project.symbols.get(edge.path),loader.options,path_buf)==blot_error::Error.none {
+                    addParseInput(loader,path_buf[..],dir_map,dir_owned,name_buf);
+                }
             }
         }
+        var i:i64=0;
+        while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item,dir_map,dir_owned,name_buf,path_buf);i++;}
     }
-    var i:i64=0;
-    while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item,name_buf,source_buf,path_buf);i++;}
+    for s in dir_owned {releaseSource(s);}
+    dir_owned.clear();
     if batch.inputs.items.len<16 || batch.total<65536 {return;}
     var width=min(16,workers);
     if width==0 {

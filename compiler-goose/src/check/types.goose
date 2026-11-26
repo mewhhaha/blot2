@@ -768,7 +768,7 @@ recursive fn resolveRoot(self_: Store&, root: Id, at: Cursor) -> Id, Error {
     if !self_.resolved.activate(self_.mutation_epoch as u32, self_.effects.mutation_epoch as u32) { return resolveDepth(self_, root, at, 0); }
     let cached = self_.resolved.get(root); if cached.present { return cached.value, blot_error::Error.none; }
     let composite = self_.use_composite_cache;
-    if composite && self_.composites.entries.len != 0 { let cached = compositeResult(self_, root, at); if cached.present {
+    if composite && self_.composites.hasEntries(self_.closed_generation, self_.effects.physical_epoch) { let cached = compositeResult(self_, root, at); if cached.present {
         if cached.value != root || root < self_.resolved.high_water { let error = self_.resolved.put(root, cached.value); if error != blot_error::Error.none { return 0, error; } }
         return cached.value, blot_error::Error.none;
     } }
@@ -796,6 +796,10 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
         if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
         return root, blot_error::Error.none;
     }
+    var resolved_id = root;
+    var resolved_pos = at;
+    var chased_non_var = false;
+    var chased_value = default<Node>();
     if !self_.has_projections && self_.associated_equations.count == 0 && root > never {
         var value = node(self_, root);
         if value.tag == Tag.variable {
@@ -813,10 +817,20 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
                 if depth + target_height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
                 return id, blot_error::Error.none;
             }
+            resolved_id = id;
+            resolved_pos = position;
+            chased_value = value;
+            chased_non_var = true;
+        } else {
+            chased_value = value;
+            chased_non_var = true;
         }
     }
     if (self_.has_projections || self_.use_closed_graphs) && self_.use_resolution_cache && depth != 0 && root > never {
-        if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth, height); }
+        if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff {
+            if chased_non_var { return resolveChased(self_, resolved_id, chased_value, resolved_pos, depth); }
+            return resolveNode(self_, root, at, depth, height);
+        }
         if self_.projection_resolution_types != self_.mutation_epoch || self_.projection_resolution_rows != self_.effects.mutation_epoch || self_.projection_resolution_limit != self_.resolution_depth_limit {
             if self_.projection_resolutions.count != 0 { self_.projection_resolutions.clear(); }
             self_.projection_resolution_types = self_.mutation_epoch; self_.projection_resolution_rows = self_.effects.mutation_epoch; self_.projection_resolution_limit = self_.resolution_depth_limit;
@@ -824,11 +838,23 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
         let key = ProjectionResolution { root, at, depth as u32 , ..};
         block { let cached = self_.projection_resolutions.get(key); if cached { return cached, blot_error::Error.none; } }
-        let result, error = resolveNode(self_, root, at, depth, height); if error != blot_error::Error.none { return 0, error; }
+        var result: Id = 0; var error = blot_error::Error.none;
+        if chased_non_var { result, error = resolveChased(self_, resolved_id, chased_value, resolved_pos, depth); }
+        else { result, error = resolveNode(self_, root, at, depth, height); }
+        if error != blot_error::Error.none { return 0, error; }
         if self_.projection_resolutions.count < 65536 { self_.projection_resolutions.insert(key, result);if self_.projection_resolutions.failure!=blot_error::Error.none {return 0,self_.projection_resolutions.failure;} }
         return result, blot_error::Error.none;
     }
+    if chased_non_var { return resolveChased(self_, resolved_id, chased_value, resolved_pos, depth); }
     return resolveNode(self_, root, at, depth, height);
+}
+recursive fn resolveChased(self_: Store&, id: Id, value: Node, position: Cursor, depth: i64) -> Id, Error {
+    if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+    let result, error = resolveSelected(self_, id, value, position, depth);
+    if result == id && self_.use_closed_graphs && self_.closed_generation != 0xffff {
+        let refreshed = closedNodeHeight(self_, value); if refreshed != 0 { self_.nodes.items[id].closed_height = refreshed; self_.nodes.items[id].closed_generation = self_.closed_generation; }
+    }
+    return result, error;
 }
 recursive fn resolveNode(self_: Store&, root: Id, at: Cursor, depth: i64, height: u8) -> Id, Error {
     if self_.associated_equations.count != 0 { let equation = self_.associated_equations.get(root); if equation { return resolveDepth(self_, equation, at, depth + 1); } }
@@ -845,7 +871,7 @@ recursive fn resolveNode(self_: Store&, root: Id, at: Cursor, depth: i64, height
     }
     if id != root { let target_height = closedHeight(self_, id); if target_height != 0 { if depth + target_height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; } return id, blot_error::Error.none; } }
     let result, error = resolveSelected(self_, id, value, position, depth);
-    if self_.use_closed_graphs && self_.closed_generation != 0xffff {
+    if result == id && self_.use_closed_graphs && self_.closed_generation != 0xffff {
         let refreshed = closedNodeHeight(self_, value); if refreshed != 0 { self_.nodes.items[id].closed_height = refreshed; self_.nodes.items[id].closed_generation = self_.closed_generation; }
     }
     return result, error;

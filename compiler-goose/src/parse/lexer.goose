@@ -207,14 +207,19 @@ fn scan(source: const u8[:],result: Result&) {
    if !terminated { diagnose(result,string_literal,start,at); } emit(result.tokens,blot_parse_token::string,start,at); continue;
   }
   if digit(c) { let n=scan_number(source,at); at=n.end; emit(result.tokens,n.tag,start,at); continue; }
-  if (c=='f'||c=='w')&&(starts(source,at,"froM")||starts(source,at,"wherE")) {
+  if (c=='f' && at+3<source.len && source[at+3]=='M' && starts(source,at,"froM")) ||
+     (c=='w' && at+4<source.len && source[at+4]=='E' && starts(source,at,"wherE")) {
    var tag=blot_parse_token::private_where; var size=5; if c=='f' { tag=blot_parse_token::private_from; size=4; } at+=size; emit(result.tokens,tag,start,at); continue;
   }
-  if lower(c)||upper(c)||c=='_' {
-   let capital=upper(c); at++;
-   while at<source.len { var valid=ident(source[at]); if capital { valid=type_ident(source[at]); } if !valid { break; } at++; }
-   var kind=blot_parse_token::keyword(source[start..at]); if capital&&kind==blot_parse_token::identifier { kind=blot_parse_token::type_identifier; }
-   emit(result.tokens,kind,start,at); continue;
+  if lower(c)||c=='_' {
+   at++;
+   while at<source.len && ident(source[at]) { at++; }
+   emit(result.tokens,blot_parse_token::keyword(source[start..at]),start,at); continue;
+  }
+  if upper(c) {
+   at++;
+   while at<source.len && type_ident(source[at]) { at++; }
+   emit(result.tokens,blot_parse_token::type_identifier,start,at); continue;
   }
   if c=='@'&&at+1<source.len&&(lower(source[at+1])||source[at+1]=='_') {
    at+=2; while at<source.len&&ident(source[at]) { at++; }
@@ -248,24 +253,42 @@ fn scan(source: const u8[:],result: Result&) {
 }
 struct Frame { indent: i64, depth: i32 }
 struct Indentation { width: i64, start: i64, tab: bool }
-fn indentation(source: const u8[:],starts: const u32[:],at: u32) -> Indentation {
- var low=0; var high=starts.len;
- while low+1<high { let mid=low+(high-low)/2; if starts[mid]<=at { low=mid; } else { high=mid; } }
- let start=starts[low] as i64; var end=start; var tab=false;
- while end<at&&(source[end]==' '||source[end]=='\t') { tab=tab||source[end]=='\t'; end++; }
- return Indentation {end-start,start,tab};
+fn find_break(source: const u8[:], from: i64, to: i64) -> i64 {
+ var i = to;
+ while i > from {
+  i--;
+  let c = source[i];
+  if c == '\r' || c == '\n' { return i + 1; }
+ }
+ return -1;
+}
+fn indent_from(source: const u8[:], start: i64, at: i64) -> Indentation {
+ var end = start; var tab = false;
+ while end < at && (source[end] == ' ' || source[end] == '\t') { tab = tab || source[end] == '\t'; end++; }
+ return Indentation { end - start, start, tab };
 }
 fn broken_line(source: const u8[:],previous: Token,next: Token) -> bool { for c in source[previous.end..next.start] { if c=='\r'||c=='\n' { return true; } } return false; }
 fn close(tag: Tag) -> bool { return tag==blot_parse_token::r_paren||tag==blot_parse_token::r_bracket||tag==blot_parse_token::r_brace; }
 fn open(tag: Tag) -> bool { return tag==blot_parse_token::l_paren||tag==blot_parse_token::l_bracket||tag==blot_parse_token::l_brace; }
 fn layout(source: const u8[:],result: Result&) {
  var raw: Token[>..]=[]; raw.append(result.tokens); result.tokens.resize(0);
- var starts: u32[>..]=[0]; for c,index in source { if c=='\r'||c=='\n' { starts.push((index+1) as u32); } }
  var frames: Frame[>..<]=[Frame {0,0}]; var depth: i32=0; var operations_depth: i32=-1;
- if raw.len!=0 { let first=raw[0]; let width=indentation(source,starts,first.start); if width.tab { diagnose(result,layout_tab,width.start,first.start); return; } if width.width!=0 { diagnose(result,layout_indent,first.start,first.start); return; } }
+ var cur_line_start: i64=0; var prev_line_start: i64=0;
+ if raw.len!=0 {
+  let first=raw[0];
+  let brk=find_break(source,0,first.start as i64);
+  if brk>=0 { cur_line_start=brk; }
+  let width=indent_from(source,cur_line_start,first.start as i64);
+  if width.tab { diagnose(result,layout_tab,width.start,first.start); return; }
+  if width.width!=0 { diagnose(result,layout_indent,first.start,first.start); return; }
+ }
  for current,index in raw {
   var previous=Token {blot_parse_token::eof,0,0}; var broken=false;
-  if index!=0 { previous=raw[index-1]; broken=broken_line(source,previous,current); }
+  if index!=0 {
+   previous=raw[index-1];
+   let brk=find_break(source,previous.end as i64,current.start as i64);
+   if brk>=0 { broken=true; prev_line_start=cur_line_start; cur_line_start=brk; }
+  }
   if close(current.tag)&&frames.len>1&&frames[frames.len-1].depth==depth {
    emit(result.tokens,blot_parse_token::newline,current.start,current.start);
    while frames.len>1&&frames[frames.len-1].depth==depth { frames.resize(frames.len-1); emit(result.tokens,blot_parse_token::dedent,current.start,current.start); if frames.len>1&&frames[frames.len-1].depth==depth { emit(result.tokens,blot_parse_token::newline,current.start,current.start); } }
@@ -286,9 +309,9 @@ fn layout(source: const u8[:],result: Result&) {
    }
    let suite=previous.tag==blot_parse_token::colon||previous.tag==blot_parse_token::kw_of||arrow_suite;
    if suite||depth==frame.depth {
-    let width=indentation(source,starts,current.start); if width.tab { diagnose(result,layout_tab,width.start,current.start); return; }
+    let width=indent_from(source,cur_line_start,current.start as i64); if width.tab { diagnose(result,layout_tab,width.start,current.start); return; }
     if suite {
-     if width.width<=indentation(source,starts,previous.start).width { diagnose(result,layout_suite,current.start,current.start); return; }
+     if width.width<=indent_from(source,prev_line_start,previous.start as i64).width { diagnose(result,layout_suite,current.start,current.start); return; }
      emit(result.tokens,blot_parse_token::newline,current.start,current.start); emit(result.tokens,blot_parse_token::indent,current.start,current.start); frames.push(Frame {width.width,depth});
     } else if width.width>frame.indent||(width.width==frame.indent&&current.tag==blot_parse_token::pipe) {
     } else {
@@ -319,10 +342,12 @@ fn annotation_colon(source: const u8[:],tokens: const Token[:],index: i64) -> bo
 }
 fn contextual(source: const u8[:],result: Result&) {
  var importing=false; var braces: i32=0; var annotation: i32=0; var has_annotation=false;
- for index in 0..result.tokens.len {
+ let count=result.tokens.len;
+ for index in 0..count {
   let current=result.tokens[index]; let tag=current.tag;
+  if !importing && !has_annotation && tag!=blot_parse_token::kw_import && tag!=blot_parse_token::l_brace && tag!=blot_parse_token::r_brace && tag!=blot_parse_token::colon && tag!=blot_parse_token::dot { continue; }
   if tag==blot_parse_token::kw_import { importing=true; } if tag==blot_parse_token::newline { importing=false; }
-  if importing&&index+1<result.tokens.len&&result.tokens[index+1].tag==blot_parse_token::string {
+  if importing&&index+1<count&&result.tokens[index+1].tag==blot_parse_token::string {
    if tag==blot_parse_token::private_from { diagnose(result,reserved_import_marker,current.start,current.end); }
    else if tag==blot_parse_token::identifier&&blot_parse_token::text(current,source)=="from" { result.tokens[index].tag=blot_parse_token::kw_from; }
   }
@@ -330,7 +355,7 @@ fn contextual(source: const u8[:],result: Result&) {
   if has_annotation&&braces<annotation { has_annotation=false; }
   if tag==blot_parse_token::colon&&annotation_colon(source,result.tokens,index) { annotation=braces; has_annotation=true; }
   else if has_annotation&&annotation==braces&&(tag==blot_parse_token::newline||tag==blot_parse_token::equal||tag==blot_parse_token::fat_arrow||tag==blot_parse_token::left_arrow||tag==blot_parse_token::colon_equal) { has_annotation=false; }
-  else if has_annotation&&annotation==braces&&index+1<result.tokens.len&&result.tokens[index+1].tag==blot_parse_token::l_brace {
+  else if has_annotation&&annotation==braces&&index+1<count&&result.tokens[index+1].tag==blot_parse_token::l_brace {
    if tag==blot_parse_token::private_where { diagnose(result,reserved_clause_marker,current.start,current.end); } else if tag==blot_parse_token::identifier&&blot_parse_token::text(current,source)=="where" { result.tokens[index].tag=blot_parse_token::kw_where; }
   }
   if tag==blot_parse_token::dot {

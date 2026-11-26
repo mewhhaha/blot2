@@ -161,7 +161,7 @@ fn selectUnitNames(self_:Engine&,unit:u32) {
     }
     source.symbols.restrictView(end);
 }
-fn persistentUnit(self_:Engine&,unit:u32,shared:u64,packet:u8[>..<]&)->Error {
+fn persistentUnit(self_:Engine&,unit:u32,shared:u64,packet:u8[>..<]&,need_interface:bool=true)->Error {
     self_.selectUnitNames(unit);
     let cache:PersistentCache& =self_.persistentCache();
     if unit==0 || unit>cache.producers.len || self_.diagnostics.items.len!=0 {
@@ -195,19 +195,22 @@ fn persistentUnit(self_:Engine&,unit:u32,shared:u64,packet:u8[>..<]&)->Error {
     self_.associated_remaining=associated;
     let slots=moduleSlots(self_.result);
     if !slots[unit-1].present || !slots[unit-1].value.valid {return blot_error::Error.invalid_artifact;}
-    let error=publishPersistentUnit(self_.source,slots[unit-1].value,unit,shared,work,resolution_used,associated_used,check_elapsed,packet);
+    let error=publishPersistentUnit(self_.source,slots[unit-1].value,unit,shared,work,resolution_used,associated_used,check_elapsed,packet,need_interface);
     slots[unit-1].value.deinit();
     slots[unit-1]=blot_support::none<Module>();
     if self_.source.symbols.outsideView() {return blot_error::Error.invalid_artifact;}
     return error;
 }
 
-fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u64,work:blot_work_counters::Frontend,resolution_used:i64,associated_used:i64,check_cpu_us:u64,packet:u8[>..<]&)->Error {
+fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u64,work:blot_work_counters::Frontend,resolution_used:i64,associated_used:i64,check_cpu_us:u64,packet:u8[>..<]&,need_interface:bool=true)->Error {
     let current=source.unit(unit);
-    let freeze_cpu=blot_native::thread_cpu_ns();
-    let error=publishPersistentInterface(source.prelude_unit,current.tree,module,unit,shared,packet);
-    let freeze_elapsed=cpuMicros(freeze_cpu);
-    if error!=blot_error::Error.none {return error;}
+    var freeze_elapsed:u64=0;
+    if need_interface || blot_native::persist_consumers(shared,unit)!=0 {
+        let freeze_cpu=blot_native::thread_cpu_ns();
+        let error=publishPersistentInterface(source.prelude_unit,current.tree,module,unit,shared,packet);
+        freeze_elapsed=cpuMicros(freeze_cpu);
+        if error!=blot_error::Error.none {return error;}
+    }
     let lower_cpu=blot_native::thread_cpu_ns();
     var core,error=blot_check_core_builder::lowerWithOrigins(current.tree,source.symbols,module.checked,moduleOrigins(source),true);
     let lower_elapsed=cpuMicros(lower_cpu);

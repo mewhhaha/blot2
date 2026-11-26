@@ -35,7 +35,7 @@ static const uint64_t persist_timeout = UINT64_C(15000000000);
 struct persist_packet {
     uint64_t offset;
     uint64_t length;
-    bool ready;
+    _Atomic bool ready;
 };
 struct persist_node {
     struct persist_packet packets[2];
@@ -59,7 +59,7 @@ struct persist_queue {
     uint32_t active;
     uint32_t finished;
     uint32_t ready_len;
-    int failure;
+    _Atomic int failure;
     bool sealed;
     struct persist_node nodes[];
 };
@@ -135,7 +135,7 @@ static void persist_notify(struct persist_queue *queue) {
 static int persist_lock(struct persist_queue *queue) {
     int error = pthread_mutex_lock(&queue->mutex);
     if (error == EOWNERDEAD) {
-        queue->failure = EOWNERDEAD;
+        atomic_store_explicit(&queue->failure, EOWNERDEAD, memory_order_release);
         int recovered = pthread_mutex_consistent(&queue->mutex);
         persist_notify(queue);
         if (recovered != 0) {
@@ -148,7 +148,9 @@ static int persist_lock(struct persist_queue *queue) {
 }
 
 static void persist_fail_locked(struct persist_queue *queue, int error) {
-    if (queue->failure == 0) queue->failure = error;
+    if (atomic_load_explicit(&queue->failure, memory_order_relaxed) == 0) {
+        atomic_store_explicit(&queue->failure, error, memory_order_release);
+    }
     persist_notify(queue);
 }
 
@@ -193,6 +195,7 @@ uint64_t blot_persist_open(uint32_t count) {
 
     atomic_init(&queue->generation, 0);
     atomic_init(&queue->waiters, 0);
+    atomic_init(&queue->failure, 0);
     queue->map_length = map_length;
     queue->count = count;
     queue->edge_words = words;
@@ -202,7 +205,7 @@ uint64_t blot_persist_open(uint32_t count) {
 bool blot_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue || id == 0 || id > queue->count || persist_lock(queue) != 0) return false;
-    bool valid = !queue->sealed && queue->failure == 0 && !queue->nodes[id - 1].configured;
+    bool valid = !queue->sealed && atomic_load_explicit(&queue->failure, memory_order_relaxed) == 0 && !queue->nodes[id - 1].configured;
     if (valid) {
         struct persist_node *node = &queue->nodes[id - 1];
         node->configured = true;
@@ -221,7 +224,7 @@ bool blot_persist_edge(uint64_t h, uint32_t consumer, uint32_t producer) {
 
     --consumer;
     --producer;
-    bool valid = !queue->sealed && queue->failure == 0 &&
+    bool valid = !queue->sealed && atomic_load_explicit(&queue->failure, memory_order_relaxed) == 0 &&
                  queue->nodes[consumer].configured && queue->nodes[producer].configured;
     if (valid) {
         uint64_t *words = persist_edges(queue) + producer * queue->edge_words;
@@ -264,14 +267,17 @@ int64_t blot_persist_claim(uint64_t h) {
                 }
             }
         }
-        if (queue->failure == 0 && queue->finished == queue->count) {
+        int fail = atomic_load_explicit(&queue->failure, memory_order_relaxed);
+        if (fail == 0 && queue->finished == queue->count) {
             pthread_mutex_unlock(&queue->mutex);
             return 0;
         }
-        if (queue->failure == 0 && now >= queue->deadline)
+        if (fail == 0 && now >= queue->deadline) {
             persist_fail_locked(queue, ETIMEDOUT);
-        if (queue->failure != 0) {
-            error = queue->failure;
+            fail = ETIMEDOUT;
+        }
+        if (fail != 0) {
+            error = fail;
             pthread_mutex_unlock(&queue->mutex);
             return -error;
         }
@@ -317,8 +323,10 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
         return false;
     struct persist_node *node = &queue->nodes[id - 1];
     struct persist_packet *packet = &node->packets[kind - 1];
-    bool valid = queue->failure == 0 && node->owner == getpid() && packet->length == 0 &&
-                 (kind == 1 || node->consumers == 0 || node->packets[0].ready);
+    bool valid = atomic_load_explicit(&queue->failure, memory_order_relaxed) == 0 &&
+                 node->owner == getpid() && packet->length == 0 &&
+                 (kind == 1 || node->consumers == 0 ||
+                  atomic_load_explicit(&node->packets[0].ready, memory_order_relaxed));
     if (valid && len > PERSIST_ARENA_CAPACITY - queue->arena_used) {
         persist_fail_locked(queue, ENOSPC);
         valid = false;
@@ -333,15 +341,15 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
     queue->arena_used += len;
     pthread_mutex_unlock(&queue->mutex);
 
-    /* Readers only see a length after the copy commits under the mutex. */
+    /* Readers only see ready==true after offset, length and arena bytes are committed. */
     memcpy(persist_arena(queue) + offset, bytes, (size_t)len);
 
     if (persist_lock(queue) != 0) return false;
-    if (queue->failure != 0) {
+    if (atomic_load_explicit(&queue->failure, memory_order_relaxed) != 0) {
         pthread_mutex_unlock(&queue->mutex);
         return false;
     }
-    packet->ready = true;
+    atomic_store_explicit(&packet->ready, true, memory_order_release);
     if (kind == 1) {
         const uint64_t *words = persist_edges(queue) + (id - 1) * queue->edge_words;
         for (uint32_t w = 0; w < queue->edge_words; ++w) {
@@ -366,26 +374,41 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
 int64_t blot_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
     struct persist_queue *queue = persist_queue(h);
     if (!persist_valid_packet(queue, id, kind)) return -EINVAL;
-    int error = persist_lock(queue);
-    if (error != 0) return -error;
     const struct persist_packet *packet = &queue->nodes[id - 1].packets[kind - 1];
-    int64_t result = 0;
-    if (queue->failure != 0) result = -queue->failure;
-    else if (packet->ready) result = packet->length;
-    pthread_mutex_unlock(&queue->mutex);
-    return result;
+    bool ready = atomic_load_explicit(&packet->ready, memory_order_acquire);
+    int fail = atomic_load_explicit(&queue->failure, memory_order_acquire);
+    if (fail != 0) return -fail;
+    return ready ? (int64_t)packet->length : 0;
 }
 
 bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind, uint8_t *bytes, uint64_t len) {
     struct persist_queue *queue = persist_queue(h);
-    if (!persist_valid_packet(queue, id, kind) || !bytes || len == 0 ||
-        persist_lock(queue) != 0)
+    if (!persist_valid_packet(queue, id, kind) || !bytes || len == 0) return false;
+    const struct persist_packet *packet = &queue->nodes[id - 1].packets[kind - 1];
+    bool ready = atomic_load_explicit(&packet->ready, memory_order_acquire);
+    int fail = atomic_load_explicit(&queue->failure, memory_order_acquire);
+    if (fail != 0 || !ready || packet->length != len) return false;
+    memcpy(bytes, persist_arena(queue) + packet->offset, (size_t)len);
+    return true;
+}
+
+bool blot_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
+                          uint64_t byte_offset, const uint8_t *bytes, uint64_t len) {
+    struct persist_queue *queue = persist_queue(h);
+    if (!persist_valid_packet(queue, id, kind) || (!bytes && len != 0)) return false;
+    const struct persist_packet *packet = &queue->nodes[id - 1].packets[kind - 1];
+    bool ready = atomic_load_explicit(&packet->ready, memory_order_acquire);
+    int fail = atomic_load_explicit(&queue->failure, memory_order_acquire);
+    if (fail != 0 || !ready || byte_offset > packet->length || len > packet->length - byte_offset)
         return false;
-    struct persist_packet packet = queue->nodes[id - 1].packets[kind - 1];
-    bool valid = queue->failure == 0 && packet.ready && packet.length == len;
-    pthread_mutex_unlock(&queue->mutex);
-    if (valid) memcpy(bytes, persist_arena(queue) + packet.offset, (size_t)len);
-    return valid;
+    if (len != 0) memcpy((void *)bytes, persist_arena(queue) + packet->offset + byte_offset, (size_t)len);
+    return true;
+}
+
+uint32_t blot_persist_consumers(uint64_t h, uint32_t id) {
+    struct persist_queue *queue = persist_queue(h);
+    if (!queue || id == 0 || id > queue->count) return 0;
+    return queue->nodes[id - 1].consumers;
 }
 
 void blot_persist_fail(uint64_t h) {
@@ -590,6 +613,11 @@ bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind,
                        uint8_t *bytes, uint64_t len) {
     (void)h; (void)id; (void)kind; (void)bytes; (void)len; return false;
 }
+bool blot_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
+                          uint64_t byte_offset, const uint8_t *bytes, uint64_t len) {
+    (void)h; (void)id; (void)kind; (void)byte_offset; (void)bytes; (void)len; return false;
+}
+uint32_t blot_persist_consumers(uint64_t h, uint32_t id) { (void)h; (void)id; return 0; }
 void blot_persist_fail(uint64_t h) { (void)h; }
 void blot_persist_close(uint64_t h) { (void)h; }
 uint64_t blot_emit_pool_open(uint32_t workers) { (void)workers; return 0; }

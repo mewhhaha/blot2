@@ -60,9 +60,12 @@ fn add(p: Parser&,source: const u8[:],tokens: const Token[:],tag: u32,a: u32,b: 
  if p.failure!=blot_error::Error.none { return 0; }
  if p.tree.nodes.len>=0xffffffff { return fail(p,source,tokens,c_table_limit); }
  let id=p.tree.nodes.len as Id;
- p.tree.nodes.push(blot_parse_ast::Node {tag,a,b,c}); let node_error=p.tree.failure(); if node_error!=blot_error::Error.none { p.failure=node_error; return 0; }
+ p.tree.nodes.push(blot_parse_ast::Node {tag,a,b,c});
+ if p.tree.nodes.failure!=blot_error::Error.none { p.failure=p.tree.nodes.failure; return 0; }
  var end=start; if p.index>0 { end=tokens[p.index-1].end; }
- p.tree.spans.push(Span {start,end}); return id;
+ p.tree.spans.push(Span {start,end});
+ if p.tree.spans.failure!=blot_error::Error.none { p.failure=p.tree.spans.failure; return 0; }
+ return id;
 }
 fn numeric_failure(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,code: u32) -> Id { return add(p,source,tokens,a_numeric_error,code,t.start,t.end,t.start); }
 fn integer_literal(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,tag: u32) -> Id {
@@ -74,7 +77,9 @@ fn integer_literal(p: Parser&,source: const u8[:],tokens: const Token[:],t: Toke
 fn extra(p: Parser&,source: const u8[:],tokens: const Token[:],values: const u32[:]) -> u32 {
  if p.failure!=blot_error::Error.none { return 0; }
  if values.len>0xffffffff-p.tree.extra.len { return fail(p,source,tokens,c_table_limit); }
- let start=p.tree.extra.len as u32; for v in values { p.tree.extra.push(v); } return start;
+ let start=p.tree.extra.len as u32; p.tree.extra.append(values);
+ if p.tree.extra.failure!=blot_error::Error.none { p.failure=p.tree.extra.failure; }
+ return start;
 }
 fn list(p: Parser&,source: const u8[:],tokens: const Token[:],values: const u32[:]) -> List { let start=extra(p,source,tokens,values); return List {start,values.len as u32}; }
 fn list_node(p: Parser&,source: const u8[:],tokens: const Token[:],tag: u32,values: const Id[:],start: u32) -> Id { let range=list(p,source,tokens,values); return add(p,source,tokens,tag,range.start,range.len,0,start); }

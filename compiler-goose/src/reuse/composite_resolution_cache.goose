@@ -91,6 +91,11 @@ fn occupied(cache: const Cache&, root: u32, at: u32) -> bool {
     }
     return true;
 }
+fn hasEntries(cache: const Cache&, physical: u16, effects_physical: u64) -> bool {
+    if cache.lease == 0 || cache.entries.len == 0 { return false; }
+    let state:const State& =states[cache.lease-1];
+    return state.count != 0 && state.physical == physical && state.effects_physical == effects_physical;
+}
 fn probeHit(cache: Cache&, physical: u16, effects_physical: u64, root: u32, at: u32, collision: bool&) -> i64 {
     if cache.lease == 0 || cache.entries.len == 0 || physical == 65535 || effects_physical == 18446744073709551615 { return -1; }
     let state:State& =states[cache.lease-1];

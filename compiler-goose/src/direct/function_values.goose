@@ -30,7 +30,10 @@ fn canonicalizeF32Stack(g: Generator&, f: const Fn&) {
 }
 fn isF32CoreExpr(g: Generator&, f: const Fn&, m: const Module&, expr_id: u32) -> bool {
     if expr_id == 0 { return false; }
-    let ty, err = g.types.lower(m, m.typeOf(expr_id), f.env);
+    let raw = m.typeOf(expr_id);
+    if raw == blot_check_types::f32_type { return true; }
+    if raw <= blot_check_types::never { return false; }
+    let ty, err = g.types.lower(m, raw, f.env);
     if err != blot_direct_types::Error.none { g.dropFailure(); return false; }
     return tagOf(g, ty) == blot_direct_types::Tag.f32_;
 }

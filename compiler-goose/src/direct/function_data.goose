@@ -890,27 +890,48 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
         return field_val, BindingRef { 0, 0 }, false, error;
     }
     let nominal_field = variants.len != 0 && projection.nominal.decl != 0;
-    var name: u32 = 0xffffffff;
-    if !(nominal_field && variants.len > 1) {
-        name = cachedProjectionFieldName(g, m, n.b);
-    }
-    if name == 0xffffffff {
-        if nominal_field {
+    let cached = cachedProjectionFieldName(g, m, n.b);
+    if nominal_field && variants.len > 1 {
+        var sym = cached;
+        if sym == 0xffffffff {
             var found = false;
-            for constructor in m.constructors {
-                let identity = m.nominal(constructor.nominal).identity;
-                if !sameNominal(identity, projection.nominal) || constructor.tag != variants[0].tag { continue; }
-                let payload = m.types.node(constructor.payload);
-                if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
-                name_symbol = m.types.recordField(payload, variants[0].field).name;
-                found = true;
+            for nom, ni in m.nominals {
+                if !sameNominal(nom.identity, projection.nominal) { continue; }
+                for ci in m.nominalConstructors(ni as u32) {
+                    let constructor = m.constructors[ci];
+                    if constructor.tag != variants[0].tag { continue; }
+                    let payload = m.types.node(constructor.payload);
+                    if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
+                    sym = m.types.recordField(payload, variants[0].field).name;
+                    found = true;
+                    break;
+                }
                 break;
             }
             if !found { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected constructor missing from the catalog"); }
-            if variants.len > 1 {
-                let field_val, error = sharedField(g, f, value, n.b, name_symbol, id);
-                return field_val, BindingRef { 0, 0 }, false, error;
+            cacheProjectionFieldName(g, m, n.b, sym);
+        }
+        let field_val, error = sharedField(g, f, value, n.b, sym, id);
+        return field_val, BindingRef { 0, 0 }, false, error;
+    }
+    var name: u32 = cached;
+    if name == 0xffffffff {
+        if nominal_field {
+            var found = false;
+            for nom, ni in m.nominals {
+                if !sameNominal(nom.identity, projection.nominal) { continue; }
+                for ci in m.nominalConstructors(ni as u32) {
+                    let constructor = m.constructors[ci];
+                    if constructor.tag != variants[0].tag { continue; }
+                    let payload = m.types.node(constructor.payload);
+                    if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
+                    name_symbol = m.types.recordField(payload, variants[0].field).name;
+                    found = true;
+                    break;
+                }
+                break;
             }
+            if !found { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected constructor missing from the catalog"); }
         }
         let resolved_name, has_name = g.types.fieldNameOf(m, name_symbol, true);
         if !has_name { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field without a spelling"); }
