@@ -587,6 +587,11 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
         nominal => { return g.types.nominalIdentity(ty), true; },
         u32_ => { return NominalIdentity { 0, blot_check_types::u32_type }, true; },
         f32_ => { return NominalIdentity { 0, blot_check_types::f32_type }, true; },
+        u8_ => { return NominalIdentity { 0, blot_check_types::u8_type }, true; },
+        i32_ => { return NominalIdentity { 0, blot_check_types::i32_type }, true; },
+        u64_ => { return NominalIdentity { 0, blot_check_types::u64_type }, true; },
+        i64_ => { return NominalIdentity { 0, blot_check_types::i64_type }, true; },
+        f64_ => { return NominalIdentity { 0, blot_check_types::f64_type }, true; },
         boolean => { return NominalIdentity { 0, blot_check_types::boolean }, true; },
         unit => { return NominalIdentity { 0, blot_check_types::unit }, true; },
         array => { return NominalIdentity { 0, 0xffffffff }, true; },
@@ -745,7 +750,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     let n = g.types.node(ty);
     var result = false;
     match n.tag {
-        unit, boolean, u32_, f32_, never => {},
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         function, provider, array, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
@@ -797,7 +802,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     let n = g.types.node(ty);
     var result = false;
     match n.tag {
-        unit, boolean, u32_, f32_, never => {},
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         function, provider, array, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
@@ -1586,7 +1591,7 @@ recursive fn packTyGrow(types: const blot_direct_types::Types&, ty: Ty, out: u8[
     let n = types.node(ty);
     out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
-        unit, boolean, u32_, f32_, never => {},
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         array, ref, view, link, provider, cell => {
             packTyGrow(types, n.a, out);
         },
@@ -1637,7 +1642,7 @@ recursive fn packTy(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..<
     let n = types.node(ty);
     out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
-        unit, boolean, u32_, f32_, never => {},
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         array, ref, view, link, provider, cell => {
             packTy(types, n.a, out);
         },

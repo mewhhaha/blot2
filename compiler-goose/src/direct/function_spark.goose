@@ -258,13 +258,17 @@ fn findAffineStream(plan: const SparkVecPlan&, unit: u32, node_id: u32) -> i64 {
     }
     return -1;
 }
+// Vector tracing uses the existing i32x4/f32x4 lane representations.
+fn isSparkLaneTag(tag: blot_direct_types::Tag) -> bool {
+    return tag == blot_direct_types::Tag.u32_ || tag == blot_direct_types::Tag.f32_ || tag == blot_direct_types::Tag.boolean;
+}
 fn isContiguousScalarContainer(g: const Generator&, ty: Ty) -> blot_direct_types::Tag, bool {
     let n = g.types.node(ty);
     if n.tag != blot_direct_types::Tag.array && n.tag != blot_direct_types::Tag.view {
         return blot_direct_types::Tag.unit, false;
     }
     let elem = g.types.node(n.a).tag;
-    if isScalarTag(elem) { return elem, true; }
+    if isSparkLaneTag(elem) { return elem, true; }
     return blot_direct_types::Tag.unit, false;
 }
 fn lowerInEnv(g: Generator&, m: const Module&, tid: TId, env: const Env&) -> Ty, bool {
@@ -631,7 +635,7 @@ recursive fn checkVecCall(
     var arg_inv: bool[8] = [false; 8];
     for at in 0..arg_ids.len {
         let aty, aok = lowerInEnv(g, m, m.typeOf(arg_ids[at]), env);
-        if !aok || !isScalarTag(tagOf(g, aty)) { return false; }
+        if !aok || !isSparkLaneTag(tagOf(g, aty)) { return false; }
         arg_tys[at] = aty;
         arg_inv[at] = isInvariantScalarExpr(g, f, plan, m, env, arg_ids[at], tagOf(g, aty), 0);
         if !checkVecExpr(g, f, plan, m, env, arg_ids[at], inline_depth, depth + 1, false) { return false; }
@@ -692,11 +696,11 @@ recursive fn checkVecExpr(
     match n.tag {
         constant => {
             let ty, ok = lowerInEnv(g, m, m.typeOf(id), env);
-            return ok && isScalarTag(tagOf(g, ty));
+            return ok && isSparkLaneTag(tagOf(g, ty));
         },
         reference => {
             let ty, ok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !ok || !isScalarTag(tagOf(g, ty)) { return false; }
+            if !ok || !isSparkLaneTag(tagOf(g, ty)) { return false; }
             let want_tag = tagOf(g, ty);
             let ref = m.reference(id);
             if ref.unit == 0 || ref.unit == m.unit {
@@ -734,9 +738,9 @@ recursive fn checkVecExpr(
         },
         scalar => {
             let res_ty, rok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !rok || !isScalarTag(tagOf(g, res_ty)) { return false; }
+            if !rok || !isSparkLaneTag(tagOf(g, res_ty)) { return false; }
             let a_ty, aok = lowerInEnv(g, m, m.typeOf(n.a), env);
-            if !aok || !isScalarTag(tagOf(g, a_ty)) { return false; }
+            if !aok || !isSparkLaneTag(tagOf(g, a_ty)) { return false; }
             let a_tag = tagOf(g, a_ty);
             let machine, disp_target, resolved = resolveSparkScalarOp(g, m, n.op, 0, n.c == 1, a_ty);
             if !resolved { return false; }
@@ -764,9 +768,9 @@ recursive fn checkVecExpr(
         },
         associated => {
             let res_ty, rok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !rok || !isScalarTag(tagOf(g, res_ty)) { return false; }
+            if !rok || !isSparkLaneTag(tagOf(g, res_ty)) { return false; }
             let a_ty, aok = lowerInEnv(g, m, m.typeOf(n.a), env);
-            if !aok || !isScalarTag(tagOf(g, a_ty)) { return false; }
+            if !aok || !isSparkLaneTag(tagOf(g, a_ty)) { return false; }
             let a_tag = tagOf(g, a_ty);
             let machine, disp_target, resolved = resolveSparkScalarOp(g, m, n.op, n.c, true, a_ty);
             if !resolved { return false; }
@@ -799,7 +803,7 @@ recursive fn checkVecExpr(
         },
         if_value => {
             let res_ty, rok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !rok || !isScalarTag(tagOf(g, res_ty)) { return false; }
+            if !rok || !isSparkLaneTag(tagOf(g, res_ty)) { return false; }
             let t_ty, tok = lowerInEnv(g, m, m.typeOf(n.b), env);
             let e_ty, eok = lowerInEnv(g, m, m.typeOf(n.c), env);
             if !tok || !eok || t_ty != res_ty || e_ty != res_ty { return false; }
@@ -821,7 +825,7 @@ recursive fn checkVecExpr(
                 let cn = m.node(child);
                 if cn.tag == blot_check_core::Tag.bind && cn.c == 0 && m.binding(cn.a).scheme.variables.len == 0 {
                     let bty, bok = lowerInEnv(g, m, m.typeOf(cn.b), env);
-                    if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 { ok = false; break; }
+                    if !bok || !isSparkLaneTag(tagOf(g, bty)) || plan.locals_len >= 64 { ok = false; break; }
                     if !checkVecExpr(g, f, plan, m, env, cn.b, inline_depth, depth + 1, false) { ok = false; break; }
                     let btag = tagOf(g, bty);
                     let inv = isInvariantScalarExpr(g, f, plan, m, env, cn.b, btag, 0);
@@ -837,7 +841,7 @@ recursive fn checkVecExpr(
                     let pat = m.pattern(cn.a);
                     if pat.tag != blot_check_core::PatternTag.bind && pat.tag != blot_check_core::PatternTag.wildcard { ok = false; break; }
                     let bty, bok = lowerInEnv(g, m, m.typeOf(cn.b), env);
-                    if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 { ok = false; break; }
+                    if !bok || !isSparkLaneTag(tagOf(g, bty)) || plan.locals_len >= 64 { ok = false; break; }
                     if !checkVecExpr(g, f, plan, m, env, cn.b, inline_depth, depth + 1, false) { ok = false; break; }
                     if pat.tag == blot_check_core::PatternTag.bind {
                         let btag = tagOf(g, bty);
@@ -867,7 +871,7 @@ recursive fn checkVecExpr(
         call => {
             let info = m.call(id);
             let res_ty, rok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !rok || !isScalarTag(tagOf(g, res_ty)) { return false; }
+            if !rok || !isSparkLaneTag(tagOf(g, res_ty)) { return false; }
             let target = g.resolve(m, info.target);
             return checkVecCall(g, f, plan, m, env, target, info.arguments, res_ty, inline_depth, depth + 1);
         },
@@ -875,9 +879,9 @@ recursive fn checkVecExpr(
             let proj = m.projection(n.b);
             if proj.field == 0 || m.projectionVariants(n.b).len != 0 { return false; }
             let res_ty, rok = lowerInEnv(g, m, m.typeOf(id), env);
-            if !rok || !isScalarTag(tagOf(g, res_ty)) { return false; }
+            if !rok || !isSparkLaneTag(tagOf(g, res_ty)) { return false; }
             let recv_ty, rec_ok = lowerInEnv(g, m, m.typeOf(n.a), env);
-            if !rec_ok || !isScalarTag(tagOf(g, recv_ty)) { return false; }
+            if !rec_ok || !isSparkLaneTag(tagOf(g, recv_ty)) { return false; }
             let identity, has_ident = g.receiverIdentity(recv_ty);
             if !has_ident { return false; }
             let target, has_target = g.dispatchTarget(m, identity, proj.field, blot_check_types::Operator.none);
@@ -1645,7 +1649,7 @@ fn tryEmitVectorSpark(
     let m .= g.units[f.unit - 1];
     let info = m.sparkInfo(id);
     let out_tag = tagOf(g, elem_ty);
-    if !isScalarTag(out_tag) { return false, 0, blot_direct_types::Error.none; }
+    if !isSparkLaneTag(out_tag) { return false, 0, blot_direct_types::Error.none; }
 
     var iter_tag = blot_direct_types::Tag.u32_;
     if !info.is_range {
@@ -2173,7 +2177,7 @@ fn tryEmitVectorForLoop(
                 continue;
             }
             let bty, bok = lowerInEnv(g, m, m.typeOf(cn.b), f.env);
-            if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 || lead_bind_len >= 8 {
+            if !bok || !isSparkLaneTag(tagOf(g, bty)) || plan.locals_len >= 64 || lead_bind_len >= 8 {
                 return blot_direct_types::Error.none;
             }
             if !checkVecExpr(g, f, plan, m, f.env, cn.b, 0, 0, false) {
@@ -3694,7 +3698,7 @@ fn tryEmitVectorEscapeLoop(
                 return blot_direct_types::Error.none;
             }
             let bty, bok = lowerInEnv(g, m, m.typeOf(cn.b), f.env);
-            if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 || pre_len >= 8 {
+            if !bok || !isSparkLaneTag(tagOf(g, bty)) || plan.locals_len >= 64 || pre_len >= 8 {
                 return blot_direct_types::Error.none;
             }
             var bb: i64 = 64;
@@ -3723,7 +3727,7 @@ fn tryEmitVectorEscapeLoop(
         for ic, ci in icarries {
             if ic.backedge == 0 { return blot_direct_types::Error.none; }
             let cty, cok = lowerInEnv(g, m, m.binding(ic.iteration).ty, f.env);
-            if !cok || !isScalarTag(tagOf(g, cty)) { return blot_direct_types::Error.none; }
+            if !cok || !isSparkLaneTag(tagOf(g, cty)) { return blot_direct_types::Error.none; }
             let ctag = tagOf(g, cty);
             ic_incoming[ci] = ic.incoming;
             ic_iter[ci] = ic.iteration;
@@ -3832,7 +3836,7 @@ fn tryEmitVectorEscapeLoop(
                     found_it_inc = true;
                 } else {
                     let bty, bok = lowerInEnv(g, m, m.typeOf(sn.b), f.env);
-                    if !bok || !isScalarTag(tagOf(g, bty)) || plan.locals_len >= 64 { return blot_direct_types::Error.none; }
+                    if !bok || !isSparkLaneTag(tagOf(g, bty)) || plan.locals_len >= 64 { return blot_direct_types::Error.none; }
                     var bb: i64 = 64;
                     if exprHasBitsOp(m, sn.b, bb) { return blot_direct_types::Error.none; }
                     if !checkVecExpr(g, f, plan, m, f.env, sn.b, 0, 0, false) || plan.streams_len != 0 {

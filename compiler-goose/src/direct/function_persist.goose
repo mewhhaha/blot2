@@ -76,12 +76,11 @@ fn zeroPersistRootGlobals(g: Generator&, root: PersistRoot) -> Error {
     for wi in 0..(root.state_globals_len as i64) {
         let gid = g.s.words[root.state_globals_start + wi];
         let wt = layout[wi];
-        if wt == VT_f32 { f32Const(g, 0); }
-        else if wt == VT_v128 {
+        if wt == VT_v128 {
             op(g, OP_prefix_fd);
             uleb(g, 12);
             for _ in 0..16 { op(g, 0); }
-        } else { i32Const(g, 0); }
+        } else { pushZero(g, wt); }
         gset(g, gid);
     }
     return blot_direct_types::Error.none;
@@ -600,7 +599,7 @@ fn emitStageRoot(
     let layout, lerr = g.types.layout(root.state_ty);
     if lerr != blot_direct_types::Error.none { return lerr; }
     var root_bytes: u32 = 0;
-    for wt in layout { root_bytes += wordBytes(wt); }
+    for wt in layout { root_bytes += blot_direct_writer::wordBytes(wt); }
     var root_alloc_bytes = root_bytes;
     if root_alloc_bytes < 16 { root_alloc_bytes = 16; }
 

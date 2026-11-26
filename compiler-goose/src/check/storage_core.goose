@@ -17,7 +17,7 @@ recursive fn equalStorageType(types: const blot_check_core::Types&, left: blot_c
     let b = types.node(right);
     if a.tag != b.tag { return false, blot_error::Error.none; }
     match a.tag {
-        unit, boolean, unsigned32, floating32, never => { return true, blot_error::Error.none; },
+        unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { return true, blot_error::Error.none; },
         variable => { return a.a == b.a, blot_error::Error.none; },
         array => { return equalStorageType(types, a.a, b.a, remaining, depth + 1); },
         usage => {

@@ -58,7 +58,13 @@ recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budge
             { let propagated_error = number(context, bytes, node.b); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = text(context, bytes, ":"); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = number(context, bytes, node.c); if propagated_error != blot_error::Error.none { return propagated_error; } }
         },
         absent => { { let propagated_error = text(context, bytes, "?"); if propagated_error != blot_error::Error.none { return propagated_error; } } }, unit => { { let propagated_error = text(context, bytes, "Unit"); if propagated_error != blot_error::Error.none { return propagated_error; } } }, boolean => { { let propagated_error = text(context, bytes, "Bool"); if propagated_error != blot_error::Error.none { return propagated_error; } } },
-        unsigned32 => { { let propagated_error = text(context, bytes, "U32"); if propagated_error != blot_error::Error.none { return propagated_error; } } }, floating32 => { { let propagated_error = text(context, bytes, "F32"); if propagated_error != blot_error::Error.none { return propagated_error; } } }, never => { { let propagated_error = text(context, bytes, "Never"); if propagated_error != blot_error::Error.none { return propagated_error; } } },
+        unsigned32 => { { let propagated_error = text(context, bytes, "U32"); if propagated_error != blot_error::Error.none { return propagated_error; } } }, floating32 => { { let propagated_error = text(context, bytes, "F32"); if propagated_error != blot_error::Error.none { return propagated_error; } } },
+        unsigned8 => { let err = text(context, bytes, "U8"); if err != blot_error::Error.none { return err; } },
+        signed32 => { let err = text(context, bytes, "I32"); if err != blot_error::Error.none { return err; } },
+        unsigned64 => { let err = text(context, bytes, "U64"); if err != blot_error::Error.none { return err; } },
+        signed64 => { let err = text(context, bytes, "I64"); if err != blot_error::Error.none { return err; } },
+        floating64 => { let err = text(context, bytes, "F64"); if err != blot_error::Error.none { return err; } },
+        never => { { let propagated_error = text(context, bytes, "Never"); if propagated_error != blot_error::Error.none { return propagated_error; } } },
         variable => { { let propagated_error = text(context, bytes, "?t"); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = number(context, bytes, node.a); if propagated_error != blot_error::Error.none { return propagated_error; } } },
         array, list, cursor => {
             var keyword: const u8[:] = "Array "; if node.tag == blot_check_types::Tag.list { keyword = "List "; } else if node.tag == blot_check_types::Tag.cursor { keyword = "Cursor "; }

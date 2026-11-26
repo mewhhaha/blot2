@@ -55,7 +55,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     if depth >= 256 { return false; }
     let shape = g.types.node(ty);
     match shape.tag {
-        unit, boolean, u32_, f32_ => { return true; },
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_ => { return true; },
         function, provider, state_provider, cell, never => { return false; },
         array, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
@@ -1724,7 +1724,7 @@ fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, 
     }
     if arguments.len > primitive.arity { return neverVal(), g.fail(m, id, "primitive over-application"); }
     for at in 0..(arguments.len as i64) { push(g, g.s.vals[arguments.start + at]); }
-    let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id, !elide_nan);
+    let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id, !elide_nan, result);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     return pop(g, f, result, id);
 }
@@ -2364,7 +2364,7 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
             let machine, error = scalarMember(g, f, tm, left.ty, n.c, n.op, id);
             if error != blot_direct_types::Error.none { return neverVal(), false, error; }
             for at in 0..(forwarded.len as i64) { push(g, g.s.vals[forwarded.start + at]); }
-            let emitted = scalarOp(g, f, machine, left.ty, id);
+            let emitted = scalarOp(g, f, machine, left.ty, id, true, result);
             if emitted != blot_direct_types::Error.none { return neverVal(), false, emitted; }
             var popped_ty = result;
             if tagOf(g, result) == blot_direct_types::Tag.never { popped_ty = scalarResult(machine, left.ty); }
@@ -2432,7 +2432,7 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false)
         push(g, left);
         if has_right { push(g, right); }
         let skip_nan = elide_nan || (f.defer_f32_nan && isCanonicalF32Op(machine));
-        let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
+        let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan, result);
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
         var popped_ty = scalarResult(machine, left.ty);
         if has_result { popped_ty = result; }

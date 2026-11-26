@@ -22,10 +22,13 @@ type Id = u32;
 type Cursor = u32;
 type UsageKind = blot_parse_ast::UsageKind;
 let absent: Id = 0; let unit: Id = 1; let boolean: Id = 2;
-let u32_type: Id = 3; let f32_type: Id = 4; let never: Id = 5;
+let u32_type: Id = 3; let f32_type: Id = 4;
+let u8_type: Id = 5; let i32_type: Id = 6; let u64_type: Id = 7; let i64_type: Id = 8; let f64_type: Id = 9;
+let never: Id = 10;
+let builtin_count: i64 = (never as i64) + 1;
 let none: u32 = 0xffffffff;
 let opaque_name_bit: u32 = 0x80000000;
-enum Tag { absent, unit, boolean, unsigned32, floating32, never, variable, function, product, record, nominal, array, list, cursor, type_constructor, resolver, provider, state_provider, projection, scoped, instance_selection, erased_proof, forall, existential, bound, rigid, usage, instance_version }
+enum Tag { absent, unit, boolean, unsigned32, floating32, never, variable, function, product, record, nominal, array, list, cursor, type_constructor, resolver, provider, state_provider, projection, scoped, instance_selection, erased_proof, forall, existential, bound, rigid, usage, instance_version, unsigned8, signed32, unsigned64, signed64, floating64 }
 struct Node { tag: Tag, closed_height: u8 = 0, closed_generation: u16 = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
 struct NominalIdentity { unit: u32, decl: u32 }
 struct List { start: u32 = 0, len: u32 = 0 }
@@ -144,11 +147,43 @@ fn rowKeyFormal(key: u32) -> blot_support::Option<Id> {
     return blot_support::Option<Id> { true, key & ~blot_check_effects::formal_key_bit , ..};
 }
 fn effectError(error: Error) -> Error { if error == blot_error::Error.effect_limit { return blot_error::Error.type_limit; } return error; }
+fn numericBuiltin(name: const u8[:]) -> Id {
+    if name == "U32" { return u32_type; }
+    if name == "F32" { return f32_type; }
+    if name == "U8" { return u8_type; }
+    if name == "I32" { return i32_type; }
+    if name == "U64" { return u64_type; }
+    if name == "I64" { return i64_type; }
+    if name == "F64" { return f64_type; }
+    return absent;
+}
+fn isNumeric(tag: Tag) -> bool {
+    match tag {
+        unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64 => { return true; },
+        _ => { return false; },
+    }
+}
+fn isInteger(tag: Tag) -> bool { return isNumeric(tag) && tag != Tag.floating32 && tag != Tag.floating64; }
+fn isNumericId(id: Id) -> bool { return id >= u32_type && id < never; }
+fn numericName(id: Id) -> const u8[:] {
+    match id {
+        u32_type => { return "U32"; }, f32_type => { return "F32"; },
+        u8_type => { return "U8"; }, i32_type => { return "I32"; },
+        u64_type => { return "U64"; }, i64_type => { return "I64"; },
+        f64_type => { return "F64"; },
+        _ => { return ""; },
+    }
+}
 fn receiverIdentity(value: Node) -> blot_support::Option<NominalIdentity> {
     match value.tag {
         nominal => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { value.a, value.b , ..} , ..}; },
         unsigned32 => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, u32_type , ..} , ..}; },
         floating32 => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, f32_type , ..} , ..}; },
+        unsigned8 => { return blot_support::some(NominalIdentity { 0, u8_type, .. }); },
+        signed32 => { return blot_support::some(NominalIdentity { 0, i32_type, .. }); },
+        unsigned64 => { return blot_support::some(NominalIdentity { 0, u64_type, .. }); },
+        signed64 => { return blot_support::some(NominalIdentity { 0, i64_type, .. }); },
+        floating64 => { return blot_support::some(NominalIdentity { 0, f64_type, .. }); },
         boolean => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, boolean , ..} , ..}; },
         unit => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, unit , ..} , ..}; },
         array => { return blot_support::Option<NominalIdentity> { true, NominalIdentity { 0, none , ..} , ..}; },
@@ -501,6 +536,11 @@ fn tagCode(value: Tag) -> u32 {
         unsigned32 => { return 3; },
         floating32 => { return 4; },
         never => { return 5; },
+        unsigned8 => { return 28; },
+        signed32 => { return 29; },
+        unsigned64 => { return 30; },
+        signed64 => { return 31; },
+        floating64 => { return 32; },
         variable => { return 6; },
         function => { return 7; },
         product => { return 8; },
@@ -527,6 +567,11 @@ fn tagCode(value: Tag) -> u32 {
 }
 fn tagFromCode(code: u32) -> Tag, Error {
     match code {
+        28 => { return Tag.unsigned8, blot_error::Error.none; },
+        29 => { return Tag.signed32, blot_error::Error.none; },
+        30 => { return Tag.unsigned64, blot_error::Error.none; },
+        31 => { return Tag.signed64, blot_error::Error.none; },
+        32 => { return Tag.floating64, blot_error::Error.none; },
         0 => { return Tag.absent, blot_error::Error.none; },
         1 => { return Tag.unit, blot_error::Error.none; },
         2 => { return Tag.boolean, blot_error::Error.none; },
@@ -1347,7 +1392,7 @@ fn equalGraph(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, Error
         if symbolic && left == right { return true, blot_error::Error.none; } if !symbolic && left == right && closedHeight(self_, left) != 0 { return true, blot_error::Error.none; }
         let l = node(self_, left); let r = node(self_, right); if l.tag != r.tag { return false, blot_error::Error.none; }
         match l.tag {
-            absent, bound => { return false, blot_error::Error.none; }, unit, boolean, unsigned32, floating32, never => { return true, blot_error::Error.none; },
+            absent, bound => { return false, blot_error::Error.none; }, unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { return true, blot_error::Error.none; },
             nominal, instance_selection, type_constructor => { if l.a != r.a || l.b != r.b { return false, blot_error::Error.none; } }, _ => {},
         }
     }
@@ -2817,7 +2862,7 @@ fn canonical(lease:u32,generation:u64)->const Store& {
 }
 fn registeredView(lease:u32,generation:u64)->Store {assert(lease!=0 && lease-1<owner_states.len);let at=lease-1;assert(owner_states[at].live && owner_states[at].generation==generation);return Store{lease:lease,owner_generation:generation,nodes:owner_states[at].nodes,extra:owner_states[at].extra,variables:owner_states[at].variables,versions:owner_states[at].versions,operations:owner_states[at].operations,operation_links:owner_states[at].operation_links,occurs_seen:owner_states[at].occurs_seen,closed_row_index:owner_states[at].closed_row_index,closed_operation_index:owner_states[at].closed_operation_index,variable_views:owner_states[at].variable_views,associated_equations:owner_states[at].associated_equations,projection_resolutions:owner_states[at].projection_resolutions,operation_chains:owner_states[at].operation_chains,effects:owner_states[at].effects,resolved:owner_states[at].resolved,composites:owner_states[at].composites,owner_id:owner_states[at].owner_id,use_closed_rows:owner_states[at].use_closed_rows,closed_rows:owner_states[at].closed_rows,use_operation_rows:owner_states[at].use_operation_rows,operation_rows:owner_states[at].operation_rows,has_usage_types:owner_states[at].has_usage_types,has_rank_types:owner_states[at].has_rank_types,next_rigid_scope:owner_states[at].next_rigid_scope,use_closed_graphs:owner_states[at].use_closed_graphs,has_proof_kinds:owner_states[at].has_proof_kinds,has_projections:owner_states[at].has_projections,projection_limit:owner_states[at].projection_limit,projection_steps:owner_states[at].projection_steps,resolution_depth_limit:owner_states[at].resolution_depth_limit,projection_exhausted:owner_states[at].projection_exhausted,projection_resolution_types:owner_states[at].projection_resolution_types,projection_resolution_rows:owner_states[at].projection_resolution_rows,projection_resolution_limit:owner_states[at].projection_resolution_limit,closed_generation:owner_states[at].closed_generation,closed_effect_physical_epoch:owner_states[at].closed_effect_physical_epoch,mutation_epoch:owner_states[at].mutation_epoch,occurs_steps:owner_states[at].occurs_steps,normalization:owner_states[at].normalization,resolution_steps:owner_states[at].resolution_steps,occurs_generation:owner_states[at].occurs_generation,use_resolution_cache:owner_states[at].use_resolution_cache,use_composite_cache:owner_states[at].use_composite_cache,composite_min_growth:owner_states[at].composite_min_growth,use_operation_shapes:owner_states[at].use_operation_shapes,operation_shape_generation:owner_states[at].operation_shape_generation,operation_shape_enabled:owner_states[at].operation_shape_enabled, ..};}
 fn checkedView(store:const Store&)->Store {let canonical:const blot_check_types::Store& =blot_check_types::canonical(store.lease,store.owner_generation);assert(store.nodes .== canonical.nodes);assert(store.extra .== canonical.extra);assert(store.variables .== canonical.variables);assert(store.versions .== canonical.versions);assert(store.operations .== canonical.operations);assert(store.operation_links .== canonical.operation_links);assert(store.occurs_seen .== canonical.occurs_seen);assert(store.closed_row_index .== canonical.closed_row_index);assert(store.closed_operation_index .== canonical.closed_operation_index);assert(store.variable_views .== canonical.variable_views);assert(store.associated_equations .== canonical.associated_equations);assert(store.projection_resolutions .== canonical.projection_resolutions);assert(store.operation_chains .== canonical.operation_chains);assert(store.effects .== canonical.effects);assert(store.resolved .== canonical.resolved);assert(store.composites .== canonical.composites);assert(store.owner_id .== canonical.owner_id);assert(store.use_closed_rows .== canonical.use_closed_rows);assert(store.closed_rows .== canonical.closed_rows);assert(store.use_operation_rows .== canonical.use_operation_rows);assert(store.operation_rows .== canonical.operation_rows);assert(store.has_usage_types .== canonical.has_usage_types);assert(store.has_rank_types .== canonical.has_rank_types);assert(store.next_rigid_scope .== canonical.next_rigid_scope);assert(store.use_closed_graphs .== canonical.use_closed_graphs);assert(store.has_proof_kinds .== canonical.has_proof_kinds);assert(store.has_projections .== canonical.has_projections);assert(store.projection_limit .== canonical.projection_limit);assert(store.projection_steps .== canonical.projection_steps);assert(store.resolution_depth_limit .== canonical.resolution_depth_limit);assert(store.projection_exhausted .== canonical.projection_exhausted);assert(store.projection_resolution_types .== canonical.projection_resolution_types);assert(store.projection_resolution_rows .== canonical.projection_resolution_rows);assert(store.projection_resolution_limit .== canonical.projection_resolution_limit);assert(store.closed_generation .== canonical.closed_generation);assert(store.closed_effect_physical_epoch .== canonical.closed_effect_physical_epoch);assert(store.mutation_epoch .== canonical.mutation_epoch);assert(store.occurs_steps .== canonical.occurs_steps);assert(store.normalization .== canonical.normalization);assert(store.resolution_steps .== canonical.resolution_steps);assert(store.occurs_generation .== canonical.occurs_generation);assert(store.use_resolution_cache .== canonical.use_resolution_cache);assert(store.use_composite_cache .== canonical.use_composite_cache);assert(store.composite_min_growth .== canonical.composite_min_growth);assert(store.use_operation_shapes .== canonical.use_operation_shapes);assert(store.operation_shape_generation .== canonical.operation_shape_generation);assert(store.operation_shape_enabled .== canonical.operation_shape_enabled);return registeredView(store.lease,store.owner_generation);}
-fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owner_states[index];state.canonical=registeredView((index+1) as u32,generation);var self_=state.canonical;self_.owner_id=blot_native::fresh_owner_id();self_.use_closed_graphs=options.closed_graphs;self_.use_resolution_cache=options.resolution_cache;self_.use_composite_cache=options.composite_cache && options.closed_graphs;self_.composite_min_growth=options.composite_min_growth;let effects,error=blot_check_effects::initPooled(blot_check_effects::Options{resolution_cache:options.resolution_cache, ..});if error!=blot_error::Error.none {self_.deinit();return Store{..},effectError(error);}self_.effects=effects;let resolved,error=blot_reuse_epoch_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.resolved=resolved;let composites,error=blot_reuse_composite_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.composites=composites;self_.nodes.append([Node{Tag.absent, ..},Node{Tag.unit, ..},Node{Tag.boolean, ..},Node{Tag.unsigned32, ..},Node{Tag.floating32, ..},Node{Tag.never, ..}]);self_.operations.append([Operation{NominalIdentity{0,0}, ..},Operation{NominalIdentity{0,1}, ..}]);if self_.nodes.failure!=blot_error::Error.none || self_.operations.failure!=blot_error::Error.none {var error=self_.nodes.failure;if error==blot_error::Error.none {error=self_.operations.failure;}self_.deinit();return Store{..},error;}return self_,blot_error::Error.none;}
+fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owner_states[index];state.canonical=registeredView((index+1) as u32,generation);var self_=state.canonical;self_.owner_id=blot_native::fresh_owner_id();self_.use_closed_graphs=options.closed_graphs;self_.use_resolution_cache=options.resolution_cache;self_.use_composite_cache=options.composite_cache && options.closed_graphs;self_.composite_min_growth=options.composite_min_growth;let effects,error=blot_check_effects::initPooled(blot_check_effects::Options{resolution_cache:options.resolution_cache, ..});if error!=blot_error::Error.none {self_.deinit();return Store{..},effectError(error);}self_.effects=effects;let resolved,error=blot_reuse_epoch_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.resolved=resolved;let composites,error=blot_reuse_composite_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.composites=composites;self_.nodes.append([Node{Tag.absent, ..},Node{Tag.unit, ..},Node{Tag.boolean, ..},Node{Tag.unsigned32, ..},Node{Tag.floating32, ..},Node{Tag.unsigned8, ..},Node{Tag.signed32, ..},Node{Tag.unsigned64, ..},Node{Tag.signed64, ..},Node{Tag.floating64, ..},Node{Tag.never, ..}]);self_.operations.append([Operation{NominalIdentity{0,0}, ..},Operation{NominalIdentity{0,1}, ..}]);if self_.nodes.failure!=blot_error::Error.none || self_.operations.failure!=blot_error::Error.none {var error=self_.nodes.failure;if error==blot_error::Error.none {error=self_.operations.failure;}self_.deinit();return Store{..},error;}return self_,blot_error::Error.none;}
 fn init()->Store,Error {return initPooled();}
 fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
 fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes.deinit();self_.extra.deinit();self_.variables.deinit();self_.versions.deinit();self_.operations.deinit();self_.operation_links.deinit();self_.occurs_seen.deinit();self_.closed_row_index.deinit();self_.closed_operation_index.deinit();self_.variable_views.deinit();self_.associated_equations.deinit();self_.projection_resolutions.deinit();self_.operation_chains.deinit();self_.effects.deinit();self_.resolved.deinit();self_.composites.deinit();let index=self_.lease-1;owner_states[index].live=false;owner_states.free(index);self_=Store{..};}

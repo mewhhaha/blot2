@@ -55,7 +55,76 @@ struct Primitive {
     array_op: ArrayOp = blot_backend_collection_ops::Op.length,
     arity: u8
 }
-enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_ }
+enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_, numeric_convert }
+// The uses of these intrinsics in checking and lowering share one signature.
+struct NumericIntrinsic {
+    input: u32 = 0,
+    output: u32 = 0,
+    op: Op = Op.none,
+    arity: u8 = 0,
+}
+fn numericSuffix(name: const u8[:]) -> u32 {
+    if name == "u8" { return blot_check_types::u8_type; }
+    if name == "u32" { return blot_check_types::u32_type; }
+    if name == "i32" { return blot_check_types::i32_type; }
+    if name == "u64" { return blot_check_types::u64_type; }
+    if name == "i64" { return blot_check_types::i64_type; }
+    if name == "f32" { return blot_check_types::f32_type; }
+    if name == "f64" { return blot_check_types::f64_type; }
+    return 0;
+}
+fn numericIntrinsic(name: const u8[:]) -> NumericIntrinsic {
+    if name.len < 6 || name[0] != '@' { return NumericIntrinsic {..}; }
+    var dot = 1;
+    while dot < name.len && name[dot] != '.' { dot++; }
+    if dot == name.len { return NumericIntrinsic {..}; }
+    let input = numericSuffix(name[1..dot]);
+    if input == 0 { return NumericIntrinsic {..}; }
+    let member = name[dot+1..];
+    let float = input == blot_check_types::f32_type || input == blot_check_types::f64_type;
+    if member == "to_bits" && float {
+        let output = if input == blot_check_types::f32_type { blot_check_types::u32_type } else { blot_check_types::u64_type };
+        return NumericIntrinsic { input, output, Op.bits, 1 };
+    }
+    if member == "from_bits" && float {
+        let bits = if input == blot_check_types::f32_type { blot_check_types::u32_type } else { blot_check_types::u64_type };
+        return NumericIntrinsic { bits, input, Op.from_bits, 1 };
+    }
+    if member.len > 3 && member[..3] == "to_" {
+        let output = numericSuffix(member[3..]);
+        if output != 0 { return NumericIntrinsic { input, output, Op.numeric_convert, 1 }; }
+    }
+    // Existing U32/F32 intrinsics are recognized before this lookup.
+    if input == blot_check_types::u32_type || input == blot_check_types::f32_type { return NumericIntrinsic {..}; }
+    let signed = input == blot_check_types::i32_type || input == blot_check_types::i64_type;
+    if member == "add" { return NumericIntrinsic { input, input, Op.add, 2 }; }
+    if member == "sub" { return NumericIntrinsic { input, input, Op.sub, 2 }; }
+    if member == "mul" { return NumericIntrinsic { input, input, Op.mul, 2 }; }
+    if member == "div" { return NumericIntrinsic { input, input, Op.div, 2 }; }
+    if member == "rem" && !float { return NumericIntrinsic { input, input, Op.rem, 2 }; }
+    if member == "eq" { return NumericIntrinsic { input, blot_check_types::boolean, Op.equal, 2 }; }
+    if member == "ne" { return NumericIntrinsic { input, blot_check_types::boolean, Op.not_equal, 2 }; }
+    if member == "lt" { return NumericIntrinsic { input, blot_check_types::boolean, Op.less, 2 }; }
+    if member == "le" { return NumericIntrinsic { input, blot_check_types::boolean, Op.less_equal, 2 }; }
+    if member == "gt" { return NumericIntrinsic { input, blot_check_types::boolean, Op.greater, 2 }; }
+    if member == "ge" { return NumericIntrinsic { input, blot_check_types::boolean, Op.greater_equal, 2 }; }
+    if member == "bit_and" && !float { return NumericIntrinsic { input, input, Op.bit_and, 2 }; }
+    if member == "bit_or" && !float { return NumericIntrinsic { input, input, Op.bit_or, 2 }; }
+    if member == "bit_xor" && !float { return NumericIntrinsic { input, input, Op.bit_xor, 2 }; }
+    if member == "bit_not" && !float { return NumericIntrinsic { input, input, Op.bit_not, 1 }; }
+    if member == "shl" && !float { return NumericIntrinsic { input, input, Op.shift_left, 2 }; }
+    if member == "shr" && !float { return NumericIntrinsic { input, input, Op.shift_right, 2 }; }
+    if member == "neg" && (float || signed) { return NumericIntrinsic { input, input, Op.neg, 1 }; }
+    if member == "abs" { return NumericIntrinsic { input, input, Op.abs, 1 }; }
+    if member == "sqrt" && float { return NumericIntrinsic { input, input, Op.sqrt, 1 }; }
+    if member == "floor" && float { return NumericIntrinsic { input, input, Op.floor, 1 }; }
+    if member == "ceil" && float { return NumericIntrinsic { input, input, Op.ceil, 1 }; }
+    if member == "trunc" && float { return NumericIntrinsic { input, input, Op.trunc, 1 }; }
+    if member == "min" && float { return NumericIntrinsic { input, input, Op.min, 2 }; }
+    if member == "max" && float { return NumericIntrinsic { input, input, Op.max, 2 }; }
+    return NumericIntrinsic {..};
+}
+
 // bind: a = the name's binding, b = its value, c = 1 when `:=` rebinds it.
 struct Node {
     tag: Tag,
@@ -719,6 +788,7 @@ fn opCode(value: Op) -> u32 {
         convert_f32_i32 => { return 43; },
         continue_ => { return 44; },
         not_ => { return 45; },
+        numeric_convert => { return 46; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -769,6 +839,7 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         43 => { return Op.convert_f32_i32, blot_error::Error.none; },
         44 => { return Op.continue_, blot_error::Error.none; },
         45 => { return Op.not_, blot_error::Error.none; },
+        46 => { return Op.numeric_convert, blot_error::Error.none; },
         _ => { return Op.none, blot_error::Error.core_limit; },
     }
 }
@@ -1046,7 +1117,7 @@ recursive fn sameCoreType(a:const Module&,ta:u32,b:const Module&,tb:u32,depth:i6
     let nb=b.types.nodes[tb];
     if na.tag!=nb.tag { return false; }
     match na.tag {
-        unit,boolean,unsigned32,floating32,never=>{ return true; },
+        unit,boolean,unsigned32,floating32,unsigned8,signed32,unsigned64,signed64,floating64,never=>{ return true; },
         variable,bound=>{ return na.a==nb.a && na.b==nb.b; },
         usage=>{ return na.b==nb.b && sameCoreType(a,na.a,b,nb.a,depth+1) && sameCoreType(a,na.c,b,nb.c,depth+1); },
         forall,existential=>{

@@ -3073,13 +3073,18 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
             }
             push(g, value);
             if pattern.tag == blot_check_core::PatternTag.constant {
-                if tag == blot_direct_types::Tag.f32_ { f32Const(g, pattern.a); } else { i32Const(g, pattern.a); }
+                pushConstant(g, value.ty, pattern.a, pattern.b);
             } else {
                 let expected, error = expr(g, f, pattern.a);
                 if error != blot_direct_types::Error.none { return error; }
                 push(g, expected);
             }
-            if tag == blot_direct_types::Tag.f32_ { op(g, OP_f32_ne); } else { op(g, OP_i32_ne); }
+            match tag {
+                f32_ => { op(g, OP_f32_ne); },
+                f64_ => { op(g, OP_f64_ne); },
+                u64_, i64_ => { op(g, OP_i64_ne); },
+                _ => { op(g, OP_i32_ne); },
+            }
             failIf(g, f, has_fail, fail);
         },
         product => {
@@ -4983,8 +4988,12 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[8]&, len: 
 }
 
 fn localKindForScalar(g: const Generator&, ty: Ty) -> ValType {
-    if tagOf(g, ty) == blot_direct_types::Tag.f32_ { return VT_f32; }
-    return VT_i32;
+    match tagOf(g, ty) {
+        f32_ => { return VT_f32; },
+        f64_ => { return VT_f64; },
+        u64_, i64_ => { return VT_i64; },
+        _ => { return VT_i32; },
+    }
 }
 
 fn returnedFreshArrayExpr(m: const Module&, id: u32) -> u32 {
@@ -6805,18 +6814,20 @@ fn tryEmitCopyTailLoop(
     lget(g, k_loc); lget(g, count); op(g, OP_i32_add); lset(g, k_end);
 
     let bytes = local32(g, f);
+    let elem_kind = localKindForScalar(g, g.types.node(sv.ty).a);
+    let shift = if blot_direct_writer::wordBytes(elem_kind) == 8 { 3 as u32 } else { 2 as u32 };
     lget(g, count);
-    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    if !byteElement(elem_tag) { i32Const(g, shift); op(g, OP_i32_shl); }
     lset(g, bytes);
 
     let src_ptr = local32(g, f);
     lget(g, src_base); lget(g, i_loc);
-    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    if !byteElement(elem_tag) { i32Const(g, shift); op(g, OP_i32_shl); }
     op(g, OP_i32_add); lset(g, src_ptr);
 
     let dst_ptr = local32(g, f);
     lget(g, dst_base); lget(g, k_loc);
-    if elem_tag != blot_direct_types::Tag.boolean { i32Const(g, 2); op(g, OP_i32_shl); }
+    if !byteElement(elem_tag) { i32Const(g, shift); op(g, OP_i32_shl); }
     op(g, OP_i32_add); lset(g, dst_ptr);
 
     let src_end = local32(g, f);

@@ -16,7 +16,14 @@ let unit: Ty = 0;
 let boolean: Ty = 1;
 let u32_: Ty = 2;
 let f32_: Ty = 3;
-let never: Ty = 4;
+let u8_: Ty = 4;
+let i32_: Ty = 5;
+let u64_: Ty = 6;
+let i64_: Ty = 7;
+let f64_: Ty = 8;
+let never: Ty = 9;
+// The concrete IDs follow the checked primitive IDs without the absent slot.
+fn lowerBuiltin(ty: u32) -> Ty { return ty - blot_check_types::unit; }
 type Module = blot_check_core::Module;
 type ValType = blot_direct_writer::ValType;
 type TId = blot_check_types::Id;
@@ -28,10 +35,15 @@ type U64Map = blot_direct_map::U64Map;
 // failure is not an error value here.
 enum Error { none, unsupported, diverged }
 
-enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, ref, view, link, provider, state_provider, cell }
+enum Tag { unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never, tuple, record, nominal, function, array, ref, view, link, provider, state_provider, cell }
 fn tagCode(tag: Tag) -> u32 {
     match tag {
         unit => { return 0; }, boolean => { return 1; }, u32_ => { return 2; }, f32_ => { return 3; }, never => { return 4; },
+        u8_ => { return 18; },
+        i32_ => { return 19; },
+        u64_ => { return 20; },
+        i64_ => { return 21; },
+        f64_ => { return 22; },
         tuple => { return 5; }, record => { return 6; }, nominal => { return 7; }, function => { return 8; }, array => { return 9; },
         ref => { return 12; },
         view => { return 13; }, link => { return 14; }, provider => { return 15; }, state_provider => { return 16; }, cell => { return 17; },
@@ -41,6 +53,11 @@ fn tagCode(tag: Tag) -> u32 {
 fn tagName(tag: Tag) -> Text {
     match tag {
         unit => { return "unit"; }, boolean => { return "boolean"; }, u32_ => { return "u32"; }, f32_ => { return "f32"; }, never => { return "never"; },
+        u8_ => { return "u8"; },
+        i32_ => { return "i32"; },
+        u64_ => { return "u64"; },
+        i64_ => { return "i64"; },
+        f64_ => { return "f64"; },
         tuple => { return "tuple"; }, record => { return "record"; }, nominal => { return "nominal"; }, function => { return "function"; }, array => { return "array"; },
         ref => { return "ref"; },
         view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, cell => { return "cell"; },
@@ -50,6 +67,11 @@ fn tagName(tag: Tag) -> Text {
 fn coreTypeTagName(tag: TTag) -> Text {
     match tag {
         absent => { return "absent"; }, unit => { return "unit"; }, boolean => { return "boolean"; }, unsigned32 => { return "u32"; }, floating32 => { return "f32"; },
+        unsigned8 => { return "u8"; },
+        signed32 => { return "i32"; },
+        unsigned64 => { return "u64"; },
+        signed64 => { return "i64"; },
+        floating64 => { return "f64"; },
         never => { return "never"; }, variable => { return "variable"; }, function => { return "function"; }, product => { return "product"; }, record => { return "record"; },
         nominal => { return "nominal"; }, array => { return "array"; }, type_constructor => { return "type_constructor"; },
         provider => { return "provider"; }, state_provider => { return "state_provider"; }, projection => { return "projection"; },
@@ -140,7 +162,7 @@ root struct Types {
     failure: VarKey = VarKey {},
     holes: bool = false,
     // What an unbound variable lowers to while `holes` is set.
-    hole_fill: Ty = 4,
+    hole_fill: Ty = never,
     failure_reason: Text = "",
     env_nodes: EnvNode[>..] = [],
     // Scratch shared by the recursive walks; grows only, top tracked by *_len.
@@ -250,10 +272,13 @@ fn init(self_: Types&) {
     self_.layout_words.push(blot_direct_writer::VT_i32);
     self_.layout_words.push(blot_direct_writer::VT_i32);
     self_.layout_words.push(blot_direct_writer::VT_i32);
+    // [6..7] = [VT_i64], [7..8] = [VT_f64]
+    self_.layout_words.push(blot_direct_writer::VT_i64);
+    self_.layout_words.push(blot_direct_writer::VT_f64);
     // Environment node 0 ends every list.
     self_.env_nodes.push(EnvNode { 0, 0, 0, 0 });
     initUnitTables(self_);
-    for tag in [Tag.unit, Tag.boolean, Tag.u32_, Tag.f32_, Tag.never] {
+    for tag in [Tag.unit, Tag.boolean, Tag.u32_, Tag.f32_, Tag.u8_, Tag.i32_, Tag.u64_, Tag.i64_, Tag.f64_, Tag.never] {
         let id, error = intern(self_, tag, []);
         assert(error == Error.none);
     }
@@ -371,7 +396,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     if arity >= 0 { first = payload[0]; }
     var value = Node { tag: tag };
     match tag {
-        unit, boolean, u32_, f32_, never => {},
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         tuple, state_provider => { value = Node { tag, start, payload.len as u32 }; },
         record => { value = Node { tag, start, (payload.len / 2) as u32 }; },
         nominal => { value = Node { tag, start, (payload.len - 2) as u32 }; },
@@ -381,7 +406,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var cdepth: u8 = 0;
     match tag {
         never => { cdepth = 255; },
-        unit, boolean, u32_, f32_ => { cdepth = 0; },
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_ => { cdepth = 0; },
         function => {
             var md = self_.concrete_depth[payload[0]];
             let d1 = self_.concrete_depth[payload[1]];
@@ -429,7 +454,9 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var init_fbytes: u32 = 0xffffffff;
     match tag {
         unit, never => { init_flat = Slot { true, 0, 0 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 0; },
-        boolean, u32_, cell => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
+        boolean, u32_, u8_, i32_, cell => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
+        u64_, i64_ => { init_flat = Slot { true, 6, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
+        f64_ => { init_flat = Slot { true, 7, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
         f32_ => { init_flat = Slot { true, 1, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
         function, provider, array => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
         ref, link => { init_flat = Slot { true, 2, 3 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 12; },
@@ -599,11 +626,7 @@ fn lowerFilled(self_: Types&, m: const Module&, ty: TId, env: Env, fill: Ty) -> 
     return result, error;
 }
 recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open: bool&, depth: i64) -> Ty, Error {
-    if ty == blot_check_types::unit { return unit, Error.none; }
-    if ty == blot_check_types::boolean { return boolean, Error.none; }
-    if ty == blot_check_types::u32_type { return u32_, Error.none; }
-    if ty == blot_check_types::f32_type { return f32_, Error.none; }
-    if ty == blot_check_types::never { return never, Error.none; }
+    if ty >= blot_check_types::unit && ty <= blot_check_types::never { return lowerBuiltin(ty), Error.none; }
     if depth > 256 { return 0, fail(self_, m, ty, "type nesting exceeds 256"); }
     let closed_idx = (self_.closed_base[m.unit - 1] as i64) + (ty as i64);
     let hit = self_.closed_vals[closed_idx];
@@ -1033,7 +1056,7 @@ fn blockFlat(self_: Types&, ty: Ty) -> const ValType[:], Error {
 }
 fn wordBytes(words: const ValType[:]) -> u32 {
     var bytes: u32 = 0;
-    for kind in words { if kind == blot_direct_writer::VT_v128 { bytes += 16; } else { bytes += 4; } }
+    for kind in words { bytes += blot_direct_writer::wordBytes(kind); }
     return bytes;
 }
 fn blockBytes(self_: Types&, ty: Ty) -> u32, Error {
@@ -1145,7 +1168,9 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
     let n = self_.node(ty);
     match n.tag {
         unit, never => {},
-        boolean, u32_ => { self_.pushScratchLayout(i32w); },
+        boolean, u32_, u8_, i32_ => { self_.pushScratchLayout(i32w); },
+        u64_, i64_ => { self_.pushScratchLayout(blot_direct_writer::VT_i64); },
+        f64_ => { self_.pushScratchLayout(blot_direct_writer::VT_f64); },
         f32_ => { self_.pushScratchLayout(blot_direct_writer::VT_f32); },
         tuple => {
             for at in 0..(n.b as i64) {

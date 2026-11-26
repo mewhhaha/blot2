@@ -8,7 +8,10 @@ fn opName(value: Op) -> Chars {
     match value { const for <N, V> in variants<blot_check_core::Op> { V => { return N; }, } }
 }
 fn isScalarTag(tag: blot_direct_types::Tag) -> bool {
-    return tag == blot_direct_types::Tag.u32_ || tag == blot_direct_types::Tag.f32_ || tag == blot_direct_types::Tag.boolean;
+    match tag {
+        u8_, i32_, u32_, i64_, u64_, f32_, f64_, boolean => { return true; },
+        _ => { return false; },
+    }
 }
 fn isComparisonOp(op_: Op) -> bool {
     return op_ == blot_check_core::Op.equal || op_ == blot_check_core::Op.not_equal || op_ == blot_check_core::Op.less || op_ == blot_check_core::Op.less_equal || op_ == blot_check_core::Op.greater || op_ == blot_check_core::Op.greater_equal;
@@ -96,14 +99,153 @@ recursive fn isBoundedFiniteF32(g: const Generator&, f: const Fn&, m: const Modu
 }
 fn isCoreScalar(m: const Module&, id: u32) -> bool {
     if id == 0 { return false; }
-    match m.types.node(m.typeOf(id)).tag {
-        unsigned32, floating32, boolean => { return true; },
-        _ => { return false; },
-    }
+    let tag = m.types.node(m.typeOf(id)).tag;
+    return blot_check_types::isNumeric(tag) || tag == blot_check_types::Tag.boolean;
 }
 
 // A scalar literal can stay as a typed operand until its consumer needs it.
-recursive fn scalarOperand(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+recursive fn canonicalizeF64Stack(g: Generator&, f: const Fn&) {
+    let tmp = local(g, f, VT_f64);
+    ltee(g, tmp);
+    f64Const(g, 0, 0x7ff80000);
+    lget(g, tmp);
+    lget(g, tmp);
+    op(g, OP_f64_eq);
+    op(g, OP_select);
+}
+fn maskU8(g: Generator&) {
+    i32Const(g, 255);
+    op(g, OP_i32_and);
+}
+fn signedAbs(g: Generator&, f: const Fn&, wide: bool) {
+    let value = local(g, f, if wide { VT_i64 } else { VT_i32 });
+    lset(g, value);
+    if wide { i64Const(g, 0); } else { i32Const(g, 0); }
+    lget(g, value);
+    op(g, if wide { OP_i64_sub } else { OP_i32_sub });
+    lget(g, value);
+    lget(g, value);
+    if wide { i64Const(g, 0); } else { i32Const(g, 0); }
+    op(g, if wide { OP_i64_lt_s } else { OP_i32_lt_s });
+    op(g, OP_select);
+}
+fn scalarI64(g: Generator&, f: const Fn&, operation: Op, signed: bool, id: u32) -> Error {
+    var code: u8 = 0;
+    match operation {
+        add => { code = OP_i64_add; },
+        sub => { code = OP_i64_sub; },
+        mul => { code = OP_i64_mul; },
+        equal => { code = OP_i64_eq; },
+        not_equal => { code = OP_i64_ne; },
+        bit_and => { code = OP_i64_and; },
+        bit_or => { code = OP_i64_or; },
+        bit_xor => { code = OP_i64_xor; },
+        shift_left => { code = OP_i64_shl; },
+        from_bits => { code = OP_f64_reinterpret_i64; },
+        div => { code = if signed { OP_i64_div_s } else { OP_i64_div_u }; },
+        rem => { code = if signed { OP_i64_rem_s } else { OP_i64_rem_u }; },
+        less => { code = if signed { OP_i64_lt_s } else { OP_i64_lt_u }; },
+        less_equal => { code = if signed { OP_i64_le_s } else { OP_i64_le_u }; },
+        greater => { code = if signed { OP_i64_gt_s } else { OP_i64_gt_u }; },
+        greater_equal => { code = if signed { OP_i64_ge_s } else { OP_i64_ge_u }; },
+        shift_right => { code = if signed { OP_i64_shr_s } else { OP_i64_shr_u }; },
+        bit_not => { i64Const(g, -1); code = OP_i64_xor; },
+        neg => {
+            let value = local(g, f, VT_i64);
+            lset(g, value);
+            i64Const(g, 0);
+            lget(g, value);
+            code = OP_i64_sub;
+        },
+        abs => {
+            if signed { signedAbs(g, f, true); }
+            return blot_direct_types::Error.none;
+        },
+        _ => { return g.fail(g.units[f.unit - 1], id, "unsupported 64-bit integer operation"); },
+    }
+    op(g, code);
+    return blot_direct_types::Error.none;
+}
+fn scalarF64(g: Generator&, f: const Fn&, operation: Op, id: u32) -> Error {
+    var code: u8 = 0;
+    match operation {
+        add => { code = OP_f64_add; },
+        sub => { code = OP_f64_sub; },
+        mul => { code = OP_f64_mul; },
+        div => { code = OP_f64_div; },
+        abs => { code = OP_f64_abs; },
+        neg => { code = OP_f64_neg; },
+        sqrt => { code = OP_f64_sqrt; },
+        floor => { code = OP_f64_floor; },
+        ceil => { code = OP_f64_ceil; },
+        trunc => { code = OP_f64_trunc; },
+        equal => { code = OP_f64_eq; },
+        not_equal => { code = OP_f64_ne; },
+        less => { code = OP_f64_lt; },
+        less_equal => { code = OP_f64_le; },
+        greater => { code = OP_f64_gt; },
+        greater_equal => { code = OP_f64_ge; },
+        min => { code = OP_f64_min; },
+        max => { code = OP_f64_max; },
+        bits => { code = OP_i64_reinterpret_f64; },
+        _ => { return g.fail(g.units[f.unit - 1], id, "unsupported F64 operation"); },
+    }
+    op(g, code);
+    if isCanonicalF32Op(operation) || operation == blot_check_core::Op.min || operation == blot_check_core::Op.max { canonicalizeF64Stack(g, f); }
+    return blot_direct_types::Error.none;
+}
+fn convertScalar(g: Generator&, f: const Fn&, input: Ty, output: Ty, id: u32) -> Error {
+    if input == output { return blot_direct_types::Error.none; }
+    let src = tagOf(g, input);
+    let dst = tagOf(g, output);
+    if !isScalarTag(src) || !isScalarTag(dst) {
+        return g.fail(g.units[f.unit - 1], id, "conversion requires concrete numeric types");
+    }
+    let src_float = src == blot_direct_types::Tag.f32_ || src == blot_direct_types::Tag.f64_;
+    let dst_float = dst == blot_direct_types::Tag.f32_ || dst == blot_direct_types::Tag.f64_;
+    let src_wide = src == blot_direct_types::Tag.i64_ || src == blot_direct_types::Tag.u64_;
+    let dst_wide = dst == blot_direct_types::Tag.i64_ || dst == blot_direct_types::Tag.u64_;
+    let src_signed = src == blot_direct_types::Tag.i32_ || src == blot_direct_types::Tag.i64_;
+    let dst_signed = dst == blot_direct_types::Tag.i32_ || dst == blot_direct_types::Tag.i64_;
+    if src_float && dst_float {
+        if dst == blot_direct_types::Tag.f64_ {
+            op(g, OP_f64_promote_f32);
+            canonicalizeF64Stack(g, f);
+        } else {
+            op(g, OP_f32_demote_f64);
+            canonicalizeF32Stack(g, f);
+        }
+    } else if src_float {
+        // 0..7 are trunc_sat: result width, input width, then signedness.
+        var subop: u32 = 0;
+        if dst_wide { subop += 4; }
+        if src == blot_direct_types::Tag.f64_ { subop += 2; }
+        if !dst_signed { subop += 1; }
+        op(g, OP_prefix_fc);
+        uleb(g, subop);
+        if dst == blot_direct_types::Tag.u8_ {
+            let value = local32(g, f);
+            ltee(g, value);
+            i32Const(g, 255);
+            lget(g, value);
+            i32Const(g, 255);
+            op(g, OP_i32_le_u);
+            op(g, OP_select);
+        }
+    } else if dst_float {
+        var code = if dst == blot_direct_types::Tag.f32_ { OP_f32_convert_i32_s } else { OP_f64_convert_i32_s };
+        if src_wide { code += 2; }
+        if !src_signed { code += 1; }
+        op(g, code);
+    } else {
+        if src_wide && !dst_wide { op(g, OP_i32_wrap_i64); }
+        if !src_wide && dst_wide { op(g, if src_signed { OP_i64_extend_i32_s } else { OP_i64_extend_i32_u }); }
+        if dst == blot_direct_types::Tag.u8_ { maskU8(g); }
+    }
+    return blot_direct_types::Error.none;
+}
+
+fn scalarOperand(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     if m.node(id).tag == blot_check_core::Tag.constant && isCoreScalar(m, id) {
         let ty, error = typeOf(g, f, id);
@@ -115,9 +257,8 @@ fn pushScalarOperand(g: Generator&, f: const Fn&, id: u32, value: Val) {
     if value.len != 0 || !isScalarTag(tagOf(g, value.ty)) { push(g, value); return; }
     let m .= g.units[f.unit - 1];
     blot_direct_relocations::operand(m.unit, id, g.s.code.len);
-    let bits = m.node(id).a;
-    if value.ty == blot_direct_types::f32_ { f32Const(g, bits); }
-    else { i32Const(g, bits); }
+    let n = m.node(id);
+    pushConstant(g, value.ty, n.a, n.b);
 }
 fn u32OperandConstant(g: const Generator&, f: const Fn&, id: u32, value: Val) -> ConstU32, bool {
     if value.len == 0 {
@@ -395,7 +536,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     }
     pushScalarOperand(g, f, n.a, left);
     if has_right { pushScalarOperand(g, f, n.b, right); }
-    let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
+    let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan, result);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     if stack_result { return Val { ty: result }, blot_direct_types::Error.none; }
     return pop(g, f, result, id);
@@ -681,7 +822,7 @@ fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, i
 // F32 arithmetic & rounding producers (+, -, *, /, sqrt, floor, ceil, trunc)
 // canonicalize NaN outputs to positive quiet NaN 0x7fc00000 unless `canonicalize`
 // is false (peephole-elided directly into a canonicalizing consumer).
-fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonicalize: bool = true) -> Error {
+fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonicalize: bool = true, result: Ty = 0) -> Error {
     let m .= g.units[f.unit - 1];
     let tag = g.types.node(operand).tag;
     let float = tag == blot_direct_types::Tag.f32_;
@@ -695,24 +836,35 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonica
         g.put(" node");
         return g.failClose();
     }
+    if op_ == blot_check_core::Op.numeric_convert { return convertScalar(g, f, operand, result, id); }
+    if tag == blot_direct_types::Tag.f64_ { return scalarF64(g, f, op_, id); }
+    if tag == blot_direct_types::Tag.u64_ || tag == blot_direct_types::Tag.i64_ {
+        return scalarI64(g, f, op_, tag == blot_direct_types::Tag.i64_, id);
+    }
+    let byte_ = tag == blot_direct_types::Tag.u8_;
+    let signed = tag == blot_direct_types::Tag.i32_;
+    if byte_ && (op_ == blot_check_core::Op.shift_left || op_ == blot_check_core::Op.shift_right) {
+        i32Const(g, 7);
+        op(g, OP_i32_and);
+    }
     var code: u8 = 0;
     match op_ {
         add => { if float { code = OP_f32_add; } else { code = OP_i32_add; } },
         sub => { if float { code = OP_f32_sub; } else { code = OP_i32_sub; } },
         mul => { if float { code = OP_f32_mul; } else { code = OP_i32_mul; } },
-        div => { if float { code = OP_f32_div; } else { code = OP_i32_div_u; } },
-        rem => { if float { return g.fail(m, id, "F32 remainder"); } code = OP_i32_rem_u; },
+        div => { if float { code = OP_f32_div; } else { code = if signed { OP_i32_div_s } else { OP_i32_div_u }; } },
+        rem => { if float { return g.fail(m, id, "F32 remainder"); } code = if signed { OP_i32_rem_s } else { OP_i32_rem_u }; },
         equal => { if float { code = OP_f32_eq; } else { code = OP_i32_eq; } },
         not_equal => { if float { code = OP_f32_ne; } else { code = OP_i32_ne; } },
-        less => { if float { code = OP_f32_lt; } else { code = OP_i32_lt_u; } },
-        less_equal => { if float { code = OP_f32_le; } else { code = OP_i32_le_u; } },
-        greater => { if float { code = OP_f32_gt; } else { code = OP_i32_gt_u; } },
-        greater_equal => { if float { code = OP_f32_ge; } else { code = OP_i32_ge_u; } },
+        less => { if float { code = OP_f32_lt; } else { code = if signed { OP_i32_lt_s } else { OP_i32_lt_u }; } },
+        less_equal => { if float { code = OP_f32_le; } else { code = if signed { OP_i32_le_s } else { OP_i32_le_u }; } },
+        greater => { if float { code = OP_f32_gt; } else { code = if signed { OP_i32_gt_s } else { OP_i32_gt_u }; } },
+        greater_equal => { if float { code = OP_f32_ge; } else { code = if signed { OP_i32_ge_s } else { OP_i32_ge_u }; } },
         bit_and => { code = OP_i32_and; },
         bit_or => { code = OP_i32_or; },
         bit_xor => { code = OP_i32_xor; },
         shift_left => { code = OP_i32_shl; },
-        shift_right => { code = OP_i32_shr_u; },
+        shift_right => { code = if signed { OP_i32_shr_s } else { OP_i32_shr_u }; },
         shift_right_signed => { code = OP_i32_shr_s; },
         neg => {
             if float { code = OP_f32_neg; }
@@ -726,7 +878,13 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonica
                 return blot_direct_types::Error.none;
             }
         },
-        abs => { if float { code = OP_f32_abs; } else { return blot_direct_types::Error.none; } },
+        abs => {
+            if float { code = OP_f32_abs; }
+            else {
+                if signed { signedAbs(g, f, false); }
+                return blot_direct_types::Error.none;
+            }
+        },
         ceil => { code = OP_f32_ceil; },
         floor => { code = OP_f32_floor; },
         trunc => { code = OP_f32_trunc; },
@@ -747,16 +905,18 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonica
         convert_i32_f32 => { code = OP_f32_convert_i32_s; },
         bit_andnot => {
             // left & ~right, both already on the stack.
-            i32Const(g, 0xffffffff);
+            i32Const(g, if byte_ { 0xff } else { 0xffffffff });
             op(g, OP_i32_xor);
             op(g, OP_i32_and);
             return blot_direct_types::Error.none;
         },
         bit_not => {
-            i32Const(g, 0xffffffff);
+            i32Const(g, if byte_ { 0xff } else { 0xffffffff });
             op(g, OP_i32_xor);
             return blot_direct_types::Error.none;
         },
+        bits => { code = OP_i32_reinterpret_f32; },
+        from_bits => { code = if tag == blot_direct_types::Tag.u64_ { OP_f64_reinterpret_i64 } else { OP_f32_reinterpret_i32 }; },
         not_ => { code = OP_i32_eqz; },
         _ => {
             g.failOpen(m, id);
@@ -766,6 +926,7 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32, canonica
         },
     }
     op(g, code);
+    if byte_ && (op_ == blot_check_core::Op.add || op_ == blot_check_core::Op.sub || op_ == blot_check_core::Op.mul || op_ == blot_check_core::Op.shift_left) { maskU8(g); }
     if float && canonicalize && isCanonicalF32Op(op_) { canonicalizeF32Stack(g, f); }
     return blot_direct_types::Error.none;
 }

@@ -65,11 +65,14 @@ fn add(p: Parser&,source: const u8[:],tokens: const Token[:],tag: u32,a: u32,b: 
  return id;
 }
 fn numeric_failure(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,code: u32) -> Id { return add(p,source,tokens,a_numeric_error,code,t.start,t.end,t.start); }
-fn integer_literal(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,tag: u32) -> Id {
+fn integer_literal(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,tag: u32,negative: bool=false) -> Id {
  if p.failure!=blot_error::Error.none { return 0; }
  let value,err=blot_parse_lexer::integer_value(text(p,source,t));
  if err==blot_error::Error.integer_range { return numeric_failure(p,source,tokens,t,blot_parse_ast::numericcode_integer_range); }
- if err!=blot_error::Error.none { return fail(p,source,tokens,c_invalid_literal); } return add(p,source,tokens,tag,value,0,0,t.start);
+ if err!=blot_error::Error.none { return fail(p,source,tokens,c_invalid_literal); } let high=(value>>32) as u32;
+ var flags:u32=0; if high!=0 {flags=1;} if negative {flags|=2;}
+ var start=t.start; if negative {start=tokens[p.index-2].start;}
+ return add(p,source,tokens,tag,value as! u32,high,flags,start);
 }
 fn extra(p: Parser&,source: const u8[:],tokens: const Token[:],values: const u32[:]) -> u32 {
  if p.failure!=blot_error::Error.none { return 0; }
@@ -957,10 +960,19 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if t.tag==t_kw_true||t.tag==t_kw_false { advance(p,source,tokens); var value: u32=0; if t.tag==t_kw_true { value=1; } let __cleanup_result_39_0: Id = add(p,source,tokens,a_boolean,value,0,0,start); { p.depth--; } return __cleanup_result_39_0; }
  if t.tag==t_integer { advance(p,source,tokens); let __cleanup_result_40_0: Id = integer_literal(p,source,tokens,t,a_integer); { p.depth--; } return __cleanup_result_40_0; }
  if t.tag==t_float {
-  advance(p,source,tokens); let bits,err=blot_parse_lexer::float_bits(text(p,source,t));
-  if err==blot_error::Error.float_range { let __cleanup_result_41_0: Id = numeric_failure(p,source,tokens,t,blot_parse_ast::numericcode_float_range); { p.depth--; } return __cleanup_result_41_0; }
-  if err==blot_error::Error.invalid_float { let __cleanup_result_42_0: Id = numeric_failure(p,source,tokens,t,blot_parse_ast::numericcode_float_literal); { p.depth--; } return __cleanup_result_42_0; }
-  if err!=blot_error::Error.none { p.failure=err; let __cleanup_result_43_0: Id = 0; { p.depth--; } return __cleanup_result_43_0; } let __cleanup_result_44_0: Id = add(p,source,tokens,a_float,bits,0,0,start); { p.depth--; } return __cleanup_result_44_0;
+  advance(p,source,tokens);
+  let token_text=text(p,source,t);
+  var bits,err=blot_parse_lexer::float_bits(token_text);
+  var result:Id=0;
+  if err==blot_error::Error.invalid_float {
+   result=numeric_failure(p,source,tokens,t,blot_parse_ast::numericcode_float_literal);
+  } else {
+   if err==blot_error::Error.float_range {bits=0x7f800000;}
+   var wide,wide_error=blot_parse_lexer::decimal_bits(token_text,true);
+   if wide_error==blot_error::Error.float_range {wide=0x7ff0000000000000;}
+   result=add(p,source,tokens,a_float,bits,wide as! u32,(wide>>32) as u32,start);
+  }
+  p.depth--; return result;
  }
  if t.tag==t_string { let __cleanup_result_45_0: Id = add(p,source,tokens,a_string,string_symbol(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_45_0; }
  if t.tag==t_intrinsic {
@@ -1439,6 +1451,13 @@ recursive fn pattern(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
  if eat(p,source,tokens,t_caret) { let __cleanup_result_68_0: Id = add(p,source,tokens,a_pattern_value,qualified(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_68_0; }
  if at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false) { advance(p,source,tokens); var value: u32=0; if t.tag==t_kw_true { value=1; } let __cleanup_result_69_0: Id = add(p,source,tokens,a_pattern_boolean,value,0,0,start); { p.depth--; } return __cleanup_result_69_0; }
  if at(p,source,tokens,t_type_identifier) { let __cleanup_result_70_0: Id = identifier_syntax(p,source,tokens); { p.depth--; } return __cleanup_result_70_0; } if at(p,source,tokens,t_identifier) { let __cleanup_result_71_0: Id = add(p,source,tokens,a_pattern_name,lower_identifier(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_71_0; }
+ if t.tag==t_symbol && text(p,source,t)=="-" && peek(p,tokens,1)==t_integer {
+  advance(p,source,tokens);
+  let magnitude=current(p,source,tokens);
+  advance(p,source,tokens);
+  let result=integer_literal(p,source,tokens,magnitude,a_pattern_integer,true);
+  p.depth--; return result;
+ }
  if eat(p,source,tokens,t_integer) { let __cleanup_result_72_0: Id = integer_literal(p,source,tokens,t,a_pattern_integer); { p.depth--; } return __cleanup_result_72_0; }
  if eat(p,source,tokens,t_hash) { let name=constructor_pattern_name(p,source,tokens); var payload: Id=0; if at(p,source,tokens,t_l_brace) { payload=constructor_fields(p,source,tokens); } else if pattern_tag(current(p,source,tokens).tag) { payload=pattern(p,source,tokens); } let __cleanup_result_73_0: Id = add(p,source,tokens,a_pattern_constructor,name,payload,0,start); { p.depth--; } return __cleanup_result_73_0; }
  if at(p,source,tokens,t_l_brace) { let __cleanup_result_74_0: Id = constructor_fields(p,source,tokens); { p.depth--; } return __cleanup_result_74_0; }

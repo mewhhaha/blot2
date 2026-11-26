@@ -67,10 +67,10 @@ fn writeFlat(g: Generator&, f: const Fn&, base: u32, offset: u32, value: Val, id
     return blot_direct_types::Error.none;
 }
 // Writes an element `value` into a container at `base + offset`.
-// Bare `Bool` container elements are byte-packed (1-byte stride).
+// Bare `Bool` and `U8` container elements are byte-packed (1-byte stride).
 fn writeElement(g: Generator&, f: const Fn&, base: u32, offset: u32, value: Val, id: u32) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
-    if tagOf(g, value.ty) == blot_direct_types::Tag.boolean {
+    if byteElement(tagOf(g, value.ty)) {
         lget(g, base);
         lget(g, w(g, value, 0));
         op(g, OP_i32_store8);
@@ -97,7 +97,7 @@ fn readFlat(g: Generator&, f: const Fn&, base: u32, offset: u32, ty: Ty, id: u32
 }
 // Element reads copy: storage elements change through their owner.
 fn loadElement(g: Generator&, f: Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
-    if tagOf(g, ty) == blot_direct_types::Tag.boolean {
+    if byteElement(tagOf(g, ty)) {
         let value, error = fresh(g, f, ty, id);
         if error != blot_direct_types::Error.none { return value, error; }
         lget(g, address);
@@ -170,13 +170,12 @@ fn tupleItem(g: Generator&, f: const Fn&, tuple: Val, index: i64, id: u32) -> Va
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     return Val { item_ty, tuple.start + start, width }, blot_direct_types::Error.none;
 }
-fn wordBytes(kind: ValType) -> u32 {
-    if kind == VT_v128 { return 16; }
-    return 4;
+fn byteElement(tag: blot_direct_types::Tag) -> bool {
+    return tag == blot_direct_types::Tag.boolean || tag == blot_direct_types::Tag.u8_;
 }
 // Bytes per element of a container holding `element`.
 fn stride(g: Generator&, f: const Fn&, element: Ty, id: u32) -> u32, Error {
-    if tagOf(g, element) == blot_direct_types::Tag.boolean {
+    if byteElement(tagOf(g, element)) {
         return 1, blot_direct_types::Error.none;
     }
     let bytes, error = flatBytes(g, f, element, id);
@@ -191,11 +190,13 @@ fn storeAt(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
         lget(g, address);
         lget(g, word);
         if kind == VT_f32 { op(g, OP_f32_store); }
+        else if kind == VT_i64 { op(g, OP_i64_store); }
+        else if kind == VT_f64 { op(g, OP_f64_store); }
         else if kind == VT_v128 { op(g, OP_prefix_fd); uleb(g, 11); }
         else { op(g, OP_i32_store); }
         if kind == VT_v128 { uleb(g, 4); } else { uleb(g, 2); }
         uleb(g, at);
-        at += wordBytes(kind);
+        at += blot_direct_writer::wordBytes(kind);
     }
 }
 fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
@@ -207,12 +208,14 @@ fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u3
         let kind = localType(g, f, word);
         lget(g, address);
         if kind == VT_f32 { op(g, OP_f32_load); }
+        else if kind == VT_i64 { op(g, OP_i64_load); }
+        else if kind == VT_f64 { op(g, OP_f64_load); }
         else if kind == VT_v128 { op(g, OP_prefix_fd); uleb(g, 0); }
         else { op(g, OP_i32_load); }
         if kind == VT_v128 { uleb(g, 4); } else { uleb(g, 2); }
         uleb(g, at);
         lset(g, word);
-        at += wordBytes(kind);
+        at += blot_direct_writer::wordBytes(kind);
     }
     return value, blot_direct_types::Error.none;
 }
@@ -1020,10 +1023,10 @@ fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: 
     // 7B: Skip dead zero/constant memory.fill when an immediately following 0..count loop
     // unconditionally initializes every element before any read.
     if is_fill && skip_fill && source.len == 1 && (step == 1 || step == 4) &&
-        (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.f32_ || elem_tag == blot_direct_types::Tag.boolean) {
+        (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.f32_ || byteElement(elem_tag)) {
         return handle, blot_direct_types::Error.none;
     }
-    if is_fill && step == 1 && source.len == 1 && elem_tag == blot_direct_types::Tag.boolean {
+    if is_fill && step == 1 && source.len == 1 && byteElement(elem_tag) {
         lget(g, base);
         lget(g, w(g, source, 0));
         lget(g, count);

@@ -131,6 +131,66 @@ let OP_ref_null: Op = 0xd0;
 let OP_prefix_fc: Op = 0xfc;
 let OP_prefix_fd: Op = 0xfd;
 
+let OP_i64_load: Op = 0x29;
+let OP_f64_load: Op = 0x2b;
+let OP_i64_store: Op = 0x37;
+let OP_f64_store: Op = 0x39;
+let OP_f64_const: Op = 0x44;
+let OP_i64_eqz: Op = 0x50;
+let OP_i64_eq: Op = 0x51;
+let OP_i64_ne: Op = 0x52;
+let OP_i64_lt_s: Op = 0x53;
+let OP_i64_lt_u: Op = 0x54;
+let OP_i64_gt_s: Op = 0x55;
+let OP_i64_gt_u: Op = 0x56;
+let OP_i64_le_s: Op = 0x57;
+let OP_i64_le_u: Op = 0x58;
+let OP_i64_ge_s: Op = 0x59;
+let OP_i64_ge_u: Op = 0x5a;
+let OP_f64_eq: Op = 0x61;
+let OP_f64_ne: Op = 0x62;
+let OP_f64_lt: Op = 0x63;
+let OP_f64_gt: Op = 0x64;
+let OP_f64_le: Op = 0x65;
+let OP_f64_ge: Op = 0x66;
+let OP_i64_div_s: Op = 0x7f;
+let OP_i64_rem_s: Op = 0x81;
+let OP_i64_rem_u: Op = 0x82;
+let OP_i64_and: Op = 0x83;
+let OP_i64_or: Op = 0x84;
+let OP_i64_xor: Op = 0x85;
+let OP_i64_shr_s: Op = 0x87;
+let OP_f64_abs: Op = 0x99;
+let OP_f64_neg: Op = 0x9a;
+let OP_f64_ceil: Op = 0x9b;
+let OP_f64_floor: Op = 0x9c;
+let OP_f64_trunc: Op = 0x9d;
+let OP_f64_nearest: Op = 0x9e;
+let OP_f64_sqrt: Op = 0x9f;
+let OP_f64_add: Op = 0xa0;
+let OP_f64_sub: Op = 0xa1;
+let OP_f64_mul: Op = 0xa2;
+let OP_f64_div: Op = 0xa3;
+let OP_f64_min: Op = 0xa4;
+let OP_f64_max: Op = 0xa5;
+let OP_i64_extend_i32_s: Op = 0xac;
+let OP_f32_convert_i64_s: Op = 0xb4;
+let OP_f32_convert_i64_u: Op = 0xb5;
+let OP_f32_demote_f64: Op = 0xb6;
+let OP_f64_convert_i32_s: Op = 0xb7;
+let OP_f64_convert_i32_u: Op = 0xb8;
+let OP_f64_convert_i64_s: Op = 0xb9;
+let OP_f64_convert_i64_u: Op = 0xba;
+let OP_f64_promote_f32: Op = 0xbb;
+let OP_i64_reinterpret_f64: Op = 0xbd;
+let OP_f64_reinterpret_i64: Op = 0xbf;
+
+fn wordBytes(kind: ValType) -> u32 {
+    if kind == VT_v128 { return 16; }
+    if kind == VT_i64 || kind == VT_f64 { return 8; }
+    return 4;
+}
+
 // Every function appends to the caller's byte array.
 fn byte(bytes: u8[>..<]&, value: u8) { bytes.push(value); }
 fn raw(bytes: u8[>..<]&, value: const u8[:]) { bytes.append(value); }
@@ -393,6 +453,13 @@ fn assemble(module: const Module&, out: u8[>..<]&) {
             if global.ty == VT_f32 {
                 byte(payload, OP_f32_const);
                 word(payload, global.init);
+            } else if global.ty == VT_i64 {
+                byte(payload, OP_i64_const);
+                sleb(payload, global.init);
+            } else if global.ty == VT_f64 {
+                byte(payload, OP_f64_const);
+                word(payload, global.init);
+                word(payload, 0);
             } else {
                 byte(payload, OP_i32_const);
                 sleb(payload, global.init as! i32);

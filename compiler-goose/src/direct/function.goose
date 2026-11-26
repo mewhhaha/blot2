@@ -389,6 +389,27 @@ fn f32Const(g: Generator&, bits: u32) {
     g.s.code.push(OP_f32_const);
     blot_direct_writer::word(g.s.code, bits);
 }
+fn f64Const(g: Generator&, low: u32, high: u32) {
+    op(g, OP_f64_const);
+    blot_direct_writer::word(g.s.code, low);
+    blot_direct_writer::word(g.s.code, high);
+}
+fn pushConstant(g: Generator&, ty: Ty, low: u32, high: u32 = 0) {
+    match tagOf(g, ty) {
+        f32_ => { f32Const(g, low); },
+        f64_ => { f64Const(g, low, high); },
+        i64_, u64_ => { i64Const(g, ((low as u64) | ((high as u64) << 32)) as! i64); },
+        _ => { i32Const(g, low); },
+    }
+}
+fn pushZero(g: Generator&, kind: ValType) {
+    match kind {
+        VT_i64 => { i64Const(g, 0); },
+        VT_f64 => { f64Const(g, 0, 0); },
+        VT_f32 => { f32Const(g, 0); },
+        _ => { i32Const(g, 0); },
+    }
+}
 // Opens a void structured block (block, loop or if) and returns its depth.
 fn open(g: Generator&, f: Fn&, kind: u8) -> u32 {
     op(g, kind);
@@ -868,12 +889,8 @@ fn fresh(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Val, Error {
     return Val { ty, start, n as u32 }, blot_direct_types::Error.none;
 }
 fn lower(g: Generator&, f: Fn&, ty: TId, id: u32) -> Ty, Error {
-    if ty <= blot_check_types::never && ty != 0 {
-        if ty == blot_check_types::u32_type { return blot_direct_types::u32_, blot_direct_types::Error.none; }
-        if ty == blot_check_types::f32_type { return blot_direct_types::f32_, blot_direct_types::Error.none; }
-        if ty == blot_check_types::boolean { return blot_direct_types::boolean, blot_direct_types::Error.none; }
-        if ty == blot_check_types::unit { return blot_direct_types::unit, blot_direct_types::Error.none; }
-        return blot_direct_types::never, blot_direct_types::Error.none;
+    if ty >= blot_check_types::unit && ty <= blot_check_types::never {
+        return blot_direct_types::lowerBuiltin(ty), blot_direct_types::Error.none;
     }
     let m .= g.units[f.unit - 1];
     let lowered, error = g.types.lower(m, ty, f.env);
@@ -1001,7 +1018,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     match n.tag {
-        constant => { return constant(g, f, id, n.a, true); },
+        constant => { return constant(g, f, id, n.a, true, n.b); },
         staging => { return stagedConstant(g, f, id); },
         reference => { return reference(g, f, id); },
         scalar => { return scalar(g, f, id, elide_f32_nan); },
@@ -1872,17 +1889,14 @@ recursive fn collectTailConstructs(
     }
 }
 
-fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false) -> Val, Error {
+fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false, high:u32=0) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let ty, error = typeOf(g, f, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if literal && ty!=blot_direct_types::unit { blot_direct_relocations::operand(m.unit,id,g.s.code.len); }
-    match tagOf(g, ty) {
-        unit => { return unitVal(), blot_direct_types::Error.none; },
-        f32_ => { f32Const(g, bits); },
-        u32_, boolean => { i32Const(g, bits); },
-        _ => { return neverVal(), g.fail(m, id, "constant of a composite type"); },
-    }
+    if ty == blot_direct_types::unit { return unitVal(), blot_direct_types::Error.none; }
+    if !isScalarTag(tagOf(g, ty)) { return neverVal(), g.fail(m, id, "constant of a composite type"); }
+    pushConstant(g, ty, bits, high);
     let value, err = pop(g, f, ty, id);
     if err == blot_direct_types::Error.none && ty == blot_direct_types::u32_ {
         if literal { recordConstU32(f, w(g, value, 0), bits, m.unit, id); }
@@ -2005,10 +2019,10 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
             let rn = tm.node(root);
             if rn.tag == blot_check_core::Tag.constant {
                 let ctag = tagOf(g, ty);
-                if ctag == blot_direct_types::Tag.u32_ || ctag == blot_direct_types::Tag.boolean || ctag == blot_direct_types::Tag.f32_ {
+                if isScalarTag(ctag) {
                     g.recordInlined(target.unit, target.binding);
                     blot_direct_relocations::operand(target.unit, root, g.s.code.len);
-                    if ctag == blot_direct_types::Tag.f32_ { f32Const(g, rn.a); } else { i32Const(g, rn.a); }
+                    pushConstant(g, ty, rn.a, rn.b);
                     let value, error = pop(g, f, ty, id);
                     if error == blot_direct_types::Error.none && ctag == blot_direct_types::Tag.u32_ {
                         recordConstU32(f, w(g, value, 0), rn.a, target.unit, root);
@@ -2199,18 +2213,29 @@ fn releaseTo(g: Generator&, owner_mark: u32, stack_mark: u32) {
     op(g, OP_end);
 }
 fn storeOp(g: const Generator&, f: const Fn&, local_id: u32) -> u8 {
-    if localType(g, f, local_id) == VT_f32 { return OP_f32_store; }
+    let kind = localType(g, f, local_id);
+    if kind == VT_f32 { return OP_f32_store; }
+    if kind == VT_i64 { return OP_i64_store; }
+    if kind == VT_f64 { return OP_f64_store; }
     return OP_i32_store;
 }
 fn loadOp(g: const Generator&, f: const Fn&, local_id: u32) -> u8 {
-    if localType(g, f, local_id) == VT_f32 { return OP_f32_load; }
+    let kind = localType(g, f, local_id);
+    if kind == VT_f32 { return OP_f32_load; }
+    if kind == VT_i64 { return OP_i64_load; }
+    if kind == VT_f64 { return OP_f64_load; }
     return OP_i32_load;
 }
 // A closure over `captures`, invoking instance `instance` with them.
 fn makeClosure(g: Generator&, f: Fn&, instance: u32, ty: Ty, captures: Vals, id: u32) -> Val, Error {
     let slot = g.s.instances[instance].slot;
-    var words: i64 = 0;
-    for at in 0..(captures.len as i64) { words += g.s.vals[captures.start + at].len; }
+    var bytes: u32 = 0;
+    for at in 0..(captures.len as i64) {
+        let capture = g.s.vals[captures.start + at];
+        for index in 0..(capture.len as i64) {
+            bytes += blot_direct_writer::wordBytes(localType(g, f, w(g, capture, index)));
+        }
+    }
     let result, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
     if g.s.parallel_readonly && blot_direct_emit::tryPatchSlot(g, slot) {
@@ -2218,12 +2243,12 @@ fn makeClosure(g: Generator&, f: Fn&, instance: u32, ty: Ty, captures: Vals, id:
         i32Const(g, slot);
     }
     opIndex(g, OP_local_set, w(g, result, 0));
-    if words == 0 {
+    if bytes == 0 {
         i32Const(g, 0);
         opIndex(g, OP_local_set, w(g, result, 1));
         return result, blot_direct_types::Error.none;
     }
-    let address = allocate(g, f, (words * 4) as u32);
+    let address = allocate(g, f, bytes);
     var offset: u32 = 0;
     for at in 0..(captures.len as i64) {
         let capture = g.s.vals[captures.start + at];
@@ -2234,7 +2259,7 @@ fn makeClosure(g: Generator&, f: Fn&, instance: u32, ty: Ty, captures: Vals, id:
             op(g, storeOp(g, f, word));
             uleb(g, 2);
             uleb(g, offset);
-            offset += 4;
+            offset += blot_direct_writer::wordBytes(localType(g, f, word));
         }
     }
     opIndex(g, OP_local_get, address);
@@ -2256,7 +2281,7 @@ fn loadCaptures(g: Generator&, f: Fn&, captures: Tys, id: u32) -> Vals, Error {
             uleb(g, 2);
             uleb(g, offset);
             opIndex(g, OP_local_set, word);
-            offset += 4;
+            offset += blot_direct_writer::wordBytes(localType(g, f, word));
         }
     }
     return out, blot_direct_types::Error.none;

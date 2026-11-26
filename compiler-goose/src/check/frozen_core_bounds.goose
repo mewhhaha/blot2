@@ -69,8 +69,8 @@ fn updateStep(self_: Bounds,value: blot_check_core::UpdateStep) -> Error {
     match value.kind { field => { { let propagated_error = index(self_.m.projections.len,value.projection); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = require(value.index == 0); if propagated_error != blot_error::Error.none { return propagated_error; } } }, comptime_field => { let err=self_.binding(value.projection,false); if err!=blot_error::Error.none {return err;} return require(value.index==0); }, index => { { let propagated_error = self_.node(value.index,false); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = require(value.projection == 0); if propagated_error != blot_error::Error.none { return propagated_error; } } } } return blot_error::Error.none;
 }
 fn types(self_: Bounds) -> Error {
-    let m .= self_.m; { let propagated_error = require(m.types.nodes.len >= 6); if propagated_error != blot_error::Error.none { return propagated_error; } }
-    let builtins=[blot_check_types::Tag.absent,blot_check_types::Tag.unit,blot_check_types::Tag.boolean,blot_check_types::Tag.unsigned32,blot_check_types::Tag.floating32,blot_check_types::Tag.never];
+    let m .= self_.m; { let propagated_error = require(m.types.nodes.len >= blot_check_types::builtin_count); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    let builtins=[blot_check_types::Tag.absent,blot_check_types::Tag.unit,blot_check_types::Tag.boolean,blot_check_types::Tag.unsigned32,blot_check_types::Tag.floating32,blot_check_types::Tag.unsigned8,blot_check_types::Tag.signed32,blot_check_types::Tag.unsigned64,blot_check_types::Tag.signed64,blot_check_types::Tag.floating64,blot_check_types::Tag.never];
     for value,id in m.types.nodes {
         if id < builtins.len { { let propagated_error = require(value.tag == builtins[id] && value.a == 0 && value.b == 0 && value.c == 0); if propagated_error != blot_error::Error.none { return propagated_error; } } } else { { let propagated_error = require(value.tag != blot_check_types::Tag.absent); if propagated_error != blot_error::Error.none { return propagated_error; } } }
         match value.tag {
@@ -84,7 +84,8 @@ fn types(self_: Bounds) -> Error {
                 let children=m.types.nominalArguments(value); for choice in children[..2] { { let propagated_error = require(m.types.node(choice).tag == blot_check_types::Tag.scoped); if propagated_error != blot_error::Error.none { return propagated_error; } } } if count == 3 { { let propagated_error = require(m.types.node(children[2]).tag == blot_check_types::Tag.instance_version); if propagated_error != blot_error::Error.none { return propagated_error; } } }
             },
             scoped => { { let propagated_error = self_.ty(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = require(m.types.node(value.a).tag == blot_check_types::Tag.nominal && value.c != 0); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = self_.scopedInstance(blot_check_types::NominalIdentity{value.b,value.c, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } } },
-            absent,unit,boolean,unsigned32,floating32,never,variable => {},
+            absent,unit,boolean,unsigned32,floating32,unsigned8,signed32,unsigned64,signed64,floating64,never => {if id>=builtins.len {return blot_error::Error.invalid_artifact;}},
+            variable => {},
             function => { { let propagated_error = self_.ty(value.a); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = self_.ty(value.b); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = self_.row(value.c); if propagated_error != blot_error::Error.none { return propagated_error; } } },
             product => { { let propagated_error = self_.listTypes(blot_check_types::List{value.a,value.b, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } } },
             record => { let count=value.b as i64*2; { let propagated_error = require(value.a <= m.types.extra.len && count <= m.types.extra.len-value.a); if propagated_error != blot_error::Error.none { return propagated_error; } } for field in 0..value.b { let name=m.types.extra[value.a+field*2]; { let propagated_error = self_.symbol(name,false); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = hasFieldSpelling(m,name); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = self_.ty(m.types.extra[value.a+field*2+1]); if propagated_error != blot_error::Error.none { return propagated_error; } } } },
@@ -290,7 +291,7 @@ fn scalarArity(op: blot_check_core::Op) -> u8,Error {
     match op {
         none => { return 0,blot_error::Error.invalid_artifact; },
         neg,abs,ceil,floor,trunc,sqrt,
-        convert_u32_f32,convert_f32_u32,convert_i32_f32,convert_f32_i32,
+        convert_u32_f32,convert_f32_u32,convert_i32_f32,convert_f32_i32,numeric_convert,
         bit_not,not_,any_true,all_true,bits,from_bits => { return 1,blot_error::Error.none; },
         _ => { return 2,blot_error::Error.none; },
     }

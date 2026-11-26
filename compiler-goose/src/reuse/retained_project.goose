@@ -477,7 +477,7 @@ fn editedInteger(old:const Unit&,next:const Unit&)->u32 {
   if span.start>first || span.end<=first {continue;}
   let prior=old.tree.nodes.items[i];
   let before=old.tree.spans.items[i];
-  if prior.tag!=node.tag || prior.a==node.a || before.start!=span.start || before.end!=span.end {return 0;}
+  if prior.tag!=node.tag || prior.a==node.a || prior.b!=0 || node.b!=0 || before.start!=span.start || before.end!=span.end {return 0;}
   for at in span.start..span.end {
    if old.source[at]<48 || old.source[at]>57 || next.source[at]<48 || next.source[at]>57 {return 0;}
   }
@@ -679,8 +679,9 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
   let sa=ot.spans.items[i];
   let sb=nt.spans.items[i];
   if sa.start!=sb.start || sa.end!=sb.end {return 0,0;}
-  if a.tag!=b.tag || a.b!=b.b || a.c!=b.c {return 0,0;}
-  if a.a!=b.a {
+  if a.tag!=b.tag {return 0,0;}
+  if a.a!=b.a || a.b!=b.b || a.c!=b.c {
+   if a.tag==blot_parse_ast::tag_integer && (a.b!=0 || b.b!=0) {return 0,0;}
    if lit!=0 {return 0,0;}
    if a.tag!=blot_parse_ast::tag_integer && a.tag!=blot_parse_ast::tag_float {return 0,0;}
    if (sb.start as i64)>first || (sb.end as i64)<=first {return 0,0;}
@@ -697,7 +698,7 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
  let old_bits=ot.nodes.items[lit].a;
  let new_bits=nt.nodes.items[lit].a;
  let is_float=nt.nodes.items[lit].tag==blot_parse_ast::tag_float;
- if is_float && !isSafeF32LiteralPatch(old_bits,new_bits) {return 0,0;}
+ if is_float && (old_bits==0x7f800000 || new_bits==0x7f800000 || !isSafeF32LiteralPatch(old_bits,new_bits)) {return 0,0;}
  var want_ty=blot_check_types::u32_type;
  if is_float {want_ty=blot_check_types::f32_type;}
  var id:u32=0;
@@ -778,7 +779,10 @@ fn trySelectiveRetainedUnit(engine:blot_reuse_project_check::Engine&,unit:u32,ol
  let source=engine.source.unit(unit);
  // Bound the append-only tables even when one session keeps editing the
  // same body. A normal rebuild drops unreachable versions of edited bodies.
- if previous.nodes.len>2*source.tree.nodes.len || previous.bindings.len>2*source.tree.nodes.len {
+ // The imported associated catalog contributes stable external bindings even
+ // when the module has a small syntax tree. Splices reuse those bindings.
+ let binding_budget=2*source.tree.nodes.len+previous.associated.len;
+ if previous.nodes.len>2*source.tree.nodes.len || previous.bindings.len>binding_budget {
   return false,blot_error::Error.none;
  }
  var checked=default<blot_check_check::Checked>();

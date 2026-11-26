@@ -12,7 +12,7 @@ import support.json;
 type Error=blot_error::Error;
 type Text=blot_support::Option<const u8[:]>;
 type IdOption=blot_support::Option<u32>;
-enum Kind {truncated,absent,unit,boolean,unsigned32,floating32,never,variable,function,product,record,nominal,projection,array,list,cursor,type_constructor,resolver,provider,state_provider,effects,operation,row_variable,row_parameter}
+enum Kind {truncated,absent,unit,boolean,unsigned32,floating32,never,variable,function,product,record,nominal,projection,array,list,cursor,type_constructor,resolver,provider,state_provider,effects,operation,row_variable,row_parameter,unsigned8,signed32,unsigned64,signed64,floating64}
 struct Span {start:u32=0,len:u32=0}
 struct Node {kind:Kind=Kind.truncated,name:Text=blot_support::none<const u8[:]>(),identity:blot_support::Option<blot_check_types::NominalIdentity> =blot_support::none<blot_check_types::NominalIdentity>(),variable:IdOption=blot_support::none<u32>(),children:Span=Span{},effects:IdOption=blot_support::none<u32>()}
 struct Edge {name:Text=blot_support::none<const u8[:]>(),ty:u32=0}
@@ -67,6 +67,11 @@ fn nodeKind(tag:blot_check_types::Tag)->Kind {match tag {
  boolean=>{return Kind.boolean;},
  unsigned32=>{return Kind.unsigned32;},
  floating32=>{return Kind.floating32;},
+ unsigned8=>{return Kind.unsigned8;},
+ signed32=>{return Kind.signed32;},
+ unsigned64=>{return Kind.unsigned64;},
+ signed64=>{return Kind.signed64;},
+ floating64=>{return Kind.floating64;},
  never=>{return Kind.never;},
  variable=>{return Kind.variable;},
  function=>{return Kind.function;},

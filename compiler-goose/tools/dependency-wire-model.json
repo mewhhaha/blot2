@@ -782,6 +782,31 @@
           "instance_version",
           27,
           "instance_version"
+        ],
+        [
+          "u8",
+          28,
+          "unsigned8"
+        ],
+        [
+          "i32",
+          29,
+          "signed32"
+        ],
+        [
+          "u64",
+          30,
+          "unsigned64"
+        ],
+        [
+          "i64",
+          31,
+          "signed64"
+        ],
+        [
+          "f64",
+          32,
+          "floating64"
         ]
       ]
     },
@@ -1826,6 +1851,11 @@
           "not_",
           45,
           "not_"
+        ],
+        [
+          "numeric_convert",
+          46,
+          "numeric_convert"
         ]
       ]
     },

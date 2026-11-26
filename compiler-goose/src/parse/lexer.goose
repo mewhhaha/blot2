@@ -75,11 +75,11 @@ fn scan_number(source: const u8[:],start: i64) -> Number {
  }
  return Number {at,tag};
 }
-fn integer_value(text: const u8[:]) -> u32,Error {
- var radix: u32=10; var at=0;
+fn integer_value(text: const u8[:]) -> u64,Error {
+ var radix: u64=10; var at=0;
  if text.len>=2 && text[0]=='0' && (text[1]=='x'||text[1]=='X') { radix=16; at=2; }
  let first=at; if at==text.len { return 0,blot_error::Error.invalid_integer; }
- var value: u32=0;
+ var value: u64=0;
  while at<text.len {
   let c=text[at];
   if c=='_' {
@@ -89,7 +89,7 @@ fn integer_value(text: const u8[:]) -> u32,Error {
   }
   var valid=digit(c); if radix==16 { valid=hex(c); } if !valid { return 0,blot_error::Error.invalid_integer; }
   var n: u32=0; if digit(c) { n=(c-'0') as u32; } else if upper(c) { n=(c-'A'+10) as u32; } else { n=(c-'a'+10) as u32; }
-  if value>(0xffffffff-n)/radix { return 0,blot_error::Error.integer_range; }
+  if value>((0xffffffffffffffff as u64)-n)/radix { return 0,blot_error::Error.integer_range; }
   value=value*radix+n; at++;
  }
  return value,blot_error::Error.none;
@@ -117,12 +117,32 @@ fn compare_decimal(digits: const u8[:],exp10: i64,h: u64,p: i64) -> i64 {
  if shift>=0 { big_shift(a,shift); } else { big_shift(b,-shift); }
  return big_compare(a,b);
 }
-fn dyadic(bits: u32) -> u64,i64 {
- let exponent=(bits>>23)&255; let fraction=bits&0x7fffff;
- if exponent==0 { return fraction as u64,-149; }
- return (fraction|0x800000) as u64,(exponent as i64)-150;
+fn binary_dyadic(bits: u64, fraction_width: i64, bias: i64) -> u64,i64 {
+ let implicit = (1 as u64) << fraction_width;
+ let exponent = (bits >> fraction_width) as i64;
+ let fraction = bits & (implicit - 1);
+ if exponent == 0 { return fraction, 1 - bias - fraction_width; }
+ return fraction | implicit, exponent - bias - fraction_width;
 }
-fn float_bits(text: const u8[:]) -> u32,Error {
+fn round_decimal(exact: const u8[:], exp10: i64, fraction_width: i64, infinity: u64, bias: i64) -> u64,Error {
+ var low: u64 = 0; var high = infinity;
+ while low + 1 < high {
+  let mid = low + (high - low) / 2;
+  let h,p = binary_dyadic(mid, fraction_width, bias);
+  if compare_decimal(exact, exp10, h, p) >= 0 { low = mid; } else { high = mid; }
+ }
+ let lh,lp = binary_dyadic(low, fraction_width, bias);
+ var hh: u64 = 1; var hp = bias + 1;
+ if high < infinity { hh,hp = binary_dyadic(high, fraction_width, bias); }
+ let base = min(lp,hp);
+ let midpoint = (lh << (lp-base)) + (hh << (hp-base));
+ let comparison = compare_decimal(exact,exp10,midpoint,base-1);
+ var rounded = low;
+ if comparison > 0 || (comparison == 0 && (low & 1) != 0) { rounded = high; }
+ if rounded == infinity { return 0,blot_error::Error.float_range; }
+ return rounded,blot_error::Error.none;
+}
+fn decimal_bits(text: const u8[:], wide: bool) -> u64,Error {
  if text.len==0 || !digit(text[0]) { return 0,blot_error::Error.invalid_float; }
  let scanned=scan_number(text,0);
  if scanned.tag!=blot_parse_token::float || scanned.end!=text.len { return 0,blot_error::Error.invalid_float; }
@@ -139,6 +159,21 @@ fn float_bits(text: const u8[:]) -> u32,Error {
  var leading=0; while leading<significant.len && significant[leading]=='0' { leading++; }
  if leading==significant.len { return 0,blot_error::Error.none; }
  let exact=significant[leading..]; let magnitude=exact.len+exp10;
+ if wide {
+  if magnitude > 309 { return 0,blot_error::Error.float_range; }
+  if magnitude < -323 { return 0,blot_error::Error.none; }
+  // The significand and 10^n are exact binary64 values for this fast path.
+  if exact.len <= 15 && exp10 >= -22 && exp10 <= 22 {
+   var integer: u64 = 0;
+   for byte in exact { integer = integer * 10 + (byte - '0') as u64; }
+   let powers: f64[23] = [1.0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9,1e10,
+     1e11,1e12,1e13,1e14,1e15,1e16,1e17,1e18,1e19,1e20,1e21,1e22];
+   var value = integer as! f64;
+   if exp10 < 0 { value /= powers[-exp10]; } else { value *= powers[exp10]; }
+   return blot_native::f64_bits(value),blot_error::Error.none;
+  }
+  return round_decimal(exact, exp10, 52, 0x7ff0000000000000, 1023);
+ }
  if magnitude>40 { return 0,blot_error::Error.float_range; } if magnitude < -46 { return 0,blot_error::Error.none; }
  // With an exact significand and power of ten, the one f32 operation
  // rounds the decimal directly. Keep the midpoint comparison for wider inputs.
@@ -152,19 +187,11 @@ fn float_bits(text: const u8[:]) -> u32,Error {
    return blot_native::f32_bits(value),blot_error::Error.none;
   }
  }
- var low: u32=0; var high: u32=0x7f800000;
- while low+1<high {
-  let mid=low+(high-low)/2; let h,p=dyadic(mid);
-  if compare_decimal(exact,exp10,h,p)>=0 { low=mid; } else { high=mid; }
- }
- let lh,lp=dyadic(low); var hh: u64=1; var hp: i64=128;
- if high<0x7f800000 { let h,p=dyadic(high); hh=h; hp=p; }
- var base=lp; if hp<base { base=hp; }
- let midpoint=(lh<<(lp-base))+(hh<<(hp-base));
- let comparison=compare_decimal(exact,exp10,midpoint,base-1);
- var rounded=low; if comparison>0 || (comparison==0 && (low&1)!=0) { rounded=high; }
- if rounded>=0x7f800000 { return 0,blot_error::Error.float_range; }
- return rounded,blot_error::Error.none;
+ return round_decimal(exact, exp10, 23, 0x7f800000, 127);
+}
+fn float_bits(text: const u8[:]) -> u32,Error {
+ let bits,error = decimal_bits(text,false);
+ return bits as! u32,error;
 }
 fn utf8_width(c: u8) -> i64 {
  if c<0x80 { return 1; } if c>=0xc2 && c<=0xdf { return 2; }

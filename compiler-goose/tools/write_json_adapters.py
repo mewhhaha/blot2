@@ -172,7 +172,8 @@ for _, _, module in arrays:
     imports.add(module)
 out.extend('import '+module+';' for module in sorted(imports) if module != 'support.json')
 for name, (generic, _) in sorted(structs.items()):
-    if name in custom or name in {'blot_support::Option<T>', 'blot_json::Raw'}:
+    # Intrinsic lookup metadata never appears in a diagnostic record.
+    if name in custom or name in {'blot_support::Option<T>', 'blot_json::Raw', 'blot_check_core::NumericIntrinsic'}:
         continue
     parameters = '<JsonWriter'
     if generic:

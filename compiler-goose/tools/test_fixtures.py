@@ -243,6 +243,20 @@ and the `Tier 6B-1` `matchMatmulKLoop` `self`-update fix. Re-recorded
 `expected.json`: 57 of 109 fixtures updated Wasm bytes/SHA/function counts only
 (net -3,780 bytes), with zero exit-code, diagnostic, or frontend counter changes.
 
+Granular Numeric Types Wave 3 (26 November 2026) added built-in `U8`, `I32`,
+`U64`, `I64`, and `F64` scalar types across parser, typechecker, Core,
+dependency adapters, `#run` staging, `std/prelude.blot`, and the direct Wasm
+backend: 1-byte packed `#[U8]` arrays (`i32.load8_u`/`i32.store8`/`memory.fill`),
+native 64-bit Wasm `i64`/`f64` lowering and 8-byte arrays, contextual literal
+typing with strict range checks (preserving `U32`/`F32` defaults and exact
+decimal-to-binary32 rounding), full cross-type conversions, canonical
+`0x7ff8000000000000` NaN determinism on `F64` arithmetic/rounding/min/max,
+`F32.to_bits`/`from_bits` & `F64.to_bits`/`from_bits`, and ABI 8 preservation.
+Re-recorded `expected.json`: all 109 fixtures keep 100% identical exit codes,
+diagnostics, emitted function counts, and Wasm bytes/SHA-256 (`exit_diffs=0`,
+`diag_diffs=0`, `wasm_diffs=0`, `fn_diffs=0`); only JSON prelude/frontend work
+counters updated for the expanded `std/prelude.blot`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

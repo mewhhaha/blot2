@@ -337,7 +337,7 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
    if source.tag==a_name&&!local(self_,tree,pool,context,locals,source.a)&&context.source_qualified_exists(source.a,n.b) { return; } walk(self_,tree,pool,context,locals,n.a,depth+1);
   },
   blot_parse_ast::tag_field => { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } },
-  blot_parse_ast::tag_unary => { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } },
+  blot_parse_ast::tag_unary => { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" && pool.get(n.a)!="~" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } },
   blot_parse_ast::tag_binary => {
    walk(self_,tree,pool,context,locals,n.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } operator(self_,tree,pool,context,locals,n.a,named(pool,n.a),id); walk(self_,tree,pool,context,locals,n.c,depth+1);
   },

@@ -151,7 +151,7 @@ recursive fn copyDepth(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
             if node.b == 0 { let value, error = copy(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } identity = Identity { 0, value , ..}; }
             else { let value, error = copyPhysical(self_, identity); if error != blot_error::Error.none { return 0, error; } identity = value; } let value, error = self_.destination.scoped(payload, identity); result = value; failure = error;
         },
-        absent, unit, boolean, unsigned32, floating32, never => { result = id; },
+        absent, unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { result = id; },
         array, list, cursor => { let payload, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.sequence(node.tag, payload); result = value; failure = error; },
         provider => { let payload, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let row, error = copyRow(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.provider(payload, row); result = value; failure = error; },
         state_provider => { let a, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let b, error = copy(self_, node.b, depth + 1); if error != blot_error::Error.none { return 0, error; } let c, error = copy(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.stateProvider(a, b, c); result = value; failure = error; },

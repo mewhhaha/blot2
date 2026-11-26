@@ -11,7 +11,7 @@ reusable[] var binding_runs:StageBinding[>..]=[];
 import check.typed_staging;
 import support.native;
 
-struct StageValue { bits: u32 = 0, ty: u32 = blot_check_types::unit, returning_to: u32 = 0 }
+struct StageValue { bits: u32 = 0, ty: u32 = blot_check_types::unit, returning_to: u32 = 0, high: u32 = 0 }
 struct StageFunction { unit: u32, target: u32, captures: u32, count: u32, named: bool }
 reusable[] var stage_function_runs:StageFunction[>..]=[];
 let stage_function: u32 = 0xfffffffe;
@@ -74,7 +74,7 @@ recursive fn hashStageValue(g: Generator&, s: const Stage&, v: StageValue, depth
         return;
     }
     if v.ty != stage_aggregate {
-        g.mixStagedDigest(v.bits as u64);
+        g.mixStagedDigest(stageBits(v));
         return;
     }
     let agg = s.aggregates.items[v.bits];
@@ -109,7 +109,7 @@ fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     else {
         g.mixStagedDigest(((m.unit as u64) << 32) | (id as u64));
         hashStageValue(g, s, value, 0);
-        if value.ty != stage_aggregate && value.ty != stage_function { result, error = constant(g, f, id, value.bits); }
+        if value.ty != stage_aggregate && value.ty != stage_function { result, error = constant(g, f, id, value.bits, false, value.high); }
         else {
             let ty, lowered = typeOf(g, f, id);
             error = lowered;
@@ -167,7 +167,10 @@ recursive fn stageValueEqual(s: const Stage&, a: StageValue, b: StageValue, dept
         if a.ty == blot_check_types::f32_type {
             return blot_native::f32_from_bits(a.bits) == blot_native::f32_from_bits(b.bits);
         }
-        return a.bits == b.bits;
+        if a.ty == blot_check_types::f64_type {
+            return blot_native::f64_from_bits(stageBits(a)) == blot_native::f64_from_bits(stageBits(b));
+        }
+        return stageBits(a) == stageBits(b);
     }
     let aa = s.aggregates.items[a.bits];
     let ba = s.aggregates.items[b.bits];
@@ -320,7 +323,7 @@ recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id
             blot_support_pooled_buffer::push(s.bindings, StageBinding {pat.a, value}, binding_runs);
             return true;
         },
-        constant => { return value.ty != stage_aggregate && value.ty != stage_function && value.bits == pat.a; },
+        constant => { return value.ty != stage_aggregate && value.ty != stage_function && value.bits == pat.a && value.high == pat.b; },
         product => {
             let children = m.patternChildren(pat_id);
             if value.ty != stage_aggregate { return children.len == 0; }
@@ -373,8 +376,157 @@ fn compareStage<T>(op: blot_check_core::Op, a: T, b: T) -> StageValue, bool {
     }
 }
 
-fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: StageValue) -> StageValue {
+fn stageBits(value: StageValue) -> u64 {
+    return (value.bits as u64) | ((value.high as u64) << 32);
+}
+fn stageWide(bits: u64, ty: u32) -> StageValue {
+    return StageValue {bits as! u32, ty, 0, (bits >> 32) as u32};
+}
+fn stageF64(value: f64) -> StageValue {
+    let bits = if value != value { 0x7ff8000000000000 as u64 } else { blot_native::f64_bits(value) };
+    return stageWide(bits, blot_check_types::f64_type);
+}
+fn stageFloat(value: StageValue) -> f64 {
+    if value.ty == blot_check_types::f64_type { return blot_native::f64_from_bits(stageBits(value)); }
+    return blot_native::f32_from_bits(value.bits) as f64;
+}
+fn stageSigned(value: StageValue) -> i64 {
+    if value.ty == blot_check_types::i32_type { return (value.bits as! i32) as i64; }
+    return stageBits(value) as! i64;
+}
+fn stageIntegerMask(ty: u32) -> u64 {
+    if ty == blot_check_types::u8_type { return 255; }
+    if ty == blot_check_types::u64_type || ty == blot_check_types::i64_type { return 0xffffffffffffffff; }
+    return 0xffffffff;
+}
+fn stageSaturate(value: f64, ty: u32) -> u64 {
+    if value != value { return 0; }
+    if ty == blot_check_types::i32_type {
+        if value >= 2147483648.0 { return 0x7fffffff; }
+        if value <= -2147483648.0 { return 0x80000000; }
+        return (value as! i32) as! u32;
+    }
+    if ty == blot_check_types::i64_type {
+        if value >= 9223372036854775808.0 { return 0x7fffffffffffffff; }
+        if value <= -9223372036854775808.0 { return 0x8000000000000000; }
+        return (value as! i64) as! u64;
+    }
+    if value <= 0.0 { return 0; }
+    if ty == blot_check_types::u8_type && value >= 255.0 { return 255; }
+    if ty == blot_check_types::u32_type && value >= 4294967296.0 { return 0xffffffff; }
+    if ty == blot_check_types::u64_type && value >= 18446744073709551616.0 { return 0xffffffffffffffff; }
+    return value as! u64;
+}
+fn stageConvert(s: Stage&, value: StageValue, ty: u32) -> StageValue {
+    if value.ty == ty { return value; }
+    if !blot_check_types::isNumericId(ty) { return stopStage(s, "#run conversion needs a concrete numeric result"); }
+    let src_float = value.ty == blot_check_types::f32_type || value.ty == blot_check_types::f64_type;
+    let src_signed = value.ty == blot_check_types::i32_type || value.ty == blot_check_types::i64_type;
+    if ty == blot_check_types::f64_type {
+        if src_float { return stageF64(stageFloat(value)); }
+        if src_signed { return stageF64(stageSigned(value) as! f64); }
+        return stageF64(stageBits(value) as! f64);
+    }
+    if ty == blot_check_types::f32_type {
+        var n: f32 = 0.0;
+        if src_float { n = stageFloat(value) as! f32; }
+        else if src_signed { n = stageSigned(value) as! f32; }
+        else { n = stageBits(value) as! f32; }
+        return StageValue {if n != n { 0x7fc00000 } else { blot_native::f32_bits(n) }, ty, 0};
+    }
+    if src_float { return stageWide(stageSaturate(stageFloat(value), ty), ty); }
+    var bits = stageBits(value);
+    if src_signed { bits = stageSigned(value) as! u64; }
+    return stageWide(bits & stageIntegerMask(ty), ty);
+}
+fn stageFloating64(s: Stage&, op: blot_check_core::Op, a: StageValue, b: StageValue) -> StageValue {
+    let raw = stageBits(a);
+    let x = stageFloat(a);
+    let y = blot_native::f64_from_bits(stageBits(b));
+    let cmp, compared = compareStage(op, x, y);
+    if compared { return cmp; }
+    match op {
+        add => { return stageF64(x + y); }, sub => { return stageF64(x - y); },
+        mul => { return stageF64(x * y); }, div => { return stageF64(x / y); },
+        neg => { return stageWide(raw ^ 0x8000000000000000, a.ty); },
+        abs => { return stageWide(raw & 0x7fffffffffffffff, a.ty); },
+        ceil => { return stageF64(ceil(x)); }, floor => { return stageF64(floor(x)); },
+        trunc => { return stageF64(trunc(x)); }, sqrt => { return stageF64(sqrt(x)); },
+        min, max => {
+            if x != x { return stageF64(x); }
+            if y != y { return stageF64(y); }
+            if x == 0.0 && y == 0.0 {
+                let other = stageBits(b);
+                return stageWide(if op == blot_check_core::Op.min { raw | other } else { raw & other }, a.ty);
+            }
+            if op == blot_check_core::Op.min { return stageF64(min(x, y)); }
+            return stageF64(max(x, y));
+        },
+        bits => { return stageWide(raw, blot_check_types::u64_type); },
+        _ => { return stopStage(s, "#run does not support this F64 operation"); },
+    }
+}
+fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: StageValue) -> StageValue {
+    let ty = left.ty;
+    let a = stageBits(left);
+    let b = stageBits(right);
+    let x = stageSigned(left);
+    let y = stageSigned(right);
+    let signed = ty == blot_check_types::i32_type || ty == blot_check_types::i64_type;
+    if signed {
+        let cmp, compared = compareStage(op, x, y);
+        if compared { return cmp; }
+    } else {
+        let cmp, compared = compareStage(op, a, b);
+        if compared { return cmp; }
+    }
+    let mask = stageIntegerMask(ty);
+    var shift_mask: u64 = 31;
+    if ty == blot_check_types::u8_type { shift_mask = 7; }
+    if ty == blot_check_types::u64_type || ty == blot_check_types::i64_type { shift_mask = 63; }
+    let shift = b & shift_mask;
+    var bits: u64 = 0;
+    match op {
+        add => { bits = a + b; }, sub => { bits = a - b; }, mul => { bits = a * b; },
+        neg => { bits = 0 - a; },
+        abs => { bits = if signed && x < 0 { 0 - a } else { a }; },
+        div, rem => {
+            if b == 0 { return stopStage(s, "#run trapped on integer division by zero"); }
+            if signed {
+                let min_bits = (mask >> 1) + 1;
+                if a == min_bits && b == mask {
+                    if op == blot_check_core::Op.div { return stopStage(s, "#run trapped on integer division overflow"); }
+                    return stageWide(0, ty);
+                }
+                bits = if op == blot_check_core::Op.div { (x / y) as! u64 } else { (x % y) as! u64 };
+            } else { bits = if op == blot_check_core::Op.div { a / b } else { a % b }; }
+        },
+        bit_and => { bits = a & b; }, bit_or => { bits = a | b; }, bit_xor => { bits = a ^ b; },
+        bit_not => { bits = a ^ mask; },
+        shift_left => { bits = a << shift; },
+        shift_right => { bits = if signed { (x >> shift) as! u64 } else { a >> shift }; },
+        from_bits => { return stageWide(a, blot_check_types::f64_type); },
+        _ => { return stopStage(s, "#run does not support this integer operation"); },
+    }
+    return stageWide(bits & mask, ty);
+}
+fn stagePrimitiveResult(m: const Module&, alias: u32, arity: i64) -> u32 {
+    var ty = m.typeOf(alias);
+    for _ in 0..arity {
+        let node = m.types.node(ty);
+        if node.tag != blot_check_types::Tag.function { return 0; }
+        ty = node.b;
+    }
+    return ty;
+}
+
+fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: StageValue, result_ty: u32 = 0) -> StageValue {
     if left.ty == stage_aggregate || right.ty == stage_aggregate { return stopStage(s, "#run requires scalar operands"); }
+    if op == blot_check_core::Op.numeric_convert { return stageConvert(s, left, result_ty); }
+    if left.ty == blot_check_types::f64_type { return stageFloating64(s, op, left, right); }
+    if left.ty >= blot_check_types::u8_type && left.ty <= blot_check_types::i64_type {
+        return stageInteger(s, op, left, right);
+    }
     let a = left.bits;
     let b = right.bits;
     if left.ty == blot_check_types::f32_type {
@@ -488,7 +640,7 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
         var b = StageValue {};
         if call.arguments.len == 2 { b = evaluateStage(g, f, s, m, call.arguments[1], frame, depth + 1); }
         if s.failure.len != 0 || b.returning_to != 0 { return b; }
-        return stageScalar(s, info.op, a, b);
+        return stageScalar(s, info.op, a, b, stagePrimitiveResult(owner, alias, info.arity));
     }
     let body .= owner.body(target.binding);
     if !body { return stopStage(s, "#run has no body for this call"); }
@@ -519,8 +671,7 @@ fn stageReceiverIdentity(s: const Stage&, v: StageValue) -> blot_check_types::No
         }
         return blot_check_types::NominalIdentity { 0, 0 }, false;
     }
-    if v.ty == blot_check_types::u32_type { return blot_check_types::NominalIdentity { 0, blot_check_types::u32_type }, true; }
-    if v.ty == blot_check_types::f32_type { return blot_check_types::NominalIdentity { 0, blot_check_types::f32_type }, true; }
+    if blot_check_types::isNumericId(v.ty) { return blot_check_types::NominalIdentity { 0, v.ty }, true; }
     if v.ty == blot_check_types::boolean { return blot_check_types::NominalIdentity { 0, blot_check_types::boolean }, true; }
     if v.ty == blot_check_types::unit { return blot_check_types::NominalIdentity { 0, blot_check_types::unit }, true; }
     return blot_check_types::NominalIdentity { 0, 0 }, false;
@@ -562,7 +713,7 @@ recursive fn callStageTarget(
         if info.kind != blot_check_core::PrimitiveKind.scalar || info.arity != arity {
             return stopStage(s, "#run requires a saturated scalar primitive");
         }
-        return stageScalar(s, info.op, a, b);
+        return stageScalar(s, info.op, a, b, stagePrimitiveResult(owner, alias, info.arity));
     }
     let body .= owner.body(target.binding);
     if !body || !body.is_function || body.runtime {
@@ -652,9 +803,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             g.recordStagedDepUnit(m.unit);
             let ty = m.types.node(n.ty).tag;
             if ty == blot_check_types::Tag.unit { return StageValue {}; }
-            if ty == blot_check_types::Tag.unsigned32 { return StageValue {n.a, blot_check_types::u32_type, 0}; }
-            if ty == blot_check_types::Tag.boolean { return StageValue {n.a, blot_check_types::boolean, 0}; }
-            if ty == blot_check_types::Tag.floating32 { return StageValue {n.a, blot_check_types::f32_type, 0}; }
+            if blot_check_types::isNumeric(ty) || ty == blot_check_types::Tag.boolean { return StageValue {n.a, n.ty, 0, n.b}; }
             return stopStage(s, "#run requires a scalar constant");
         },
         reference => {
@@ -820,7 +969,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             if n.c == 1 && (a.ty == stage_aggregate || b.ty == stage_aggregate) {
                 return evalStageAssociated(g, f, s, m, n.op, 0, a, n.b != 0, b, depth);
             }
-            return stageScalar(s, n.op, a, b);
+            return stageScalar(s, n.op, a, b, n.ty);
         },
         associated => {
             let a = evaluateStage(g, f, s, m, n.a, frame, depth + 1);
@@ -989,12 +1138,9 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
         return makeClosure(g, f, instance, ty, values, id);
     }
     if v.ty != stage_aggregate {
-        match tagOf(g, ty) {
-            unit => { return unitVal(), blot_direct_types::Error.none; },
-            f32_ => { f32Const(g, v.bits); },
-            u32_, boolean => { i32Const(g, v.bits); },
-            _ => { return neverVal(), g.fail(m, id, "#run scalar result shape mismatch"); },
-        }
+        if ty == blot_direct_types::unit { return unitVal(), blot_direct_types::Error.none; }
+        if !isScalarTag(tagOf(g, ty)) { return neverVal(), g.fail(m, id, "#run scalar result shape mismatch"); }
+        pushConstant(g, ty, v.bits, v.high);
         return pop(g, f, ty, id);
     }
     let a = s.aggregates.items[v.bits];

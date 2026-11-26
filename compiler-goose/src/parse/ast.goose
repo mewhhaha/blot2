@@ -135,6 +135,11 @@ let code_function_return_required: Code = 17;
 let code_spark_generator: Code = 18;
 
 struct Node { tag: Tag = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
+// Integer literal and integer pattern payloads contain a split u64 magnitude.
+fn integerMagnitude(node: Node) -> u64 {
+    return (node.a as u64) | ((node.b as u64) << 32);
+}
+
 struct NumericFault { node: Id, code: NumericCode, span: Span, actual_token: blot_parse_token::Tag }
 struct Diagnostic {
  code: Code, start: u32, end: u32,

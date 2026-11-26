@@ -1226,7 +1226,7 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
         if cached { return known; }
     }
     let n = m.types.node(ty);
-    if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
+    if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || blot_check_types::isNumeric(n.tag) || n.tag == blot_check_types::Tag.never { return false; }
     // Inside a generic body a type variable is plain data.
     if (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.function { return true; }
@@ -1350,7 +1350,7 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
     if depth > 64 || ty >= m.types.nodes.len { return conservative; }
     for variable, at in variables { if variable == ty { return arguments[at]; } }
     let n = m.types.node(ty);
-    if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
+    if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || blot_check_types::isNumeric(n.tag) || n.tag == blot_check_types::Tag.never { return false; }
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.function { return want != 0; }
     if n.tag == blot_check_types::Tag.usage { return partsInMemo(self_, m, n.a, want, variables, arguments, depth + 1, memo); }
@@ -1457,7 +1457,7 @@ recursive fn copyHasUncopiedInner(self_: Analyzer&, m: const Module&, ty: u32, v
     }
     let n = m.types.node(ty);
     match n.tag {
-        unit, boolean, unsigned32, floating32, never => { return false; },
+        unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { return false; },
         usage => { return copyHasUncopiedInner(self_, m, n.a, variables, arguments, depth + 1); },
         array => {
             var elem = n.a;
@@ -1526,7 +1526,7 @@ recursive fn copyResultFact(self_: Analyzer&, m: const Module&, ty: u32, depth: 
     if depth > 16 || ty == 0 || ty >= m.types.nodes.len { return none; }
     let n = m.types.node(ty);
     match n.tag {
-        unit, boolean, unsigned32, floating32, never => { return deep; },
+        unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { return deep; },
         usage => { return copyResultFact(self_, m, n.a, depth + 1); },
         array => { return freshContainer(self_, m, ty, false); },
         record => {
@@ -2858,10 +2858,8 @@ fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdent
         identity = blot_check_types::NominalIdentity { unit: shape.a, decl: shape.b };
     } else if shape.tag == blot_check_types::Tag.array {
         identity.decl = 0xffffffff;
-    } else if shape.tag == blot_check_types::Tag.unsigned32 {
-        identity.decl = blot_check_types::u32_type;
-    } else if shape.tag == blot_check_types::Tag.floating32 {
-        identity.decl = blot_check_types::f32_type;
+    } else if blot_check_types::isNumeric(shape.tag) {
+        identity.decl = ty;
     } else if shape.tag == blot_check_types::Tag.boolean {
         identity.decl = blot_check_types::boolean;
     } else if shape.tag == blot_check_types::Tag.unit {
@@ -2913,7 +2911,7 @@ recursive fn occursNode(m: const Module&, variable: u32, ty: u32, data: bool, de
     if ty == 0 || ty >= m.types.nodes.len { return false; }
     if depth > 64 { return true; }
     let n = m.types.node(ty);
-    if n.tag == blot_check_types::Tag.absent || n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
+    if n.tag == blot_check_types::Tag.absent || n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || blot_check_types::isNumeric(n.tag) || n.tag == blot_check_types::Tag.never { return false; }
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.function {
         if data { return false; }

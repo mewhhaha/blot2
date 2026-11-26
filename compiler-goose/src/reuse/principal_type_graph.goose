@@ -127,7 +127,7 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
                 }
             },
             instance_version => { if from.a != to.a || from.b != to.b || from.c != to.c { return false, blot_error::Error.none; } },
-            unit, boolean, unsigned32, floating32, never => {},
+            unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => {},
             _ => { return false, blot_error::Error.none; },
         }
     }
@@ -192,7 +192,7 @@ recursive fn ty(self_: Copier&, original: Id, depth: i64) -> Id, Error {
             _ => {},
         }
     }
-    if original <= 5 { return original, blot_error::Error.none; }
+    if original <= blot_check_types::never { return original, blot_error::Error.none; }
     if depth >= self_.max_depth || self_.types.count >= self_.max_nodes { return 0, blot_error::Error.type_limit; }
     { let optional_source_21 .= self_.types.get(original); if optional_source_21 { let known = optional_source_21; return known, blot_error::Error.none;  } }
     let charged = self_.charge(); if charged != blot_error::Error.none { return 0, charged; }
@@ -250,7 +250,7 @@ recursive fn ty(self_: Copier&, original: Id, depth: i64) -> Id, Error {
         type_constructor => { let value, error = self_.destination.typeConstructor(blot_check_types::NominalIdentity { node.a, node.b , ..}); result = value; failure = error; },
         record=>{let value,error=self_.copyRecord(node,depth);result=value;failure=error;},
         product,nominal,projection,instance_selection=>{let value,error=self_.copyChildren(node,depth);result=value;failure=error;},
-        absent, unit, boolean, unsigned32, floating32, never => { assert(false); },
+        absent, unit, boolean, unsigned32, floating32, unsigned8, signed32, unsigned64, signed64, floating64, never => { assert(false); },
     }
     if failure != blot_error::Error.none { return 0, failure; } self_.types.insert(original, result); return result, blot_error::Error.none;
 }
