@@ -98,6 +98,30 @@ fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
     value=run;
     receiver.at=end;
 }
+fn putRawFlat<T>(receiver:Writer&,values:const T[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn getRawFlat<T>(receiver:Reader&,value:T[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<T[:]>();return;}
+    var sample:T[1]=[default<T>()];
+    let elem_size=bytes_of(sample[..]).len;
+    if elem_size<=0 || length>limit/elem_size {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*elem_size;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<T>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let dst=bytes_of(run);
+    assert(dst.len==byte_len);
+    blot_native::copy_flat(dst[0],receiver.bytes[receiver.at],byte_len as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
 
 // Direct byte and u32 slice codecs avoid temporary from_bytes allocations.
 fn put(receiver:Writer&,values:const u8[:]) {

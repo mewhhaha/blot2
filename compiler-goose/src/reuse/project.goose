@@ -254,13 +254,36 @@ fn readView(self_:FileInputs&,path:const u8[:],maximum:i64,scratch:u8[>..<]&)->c
     return scratch[..],blot_error::Error.none;
 }
 fn readOpen(self_:FileInputs&,fd:i32,maximum:i64,output:u8[>..<]&)->Error {
-    let before=output.len;var chunk:u8[65536];var failure=blot_error::Error.none;
-    loop {
-        let count=blot_native::read(fd,chunk[0],65536);
-        if count<0 {failure=self_.ioFailure(count);break;}
-        if count==0 {break;}
-        if output.len-before>maximum||count>maximum-(output.len-before) {self_.last_cause="StreamTooLong";failure=blot_error::Error.stream_too_long;break;}
-        output.append(chunk[..count]);
+    let before=output.len;var failure=blot_error::Error.none;
+    let size=blot_native::file_size(fd);
+    if size>0 && size<=maximum {
+        output.resize(before+size,0);
+        var got:i64=0;
+        while got<size {
+            let count=blot_native::read(fd,output[before+got],(size-got) as u64);
+            if count<0 {failure=self_.ioFailure(count);break;}
+            if count==0 {output.resize(before+got);break;}
+            got+=count;
+        }
+        if failure==blot_error::Error.none && got==size {
+            var tail:u8[4096];
+            loop {
+                let count=blot_native::read(fd,tail[0],4096);
+                if count<0 {failure=self_.ioFailure(count);break;}
+                if count==0 {break;}
+                if output.len-before>maximum||count>maximum-(output.len-before) {self_.last_cause="StreamTooLong";failure=blot_error::Error.stream_too_long;break;}
+                output.append(tail[..count]);
+            }
+        }
+    } else {
+        var chunk:u8[65536];
+        loop {
+            let count=blot_native::read(fd,chunk[0],65536);
+            if count<0 {failure=self_.ioFailure(count);break;}
+            if count==0 {break;}
+            if output.len-before>maximum||count>maximum-(output.len-before) {self_.last_cause="StreamTooLong";failure=blot_error::Error.stream_too_long;break;}
+            output.append(chunk[..count]);
+        }
     }
     let closed=blot_native::close(fd);
     if failure!=blot_error::Error.none {output.resize(before);}return failure;
@@ -394,7 +417,7 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
     if probed.present {
         let canonical_error=self_.inputs.recordProbedCanonical(path,probed.value.path);
         if canonical_error!=blot_error::Error.none {return no,canonical_error;}
-        return readCanonical(self_,probed.value.path,origin,true,probed.value.source);
+        return readCanonical(self_,probed.value.path,origin,!probed.value.taken,probed.value.source);
     }
     var canonical_buf:u8[>..<]=[];
     let canonical_error=self_.inputs.canonical(path,canonical_buf);
@@ -463,7 +486,10 @@ fn readSource<P>(self_:Loader<P>&,filename:Symbol,reserved:blot_support::Option<
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
     if recorded.failure!=blot_error::Error.none {let error=recorded.failure;recorded.deinit();tree.deinit();return no,error;}
-    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,is_std:(self_.options.prelude_path.present && !self_.prelude_ready) || isStdPath(canonical,self_.options),parse_start:parse_start,parse_end:self_.project.symbols.entries.len,parse_names:blot_reuse_project_check::copyOwned(recorded.items), ..};
+    var owned_src=default<const u8[:]>();
+    let taken_src,was_taken=self_.parse_batch.takeSource(canonical,source);
+    if was_taken {owned_src=taken_src;} else {owned_src=copySource(source);}
+    var loaded=Unit {filename:filename,source:owned_src,tree:tree,implicit_prelude:self_.prelude_ready,is_std:(self_.options.prelude_path.present && !self_.prelude_ready) || isStdPath(canonical,self_.options),parse_start:parse_start,parse_end:self_.project.symbols.entries.len,parse_names:blot_reuse_project_check::copyOwned(recorded.items), ..};
     recorded.deinit();
     if reserved.present {self_.project.units.items[id-1]=canonicalUnit(loaded);}
     else {let appended=self_.project.units.push(loaded);if appended!=blot_error::Error.none {loaded.deinit();return no,appended;}}

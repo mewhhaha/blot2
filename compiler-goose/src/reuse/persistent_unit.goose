@@ -17,6 +17,7 @@ struct PersistentProducer {
 reusable[] var persistent_producers:PersistentProducer[>..]=[];
 struct PersistentCache {
     producers:PersistentProducer[:]=default<PersistentProducer[:]>(),
+    scratch:u8[:]=default<u8[:]>(),
     shared:u64=0,
     current:u32=0,
     error:Error=blot_error::Error.none,
@@ -57,6 +58,7 @@ fn deinitPersistentProducers(self_:Engine&) {
     for &producer in cache.producers {
         if producer.owner.slot!=0 {deinitPersistentProducer(producer);}
     }
+    if cache.scratch.len!=0 {owned_u8.free_slice(cache.scratch);cache.scratch=default<u8[:]>();}
     persistent_producers.free_slice(cache.producers);
     persistent_caches.free(self_.persistent_cache-1);
     self_.persistent_cache=0;
@@ -75,23 +77,25 @@ fn persistentProducer(self_:const Engine&,unit:u32)->const PersistentProducer? {
         let retained=self_.retainedPersistentPacket(unit);
         var error=blot_error::Error.none;
         if retained.len!=0 {error=decodePersistentProducer(selected,unit,retained);}
-        else {error=readPersistentProducer(selected,unit,cache.shared);}
+        else {error=readPersistentProducer(cache,selected,unit,cache.shared);}
         if error!=blot_error::Error.none {cache.error=error;return null;}
     }
     return selected;
 }
 
-fn readPersistentProducer(destination:PersistentProducer&,unit:u32,shared:u64)->Error {
+fn readPersistentProducer(cache:PersistentCache&,destination:PersistentProducer&,unit:u32,shared:u64)->Error {
     let size=blot_native::persist_size(shared,unit,1);
     if size<=0 || size>blot_project_packet::limit {return blot_error::Error.invalid_artifact;}
-    let packet=owned_u8.alloc_slice(size);
-    if !blot_native::persist_read(shared,unit,1,packet[0],size as u64) {
-        releaseOwned(packet);
+    if size>cache.scratch.len {
+        var next_cap=size;
+        if cache.scratch.len*2>next_cap {next_cap=cache.scratch.len*2;}
+        if cache.scratch.len!=0 {owned_u8.free_slice(cache.scratch);}
+        cache.scratch=owned_u8.alloc_slice(next_cap);
+    }
+    if !blot_native::persist_read(shared,unit,1,cache.scratch[0],size as u64) {
         return blot_error::Error.invalid_artifact;
     }
-    let error=decodePersistentProducer(destination,unit,packet);
-    releaseOwned(packet);
-    return error;
+    return decodePersistentProducer(destination,unit,cache.scratch[..size]);
 }
 
 fn readPersistentSummaries(reader:blot_project_packet::Reader&,bindings:i64)->const PersistentSummary[:] {

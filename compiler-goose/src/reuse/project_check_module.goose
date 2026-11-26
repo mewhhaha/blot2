@@ -45,9 +45,36 @@ fn checkModuleBody(self_:Engine&,unit:u32,options_core:const blot_check_core::Mo
  let found=self_.catalogModule(imported.target);if !found.present || !found.value.valid {{ let propagated_error = self_.diagnostic(unit,imported.span,Code.dependency_failed); if propagated_error != blot_error::Error.none { return propagated_error; } }continue;}let producer=found.value;
  { let propagated_error = self_.appendCatalog(catalogs,source_catalogs,producer,0,0,blot_check_check::ImportedCatalog_kind.catalog,0,imported.declaration.node); if propagated_error != blot_error::Error.none { return propagated_error; } }
  if info.namespace_!=0 {for exported in producer.exports {var original=producer;if exported.kind!=blot_reuse_frozen_dependency::ExportKind.value && exported.target.unit!=0 && exported.target.unit!=imported.target {let current=self_.catalogModule(exported.target.unit);if !current.present {return blot_error::Error.invalid_artifact;}original=current.value;}{ let propagated_error = self_.importExport(imports,headers,catalogs,source_catalogs,original,exported,exported.name,info.namespace_,imported.declaration.node); if propagated_error != blot_error::Error.none { return propagated_error; } }}}
- else {let binding_count=tree.list(info.bindings).len;for binding_ordinal in 0..binding_count {let binding=tree.list(info.bindings)[binding_ordinal];let alias=tree.import_binding(binding);let present=occupied.contains(alias.alias);if !present {occupied.insert(alias.alias,true);}if present {{ let propagated_error = self_.diagnostic(unit,tree.span(binding),Code.duplicate_name); if propagated_error != blot_error::Error.none { return propagated_error; } }continue;}var found=false;
- for exported in producer.exports {if forwarding {if self_.resolution_remaining==0 {{ let propagated_error = self_.diagnostic(unit,tree.span(binding),Code.resolution_budget); if propagated_error != blot_error::Error.none { return propagated_error; } }break;}self_.resolution_remaining-=1;}if exported.name!=alias.name {continue;}found=true;var original=producer;if exported.kind!=blot_reuse_frozen_dependency::ExportKind.value && exported.target.unit!=0 && exported.target.unit!=imported.target {let current=self_.catalogModule(exported.target.unit);if !current.present {return blot_error::Error.invalid_artifact;}original=current.value;}
- { let propagated_error = self_.importExport(imports,headers,catalogs,source_catalogs,original,exported,alias.alias,0,binding); if propagated_error != blot_error::Error.none { return propagated_error; } }if forwarding {var public=exported;public.name=alias.alias;forwarded.push(public);}}
+ else {let binding_count=tree.list(info.bindings).len;
+ var export_heads=dictionary<u32,i64>{};var export_next:i64[>..]=[];
+ let indexed_exports=!forwarding && binding_count>=4 && producer.exports.len>=16;
+ if indexed_exports {
+  export_next.resize(producer.exports.len,-1);
+  var ei=producer.exports.len;
+  while ei>0 {
+   ei-=1;
+   let ename=producer.exports[ei].name;
+   let prev .= export_heads.get(ename);
+   if prev {export_next[ei]=prev;}
+   export_heads.insert(ename,ei);
+  }
+ }
+ for binding_ordinal in 0..binding_count {let binding=tree.list(info.bindings)[binding_ordinal];let alias=tree.import_binding(binding);let present=occupied.contains(alias.alias);if !present {occupied.insert(alias.alias,true);}if present {{ let propagated_error = self_.diagnostic(unit,tree.span(binding),Code.duplicate_name); if propagated_error != blot_error::Error.none { return propagated_error; } }continue;}var found=false;
+ if indexed_exports {
+  let head .= export_heads.get(alias.name);
+  if head {
+   var ei:i64=head;
+   while ei>=0 {
+    let exported=producer.exports[ei];
+    found=true;var original=producer;if exported.kind!=blot_reuse_frozen_dependency::ExportKind.value && exported.target.unit!=0 && exported.target.unit!=imported.target {let current=self_.catalogModule(exported.target.unit);if !current.present {return blot_error::Error.invalid_artifact;}original=current.value;}
+    { let propagated_error = self_.importExport(imports,headers,catalogs,source_catalogs,original,exported,alias.alias,0,binding); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    ei=export_next[ei];
+   }
+  }
+ } else {
+  for exported in producer.exports {if forwarding {if self_.resolution_remaining==0 {{ let propagated_error = self_.diagnostic(unit,tree.span(binding),Code.resolution_budget); if propagated_error != blot_error::Error.none { return propagated_error; } }break;}self_.resolution_remaining-=1;}if exported.name!=alias.name {continue;}found=true;var original=producer;if exported.kind!=blot_reuse_frozen_dependency::ExportKind.value && exported.target.unit!=0 && exported.target.unit!=imported.target {let current=self_.catalogModule(exported.target.unit);if !current.present {return blot_error::Error.invalid_artifact;}original=current.value;}
+  { let propagated_error = self_.importExport(imports,headers,catalogs,source_catalogs,original,exported,alias.alias,0,binding); if propagated_error != blot_error::Error.none { return propagated_error; } }if forwarding {var public=exported;public.name=alias.alias;forwarded.push(public);}}
+ }
  if !found {{ let propagated_error = self_.diagnostic(unit,tree.span(binding),Code.unknown_export); if propagated_error != blot_error::Error.none { return propagated_error; } }continue;}
  }}
  }

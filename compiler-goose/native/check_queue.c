@@ -49,6 +49,7 @@ struct persist_node {
 struct persist_queue {
     pthread_mutex_t mutex;
     _Atomic uint32_t generation;
+    _Atomic uint32_t waiters;
     uint64_t deadline;
     size_t map_length;
     uint64_t arena_used;
@@ -57,6 +58,7 @@ struct persist_queue {
     uint32_t configured;
     uint32_t active;
     uint32_t finished;
+    uint32_t ready_len;
     int failure;
     bool sealed;
     struct persist_node nodes[];
@@ -66,19 +68,68 @@ static struct persist_queue *persist_queue(uint64_t handle) {
     return (struct persist_queue *)(uintptr_t)handle;
 }
 
+static uint32_t *persist_heap(struct persist_queue *queue) {
+    size_t end = offsetof(struct persist_queue, nodes) +
+                 queue->count * sizeof(struct persist_node);
+    return (uint32_t *)((uint8_t *)queue + (end + 7) / 8 * 8);
+}
+
 static uint64_t *persist_edges(struct persist_queue *queue) {
     size_t end = offsetof(struct persist_queue, nodes) +
                  queue->count * sizeof(struct persist_node);
-    return (uint64_t *)((uint8_t *)queue + (end + 7) / 8 * 8);
+    size_t heap_end = (end + 7) / 8 * 8 + queue->count * sizeof(uint32_t);
+    return (uint64_t *)((uint8_t *)queue + (heap_end + 7) / 8 * 8);
 }
 
 static uint8_t *persist_arena(struct persist_queue *queue) {
     return (uint8_t *)(persist_edges(queue) + queue->count * queue->edge_words);
 }
 
+static bool persist_higher(const struct persist_queue *queue, uint32_t a, uint32_t b) {
+    uint32_t pa = queue->nodes[a].priority;
+    uint32_t pb = queue->nodes[b].priority;
+    return pa > pb || (pa == pb && a < b);
+}
+
+static void persist_heap_push(struct persist_queue *queue, uint32_t idx) {
+    uint32_t *heap = persist_heap(queue);
+    uint32_t pos = queue->ready_len++;
+    while (pos > 0) {
+        uint32_t parent = (pos - 1) >> 1;
+        if (!persist_higher(queue, idx, heap[parent])) break;
+        heap[pos] = heap[parent];
+        pos = parent;
+    }
+    heap[pos] = idx;
+}
+
+static uint32_t persist_heap_pop(struct persist_queue *queue) {
+    uint32_t *heap = persist_heap(queue);
+    uint32_t top = heap[0];
+    uint32_t last = heap[--queue->ready_len];
+    uint32_t n = queue->ready_len;
+    if (n > 0) {
+        uint32_t pos = 0;
+        for (;;) {
+            uint32_t left = (pos << 1) + 1;
+            if (left >= n) break;
+            uint32_t best = left;
+            uint32_t right = left + 1;
+            if (right < n && persist_higher(queue, heap[right], heap[left])) best = right;
+            if (!persist_higher(queue, heap[best], last)) break;
+            heap[pos] = heap[best];
+            pos = best;
+        }
+        heap[pos] = last;
+    }
+    return top;
+}
+
 static void persist_notify(struct persist_queue *queue) {
     atomic_fetch_add_explicit(&queue->generation, 1, memory_order_release);
-    (void)syscall(SYS_futex, &queue->generation, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+    if (atomic_load_explicit(&queue->waiters, memory_order_acquire) != 0) {
+        (void)syscall(SYS_futex, &queue->generation, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+    }
 }
 
 static int persist_lock(struct persist_queue *queue) {
@@ -120,7 +171,8 @@ uint64_t blot_persist_open(uint32_t count) {
     if (count == 0 || count > PERSIST_MAX_NODES) return 0;
     uint32_t words = (count + 63) / 64;
     size_t end = offsetof(struct persist_queue, nodes) + count * sizeof(struct persist_node);
-    size_t graph_bytes = (end + 7) / 8 * 8 + count * words * sizeof(uint64_t);
+    size_t heap_end = (end + 7) / 8 * 8 + count * sizeof(uint32_t);
+    size_t graph_bytes = (heap_end + 7) / 8 * 8 + count * words * sizeof(uint64_t);
     size_t map_length = graph_bytes + PERSIST_ARENA_CAPACITY;
     struct persist_queue *queue = mmap(NULL, map_length, PROT_READ | PROT_WRITE,
                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -140,6 +192,7 @@ uint64_t blot_persist_open(uint32_t count) {
     }
 
     atomic_init(&queue->generation, 0);
+    atomic_init(&queue->waiters, 0);
     queue->map_length = map_length;
     queue->count = count;
     queue->edge_words = words;
@@ -202,7 +255,14 @@ int64_t blot_persist_claim(uint64_t h) {
         if (!queue->sealed) {
             queue->sealed = true;
             queue->deadline = now + persist_timeout;
-            if (queue->count != queue->configured) persist_fail_locked(queue, EINVAL);
+            if (queue->count != queue->configured) {
+                persist_fail_locked(queue, EINVAL);
+            } else {
+                queue->ready_len = 0;
+                for (uint32_t i = 0; i < queue->count; ++i) {
+                    if (queue->nodes[i].pending == 0) persist_heap_push(queue, i);
+                }
+            }
         }
         if (queue->failure == 0 && queue->finished == queue->count) {
             pthread_mutex_unlock(&queue->mutex);
@@ -216,13 +276,8 @@ int64_t blot_persist_claim(uint64_t h) {
             return -error;
         }
 
-        uint32_t best = UINT32_MAX;
-        for (uint32_t i = 0; i < queue->count; ++i) {
-            const struct persist_node *node = &queue->nodes[i];
-            if (node->finished || node->owner != 0 || node->pending != 0) continue;
-            if (best == UINT32_MAX || node->priority > queue->nodes[best].priority) best = i;
-        }
-        if (best != UINT32_MAX) {
+        if (queue->ready_len != 0) {
+            uint32_t best = persist_heap_pop(queue);
             queue->nodes[best].owner = caller;
             queue->active++;
             pthread_mutex_unlock(&queue->mutex);
@@ -240,11 +295,13 @@ int64_t blot_persist_claim(uint64_t h) {
             return -ECHILD;
         }
         uint32_t generation = atomic_load_explicit(&queue->generation, memory_order_relaxed);
+        atomic_fetch_add_explicit(&queue->waiters, 1, memory_order_acq_rel);
         uint64_t remaining = queue->deadline - now;
         if (remaining > PERSIST_WAIT_NS) remaining = PERSIST_WAIT_NS;
         struct timespec wait = { .tv_nsec = (long)remaining };
         pthread_mutex_unlock(&queue->mutex);
         (void)syscall(SYS_futex, &queue->generation, FUTEX_WAIT, generation, &wait, NULL, 0);
+        atomic_fetch_sub_explicit(&queue->waiters, 1, memory_order_release);
     }
 }
 
@@ -290,7 +347,9 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
         for (uint32_t w = 0; w < queue->edge_words; ++w) {
             for (uint64_t bits = words[w]; bits != 0; bits &= bits - 1) {
                 uint32_t consumer = w * 64 + (uint32_t)__builtin_ctzll(bits);
-                queue->nodes[consumer].pending--;
+                if (--queue->nodes[consumer].pending == 0) {
+                    persist_heap_push(queue, consumer);
+                }
             }
         }
     } else {

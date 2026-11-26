@@ -6,7 +6,7 @@ import reuse.parse_packet;
 import dictionary;
 import support.pooled_map;
 
-struct ParseInput { path:const u8[:], source:const u8[:] }
+struct ParseInput { path:const u8[:], source:const u8[:], taken:bool=false }
 reusable[] var parse_inputs:ParseInput[>..]=[];
 reusable[] var parse_paths:dictionary_slot<const u8[:],u32>[>..]=[];
 reusable[] var parse_raw_keys:const u8[:][>..]=[];
@@ -26,7 +26,7 @@ fn deinit(batch:ParseBatch&) {
     batch.raw_paths.deinit(parse_paths);
     for key in batch.raw_keys.items {releaseSource(key);}
     blot_support_pooled_buffer::deinit(batch.raw_keys,parse_raw_keys);
-    for item in batch.inputs.items {releaseSource(item.path);releaseSource(item.source);}
+    for item in batch.inputs.items {releaseSource(item.path);if !item.taken {releaseSource(item.source);}}
     blot_support_pooled_buffer::deinit(batch.inputs,parse_inputs);
     batch.shared=0;
 }
@@ -41,14 +41,27 @@ fn probed(batch:const ParseBatch&,path:const u8[:])->blot_support::Option<ParseI
     let raw_idx .= batch.raw_paths.get(path);
     if raw_idx {
         let item=batch.inputs.items[raw_idx];
-        return blot_support::some(ParseInput{canonicalSource(item.path),canonicalSource(item.source)});
+        var src=default<const u8[:]>();
+        if !item.taken {src=canonicalSource(item.source);}
+        return blot_support::some(ParseInput{canonicalSource(item.path),src,item.taken});
     }
     let idx .= batch.paths.get(path);
     if idx {
         let item=batch.inputs.items[idx];
-        return blot_support::some(ParseInput{canonicalSource(item.path),canonicalSource(item.source)});
+        var src=default<const u8[:]>();
+        if !item.taken {src=canonicalSource(item.source);}
+        return blot_support::some(ParseInput{canonicalSource(item.path),src,item.taken});
     }
     return blot_support::none<ParseInput>();
+}
+fn takeSource(batch:ParseBatch&,path:const u8[:],source:const u8[:])->const u8[:],bool {
+    if batch.shared==0 {return default<const u8[:]>(),false;}
+    let index .= batch.paths.get(path);
+    if !index {return default<const u8[:]>(),false;}
+    let item .= batch.inputs.items[index];
+    if item.taken || !blot_support::same_slice_identity(item.source,source) {return default<const u8[:]>(),false;}
+    item.taken=true;
+    return canonicalSource(item.source),true;
 }
 fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_parse_symbols::Pool&,tree:blot_parse_ast::Tree&,recorded:blot_parse_parser::ScratchIdBuffer&)->bool {
     if batch.shared==0 {return false;}
@@ -67,14 +80,14 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
     if !blot_native::persist_read(batch.shared,id,2,batch.scratch[0],size as u64) {return false;}
     return blot_reuse_parse_packet::decode(batch.scratch[..size],symbols,tree,recorded);
 }
-fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
+fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],name:u8[>..<]&,source:u8[>..<]&) {
     let batch .= loader.parse_batch;
     if batch.inputs.items.len>=min(16384,loader.options.max_files) {return;}
     if batch.raw_paths.contains(path) || batch.paths.contains(path) {return;}
     let limit=min(loader.options.max_source_bytes,loader.options.max_total_source_bytes-batch.total-loader.project.source_bytes);
     if limit<=0 {return;}
-    var name:u8[>..<]=[];
-    var source:u8[>..<]=[];
+    name.clear();
+    source.clear();
     if !loader.inputs.probeSource(path,limit,name,source) {return;}
     let existing .= batch.paths.get(name[..]);
     if existing {
@@ -89,7 +102,7 @@ fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
     }
     let sym,present=loader.project.symbols.lookup(name[..]);
     if present && loader.files.get(sym)!=null {return;}
-    let input=ParseInput{copySource(name[..]),copySource(source[..])};
+    let input=ParseInput{copySource(name[..]),copySource(source[..]),false};
     let error=batch.inputs.push(input,parse_inputs);
     if error!=blot_error::Error.none {releaseSource(input.path);releaseSource(input.source);return;}
     let idx=(batch.inputs.items.len-1) as u32;
@@ -104,7 +117,7 @@ fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
 }
 // Discover literal imports cheaply. Unsupported spellings are left to the
 // normal loader. Only a successful parse of the exact source can be adopted.
-fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput) {
+fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput,name:u8[>..<]&,source:u8[>..<]&,path:u8[>..<]&) {
     let src=input.source;
     var at:i64=0;
     while at<src.len {
@@ -122,13 +135,12 @@ fn discoverParseInputs<P>(loader:Loader<P>&,input:ParseInput) {
         var end=quote+1;
         while end<line.len && line[end]!='"' {end++;}
         if end==line.len {break;}
-        var path:u8[>..<]=[];
-        if resolveImportPath(input.path,line[quote+1..end],loader.options,path)==blot_error::Error.none {addParseInput(loader,path[..]);}
+        path.clear();
+        if resolveImportPath(input.path,line[quote+1..end],loader.options,path)==blot_error::Error.none {addParseInput(loader,path[..],name,source);}
     }
 }
 fn runParseLane<P>(loader:Loader<P>&)->bool {
     let batch .= loader.parse_batch;
-    let marker:u8=0;
     var tokens:blot_parse_token::Token[>..<]=[];
     var comments:blot_parse_token::Token[>..<]=[];
     var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
@@ -142,25 +154,28 @@ fn runParseLane<P>(loader:Loader<P>&)->bool {
         let ok=blot_reuse_parse_packet::encodeWithScratch(batch.inputs.items[job-1].source,loader.project.symbols,tokens,comments,diagnostics,local,bytes);
         if !ok || bytes.len==0 {bytes.clear();bytes.push(0);}
         let id=job as u32;
-        if !blot_native::persist_publish(batch.shared,id,1,marker,1) || !blot_native::persist_publish(batch.shared,id,2,bytes[0],bytes.len as u64) {local.deinit();return false;}
+        if !blot_native::persist_publish(batch.shared,id,2,bytes[0],bytes.len as u64) {local.deinit();return false;}
     }
 }
 fn prepareParseBatch<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {
     if workers==1 || blot_native::platform_is_linux()==0 {return;}
     let batch .= loader.parse_batch;
+    var name_buf:u8[>..<]=[];
+    var source_buf:u8[>..<]=[];
+    var path_buf:u8[>..<]=[];
     if loader.project.entry==0 {
-        addParseInput(loader,entry);
+        addParseInput(loader,entry,name_buf,source_buf);
     } else {
         let root=loader.project.entry;
         for edge in loader.project.unitImports(root) {
-            var path:u8[>..<]=[];
-            if resolveImportPath(loader.project.filename(root),loader.project.symbols.get(edge.path),loader.options,path)==blot_error::Error.none {
-                addParseInput(loader,path[..]);
+            path_buf.clear();
+            if resolveImportPath(loader.project.filename(root),loader.project.symbols.get(edge.path),loader.options,path_buf)==blot_error::Error.none {
+                addParseInput(loader,path_buf[..],name_buf,source_buf);
             }
         }
     }
     var i:i64=0;
-    while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item);i++;}
+    while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item,name_buf,source_buf,path_buf);i++;}
     if batch.inputs.items.len<16 || batch.total<65536 {return;}
     var width=min(16,workers);
     if width==0 {

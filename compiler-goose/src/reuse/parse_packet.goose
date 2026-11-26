@@ -82,10 +82,9 @@ fn encode(source: const u8[:], seed: const Pool&, packet: u8[>..<]&) -> bool {
     return result;
 }
 
-// Goose's flat image starts with the byte length as ULEB. Verify the image
-// and copy it into this tree's own pooled storage before releasing the packet.
+// Goose's flat image starts with the byte length as ULEB. Copy directly into
+// this tree's own pooled storage without temporary from_bytes allocation.
 fn read_table<T,B>(packet: const u8[:], at:i64&, table: B&, witness: T) -> bool {
-    let start=at;
     var length:u64=0;
     var shift:u64=0;
     while true {
@@ -97,13 +96,18 @@ fn read_table<T,B>(packet: const u8[:], at:i64&, table: B&, witness: T) -> bool 
     }
     if length>(packet.len-at) as u64 {return false;}
     if length==0 {table.items=default<T[:]>();table.len=0;return true;}
+    var sample:T[1]=[witness];
+    let elem_size=bytes_of(sample[..]).len;
+    if elem_size<=0 || (length as i64)%elem_size!=0 {return false;}
+    let count=(length as i64)/elem_size;
+    if table.ensure(count)!=ok {return false;}
+    let target=table.storage[..count];
+    let dst=bytes_of(target);
+    assert(dst.len==length as i64);
+    blot_native::copy_flat(dst[0],packet[at],length);
     at+=length as i64;
-    let values,valid=from_bytes<T[>..]>(packet[start..at]);
-    if !valid || table.ensure(values.len)!=ok {return false;}
-    let target=table.storage[..values.len];
-    target.move_from(values[..]);
     table.items=target;
-    table.len=values.len;
+    table.len=count;
     return true;
 }
 

@@ -9,6 +9,7 @@ extern fn f64_bits(value: f64) -> u64 = "blot_f64_bits";
 extern fn f64_from_bits(value: u64) -> f64 = "blot_f64_from_bits";
 extern fn copy_u32(dst: u32&, src: const u8&, count: u64) = "blot_copy_u32";
 extern fn copy_u8(dst: u8&, src: const u8&, count: u64) = "blot_copy_u8";
+extern fn copy_flat(dst: const u8&, src: const u8&, count: u64) = "blot_copy_flat";
 extern fn read(fd: i32, first: u8&, count: u64) -> i64 = "blot_read";
 extern fn write(fd: i32, first: const u8&, count: u64) -> i64 = "blot_write";
 extern fn open_read(path: const u8&) -> i32 = "blot_open_read";

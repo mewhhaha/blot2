@@ -248,11 +248,16 @@ def has_tagged_union(t, ns='blot_project_packet'):
  if kind == 'struct':
   return any(has_tagged_union(ty, owner) for _, ty in data)
  return False
+VERIFIED_FLAT_SLICES = {'blot_reuse_principal_interface::Binding'}
 for t in FLAT_SLICES:
  assert t in SLICES, t
  assert not has_tagged_union(t), f'FLAT_SLICES type {t} contains a tagged union with uninitialized inactive bytes'
- code.append(f'fn put(receiver:Writer&,value:const {t}[:]) {{putFlat(receiver,value);}}')
- code.append(f'fn get(receiver:Reader&,value:{t}[:]& ) {{getFlat(receiver,value);}}')
+ if t in VERIFIED_FLAT_SLICES:
+  code.append(f'fn put(receiver:Writer&,value:const {t}[:]) {{putFlat(receiver,value);}}')
+  code.append(f'fn get(receiver:Reader&,value:{t}[:]& ) {{getFlat(receiver,value);}}')
+ else:
+  code.append(f'fn put(receiver:Writer&,value:const {t}[:]) {{putRawFlat(receiver,value);}}')
+  code.append(f'fn get(receiver:Reader&,value:{t}[:]& ) {{getRawFlat(receiver,value);}}')
 syntax_types=PRIM|{name.split('::')[-1] for name in D}
 (R/'support/project_packet_codecs.goose').write_text(finish_syntax(normalize('\n'.join(code)+'\n',syntax_types)))
 # Every family is concrete; no generic cast, byte arena or ownership erasure.

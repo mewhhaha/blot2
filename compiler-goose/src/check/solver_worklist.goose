@@ -104,11 +104,20 @@ fn wake(self_: Queue, key: u64) {
 }
 fn wakeExternal(self_: Queue) { wake(self_, external); }
 fn observe(self_: Queue, store: const blot_check_types::Store&) {
+    if self_.remaining == 0 {
+        self_.type_versions = store.versions.len; self_.row_versions = store.effects.versions.len; self_.type_generation = store.closed_generation; self_.row_generation = store.effects.physical_epoch; self_.clock = store.cursor();
+        return;
+    }
     let physical = self_.type_generation != store.closed_generation || self_.row_generation != store.effects.physical_epoch || store.closed_generation == 0xffff || store.effects.physical_epoch == any_write || self_.type_versions > store.versions.len || self_.row_versions > store.effects.versions.len;
     if physical { wakeAll(self_); }
-    else { for write in store.versions.items[self_.type_versions..] { wake(self_, (write.variable as u64) * 2); } for write in store.effects.versions.items[self_.row_versions..] { wake(self_, (write.variable as u64) * 2 + 1); } }
-    if physical || self_.type_versions != store.versions.len || self_.row_versions != store.effects.versions.len { wake(self_, any_write); }
-    if self_.clock != store.cursor() { wake(self_, future_clock); }
+    else if self_.heads.count != 0 {
+        for write in store.versions.items[self_.type_versions..] { wake(self_, (write.variable as u64) * 2); }
+        for write in store.effects.versions.items[self_.row_versions..] { wake(self_, (write.variable as u64) * 2 + 1); }
+    }
+    if self_.heads.count != 0 {
+        if physical || self_.type_versions != store.versions.len || self_.row_versions != store.effects.versions.len { wake(self_, any_write); }
+        if self_.clock != store.cursor() { wake(self_, future_clock); }
+    }
     self_.type_versions = store.versions.len; self_.row_versions = store.effects.versions.len; self_.type_generation = store.closed_generation; self_.row_generation = store.effects.physical_epoch; self_.clock = store.cursor();
 }
 fn clearWatches(self_: Queue, index: i64) {
