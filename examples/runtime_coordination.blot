@@ -1,0 +1,140 @@
+// In-language orchestration of `#kernel` batches and stateful `#process` actors.
+//
+// Run against a real host runtime with `createRuntime` (`host/runtime.ts`), or
+// execute the `mocked` entry / `test` block with zero host by handling
+// `runtime.Runtime.call` in pure Blot.
+
+import * as runtime from "std/runtime"
+import * as kernel from "std/kernel"
+import * as process from "std/process"
+
+// ── 1. Pure multi-core kernels ──────────────────────────────────────────────
+
+// Stateless kernel: each item runs independently across host worker threads.
+#kernel func score_tile (tile: U32): U32 =>
+  return tile * tile + 1
+
+// Prepared-context kernel: build a read-only lookup table once, then fan out.
+type Sample is data = $Sample { weight: F32, bucket: U32 }
+
+func prepare_scale (weights: #[F32]): #[F32] =>
+  return weights.copy
+
+func apply_scale (table: #[F32]) -> (sample: Sample): F32 =>
+  let $Sample { weight, bucket } = sample
+  let scale = if bucket < table.length then table[bucket] else 1.0
+  return weight * scale
+
+#kernel const weighted_score: Kernel [#[F32], Sample, F32] = {
+  prepare: prepare_scale,
+  run: apply_scale,
+}
+
+// ── 2. Isolated stateful process actor ──────────────────────────────────────
+
+type LedgerState is data = $LedgerState { total: U32, entries: #[U32] }
+
+type LedgerCmd is data = $LedgerCmd { op: U32, amount: U32 }
+
+type LedgerReply is data = $LedgerReply { total: U32, count: U32 }
+
+func init_ledger (initial: U32): LedgerState =>
+  return $LedgerState { total: initial, entries: #[] }
+
+func step_ledger (st: own LedgerState) -> (cmd: LedgerCmd): (LedgerState, LedgerReply) =>
+  let $LedgerState { total, entries } = st
+  let $LedgerCmd { op, amount } = cmd
+  if op == 1:
+    let next = total + amount
+    @storage.push entries amount
+    let count = entries.length
+    return ($LedgerState { total: next, entries }, $LedgerReply { total: next, count })
+  let count = entries.length
+  return ($LedgerState { total, entries }, $LedgerReply { total, count })
+
+#process const ledger: Process [U32, LedgerCmd, LedgerReply] = {
+  init: init_ledger,
+  step: step_ledger,
+}
+
+// ── 3. In-language coordination (effectful over `runtime.Runtime`) ──────────
+
+// Pure-Blot orchestration logic: knows nothing about JS/Wasmtime hosts.
+func run_pipeline (seed: U32): U32 ! { runtime.Runtime } =>
+  // A. Synchronous stateless batch fan-out: #[seed, seed + 1, seed + 2]
+  use tile_res <- kernel.run score_tile #[seed, seed + 1, seed + 2]
+  let $Ok tile_scores = tile_res else:
+    return 0
+  let tile_sum = tile_scores[0] + tile_scores[1] + tile_scores[2]
+
+  // B. Prepared-context kernel: prepare once, run a batch, release context.
+  use prep_res <- kernel.prepare weighted_score #[2.0, 4.0]
+  let $Ok prepared = prep_res else:
+    return 0
+  let samples = #[
+    $Sample { weight: 3.0, bucket: 0 },
+    $Sample { weight: 5.0, bucket: 1 },
+  ]
+  use scaled_res <- kernel.run_prepared prepared samples
+  let $Ok scaled = scaled_res else:
+    return 0
+  use _ <- kernel.clear prepared
+  let scaled_sum = @f32.to_u32 (scaled[0] + scaled[1])
+
+  // C. Non-blocking concurrent kernel jobs: submit two, await both.
+  use j1_res <- kernel.submit score_tile #[10]
+  let $Ok j1 = j1_res else:
+    return 0
+  use j2_res <- kernel.submit score_tile #[20]
+  let $Ok j2 = j2_res else:
+    return 0
+  use r1_res <- kernel.await_job j1
+  let $Ok r1 = r1_res else:
+    return 0
+  use r2_res <- kernel.await_job j2
+  let $Ok r2 = r2_res else:
+    return 0
+
+  // D. Stateful process actor: spawn, synchronous call, async send/advance/poll, close.
+  use pid_res <- process.spawn ledger 100
+  let $Ok pid = pid_res else:
+    return 0
+  use c1_res <- process.call pid $LedgerCmd { op: 1, amount: tile_sum }
+  let $Ok c1 = c1_res else:
+    return 0
+  let $LedgerReply { total: recorded_total, count: _ } = c1
+
+  use t_res <- process.send pid $LedgerCmd { op: 1, amount: scaled_sum }
+  let $Ok ticket = t_res else:
+    return 0
+  use _ <- process.advance 1
+  use polled_res <- process.poll ticket
+  let $Some ($Ok reply) = polled_res else:
+    return 0
+  let $LedgerReply { total: final_total, count: _ } = reply
+  use _ <- process.close pid
+
+  return final_total + recorded_total + r1[0] + r2[0]
+
+// ── 4. Host entry point & zero-host pure-Blot mock ──────────────────────────
+
+// Real host wiring: pass `runtime.provider host` (from `host/runtime.ts`).
+io main (host: #[U32] -> #[U32] ! { Foreign }): U32 ! { Foreign } => do runtime.provider host:
+  use total <- run_pipeline 2
+  break total
+
+// Pure-Blot unit test: mock `runtime.Runtime.call` directly with no host.
+func mock_stateless_host (req: #[U32]): #[U32] =>
+  let opcode = req[2]
+  if opcode == runtime.op_kernel_run:
+    return #[runtime.magic, runtime.status_ok, 10, 20, 30]
+  return #[runtime.magic, runtime.err_host]
+
+io mocked (): U32 => do @effect.provider runtime.Runtime.call mock_stateless_host:
+  use res <- kernel.run score_tile #[1, 2, 3]
+  let $Ok out = res else:
+    break 0
+  break out[0] + out[1] + out[2]
+
+test "mocked runtime coordination requires no host":
+  return mocked () == 60

@@ -1,0 +1,35 @@
+// Entry point declarations with `io`.
+//
+// `io` marks host Wasm exports at top level (`io name (...) => ...`, `io const`,
+// `io let`, and `private io`) while remaining an ordinary identifier everywhere
+// else — parameters, local bindings, and helper names.
+
+func clamp_u32 (value: U32) -> (lo: U32) -> (hi: U32): U32 =>
+  if value < lo:
+    return lo
+  if value > hi:
+    return hi
+  return value
+
+// `io` as a parameter and local variable name inside a regular function:
+func transform_with_io (io: U32): U32 =>
+  let next = io * 2
+  return clamp_u32 next 0 100
+
+// Exported entry function (no `func` keyword needed):
+io main (seed: U32): U32 =>
+  let base = transform_with_io seed
+  return base + version
+
+// Exported compile-time constant and module-startup global:
+io const version: U32 = 1
+io let boot_bias: U32 = clamp_u32 7 0 10
+
+// Exported to Wasm while hidden from Blot importers of this module:
+private io internal_probe (x: U32): U32 =>
+  return x + boot_bias
+
+test "io entry functions and contextual io identifiers":
+  let a = main 20
+  let b = internal_probe 3
+  return a == 41 and b == 10

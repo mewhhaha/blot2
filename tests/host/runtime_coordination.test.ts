@@ -351,3 +351,31 @@ io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.pro
     await rt.dispose();
   }
 });
+
+Deno.test("shipped examples io_entries.blot and runtime_coordination.blot execute cleanly", async () => {
+  const ioSource = await Deno.readTextFile(
+    new URL("../../examples/io_entries.blot", import.meta.url),
+  );
+  const ioWasm = await compileWasm(ioSource);
+  const ioGuest = await instantiateGuest(ioWasm);
+  equal(ioGuest.call("main", 20), 41);
+  equal(ioGuest.call("internal_probe", 3), 10);
+
+  const coordSource = await Deno.readTextFile(
+    new URL("../../examples/runtime_coordination.blot", import.meta.url),
+  );
+  const coordWasm = await compileWasm(coordSource);
+  const rt = createRuntime(coordWasm, { workers: 2 });
+  try {
+    // tile_sum = (2^2+1)+(3^2+1)+(4^2+1) = 5+10+17 = 32
+    // scaled_sum = 3*2 + 5*4 = 26
+    // r1 = 10^2+1 = 101, r2 = 20^2+1 = 401
+    // recorded_total = 100 + 32 = 132, final_total = 132 + 26 = 158
+    // result = 158 + 132 + 101 + 401 = 792
+    equal(await rt.run("main"), 792);
+  } finally {
+    await rt.dispose();
+  }
+  const mockedGuest = await instantiateGuest(coordWasm);
+  equal(mockedGuest.call("mocked", null), 60);
+});

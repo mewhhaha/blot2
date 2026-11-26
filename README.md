@@ -132,11 +132,15 @@ func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32]
   return spark #[px[i] + vx[i] * dt + ax[i] * half_dt2 | i <- 0 .. px.length]
 ```
 
-### 6. First-Class Multi-Core Kernels & Persistent Processes
+### 6. First-Class Multi-Core Kernels, Persistent Processes & In-Language Coordination
 
-Two built-in Wasm ABI 8 entry points cover parallel fan-out and long-lived stateful systems without threads or shared mutable memory:
+Two built-in Wasm ABI 8 entry points cover parallel fan-out and long-lived stateful systems without threads or shared mutable memory — and programs can orchestrate both directly inside Blot via `std/runtime`, `std/kernel`, and `std/process`:
 
 ```blot
+import * as runtime from "std/runtime"
+import * as kernel from "std/kernel"
+import * as process from "std/process"
+
 // Pure data-parallel worker dispatched across host worker pools:
 #kernel func shade_row (row: U32): U32 =>
   let acc: U32 = 0
@@ -160,7 +164,23 @@ func step_counter (st: own Counter) -> (delta: U32): (Counter, U32) =>
   init: init_counter,
   step: step_counter,
 }
+
+// Orchestrate both directly in Blot over a single mockable `Runtime` effect:
+io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
+  use rows_res <- kernel.run shade_row #[0, 1, 2, 3]
+  let $Ok rows = rows_res else:
+    break 0
+  use pid_res <- process.spawn counter 10
+  let $Ok pid = pid_res else:
+    break 0
+  use reply_res <- process.call pid rows[0]
+  let $Ok total = reply_res else:
+    break 0
+  use _ <- process.close pid
+  break total
 ```
+
+See [examples/runtime_coordination.blot](examples/runtime_coordination.blot) for the full runnable pipeline (including prepared kernels, concurrent `submit`/`await_job`, async `send`/`advance`/`poll`, and pure-Blot mocking) and [examples/io_entries.blot](examples/io_entries.blot) for `io` entry declarations.
 
 ### 7. Ergonomics That Stay Out of Your Way
 
@@ -214,6 +234,6 @@ deno task test:guest
 
 ## Documentation
 
-- **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Effects & I/O](docs/language/effects-and-io.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot)
+- **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Effects & I/O](docs/language/effects-and-io.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [`io` entries](examples/io_entries.blot) · [Runtime coordination](examples/runtime_coordination.blot)
 - **Compiler & Host:** [Goose compiler](compiler-goose/README.md) · [Deno host & CLI](host/README.md) · [Guest ABI](docs/host/guest-abi.md) · [Packages](docs/host/packages.md)
 - **Benchmarks & State:** [Comparison suite](benchmarks/comparison/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)
