@@ -4025,6 +4025,12 @@ recursive fn exprPreservesHandle(
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push { return false; }
+            let ch = m.children(id);
+            return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
+        },
         block_, suite => {
             let ch = m.children(id);
             if ch.len == 1 { return exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth); }
@@ -4207,25 +4213,39 @@ fn isTwoParamPushForwarder(tm: const Module&, body: const blot_check_core::Body&
     return ch.len == 2 && localRef(tm, ch[0]) == params[0].binding && localRef(tm, ch[1]) == params[1].binding;
 }
 
-// Recognize `for item in src: dest.push item` (or `@storage.push dest item`)
-// with no loop carries and plain non-boxed elements, emitting a single ensure
-// + `memory.copy`.
+// Recognize `for item in src: dest := self.push item` (or `dest := @storage.push self item`
+// or bare `@storage.push dest item` / `dest.push item`) with plain non-boxed elements,
+// emitting a single ensure + `memory.copy`.
 recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> bool, Error {
     if g.runtime_().has_fork { return false, blot_direct_types::Error.none; }
-    if info.kind != blot_check_core::LoopKind.array || info.carries.len != 0 || info.pattern == 0 {
+    if info.kind != blot_check_core::LoopKind.array || info.carries.len > 1 || info.pattern == 0 {
         return false, blot_direct_types::Error.none;
     }
     var dest = neverVal();
     var method_target = BindingRef { 0, 0 };
     var step: u32 = 0;
     var stag = blot_direct_types::Tag.unit;
+    var carry_incoming: u32 = 0;
+    var carry_outgoing: u32 = 0;
     {
         let m .= g.units[f.unit - 1];
         let pat = m.pattern(info.pattern);
         if pat.tag != blot_check_core::PatternTag.bind { return false, blot_direct_types::Error.none; }
         let item_binding = pat.a;
-        let body_node = unwrapSingleBody(m, info.body);
+        var body_node = unwrapSingleBody(m, info.body);
         if body_node == 0 { return false, blot_direct_types::Error.none; }
+        var carry_iter: u32 = 0;
+        if info.carries.len == 1 {
+            let carry = m.loopCarries(id)[0];
+            let bnode = m.node(body_node);
+            if bnode.tag != blot_check_core::Tag.bind || bnode.c >= 2 || bnode.a != carry.backedge {
+                return false, blot_direct_types::Error.none;
+            }
+            carry_incoming = carry.incoming;
+            carry_iter = carry.iteration;
+            carry_outgoing = carry.outgoing;
+            body_node = bnode.b;
+        }
         let bn = m.node(body_node);
         var dest_binding: u32 = 0;
         if bn.tag == blot_check_core::Tag.storage {
@@ -4243,7 +4263,12 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
             let proj = m.node(bn.a);
             dest_binding = localRef(m, proj.a);
             if dest_binding == 0 { return false, blot_direct_types::Error.none; }
-            let dest_check, has_dest = bindGet(g, f, dest_binding);
+            var lookup_binding = dest_binding;
+            if carry_iter != 0 {
+                if dest_binding != carry_iter { return false, blot_direct_types::Error.none; }
+                lookup_binding = carry_incoming;
+            }
+            let dest_check, has_dest = bindGet(g, f, lookup_binding);
             if !has_dest || tagOf(g, dest_check.ty) != blot_direct_types::Tag.array {
                 return false, blot_direct_types::Error.none;
             }
@@ -4269,6 +4294,10 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
             method_target = target;
         } else {
             return false, blot_direct_types::Error.none;
+        }
+        if carry_iter != 0 {
+            if dest_binding != carry_iter { return false, blot_direct_types::Error.none; }
+            dest_binding = carry_incoming;
         }
         if dest_binding == 0 || dest_binding == item_binding || dest_binding == localRef(m, info.first) { return false, blot_direct_types::Error.none; }
         let found_dest, has_dest = bindGet(g, f, dest_binding);
@@ -4451,6 +4480,12 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lget(g, new_len);
     op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
     close(g, f);
+    if carry_outgoing != 0 {
+        bindPut(g, f, carry_outgoing, dest);
+        if isUniqueOwned(g, f, carry_incoming) {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry_outgoing, f.loop_depth + 1);
+        }
+    }
     return true, blot_direct_types::Error.none;
 }
 
@@ -4909,7 +4944,13 @@ recursive fn isFreshOwnedArrayNode(g: const Generator&, m: const Module&, id: u3
         },
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            return ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.copy;
+            if ok != blot_error::Error.none { return false; }
+            if op_kind == blot_check_storage_ops::Op.copy { return true; }
+            if op_kind == blot_check_storage_ops::Op.push {
+                let ch = m.children(id);
+                return ch.len == 2 && isFreshOwnedArrayNode(g, m, ch[0], depth + 1);
+            }
+            return false;
         },
         call => {
             if depth > 0 { return false; }

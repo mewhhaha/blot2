@@ -106,7 +106,7 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
         push => {
             if m.types.node(input).tag != blot_check_types::Tag.array { return Contract {..}, blot_error::Error.invalid_artifact; }
             same(result, m.types.node(input).a, m.typeOf(args[1]));
-            same(result, blot_check_types::unit, n.ty); },
+            same(result, input, n.ty); },
         pop, truncate => {
             if m.types.node(input).tag != blot_check_types::Tag.array { return Contract {..}, blot_error::Error.invalid_artifact; }
             let elem_ty = m.types.node(input).a;

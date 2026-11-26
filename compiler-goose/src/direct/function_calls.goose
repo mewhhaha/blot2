@@ -2198,7 +2198,7 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 return value, true, error;
             },
             push => {
-                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 || tagOf(g, result) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
                 let pushed = g.s.vals[forwarded.start + 1];
                 let holds, herr = g.contentsHoldMemory(pushed.ty);
                 if herr != blot_direct_types::Error.none { return neverVal(), false, herr; }

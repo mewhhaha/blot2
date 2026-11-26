@@ -17,6 +17,7 @@ io const rowed = func (input: U32): Array U32 => return do:
   let observations: Array U32 = #[]
   let candidate = if @u32.eq (@u32.rem input 2) 0 then $Left input else $Right input
   case candidate of
-    $Left value | $Right value => @storage.push observations value
+    $Left value | $Right value =>
+      observations := @storage.push self value
     $Empty => ()
   return observations

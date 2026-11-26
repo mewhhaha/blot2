@@ -15,7 +15,8 @@ const packing =
     for lane in math.Mat4.lanes draw.matrix:
       @storage.push output lane
     case draw.parameters of
-      $Nothing => @storage.push output 0.0
+      $Nothing => do:
+        @storage.push output 0.0
       $Some value => do:
         @storage.push output 1.0
         @storage.push output value.x

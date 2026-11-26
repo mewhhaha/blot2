@@ -1355,7 +1355,7 @@ fn ownedTotalUses(g: Generator&, f: Fn&, binding: u32) -> u32 {
     if r == 0xffffffff || fl == 0xffffffff { return 0xffffffff; }
     return r + fl;
 }
-fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
+recursive fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
     if id == 0 || tagOf(g, ty) != blot_direct_types::Tag.array { return false; }
     let n = m.node(id);
     match n.tag {
@@ -1368,7 +1368,13 @@ fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u32, ty: Ty
         },
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            return ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.copy;
+            if ok != blot_error::Error.none { return false; }
+            if op_kind == blot_check_storage_ops::Op.copy { return true; }
+            if op_kind == blot_check_storage_ops::Op.push {
+                let ch = m.children(id);
+                return ch.len == 2 && isFreshOwnedArrayRhs(g, f, m, ch[0], ty);
+            }
+            return false;
         },
         reference => {
             let local_id = localRef(m, id);

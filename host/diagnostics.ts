@@ -442,7 +442,7 @@ io main (): Opt => return $Some 1`,
     checklist: [
       "Check the exact record fields or associated functions available on the receiver type.",
       "Use `.length` (not `.len`) on `#[T]` / `Array T`.",
-      "Use `.copy` for explicit deep copies and `@storage.push arr item` to append to an owned array.",
+      "Use `.copy` for explicit deep copies and `arr := self.push item` (or `arr := @storage.push self item`) to append to an owned array.",
     ],
   },
   UNKNOWN_RECORD_FIELD: {
@@ -1823,7 +1823,7 @@ function buildHeadlineAndFix(
       fix = "Blot arrays use `.length` (not `.len`).";
     } else if (member === "push") {
       fix =
-        "Use `@storage.push arr item` (or `arr.push item` if an array extension is in scope) to append to an owned `#[T]`.";
+        "Use `arr := self.push item` (with the prelude in scope) or `arr := @storage.push self item` to append to an owned `#[T]`.";
     } else {
       fix =
         "Check the receiver's fields or call a namespaced function directly (e.g. `F32.sqrt x`).";

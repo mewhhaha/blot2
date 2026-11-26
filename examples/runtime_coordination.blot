@@ -46,7 +46,7 @@ func step_ledger (st: own LedgerState) -> (cmd: LedgerCmd): (LedgerState, Ledger
   let $LedgerCmd { op, amount } = cmd
   if op == 1:
     let next = total + amount
-    @storage.push entries amount
+    entries := self.push amount
     let count = entries.length
     return ($LedgerState { total: next, entries }, $LedgerReply { total: next, count })
   let count = entries.length

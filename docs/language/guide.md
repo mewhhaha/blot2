@@ -897,7 +897,8 @@ variable is an array (`lent_result_value`): pass a function that copies.
 does not own, written via `@simd.store`, or passed to an effect operation
 (whose handler may keep them) must hold no borrowed arrays: passing a borrowed
 parameter or part of one is `kept_value`; pass `values.copy` instead. An owned
-`#[T]` supports in-place `@storage.push`, `@storage.pop`, and
+`#[T]` supports in-place `@storage.push` (which returns the updated `#[T]`,
+wrapped in the prelude as `items := self.push value`), `@storage.pop`, and
 `@storage.truncate` directly. To preserve a snapshot before handing a value to
 a helper with an `own` parameter, copy it with `.copy`.
 
@@ -912,7 +913,7 @@ unique again:
 func collect_lengths (rows: #[#[U32]]): *#[U32] =>
   let seen: #[U32] = #[]
   for row in rows:
-    @storage.push seen row.length
+    seen := self.push row.length
   return freeze seen   // read-only shared handle *#[U32]
 ```
 
@@ -1796,7 +1797,7 @@ with in-place element writes and dynamic growth/truncation:
 io answer (): U32 =>
   let items: #[U32] = #[41]
   let score = 42
-  @storage.push items 9
+  items := @storage.push self 9
   items[0] := 42
   let first: &U32 = &items[0]
   let local_ref: &U32 = &score

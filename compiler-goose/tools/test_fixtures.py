@@ -217,6 +217,19 @@ fast path in `check/types.goose:unifyMode`. Re-recorded `expected.json`: all
 allocated `type_nodes` (~46 fewer per fixture) and `effect_rows` (-1 to -2 on
 6 fixtures).
 
+Value-Returning `@storage.push` (26 November 2026) changed `@storage.push` to
+return the updated `#[T]` handle in place (matching `@simd.store` ownership
+and move semantics in `check/check.goose`, `check/storage_core.goose`,
+`check/uniqueness.goose`, and `direct/function*.goose`, including loop-carry
+handle preservation and single-carry bulk-push loops) and simplified
+`std/prelude.blot`'s `Array.push` to `return @storage.push values value`.
+Re-recorded `expected.json`: 108 of 109 fixtures keep 100% identical exit
+codes, diagnostics, and Wasm SHA-256 (only `std/prelude.blot` shrank by
+9 source bytes / 1 syntax node / 1 core node); `immutable_survivor.blot` was
+updated from an expression-position `$Left/$Right => @storage.push` arm
+opposite `$Empty => ()` to a suite arm `observations := @storage.push self
+value`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

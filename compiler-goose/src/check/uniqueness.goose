@@ -1921,7 +1921,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let logged = self_.reads.len;
         let outer_leaving = self_.leaving_root;
         let outer_rebind_slot = self_.rebinding_cell_slot;
-        if leaves { self_.leaving_root = n.b; self_.rebinding_cell_slot = -1; }
+        if leaves && !tail { self_.leaving_root = n.b; self_.rebinding_cell_slot = -1; }
+        else if !tail && self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b && self_.function_roots.len != 0 { self_.leaving_root = self_.function_roots[self_.function_roots.len - 1]; }
         let outer_result = self_.result_node;
         self_.result_node = 0;
         if n.a != 0 && !tail && (leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b)) { self_.result_node = n.a; }
@@ -2645,12 +2646,18 @@ fn callDownwardSafe(self_: Analyzer&, m: const Module&, call_id: u32, callee: u3
 // (growable push/truncate/length, a proven non-escaping callee parameter, or a
 // pure downward closure whose call returns a scalar/Unit with no mutable or
 // callable sibling arguments). Any bare reference or escaping capture returns false.
-recursive fn paramNonEscaping(self_: Analyzer&, m: const Module&, id: u32, param_binding: u32, depth: i64) -> bool {
+recursive fn paramNonEscaping(self_: Analyzer&, m: const Module&, id: u32, param_binding: u32, depth: i64, discarded: bool = false) -> bool {
     if id == 0 || id >= m.nodes.len { return true; }
     if depth > 64 { return false; }
     let n = m.node(id);
     if n.tag == blot_check_core::Tag.reference {
         return !isExactParamRef(m, id, param_binding);
+    }
+    if n.tag == blot_check_core::Tag.suite || n.tag == blot_check_core::Tag.block_ {
+        for child in m.children(id) {
+            if !paramNonEscaping(self_, m, child, param_binding, depth + 1, true) { return false; }
+        }
+        return true;
     }
     if n.tag == blot_check_core::Tag.fork_ || n.tag == blot_check_core::Tag.operation_value || n.tag == blot_check_core::Tag.handle || n.tag == blot_check_core::Tag.with_handle { return false; }
     if n.tag == blot_check_core::Tag.closure {
@@ -2661,7 +2668,7 @@ recursive fn paramNonEscaping(self_: Analyzer&, m: const Module&, id: u32, param
     }
     if n.tag == blot_check_core::Tag.storage {
         let op, err = blot_check_storage_ops::opFromCode(n.c);
-        let safe_first = err == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || op == blot_check_storage_ops::Op.truncate || op == blot_check_storage_ops::Op.length);
+        let safe_first = err == blot_error::Error.none && ((discarded && op == blot_check_storage_ops::Op.push) || op == blot_check_storage_ops::Op.truncate || op == blot_check_storage_ops::Op.length);
         for child, at in m.children(id) {
             if at == 0 && safe_first && isExactParamRef(m, child, param_binding) { continue; }
             if !paramNonEscaping(self_, m, child, param_binding, depth + 1) { return false; }
@@ -3993,7 +4000,10 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { origin: container.origin, exits: exits, .. };
         }
         if operation == blot_check_storage_ops::Op.push {
+            // Appends in place and returns the same storage; requires unique
+            // ownership of the target container.
             let container = visit(self_, m, children[0]);
+            let fresh = container.origin == 0 && unique(container.fact);
             let place_base = self_.argument_places.len;
             if local(self_, container.origin) {
                 var locked = Place { binding: container.origin, .. };
@@ -4004,13 +4014,32 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = visit(self_, m, children[1]);
             let pushed = taken(self_, m, children[1], value);
             self_.argument_places.resize(place_base);
+            let exits = container.exits || value.exits;
+            let pushed_shared = elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0);
+            if fresh {
+                var fact = container.fact;
+                if pushed_shared && fact == deep { fact = shell; }
+                return Value { fact: fact, exits: exits, .. };
+            }
             let base, ok = ownedInPlacePath(self_, m, children[0], container.origin);
             if !ok {
                 rejectSubject(self_, m, id, blot_check_core::Code.aliased_update, container.origin);
-            } else if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) {
-                sharedIntoPlace(self_, base);
+                escape(self_, container);
+                return Value { exits: exits, .. };
             }
-            return Value { exits: container.exits || value.exits, .. };
+            if self_.in_fork != 0 && local(self_, base.binding) {
+                let vt = nodeTaint(self_, m, children[1], 0);
+                if vt != 0 { setForkTaint(self_, base.binding, maxU32(getForkTaint(self_, base.binding), vt)); }
+            }
+            // A local pushed at its last read hands its storage on.
+            if container.origin != 0 && moves(self_, m, children[0], container.origin) {
+                var fact = self_.facts[container.origin];
+                if pushed_shared && fact == deep { fact = shell; }
+                kill(self_, container.origin);
+                return Value { fact: fact, exits: exits, .. };
+            }
+            if pushed_shared { sharedIntoPlace(self_, base); }
+            return Value { origin: container.origin, exits: exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {
             let input_ty = m.typeOf(children[0]);
@@ -4713,6 +4742,9 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
         let op, unknown = blot_check_storage_ops::opFromCode(n.c);
         if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.copy {
             if !blot_check_storage_types::arrayElement(m.types, n.ty).present || !elementHolds(self_, m, n.ty) { return 0; }
+        }
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.push && children.len >= 2 {
+            return maxU32(nodeTaint(self_, m, children[0], depth + 1), nodeTaint(self_, m, children[1], depth + 1));
         }
         return nodeTaint(self_, m, children[0], depth + 1);
     }

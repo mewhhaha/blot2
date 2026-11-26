@@ -944,3 +944,226 @@ io bad (): U32 =>
     }
   }
 });
+
+Deno.test("@storage.push returns updated #[T] with linear rebinding, fresh chaining, bulk push, fork, and aliasing soundness", async () => {
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+
+  await compileAndRun(
+    `
+func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
+  for i in 0 .. items.length:
+    items[i] := self * factor
+  items := @storage.push self factor
+  return items
+
+func push_return (items: own #[U32]) -> (x: U32): #[U32] =>
+  return @storage.push items x
+
+func push_loop (n: U32): #[U32] =>
+  let out: #[U32] = #[]
+  for i in 0 .. n:
+    out := @storage.push self (i * 2)
+  return out
+
+func bulk_copy_storage (src: #[U32]): #[U32] =>
+  let out: #[U32] = #[100]
+  for v in src:
+    out := @storage.push self v
+  return out
+
+func field_push (): U32 =>
+  let rec = { items: #[1, 2], tag: 7 }
+  rec.items := @storage.push self 3
+  rec.items := @storage.push self 4
+  return rec.items.length * 100 + rec.items[3] + rec.tag
+
+func fork_push (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]) =>
+  let score = fork board:
+    board[slot] := piece
+    board := @storage.push self piece
+    let acc: U32 = 0
+    for cell in board:
+      acc := self + cell
+    return acc
+  return (score, board)
+
+io test_storage_push (): U32 =>
+  let base = #[1.0, 2.0, 3.0]
+  let snap = copy base
+  let updated = scale_and_append base 2.0
+  let s1 = @f32.to_u32 (snap[0] + updated[3])
+
+  let chained = @storage.push (@storage.push #[10] 20) 30
+  let direct = push_return #[1, 2] 3
+  let looped = push_loop 4
+  let bulk = bulk_copy_storage #[5, 6, 7]
+  let (preview, restored) = fork_push #[1, 2, 3] 1 99
+  let fp = field_push ()
+  return s1 + chained[2] + direct[2] + looped[3] + bulk.length + bulk[3] + preview + restored[1] + restored.length + fp
+`,
+    (guest) => {
+      // s1=3, chained[2]=30, direct[2]=3, looped[3]=6, bulk.length=4, bulk[3]=7,
+      // preview=202, restored[1]=2, restored.length=3, fp=411
+      equal(guest.call("test_storage_push", null), 3 + 30 + 3 + 6 + 4 + 7 + 202 + 2 + 3 + 411);
+    },
+  );
+
+  // Verify prelude `:= self.push` across README patterns (own, comptime #for, fork, bulk loop).
+  await compileAndRun(
+    `
+type Skip is data = $Skip
+type FieldId is data = $FieldId U32
+
+type Codec a is trait = { encode: a -> #[U32] }
+const U32.Codec: Codec U32 = { encode: func x => #[x] }
+const Bool.Codec: Codec Bool = { encode: func b => #[if b then 1 else 0] }
+
+type Player is data = $Player {
+  @[$FieldId 10]
+  id: U32,
+  @[$FieldId 20]
+  hp: U32 = 100,
+  @[$FieldId 30]
+  alive: Bool = true,
+  @[$Skip]
+  cached_score: U32 = 0,
+}
+
+func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
+  for i in 0 .. items.length:
+    items[i] := self * factor
+  items := self.push factor
+  return items
+
+func encode_record (val: t): #[U32] =>
+  let out: #[U32] = #[]
+  #for field in #fields t:
+    #if not (field.has_tag $Skip):
+      out := self.push (field.tag $FieldId)
+      for word in Codec.encode val.(field):
+        out := self.push word
+  return out
+
+func score_move (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]) =>
+  let score = fork board:
+    board[slot] := piece
+    board := self.push piece
+    let acc: U32 = 0
+    for cell in board:
+      acc := self + cell
+    return acc
+  return (score, board)
+
+type Counter is data = $Counter { tick: U32, history: #[U32] }
+
+func init_counter (start: U32): Counter =>
+  return $Counter { tick: start, history: #[] }
+
+func step_counter (st: own Counter) -> (delta: U32): (Counter, U32) =>
+  let $Counter { tick, history } = st
+  let next = tick + delta
+  history := self.push next
+  return ($Counter { tick: next, history }, next)
+
+io test_readme_patterns (): U32 =>
+  let base = #[1.0, 2.0, 3.0]
+  let snapshot = copy base
+  let updated = scale_and_append base 2.0
+  let p1 = @f32.to_u32 (snapshot[0] + updated[3])
+
+  let encoded = encode_record ($Player { id: 7 })
+  let p2 = encoded.length * 1000 + encoded[0] + encoded[1] + encoded[2] + encoded[3] + encoded[4] + encoded[5]
+
+  let (preview, restored) = score_move #[1, 2, 3] 1 99
+  let p3 = preview * 100 + restored[1] * 10 + restored.length
+
+  let c0 = init_counter 10
+  let (c1, n1) = step_counter c0 5
+  let (c2, n2) = step_counter c1 7
+  let $Counter { tick: _, history } = c2
+  let p4 = n1 + n2 + history.length * 100 + history[1]
+  return p1 + p2 + p3 + p4
+`,
+    (guest) => {
+      // p1 = 3, p2 = 6168, p3 = 20223, p4 = 15 + 22 + 200 + 22 = 259
+      equal(guest.call("test_readme_patterns", null), 3 + 6168 + 20223 + 259);
+    },
+    { stdRoot },
+  );
+
+  for (
+    const [name, source, code] of [
+      [
+        "mutating result of @storage.push while original local stays live",
+        `io bad (): U32 =>
+  let a = #[1]
+  let b = @storage.push a 2
+  b[0] := 99
+  return a[0]`,
+        "aliased_update",
+      ],
+      [
+        "mutating original local while result of @storage.push stays live",
+        `io bad (): U32 =>
+  let a = #[1]
+  let b = @storage.push a 2
+  a[0] := 99
+  return b[0]`,
+        "aliased_update",
+      ],
+      [
+        "@storage.push overlapping sibling call argument",
+        `func pair (a: #[U32]) -> (b: #[U32]): U32 => return a[0] + b[0]
+io bad (): U32 =>
+  let xs = #[1]
+  return pair xs (@storage.push xs 2)`,
+        "aliased_update",
+      ],
+      [
+        "@storage.push of shared nested array weakens deep to shell",
+        `io bad (): U32 =>
+  let shared = #[1]
+  let grid = #[#[2]]
+  let g2 = @storage.push grid shared
+  g2[0][0] := 9
+  return shared[0]`,
+        "aliased_update",
+      ],
+      [
+        "@storage.push cannot escape forked array out of fork",
+        `io bad (): #[U32] =>
+  let xs = #[1, 2]
+  return fork xs:
+    return @storage.push xs 3`,
+        "result_not_owned",
+      ],
+      [
+        "@storage.push cannot smuggle forked nested array inside fresh outer array",
+        `io bad (): #[#[U32]] =>
+  let xs = #[1, 2]
+  return fork xs:
+    let out: #[#[U32]] = #[]
+    return @storage.push out xs`,
+        "result_not_owned",
+      ],
+      [
+        "paramNonEscaping does not treat returned @storage.push result as non-escaping",
+        `func push_and_view (out: own #[#[U32]]) -> (xs: #[U32]): &[#[U32]] =>
+  return @storage.view (@storage.push out xs) 0 1
+io bad (): U32 =>
+  let out: #[#[U32]] = #[]
+  let xs = #[1]
+  let v = push_and_view out xs
+  xs[0] := 99
+  return v[0][0]`,
+        "aliased_update",
+      ],
+    ] as [string, string, string][]
+  ) {
+    try {
+      await compileExpectedFailure(source + "\n", code);
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
+});

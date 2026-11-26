@@ -1228,7 +1228,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     } else {
         invalidateCheckedContainers(f);
     }
-    return unitVal(), blot_direct_types::Error.none;
+    return container, blot_direct_types::Error.none;
 }
 fn emitStorageViewVal(g: Generator&, f: Fn&, container: Val, start: u32, end: u32, ty: Ty, id: u32) -> Val, Error {
     let length, error = lengthOf(g, f, container, id);

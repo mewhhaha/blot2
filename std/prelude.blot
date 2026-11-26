@@ -272,8 +272,7 @@ func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.l
 
 // Mutation dispatch keeps the owner mode explicit in each selected signature.
 func Array.push (values: own #[a]) -> (value: a): #[a] =>
-  @storage.push values value
-  return values
+  return @storage.push values value
 func Array.truncate (values: own #[a]) -> (count: U32): #[a] =>
   @storage.truncate values count
   return values

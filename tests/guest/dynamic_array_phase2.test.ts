@@ -102,7 +102,7 @@ io main (): U32 =>
   );
   // Outer #[T] captured in closure cannot be pushed
   await compileExpectedFailure(
-    `func run (f: Unit -> Unit) => f ()
+    `func run (f: Unit -> #[U32]) => f ()
 io main (): U32 =>
   let xs: #[U32] = #[1, 2]
   let _ = run (func () => @storage.push xs 3)

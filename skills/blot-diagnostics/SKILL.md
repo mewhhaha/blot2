@@ -117,7 +117,7 @@ io main (): Opt => return $Some 1
 
 **Most frequent fixes:**
 - Arrays use `.length` (not `.len`).
-- Append to an owned array with `@storage.push arr item`.
+- Append to an owned array with `arr := self.push item` (or `arr := @storage.push self item`).
 - Match exact field names shown in the receiver record type.
 
 ```blot

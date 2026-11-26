@@ -64,7 +64,7 @@ func unwrap_or_zero (opt: Maybe U32): U32 =>
 
 ## 4. Ownership, Borrowing & In-Place Mutation
 
-- Locals owning an array (`let a = #[1, 2, 3]`) mutate **in place with zero copies** via `a[i] := val`, `@storage.push a val`, `@storage.truncate a n`.
+- Locals owning an array (`let a = #[1, 2, 3]`) mutate **in place with zero copies** via `a[i] := val`, `a := self.push val` (or `a := @storage.push self val`), `a := self.truncate n`.
 - `let b = a` **borrows** `a` until `b`'s last read; mutating `a` while `b` is still live fails with `[ALIASED_UPDATE]`.
   - Fix: `let b = a.copy` (explicit snapshot) or finish reading `b` before mutating `a`.
 - Passing `a` to an `own` parameter **moves** `a`; reading `a` afterward fails with `[SPENT_VALUE]`.

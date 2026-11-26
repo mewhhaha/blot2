@@ -21,13 +21,13 @@ Blot sits between garbage-collected scripting languages and LLVM-heavy systems l
 
 ### 1. In-Place Ownership Without Lifetimes
 
-Mutate uniquely owned arrays in place with `:=` and `@storage.push`, take an explicit snapshot with `copy`, and hand ownership across functions with `own` — zero lifetime parameters, zero hidden aliasing, and `self` shorthand for clean updates:
+Mutate uniquely owned arrays in place with `:=` and `.push`, take an explicit snapshot with `copy`, and hand ownership across functions with `own` — zero lifetime parameters, zero hidden aliasing, and `self` shorthand for clean updates:
 
 ```blot
 func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
   for i in 0 .. items.length:
     items[i] := self * factor
-  @storage.push items factor
+  items := self.push factor
   return items
 
 io main (): F32 =>
@@ -64,9 +64,9 @@ func encode_record (val: t): #[U32] =>
   let out: #[U32] = #[]
   #for field in #fields t:
     #if not (field.has_tag $Skip):
-      @storage.push out (field.tag $FieldId)
+      out := self.push (field.tag $FieldId)
       for word in Codec.encode val.(field):
-        @storage.push out word
+        out := self.push word
   return out
 
 io main (): #[U32] =>
@@ -108,7 +108,7 @@ Need lookahead search, move evaluation, or transactional validation? `fork` lets
 func score_move (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]) =>
   let score = fork board:
     board[slot] := piece
-    @storage.push board piece
+    board := self.push piece
     let acc: U32 = 0
     for cell in board:
       acc := self + cell
@@ -157,7 +157,7 @@ func init_counter (start: U32): Counter =>
 func step_counter (st: own Counter) -> (delta: U32): (Counter, U32) =>
   let $Counter { tick, history } = st
   let next = tick + delta
-  @storage.push history next
+  history := self.push next
   return ($Counter { tick: next, history }, next)
 
 #process const counter: Process [U32, U32, U32] = {
@@ -198,7 +198,7 @@ Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goo
 
 - **Runtime throughput:** Blot beats LLVM `-O3` Wasm across all 6 kernels (**0.19×–0.69×**) and beats native Rust `-O3` across all 6 (**0.18×–0.92×**) while keeping Wasm bounds safety and canonical NaN determinism — including **5.63× faster** on `mandelbrot_f32`, **3.18× faster** on `lcg_recurrence`, **1.32× faster** on `merge_sort`, and **1.29× faster** on `particle_spark_simd` (**0.50 ms** vs **0.65 ms**).
 - **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **2.13 ms** vs **2.80 ms** native Rust (**1.31× faster**); 8-thread Mandelbrot scales **6.02×** across isolated guests (**0.94 ms**, **4.42× faster** than 8-thread native Rust); persistent `#process` commits in **~51 ns/step** (~19.7M steps/sec).
-- **Compile & edit latency:** **6.8× faster** cold builds than `rustc -O3 wasm32` (**12.1 ms** vs **82.9 ms**) with **65× smaller** `.wasm` binaries (**22.5 KiB** vs **1,468 KiB**). On a 319-module / 6.19 MB 3D game, cold builds finish in **~0.63 s**, single-file structural edits localize to `fresh=1` in **61–90 ms**, and literal/comment edits rebuild in **~20 ms**.
+- **Compile & edit latency:** **6.8× faster** cold builds than `rustc -O3 wasm32` (**12.1 ms** vs **82.9 ms**) with **65× smaller** `.wasm` binaries (**22.5 KiB** vs **1,468 KiB**). On a private internal 3D game project (**~69k LOC** of Blot across **263** source modules + **62** shader/data asset modules, **325 modules / 4,572 functions / 6.71 MB** `.wasm`), full cold builds finish in **~0.43–0.55 s**, single-file incremental edits localize to `fresh=1` in **~41–44 ms**, and literal/comment edits rebuild in **~20 ms** (with synthetic **1M LOC** throughput reaching **~2.0M LOC/s** in **~0.50 s**).
 - **Optional Wasm 3.0 (`--wasm3`):** Enables tail calls (`return_call` / `return_call_indirect`) and relaxed SIMD (FMA, `relaxed_min`/`max`/`trunc`) on V8/Deno and `wtime-aot 0.1.6`.
 
 ---
