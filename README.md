@@ -11,7 +11,7 @@ Blot sits between garbage-collected scripting languages and LLVM-heavy systems l
 ## Why Blot?
 
 - **No GC pauses, no `'a` lifetimes.** Values are immutable by default; uniquely owned dynamic arrays (`#[T]`) mutate in place with `:=`, while the compiler infers local borrows (`&T`, `&[T]`) and ownership transfers (`own`) statically.
-- **Native-class speed, direct to Wasm.** No LLVM in the loop — a 6-kernel benchmark compiles in **12.1 ms** (**22.5 KiB** `.wasm`) and beats native `rustc -O3` across all 6 kernels on `wtime-aot`.
+- **Native-class speed, direct to Wasm.** No LLVM in the loop — a 6-kernel benchmark compiles in **13.6 ms** (**22.5 KiB** `.wasm`) and beats native `rustc -O3` across all 6 kernels on `wtime-aot`.
 - **Deterministic & sandboxed by construction.** Pure by default, explicit algebraic effects for I/O and state, canonical IEEE 754 quiet NaN (`0x7fc00000`) across scalar, SIMD, and `#run`.
 - **Low-friction metaprogramming & parallelism.** Field defaults, `@[...]` data tags, compile-time `#for #fields` / `#variants`, speculative `fork` rollback, auto-SIMD `spark #[...]`, and first-class `#kernel` / `#process` concurrency.
 
@@ -190,16 +190,16 @@ Curried functions (`->`), exhaustive `case ... of` matching, `let $Some x = ... 
 
 ## Performance
 
-Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goose`) on **`wtime-aot 0.1.6`** (`--backend x64`, `x64-v3`, explicit software bounds checks) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.6`) and native `x86_64` (`-O3`, thin LTO). All runs report medians with **bit-exact checksum parity** ([source & runner](benchmarks/comparison/README.md), [raw JSON](benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.6.json)).
+Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goose`) on **`wtime-aot 0.1.7`** (`--backend x64`, `x64-v4`, explicit software bounds checks) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.7`) and native `x86_64` (`-O3`, thin LTO). All runs report medians with **bit-exact checksum parity** ([source & runner](benchmarks/comparison/README.md), [raw JSON](benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json)).
 
 ![Compile speed and WebAssembly output size: Blot vs Rust](benchmarks/evidence/measurements/2026-11-26-compile-and-size.svg)
 
 ![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-26-blot-vs-rust-kernels.svg)
 
-- **Runtime throughput:** Blot beats LLVM `-O3` Wasm across all 6 kernels (**0.19×–0.69×**) and beats native Rust `-O3` across all 6 (**0.18×–0.92×**) while keeping Wasm bounds safety and canonical NaN determinism — including **5.63× faster** on `mandelbrot_f32`, **3.18× faster** on `lcg_recurrence`, **1.32× faster** on `merge_sort`, and **1.29× faster** on `particle_spark_simd` (**0.50 ms** vs **0.65 ms**).
-- **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **2.13 ms** vs **2.80 ms** native Rust (**1.31× faster**); 8-thread Mandelbrot scales **6.02×** across isolated guests (**0.94 ms**, **4.42× faster** than 8-thread native Rust); persistent `#process` commits in **~51 ns/step** (~19.7M steps/sec).
-- **Compile & edit latency:** **6.8× faster** cold builds than `rustc -O3 wasm32` (**12.1 ms** vs **82.9 ms**) with **65× smaller** `.wasm` binaries (**22.5 KiB** vs **1,468 KiB**). On a private internal 3D game project (**~69k LOC** of Blot across **263** source modules + **62** shader/data asset modules, **325 modules / 4,572 functions / 6.71 MB** `.wasm`), full cold builds finish in **~0.43–0.55 s**, single-file incremental edits localize to `fresh=1` in **~41–44 ms**, and literal/comment edits rebuild in **~20 ms** (with synthetic **1M LOC** throughput reaching **~2.0M LOC/s** in **~0.50 s**).
-- **Optional Wasm 3.0 (`--wasm3`):** Enables tail calls (`return_call` / `return_call_indirect`) and relaxed SIMD (FMA, `relaxed_min`/`max`/`trunc`) on V8/Deno and `wtime-aot 0.1.6`.
+- **Runtime throughput:** Blot beats LLVM `-O3` Wasm across all 6 kernels (**0.16×–0.71×**) and beats native Rust `-O3` across all 6 (**0.17×–0.92×**) while keeping Wasm bounds safety and canonical NaN determinism — including **5.77× faster** on `mandelbrot_f32`, **3.68× faster** on `lcg_recurrence`, **1.47× faster** on `particle_spark_simd` (**0.44 ms** vs **0.64 ms**), and **1.33× faster** on `merge_sort`.
+- **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **1.57 ms** vs **2.88 ms** native Rust (**1.83× faster**); 8-thread Mandelbrot scales **4.64×** across isolated guests (**1.24 ms**, **3.67× faster** than 8-thread native Rust); persistent `#process` commits in **~53 ns/step** (~18.8M steps/sec).
+- **Compile & edit latency:** **7.0× faster** cold builds than `rustc -O3 wasm32` (**13.6 ms** vs **96.0 ms**) with **65× smaller** `.wasm` binaries (**22.5 KiB** vs **1,468 KiB**). On a private internal 3D game project (**~69k LOC** of Blot across **263** source modules + **62** shader/data asset modules, **325 modules / 4,572 functions / 6.71 MB** `.wasm`), full cold builds finish in **~0.43–0.55 s**, single-file incremental edits localize to `fresh=1` in **~41–44 ms**, and literal/comment edits rebuild in **~20 ms** (with synthetic **1M LOC** throughput reaching **~2.0M LOC/s** in **~0.50 s**).
+- **Optional Wasm 3.0 (`--wasm3`):** Enables tail calls (`return_call` / `return_call_indirect`) and relaxed SIMD (FMA, `relaxed_min`/`max`/`trunc`) on V8/Deno and `wtime-aot 0.1.7`.
 
 ---
 

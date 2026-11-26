@@ -674,7 +674,7 @@ fn main() {
         "checksum_bevy": bevy_snap_chk,
     }));
 
-    // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot 0.1.6,
+    // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot 0.1.7,
     //    generalized AoS Vec2/Vec4 record auto-SIMD, multi-core isolated-guest scaling,
     //    and persistent #process throughput.
     let blot_kernels_w3_wasm = Path::new("/tmp/blot_kernels_w3.wasm");
@@ -910,7 +910,7 @@ fn main() {
         }));
     }
 
-    // 4d. Persistent ABI 8 `#process` zero-alloc step throughput on wtime-aot 0.1.6.
+    // 4d. Persistent ABI 8 `#process` zero-alloc step throughput on wtime-aot 0.1.7.
     let (proc_noop_us, proc_phys_us) = {
         let mut g = mc_def_mod.instantiate();
         g.call_proc_init("particle_sim", 4096);
@@ -942,7 +942,30 @@ fn main() {
                 .and_then(|l| l.split('"').nth(1))
                 .map(|v| v.to_string())
         })
-        .unwrap_or_else(|| "0.1.6".to_string());
+        .unwrap_or_else(|| "0.1.7".to_string());
+    let x64_profile = {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if std::arch::is_x86_feature_detected!("avx512f")
+                && std::arch::is_x86_feature_detected!("avx512vl")
+                && std::arch::is_x86_feature_detected!("avx512bw")
+                && std::arch::is_x86_feature_detected!("avx512dq")
+            {
+                "x64-v4"
+            } else if std::arch::is_x86_feature_detected!("avx2")
+                && std::arch::is_x86_feature_detected!("bmi2")
+                && std::arch::is_x86_feature_detected!("fma")
+            {
+                "x64-v3"
+            } else {
+                "x64-v2"
+            }
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            "native"
+        }
+    };
     let rustc_version = Command::new("rustc")
         .arg("--version")
         .output()
@@ -955,7 +978,7 @@ fn main() {
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
             "blot_commit": blot_commit,
-            "wtime_aot": format!("{wtime_version} (x64-v3, {wtime_commit})"),
+            "wtime_aot": format!("{wtime_version} ({x64_profile}, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
             "rustc": rustc_version,
         },
