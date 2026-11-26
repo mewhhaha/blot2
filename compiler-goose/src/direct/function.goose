@@ -123,7 +123,31 @@ struct ComptimeFrame {
     loop_node: u32 = 0,
     carry_slots: Vals = Vals {},
 }
+struct ConstU32 {
+    local_id: u32 = 0,
+    value: u32 = 0,
+    unit: u32 = 0,
+    node: u32 = 0,
+}
+struct MutableOwner {
+    slot: u32 = 0,
+    generation: u32 = 0,
+}
+struct LoopReciprocal {
+    divisor: u32 = 0,
+    multiplier: u32 = 0,
+    shift: u32 = 0,
+    check_at_use: bool = true,
+}
 struct Fn {
+    // Only stable value locals have facts. Loop-carried copies and mutable
+    // counters start out unknown. An in-place array carry keeps its handle.
+    const_u32: ConstU32[32] = [ConstU32 {}; 32],
+    const_u32_len: i64 = 0,
+    known_mutable: MutableOwner[32] = [MutableOwner {}; 32],
+    known_mutable_len: i64 = 0,
+    loop_reciprocals: LoopReciprocal[8] = [LoopReciprocal {}; 8],
+    loop_reciprocals_len: i64 = 0,
     checked_range: CheckedRange = CheckedRange {},
     checked_arrays: CheckedArray[16] = [CheckedArray {}; 16],
     checked_arrays_len: i64 = 0,
@@ -187,6 +211,7 @@ struct Fn {
     handle_cells_base: i64 = 0,
     code_base: i64 = 0,
     locals_base: i64 = 0,
+    shadows_base: i64 = 0,
     labels_base: i64 = 0,
     parameter_words: u32 = 0,
     bindings: blot_support_zigmap::Map = blot_support_zigmap::Map {},
@@ -227,6 +252,9 @@ struct Fn {
     self_tco_loop: u32 = 0xffffffff,
     self_tco_inputs: Vals = Vals {},
     tail_call_node: u32 = 0,
+    direct_returns: bool = false,
+    assoc_tco_local: u32 = 0xffffffff,
+    assoc_tco_opcode: u8 = 0,
     tco_inhibit: u32 = 0,
     emitted_return_call: bool = false,
     // 7B: `@array.fill` node IDs proved completely overwritten by an immediately following 0..n loop.
@@ -253,6 +281,37 @@ fn consumeSkipFillNode(f: Fn&, id: u32) -> bool {
     return false;
 }
 
+fn constU32(f: const Fn&, local_id: u32) -> ConstU32, bool {
+    for at in 0..f.const_u32_len {
+        let fact = f.const_u32[at];
+        if fact.local_id == local_id { return fact, true; }
+    }
+    return ConstU32 {}, false;
+}
+fn recordConstU32(f: Fn&, local_id: u32, value: u32, unit: u32 = 0, node: u32 = 0) {
+    if f.const_u32_len >= 32 { return; }
+    f.const_u32[f.const_u32_len] = ConstU32 { local_id, value, unit, node };
+    f.const_u32_len += 1;
+}
+fn useConstU32(fact: ConstU32) {
+    if fact.node != 0 { blot_direct_relocations::unpatchableOperand(fact.unit, fact.node); }
+}
+fn knownMutable(g: const Generator&, f: const Fn&, owner: Val) -> bool {
+    if tagOf(g, owner.ty) != blot_direct_types::Tag.array { return false; }
+    let slot = w(g, owner, 0);
+    let generation = w(g, owner, 1);
+    for at in 0..f.known_mutable_len {
+        let fact = f.known_mutable[at];
+        if fact.slot == slot && fact.generation == generation { return true; }
+    }
+    return false;
+}
+fn recordMutable(g: const Generator&, f: Fn&, owner: Val) {
+    if tagOf(g, owner.ty) != blot_direct_types::Tag.array || f.known_mutable_len >= 32 || knownMutable(g, f, owner) { return; }
+    f.known_mutable[f.known_mutable_len] = MutableOwner { w(g, owner, 0), w(g, owner, 1) };
+    f.known_mutable_len += 1;
+}
+
 fn hasFiniteF32(f: const Fn&, binding: u32) -> bool {
     for i in 0..f.finite_f32_len {
         if f.finite_f32[i] == binding { return true; }
@@ -265,8 +324,16 @@ fn recordFiniteF32(f: Fn&, binding: u32) {
     f.finite_f32_len += 1;
 }
 
-fn op(g: Generator&, value: u8) { g.s.code.push(value); }
+// Materialization is reusable within straight-line code. An extraction in
+// one arm of a branch (or in a possibly empty loop) does not dominate its exit.
+fn op(g: Generator&, value: u8) {
+    if value == OP_else_ || value == OP_end || value == OP_if_ || value == OP_block || value == OP_loop {
+        g.s.shadow_epoch += 1;
+    }
+    g.s.code.push(value);
+}
 fn opIndex(g: Generator&, value: u8, index: u32) {
+    if value == OP_local_get && isShadowWord(index) { lget(g, index); return; }
     g.s.code.push(value);
     if g.s.parallel_readonly {
         if (value == OP_call || value == OP_return_call) && blot_direct_emit::tryPatchCall(g, index) { return; }
@@ -279,7 +346,31 @@ fn opIndexRaw(g: Generator&, value: u8, index: u32) {
     g.s.code.push(value);
     if index < 128 { g.s.code.push(index as u8); } else { blot_direct_writer::uleb(g.s.code, index); }
 }
-fn lget(g: Generator&, id: u32) { opIndexRaw(g, OP_local_get, id); }
+// Shadow words can be projected, flattened or passed around like ordinary
+// immutable words. All scalar machine reads converge here, including reads
+// from only part of a tuple or from a larger product containing one.
+let shadow_word_bit: u32 = 0x80000000;
+fn isShadowWord(word: u32) -> bool { return (word & shadow_word_bit) != 0; }
+fn shadowIndex(word: u32) -> u32 { return (word & ~shadow_word_bit) >> 2; }
+fn lget(g: Generator&, id: u32) {
+    if !isShadowWord(id) {
+        opIndexRaw(g, OP_local_get, id);
+        return;
+    }
+    let at = shadowIndex(id);
+    let shadow = g.s.v128_shadows[at];
+    if shadow.materialized_at != g.s.shadow_epoch {
+        var opcode = SIMD_i32x4_extract_lane;
+        if shadow.is_float { opcode = SIMD_f32x4_extract_lane; }
+        for lane in 0..4 {
+            opIndexRaw(g, OP_local_get, shadow.vloc);
+            simdLaneOp(g, opcode, lane as u8);
+            lset(g, shadow.w0 + (lane as u32));
+        }
+        g.s.v128_shadows[at].materialized_at = g.s.shadow_epoch;
+    }
+    opIndexRaw(g, OP_local_get, shadow.w0 + (id & 3));
+}
 fn lset(g: Generator&, id: u32) { opIndexRaw(g, OP_local_set, id); }
 fn ltee(g: Generator&, id: u32) { opIndexRaw(g, OP_local_tee, id); }
 fn gget(g: Generator&, id: u32) { opIndexRaw(g, OP_global_get, id); }
@@ -290,19 +381,23 @@ fn i32Const(g: Generator&, value: u32) {
     if value < 64 { g.s.code.push(value as u8); return; }
     blot_direct_writer::sleb(g.s.code, (value as! i32));
 }
+fn i64Const(g: Generator&, value: i64) {
+    op(g, OP_i64_const);
+    blot_direct_writer::sleb(g.s.code, value);
+}
 fn f32Const(g: Generator&, bits: u32) {
     g.s.code.push(OP_f32_const);
     blot_direct_writer::word(g.s.code, bits);
 }
 // Opens a void structured block (block, loop or if) and returns its depth.
 fn open(g: Generator&, f: Fn&, kind: u8) -> u32 {
-    g.s.code.push(kind);
+    op(g, kind);
     g.s.code.push(0x40);
     f.depth += 1;
     return f.depth;
 }
 fn close(g: Generator&, f: Fn&) {
-    g.s.code.push(OP_end);
+    op(g, OP_end);
     f.depth -= 1;
     popCheckedArrays(f, f.depth);
 }
@@ -540,6 +635,24 @@ fn invalidateCheckedContainers(f: Fn&) {
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
+    var constants: i64 = 0;
+    for at in 0..f.const_u32_len {
+        let fact = f.const_u32[at];
+        if !hasWord(g, value, fact.local_id) {
+            f.const_u32[constants] = fact;
+            constants += 1;
+        }
+    }
+    f.const_u32_len = constants;
+    var owners: i64 = 0;
+    for at in 0..f.known_mutable_len {
+        let fact = f.known_mutable[at];
+        if !hasWord(g, value, fact.slot) && !hasWord(g, value, fact.generation) {
+            f.known_mutable[owners] = fact;
+            owners += 1;
+        }
+    }
+    f.known_mutable_len = owners;
     if f.checked_arrays_len != 0 {
         var out: i64 = 0;
         for i in 0..f.checked_arrays_len {
@@ -681,7 +794,13 @@ fn local(g: Generator&, f: const Fn&, ty: ValType) -> u32 {
     return id;
 }
 fn local32(g: Generator&, f: const Fn&) -> u32 { return local(g, f, VT_i32); }
-fn localType(g: const Generator&, f: const Fn&, id: u32) -> ValType { return g.s.locals[f.locals_base + id]; }
+fn localType(g: const Generator&, f: const Fn&, id: u32) -> ValType {
+    if isShadowWord(id) {
+        if g.s.v128_shadows[shadowIndex(id)].is_float { return VT_f32; }
+        return VT_i32;
+    }
+    return g.s.locals[f.locals_base + id];
+}
 fn localCount(g: const Generator&, f: const Fn&) -> u32 { return (g.s.locals.len - f.locals_base) as u32; }
 fn tagOf(g: const Generator&, ty: Ty) -> blot_direct_types::Tag { return g.types.node(ty).tag; }
 fn unitVal() -> Val { return Val { ty: blot_direct_types::unit }; }
@@ -1764,7 +1883,13 @@ fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false) -> Va
         u32_, boolean => { i32Const(g, bits); },
         _ => { return neverVal(), g.fail(m, id, "constant of a composite type"); },
     }
-    return pop(g, f, ty, id);
+    let value, err = pop(g, f, ty, id);
+    if err == blot_direct_types::Error.none && ty == blot_direct_types::u32_ {
+        if literal { recordConstU32(f, w(g, value, 0), bits, m.unit, id); }
+        // Staging records its dependencies while evaluating the value.
+        else { recordConstU32(f, w(g, value, 0), bits); }
+    }
+    return value, err;
 }
 
 fn containsText(haystack: Chars, needle: Chars) -> bool {
@@ -1884,7 +2009,11 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
                     g.recordInlined(target.unit, target.binding);
                     blot_direct_relocations::operand(target.unit, root, g.s.code.len);
                     if ctag == blot_direct_types::Tag.f32_ { f32Const(g, rn.a); } else { i32Const(g, rn.a); }
-                    return pop(g, f, ty, id);
+                    let value, error = pop(g, f, ty, id);
+                    if error == blot_direct_types::Error.none && ctag == blot_direct_types::Tag.u32_ {
+                        recordConstU32(f, w(g, value, 0), rn.a, target.unit, root);
+                    }
+                    return value, error;
                 }
             } else if rn.tag == blot_check_core::Tag.construct && rn.b == 0 {
                 let boxed, berr = isBoxed(g, f, ty, id);

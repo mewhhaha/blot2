@@ -19,6 +19,17 @@ fn isCanonicalF32Op(op_: Op) -> bool {
 fn isCanonicalF32Consumer(op_: Op) -> bool {
     return isCanonicalF32Op(op_) || isComparisonOp(op_) || op_ == blot_check_core::Op.convert_f32_u32 || op_ == blot_check_core::Op.convert_f32_i32;
 }
+fn canonicalV128Producer(op_: Op) -> bool {
+    return isCanonicalF32Op(op_) || op_ == blot_check_core::Op.relaxed_madd || op_ == blot_check_core::Op.relaxed_nmadd;
+}
+fn isF32x4CoreExpr(m: const Module&, id: u32) -> bool {
+    let ty = m.types.node(m.typeOf(id));
+    if ty.tag != blot_check_types::Tag.product || ty.b != 4 { return false; }
+    for lane in 0..4 {
+        if m.types.extra[ty.a + lane] != blot_check_types::f32_type { return false; }
+    }
+    return true;
+}
 fn canonicalizeF32Stack(g: Generator&, f: const Fn&) {
     let tmp = local(g, f, VT_f32);
     ltee(g, tmp);
@@ -83,22 +94,164 @@ recursive fn isBoundedFiniteF32(g: const Generator&, f: const Fn&, m: const Modu
         _ => { return false; },
     }
 }
-recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
+fn isCoreScalar(m: const Module&, id: u32) -> bool {
+    if id == 0 { return false; }
+    match m.types.node(m.typeOf(id)).tag {
+        unsigned32, floating32, boolean => { return true; },
+        _ => { return false; },
+    }
+}
+
+// A scalar literal can stay as a typed operand until its consumer needs it.
+recursive fn scalarOperand(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    if m.node(id).tag == blot_check_core::Tag.constant && isCoreScalar(m, id) {
+        let ty, error = typeOf(g, f, id);
+        return Val { ty: ty }, error;
+    }
+    return expr(g, f, id);
+}
+fn pushScalarOperand(g: Generator&, f: const Fn&, id: u32, value: Val) {
+    if value.len != 0 || !isScalarTag(tagOf(g, value.ty)) { push(g, value); return; }
+    let m .= g.units[f.unit - 1];
+    blot_direct_relocations::operand(m.unit, id, g.s.code.len);
+    let bits = m.node(id).a;
+    if value.ty == blot_direct_types::f32_ { f32Const(g, bits); }
+    else { i32Const(g, bits); }
+}
+fn u32OperandConstant(g: const Generator&, f: const Fn&, id: u32, value: Val) -> ConstU32, bool {
+    if value.len == 0 {
+        let m .= g.units[f.unit - 1];
+        return ConstU32 { value: m.node(id).a, unit: m.unit, node: id }, true;
+    }
+    return constU32(f, w(g, value, 0));
+}
+fn floorLog2U32(value: u32) -> u32 {
+    var bits = value;
+    var log: u32 = 0;
+    while bits > 1 { bits >>= 1; log += 1; }
+    return log;
+}
+
+// The rounded-up reciprocal at 32 + ceil(log2(d)) has an error strictly
+// below 1/d for every U32 dividend. Subtract the implicit high word before
+// multiplying, so both the reciprocal construction and product fit in u64.
+fn reciprocalLow(d: u64, shift: u32) -> u64 {
+    return (((((1 as u64) << shift) - d) << 32) + (d - 1)) / d;
+}
+fn emitReciprocalQuotient(g: Generator&, f: const Fn&, left_id: u32, left: Val, multiplier: u64, shift: u32, add: bool, runtime: bool) {
+    pushScalarOperand(g, f, left_id, left);
+    op(g, OP_i64_extend_i32_u);
+    if runtime { lget(g, multiplier as u32); } else { i64Const(g, multiplier as i64); }
+    op(g, OP_i64_mul);
+    if add {
+        i64Const(g, 32);
+        op(g, OP_i64_shr_u);
+        pushScalarOperand(g, f, left_id, left);
+        op(g, OP_i64_extend_i32_u);
+        op(g, OP_i64_add);
+    }
+    if runtime { lget(g, shift); } else { i64Const(g, shift); }
+    op(g, OP_i64_shr_u);
+    op(g, OP_i32_wrap_i64);
+}
+
+fn emitU32StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, left: Val, right_id: u32, right: Val) -> bool {
+    if machine != blot_check_core::Op.mul && machine != blot_check_core::Op.div && machine != blot_check_core::Op.rem { return false; }
+    let rhs, rhs_known = u32OperandConstant(g, f, right_id, right);
+    if machine == blot_check_core::Op.mul {
+        var input = left;
+        var input_id = left_id;
+        var factor = rhs;
+        if !rhs_known || (rhs.value != 0 && (rhs.value & (rhs.value - 1)) != 0) {
+            let lhs, lhs_known = u32OperandConstant(g, f, left_id, left);
+            if !lhs_known || (lhs.value != 0 && (lhs.value & (lhs.value - 1)) != 0) { return false; }
+            factor = lhs;
+            input = right;
+            input_id = right_id;
+        }
+        useConstU32(factor);
+        if factor.value == 0 { i32Const(g, 0); }
+        else {
+            pushScalarOperand(g, f, input_id, input);
+            if factor.value > 1 {
+                i32Const(g, floorLog2U32(factor.value));
+                op(g, OP_i32_shl);
+            }
+        }
+        return true;
+    }
+    let remainder = machine == blot_check_core::Op.rem;
+    if rhs_known {
+        let d = rhs.value;
+        // Keep the native divide-by-zero instruction and its trap.
+        if d == 0 { return false; }
+        useConstU32(rhs);
+        if d == 1 {
+            if remainder { i32Const(g, 0); } else { pushScalarOperand(g, f, left_id, left); }
+            return true;
+        }
+        let log = floorLog2U32(d);
+        if (d & (d - 1)) == 0 {
+            pushScalarOperand(g, f, left_id, left);
+            if remainder { i32Const(g, d - 1); op(g, OP_i32_and); }
+            else { i32Const(g, log); op(g, OP_i32_shr_u); }
+            return true;
+        }
+        if remainder { pushScalarOperand(g, f, left_id, left); }
+        let scale = (1 as u64) << (32 + log);
+        let d64 = d as u64;
+        let rounding = d64 - scale % d64;
+        if rounding <= ((1 as u64) << log) {
+            // This smaller reciprocal also has error below 1/d.
+            emitReciprocalQuotient(g, f, left_id, left, scale / d64 + 1, 32 + log, false, false);
+        } else {
+            let shift = log + 1;
+            emitReciprocalQuotient(g, f, left_id, left, reciprocalLow(d64, shift), shift, true, false);
+        }
+        if remainder { i32Const(g, d); op(g, OP_i32_mul); op(g, OP_i32_sub); }
+        return true;
+    }
+    let divisor = w(g, right, 0);
+    for at in 0..f.loop_reciprocals_len {
+        let reciprocal = f.loop_reciprocals[at];
+        if reciprocal.divisor != divisor { continue; }
+        // Without an unconditional, trap-free prefix, defer a zero
+        // divisor trap to the operation that actually executes.
+        if reciprocal.check_at_use {
+            lget(g, divisor);
+            op(g, OP_i32_eqz);
+            trap(g, f);
+        }
+        if remainder { pushScalarOperand(g, f, left_id, left); }
+        emitReciprocalQuotient(g, f, left_id, left, reciprocal.multiplier, reciprocal.shift, true, true);
+        if remainder { lget(g, divisor); op(g, OP_i32_mul); op(g, OP_i32_sub); }
+        return true;
+    }
+    return false;
+}
+
+recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, stack_result: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     // Peephole-elide NaN canonicalization on direct F32 operands ONLY when this
     // operation itself canonicalizes or ignores NaN payloads (arithmetic/rounding,
     // float comparisons, F32.to_u32 / F32.to_i32).
-    let elide_children = isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    let scalar_children = isCanonicalF32Consumer(n.op) && isF32CoreExpr(g, f, m, n.a);
+    let vector_children = (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)) && isF32x4CoreExpr(m, n.a);
+    let elide_children = scalar_children || vector_children;
     if elide_children { f.elide_f32_nan_node = n.a; }
-    let left, error = expr(g, f, n.a);
+    let left, error = scalarOperand(g, f, n.a);
     f.elide_f32_nan_node = 0;
     if error != blot_direct_types::Error.none { return left, error; }
     var has_right = false;
     var right = neverVal();
     if n.b != 0 {
         if elide_children { f.elide_f32_nan_node = n.b; }
-        let value, error = expr(g, f, n.b);
+        var value = neverVal();
+        var error = blot_direct_types::Error.none;
+        if isScalarTag(tagOf(g, left.ty)) { value, error = scalarOperand(g, f, n.b); }
+        else { value, error = expr(g, f, n.b); }
         f.elide_f32_nan_node = 0;
         if error != blot_direct_types::Error.none { return value, error; }
         has_right = true;
@@ -185,7 +338,10 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> 
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         result = lowered;
     }
-    if tag == blot_direct_types::Tag.tuple { return lanes(g, f, n.op, left, has_right, right, result, id); }
+    if tag == blot_direct_types::Tag.tuple {
+        let selectors = laneSelectorOperand(n.op, n.a, n.b);
+        return lanes(g, f, n.op, left, right, result, id, elide_nan, selectors);
+    }
     // Machine operations take operands of one type; the checker should reject
     // a mix, so never emit one.
     if has_right && right.ty != left.ty {
@@ -217,24 +373,31 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> 
         let na = m.node(n.a);
         let nb = m.node(n.b);
         if na.tag == blot_check_core::Tag.constant && na.a == 0x40000000 {
-            push(g, right);
-            push(g, right);
+            blot_direct_relocations::unpatchableOperand(m.unit, n.a);
+            pushScalarOperand(g, f, n.b, right);
+            pushScalarOperand(g, f, n.b, right);
             let emitted = scalarOp(g, f, blot_check_core::Op.add, left.ty, id, !skip_nan);
             if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
             return pop(g, f, result, id);
         }
         if nb.tag == blot_check_core::Tag.constant && nb.a == 0x40000000 {
-            push(g, left);
-            push(g, left);
+            blot_direct_relocations::unpatchableOperand(m.unit, n.b);
+            pushScalarOperand(g, f, n.a, left);
+            pushScalarOperand(g, f, n.a, left);
             let emitted = scalarOp(g, f, blot_check_core::Op.add, left.ty, id, !skip_nan);
             if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
             return pop(g, f, result, id);
         }
     }
-    push(g, left);
-    if has_right { push(g, right); }
+    if has_right && left.ty == blot_direct_types::u32_ &&
+        emitU32StrengthReduction(g, f, machine, n.a, left, n.b, right) {
+        return pop(g, f, result, id);
+    }
+    pushScalarOperand(g, f, n.a, left);
+    if has_right { pushScalarOperand(g, f, n.b, right); }
     let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
+    if stack_result { return Val { ty: result }, blot_direct_types::Error.none; }
     return pop(g, f, result, id);
 }
 // `calleeFromArguments` for values: the callee's type from argument types.
@@ -293,171 +456,226 @@ fn scalarPayload(g: Generator&, value: Val) -> Val, bool {
     if !isScalarTag(tagOf(g, payload)) { return value, false; }
     return Val { payload, value.start, value.len }, true;
 }
-// Four-lane operations on (U32|F32)x4 products, one lane at a time.
-fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, has_right: bool, right: Val, result_ty: Ty, id: u32) -> Val, Error {
-    let m .= g.units[f.unit - 1];
-    let shape = g.types.node(left.ty);
-    if shape.b != 4 {
-        g.failOpen(m, id);
-        g.put("lane operation on a ");
-        g.putNumber(shape.b);
-        g.put("-tuple");
-        return neverVal(), g.failClose();
+// The shadow's scalar locals are private to this immutable vector result.
+// Branch joins and loop carries still copy through the ordinary tuple layout.
+fn shadowV128(g: Generator&, f: const Fn&, ty: Ty, vloc: u32) -> Val {
+    let is_float = g.types.words[g.types.node(ty).a] == blot_direct_types::f32_;
+    var kind = VT_i32;
+    if is_float { kind = VT_f32; }
+    let start = g.s.words.len as u32;
+    let w0 = local(g, f, kind);
+    let key = shadow_word_bit | ((g.s.v128_shadows.len as u32) << 2);
+    g.s.v128_shadows.push(blot_direct_emit::V128Shadow { w0, vloc, is_float, f.depth, .. });
+    g.s.words.push(key);
+    for lane in 1..4 {
+        let _ = local(g, f, kind);
+        g.s.words.push(key + (lane as u32));
     }
-    let lane = g.types.words[shape.a];
-    let float = tagOf(g, lane) == blot_direct_types::Tag.f32_;
+    return Val { ty, start, 4 };
+}
+fn popV128(g: Generator&, f: const Fn&, ty: Ty) -> Val {
+    let vloc = local(g, f, VT_v128);
+    lset(g, vloc);
+    return shadowV128(g, f, ty, vloc);
+}
+fn ensureV128(g: Generator&, f: const Fn&, value: Val) -> u32 {
+    let first = w(g, value, 0);
+    let second = w(g, value, 1);
+    let third = w(g, value, 2);
+    let fourth = w(g, value, 3);
+    if isShadowWord(first) && (first & 3) == 0 &&
+        second == first + 1 && third == first + 2 && fourth == first + 3 {
+        let at = shadowIndex(first);
+        let shadow = g.s.v128_shadows[at];
+        assert(at >= f.shadows_base && shadow.depth <= f.depth);
+        return shadow.vloc;
+    }
+    let float = localType(g, f, first) == VT_f32;
+    lget(g, first);
+    if float { simdOp(g, SIMD_f32x4_splat); } else { simdOp(g, SIMD_i32x4_splat); }
+    if second != first || third != first || fourth != first {
+        var replace = SIMD_i32x4_replace_lane;
+        if float { replace = SIMD_f32x4_replace_lane; }
+        for lane in 1..4 {
+            let word = w(g, value, lane);
+            if word == first { continue; }
+            lget(g, word);
+            simdLaneOp(g, replace, lane as u8);
+        }
+    }
+    let vloc = local(g, f, VT_v128);
+    lset(g, vloc);
+    return vloc;
+}
+
+fn laneOpcode(op_: Op, float: bool) -> u32 {
+    match op_ {
+        add => { if float { return SIMD_f32x4_add; } return SIMD_i32x4_add; },
+        sub => { if float { return SIMD_f32x4_sub; } return SIMD_i32x4_sub; },
+        mul => { if float { return SIMD_f32x4_mul; } return SIMD_i32x4_mul; },
+        div => { return SIMD_f32x4_div; },
+        abs => { return SIMD_f32x4_abs; },
+        neg => { return SIMD_f32x4_neg; },
+        ceil => { return SIMD_f32x4_ceil; },
+        floor => { return SIMD_f32x4_floor; },
+        trunc => { return SIMD_f32x4_trunc; },
+        sqrt => { return SIMD_f32x4_sqrt; },
+        min => { if float { return SIMD_f32x4_lt; } return SIMD_i32x4_min_u; },
+        max => { if float { return SIMD_f32x4_gt; } return SIMD_i32x4_max_u; },
+        equal => { if float { return SIMD_f32x4_eq; } return SIMD_i32x4_eq; },
+        not_equal => { if float { return SIMD_f32x4_ne; } return SIMD_i32x4_ne; },
+        less => { if float { return SIMD_f32x4_lt; } return SIMD_i32x4_lt_u; },
+        less_equal => { if float { return SIMD_f32x4_le; } return SIMD_i32x4_le_u; },
+        greater => { if float { return SIMD_f32x4_gt; } return SIMD_i32x4_gt_u; },
+        greater_equal => { if float { return SIMD_f32x4_ge; } return SIMD_i32x4_ge_u; },
+        bit_and => { return SIMD_v128_and; },
+        bit_or => { return SIMD_v128_or; },
+        bit_xor => { return SIMD_v128_xor; },
+        bit_not => { return SIMD_v128_not; },
+        bit_andnot => { return SIMD_v128_andnot; },
+        shift_left => { return SIMD_i32x4_shl; },
+        shift_right => { return SIMD_i32x4_shr_u; },
+        shift_right_signed => { return SIMD_i32x4_shr_s; },
+        any_true => { return SIMD_v128_any_true; },
+        all_true => { return SIMD_i32x4_all_true; },
+        convert_u32_f32 => { return SIMD_f32x4_convert_i32x4_u; },
+        convert_i32_f32 => { return SIMD_f32x4_convert_i32x4_s; },
+        convert_f32_u32 => { return SIMD_i32x4_trunc_sat_f32x4_u; },
+        convert_f32_i32 => { return SIMD_i32x4_trunc_sat_f32x4_s; },
+        _ => { return 0; },
+    }
+}
+fn laneSelectorOperand(op_: Op, left: u32, right: u32) -> u32 {
+    match op_ {
+        broadcast => { return right; },
+        shuffle, swizzle => { return left; },
+        _ => { return 0; },
+    }
+}
+fn literalLaneSelector(m: const Module&, selectors: u32, broadcast: bool, lane: i64) -> ConstU32, bool {
+    if selectors == 0 { return ConstU32 {}, false; }
+    var source = selectors;
+    if !broadcast {
+        let node = m.node(selectors);
+        if node.tag != blot_check_core::Tag.product || node.b != 4 { return ConstU32 {}, false; }
+        source = m.children(selectors)[lane];
+    }
+    let literal = m.node(source);
+    if literal.tag != blot_check_core::Tag.constant { return ConstU32 {}, false; }
+    return ConstU32 { value: literal.a, unit: m.unit, node: source }, true;
+}
+fn lanePermutation(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, id: u32, selector_node: u32) -> Val, Error {
+    let broadcast = op_ == blot_check_core::Op.broadcast;
+    var selectors = left;
+    var candidates = right;
+    if broadcast { selectors = right; candidates = left; }
+
+    var indices: u32[4] = [0; 4];
+    var facts: ConstU32[4] = [ConstU32 {}; 4];
+    var constant = true;
+    for lane in 0..4 {
+        var sel = 0;
+        if !broadcast { sel = lane; }
+        var fact, known = literalLaneSelector(g.units[f.unit - 1], selector_node, broadcast, lane);
+        if !known { fact, known = constU32(f, w(g, selectors, sel)); }
+        if !known { constant = false; break; }
+        facts[lane] = fact;
+        if fact.value < candidates.len { indices[lane] = fact.value; }
+    }
+    if constant {
+        for fact in facts { useConstU32(fact); }
+        let first = ensureV128(g, f, Val { candidates.ty, candidates.start, 4 });
+        var second = first;
+        if candidates.len == 8 { second = ensureV128(g, f, Val { candidates.ty, candidates.start + 4, 4 }); }
+        lget(g, first);
+        lget(g, second);
+        emitI32x4Shuffle(g, indices[0], indices[1], indices[2], indices[3]);
+        return popV128(g, f, result_ty), blot_direct_types::Error.none;
+    }
+
+    // A selector arriving via a scalar ABI boundary may have lost its
+    // literal fact. Preserve the scalar fallback's lane-zero default.
     let result, error = fresh(g, f, result_ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
-    match op_ {
-        any_true, all_true => {
-            i32Const(g, boolWord(op_ == blot_check_core::Op.all_true));
-            for index in 0..(left.len as i64) {
-                lget(g, w(g, left, index));
-                i32Const(g, 0);
-                op(g, OP_i32_ne);
-                if op_ == blot_check_core::Op.all_true { op(g, OP_i32_and); } else { op(g, OP_i32_or); }
-            }
-            lset(g, w(g, result, 0));
-            return result, blot_direct_types::Error.none;
-        },
-        select => {
-            // mask selects bits of the first product, the rest from the second.
-            if !has_right { return neverVal(), g.fail(m, id, "select without operands"); }
-            for index in 0..4 {
-                let mask = w(g, left, index);
-                let yes = w(g, right, index);
-                let no = w(g, right, index + 4);
-                let is_float = localType(g, f, yes) == VT_f32;
-                lget(g, yes);
-                if is_float { op(g, OP_i32_reinterpret_f32); }
-                lget(g, mask);
-                op(g, OP_i32_and);
-                lget(g, no);
-                if is_float { op(g, OP_i32_reinterpret_f32); }
-                lget(g, mask);
-                i32Const(g, 0xffffffff);
-                op(g, OP_i32_xor);
-                op(g, OP_i32_and);
-                op(g, OP_i32_or);
-                if is_float { op(g, OP_f32_reinterpret_i32); }
-                lset(g, w(g, result, index));
-            }
-            return result, blot_direct_types::Error.none;
-        },
-        relaxed_madd, relaxed_nmadd => {
-            // left * b + c (nmadd: c - left * b), with (b, c) the right pair.
-            if !has_right { return neverVal(), g.fail(m, id, "multiply-add without operands"); }
-            if right.len != 8 {
-                g.failOpen(m, id);
-                g.put("multiply-add with a ");
-                g.putNumber(right.len);
-                g.put("-word operand");
-                return neverVal(), g.failClose();
-            }
-            for index in 0..4 {
-                if op_ == blot_check_core::Op.relaxed_nmadd { lget(g, w(g, right, index + 4)); }
-                lget(g, w(g, left, index));
-                lget(g, w(g, right, index));
-                let multiplied = scalarOp(g, f, blot_check_core::Op.mul, lane, id, false);
-                if multiplied != blot_direct_types::Error.none { return neverVal(), multiplied; }
-                if op_ == blot_check_core::Op.relaxed_madd {
-                    lget(g, w(g, right, index + 4));
-                    let added = scalarOp(g, f, blot_check_core::Op.add, lane, id, true);
-                    if added != blot_direct_types::Error.none { return neverVal(), added; }
-                } else {
-                    let subtracted = scalarOp(g, f, blot_check_core::Op.sub, lane, id, true);
-                    if subtracted != blot_direct_types::Error.none { return neverVal(), subtracted; }
-                }
-                lset(g, w(g, result, index));
-            }
-            return result, blot_direct_types::Error.none;
-        },
-        shuffle, swizzle, broadcast => {
-            // Lane selectors index the candidate words: shuffle's two products
-            // (0-3, 4-7), swizzle's one, broadcast's one lane.
-            if !has_right {
-                g.failOpen(m, id);
-                g.put(opName(op_));
-                g.put(" without operands");
-                return neverVal(), g.failClose();
-            }
-            var candidates = right;
-            if op_ == blot_check_core::Op.broadcast { candidates = left; }
-            for index in 0..4 {
-                var selector = w(g, left, index);
-                if op_ == blot_check_core::Op.broadcast { selector = w(g, right, 0); }
-                lget(g, w(g, candidates, 0));
-                for position in 1..(candidates.len as i64) {
-                    let candidate = w(g, candidates, position);
-                    let value = local(g, f, localType(g, f, candidate));
-                    lset(g, value);
-                    lget(g, candidate);
-                    lget(g, value);
-                    lget(g, selector);
-                    i32Const(g, position as u32);
-                    op(g, OP_i32_eq);
-                    op(g, OP_select);
-                }
-                lset(g, w(g, result, index));
-            }
-            return result, blot_direct_types::Error.none;
-        },
-        _ => {},
-    }
-    // A scalar right operand (a shift count) applies to every lane.
-    var right_words: u32[4] = [0; 4];
-    if has_right {
-        if right.len == 1 { for index in 0..4 { right_words[index] = w(g, right, 0); } }
-        else {
-            if right.len != 4 {
-                g.failOpen(m, id);
-                g.put("lane operation with a ");
-                g.putNumber(right.len);
-                g.put("-word right operand");
-                return neverVal(), g.failClose();
-            }
-            for index in 0..4 { right_words[index] = w(g, right, index); }
+    let chosen = local(g, f, localType(g, f, w(g, candidates, 0)));
+    for lane in 0..4 {
+        var sel = 0;
+        if !broadcast { sel = lane; }
+        let selector = w(g, selectors, sel);
+        lget(g, w(g, candidates, 0));
+        for position in 1..(candidates.len as i64) {
+            lset(g, chosen);
+            lget(g, w(g, candidates, position));
+            lget(g, chosen);
+            lget(g, selector);
+            i32Const(g, position as u32);
+            op(g, OP_i32_eq);
+            op(g, OP_select);
         }
-    }
-    for index in 0..4 {
-        match op_ {
-            bits, from_bits => {
-                lget(g, w(g, left, index));
-                if op_ == blot_check_core::Op.bits { op(g, OP_i32_reinterpret_f32); } else { op(g, OP_f32_reinterpret_i32); }
-            },
-            min, max => {
-                // The prelude's `if a < b then a else b`, NaN and zero signs included.
-                if !has_right { return neverVal(), g.fail(m, id, "lane operation without a right operand"); }
-                let r = right_words[index];
-                lget(g, w(g, left, index));
-                lget(g, r);
-                lget(g, w(g, left, index));
-                lget(g, r);
-                if float { if op_ == blot_check_core::Op.min { op(g, OP_f32_lt); } else { op(g, OP_f32_gt); } }
-                else { if op_ == blot_check_core::Op.min { op(g, OP_i32_lt_u); } else { op(g, OP_i32_gt_u); } }
-                op(g, OP_select);
-            },
-            equal, not_equal, less, less_equal, greater, greater_equal => {
-                if !has_right { return neverVal(), g.fail(m, id, "comparison without a right operand"); }
-                let r = right_words[index];
-                // A lane mask: all ones where the comparison holds.
-                i32Const(g, 0);
-                lget(g, w(g, left, index));
-                lget(g, r);
-                let compared = scalarOp(g, f, op_, lane, id);
-                if compared != blot_direct_types::Error.none { return neverVal(), compared; }
-                op(g, OP_i32_sub);
-            },
-            _ => {
-                lget(g, w(g, left, index));
-                if has_right { lget(g, right_words[index]); }
-                let applied = scalarOp(g, f, op_, lane, id);
-                if applied != blot_direct_types::Error.none { return neverVal(), applied; }
-            },
-        }
-        lset(g, w(g, result, index));
+        lset(g, w(g, result, lane));
     }
     return result, blot_direct_types::Error.none;
+}
+
+fn lanes(g: Generator&, f: Fn&, op_: Op, left: Val, right: Val, result_ty: Ty, id: u32, elide_nan: bool, selector_node: u32) -> Val, Error {
+    if left.len != 4 {
+        return neverVal(), g.fail(g.units[f.unit - 1], id, "lane operation requires a four-word tuple");
+    }
+    if op_ == blot_check_core::Op.shuffle || op_ == blot_check_core::Op.swizzle || op_ == blot_check_core::Op.broadcast {
+        return lanePermutation(g, f, op_, left, right, result_ty, id, selector_node);
+    }
+    let a = ensureV128(g, f, left);
+    if op_ == blot_check_core::Op.bits || op_ == blot_check_core::Op.from_bits {
+        return shadowV128(g, f, result_ty, a), blot_direct_types::Error.none;
+    }
+    if right.len == 8 {
+        let b = ensureV128(g, f, Val { right.ty, right.start, 4 });
+        let c = ensureV128(g, f, Val { right.ty, right.start + 4, 4 });
+        match op_ {
+            select => {
+                // Wasm bitselect(yes, no, mask) takes yes for set mask bits.
+                lget(g, b); lget(g, c); lget(g, a);
+                simdOp(g, SIMD_v128_bitselect);
+            },
+            relaxed_madd, relaxed_nmadd => {
+                let neg = op_ == blot_check_core::Op.relaxed_nmadd;
+                if blot_direct_writer::relaxedSimdEnabled() {
+                    lget(g, a); lget(g, b); lget(g, c);
+                    if neg { simdOp(g, SIMD_f32x4_relaxed_nmadd); } else { simdOp(g, SIMD_f32x4_relaxed_madd); }
+                } else {
+                    if neg { lget(g, c); }
+                    lget(g, a); lget(g, b);
+                    simdOp(g, SIMD_f32x4_mul);
+                    if neg { simdOp(g, SIMD_f32x4_sub); } else { lget(g, c); simdOp(g, SIMD_f32x4_add); }
+                }
+            },
+            _ => { return neverVal(), g.fail(g.units[f.unit - 1], id, "unsupported paired lane operation"); },
+        }
+    } else {
+        let float = localType(g, f, w(g, left, 0)) == VT_f32;
+        let opcode = laneOpcode(op_, float);
+        if opcode == 0 { return neverVal(), g.fail(g.units[f.unit - 1], id, "unsupported lane operation"); }
+        let float_minmax = float && (op_ == blot_check_core::Op.min || op_ == blot_check_core::Op.max);
+        if right.len == 4 {
+            let b = ensureV128(g, f, right);
+            if float_minmax { lget(g, a); lget(g, b); }
+            lget(g, a); lget(g, b);
+        } else {
+            lget(g, a);
+            if right.len == 1 { lget(g, w(g, right, 0)); }
+        }
+        simdOp(g, opcode);
+        // Match `if a < b then a else b` (or >), including unordered
+        // operands and ties between signed zeros. Keep the selected bits.
+        if float_minmax { simdOp(g, SIMD_v128_bitselect); }
+    }
+    if op_ == blot_check_core::Op.any_true || op_ == blot_check_core::Op.all_true {
+        return pop(g, f, result_ty, id);
+    }
+    if !elide_nan && canonicalV128Producer(op_) && localType(g, f, w(g, left, 0)) == VT_f32 {
+        canonicalizeF32x4(g, f, 0xffffffff);
+    }
+    return popV128(g, f, result_ty), blot_direct_types::Error.none;
 }
 // Emits the machine operation for `op` on operands already on the stack.
 // F32 arithmetic & rounding producers (+, -, *, /, sqrt, floor, ceil, trunc)

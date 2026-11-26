@@ -6,7 +6,7 @@ import .function;
 // A body that begins at the top of the generator's stacks.
 fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
     g.s.serial += 1;
-    return Fn { sites_base:blot_direct_relocations::mark(), unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, handle_cells_base: g.s.handle_cells_len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
+    return Fn { sites_base:blot_direct_relocations::mark(), unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, handle_cells_base: g.s.handle_cells_len, code_base: g.s.code.len, locals_base: g.s.locals.len, shadows_base: g.s.v128_shadows.len, labels_base: g.s.labels.len };
 }
 
 // ----- host boundary -----------------------------------------------------
@@ -273,6 +273,7 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     let code_mark = s.code.len;
     let sites_mark = blot_direct_relocations::mark();
     let locals_mark = s.locals.len;
+    let shadows_mark = s.v128_shadows.len;
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
     let handle_cells_mark = s.handle_cells_len;
@@ -309,6 +310,8 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     blot_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);
     s.locals.resize(locals_mark);
+    s.v128_shadows.resize(shadows_mark);
+    s.shadow_epoch += 1;
     s.labels.resize(labels_mark);
     s.handles.resize(handles_mark);
     s.handle_cells_len = handle_cells_mark;
@@ -354,6 +357,76 @@ recursive fn hasSelfTailCall(
         },
         loop_ => {
             return hasSelfTailCall(g, m, m.loopInfo(id).body, target, param_count, fn_ret_block, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+
+fn associativeU32Opcode(op_: Op) -> u8 {
+    match op_ {
+        add => { return OP_i32_add; },
+        bit_xor => { return OP_i32_xor; },
+        mul => { return OP_i32_mul; },
+        _ => { return 0; },
+    }
+}
+fn isExactSelfCall(g: const Generator&, m: const Module&, id: u32, target: BindingRef, param_count: i64) -> bool {
+    if id == 0 || m.node(id).tag != blot_check_core::Tag.call { return false; }
+    let info = m.call(id);
+    return info.arguments.len == param_count && g.resolve(m, info.target) == target;
+}
+
+// Whitelist the whole body so advancing one recursive call in the current
+// frame can't move an effect, access captures or bypass allocation cleanup.
+recursive fn scanScalarRecursion(g: const Generator&, m: const Module&, id: u32,
+    target: BindingRef, param_count: i64, ret_block: u32, opcode: u8&, budget: i64&, depth: i64 = 0) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 || depth >= 128 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return isCoreScalar(m, id); },
+        reference => {
+            let binding = localRef(m, id);
+            if binding == 0 || !isCoreScalar(m, id) { return false; }
+            let kind = m.binding(binding).kind;
+            return kind == blot_reuse_principal_interface::Kind.local || kind == blot_reuse_principal_interface::Kind.parameter;
+        },
+        scalar, logical => {
+            return isCoreScalar(m, n.a) && (n.b == 0 || isCoreScalar(m, n.b)) &&
+                scanScalarRecursion(g, m, n.a, target, param_count, ret_block, opcode, budget, depth + 1) &&
+                scanScalarRecursion(g, m, n.b, target, param_count, ret_block, opcode, budget, depth + 1);
+        },
+        call => {
+            if !isExactSelfCall(g, m, id, target, param_count) { return false; }
+            for arg in m.call(id).arguments {
+                if !scanScalarRecursion(g, m, arg, target, param_count, ret_block, opcode, budget, depth + 1) { return false; }
+            }
+            return true;
+        },
+        suite, block_ => {
+            for child in m.children(id) {
+                if !scanScalarRecursion(g, m, child, target, param_count, ret_block, opcode, budget, depth + 1) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            return n.c < 2 && scanScalarRecursion(g, m, n.b, target, param_count, ret_block, opcode, budget, depth + 1);
+        },
+        if_stmt, if_value => {
+            return scanScalarRecursion(g, m, n.a, target, param_count, ret_block, opcode, budget, depth + 1) &&
+                scanScalarRecursion(g, m, n.b, target, param_count, ret_block, opcode, budget, depth + 1) &&
+                scanScalarRecursion(g, m, n.c, target, param_count, ret_block, opcode, budget, depth + 1);
+        },
+        return_ => {
+            if n.a == 0 { return false; }
+            let value = m.node(n.a);
+            if opcode == 0 && (n.b == ret_block || n.b == 0) && value.tag == blot_check_core::Tag.scalar &&
+                m.types.node(m.typeOf(n.a)).tag == blot_check_types::Tag.unsigned32 &&
+                isExactSelfCall(g, m, value.b, target, param_count) {
+                opcode = associativeU32Opcode(value.op);
+            }
+            return scanScalarRecursion(g, m, n.a, target, param_count, ret_block, opcode, budget, depth + 1);
         },
         _ => { return false; },
     }
@@ -433,11 +506,33 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         } else if root != 0 && m.node(root).tag == blot_check_core::Tag.return_ && m.node(root).a != 0 && m.node(m.node(root).a).tag == blot_check_core::Tag.block_ {
             f.fn_return_block = m.node(root).a;
         }
-        if !g.s.instances[id].inferring &&
-            hasSelfTailCall(g, m, root, BindingRef { unit, key.id }, parameters.len as i64, f.fn_return_block, 0) {
-            f.self_tco_loop = open(g, f, OP_loop);
-            f.self_tco_inputs = inputs;
-            has_tco_loop = true;
+        if !g.s.instances[id].inferring {
+            let target = BindingRef { unit, key.id };
+            var budget: i64 = 512;
+            f.direct_returns = bodyNoAlloc(g, f, m, root, budget);
+            var scalar_parameters = g.s.instances[id].result == blot_direct_types::u32_;
+            for at in 0..(parameters.len as i64) {
+                if g.s.tys[parameters.start + at] != blot_direct_types::u32_ { scalar_parameters = false; }
+            }
+            if scalar_parameters {
+                var opcode: u8 = 0;
+                var recursion_budget: i64 = 256;
+                if scanScalarRecursion(g, m, root, target, parameters.len as i64, f.fn_return_block, opcode, recursion_budget) && opcode != 0 {
+                    f.assoc_tco_opcode = opcode;
+                    f.assoc_tco_local = local32(g, f);
+                    if opcode == OP_i32_mul {
+                        i32Const(g, 1);
+                        lset(g, f.assoc_tco_local);
+                    }
+                    f.direct_returns = true;
+                }
+            }
+            if f.assoc_tco_local != 0xffffffff ||
+                hasSelfTailCall(g, m, root, target, parameters.len as i64, f.fn_return_block, 0) {
+                f.self_tco_loop = open(g, f, OP_loop);
+                f.self_tco_inputs = inputs;
+                has_tco_loop = true;
+            }
         }
     }
     var value = neverVal();
@@ -534,6 +629,7 @@ fn finish(g: Generator&, function: u32, f: const Fn&) {
     finishWith(g, function, f, false, 0, 0, 0);
     g.s.code.resize(f.code_base);
     g.s.locals.resize(f.locals_base);
+    g.s.v128_shadows.resize(f.shadows_base);
     g.s.labels.resize(f.labels_base);
     g.s.handles.resize(f.handles_base);
     g.s.handle_cells_len = f.handle_cells_base;

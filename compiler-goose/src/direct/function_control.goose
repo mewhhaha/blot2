@@ -497,6 +497,18 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     return unitVal(), true, blot_direct_types::Error.none;
 }
 
+recursive fn pushCondition(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.scalar && isComparisonOp(n.op) &&
+        isCoreScalar(m, n.a) && isCoreScalar(m, n.b) {
+        return scalar(g, f, id, false, true);
+    }
+    let value, error = expr(g, f, id);
+    if error == blot_direct_types::Error.none { push(g, value); }
+    return value, error;
+}
+
 recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let sc_val, sc_done, sc_err = tryIfShortCircuitBreak(g, f, id);
     if sc_err != blot_direct_types::Error.none { return sc_val, sc_err; }
@@ -512,9 +524,10 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let result = g.newSlot();
     let merges = m.branchMerges(id);
     let merged = newSlots(g, merges.len);
-    let condition, error = expr(g, f, n.a);
+    let condition, error = pushCondition(g, f, n.a);
     if error != blot_direct_types::Error.none { return condition, error; }
-    push(g, condition);
+    let incoming_arrays = f.checked_arrays;
+    let incoming_arrays_len = f.checked_arrays_len;
     var saved_ce: CheckedElem[8] = [CheckedElem {}; 8];
     let saved_ce_len = f.checked_elems_len;
     for ci in 0..saved_ce_len { saved_ce[ci] = f.checked_elems[ci]; }
@@ -538,16 +551,24 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     popCheckedArraysAt(f, opened);
+    let then_arrays = f.checked_arrays;
+    let then_arrays_len = f.checked_arrays_len;
+    // The else arm starts from the same dominating descriptors as the then
+    // arm. Keep only descriptors valid on every continuing path at the join.
+    f.checked_arrays = incoming_arrays;
+    f.checked_arrays_len = incoming_arrays_len;
     f.checked_elems_len = saved_ce_len;
     for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
     op(g, OP_else_);
     var else_falls = false;
+    var else_mutable = false;
     if n.c != 0 {
         recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
         let otherwise, error = stmt(g, f, n.c);
         if error != blot_direct_types::Error.none { return otherwise, error; }
         if otherwise.ty != blot_direct_types::never {
             else_falls = true;
+            else_mutable = knownMutable(g, f, otherwise);
             falls = true;
             if n.tag == blot_check_core::Tag.if_value {
                 let delivered = deliver(g, f, otherwise, result, id);
@@ -573,6 +594,28 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     close(g, f);
+    if !else_falls {
+        f.checked_arrays = then_arrays;
+        f.checked_arrays_len = then_arrays_len;
+    } else if !then_diverges {
+        var out: i64 = 0;
+        for at in 0..f.checked_arrays_len {
+            let right = f.checked_arrays[at];
+            for left in then_arrays[..then_arrays_len] {
+                if left.slot == right.slot && left.generation == right.generation &&
+                    left.base == right.base && left.length == right.length {
+                    f.checked_arrays[out] = right;
+                    out += 1;
+                    break;
+                }
+            }
+        }
+        f.checked_arrays_len = out;
+    }
+    let result_slot = g.s.slots[result];
+    if result_slot.present && (then_diverges || knownMutable(g, f, then)) && (!else_falls || else_mutable) {
+        recordMutable(g, f, result_slot.value);
+    }
     if n.c == 0 && then_diverges {
         f.checked_elems_len = saved_ce_len;
         for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
@@ -589,18 +632,22 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array {
                 var ca_t: i64 = -1;
                 var ca_e: i64 = -1;
+                var mutable_merge = true;
                 if !then_diverges {
                     let tv, tok = bindGet(g, f, merge.then_binding);
+                    mutable_merge = mutable_merge && tok && knownMutable(g, f, tv);
                     if tok && tagOf(g, tv.ty) == blot_direct_types::Tag.array {
                         ca_t = findCheckedArray(f, w(g, tv, 0), w(g, tv, 1));
                     }
                 }
                 if else_falls {
                     let ev, eok = bindGet(g, f, merge.else_binding);
+                    mutable_merge = mutable_merge && eok && knownMutable(g, f, ev);
                     if eok && tagOf(g, ev.ty) == blot_direct_types::Tag.array {
                         ca_e = findCheckedArray(f, w(g, ev, 0), w(g, ev, 1));
                     }
                 }
+                if mutable_merge { recordMutable(g, f, slot.value); }
                 var ca_match: i64 = -1;
                 if !then_diverges && else_falls {
                     if ca_t >= 0 && ca_t == ca_e { ca_match = ca_t; }
@@ -1656,41 +1703,73 @@ fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error
     return copy(g, f, value, g.s.slots[slot].value, id);
 }
 
+// Locate the target once and check for scopes that release memory on exit.
+fn returnTarget(g: const Generator&, f: const Fn&, target: u32) -> i64, bool {
+    var at = g.s.labels.len;
+    var releases = false;
+    while at > f.labels_base {
+        at -= 1;
+        let label = g.s.labels[at];
+        if label.kind == blot_direct_emit::LabelKind.loop_ {
+            releases = releases || label.has_release;
+        } else if label.target == target || label.kind == blot_direct_emit::LabelKind.function {
+            return at, releases;
+        }
+    }
+    return -1, releases;
+}
+
 recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    // Detect function-level tail call position when no handlers, fork, scratch-cut,
-    // or enclosing releasing loops require unwinding on exit.
-    var prev_tail = f.tail_call_node;
-    if f.tco_inhibit == 0 && f.handles_len == 0 && f.scratch_cut.target == 0 &&
-        n.a != 0 && (m.node(n.a).tag == blot_check_core::Tag.call || (m.node(n.a).tag == blot_check_core::Tag.apply && blot_direct_writer::tailCallsEnabled())) &&
-        (f.self_tco_loop != 0xffffffff || blot_direct_writer::tailCallsEnabled()) {
-        var check_at = g.s.labels.len;
-        var found_fn_exit = false;
-        var has_rel_loop = false;
-        while check_at != f.labels_base {
-            check_at -= 1;
-            let lbl = g.s.labels[check_at];
-            if lbl.kind == blot_direct_emit::LabelKind.loop_ {
-                if lbl.has_release { has_rel_loop = true; }
-                continue;
+    let at, releases = returnTarget(g, f, n.b);
+    let fn_exit = at >= 0 && (g.s.labels[at].kind == blot_direct_emit::LabelKind.function ||
+        (at == f.labels_base + 1 && f.fn_return_block != 0 && n.b == f.fn_return_block));
+    let clean = fn_exit && !releases && f.tco_inhibit == 0 && f.handles_len == 0 && f.scratch_cut.target == 0;
+    let prev_tail = f.tail_call_node;
+    var value_node = n.a;
+    if clean && n.a != 0 {
+        let value = m.node(n.a);
+        if f.assoc_tco_local != 0xffffffff && value.tag == blot_check_core::Tag.scalar &&
+            associativeU32Opcode(value.op) == f.assoc_tco_opcode &&
+            m.types.node(m.typeOf(n.a)).tag == blot_check_types::Tag.unsigned32 &&
+            isExactSelfCall(g, m, value.b, BindingRef { f.unit, g.s.instances[f.instance_id].key.id }, f.self_tco_inputs.len as i64) {
+            var machine = value.op;
+            if value.c == 1 {
+                let resolved, error = scalarMember(g, f, m, blot_direct_types::u32_, 0, value.op, n.a);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                machine = resolved;
             }
-            if lbl.target == n.b || lbl.kind == blot_direct_emit::LabelKind.function {
-                if check_at == f.labels_base ||
-                    (check_at == f.labels_base + 1 && f.fn_return_block != 0 && lbl.target == f.fn_return_block) {
-                    found_fn_exit = true;
-                }
-                break;
+            if associativeU32Opcode(machine) == f.assoc_tco_opcode {
+                let left, error = stmt(g, f, value.a);
+                if error != blot_direct_types::Error.none || left.ty == blot_direct_types::never { return left, error; }
+                lget(g, f.assoc_tco_local);
+                push(g, left);
+                op(g, f.assoc_tco_opcode);
+                lset(g, f.assoc_tco_local);
+                value_node = value.b;
             }
         }
-        if found_fn_exit && !has_rel_loop {
-            f.tail_call_node = n.a;
+        let value_tag = m.node(value_node).tag;
+        if (f.self_tco_loop != 0xffffffff || blot_direct_writer::tailCallsEnabled()) &&
+            (value_tag == blot_check_core::Tag.call || (value_tag == blot_check_core::Tag.apply && blot_direct_writer::tailCallsEnabled())) {
+            f.tail_call_node = value_node;
         }
     }
-    let value, error = stmt(g, f, n.a);
+    let value, error = stmt(g, f, value_node);
     f.tail_call_node = prev_tail;
     if error != blot_direct_types::Error.none { return value, error; }
     if value.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+    if clean && f.direct_returns && !f.allocates && value.ty == g.s.instances[f.instance_id].result &&
+        (f.self_tco_loop == 0xffffffff || f.assoc_tco_local != 0xffffffff) {
+        if f.assoc_tco_local != 0xffffffff {
+            lget(g, f.assoc_tco_local);
+            push(g, value);
+            op(g, f.assoc_tco_opcode);
+        } else { push(g, value); }
+        op(g, OP_return_);
+        return neverVal(), blot_direct_types::Error.none;
+    }
     let builder = findComptimeBlock(f, n.b);
     if builder >= 0 {
         let frame = f.comptime_frames[builder];
@@ -1700,11 +1779,8 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return neverVal(), error; }
         }
     }
-    var at = g.s.labels.len;
-    while at != f.labels_base {
-        at -= 1;
+    if at >= 0 {
         let label = g.s.labels[at];
-        if (label.target != n.b && label.kind != blot_direct_emit::LabelKind.function) || label.kind == blot_direct_emit::LabelKind.loop_ { continue; }
         let delivered = deliver(g, f, value, label.result, id);
         if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
         // Merge saved escape marks for every enclosing releasing loop left by this return.
@@ -3500,7 +3576,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
         },
         array_op => {
             match m.arrayOperation(id) {
-                length, get => {
+                length, get, simd_load, simd_store => {
                     for child in m.children(id) {
                         if !noStorageResize(g, m, child, left) { return false; }
                     }
@@ -7559,7 +7635,6 @@ fn matchMatmulKLoop(
     let uinfo = m.updateInfo(upd_id);
     let sels = m.updateSelectors(upd_id);
     if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
-    if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false; }
     let raw_c_b = localRef(m, uinfo.root);
     if raw_c_b == 0 { return false; }
     var c_b = resolveInnerCarry(m, col_loop, raw_c_b);
@@ -7583,24 +7658,30 @@ fn matchMatmulKLoop(
         rn.op != blot_check_core::Op.add {
         return false;
     }
-    var c_read_node: u32 = 0;
     var mul_node: u32 = 0;
-    let ra_get, _ra1, _ra2 = matchArrayGet(m, rn.a);
-    let rb_get, _rb1, _rb2 = matchArrayGet(m, rn.b);
-    if ra_get { c_read_node = rn.a; mul_node = rn.b; }
-    else if rb_get { c_read_node = rn.b; mul_node = rn.a; }
-    else { return false; }
-
-    let cr_ok, cr_arr, cr_idx = matchArrayGet(m, c_read_node);
-    if !cr_ok { return false; }
-    var cr_cb = resolveInnerCarry(m, col_loop, localRef(m, cr_arr));
-    if resolve_k_carries { cr_cb = resolveInnerCarry(m, k_loop_id, cr_cb); }
-    if cr_cb != c_b { return false; }
-    if dst_alias_b != 0 && localRef(m, cr_idx) == dst_alias_b {
-        // matches dst alias
+    let self_b = uinfo.self_binding;
+    if self_b != 0 && localRef(m, rn.a) == self_b {
+        mul_node = rn.b;
+    } else if self_b != 0 && localRef(m, rn.b) == self_b {
+        mul_node = rn.a;
     } else {
-        let crok, croff = matchSumWithVar(m, cr_idx, col_b);
-        if !crok || !sameOffsetExpr(m, croff, c_off_id) { return false; }
+        if self_b != 0 && uses(g, f, self_b) != 0 { return false; }
+        let ra_get, _ra1, _ra2 = matchArrayGet(m, rn.a);
+        let rb_get, _rb1, _rb2 = matchArrayGet(m, rn.b);
+        var c_read_node: u32 = 0;
+        if ra_get { c_read_node = rn.a; mul_node = rn.b; }
+        else if rb_get { c_read_node = rn.b; mul_node = rn.a; }
+        else { return false; }
+
+        let cr_ok, cr_arr, cr_idx = matchArrayGet(m, c_read_node);
+        if !cr_ok { return false; }
+        var cr_cb = resolveInnerCarry(m, col_loop, localRef(m, cr_arr));
+        if resolve_k_carries { cr_cb = resolveInnerCarry(m, k_loop_id, cr_cb); }
+        if cr_cb != c_b { return false; }
+        if dst_alias_b == 0 || localRef(m, cr_idx) != dst_alias_b {
+            let crok, croff = matchSumWithVar(m, cr_idx, col_b);
+            if !crok || !sameOffsetExpr(m, croff, c_off_id) { return false; }
+        }
     }
 
     let mn = m.node(mul_node);
@@ -8464,6 +8545,176 @@ fn tryEmitBlockedMatmulRowLoop(
     return blot_direct_types::Error.none;
 }
 
+fn invariantDivisor(g: const Generator&, f: const Fn&, m: const Module&, id: u32, input_locals: u32) -> u32 {
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.scalar || (n.op != blot_check_core::Op.div && n.op != blot_check_core::Op.rem) ||
+        m.types.node(m.typeOf(n.b)).tag != blot_check_types::Tag.unsigned32 {
+        return 0xffffffff;
+    }
+    let binding = localRef(m, n.b);
+    let value, found = bindGet(g, f, binding);
+    let _, is_cell = withCellType(g, f, binding);
+    if !found || is_cell || value.ty != blot_direct_types::u32_ { return 0xffffffff; }
+    let divisor = w(g, value, 0);
+    let _, constant = constU32(f, divisor);
+    if divisor >= input_locals || constant { return 0xffffffff; }
+    return divisor;
+}
+
+// Find a division that is guaranteed to execute before any possible trap,
+// effect, or early exit on the first iteration. Stop at control flow and
+// opaque expressions. The boolean means the prefix was entirely safe.
+recursive fn firstLoopDivision(g: Generator&, f: const Fn&, m: const Module&, id: u32, input_locals: u32, budget: i64&) -> u32, bool {
+    if id == 0 { return 0, true; }
+    if budget <= 0 { return 0, false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant => { return 0, true; },
+        reference => {
+            let binding = localRef(m, id);
+            if binding == 0 { return 0, false; }
+            let kind = m.binding(binding).kind;
+            let _, is_cell = withCellType(g, f, binding);
+            return 0, !is_cell && (kind == blot_reuse_principal_interface::Kind.local ||
+                kind == blot_reuse_principal_interface::Kind.parameter);
+        },
+        scalar => {
+            if !isCoreScalar(m, n.a) || (n.b != 0 && !isCoreScalar(m, n.b)) { return 0, false; }
+            let lhs, lhs_safe = firstLoopDivision(g, f, m, n.a, input_locals, budget);
+            if lhs != 0 || !lhs_safe { return lhs, lhs_safe; }
+            let rhs, rhs_safe = firstLoopDivision(g, f, m, n.b, input_locals, budget);
+            if rhs != 0 || !rhs_safe { return rhs, rhs_safe; }
+            let divisor = invariantDivisor(g, f, m, id, input_locals);
+            var machine = n.op;
+            if n.c == 1 {
+                // Only U32 scalar operators have a known trap classification here.
+                if m.types.node(m.typeOf(n.a)).tag != blot_check_types::Tag.unsigned32 { return 0, false; }
+                let resolved, error = scalarMember(g, f, m, blot_direct_types::u32_, 0, n.op, id);
+                if error != blot_direct_types::Error.none { return 0, false; }
+                machine = resolved;
+            }
+            if machine == blot_check_core::Op.div || machine == blot_check_core::Op.rem {
+                if divisor != 0xffffffff { return id, false; }
+                return 0, false;
+            }
+            return 0, isPureU32Op(machine) || isComparisonOp(machine);
+        },
+        bind => {
+            if n.c < 2 { return firstLoopDivision(g, f, m, n.b, input_locals, budget); }
+            return 0, false;
+        },
+        suite, block_ => {
+            for child in m.children(id) {
+                let div, safe = firstLoopDivision(g, f, m, child, input_locals, budget);
+                if div != 0 || !safe { return div, safe; }
+            }
+            return 0, true;
+        },
+        _ => { return 0, false; },
+    }
+}
+
+fn emitLoopReciprocal(g: Generator&, f: Fn&, divisor: u32, mandatory: bool, index: u32, end: u32) {
+    for at in 0..f.loop_reciprocals_len {
+        if f.loop_reciprocals[at].divisor == divisor { return; }
+    }
+    if f.loop_reciprocals_len >= 8 { return; }
+
+    let d = local(g, f, VT_i64);
+    let multiplier = local(g, f, VT_i64);
+    let shift = local(g, f, VT_i64);
+    lget(g, divisor);
+    let nonzero = open(g, f, OP_if_);
+    lget(g, divisor);
+    op(g, OP_i64_extend_i32_u);
+    lset(g, d);
+    // s = ceil(log2(d)), including zero for d == 1 and 32 for large d.
+    i64Const(g, 64);
+    lget(g, d);
+    i64Const(g, 1);
+    op(g, OP_i64_sub);
+    op(g, OP_i64_clz);
+    op(g, OP_i64_sub);
+    lset(g, shift);
+    // m = ceil(((2^s - d) * 2^32) / d).
+    i64Const(g, 1);
+    lget(g, shift);
+    op(g, OP_i64_shl);
+    lget(g, d);
+    op(g, OP_i64_sub);
+    i64Const(g, 32);
+    op(g, OP_i64_shl);
+    lget(g, d);
+    op(g, OP_i64_add);
+    i64Const(g, 1);
+    op(g, OP_i64_sub);
+    lget(g, d);
+    op(g, OP_i64_div_u);
+    lset(g, multiplier);
+    if mandatory {
+        op(g, OP_else_);
+        if index == 0xffffffff { op(g, OP_unreachable_); }
+        else {
+            lget(g, index);
+            lget(g, end);
+            op(g, OP_i32_lt_u);
+            trap(g, f);
+        }
+    }
+    close(g, f);
+    f.loop_reciprocals[f.loop_reciprocals_len] = LoopReciprocal { divisor, multiplier, shift, !mandatory };
+    f.loop_reciprocals_len += 1;
+}
+
+// Bindings in the body, the iterator and changing carries have no stable
+// local at the preheader. Nested loops scan their own scope.
+recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals: u32, mandatory: u32, index: u32, end: u32, budget: i64&) {
+    if id == 0 || budget <= 0 || f.loop_reciprocals_len >= 8 { return; }
+    budget -= 1;
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    match n.tag {
+        scalar, associated, logical => {
+            let divisor = invariantDivisor(g, f, m, id, input_locals);
+            if divisor != 0xffffffff { emitLoopReciprocal(g, f, divisor, divisor == mandatory, index, end); }
+            collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget);
+            collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
+        },
+        suite, block_, product, record, array, array_op, storage, break_ => {
+            for child in m.children(id) { collectLoopReciprocals(g, f, child, input_locals, mandatory, index, end, budget); }
+        },
+        bind, construct => { collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget); },
+        return_, project => { collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget); },
+        if_stmt, if_value, pattern_bind => {
+            if n.tag != blot_check_core::Tag.pattern_bind { collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget); }
+            collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
+            collectLoopReciprocals(g, f, n.c, input_locals, mandatory, index, end, budget);
+        },
+        call => {
+            for arg in m.call(id).arguments { collectLoopReciprocals(g, f, arg, input_locals, mandatory, index, end, budget); }
+        },
+        match_ => {
+            for input in m.matchInputs(id) { collectLoopReciprocals(g, f, input, input_locals, mandatory, index, end, budget); }
+            for arm in m.matchArms(id) {
+                collectLoopReciprocals(g, f, arm.guard_, input_locals, mandatory, index, end, budget);
+                collectLoopReciprocals(g, f, arm.body, input_locals, mandatory, index, end, budget);
+            }
+        },
+        update => {
+            let info = m.updateInfo(id);
+            collectLoopReciprocals(g, f, info.root, input_locals, mandatory, index, end, budget);
+            for selector in m.updateSelectors(id) {
+                if selector.kind == blot_check_core::UpdateKind.index {
+                    collectLoopReciprocals(g, f, selector.index, input_locals, mandatory, index, end, budget);
+                }
+            }
+            collectLoopReciprocals(g, f, info.value, input_locals, mandatory, index, end, budget);
+        },
+        _ => {},
+    }
+}
+
 recursive fn emitLoopCore(
     g: Generator&,
     f: Fn&,
@@ -8480,11 +8731,26 @@ recursive fn emitLoopCore(
     source_view_base: u32,
     range_in: CheckedRange,
     unroll2: bool,
+    input_locals: u32 = 0,
 ) -> Error {
     let m .= g.units[f.unit - 1];
     let carries = m.loopCarries(id);
     var range = range_in;
     if has_index { range.end_local = end_loc; }
+    let reciprocal_mark = f.loop_reciprocals_len;
+    if input_locals != 0 && !has_source {
+        var prefix_budget: i64 = 32;
+        var mandatory: u32 = 0xffffffff;
+        if info.pattern == 0 || m.pattern(info.pattern).tag == blot_check_core::PatternTag.bind {
+            let first, _ = firstLoopDivision(g, f, m, info.body, input_locals, prefix_budget);
+            var allocation_budget: i64 = 256;
+            if first != 0 && bodyNoAlloc(g, f, m, info.body, allocation_budget) {
+                mandatory = invariantDivisor(g, f, m, first, input_locals);
+            }
+        }
+        var budget: i64 = 256;
+        collectLoopReciprocals(g, f, info.body, input_locals, mandatory, if has_index { index } else { 0xffffffff }, end_loc, budget);
+    }
     let exit = open(g, f, OP_block);
     let top = open(g, f, OP_loop);
     f.checked_elems_len = 0;
@@ -8494,7 +8760,7 @@ recursive fn emitLoopCore(
         op(g, OP_i32_ge_u);
         let opened = open(g, f, OP_if_);
         let assigned = assign(g, f, iteration, outgoing, id);
-        if assigned != blot_direct_types::Error.none { return assigned; }
+        if assigned != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return assigned; }
         br(g, f, OP_br, exit);
         close(g, f);
         let current = local32(g, f);
@@ -8509,9 +8775,9 @@ recursive fn emitLoopCore(
         if has_source {
             if source_view_base != 0xffffffff {
                 let element, elem_err = elementOf(g, f, source.ty, id);
-                if elem_err != blot_direct_types::Error.none { return elem_err; }
+                if elem_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return elem_err; }
                 let step, step_err = stride(g, f, element, id);
-                if step_err != blot_direct_types::Error.none { return step_err; }
+                if step_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return step_err; }
                 let addr = local32(g, f);
                 lget(g, source_view_base);
                 let fast = open(g, f, OP_if_);
@@ -8521,25 +8787,25 @@ recursive fn emitLoopCore(
                 popCheckedArraysAt(f, fast);
                 op(g, OP_else_);
                 let slow_addr, slow_err = elementAddress(g, f, source, current, id);
-                if slow_err != blot_direct_types::Error.none { return slow_err; }
+                if slow_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return slow_err; }
                 lget(g, slow_addr);
                 lset(g, addr);
                 close(g, f);
                 let loaded, lerr = loadElement(g, f, addr, 0, element, id);
-                if lerr != blot_direct_types::Error.none { return lerr; }
+                if lerr != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return lerr; }
                 item = loaded;
             } else {
                 let previous_range = f.checked_range;
                 f.checked_range = range;
                 let element, error = readElement(g, f, source, current, id);
                 f.checked_range = previous_range;
-                if error != blot_direct_types::Error.none { return error; }
+                if error != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return error; }
                 item = element;
             }
         } else { item = valOf1(g, blot_direct_types::u32_, current); }
         if info.pattern != 0 {
             let tested = test_(g, f, info.pattern, item, false, 0, id);
-            if tested != blot_direct_types::Error.none { return tested; }
+            if tested != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return tested; }
         }
     }
     var release = true;
@@ -8550,7 +8816,7 @@ recursive fn emitLoopCore(
         if g.s.words[slots.start + at] != 0 { boxed_carries = true; continue; }
         let value = g.s.vals[iteration.start + at];
         let safe, error = ownerSlots(g, value.ty, value.start);
-        if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); return error; }
+        if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); f.loop_reciprocals_len = reciprocal_mark; return error; }
         if !safe { release = false; }
     }
     if release {
@@ -8581,34 +8847,34 @@ recursive fn emitLoopCore(
     if error != blot_direct_types::Error.none {
         f.loop_depth -= 1;
         s.labels.resize(labels_mark);
-        return error;
+        f.loop_reciprocals_len = reciprocal_mark; return error;
     }
     let do_unroll2 = unroll2 && !release && !has_index && body.ty != blot_direct_types::never;
     if body.ty != blot_direct_types::never {
         let backedge = g.reserveVals(carries.len);
         for carry, at in carries {
             let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); return rerr; }
-            if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); return g.fail(m, id, "loop carry without a backedge value"); }
+            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return rerr; }
+            if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
         let assigned = assignCarries(g, f, backedge, iteration, slots, unchanged, owner_mark, stack_mark, id);
-        if assigned != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); return assigned; }
+        if assigned != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return assigned; }
         if do_unroll2 {
             f.checked_elems_len = 0;
             f.checked_bounds_len = 0;
             let body2, err2 = stmt(g, f, info.body);
-            if err2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); return err2; }
+            if err2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return err2; }
             if body2.ty != blot_direct_types::never {
                 let backedge2 = g.reserveVals(carries.len);
                 for carry, at in carries {
                     let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-                    if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); return rerr; }
-                    if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); return g.fail(m, id, "loop carry without a backedge value"); }
+                    if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return rerr; }
+                    if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return g.fail(m, id, "loop carry without a backedge value"); }
                     g.s.vals[backedge2.start + at] = value;
                 }
                 let assigned2 = assignCarries(g, f, backedge2, iteration, slots, unchanged, owner_mark, stack_mark, id);
-                if assigned2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); return assigned2; }
+                if assigned2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return assigned2; }
                 br(g, f, OP_br, top);
             }
         } else {
@@ -8626,6 +8892,7 @@ recursive fn emitLoopCore(
         }
     }
     f.loop_depth -= 1;
+    f.loop_reciprocals_len = reciprocal_mark;
     let label_final = s.labels[labels_mark];
     s.labels.resize(labels_mark);
     if release && (f.allocations != allocations || label_final.used) {
@@ -8662,6 +8929,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if bulk_err != blot_direct_types::Error.none { return neverVal(), bulk_err; }
         if bulk_done { return unitVal(), blot_direct_types::Error.none; }
     }
+    let input_locals = localCount(g, f);
     var iteration = Vals {};
     var outgoing = Vals {};
     var slots = Words {};
@@ -8813,6 +9081,13 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             invalidateCheckedContainers(f);
         }
     }
+    // An opaque body may write local slots on a handler exit. Treat
+    // pre-loop facts as unknown on the backedge if the walk cannot rule it out.
+    let reciprocal_inputs = if selective_resize { input_locals } else { 0 };
+    if !selective_resize {
+        f.const_u32_len = 0;
+        f.known_mutable_len = 0;
+    }
     match info.kind {
         forever => {},
         range => {
@@ -8878,6 +9153,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     end = limit;
                     let copied = copy(g, f, last, end, id);
                     if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                    let fact, known = constU32(f, w(g, last, 0));
+                    if known { recordConstU32(f, w(g, end, 0), fact.value, fact.unit, fact.node); }
                 }
             }
             range.length_ty = rangeSizedLength(g, f, info);
@@ -9141,23 +9418,23 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.indirect_bound_binding = ind_id_b;
             f.indirect_bound_len = min_len;
             f.indirect_bound_distinct_local = all_distinct;
-            let err1a = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            let err1a = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false, reciprocal_inputs);
             f.indirect_bound_binding = prev_ib;
             f.indirect_bound_len = prev_il;
             f.indirect_bound_distinct_local = prev_id_loc;
             if err1a != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.defer_f32_nan = false; return neverVal(), err1a; }
             popCheckedArraysAt(f, ind_if);
             op(g, OP_else_);
-            let err1b = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            let err1b = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false, reciprocal_inputs);
             f.in_specialized_loop = prev_spec;
             if err1b != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1b; }
             close(g, f);
         } else {
-            let err1 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false);
+            let err1 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false, reciprocal_inputs);
             if err1 != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1; }
         }
         f.defer_f32_nan = false;
-        let err2 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false);
+        let err2 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
         if err2 != blot_direct_types::Error.none { return neverVal(), err2; }
         emitted_loop = true;
     }
@@ -9188,11 +9465,11 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if has_index { end_loc = w(g, end, 0); }
             let spec_if = open(g, f, OP_if_);
             for li in 0..le_count { recordCheckedLe(f, le_a[li], le_b[li]); }
-            let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false);
+            let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
             if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return neverVal(), ferr; }
             popCheckedArraysAt(f, spec_if);
             op(g, OP_else_);
-            let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false);
+            let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
             f.in_specialized_loop = prev_spec;
             if serr != blot_direct_types::Error.none { return neverVal(), serr; }
             close(g, f);
@@ -9207,7 +9484,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && info.kind == blot_check_core::LoopKind.forever && !has_index {
             do_unroll2 = isPureScalarForeverBody(g, g.units[f.unit - 1], info.body);
         }
-        let cerr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, do_unroll2);
+        let cerr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, do_unroll2, reciprocal_inputs);
         if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
     }
     for sci in 0..saved_ca_count {

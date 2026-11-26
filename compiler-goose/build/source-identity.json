@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "5556a50a30076997fc1e686c5cbb8d55426563567d6fc799b8669fbfb9e65175",
+  "digest": "6312bf8ad0a891adaffe52fa32dd48b7a6bd47dd3fab99fdafa18227c0eeebfc",
   "goose": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -417,24 +417,24 @@
       "sha256": "d0521a0ae305e8089c4d956c9371cb57ccf156f1518012d91c2d31eff40c4efe"
     },
     {
-      "bytes": 143449,
+      "bytes": 143758,
       "path": "src/direct/emit.goose",
-      "sha256": "c582eb763480d5c17d9c18b68785e63f0c096e9c5ed987d17d1caeab5721e2fc"
+      "sha256": "046efd15542b660ad45eaa71f83616300a41d1753a76a132d2f2f10f229b040c"
     },
     {
-      "bytes": 102888,
+      "bytes": 107824,
       "path": "src/direct/function.goose",
-      "sha256": "4c1af606c696a06eb92c6e18a1220985a2dc1c963a9585ad6e10a7a3cec617e9"
+      "sha256": "274e99d7e603ee9c784b3d6e8a7613a9831834dad6ed1907c877ab70579da1ff"
     },
     {
-      "bytes": 118709,
+      "bytes": 125013,
       "path": "src/direct/function_calls.goose",
-      "sha256": "63de47a5c444afc5ba320079766f4054e053cb5493d8de00c7f3fe4c1fb711fb"
+      "sha256": "64c82de4d0b2def37cb122f84afdedfb650e26410f884df70acaff7e92d926cd"
     },
     {
-      "bytes": 476424,
+      "bytes": 490032,
       "path": "src/direct/function_control.goose",
-      "sha256": "a3442be92f23b733ac3d0010cba0f130e84abd15e4a1adf7601707d60089adb8"
+      "sha256": "1d4d67f3daca0e5a8daf6b93d49894a635233c9023a839a97129a55a3214ae7a"
     },
     {
       "bytes": 59049,
@@ -447,9 +447,9 @@
       "sha256": "35c5202621af7f6cda3fe29d6b951e0e8a48d02db17c58e4d9b6988349975a5b"
     },
     {
-      "bytes": 38250,
+      "bytes": 42937,
       "path": "src/direct/function_entry.goose",
-      "sha256": "65fc4df2fe54c3cff0f90aa20fa78b7b6d3b2713b8518bcc8090c5576555bb47"
+      "sha256": "c580e53634f354b2a6c3f4f85b3f87b7da811fc90bfab71307feb9439ff777cb"
     },
     {
       "bytes": 97642,
@@ -457,9 +457,9 @@
       "sha256": "265d05d8b999712e6bffcf0fb3a03da32a41e9187933a29c571d7037c3436029"
     },
     {
-      "bytes": 4920,
+      "bytes": 5535,
       "path": "src/direct/function_ops.goose",
-      "sha256": "5cf1d120a253e98d301617d3c2979f20627464c6c9f427bc27d0714a33e72fe6"
+      "sha256": "4b47b5119c66c5ec885afa4f827286f7322cb32a1937097a58ab5fbad43b11a2"
     },
     {
       "bytes": 67099,
@@ -467,9 +467,9 @@
       "sha256": "bbc0691ac26d9673599a4c9c96f48fae155621fe5ee24cc12c4bb69e37fc6364"
     },
     {
-      "bytes": 214533,
+      "bytes": 214713,
       "path": "src/direct/function_spark.goose",
-      "sha256": "fc0b4606570b746244ee08e5c877aadbf505e5b9f2e14c4f6503cf3d8d0fc210"
+      "sha256": "0a591c6b85f0031af76f7ba53e5d0357b96faea004f0cfb6f322bd4eded19648"
     },
     {
       "bytes": 57691,
@@ -477,14 +477,14 @@
       "sha256": "4fc6b6293c53fd387747093634acaf61f02331f576f867ec6a4bb473edf6cda0"
     },
     {
-      "bytes": 82735,
+      "bytes": 84123,
       "path": "src/direct/function_storage.goose",
-      "sha256": "1ee0a78ad3e398e7ce419ef094d2862b2a657a4422477985b9216716d62b31c1"
+      "sha256": "45e5d0c2e03dd0c71544985f2ba5e1b5af7fc362929c243dc2274a8cb5a109d1"
     },
     {
-      "bytes": 27958,
+      "bytes": 37493,
       "path": "src/direct/function_values.goose",
-      "sha256": "c2e6c3a106b43c429f48a32b55f266494e8db282b57c17acf3d27a26ea8b915d"
+      "sha256": "45d8eff350090a37018ff01850b6d657fa7ca3c957c0d99537e6dc47aae444fb"
     },
     {
       "bytes": 2929,
@@ -507,9 +507,9 @@
       "sha256": "d50bc3962ca9dd286bcff09ccd9ce29cc04799ab8ea4b3e3f6766c1d2df54a4e"
     },
     {
-      "bytes": 17220,
+      "bytes": 17510,
       "path": "src/direct/writer.goose",
-      "sha256": "d6e375f7ea045513913bb652082d5938b49b81b3af5983fc2c68c2a3da52062d"
+      "sha256": "c907b8c828e361c045b9a6926c67e3548e78cc2ac0301697de772073f9cf20c6"
     },
     {
       "bytes": 23620,

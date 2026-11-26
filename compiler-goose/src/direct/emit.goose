@@ -168,6 +168,15 @@ struct Handle { saved: u32, depth: u32, cells_start: u32 = 0, cells_len: u32 = 0
 
 struct DepEntry { id: u32 }
 struct TrapEntry { kind: u8 = 0, unit: u32 = 0, start: u32 = 0, end: u32 = 0, message_start: u32 = 0, message_len: u32 = 0 }
+// Four consecutive scalar locals start at w0. A tagged word indexes this
+// entry and encodes its lane in the low two bits.
+struct V128Shadow {
+    w0: u32,
+    vloc: u32,
+    is_float: bool,
+    depth: u32,
+    materialized_at: u64 = 0,
+}
 root struct State {
     instances: Instance[>..] = [],
     // Hash of a key to its newest index node (id + 1).
@@ -220,6 +229,8 @@ root struct State {
     // infer its result), so each owns the top of these stacks from its mark.
     code: u8[>..<] = [],
     locals: ValType[>..<] = [],
+    v128_shadows: V128Shadow[>..<] = [],
+    shadow_epoch: u64 = 1,
     labels: Label[>..<] = [],
     handles: Handle[>..<] = [],
     handle_cells: HandleCell[>..] = [],

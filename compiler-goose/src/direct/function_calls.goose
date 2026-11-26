@@ -176,7 +176,7 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32, is_t
     lget(g, w(g, callee, 0));
     let signature, error = g.closureSignature(arrow.a, arrow.b);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
-    if is_tail && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+    if is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
         arrow.b == g.s.instances[f.instance_id].result &&
         g.s.instances[f.instance_id].result != blot_direct_types::never {
         opIndex(g, OP_return_call_indirect, signature);
@@ -720,10 +720,20 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
         return emitFillOrGenerate(g, f, false, count_loc, src_val, gen_out_ty, id);
     }
     var elide_args = false;
-    if arguments.len >= 1 && arguments.len <= 2 && g.hasUnit(target.unit) {
+    var elide_vector_args = false;
+    if arguments.len >= 1 && arguments.len <= 3 && g.hasUnit(target.unit) {
         let resolved_prim = followAliasTarget(g, target);
         if g.hasUnit(resolved_prim.unit) {
             let rtm .= g.units[resolved_prim.unit - 1];
+            let body .= rtm.body(resolved_prim.binding);
+            if body && body.is_function && rtm.bodyParameters(body).len == arguments.len {
+                let root = forwardingRoot(rtm, body.root);
+                let node = rtm.node(root);
+                elide_vector_args = node.tag == blot_check_core::Tag.scalar && node.c == 0 &&
+                    isF32x4CoreExpr(rtm, node.a) &&
+                    (isCanonicalF32Consumer(node.op) || canonicalV128Producer(node.op)) &&
+                    simdForwardingOperands(rtm, body, node.a, node.b);
+            }
             let palias, has_palias = primitiveAlias(rtm, resolved_prim.binding);
             if has_palias {
                 let pinfo = rtm.primitive(palias);
@@ -743,7 +753,9 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
             g.s.vals[values.start + at] = neverVal();
             continue;
         }
-        if elide_args { f.elide_f32_nan_node = argument; }
+        if elide_args || (elide_vector_args && isF32x4CoreExpr(m, argument)) {
+            f.elide_f32_nan_node = argument;
+        }
         let value, error = expr(g, f, argument);
         f.elide_f32_nan_node = 0;
         if error != blot_direct_types::Error.none { return value, error; }
@@ -1579,7 +1591,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         }
         if !self_tco_target && f.forward_depth < 8 && evidence_context == 0 {
             f.forward_depth += 1;
-            let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id);
+            let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id, elide_nan);
             f.forward_depth -= 1;
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             if was_forwarded { g.recordInlined(target.unit, target.binding); }
@@ -1643,7 +1655,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 br(g, f, OP_br, f.self_tco_loop);
                 return neverVal(), blot_direct_types::Error.none;
             }
-            if is_tail && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+            if is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
                 g.s.instances[instance].result == g.s.instances[f.instance_id].result &&
                 g.s.instances[f.instance_id].result != blot_direct_types::never {
                 // Opt-in Wasm 3.0 `return_call` (0x12) for non-self / mutual tail calls.
@@ -2107,20 +2119,99 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     return g.s.slots[slot].value, true, blot_direct_types::Error.none;
 }
 
-// A wrapper whose body only passes its parameters to an associated member or
-// another named function is resolved at the call site, so an operator on
-// scalars costs one machine instruction, not two calls.
-recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_core::Body&, arguments: Vals, callee: Ty, result: Ty, id: u32) -> Val, bool, Error {
-    let m .= g.units[f.unit - 1];
-    let parameters = tm.bodyParameters(body);
-    var root = body.root;
+fn forwardingRoot(tm: const Module&, body_root: u32) -> u32 {
+    var root = body_root;
     for step in 0..8 {
         let n = tm.node(root);
         if n.tag == blot_check_core::Tag.return_ { root = n.a; }
-        else if n.tag == blot_check_core::Tag.block_ && n.b == 1 { root = tm.children(root)[0]; }
-        else { break; }
+        else if (n.tag == blot_check_core::Tag.block_ || n.tag == blot_check_core::Tag.suite) && n.b == 1 {
+            root = tm.children(root)[0];
+        } else { break; }
     }
+    return root;
+}
+fn forwardedParameter(tm: const Module&, body: const blot_check_core::Body&, id: u32) -> i64 {
+    let binding = localRef(tm, id);
+    if binding != 0 {
+        for parameter, at in tm.bodyParameters(body) {
+            if parameter.binding == binding { return at; }
+        }
+    }
+    return -1;
+}
+fn simdForwardingOperands(tm: const Module&, body: const blot_check_core::Body&, left: u32, right: u32) -> bool {
+    if forwardedParameter(tm, body, left) < 0 { return false; }
+    if right == 0 || forwardedParameter(tm, body, right) >= 0 { return true; }
+    if tm.node(right).tag != blot_check_core::Tag.product { return false; }
+    let pair = tm.children(right);
+    return pair.len == 2 && forwardedParameter(tm, body, pair[0]) >= 0 && forwardedParameter(tm, body, pair[1]) >= 0;
+}
+// Forward immutable tuple lanes by sharing their word IDs. A two-vector
+// product stays flat for select, shuffle and multiply-add, so forwarding
+// these wrappers never copies a vector through a result slot.
+fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_core::Body&, root: u32,
+    args: Vals, result: Ty, id: u32, elide_nan: bool) -> Val, bool, Error {
     let n = tm.node(root);
+    if n.tag == blot_check_core::Tag.scalar && n.c == 0 && simdForwardingOperands(tm, body, n.a, n.b) {
+        let left = g.s.vals[args.start + forwardedParameter(tm, body, n.a)];
+        if left.len == 4 && tagOf(g, left.ty) == blot_direct_types::Tag.tuple {
+            var right = neverVal();
+            if n.b != 0 {
+                let index = forwardedParameter(tm, body, n.b);
+                if index >= 0 {
+                    right = g.s.vals[args.start + index];
+                } else {
+                    let pair = tm.children(n.b);
+                    let first = g.s.vals[args.start + forwardedParameter(tm, body, pair[0])];
+                    let second = g.s.vals[args.start + forwardedParameter(tm, body, pair[1])];
+                    if first.len != 4 || second.len != 4 { return neverVal(), false, blot_direct_types::Error.none; }
+                    let start = g.s.words.len as u32;
+                    for lane in 0..4 { g.s.words.push(w(g, first, lane)); }
+                    for lane in 0..4 { g.s.words.push(w(g, second, lane)); }
+                    right = Val { start: start, len: 8 };
+                }
+            }
+            let selector = laneSelectorOperand(n.op, n.a, n.b);
+            var selector_node: u32 = 0;
+            if selector != 0 && f.forward_depth == 1 {
+                let cm .= g.units[f.unit - 1];
+                if cm.node(id).tag == blot_check_core::Tag.call {
+                    let call = cm.call(id);
+                    let wrapper = BindingRef { tm.unit, body.binding };
+                    if g.resolve(cm, call.target) == wrapper {
+                        let at = forwardedParameter(tm, body, selector);
+                        if at >= 0 && at < call.arguments.len { selector_node = call.arguments[at]; }
+                    }
+                }
+            }
+            let value, error = lanes(g, f, n.op, left, right, result, id, elide_nan, selector_node);
+            return value, true, error;
+        }
+    } else if n.tag == blot_check_core::Tag.product && args.len == 1 && n.b == 4 {
+        let arg = g.s.vals[args.start];
+        if arg.ty == blot_direct_types::f32_ || arg.ty == blot_direct_types::u32_ {
+            for child in tm.children(root) {
+                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, blot_direct_types::Error.none; }
+            }
+            let word = w(g, arg, 0);
+            let words = g.saveWords([word, word, word, word]);
+            return Val { result, words.start, words.len }, true, blot_direct_types::Error.none;
+        }
+    }
+    return neverVal(), false, blot_direct_types::Error.none;
+}
+
+// A wrapper whose body only passes its parameters to an intrinsic, associated
+// member or named function can be resolved at the call site.
+recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_core::Body&, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool) -> Val, bool, Error {
+    let m .= g.units[f.unit - 1];
+    let parameters = tm.bodyParameters(body);
+    let root = forwardingRoot(tm, body.root);
+    let n = tm.node(root);
+    if !body.exported {
+        let value, forwarded, error = forwardSimd(g, f, tm, body, root, arguments, result, id, elide_nan);
+        if forwarded { return value, true, error; }
+    }
     var operands: u32[8] = [0; 8];
     var operand_count: i64 = 0;
     if n.tag == blot_check_core::Tag.associated {
@@ -2168,6 +2259,26 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
                 if error != blot_direct_types::Error.none { return neverVal(), false, error; }
                 let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
+                return value, true, error;
+            },
+            simd_load, simd_store => {
+                let container = g.s.vals[forwarded.start];
+                let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
+                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                let element, error = elementOf(g, f, container.ty, id);
+                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                let step, error = stride(g, f, element, id);
+                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                let address, error = simdAddress(g, f, container, index, step, id);
+                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                if operation == blot_backend_collection_ops::Op.simd_load {
+                    let value, error = simdLoadAt(g, f, address, element, step, id);
+                    return value, true, error;
+                }
+                // Every argument has already run. The wrapper has no RHS
+                // evaluation between the first bounds check and the write.
+                let value, error = simdStoreAt(g, f, container, index, address, element, step,
+                    g.s.vals[forwarded.start + 2], true, id);
                 return value, true, error;
             },
             fill, generate => {

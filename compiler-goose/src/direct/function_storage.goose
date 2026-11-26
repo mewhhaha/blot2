@@ -340,6 +340,7 @@ fn createUninit(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, u32
     callf(g, rt.open);
     let handle, error = pop(g, f, ty, id);
     if error != blot_direct_types::Error.none { return handle, 0, error; }
+    recordMutable(g, f, handle);
     recordCheckedArray(f, w(g, handle, 0), w(g, handle, 1), base, length);
     return handle, base, blot_direct_types::Error.none;
 }
@@ -370,6 +371,7 @@ fn create(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, Error {
     callf(g, create_function);
     let handle, error = pop(g, f, ty, id);
     if error != blot_direct_types::Error.none { return handle, error; }
+    recordMutable(g, f, handle);
     return handle, blot_direct_types::Error.none;
 }
 // The address of element 0 of an owner handle.
@@ -467,6 +469,23 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
                 }
             }
         }
+        if !in_bounds {
+            let length, known_length = constU32(f, len);
+            if known_length {
+                let position, known_position = constU32(f, index);
+                if known_position && position.value < length.value {
+                    useConstU32(position);
+                    in_bounds = true;
+                } else if index == range.index && !range.is_view && range.end_local != 0xffffffff {
+                    let end, known_end = constU32(f, range.end_local);
+                    if known_end && end.value <= length.value {
+                        useConstU32(end);
+                        in_bounds = true;
+                    }
+                }
+                if in_bounds { useConstU32(length); }
+            }
+        }
         if !in_bounds && findCheckedBound(f, index, len) >= 0 {
             in_bounds = true;
         }
@@ -556,7 +575,7 @@ fn trapBounds(g: Generator&, f: Fn&, id: u32) {
 // Runtime guard against mutating immutable static const pools (`slot >= persistent_split && static_pool_flag != 0`).
 // Matches runtime.push/pop/truncate while leaving temporary transport pins (`slot < persistent_split`) untouched.
 fn checkMutableOwner(g: Generator&, f: Fn&, container: Val) {
-    if tagOf(g, container.ty) != blot_direct_types::Tag.array { return; }
+    if tagOf(g, container.ty) != blot_direct_types::Tag.array || knownMutable(g, f, container) { return; }
     let rt = g.runtime_();
     lget(g, w(g, container, 0));
     i32Const(g, rt.layout.persistent_split);
@@ -632,6 +651,7 @@ recursive fn arrayLiteral(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 
 fn arrayFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Val, Error {
     let count = constLocal(g, f, values.len);
+    recordConstU32(f, count, values.len);
     if values.len == 0 { return create(g, f, ty, count, id); }
     let handle, base, error = createUninit(g, f, ty, count, id);
     if error != blot_direct_types::Error.none { return handle, error; }
@@ -778,88 +798,28 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             return handle, blot_direct_types::Error.none;
         },
         simd_load, simd_store => {
-            // Four consecutive elements, all in bounds.
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let position, error = expr(g, f, children[1]);
             if error != blot_direct_types::Error.none { return position, error; }
             let index, error = scalarLocal(g, f, position, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let last = local32(g, f);
-            lget(g, index);
-            i32Const(g, 3);
-            op(g, OP_i32_add);
-            ltee(g, last);
-            lget(g, index);
-            op(g, OP_i32_lt_u);
-            trapBounds(g, f, id);
-            let last_address, error = elementAddress(g, f, container, last, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let address, error = elementAddress(g, f, container, index, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
             let element, error = elementOf(g, f, container.ty, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            let elem_stride, serr = stride(g, f, element, id);
-            if serr != blot_direct_types::Error.none { return neverVal(), serr; }
-            let lane_ty, error = g.types.tuple([element, element, element, element]);
+            let step, error = stride(g, f, element, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let core_ty = m.typeOf(children[0]);
+            let address, error = simdAddress(g, f, container, index, step, id, core_ty);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             if operation == blot_backend_collection_ops::Op.simd_load {
-                var lanes_vals: Val[4] = [neverVal(); 4];
-                for li in 0..4 {
-                    var lane_addr = address;
-                    if li != 0 {
-                        lane_addr = local32(g, f);
-                        lget(g, address);
-                        i32Const(g, (li as u32) * elem_stride);
-                        op(g, OP_i32_add);
-                        lset(g, lane_addr);
-                    }
-                    let lv, lerr = loadElement(g, f, lane_addr, 0, element, id);
-                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
-                    lanes_vals[li] = lv;
-                }
-                let lane_boxed, berr = isBoxed(g, f, lane_ty, id);
-                if berr != blot_direct_types::Error.none { return neverVal(), berr; }
-                if lane_boxed {
-                    let blk, merr = newBlock(g, f, lane_ty, id);
-                    if merr != blot_direct_types::Error.none { return neverVal(), merr; }
-                    for li in 0..4 {
-                        let off, oerr = itemOffset(g, f, lane_ty, li, id);
-                        if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
-                        let werr = writeFlat(g, f, blk, off, lanes_vals[li], id);
-                        if werr != blot_direct_types::Error.none { return neverVal(), werr; }
-                    }
-                    return valOf1(g, lane_ty, blk), blot_direct_types::Error.none;
-                }
-                let start_w = g.s.words.len as u32;
-                for li in 0..4 {
-                    let lv = lanes_vals[li];
-                    for wi in 0..(lv.len as i64) { let lw = g.s.words[lv.start + wi]; g.s.words.push(lw); }
-                }
-                return Val { lane_ty, start_w, (g.s.words.len as u32) - start_w }, blot_direct_types::Error.none;
+                return simdLoadAt(g, f, address, element, step, id);
             }
             let lanes_value, error = expr(g, f, children[2]);
             if error != blot_direct_types::Error.none { return lanes_value, error; }
-            checkMutableOwner(g, f, container);
-            let noted = noteStoreToSlot(g, f, w(g, container, 0), lanes_value);
-            if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-            var store_addr = address;
-            if tagOf(g, container.ty) != blot_direct_types::Tag.array || coreSizedLength(m, m.typeOf(children[0])) == 0 {
-                let _, lerr = elementAddress(g, f, container, last, id, m.typeOf(children[0]));
-                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
-                let recomputed, rerr = elementAddress(g, f, container, index, id, m.typeOf(children[0]));
-                if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
-                store_addr = recomputed;
-            }
-            recordBeforeWrite(g, f, w(g, container, 0), store_addr, 0, elem_stride * 4);
-            for li in 0..4 {
-                let lv, lerr = tupleItem(g, f, lanes_value, li, id);
-                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
-                let werr = writeElement(g, f, store_addr, (li as u32) * elem_stride, lv, id);
-                if werr != blot_direct_types::Error.none { return neverVal(), werr; }
-            }
-            f.checked_elems_len = 0;
-            return container, blot_direct_types::Error.none;
+            var rhs_budget: i64 = 128;
+            let rhs_safe = tagOf(g, container.ty) == blot_direct_types::Tag.array &&
+                (coreSizedLength(m, core_ty) != 0 || noStorageResize(g, m, children[2], rhs_budget));
+            return simdStoreAt(g, f, container, index, address, element, step, lanes_value, rhs_safe, id, core_ty);
         },
         flatten => {
             // Sum the inner lengths, then copy each inner array in turn.
@@ -916,6 +876,95 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         },
     }
 }
+// One logical bounds trap for the whole four-element interval. Testing
+// length before subtracting four keeps even a maximally large U32 index safe.
+fn simdAddress(g: Generator&, f: Fn&, container: Val, index: u32, step: u32, id: u32, core_ty: TId = 0) -> u32, Error {
+    if tagOf(g, container.ty) == blot_direct_types::Tag.array {
+        let base, len = ensureCheckedArray(g, f, container);
+        lget(g, len);
+        i32Const(g, 4);
+        op(g, OP_i32_lt_u);
+        lget(g, index);
+        lget(g, len);
+        i32Const(g, 4);
+        op(g, OP_i32_sub);
+        op(g, OP_i32_gt_u);
+        op(g, OP_i32_or);
+        trapBounds(g, f, id);
+        return emitOffsetAddress(g, f, base, index, step), blot_direct_types::Error.none;
+    }
+    // Views retain their existing handle and subrange checks.
+    let last = local32(g, f);
+    lget(g, index);
+    i32Const(g, 3);
+    op(g, OP_i32_add);
+    ltee(g, last);
+    lget(g, index);
+    op(g, OP_i32_lt_u);
+    trapBounds(g, f, id);
+    let _, error = elementAddress(g, f, container, last, id, core_ty);
+    if error != blot_direct_types::Error.none { return 0, error; }
+    return elementAddress(g, f, container, index, id, core_ty);
+}
+fn hasV128Elements(element: Ty) -> bool {
+    return element == blot_direct_types::f32_ || element == blot_direct_types::u32_;
+}
+fn simdLoadAt(g: Generator&, f: Fn&, address: u32, element: Ty, step: u32, id: u32) -> Val, Error {
+    let lane_ty, error = g.types.tuple([element, element, element, element]);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if hasV128Elements(element) {
+        lget(g, address);
+        simdMemOp(g, SIMD_v128_load, 2, 0);
+        return popV128(g, f, lane_ty), blot_direct_types::Error.none;
+    }
+    let lanes_vals = g.reserveVals(4);
+    for lane in 0..4 {
+        var addr = address;
+        var offset = (lane as u32) * step;
+        // Boxed element reads copy a block from their base address.
+        if offset != 0 && element != blot_direct_types::boolean {
+            addr = local32(g, f);
+            lget(g, address);
+            i32Const(g, offset);
+            op(g, OP_i32_add);
+            lset(g, addr);
+            offset = 0;
+        }
+        let value, error = loadElement(g, f, addr, offset, element, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        g.s.vals[lanes_vals.start + lane] = value;
+    }
+    return packProduct(g, f, id, lane_ty, lanes_vals);
+}
+fn simdStoreAt(g: Generator&, f: Fn&, container: Val, index: u32, address: u32, element: Ty, step: u32, lanes_value: Val, rhs_safe: bool, id: u32, core_ty: TId = 0) -> Val, Error {
+    // checkMutableOwner elides the runtime guard for a knownMutable owner.
+    checkMutableOwner(g, f, container);
+    let noted = noteStoreToSlot(g, f, w(g, container, 0), lanes_value);
+    if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+    var target = address;
+    if !rhs_safe {
+        let recomputed, error = simdAddress(g, f, container, index, step, id, core_ty);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        target = recomputed;
+    }
+    recordBeforeWrite(g, f, w(g, container, 0), target, 0, step * 4);
+    if hasV128Elements(element) {
+        let vector = ensureV128(g, f, lanes_value);
+        lget(g, target);
+        lget(g, vector);
+        simdMemOp(g, SIMD_v128_store, 2, 0);
+    } else {
+        for lane in 0..4 {
+            let value, error = tupleItem(g, f, lanes_value, lane, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let written = writeElement(g, f, target, (lane as u32) * step, value, id);
+            if written != blot_direct_types::Error.none { return neverVal(), written; }
+        }
+    }
+    f.checked_elems_len = 0;
+    return container, blot_direct_types::Error.none;
+}
+
 // Copies `count` elements from `source[from..]` to `target[to..]`.
 fn copyElements(g: Generator&, f: Fn&, source: Val, from: u32, target: Val, to: u32, count: u32, id: u32) -> Error {
     let element, error = elementOf(g, f, target.ty, id);

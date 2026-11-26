@@ -230,6 +230,19 @@ updated from an expression-position `$Left/$Right => @storage.push` arm
 opposite `$Empty => ()` to a suite arm `observations := @storage.push self
 value`.
 
+Benchmark Codegen Waves 1-2 (26 November 2026) added compile-time U32
+mul/div/rem strength reduction (power-of-two shifts/masks + exact 64-bit
+Granlund-Montgomery reciprocals with relocation guards), loop-invariant runtime
+U32 div/rem reciprocal hoisting, `knownMutable` local-array mutability check
+elision, `constU32` constant-bound loop BCE, dominating `CheckedArray`
+preservation across non-resizing scopes, direct scalar constant operands and
+stack comparisons, pure scalar binary-recursion-to-loop lowering, unboxed
+tagged-word Wasm `v128` SIMD128 shadow lowering for `@simd.*` / `std/simd`
+(with automatic scalar lane materialization and canonical `0x7fc00000` NaN),
+and the `Tier 6B-1` `matchMatmulKLoop` `self`-update fix. Re-recorded
+`expected.json`: 57 of 109 fixtures updated Wasm bytes/SHA/function counts only
+(net -3,780 bytes), with zero exit-code, diagnostic, or frontend counter changes.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """
