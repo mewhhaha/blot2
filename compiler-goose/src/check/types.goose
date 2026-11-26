@@ -1402,6 +1402,47 @@ fn resolveUnification(self_: Store&, root: Id) -> Id, Error {
     let entries = self_.normalization.resolve_depth_entries; let nodes = self_.nodes.len; increment(self_.normalization.unify_resolve_calls);
     let result, error = resolve(self_, root, 0); saturatedAdd(self_.normalization.unify_resolve_entries, self_.normalization.resolve_depth_entries - entries); saturatedAdd(self_.normalization.unify_resolve_nodes, (self_.nodes.len - nodes) as u64); return result, error;
 }
+fn fastUnifyHop(self_: const Store&, id: Id) -> Id {
+    if id <= never { return id; }
+    let n = node(self_, id);
+    if n.tag == Tag.variable && n.b == 0 {
+        let w = self_.variables.items[n.a];
+        if w.first != none && w.first == w.last { return self_.versions.items[w.first].replacement; }
+    }
+    return id;
+}
+fn isEmptyUnboundRow(self_: const Store&, id: blot_check_effects::Id) -> bool {
+    if id == 0 { return false; }
+    let r = row(self_, id);
+    if r.labels.len != 0 || r.cursor != 0 { return false; }
+    match r.tail {
+        variable v => { return self_.effects.variables.items[v.value].first == blot_check_effects::none; },
+        _ => { return false; },
+    }
+}
+fn trivialEffectsUnifyReady(self_: const Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> bool {
+    if left == 0 && right == 0 { return true; }
+    if left == 0 { return isEmptyUnboundRow(self_, right); }
+    if right == 0 { return isEmptyUnboundRow(self_, left); }
+    if left == right {
+        let r = row(self_, left);
+        if r.labels.len != 0 { return false; }
+        match r.tail {
+            variable v => { return self_.effects.variables.items[v.value].first == blot_check_effects::none; },
+            _ => { return true; },
+        }
+    }
+    return isEmptyUnboundRow(self_, left) && isEmptyUnboundRow(self_, right);
+}
+fn trivialReturnBindSteps(self_: const Store&, target: Id) -> u64 {
+    if target <= never || closedHeight(self_, target) != 0 { return 1; }
+    let n = node(self_, target);
+    if n.tag == Tag.function && n.a <= never && n.b <= never && (n.c == 0 || isEmptyUnboundRow(self_, n.c)) {
+        if n.a == n.b { return 2; }
+        return 3;
+    }
+    return 0;
+}
 recursive fn unifyMode<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool) -> Error {
     if !associated && !self_.has_projections {
         if left == right && (left <= never || !self_.has_rank_types) {
@@ -1414,20 +1455,73 @@ recursive fn unifyMode<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
             return mismatch(self_, reporter, left, right);
         }
         if !self_.has_rank_types && self_.associated_equations.count == 0 {
-            if right > absent && right < never {
-                let ln = node(self_, left);
+            let fl = fastUnifyHop(self_, left);
+            let fr = fastUnifyHop(self_, right);
+            if fl == fr && (fl <= never || closedHeight(self_, fl) != 0 || (fl == left && fr == right)) {
+                increment(self_.normalization.unify_pairs);
+                return blot_error::Error.none;
+            }
+            if fl <= never && fr <= never {
+                increment(self_.normalization.unify_pairs);
+                if fl == never || fr == never { return blot_error::Error.none; }
+                return mismatch(self_, reporter, fl, fr);
+            }
+            if fr > absent && fr < never {
+                let ln = node(self_, fl);
                 if ln.tag == Tag.variable && ln.b == 0 && self_.variables.items[ln.a].first == none {
                     increment(self_.normalization.unify_pairs);
                     self_.occurs_steps += 1;
-                    return appendVersion(self_, left, right);
+                    return appendVersion(self_, fl, fr);
                 }
             }
-            if left > absent && left < never {
-                let rn = node(self_, right);
+            if fl > absent && fl < never {
+                let rn = node(self_, fr);
                 if rn.tag == Tag.variable && rn.b == 0 && self_.variables.items[rn.a].first == none {
                     increment(self_.normalization.unify_pairs);
                     self_.occurs_steps += 1;
-                    return appendVersion(self_, right, left);
+                    return appendVersion(self_, fr, fl);
+                }
+            }
+            if fl > never && fr > never {
+                let ln = node(self_, fl);
+                let rn = node(self_, fr);
+                if ln.tag == Tag.function && rn.tag == Tag.function && trivialEffectsUnifyReady(self_, ln.c, rn.c) {
+                    let la = if fl == left { fastUnifyHop(self_, ln.a) } else { ln.a };
+                    let ra = if fr == right { fastUnifyHop(self_, rn.a) } else { rn.a };
+                    if la <= never && ra <= never && (la == ra || la == never || ra == never) {
+                        let lb = if fl == left { fastUnifyHop(self_, ln.b) } else { ln.b };
+                        let rb = if fr == right { fastUnifyHop(self_, rn.b) } else { rn.b };
+                        if lb <= never && rb <= never && (lb == rb || lb == never || rb == never) {
+                            increment(self_.normalization.unify_pairs);
+                            return unifyEffects(self_, ln.c, rn.c);
+                        }
+                        if rb > never {
+                            let rbn = node(self_, rb);
+                            if rbn.tag == Tag.variable && rbn.b == 0 && self_.variables.items[rbn.a].first == none {
+                                let steps = trivialReturnBindSteps(self_, lb);
+                                if steps != 0 {
+                                    increment(self_.normalization.unify_pairs);
+                                    self_.occurs_steps += steps;
+                                    let berr = appendVersion(self_, rb, lb);
+                                    if berr != blot_error::Error.none { return berr; }
+                                    return unifyEffects(self_, ln.c, rn.c);
+                                }
+                            }
+                        }
+                        if lb > never {
+                            let lbn = node(self_, lb);
+                            if lbn.tag == Tag.variable && lbn.b == 0 && self_.variables.items[lbn.a].first == none {
+                                let steps = trivialReturnBindSteps(self_, rb);
+                                if steps != 0 {
+                                    increment(self_.normalization.unify_pairs);
+                                    self_.occurs_steps += steps;
+                                    let berr = appendVersion(self_, lb, rb);
+                                    if berr != blot_error::Error.none { return berr; }
+                                    return unifyEffects(self_, ln.c, rn.c);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -11,6 +11,7 @@ import check.core;
 import check.core_builder;
 import check.wire_schema;
 import compile;
+import direct.writer;
 import parse.ast;
 import parse.symbols;
 import reuse.project;
@@ -82,7 +83,10 @@ fn effectiveWorkers(policy:Policy,units:i64,source_bytes:i64)->u8 {
 fn projectLoad(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,output:Text,policy:Policy,started:u64,stats:ProjectStats&,error_detail:u8[>..]&,check_only:bool,include_private:bool)->bool,Error {
  var loaded,error=blot_reuse_project::loadParallel(filename,options,policy.frontend_workers);if error!=blot_error::Error.none {formatIoError(error_detail,"load",filename,error);return false,error;}
  loaded.checking=blot_reuse_project::Lowering{io:true,workers:effectiveWorkers(policy,loaded.units.len,loaded.source_bytes)};
- let accepted,error=projectLoaded(writer,command,filename,output,policy,started,stats,loaded,error_detail,check_only,include_private);let release_start=now();loaded.deinit();stats.teardown_us+=elapsed(release_start);return accepted,error;
+ blot_direct_writer::setEmitWorkers(loaded.checking.workers);
+ let accepted,error=projectLoaded(writer,command,filename,output,policy,started,stats,loaded,error_detail,check_only,include_private);
+ blot_direct_writer::setEmitWorkers(1);
+ let release_start=now();loaded.deinit();stats.teardown_us+=elapsed(release_start);return accepted,error;
 }
 fn emitPrepared(writer:blot_io::Writer,output:Text,stats:ProjectStats&,loaded:Project&,prepared:const blot_reuse_partial_dependency::Prepared&,error_detail:u8[>..]&)->bool,Error {
  let emit_start=now();

@@ -119,18 +119,22 @@ fn initOpen(request:Request,compiler:Digest,policy:Policy)->OpenProject,Error {
     }
     return result,blot_error::Error.none;
 }
-// Lowering is serial here whatever the policy asks.
-fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
+fn emitWorkerCount(self_:const OpenProject&,units:i64,source_bytes:i64)->u8 {
     var width=self_.policy.frontend_workers;
     if width==0 {
         width=1;
-        if source.units.len>=16 && source.source_bytes>=65536 {
+        if units>=16 && source_bytes>=65536 {
             var cap:u8=4;
-            if source.source_bytes>=524288 {cap=8;}
-            if source.source_bytes>=2097152 {cap=16;}
+            if source_bytes>=524288 {cap=8;}
+            if source_bytes>=2097152 {cap=16;}
             width=min(cap,blot_native::available_workers());
         }
     }
+    return width;
+}
+// Lowering is serial here whatever the policy asks.
+fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
+    let width=emitWorkerCount(self_,source.units.len,source.source_bytes);
     source.lowering=blot_reuse_project::Lowering{io:true,workers:1};
     source.checking=blot_reuse_project::Lowering{io:true,workers:width};
 }

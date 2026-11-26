@@ -3842,6 +3842,18 @@ fn preparedGlobalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Er
 fn startsBytes(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len && text[..prefix.len]==prefix;}
 fn exactIntrinsicArity(name:const u8[:])->blot_support::Option<i64> {if startsBytes(name,"@u32.") || startsBytes(name,"@f32.") {return blot_support::none<i64>();}return intrinsicArity(name);}
 fn intrinsicArity(name:const u8[:])->blot_support::Option<i64> {
+ if startsBytes(name,"@u32.") {
+  let m=name[5..];
+  if m=="to_f32" {return blot_support::some(1 as i64);}
+  for candidate in ["add","sub","mul","div","rem","bit_and","bit_or","bit_xor","shl","shr","eq","lt"] {if m==candidate {return blot_support::some(2 as i64);}}
+  return blot_support::none<i64>();
+ }
+ if startsBytes(name,"@f32.") {
+  let m=name[5..];
+  for candidate in ["add","sub","mul","div","eq","ne","lt","le","gt","ge"] {if m==candidate {return blot_support::some(2 as i64);}}
+  for candidate in ["to_u32","neg","abs","sqrt","floor","ceil","trunc"] {if m==candidate {return blot_support::some(1 as i64);}}
+  return blot_support::none<i64>();
+ }
  let storage=blot_check_storage_ops::lookup(name);if storage.present {return blot_support::some(blot_check_storage_ops::arity(storage.value) as i64);}let staging,present=blot_check_typed_staging::lookup(name);if present {return blot_support::some(blot_check_typed_staging::arity(staging) as i64);}let simd_=blot_backend_simd_intrinsics::lookup(name);if simd_.present {return blot_support::some(simd_.value.arity as i64);}let collection=blot_backend_collection_ops::lookup(name);if collection.present {return blot_support::some(collection.value.arity as i64);}
  if name=="@hole" {return blot_support::some(0 as i64);}
  for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@u32.to_f32","@f32.to_u32","@f32.neg","@f32.abs","@f32.sqrt","@f32.floor","@f32.ceil","@f32.trunc","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
@@ -3876,7 +3888,20 @@ recursive fn constrainCollection(self_:Engine&,owner:u32,element:u32,source:u32)
 fn arrow2(self_:Engine&,first:u32,second:u32,result:u32)->u32,blot_error::Error {let tail,err=self_.types.function(second,result);if err!=blot_error::Error.none {return 0,err;}return self_.types.function(first,tail);}
 fn arrow3(self_:Engine&,first:u32,second:u32,third:u32,result:u32)->u32,blot_error::Error {let tail,err=arrow2(self_,second,third,result);if err!=blot_error::Error.none {return 0,err;}return self_.types.function(first,tail);}
 recursive fn intrinsic(self_:Engine&,id:u32,name:u32)->u32,blot_error::Error {
- let text=self_.pool.get(name);if self_.editorAt(id) {return self_.captureEditor(id,0,0);}let intrinsic=blot_backend_simd_intrinsics::lookup(text);if intrinsic.present {let op=intrinsic.value;var element=blot_check_types::u32_type;if op.floating {element=blot_check_types::f32_type;}let vector,err=self_.types.product([element,element,element,element]);if err!=blot_error::Error.none {return 0,err;}let lanes,err=self_.types.product([blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type]);if err!=blot_error::Error.none {return 0,err;}var result_element=blot_check_types::u32_type;if op.resultLane()==blot_backend_simd_intrinsics::Lane.floating {result_element=blot_check_types::f32_type;}let output,err=self_.types.product([result_element,result_element,result_element,result_element]);if err!=blot_error::Error.none {return 0,err;}let pair,err=self_.types.product([vector,vector]);if err!=blot_error::Error.none {return 0,err;}match op.shape {
+ let text=self_.pool.get(name);if self_.editorAt(id) {return self_.captureEditor(id,0,0);}
+ if startsBytes(text,"@u32.") {
+  let member=text[5..];
+  for candidate in ["add","sub","mul","div","rem","bit_and","bit_or","bit_xor","shl","shr"] {if member==candidate {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type);}}
+  if member=="eq" || member=="lt" {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::boolean);}
+  if member=="to_f32" {return self_.types.function(blot_check_types::u32_type,blot_check_types::f32_type);}
+ } else if startsBytes(text,"@f32.") {
+  let member=text[5..];
+  for candidate in ["add","sub","mul","div"] {if member==candidate {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::f32_type);}}
+  for candidate in ["eq","ne","lt","le","gt","ge"] {if member==candidate {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::boolean);}}
+  for candidate in ["neg","abs","sqrt","floor","ceil","trunc"] {if member==candidate {return self_.types.function(blot_check_types::f32_type,blot_check_types::f32_type);}}
+  if member=="to_u32" {return self_.types.function(blot_check_types::f32_type,blot_check_types::u32_type);}
+ }
+ let intrinsic=blot_backend_simd_intrinsics::lookup(text);if intrinsic.present {let op=intrinsic.value;var element=blot_check_types::u32_type;if op.floating {element=blot_check_types::f32_type;}let vector,err=self_.types.product([element,element,element,element]);if err!=blot_error::Error.none {return 0,err;}let lanes,err=self_.types.product([blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type]);if err!=blot_error::Error.none {return 0,err;}var result_element=blot_check_types::u32_type;if op.resultLane()==blot_backend_simd_intrinsics::Lane.floating {result_element=blot_check_types::f32_type;}let output,err=self_.types.product([result_element,result_element,result_element,result_element]);if err!=blot_error::Error.none {return 0,err;}let pair,err=self_.types.product([vector,vector]);if err!=blot_error::Error.none {return 0,err;}match op.shape {
  unary,convert => {return self_.types.function(vector,output);},
  binary,compare => {return arrow2(self_,vector,vector,output);},
  shift,broadcast => {return arrow2(self_,vector,blot_check_types::u32_type,vector);},

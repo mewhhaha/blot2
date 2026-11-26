@@ -1057,6 +1057,7 @@ fn isOpaqueOutsideUnit(g: const Generator&, m: const Module&, ty: Ty) -> bool {
     return false;
 }
 fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     if !g.module.has_memory {
         g.module.has_memory = true;
         g.module.memory_pages = 1;
@@ -1081,6 +1082,7 @@ fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
     uleb(g, 0);
 }
 fn emitPanicTrap(g: Generator&, f: Fn&, id: u32) {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     if !g.module.has_memory {
         g.module.has_memory = true;
         g.module.memory_pages = 1;

@@ -157,10 +157,13 @@ fn selectUnitNames(self_:Engine&,unit:u32) {
     }
     source.symbols.restrictView(end);
 }
-fn persistentUnit(self_:Engine&,unit:u32,shared:u64)->Error {
+fn persistentUnit(self_:Engine&,unit:u32,shared:u64,packet:u8[>..<]&)->Error {
     self_.selectUnitNames(unit);
     let cache:PersistentCache& =self_.persistentCache();
     if unit==0 || unit>cache.producers.len || self_.diagnostics.items.len!=0 {
+        return blot_error::Error.invalid_artifact;
+    }
+    if blot_check_check::hasNumericFailure(self_.source.unit(unit).tree) {
         return blot_error::Error.invalid_artifact;
     }
     if cache.error!=blot_error::Error.none {return cache.error;}
@@ -188,17 +191,17 @@ fn persistentUnit(self_:Engine&,unit:u32,shared:u64)->Error {
     self_.associated_remaining=associated;
     let slots=moduleSlots(self_.result);
     if !slots[unit-1].present || !slots[unit-1].value.valid {return blot_error::Error.invalid_artifact;}
-    let error=publishPersistentUnit(self_.source,slots[unit-1].value,unit,shared,work,resolution_used,associated_used,check_elapsed);
+    let error=publishPersistentUnit(self_.source,slots[unit-1].value,unit,shared,work,resolution_used,associated_used,check_elapsed,packet);
     slots[unit-1].value.deinit();
     slots[unit-1]=blot_support::none<Module>();
     if self_.source.symbols.outsideView() {return blot_error::Error.invalid_artifact;}
     return error;
 }
 
-fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u64,work:blot_work_counters::Frontend,resolution_used:i64,associated_used:i64,check_cpu_us:u64)->Error {
+fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u64,work:blot_work_counters::Frontend,resolution_used:i64,associated_used:i64,check_cpu_us:u64,packet:u8[>..<]&)->Error {
     let current=source.unit(unit);
     let freeze_cpu=blot_native::thread_cpu_ns();
-    let error=publishPersistentInterface(source.prelude_unit,current.tree,module,unit,shared);
+    let error=publishPersistentInterface(source.prelude_unit,current.tree,module,unit,shared,packet);
     let freeze_elapsed=cpuMicros(freeze_cpu);
     if error!=blot_error::Error.none {return error;}
     let lower_cpu=blot_native::thread_cpu_ns();
@@ -214,7 +217,7 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     for node in core.value.nodes {
         if node.tag==blot_check_core::Tag.fork_ {has_fork_byte=2;break;}
     }
-    var packet:u8[>..<]=[];
+    packet.clear();
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,unit);
     blot_project_packet::putExecutionCore(writer,core.value);
@@ -234,8 +237,8 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     return blot_error::Error.none;
 }
 
-fn publishPersistentInterface(prelude:u32,tree:const blot_parse_ast::Tree&,module:const Module&,unit:u32,shared:u64)->Error {
-    var packet:u8[>..<]=[];
+fn publishPersistentInterface(prelude:u32,tree:const blot_parse_ast::Tree&,module:const Module&,unit:u32,shared:u64,packet:u8[>..<]&)->Error {
+    packet.clear();
     let error=encodePersistentInterface(prelude,tree,module,unit,packet);
     if error!=blot_error::Error.none {return error;}
     if !blot_native::persist_publish(shared,unit,1,packet[0],packet.len as u64) {return blot_error::Error.invalid_artifact;}

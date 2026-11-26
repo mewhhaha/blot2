@@ -830,7 +830,7 @@ fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId,parallel:bool,retain_
     let walked=loader.walk(entry);
     if walked!=blot_error::Error.none {return walked;}
     if project.diagnostics.len==0 {
-        if parallel && project.units.len>=16 {
+        if parallel && retain_parser_trees && project.units.len>=16 {
             let failure=linkCheckingNames(project,entry,prefix,loader.previous,retain_parser_trees);
             if failure!=blot_error::Error.none {return failure;}
         } else {

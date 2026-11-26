@@ -6,6 +6,7 @@ import support.error;
 import support.native;
 import support.option;
 import support.bytes;
+import parse.ast;
 import check.types;
 import check.core;
 import check.parameter_patterns;
@@ -132,6 +133,258 @@ fn get(receiver:Reader&,value:u32[:]&) {
     let run,error=allocate(receiver.owner,length,0 as u32);
     if error!=blot_error::Error.none {receiver.failure=error;return;}
     blot_native::copy_u32(run[0],receiver.bytes[receiver.at],length as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_parse_ast::Span[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_parse_ast::Span[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_parse_ast::Span[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_parse_ast::Span>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::List[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::List[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::List[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::List>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_types::List[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_types::List[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_types::List[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_types::List>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::BindingRef[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::BindingRef[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::BindingRef[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::BindingRef>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].unit,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::CallInfo[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::CallInfo[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::CallInfo[:]>();return;}
+    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*16;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::CallInfo>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].target.unit,receiver.bytes[receiver.at],(length*4) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::FieldName[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::FieldName[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::FieldName[:]>();return;}
+    if length>limit/12 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*12;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::FieldName>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].symbol,receiver.bytes[receiver.at],(length*3) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::RuntimeName[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::RuntimeName[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::RuntimeName[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::RuntimeName>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].binding,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::Merge[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::Merge[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::Merge[:]>();return;}
+    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*16;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::Merge>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*4) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::LoopCarry[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::LoopCarry[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::LoopCarry[:]>();return;}
+    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*16;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::LoopCarry>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].incoming,receiver.bytes[receiver.at],(length*4) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::ProjectionVariant[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::ProjectionVariant[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::ProjectionVariant[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::ProjectionVariant>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].tag,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::PatternRow[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::PatternRow[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::PatternRow[:]>();return;}
+    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*8;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::PatternRow>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].patterns.start,receiver.bytes[receiver.at],(length*2) as u64);
+    receiver.at+=byte_len;
+    value=run;
+}
+fn put(receiver:Writer&,values:const blot_check_core::HandleEffects[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let raw=bytes_of(values);
+    if !receiver.room(raw.len) {return;}
+    receiver.output.append(raw);
+}
+fn get(receiver:Reader&,value:blot_check_core::HandleEffects[:]&) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<blot_check_core::HandleEffects[:]>();return;}
+    if length>limit/20 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    let byte_len=length*20;
+    if !receiver.available(byte_len) {return;}
+    let run,error=allocate(receiver.owner,length,default<blot_check_core::HandleEffects>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    assert(bytes_of(run).len==byte_len);
+    blot_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*5) as u64);
     receiver.at+=byte_len;
     value=run;
 }

@@ -10,33 +10,32 @@ import work_counters;
 import phase_profile;
 
 fn preparePersistent(source:Project&,retained:Retained?)->Preparation,Error {
- // Plain #run reads checked Core at emission. Quoted code and numeric
- // validation still use the live source checker.
+ // Plain #run reads checked Core at emission. Quoted code still uses the live
+ // source checker; numeric validation is checked per-unit in parallel workers.
  for unit in source.units.items {
-  if needsLiveValues(unit.tree,source.symbols) || blot_check_check::hasNumericFailure(unit.tree) {return Preparation.inactive,blot_error::Error.none;}
+  if needsLiveValues(unit.tree,source.symbols) {return Preparation.inactive,blot_error::Error.none;}
+ }
+ let handle=blot_native::persist_open(source.units.len as u32);
+ if handle==0 {return Preparation.inactive,blot_error::Error.none;}
+ if !retained {
+  let prepared,failure=runPersistent(source,handle,default<const u8[:][:]>(),default<ModuleDebit[:]>());
+  blot_native::persist_close(handle);
+  return prepared,failure;
  }
  let parsed=source.symbols.entries.len;
  var symbols,error=blot_parse_symbols::initPooled();
- if error!=blot_error::Error.none {return Preparation.inactive,error;}
+ if error!=blot_error::Error.none {blot_native::persist_close(handle);return Preparation.inactive,error;}
  let allocation=blot_reuse_project_check::replaySymbols(symbols,source.symbols,parsed);
- if allocation!=blot_error::Error.none {symbols.deinit();return Preparation.inactive,allocation;}
+ if allocation!=blot_error::Error.none {symbols.deinit();blot_native::persist_close(handle);return Preparation.inactive,allocation;}
  var input=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
  input.symbols=blot_parse_symbols::canonical(symbols);
- let handle=blot_native::persist_open(source.units.len as u32);
- if handle==0 {symbols.deinit();return Preparation.inactive,blot_error::Error.none;}
- var packets=default<const u8[:][:]>();
- var debits=default<ModuleDebit[:]>();
- if retained {
-  packets=allocateRetainedPackets(source.units.len);
-  debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
- }
+ var packets=allocateRetainedPackets(source.units.len);
+ var debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
  let prepared,failure=runPersistent(input,handle,packets,debits);
  blot_native::persist_close(handle);
- if retained {
-  match prepared {
-   ready=>{retained.adoptPersistent(source,symbols,parsed,debits,packets);},
-   _=>{releaseRetainedPackets(packets);blot_reuse_project_check::releaseModuleDebits(debits);},
-  }
+ match prepared {
+  ready=>{retained.adoptPersistent(source,symbols,parsed,debits,packets);},
+  _=>{releaseRetainedPackets(packets);blot_reuse_project_check::releaseModuleDebits(debits);},
  }
  symbols.deinit();
  return prepared,failure;
@@ -120,12 +119,13 @@ fn runPersistent(source:Project&,handle:u64,packets:const u8[:][:],debits:Module
 fn runPersistentLane(source:Project,handle:u64)->Error {
  var engine,error=blot_reuse_project_check::initPersistentWorker(source);
  if error!=blot_error::Error.none {return error;}
+ var packet:u8[>..<]=[];
  var result=blot_error::Error.none;
  loop {
   let claimed=blot_native::persist_claim(handle);
   if claimed==0 {break;}
   if claimed<0 {result=blot_error::Error.invalid_artifact;break;}
-  result=blot_reuse_project_check::persistentUnit(engine,claimed as u32,handle);
+  result=blot_reuse_project_check::persistentUnit(engine,claimed as u32,handle,packet);
   if result!=blot_error::Error.none {blot_native::persist_fail(handle);break;}
  }
  engine.deinit();

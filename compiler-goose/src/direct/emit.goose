@@ -11,12 +11,15 @@
 // stacks in State that each body truncates to its own mark.
 namespace blot_direct_emit;
 import std;
+import binary;
+import support.native;
 import check.core;
 import check.types;
 import check.diagnostic_code;
 import check.storage_types;
 import check.wire_schema;
 import direct.writer;
+import direct.relocations;
 import direct.types;
 import direct.runtime;
 import direct.map;
@@ -271,15 +274,22 @@ root struct State {
     // Recorded runtime trap sites for the optional `blot:traps` v1 custom section.
     traps: TrapEntry[>..] = [],
     trap_text: u8[>..] = [],
+    // Speculative parallel wave emission flags (never serialized).
+    parallel_readonly: bool = false,
+    parallel_aborted: bool = false,
 }
 
+var parallel_inlined: u64[>..] = [];
+
 fn recordStagedDepUnit(g: Generator&, unit: u32) {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     if unit == 0 { return; }
     for existing in g.s.staged_dep_units { if existing == unit { return; } }
     g.s.staged_dep_units.push(unit);
 }
 
 fn mixStagedDigest(g: Generator&, v: u64) {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     g.s.staged_value_digest = (g.s.staged_value_digest ^ v) * 0x100000001b3;
 }
 
@@ -291,7 +301,10 @@ fn recordDep(g: Generator&, id: u32) {
     g.s.dep_scratch.push(DepEntry { id });
 }
 fn recordInlined(g: Generator&, unit: u32, binding: u32) {
-    if g.s.track_deps { g.s.inlined_callees.put(key64(unit, binding), 1); }
+    if g.s.track_deps {
+        if g.s.parallel_readonly { parallel_inlined.push(key64(unit, binding)); return; }
+        g.s.inlined_callees.put(key64(unit, binding), 1);
+    }
 }
 
 fn resetUnitCaches(s: State&, unit_id: u32) {
@@ -472,6 +485,7 @@ fn sameText(g: const Generator&, left: Text, right: Text) -> bool {
 }
 // Moves the current failure into the build's list, counting repeats.
 fn recordFailure(g: Generator&, m: const Module&, id: u32) {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     var failure = g.s.failure;
     if !g.s.has_failure {
         let start = g.s.text.len as u32;
@@ -683,6 +697,7 @@ fn unitsHavePersistentState(units: const Module[:]) -> bool {
 }
 fn runtime_(g: Generator&) -> const Runtime& {
     if !g.s.has_rt {
+        if g.s.parallel_readonly { g.s.parallel_aborted = true; return g.s.rt; }
         var hf = g.s.rt_has_fork;
         var hp = g.s.rt_has_persistent;
         if !g.s.rt_flags_known {
@@ -823,6 +838,7 @@ fn signatureOf(g: Generator&, parameters: const Ty[:], result: Ty) -> u32, Error
 fn operationId(g: Generator&, operation: Ty) -> u32 {
     let found, present = g.s.operation_ids.get(operation);
     if present { return found; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0; }
     let id = g.s.operation_ids.count + 1;
     g.s.operation_ids.put(operation, id);
     return id;
@@ -1059,6 +1075,7 @@ fn inferResult(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, site:
     return inferResultWith(g, key, env, parameters, false, site, site_id);
 }
 recursive fn inferResultWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, unused_holes: bool, site: const Module&, site_id: u32) -> u32, Error {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
     g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, inferring: true, emitted: true, unused_holes: unused_holes, was_inferred: true });
@@ -1077,6 +1094,7 @@ fn addInstance(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, resul
     return addInstanceWith(g, key, env, parameters, result, false, Tys {}, site, site_id);
 }
 fn addInstanceWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, result: Ty, closure: bool, captures: Tys, site: const Module&, site_id: u32) -> u32, Error {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     var signature: u32 = 0;
     if closure {
         if parameters.len != 1 { return 0, fail(g, site, site_id, "closures take one parameter"); }
@@ -1207,6 +1225,7 @@ recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys
 fn solveObligationsPublic(g: Generator&, m: const Module&, goals_span: blot_check_types::List, env: Env&) -> Error { return solveObligations(g, m, goals_span, env); }
 // A lambda instance whose result type its body determines.
 recursive fn inferClosure(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, captures: Tys, site: const Module&, site_id: u32) -> u32, Error {
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
     let slot = g.module.tableSlot(function);
@@ -1435,9 +1454,329 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
     return blot_direct_types::Error.none;
 }
 
+struct SharedSnapshot {
+    signatures_len: i64 = 0,
+    imports_len: i64 = 0,
+    functions_len: i64 = 0,
+    globals_len: i64 = 0,
+    exports_len: i64 = 0,
+    table_len: i64 = 0,
+    host_slots: u32 = 0,
+    has_memory: bool = false,
+    data_len: i64 = 0,
+    customs_len: i64 = 0,
+    instances_len: i64 = 0,
+    queue_len: i64 = 0,
+    traps_len: i64 = 0,
+    operation_ids_count: u32 = 0,
+    host_imports_count: u32 = 0,
+    pool_order_len: i64 = 0,
+    persist_rec_count: u32 = 0,
+    deep_copy_count: u32 = 0,
+    failures_len: i64 = 0,
+    staged_dep_len: i64 = 0,
+    staged_digest: u64 = 0,
+    has_rt: bool = false,
+    exported_storage: bool = false,
+    trap_closures: u32 = 0,
+    reloc_staged: bool = false,
+}
+
+fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
+    return SharedSnapshot {
+        signatures_len: g.module.signatures.len,
+        imports_len: g.module.imports.len,
+        functions_len: g.module.functions.len,
+        globals_len: g.module.globals.len,
+        exports_len: g.module.exports.len,
+        table_len: g.module.table.len,
+        host_slots: g.module.host_slots,
+        has_memory: g.module.has_memory,
+        data_len: g.module.data.len,
+        customs_len: g.module.customs.len,
+        instances_len: g.s.instances.len,
+        queue_len: g.s.queue.len,
+        traps_len: g.s.traps.len,
+        operation_ids_count: g.s.operation_ids.count,
+        host_imports_count: g.s.host_imports.count,
+        pool_order_len: g.s.pool_order.len,
+        persist_rec_count: g.s.persist_rec_helpers.count,
+        deep_copy_count: g.s.deep_copy_helpers.count,
+        failures_len: g.s.failures.len,
+        staged_dep_len: g.s.staged_dep_units.len,
+        staged_digest: g.s.staged_value_digest,
+        has_rt: g.s.has_rt,
+        exported_storage: g.s.exported_storage,
+        trap_closures: g.s.trap_closures,
+        reloc_staged: blot_direct_relocations::hasStagedFlag(),
+    };
+}
+
+fn sameSnapshot(a: SharedSnapshot, b: SharedSnapshot) -> bool {
+    return a.signatures_len == b.signatures_len &&
+        a.imports_len == b.imports_len &&
+        a.functions_len == b.functions_len &&
+        a.globals_len == b.globals_len &&
+        a.exports_len == b.exports_len &&
+        a.table_len == b.table_len &&
+        a.host_slots == b.host_slots &&
+        a.has_memory == b.has_memory &&
+        a.data_len == b.data_len &&
+        a.customs_len == b.customs_len &&
+        a.instances_len == b.instances_len &&
+        a.queue_len == b.queue_len &&
+        a.traps_len == b.traps_len &&
+        a.operation_ids_count == b.operation_ids_count &&
+        a.host_imports_count == b.host_imports_count &&
+        a.pool_order_len == b.pool_order_len &&
+        a.persist_rec_count == b.persist_rec_count &&
+        a.deep_copy_count == b.deep_copy_count &&
+        a.failures_len == b.failures_len &&
+        a.staged_dep_len == b.staged_dep_len &&
+        a.staged_digest == b.staged_digest &&
+        a.has_rt == b.has_rt &&
+        a.exported_storage == b.exported_storage &&
+        a.trap_closures == b.trap_closures &&
+        a.reloc_staged == b.reloc_staged;
+}
+
+fn packU32(out: u8[>..<]&, v: u32) {
+    out.push(v as! u8);
+    out.push((v >> 8) as! u8);
+    out.push((v >> 16) as! u8);
+    out.push((v >> 24) as! u8);
+}
+
+fn packU64(out: u8[>..<]&, v: u64) {
+    packU32(out, v as! u32);
+    packU32(out, (v >> 32) as! u32);
+}
+
+fn emitWaveSerial(g: Generator&, wave_start: i64, wave_end: i64) -> Error {
+    for pos in wave_start..wave_end {
+        let id = g.s.queue[pos];
+        if g.s.instances[id].emitted { continue; }
+        g.s.instances[id].emitted = true;
+        let error = blot_direct_function::emitInstance(g, id);
+        if error != blot_direct_types::Error.none { return error; }
+    }
+    return blot_direct_types::Error.none;
+}
+
+fn runEmitLane(g: Generator&, shared: u64, wave_start: i64) -> bool {
+    g.s.parallel_readonly = true;
+    g.module.readonly = true;
+    let base_snap = takeSnapshot(g);
+    let recording = blot_direct_relocations::isRecording();
+    let marker: u8 = 0;
+    var pkt: u8[>..<] = [];
+    loop {
+        let job = blot_native::persist_claim(shared);
+        if job == 0 { return true; }
+        if job < 0 { return false; }
+        let id = g.s.queue[wave_start + job - 1];
+        if g.s.instances[id].emitted {
+            pkt.clear();
+            pkt.push(0);
+            let job_id = job as u32;
+            if !blot_native::persist_publish(shared, job_id, 1, marker, 1) ||
+               !blot_native::persist_publish(shared, job_id, 2, pkt[0], 1) { return false; }
+            continue;
+        }
+        g.s.parallel_aborted = false;
+        g.module.readonly_hit = false;
+        g.s.has_failure = false;
+        g.s.composing = false;
+        let before_vec = g.s.sparks_vectorized;
+        let before_fb = g.s.sparks_scalar_fallback;
+        let before_deps = g.s.dep_list.len;
+        let before_inl = parallel_inlined.len;
+        let before_bodies = blot_direct_relocations::bodyCount();
+        g.s.instances[id].emitted = true;
+        let err = blot_direct_function::emitInstance(g, id);
+        let unchanged = sameSnapshot(base_snap, takeSnapshot(g));
+        let clean = err == blot_direct_types::Error.none && !g.s.parallel_aborted && !g.module.readonly_hit && !g.s.has_failure && unchanged;
+        pkt.clear();
+        if clean {
+            let fn_idx = g.s.instances[id].function - (g.module.imports.len as u32);
+            let fn_body = g.module.functions[fn_idx].body;
+            let sv = (g.s.sparks_vectorized - before_vec) as! u64;
+            let sf = (g.s.sparks_scalar_fallback - before_fb) as! u64;
+            let body_len = fn_body.len as u32;
+            let deps_len = if g.s.track_deps { (g.s.dep_list.len - before_deps) as u32 } else { 0 };
+            let inl_len = if g.s.track_deps { (parallel_inlined.len - before_inl) as u32 } else { 0 };
+            let sites_len = if recording { (blot_direct_relocations::bodyCount() - before_bodies) as u32 } else { 0 };
+            pkt.push(1);
+            packU64(pkt, sv);
+            packU64(pkt, sf);
+            packU32(pkt, body_len);
+            packU32(pkt, deps_len);
+            packU32(pkt, inl_len);
+            packU32(pkt, sites_len);
+            if fn_body.len != 0 { pkt.append(g.module.text[fn_body.start..fn_body.start + fn_body.len]); }
+            if deps_len != 0 {
+                for di in 0..(deps_len as i64) { packU32(pkt, g.s.dep_list[before_deps + di]); }
+            }
+            if inl_len != 0 {
+                for ii in 0..(inl_len as i64) { packU64(pkt, parallel_inlined[before_inl + ii]); }
+            }
+            if sites_len != 0 {
+                for si in 0..(sites_len as i64) {
+                    let rec = blot_direct_relocations::bodyAt(before_bodies + si);
+                    packU32(pkt, rec.site.unit);
+                    packU32(pkt, rec.site.node);
+                    packU64(pkt, rec.site.offset as! u64);
+                }
+            }
+        } else {
+            pkt.push(0);
+        }
+        g.s.sparks_vectorized = before_vec;
+        g.s.sparks_scalar_fallback = before_fb;
+        let job_id = job as u32;
+        if !blot_native::persist_publish(shared, job_id, 1, marker, 1) ||
+           !blot_native::persist_publish(shared, job_id, 2, pkt[0], pkt.len as u64) {
+            return false;
+        }
+        if !unchanged { return true; }
+    }
+}
+
+fn emitWaveParallel(g: Generator&, wave_start: i64, wave_end: i64, workers: u8) -> Error, i64 {
+    let count = wave_end - wave_start;
+    let width = min(16, min(workers as i64, max(1, count / 8)));
+    if width <= 1 { return emitWaveSerial(g, wave_start, wave_end), 0; }
+    let shared = blot_native::persist_open(count as u32);
+    if shared == 0 { return emitWaveSerial(g, wave_start, wave_end), 0; }
+    for idx in 0..count {
+        if !blot_native::persist_node(shared, (idx + 1) as u32, (count - idx) as u32) {
+            blot_native::persist_close(shared);
+            return emitWaveSerial(g, wave_start, wave_end), 0;
+        }
+    }
+    var pids: i64[16] = [0; 16];
+    var children: i64 = 0;
+    for lane in 0..width {
+        let pid = blot_native::fork_process();
+        if pid == 0 {
+            if !runEmitLane(g, shared, wave_start) {
+                blot_native::persist_fail(shared);
+                blot_native::job_exit(1);
+            }
+            blot_native::job_exit(0);
+        }
+        if pid > 0 { pids[lane] = pid; children += 1; }
+    }
+    if children == 0 {
+        blot_native::persist_close(shared);
+        return emitWaveSerial(g, wave_start, wave_end), 0;
+    }
+    var ok = true;
+    for pid in pids {
+        if pid > 0 && !blot_native::wait_success(pid as u32) { ok = false; }
+    }
+    if !ok {
+        blot_native::persist_close(shared);
+        return emitWaveSerial(g, wave_start, wave_end), 0;
+    }
+    let recording = blot_direct_relocations::isRecording();
+    var pkt: u8[>..<] = [];
+    var wave_err = blot_direct_types::Error.none;
+    var applied_count: i64 = 0;
+    for idx in 0..count {
+        let id = g.s.queue[wave_start + idx];
+        if g.s.instances[id].emitted { continue; }
+        let job_id = (idx + 1) as u32;
+        let size = blot_native::persist_size(shared, job_id, 2);
+        var applied = false;
+        if size >= 33 {
+            if size > pkt.len { pkt.resize(max(size, pkt.len * 2), 0); }
+            if blot_native::persist_read(shared, job_id, 2, pkt[0], size as u64) && pkt[0] == 1 {
+                let sv = binary::u64le(pkt[..size], 1) as! i64;
+                let sf = binary::u64le(pkt[..size], 9) as! i64;
+                let body_len = binary::u32le(pkt[..size], 17) as i64;
+                let deps_len = binary::u32le(pkt[..size], 21) as i64;
+                let inl_len = binary::u32le(pkt[..size], 25) as i64;
+                let sites_len = binary::u32le(pkt[..size], 29) as i64;
+                let expected = 33 + body_len + deps_len * 4 + inl_len * 8 + sites_len * 16;
+                if expected == size {
+                    g.s.sparks_vectorized += sv;
+                    g.s.sparks_scalar_fallback += sf;
+                    let body_start = g.module.text.len;
+                    var pos: i64 = 33;
+                    if body_len != 0 {
+                        g.module.text.append(pkt[pos..pos + body_len]);
+                        pos += body_len;
+                    }
+                    let fn_idx = g.s.instances[id].function - (g.module.imports.len as u32);
+                    g.module.functions[fn_idx].body = blot_direct_writer::Range { start: body_start, len: body_len };
+                    if g.s.track_deps {
+                        let dep_start = g.s.dep_list.len as u32;
+                        for di in 0..deps_len {
+                            g.s.dep_list.push(binary::u32le(pkt[..size], pos));
+                            pos += 4;
+                        }
+                        g.s.instances[id].deps_start = dep_start;
+                        g.s.instances[id].deps_len = deps_len as u32;
+                        for ii in 0..inl_len {
+                            g.s.inlined_callees.put(binary::u64le(pkt[..size], pos), 1);
+                            pos += 8;
+                        }
+                    } else {
+                        pos += deps_len * 4 + inl_len * 8;
+                    }
+                    if recording {
+                        for si in 0..sites_len {
+                            let sunit = binary::u32le(pkt[..size], pos);
+                            let snode = binary::u32le(pkt[..size], pos + 4);
+                            let soff = binary::u64le(pkt[..size], pos + 8) as! i64;
+                            pos += 16;
+                            blot_direct_relocations::pushBodySite(blot_direct_relocations::Site { sunit, snode, soff }, fn_idx, body_start);
+                        }
+                    }
+                    g.s.instances[id].emitted = true;
+                    applied = true;
+                    applied_count += 1;
+                }
+            }
+        }
+        if !applied {
+            g.s.instances[id].emitted = true;
+            let error = blot_direct_function::emitInstance(g, id);
+            if error != blot_direct_types::Error.none { wave_err = error; break; }
+        }
+    }
+    blot_native::persist_close(shared);
+    return wave_err, applied_count;
+}
+
 fn emitAll(g: Generator&) -> Error {
     var next: i64 = 0;
+    let workers = blot_direct_writer::emitWorkers();
+    var allow_parallel = workers > 1 && blot_native::platform_is_linux() != 0 && !g.s.replaying;
+    if allow_parallel {
+        var total_core_nodes: i64 = 0;
+        for u in g.units { total_core_nodes += u.nodes.len; }
+        if total_core_nodes < 250000 { allow_parallel = false; }
+    }
+    var min_wave: i64 = 64;
     while next < g.s.queue.len {
+        if allow_parallel {
+            let pending = g.s.queue.len - next;
+            if pending >= min_wave {
+                let take = min(pending, 16384);
+                let wave_start = next;
+                next += take;
+                let werr, applied = emitWaveParallel(g, wave_start, next, workers);
+                if werr != blot_direct_types::Error.none { return werr; }
+                if applied == 0 {
+                    min_wave = 0x7fffffff;
+                } else if applied * 2 < take {
+                    if min_wave < 4096 { min_wave = min_wave * 4; }
+                }
+                continue;
+            }
+        }
         let id = g.s.queue[next];
         next += 1;
         if g.s.instances[id].emitted { continue; }

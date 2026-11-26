@@ -37,6 +37,10 @@ var opt_test_mode: bool = false;
 fn testModeEnabled() -> bool { return opt_test_mode; }
 fn setTestMode(enabled: bool) { opt_test_mode = enabled; }
 
+var opt_emit_workers: u8 = 1;
+fn emitWorkers() -> u8 { return opt_emit_workers; }
+fn setEmitWorkers(workers: u8) { opt_emit_workers = workers; }
+
 // Opt-in Wasm 3.0 backend feature toggles (default false: strict deterministic V8 + wtime-aot x64 subset).
 var opt_relaxed_simd: bool = false;
 var opt_tail_calls: bool = false;
@@ -201,7 +205,10 @@ root struct Module {
     customs: Custom[>..] = [],
     // Function names by function index.
     names: FunctionName[>..<] = [],
-    named: i64 = 0
+    named: i64 = 0,
+    // Speculative parallel wave guard (never serialized).
+    readonly: bool = false,
+    readonly_hit: bool = false
 }
 
 fn own(module: Module&, value: const u8[:]) -> Range {
@@ -232,6 +239,7 @@ fn signature(module: Module&, params: const ValType[:], results: const ValType[:
         if same(types(module, known.params), params) && same(types(module, known.results), results) { return at - 1; }
         at = known.next;
     }
+    if module.readonly { module.readonly_hit = true; return 0; }
     let id = module.signatures.len as! u32;
     let owned_params = Range { start: module.types.len, len: params.len };
     module.types.append(params);
@@ -243,6 +251,7 @@ fn signature(module: Module&, params: const ValType[:], results: const ValType[:
 }
 // Imports precede defined functions in the index space; add them first.
 fn importFunction(module: Module&, from: const u8[:], member: const u8[:], signature_id: u32) -> u32 {
+    if module.readonly { module.readonly_hit = true; return 0; }
     assert(module.functions.len == 0);
     let id = module.imports.len as! u32;
     let owned_module = own(module, from);
@@ -252,34 +261,41 @@ fn importFunction(module: Module&, from: const u8[:], member: const u8[:], signa
 }
 // Reserves a defined function; its body is supplied later.
 fn addFunction(module: Module&, signature_id: u32) -> u32 {
+    if module.readonly { module.readonly_hit = true; return 0; }
     let id = (module.imports.len + module.functions.len) as! u32;
     module.functions.push(Function { signature: signature_id, body: Range {} });
     return id;
 }
 fn setBody(module: Module&, function: u32, body: const u8[:]) {
+    if module.readonly { module.readonly_hit = true; return; }
     let owned = own(module, body);
     module.functions[function - module.imports.len].body = owned;
 }
 fn addGlobal(module: Module&, ty: ValType, mutable: bool, init_value: u32) -> u32 {
+    if module.readonly { module.readonly_hit = true; return 0; }
     let id = module.globals.len as! u32;
     module.globals.push(Global { ty: ty, mutable: mutable, init: init_value });
     return id;
 }
 fn exportItem(module: Module&, exported: const u8[:], kind: ExportKind, index: u32) {
+    if module.readonly { module.readonly_hit = true; return; }
     let owned = own(module, exported);
     module.exports.push(Export { name: owned, kind: kind, index: index });
 }
 fn tableSlot(module: Module&, function: u32) -> u32 {
+    if module.readonly { module.readonly_hit = true; return 0; }
     let slot = module.table.len as! u32;
     module.table.push(function);
     return slot;
 }
 fn custom(module: Module&, section_name: const u8[:], payload: const u8[:]) {
+    if module.readonly { module.readonly_hit = true; return; }
     let owned_name = own(module, section_name);
     let owned_payload = own(module, payload);
     module.customs.push(Custom { name: owned_name, payload: owned_payload });
 }
 fn setName(module: Module&, function: u32, value: const u8[:]) {
+    if module.readonly { module.readonly_hit = true; return; }
     let owned = own(module, value);
     while module.names.len <= function { module.names.push(FunctionName { present: false, text: Range {} }); }
     if !module.names[function as i64].present { module.named += 1; }

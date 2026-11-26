@@ -296,6 +296,7 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
     let key = blot_direct_emit::key64(ty, 1);
     let existing, found = g.s.persist_rec_helpers.get(key);
     if found { return existing, blot_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
     g.s.persist_rec_helpers.put(key, fn_id);
     let s .= g.s;

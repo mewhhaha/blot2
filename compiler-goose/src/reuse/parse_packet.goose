@@ -96,6 +96,7 @@ fn read_table<T,B>(packet: const u8[:], at:i64&, table: B&, witness: T) -> bool 
         shift+=7;
     }
     if length>(packet.len-at) as u64 {return false;}
+    if length==0 {table.items=default<T[:]>();table.len=0;return true;}
     at+=length as i64;
     let values,valid=from_bytes<T[>..]>(packet[start..at]);
     if !valid || table.ensure(values.len)!=ok {return false;}

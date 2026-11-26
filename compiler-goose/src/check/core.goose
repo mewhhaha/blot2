@@ -521,7 +521,11 @@ fn body(self_: const Module&, id: BindingId) -> const Body? {
     let body_id = self_.bindings[id].body_id; if body_id == 0 { return null; } return self_.bodies[body_id];
 }
 fn bodyParameters(self_: const Module&, value: const Body&) -> const Parameter[:] { return self_.parameters[value.parameters.start..value.parameters.start + value.parameters.len]; }
-fn branchMerges(self_: const Module&, id: Id) -> const Merge[:] { let range = self_.merge_ranges[id]; return self_.merges[range.start..range.start + range.len]; }
+fn branchMerges(self_: const Module&, id: Id) -> const Merge[:] {
+    if self_.merge_ranges.len == 0 { return self_.merges[..0]; }
+    let range = self_.merge_ranges[id];
+    return self_.merges[range.start..range.start + range.len];
+}
 fn loopInfo(self_: const Module&, id: Id) -> LoopInfo { let value = self_.node(id); assert(value.tag == Tag.loop_); return self_.loops[value.a]; }
 fn loopCarries(self_: const Module&, id: Id) -> const LoopCarry[:] { let range = self_.loopInfo(id).carries; return self_.loop_carries[range.start..range.start + range.len]; }
 fn sparkInfo(self_: const Module&, id: Id) -> SparkInfo { let value = self_.node(id); assert(value.tag == Tag.spark); return self_.sparks[value.a]; }

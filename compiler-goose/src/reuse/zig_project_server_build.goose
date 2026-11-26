@@ -141,6 +141,8 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     blot_check_wire_schema::analyzeWithForkFlags(payload.value.units,payload.value.entry,payload.value.unit_has_fork,pinfo);
                 }
                 if track { blot_direct_relocations::begin(); }
+                let emit_w=emitWorkerCount(opened,payload.value.units.len,payload.value.source_bytes);
+                blot_direct_writer::setEmitWorkers(emit_w);
                 var emitted=Emission{};
                 var error=blot_error::Error.none;
                 if track && !replay.used {
@@ -149,6 +151,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,replay:blot_reuse_bo
                     if replay.used { replay.valid=false; replay.needs_reset=true; }
                     emitted,error=payload.value.emitWithAnalysis(pinfo,inputs);
                 }
+                blot_direct_writer::setEmitWorkers(1);
                 if track { pending=blot_direct_relocations::finish(); }
                 if error!=blot_error::Error.none { if replay.used { replay.valid=false; replay.needs_reset=true; } pending.deinit();timing.exit();return false,error; }
                 result=emitted;

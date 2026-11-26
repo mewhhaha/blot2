@@ -23,6 +23,11 @@ fn deinit(s:Snapshot&) {
     if s.body_sites.len!=0 { body_site_pool.free_slice(s.body_sites); }
     s=Snapshot{};
 }
+fn isRecording()->bool { return recording; }
+fn hasStagedFlag()->bool { return staged_flag; }
+fn bodyCount()->i64 { return bodies.len; }
+fn bodyAt(index:i64)->BodySite { return bodies[index]; }
+fn pushBodySite(site:Site,function:u32,generation:i64) { if recording { bodies.push(BodySite{site,function,generation}); } }
 fn begin() { assert(!recording); recording=true; staged_flag=false; suppressed_unit=0; }
 fn beginReplay(previous:const BodySite[:],skip_fn:const u8[:],drop_unit:u32) {
     assert(!recording);

@@ -201,6 +201,22 @@ relocation in `reuse/project.goose`. Re-recorded `expected.json`: all 109
 fixtures keep 100% identical exit codes, diagnostics, and Wasm SHA-256 while
 strictly reducing allocated `effect_rows` (e.g. -28% to -42%) and `type_nodes`.
 
+Compile Throughput Batch C (26 November 2026) added speculative read-only
+parallel wave Wasm emission in `direct/emit.goose` (with read-only module
+guards in `direct/writer.goose`, Core-node work gate + adaptive wave backoff,
+and worker wiring for `build-project` and `serve-project`), zero-temp-alloc
+direct `copy_u32` packet codecs for pure-`u32` Core/Types/AST slices, compact
+Core omitting empty `merge_ranges` and `dispatch_signatures` arrays (validated
+in `check/frozen_core_bounds.goose`), one-shot `loadParallel` /
+`preparePersistent` symbol/numeric-check/packet-reuse fast paths, fast
+`@u32.`/`@f32.` intrinsic dispatch in `check/check.goose` and
+`check/core_builder.goose`, and a cursor-safe function-arrow + 1-hop variable
+fast path in `check/types.goose:unifyMode`. Re-recorded `expected.json`: all
+109 fixtures keep 100% identical exit codes, diagnostics, Wasm SHA-256,
+`occurs_steps`, `type_versions`, and `row_versions`, while strictly reducing
+allocated `type_nodes` (~46 fewer per fixture) and `effect_rows` (-1 to -2 on
+6 fixtures).
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """
