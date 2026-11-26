@@ -190,17 +190,18 @@ Curried functions (`->`), exhaustive `case ... of` matching, `let $Some x = ... 
 
 ## Performance
 
-Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goose`) on **`wtime-aot 0.1.7`** (`--backend x64`, `x64-v4`, explicit software bounds checks) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.7`) and native `x86_64` (`-O3`, thin LTO). All runs verify **bit-exact checksum parity** — see **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results and charts ([comparison runner](benchmarks/comparison/README.md), [raw JSON](benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json)).
+Measured on **AMD Ryzen 7 7800X3D (Linux)** with `blotc-goose` + **`wtime-aot 0.1.7`** (`x64-v4`, explicit software bounds checks, canonical NaN) vs `rustc 1.96.0-nightly -O3`. Every run verifies bit-exact checksum parity.
 
 ![Compile speed and WebAssembly output size: Blot vs Rust](benchmarks/evidence/measurements/2026-11-26-compile-and-size.svg)
 
 ![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-26-blot-vs-rust-kernels.svg)
 
-- **Runtime throughput:** Blot beats LLVM `-O3` Wasm across all 6 kernels (**0.16×–0.71×**) and beats native Rust `-O3` across all 6 (**0.17×–0.92×**) while keeping Wasm bounds safety and canonical NaN determinism — including **5.77× faster** on `mandelbrot_f32`, **3.68× faster** on `lcg_recurrence`, **1.47× faster** on `particle_spark_simd` (**0.44 ms** vs **0.64 ms**), and **1.33× faster** on `merge_sort`.
-- **AoS SIMD, multi-core & processes:** Idiomatic `#[Vec4]` particle Euler loops auto-vectorize to **1.57 ms** vs **2.88 ms** native Rust (**1.83× faster**); 8-thread Mandelbrot scales **4.64×** across isolated guests (**1.24 ms**, **3.67× faster** than 8-thread native Rust); persistent `#process` commits in **~53 ns/step** (~18.8M steps/sec).
-- **Compile & edit latency:** **7.0× faster** cold builds than `rustc -O3 wasm32` (**13.6 ms** vs **96.0 ms**) with **65× smaller** `.wasm` binaries (**22.5 KiB** vs **1,468 KiB**). On a private internal 3D game project (**~69k LOC** of Blot across **263** source modules + **62** shader/data asset modules, **325 modules / 4,572 functions / 6.71 MB** `.wasm`), full cold builds finish in **~0.43–0.55 s**, single-file incremental edits localize to `fresh=1` in **~41–44 ms**, and literal/comment edits rebuild in **~20 ms** (with synthetic **1M LOC** throughput reaching **~2.0M LOC/s** in **~0.50 s**).
-- **Optional Wasm 3.0 (`--wasm3`):** Enables tail calls (`return_call` / `return_call_indirect`) and relaxed SIMD (FMA, `relaxed_min`/`max`/`trunc`) on V8/Deno and `wtime-aot 0.1.7`.
-- **16-benchmark cross-language suite (Blot vs Goose, Rust & C++):** Full mirror of Goose's 16-benchmark suite with bit-exact checksum parity and SVG bar charts in [benchmarks/goose-suite/README.md](benchmarks/goose-suite/README.md) — **10.2× faster** cold compile than `clang++ -O2` (**30.2 ms** geomean including `wtime-aot`), **12/16** peak-memory wins over idiomatic C++ (**#1 lowest RSS overall** on `words` and `sexp`), and **4/16** runtime wins over idiomatic C++ (**5/16** over idiomatic Rust) inside a bounds-checked Wasm32 sandbox.
+- **Real-world builds:** Anonymous internal 3D game (~69k LOC, 325 modules, 6.71 MB `.wasm`) compiles in **~0.43–0.55 s** cold, **~41–44 ms** incremental (`fresh=1`), and **~20 ms** on literal edits (**~2.0M LOC/s** synthetic).
+- **AoS SIMD & concurrency:** `#[Vec4]` loops beat native Rust **1.83×**; 8-thread isolated guests scale **4.64×** (**3.67×** faster than native Rust); `#process` commits in **~53 ns/step**.
+- **16-benchmark suite (vs Goose, Rust & C++):** **10.2× faster** cold builds than `clang++ -O2` (**30.2 ms** geomean), **12/16** memory wins over idiomatic C++ (#1 lowest RSS on `words` and `sexp`), and **4/16** runtime wins over idiomatic C++ (**5/16** over idiomatic Rust).
+- **Optional Wasm 3.0 (`--wasm3`):** Tail calls (`return_call`) and relaxed SIMD (FMA) on V8/Deno and `wtime-aot 0.1.7`.
+
+See **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results, SVG bar charts, Ink vs Bevy ECS numbers, and raw JSON evidence.
 
 ---
 
