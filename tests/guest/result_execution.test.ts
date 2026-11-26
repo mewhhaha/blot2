@@ -14,7 +14,7 @@ type Box a is data = $Box a
 const Box.from = func value => return $Box value
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 const alias: a -> b where { result "from" a b } = convert
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let local: a -> b where { result "from" a b ! {} } = func value => return alias value
   let $Box first: Box U32 = local 40
   let $Box second: Box F32 = local 2.5
@@ -29,7 +29,7 @@ type Box a is data = $Box a
 const Box.from = func value => return $Box value
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 const alias: a -> b where { result "from" a b } = convert
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let local: a -> b where { result "from" a b ! {} } = alias
   let $Box first: Box U32 = local 40
   let $Box second: Box F32 = local 2.5
@@ -42,7 +42,7 @@ const alias: a -> b where { result "from" a b } = convert
   await compileAndRun(
     `
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-#entry const answer = func () => return @u32.add (convert (floor 40.5)) (convert (ceil 1.5))
+io const answer = func () => return @u32.add (convert (floor 40.5)) (convert (ceil 1.5))
 `,
     (guest) => equal(guest.call("answer", null), 42),
   );
@@ -60,7 +60,7 @@ const convert: a -> b ! {|e} where { result "from" a b ! {|e} } = func value => 
 `;
   await compileAndRun(
     header + `
-#entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
+io const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
   let $Box value = box
   break value
@@ -76,7 +76,7 @@ const Box.from = func (value: U32) => return $Box value
 const convert: a -> b ! {Tick} where { result "from" a b ! {} } = func value => return do:
   use Tick ()
   break @type.result "from" value
-#entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
+io const answer = func () => return do (@effect.provider Tick (func () => return ())):
   use box: Box <- convert 42
   let $Box value = box
   break value
@@ -90,7 +90,7 @@ type Source is data = $Source U32
 type Target is data = $Target U32
 const Source.from = func value => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-#entry const answer: Target = convert ($Source 1)
+io const answer: Target = convert ($Source 1)
 `,
     "missing_associated",
     undefined,
@@ -101,7 +101,7 @@ const convert: a -> b where { result "from" a b } = func value => return @type.r
 type Target is data = $Target U32
 const Target.from = func (value: F32) => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-#entry const answer: Target = convert 1
+io const answer: Target = convert 1
 `,
     "type_mismatch",
     undefined,
@@ -112,7 +112,7 @@ const convert: a -> b where { result "from" a b } = func value => return @type.r
       'result "from" a b ! {|e}',
       'result "from" a b ! {}',
     ) + `
-#entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
+io const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
   let $Box value = box
   break value
@@ -127,8 +127,8 @@ Deno.test("staged nested conversions infer their destination from the surroundin
   await compileAndRun(
     `
 const count = 42
-#entry const answer: U32 = from (ceil (sqrt (from count))) + 2
-#entry const floating: F32 = from (ceil (sqrt (from count))) + 2.5
+io const answer: U32 = from (ceil (sqrt (from count))) + 2
+io const floating: F32 = from (ceil (sqrt (from count))) + 2.5
 `,
     (guest) => {
       equal(guest.read("answer"), 9);
@@ -164,15 +164,15 @@ func Other.from (value: U32): Other => return $Other value
 func Other.add ($Other value) -> (right: U32): U32 => return U32.add value (U32.mul right 2)
 `;
   await compileExpectedFailure(
-    overload + "#entry func answer (value: U32) => return from value + 2\n",
+    overload + "io answer (value: U32) => return from value + 2\n",
     "entry_type",
   );
   await compileAndRun(
     overload + `
-#entry func answer (value: U32): U32 => return do:
+io answer (value: U32): U32 => return do:
   let converted: Other = from value
   return converted + 2
-#entry func floating (value: U32) => return 2.0 + from value
+io floating (value: U32) => return 2.0 + from value
 `,
     (guest) => {
       equal(guest.call("answer", 38), 42);
@@ -184,14 +184,14 @@ func Other.add ($Other value) -> (right: U32): U32 => return U32.add value (U32.
 Deno.test("staged constants keep primitive calls, operators and saturating conversions", async () => {
   await compileAndRun(
     `
-#entry const direct = U32.add 40 2
-#entry const associated = @type.call "add" 40 2
-#entry const float_associated = @type.call "add" 1.5 2.5
-#entry const integer_operator = 6 * 7
-#entry const float_operator = 1.5 * 2.0
-#entry const infinite = 1.0 / 0.0
-#entry const saturated: U32 = from (sqrt (-1.0))
-#entry const divide = func (divisor: U32): U32 => return 42 / divisor
+io const direct = U32.add 40 2
+io const associated = @type.call "add" 40 2
+io const float_associated = @type.call "add" 1.5 2.5
+io const integer_operator = 6 * 7
+io const float_operator = 1.5 * 2.0
+io const infinite = 1.0 / 0.0
+io const saturated: U32 = from (sqrt (-1.0))
+io const divide = func (divisor: U32): U32 => return 42 / divisor
 `,
     (guest) => {
       for (const name of ["direct", "associated", "integer_operator"]) {
@@ -213,24 +213,24 @@ Deno.test("staged constants keep primitive calls, operators and saturating conve
 // Constants run at instantiation, so a constant division by zero traps there.
 Deno.test("selected primitive aliases trap on constant integer division by zero", async () => {
   await assert.rejects(
-    compileAndRun(`#entry const answer = @type.call "div" 42 0\n`, () => {}),
+    compileAndRun(`io const answer = @type.call "div" 42 0\n`, () => {}),
     WebAssembly.RuntimeError,
   );
 });
 
 Deno.test("ordinary text values compile while intrinsic validation keeps its literal rule", async () => {
   await compileAndRun(
-    `const name = "from"\n#entry const answer = func () => return name\n`,
+    `const name = "from"\nio const answer = func () => return name\n`,
     (guest) => {
       equal(decodeText(guest.call("answer", null) as Uint32Array), "from");
     },
   );
   await compileExpectedFailure(
-    `const name: String = "from"\n#entry const answer = 42\n`,
+    `const name: String = "from"\nio const answer = 42\n`,
     "unsupported_type",
   );
   await compileExpectedFailure(
-    `const name = "from"\n#entry const answer = @type.result name 42\n`,
+    `const name = "from"\nio const answer = @type.result name 42\n`,
     "literal_required",
   );
 });

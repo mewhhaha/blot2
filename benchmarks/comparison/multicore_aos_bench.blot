@@ -5,7 +5,7 @@ type Vec2 = { x: F32, y: F32 }
 type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
 
 // 1. AoS #[Vec4] (16 B) ballistic Euler integration: 65,536 particles x 32 steps.
-#entry func aos_vec4_euler (seed: U32): U32 =>
+io aos_vec4_euler (seed: U32): U32 =>
   let n: U32 = 65536
   let pos = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
   let vel = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
@@ -42,7 +42,7 @@ type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
   return F32.to_u32 (sum * 4.0)
 
 // 2. AoS #[Vec2] (8 B) structural Euler integration: 65,536 particles x 32 steps.
-#entry func aos_vec2_euler (seed: U32): U32 =>
+io aos_vec2_euler (seed: U32): U32 =>
   let n: U32 = 65536
   let pos = @array.fill n { x: 0.0, y: 0.0 }
   let vel = @array.fill n { x: 0.0, y: 0.0 }
@@ -64,7 +64,7 @@ type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
   return F32.to_u32 (sum * 8.0)
 
 // 3. Stateless 256x256 Mandelbrot tile for multi-core wtime-aot worker scaling.
-#entry func mandelbrot_tile (tile_id: U32): U32 =>
+io mandelbrot_tile (tile_id: U32): U32 =>
   let size: U32 = 256
   let inv = 1.0 / U32.to_f32 size
   let bias = U32.to_f32 (tile_id & 7) * 0.001

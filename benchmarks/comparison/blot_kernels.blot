@@ -1,7 +1,7 @@
 // Language compute, memory, sorting, and auto-SIMD benchmarks for Blot vs Rust.
 
 // 1. Tight integer recurrence (1,000,000 LCG steps).
-#entry func lcg_recurrence (seed: U32): U32 =>
+io lcg_recurrence (seed: U32): U32 =>
   let state = seed | 1
   let acc: U32 = 0
   for _ in 0 .. 1000000:
@@ -10,7 +10,7 @@
   return acc
 
 // 2. Sieve of Eratosthenes up to 100,000 + seed % 256.
-#entry func prime_sieve (seed: U32): U32 =>
+io prime_sieve (seed: U32): U32 =>
   let limit = 100000 + (seed % 256)
   let flags = @array.fill limit true
   if limit > 0:
@@ -38,7 +38,7 @@
   return sum ^ (count * 2654435761)
 
 // 3. Dense 64x64 F32 matrix multiply.
-#entry func matmul_64 (seed: U32): U32 =>
+io matmul_64 (seed: U32): U32 =>
   let n: U32 = 64
   let total = n * n
   let a = @array.fill total 0.0
@@ -64,7 +64,7 @@
   return F32.to_u32 (sum * 100.0)
 
 // 4. 256x256 F32 Mandelbrot escape-time sum (max 100 iterations).
-#entry func mandelbrot_f32 (seed: U32): U32 =>
+io mandelbrot_f32 (seed: U32): U32 =>
   let size: U32 = 256
   let inv = 1.0 / U32.to_f32 size
   let bias = U32.to_f32 (seed & 7) * 0.001
@@ -95,7 +95,7 @@ func integrate_particles (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F3
   let half_dt2 = 0.5 * dt * dt
   return spark #[px[i] + vx[i] * dt + ax[i] * half_dt2 | i <- 0 .. px.length]
 
-#entry func particle_spark_simd (seed: U32): U32 =>
+io particle_spark_simd (seed: U32): U32 =>
   let n: U32 = 65536
   let px = @array.fill n 0.0
   let vx = @array.fill n 0.0
@@ -159,7 +159,7 @@ func merge_pass (src: #[U32]) -> (dst: own #[U32]) -> (width: U32) -> (n: U32): 
     lo := self + step
   return dst
 
-#entry func merge_sort (seed: U32): U32 =>
+io merge_sort (seed: U32): U32 =>
   let n: U32 = 100000
   let a = @array.fill n 0
   let b = @array.fill n 0

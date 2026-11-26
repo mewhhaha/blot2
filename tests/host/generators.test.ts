@@ -88,13 +88,13 @@ Deno.test("WGSL generators emit native types and tracked shader references, cach
         `import { Parameters, VecInfo, Shader, shader, stage_light_slot, building_marker } from "./salt.wgsl"
 func selected (params: Parameters): Bool => return params.active
 func vec_value (info: VecInfo): F32 => return info.pos[1]
-#entry func enabled () => return selected ($Parameters { clear: 1.0, dither: 0.5, active: true })
-#entry func middle () =>
+io enabled () => return selected ($Parameters { clear: 1.0, dither: 0.5, active: true })
+io middle () =>
   let pos: #[3; F32] = #[1.0, 2.0, 3.0]
   return vec_value ($VecInfo { pos })
-#entry func slot () => return stage_light_slot
-#entry func marker () => return building_marker
-#entry func shader_id () => return case shader of
+io slot () => return stage_light_slot
+io marker () => return building_marker
+io shader_id () => return case shader of
   $Shader id => id
 `,
       ),
@@ -243,10 +243,10 @@ Deno.test("WGSL generator preserves exact unsuffixed U32 constants, scientific f
         sources: {
           [entry]:
             `import { exactly, eps, scale, half, whole_f } from "./shader.wgsl"
-#entry func exact_u32 (): U32 => return exactly
-#entry func sci_small (): F32 => return eps
-#entry func sci_neg (): F32 => return scale
-#entry func suffix_f (): F32 => return half + whole_f
+io exact_u32 (): U32 => return exactly
+io sci_small (): F32 => return eps
+io sci_neg (): F32 => return scale
+io suffix_f (): F32 => return half + whole_f
 `,
         },
         assetSources: {
@@ -266,7 +266,7 @@ const whole_f = 2f;
         await compiler.build({
           sources: {
             [entry]:
-              'import { bad } from "./shader.wgsl"\n#entry func run () => return bad\n',
+              'import { bad } from "./shader.wgsl"\nio run () => return bad\n',
           },
           assetSources: { "./shader.wgsl": "const bad = 4294967296;\n" },
         }),
@@ -277,7 +277,7 @@ const whole_f = 2f;
         await compiler.build({
           sources: {
             [entry]:
-              'import { bad } from "./shader.wgsl"\n#entry func run () => return bad\n',
+              'import { bad } from "./shader.wgsl"\nio run () => return bad\n',
           },
           assetSources: { "./shader.wgsl": "const bad = -5;\n" },
         }),
@@ -288,7 +288,7 @@ const whole_f = 2f;
         await compiler.build({
           sources: {
             [entry]:
-              'import { Bad } from "./shader.wgsl"\n#entry func run (): U32 => return 0\n',
+              'import { Bad } from "./shader.wgsl"\nio run (): U32 => return 0\n',
           },
           assetSources: { "./shader.wgsl": "struct Bad { spark: f32 };\n" },
         }),
@@ -299,7 +299,7 @@ const whole_f = 2f;
         await compiler.build({
           sources: {
             [entry]:
-              'import { fork } from "./shader.wgsl"\n#entry func run (): U32 => return 0\n',
+              'import { fork } from "./shader.wgsl"\nio run (): U32 => return 0\n',
           },
           assetSources: { "./shader.wgsl": "const fork = 1u;\n" },
         }),
@@ -333,10 +333,10 @@ Deno.test("CSV generator embeds typed rows, decimal speed and quoted Unicode nam
         sources: {
           [entry]: `import { UnitSpec, specs } from "./units.csv"
 func hit_points (spec: UnitSpec): U32 => return spec.hp
-#entry func hp () => return hit_points specs[1]
-#entry func speed () => return specs[0].speed
-#entry func name_char () => return specs[0].name[0]
-#entry func rows () => return specs.length
+io hp () => return hit_points specs[1]
+io speed () => return specs[0].speed
+io name_char () => return specs[0].name[0]
+io rows () => return specs.length
 `,
         },
         assetSources: {
@@ -378,7 +378,7 @@ Deno.test("Stage 0 supports structural record inputs, alternate names, and the l
     const options = {
       sources: {
         [entry]:
-          'import { answer } from "./generated"\n#entry func run () => return answer\n',
+          'import { answer } from "./generated"\nio run () => return answer\n',
       },
       assetSources: { [input]: "🙂" },
     };
@@ -386,7 +386,7 @@ Deno.test("Stage 0 supports structural record inputs, alternate names, and the l
       generator,
       `// 雪🙂
 import * as text from "std/text"
-#entry func reflect (input: { path: Text, text: Text }): Result [Text, Text] =>
+io reflect (input: { path: Text, text: Text }): Result [Text, Text] =>
   if text.equal input.path ${JSON.stringify(input)} and input.text[0] == 128578:
     return $Ok "const answer: U32 = 42"
   return $Err "Unexpected path or Unicode scalar"
@@ -423,7 +423,7 @@ import * as text from "std/text"
 
     await Deno.writeTextFile(
       generator,
-      `#entry func generate (input: { path: #[U32], bytes: #[U32] }): #[U32] =>
+      `io generate (input: { path: #[U32], bytes: #[U32] }): #[U32] =>
   if input.path.length > 0 and input.bytes[0] == 255 and input.bytes[1] == 0:
     return "const answer: U32 = 90"
   return "const answer: U32 = 0"
@@ -475,39 +475,39 @@ Deno.test("generator Err, trap, compile failure, missing export and unsupported 
         compiler.build({
           sources: {
             [entry]:
-              'import { answer } from "./input.txt"\n#entry func run () => return answer\n',
+              'import { answer } from "./input.txt"\nio run () => return answer\n',
           },
           assetSources: { [input]: "contents" },
         });
       for (
         const [source, message] of [
           [
-            '#entry func generate (x: Text): Result [Text, Text] => return $Err "bad schema"',
+            'io generate (x: Text): Result [Text, Text] => return $Err "bad schema"',
             /bad schema/,
           ],
           [
-            '#entry func generate (x: Text): Text => return @panic "oh no"',
+            'io generate (x: Text): Text => return @panic "oh no"',
             /generator generate trapped.*panic: "oh no"/,
           ],
           [
-            "#entry func generate (x: Text): Text => return nonexistent",
+            "io generate (x: Text): Text => return nonexistent",
             /Could not compile generator.*\n.*unknown value: nonexistent/,
           ],
           [
-            "#entry func other (x: Text): Text => return x",
-            /Missing #entry function generate/,
+            "io other (x: Text): Text => return x",
+            /Missing io entry function generate/,
           ],
           [
-            "#entry func generate (x: U32): U32 => return x",
+            "io generate (x: U32): U32 => return x",
             /Unsupported signature for generator generate/,
           ],
           [
-            "#entry func generate (x: Text): Text => return #[0xD800]",
+            "io generate (x: Text): Text => return #[0xD800]",
             /Invalid Unicode scalar/,
           ],
           [
-            `#entry func generate (x: Text): Text => return x
-#entry func requires_io (send: U32 -> U32 ! {Foreign}) => return send 1`,
+            `io generate (x: Text): Text => return x
+io requires_io (send: U32 -> U32 ! {Foreign}) => return send 1`,
             /Stage 0 grants no capabilities/,
           ],
         ] as const
@@ -517,7 +517,7 @@ Deno.test("generator Err, trap, compile failure, missing export and unsupported 
       }
       await Deno.writeTextFile(
         generator,
-        '#entry func generate (x: Text): Text => return "const answer = 90"\n',
+        'io generate (x: Text): Text => return "const answer = 90"\n',
       );
       equal(await calls(await build(), "run"), [90]);
     } finally {
@@ -553,7 +553,7 @@ Deno.test("blot.json generator rules drive blot check, build, and test from a ne
       ),
       Deno.writeTextFile(
         root + "/gen.blot",
-        "#entry func generate (input: #[U32]): #[U32] => return input\n",
+        "io generate (input: #[U32]): #[U32] => return input\n",
       ),
       Deno.writeTextFile(root + "/input.txt", "const value: U32 = 20\n"),
       Deno.copyFile(
@@ -571,7 +571,7 @@ Deno.test("blot.json generator rules drive blot check, build, and test from a ne
         `import { value as left } from "../aliased"
 import { value as right } from "../assets/z.wgsl"
 import { value as middle } from "../assets/a.wgsl"
-#entry func test_generated () => return @u32.eq (@u32.add left (@u32.add middle right)) 42
+io test_generated () => return @u32.eq (@u32.add left (@u32.add middle right)) 42
 `,
       ),
     ]);
@@ -713,7 +713,7 @@ Deno.test("raw asset source validates Unicode, NUL and the combined structured s
       compiler.build({
         sources: {
           [entry]:
-            'import { raw, structured } from "./input"\n#entry func run () => return raw + structured\n',
+            'import { raw, structured } from "./input"\nio run () => return raw + structured\n',
         },
         assetSources: { [input]: Uint8Array.of(mode) },
       });
@@ -755,7 +755,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       compiler.build({
         sources: {
           [entry]:
-            'import { answer } from "./shader.wgsl"\n#entry func run (): U32 => return answer\n',
+            'import { answer } from "./shader.wgsl"\nio run (): U32 => return answer\n',
         },
         assetSources: { [input]: "header" },
       });
@@ -763,7 +763,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       // 1. Generator @panic surfaces decoded panic payload + provenance.phase === "execute".
       await Deno.writeTextFile(
         generator,
-        '#entry func generate (x: Text): Text => return @panic "bad input"\n',
+        'io generate (x: Text): Text => return @panic "bad input"\n',
       );
       const panicked = await build();
       ok(!panicked.success);
@@ -783,7 +783,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       // 2. Generator $Err surfaces provenance.phase === "result".
       await Deno.writeTextFile(
         generator,
-        '#entry func generate (x: Text): Result [Text, Text] => return $Err "bad header"\n',
+        'io generate (x: Text): Result [Text, Text] => return $Err "bad header"\n',
       );
       const erred = await build();
       ok(!erred.success);
@@ -800,7 +800,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       // 3. Generator compile failure surfaces provenance.phase === "compile".
       await Deno.writeTextFile(
         generator,
-        "#entry func generate (x: Text): Text => return missing_symbol\n",
+        "io generate (x: Text): Text => return missing_symbol\n",
       );
       const badGen = await build();
       ok(!badGen.success);
@@ -818,9 +818,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       const emitted = "const answer: U32 = true\n";
       await Deno.writeTextFile(
         generator,
-        `#entry func generate (x: Text): Text => return ${
-          JSON.stringify(emitted)
-        }\n`,
+        `io generate (x: Text): Text => return ${JSON.stringify(emitted)}\n`,
       );
       const stage1Failed = await build();
       ok(!stage1Failed.success);

@@ -43,7 +43,7 @@ export function ownedRenderSource(
   let source = `import * as render from "ink/render"
 import * as math from "ink/math"
 ${packing}
-#entry const stream = func (input: U32) => return do:
+io const stream = func (input: U32) => return do:
   let access = render.empty_frame ()
   @storage.push access.vectors (math.vec4 (-1.0) (-0.0) 10.0 11.0)
   @storage.push access.vectors (math.vec4 (-2.0) 12.0 13.0 14.0)
@@ -82,7 +82,7 @@ ${packing}
   }
   source += `  let prefix = &access.vectors[0..2]
   return pack access.vectors access.draws prefix
-#entry const overlap = func (input: U32) => return do:
+io const overlap = func (input: U32) => return do:
   let seed: #[math.Vec4] = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0, math.vec4 7.0 8.0 9.0 10.0]
   let access = render.empty_frame ()
   let (_, access) = render.store_vectors (&seed[0..3]) access
@@ -90,7 +90,7 @@ ${packing}
   access := render.push_extra ($render.Draw {mesh: 3, material: 4, matrix: math.Mat4.identity, parameters: $Nothing, extra: render.no_span}) (&seed[1..3]) self
   let prefix = &access.vectors[0..3]
   return pack access.vectors access.draws prefix
-#entry const self_rows = func (input: U32) => return do:
+io const self_rows = func (input: U32) => return do:
   let seed: #[math.Vec4] = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0]
   let access = render.empty_frame ()
   access := render.push_extra ($render.Draw {mesh: 5, material: 6, matrix: math.Mat4.identity, parameters: $Nothing, extra: render.no_span}) (&seed[0..2]) self
@@ -104,7 +104,7 @@ ${packing}
     access := render.push_extra draw (&extra[draw.extra.start..@u32.add draw.extra.start draw.extra.count]) self
   let prefix = &access.vectors[0..2]
   return pack access.vectors access.draws prefix
-#entry const empty_after_freeze = func (input: U32) => return do:
+io const empty_after_freeze = func (input: U32) => return do:
   let access = render.empty_frame ()
   let empty: #[render.Draw] = #[]
   access := render.emit empty self

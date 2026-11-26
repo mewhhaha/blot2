@@ -32,7 +32,7 @@ For a JSON file containing `{"width":1280,"height":720}`, source can use:
 ```blot
 import { Data, value } from "./settings.json"
 const width = func (settings: Data) => return settings.width
-#entry const initial_width = func () => return width value
+io const initial_width = func () => return width value
 ```
 
 The JSON parser exports `value` and its `Data` type. Nested objects get ordinary
@@ -115,9 +115,9 @@ type without embedding shader source or fabricating a runtime input value:
 ```blot
 import { Inputs, Shader, shader } from "./triangle.wgsl"
 const scale = func (inputs: Inputs) => return inputs.scale
-#entry const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader of
+io const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader of
   $Shader id => send id
-#entry const example_scale = func () => return scale ($Inputs { scale: 1.0 })
+io const example_scale = func () => return scale ($Inputs { scale: 1.0 })
 ```
 
 Each successful build returns `assets`, an array of
@@ -158,7 +158,7 @@ try {
 }
 ```
 
-The generator entry is `#entry func generate` by default. Set `exportName` to
+The generator entry is `io generate` by default. Set `exportName` to
 select another entry. Its single parameter accepts these shapes:
 
 - `#[U32]` in the default `"bytes"` mode, with one element per input byte.

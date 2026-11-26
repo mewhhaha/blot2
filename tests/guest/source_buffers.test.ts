@@ -26,7 +26,7 @@ async function fixture() {
     cleanup: () => Deno.remove(root, { recursive: true }),
   };
 }
-const main = 'import {value} from "./dep"\n#entry const answer: U32 = value\n';
+const main = 'import {value} from "./dep"\nio const answer: U32 = value\n';
 const value = (n: number) => `const value: U32 = ${n}\n`;
 
 Deno.test("source buffers compile virtual entry dependencies prelude and aliases without writes", async () => {
@@ -42,7 +42,7 @@ Deno.test("source buffers compile virtual entry dependencies prelude and aliases
     const result = await compiler.build({
       sources: {
         [root + "/main.blot"]:
-          'import {value} from "./dep"\nimport {extra} from "pkg/extra"\n#entry const answer: U32 = @u32.add value extra\n',
+          'import {value} from "./dep"\nimport {extra} from "pkg/extra"\nio const answer: U32 = @u32.add value extra\n',
         [root + "/dep.blot"]:
           "const values = #[1, 2]\nconst value: U32 = values[1]\n",
         [root + "/prelude.blot"]:
@@ -130,7 +130,7 @@ Deno.test("source buffers use binary frames beyond the metadata limit", async ()
   });
   try {
     const source = "// " + "x".repeat(1024 * 1024 + 17) +
-      "\n#entry const answer: U32 = 42\n";
+      "\nio const answer: U32 = 42\n";
     const result = await compiler.build({ sources: { [item.entry]: source } });
     await answer(result, 42);
     ok(result.success && result.stats.sourceBytes > 1024 * 1024);
@@ -160,8 +160,8 @@ Deno.test("source buffer validation leaves the process usable and detects canoni
     );
     const conflict = await compiler.build({
       sources: {
-        [item.entry]: "#entry const answer = 1\n",
-        [item.root + "/alias/main.blot"]: "#entry const answer = 2\n",
+        [item.entry]: "io const answer = 1\n",
+        [item.root + "/alias/main.blot"]: "io const answer = 2\n",
       },
     });
     ok(!conflict.success);
@@ -169,7 +169,7 @@ Deno.test("source buffer validation leaves the process usable and detects canoni
     equal(conflict.diagnostics[0].code, "DuplicateSourcePath");
     await answer(
       await compiler.build({
-        sources: { [item.entry]: "#entry const answer: U32 = 42\n" },
+        sources: { [item.entry]: "io const answer: U32 = 42\n" },
       }),
       42,
     );

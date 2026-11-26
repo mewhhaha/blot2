@@ -5,7 +5,7 @@ Deno.test("native runtime records copy nested updates and keep aliases immutable
 type Point is data = $Point { x: U32, y: U32 }
 type Holder is data = $Holder { point: Point, flag: Bool }
 const origin = $Point { y: 3, x: 1 }
-#entry const run = func (amount: U32) : U32 => return do:
+io const run = func (amount: U32) : U32 => return do:
   let holder = $Holder { flag: true, point: origin }
   let before = holder
   holder.point.x := @u32.add self amount
@@ -22,15 +22,15 @@ type Choice a is data = $Present a | $Absent
 const get = func fallback => return func candidate => return case candidate of
   $Present value => value
   $Absent => fallback
-#entry const floating = func (value: F32) : F32 => return get 0.0 ($Present value)
-#entry const integer = func (value: U32) : U32 => return get 0 ($Present value)
-#entry const fallback = func () : U32 => return get 7 $Absent
+io const floating = func (value: F32) : F32 => return get 0.0 ($Present value)
+io const integer = func (value: U32) : U32 => return get 0 ($Present value)
+io const fallback = func () : U32 => return get 7 $Absent
 type Pick is data = $First U32 | $Second U32 | $Empty
 const choose = func candidate => return case candidate of
   $First value | $Second value if @u32.lt 39 value => value
   $First value | $Second value => @u32.add value 2
   $Empty => 0
-#entry const guarded = func (value: U32) : U32 => return choose ($Second value)
+io const guarded = func (value: U32) : U32 => return choose ($Second value)
 `, guest => {
     equal(guest.call("floating", 1.23456789), Math.fround(1.23456789));
     equal(guest.call("integer", 0xffffffff), 0xffffffff);

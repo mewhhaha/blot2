@@ -35,7 +35,7 @@ function principalFamily(count: number): string {
   const lines = ["type Box is data = $Box U32"];
   for (let i = 0; i < count; i++) {
     lines.push(`const extract${i} = func (box: Box) : U32 => return case box of\n  $Box value => @u32.add value ${i}`);
-    lines.push(`#entry const answer${i}: U32 where { type_rep U32 } = @u32.div 8 (extract${i} ($Box 2))`);
+    lines.push(`io const answer${i}: U32 where { type_rep U32 } = @u32.div 8 (extract${i} ($Box 2))`);
   }
   return lines.join("\n") + "\n";
 }
@@ -50,13 +50,13 @@ function typesFamily(count: number): string {
     'const add = func left => return func right => return @type.call "add" left right',
     "const count = 10000",
   ];
-  for (let i = 0; i < count; i++) lines.push(`#entry const builder${i} = add (from (@f32.ceil (@f32.sqrt (from count)))) ${i}`);
+  for (let i = 0; i < count; i++) lines.push(`io const builder${i} = add (from (@f32.ceil (@f32.sqrt (from count)))) ${i}`);
   return lines.join("\n") + "\n";
 }
 function rowsFamily(count: number): string {
   const lines: string[] = [];
   for (let i = 0; i < count; i++) {
-    lines.push(`#entry const builder${i}: U32 where { type_rep U32 } = do:\n  let local = func value => return value\n  break local ${i}`);
+    lines.push(`io const builder${i}: U32 where { type_rep U32 } = do:\n  let local = func value => return value\n  break local ${i}`);
   }
   return lines.join("\n") + "\n";
 }

@@ -8,7 +8,7 @@ type End is data = $Arrived | $Blocked | $Budget
 type Forecast is data = $Forecast {end: End, pose: Pose3, motion: Motion, points: &[Vec3], elapsed: F32, distance: F32, remaining: F32}
 type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
 
-#entry const trace = func (count: U32): Array U32 => return do:
+io const trace = func (count: U32): Array U32 => return do:
   let best: Maybe U32 = $Nothing
   let observations: Array U32 = #[]
   for index in 0 .. count:
@@ -20,7 +20,7 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
     @storage.push observations (Maybe.unwrap_or 99 best)
   return observations
 
-#entry const nested = func (count: U32): Array U32 => return do:
+io const nested = func (count: U32): Array U32 => return do:
   let state: {best: Maybe U32, visits: U32} = {best: $Nothing, visits: 0}
   let observations: Array U32 = #[]
   for index in 0 .. count:
@@ -32,7 +32,7 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
   @storage.push observations state.visits
   return observations
 
-#entry const alternating = func (count: U32): Array U32 => return do:
+io const alternating = func (count: U32): Array U32 => return do:
   let state: Maybe (Maybe U32) = $Some $Nothing
   let observations: Array U32 = #[]
   for index in 0 .. count:
@@ -47,7 +47,7 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
     @storage.push observations (100 + index)
   return observations
 
-#entry const mixed = func (count: U32): Array U32 => return do:
+io const mixed = func (count: U32): Array U32 => return do:
   let state: Mixed = $Left 10
   let observations: Array U32 = #[]
   for index in 0 .. count:
@@ -61,7 +61,7 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
       state := $Left 10
   return observations
 
-#entry const borrowed = func (count: U32): Array U32 => return do:
+io const borrowed = func (count: U32): Array U32 => return do:
   let labels: Array U32 = #[7]
   let view = &labels[0..1]
   let selected: Maybe (&[U32]) = $Some view
@@ -73,7 +73,7 @@ type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
     selected := if index % 2 == 0 then $Nothing else $Some view
   return observations
 
-#entry const borrowed_continue = func (count: U32): Array U32 => return do:
+io const borrowed_continue = func (count: U32): Array U32 => return do:
   let labels: Array U32 = #[7]
   let view = &labels[0..1]
   let selected: Maybe (&[U32]) = $Some view
@@ -108,7 +108,7 @@ const choose = func (forecasts: Array (Maybe Forecast)): Maybe U32 => return do:
 
 // Preserve the real forecast layout: the candidate has a borrowed point view
 // as well as pose/motion records. A scalar-only minimum uses another path.
-#entry const minimum = func (values: Array F32): U32 => return do:
+io const minimum = func (values: Array F32): U32 => return do:
   let points: Array Vec3 = #[]
   let forecasts: Array (Maybe Forecast) = array.map (func (distance: F32) => return $Some $Forecast {
     end: $Arrived,

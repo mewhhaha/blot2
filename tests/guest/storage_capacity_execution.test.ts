@@ -4,7 +4,7 @@ import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 Deno.test("dynamic array growth preserves lengths and borrows of neighboring pools", async () => {
   await compileAndRun(
     `
-#entry const answer = func (overflow: Bool): Array U32 => return do:
+io const answer = func (overflow: Bool): Array U32 => return do:
   let large: Array U32 = #[41]
   let small: Array U32 = #[1, 2, 3]
   for index in 0 .. 300000:
@@ -32,7 +32,7 @@ Deno.test("dynamic array growth preserves lengths and borrows of neighboring poo
 Deno.test("retired @storage.reserve is rejected as unknown_intrinsic", async () => {
   await compileExpectedFailure(
     `
-#entry const invalid = func (count: U32) => return do:
+io const invalid = func (count: U32) => return do:
   let rows: Array U32 = #[]
   @storage.reserve rows count
   return rows.length
@@ -48,7 +48,7 @@ Deno.test("fixed application literals remain independent", async () => {
   ).join("\n");
   await compileAndRun(
     `${declarations}
-#entry const answer = func (extra: U32): Array U32 => return do:
+io const answer = func (extra: U32): Array U32 => return do:
   let local = @storage.copy slot_0
   for i in 0 .. extra:
     @storage.push local i

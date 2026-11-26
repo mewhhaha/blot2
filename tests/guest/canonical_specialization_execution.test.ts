@@ -17,11 +17,11 @@ const nominal = make ($Other { value: ${amount + 1} }) ($Other { value: ${
   } })
 const capture = func captured => return func (value: U32) => return captured value
 const nested = capture separate_again
-#entry const first: U32 -> U32 = func value => return shared value
-#entry const again: U32 -> U32 = func value => return shared_again value
-#entry const fresh: U32 -> U32 = func value => return separate value
-#entry const equivalent: U32 -> U32 = func value => return nested value
-#entry const distinct: U32 -> U32 = func value => return nominal value
+io const first: U32 -> U32 = func value => return shared value
+io const again: U32 -> U32 = func value => return shared_again value
+io const fresh: U32 -> U32 = func value => return separate value
+io const equivalent: U32 -> U32 = func value => return nested value
+io const distinct: U32 -> U32 = func value => return nominal value
 `;
 }
 

@@ -82,7 +82,7 @@ export function parserSource(
       topLevel && declarationStart && !attributeOpener &&
       token.text !== "\uE000"
     ) {
-      if (["privatE", "exporT", "impL", "tesT"].includes(token.text)) {
+      if (["privatE", "exporT", "impL", "tesT", "iO"].includes(token.text)) {
         throw reservedMarker(token);
       }
       const testName = next?.text === "expect_trap"
@@ -93,7 +93,9 @@ export function parserSource(
         replace(token.span.end - 1, token.span.end, "E");
       } else {
         declarationStart = false;
-        if (
+        if (token.text === "io") {
+          replace(token.span.end - 1, token.span.end, "O");
+        } else if (
           token.text === "export" && prepared.tokens[index + 1]?.text === "{"
         ) {
           replace(token.span.end - 1, token.span.end, "T");

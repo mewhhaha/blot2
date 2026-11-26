@@ -27,7 +27,7 @@ const invoke_twice = func (callback: own Array U32 -> U32 -> Array U32) -> (rows
 const add_second = func (rows: own Array U32) -> (amount: U32): Array U32 => return do:
   rows[1] := @u32.add rows[1] amount
   return rows
-#entry const answer = func (input: U32) => return do:
+io const answer = func (input: U32) => return do:
   let first: Array U32 = #[input, @u32.add input 10, @u32.add input 20]
   let second: Array U32 = #[@u32.add input 100, @u32.add input 110, @u32.add input 120]
   let links: Array U32 = #[@u32.add input 200, @u32.add input 210]
@@ -88,7 +88,7 @@ const scratch = `const leaf = func (rows: own Array U32): Array U32 => return do
   rows[0] := @u32.add temporary[0] temporary[1]
   return rows
 const outer = func (rows: own Array U32): Array U32 => return leaf (leaf rows)
-#entry const answer = func (input: U32) => return do:
+io const answer = func (input: U32) => return do:
   let rows: Array U32 = #[input, 29]
   rows := leaf rows
   rows := outer rows

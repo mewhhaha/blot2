@@ -108,12 +108,12 @@ const read: ${record ? "own (Token a) -> a" : "own Token -> Array U32"} = func (
 const capture = func value => return do:
   let saved = ${opaque ? "$Token " : ""}${record ? "{value}" : "value"}
   break func () => return (${opaque ? "case saved of\n    $Token inner => " : ""}${record ? (opaque ? "inner.value" : "saved.value") : (opaque ? "inner" : "saved")})[0]
-#entry const run = func (value: U32) => return do:
+io const run = func (value: U32) => return do:
   let original = #[value, 7]
   let alias = read (make original)
   alias[0] := 0
   break @u32.add alias[0] 2
-#entry const captured = func (value: U32) => return do:
+io const captured = func (value: U32) => return do:
   let original = #[value, 7]
   let saved = capture (@storage.copy original)
   original[0] := 0
@@ -136,11 +136,11 @@ const capture = func value => return do:
     await inspectBuild(
       `type Token is opaque = U32
 type Pair is opaque = (U32, U32)
-#entry const guarded = func (value: U32) => return do:
+io const guarded = func (value: U32) => return do:
   let $Token 7 = $Token value else:
     break 99
   break 42
-#entry const pair = func (value: U32) => return do:
+io const pair = func (value: U32) => return do:
   let $Pair (left, right) = $Pair (value, 2)
   break @u32.add left right
 `,
@@ -171,7 +171,7 @@ const make: ${type} -> Token = func value => return ${opaque ? "$Token " : ""}va
 const read: Token -> ${type} = func ${
           opaque ? "($Token value)" : "value"
         } => return value
-#entry const run = func (value: ${type}) => return read (make value)
+io const run = func (value: ${type}) => return read (make value)
 `;
         await Deno.writeTextFile(entry, source);
         const compiler = await createZigProjectCompiler({

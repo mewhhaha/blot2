@@ -45,8 +45,8 @@ Deno.test("wide ownership preserves snapshots float bits and static shape reloca
             }]`,
             [entry]: `import {run, floating} from "./model"
 import {values} from "./prefix"
-#entry const main = func (value: U32): Array U32 => return run (value + values.length)
-#entry const bits = func (value: U32): F32 => return floating value
+io const main = func (value: U32): Array U32 => return run (value + values.length)
+io const bits = func (value: U32): F32 => return floating value
 `,
           };
           const result = await retained.build({ sources });
@@ -120,7 +120,7 @@ type Shape is data = $Small {child: Array U32, value: U32} | $Large {${types}}
 const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1]
   break shape
-#entry const run = func (mode: U32) => return do:
+io const run = func (mode: U32) => return do:
   let before = if mode == 0 then $Small {child: #[40], value: 7} else $Large {${values}}
   let captured = func () => return before.child[0]
   let changed = replace before
@@ -184,7 +184,7 @@ func update (frame: own scene.Frame): scene.Frame => return do:
   frame.count := @u32.add frame.count 1
   return frame
 const hooks: scene.Hooks = {reset: update}
-#entry func run (value: U32): U32 => return (scene.run hooks ($scene.Frame {parts: #[], count: value})).count
+io run (value: U32): U32 => return (scene.run hooks ($scene.Frame {parts: #[], count: value})).count
 `,
     };
     try {

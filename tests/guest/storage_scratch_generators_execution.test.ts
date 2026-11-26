@@ -14,7 +14,7 @@ const sources = [{
   for value in generated:
     @storage.push destination value
   return destination
-#entry const answer = func (input: F32) => return do:
+io const answer = func (input: F32) => return do:
   let destination: Array F32 = #[]
   destination := write self input
   destination := write self (input + 10.0)
@@ -85,13 +85,13 @@ Deno.test("generated scratch rejects mutating captured destination or module glo
     @storage.push destination (input + U32.to_f32 index)
     return input)
   return destination
-#entry const answer = func (input: F32) => return write #[] input
+io const answer = func (input: F32) => return write #[] input
 `,
     "aliased_update",
   );
   await compileExpectedFailure(
     `const pool: Array U32 = #[0]
-#entry const answer = func (input: U32) => return do:
+io const answer = func (input: U32) => return do:
   @storage.push pool input
   return pool[0]
 `,

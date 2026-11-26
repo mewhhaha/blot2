@@ -9,10 +9,10 @@ const [baseline, current, std, output] = Deno.args.map((path) => resolve(path));
 await Deno.mkdir(output, { recursive: true });
 const source = `import * as iter from "std/iter"
 let retained = @list.generate 1000000 (func index => return index)
-#entry const storage_probe = func (value: U32) => return #[value]
-#entry const cursor = func count => return iter.fold_left add 0 (iter.take count retained.iter)
-#entry const range = func count => return iter.fold_left add 0 (iter.range 0 count)
-#entry const records = func (count: U32) => return do:
+io const storage_probe = func (value: U32) => return #[value]
+io const cursor = func count => return iter.fold_left add 0 (iter.take count retained.iter)
+io const range = func count => return iter.fold_left add 0 (iter.range 0 count)
+io const records = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -27,7 +27,7 @@ const make_record = func value => return { a: value, b: value, c: value, d: valu
 const read_record = func record => return record.a + record.b + record.c + record.d + record.e + record.f +
   record.g + record.h + record.i + record.j + record.k + record.l + record.m + record.n +
   record.o + record.p + record.q + record.r
-#entry const branches = func (count: U32) => return do:
+io const branches = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = make_record value
@@ -36,7 +36,7 @@ const read_record = func record => return record.a + record.b + record.c + recor
     else:
       sum := self + read_record record + 1
   break sum
-#entry const shared = func (count: U32) => return do:
+io const shared = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let child = { a: value, b: value, c: value, d: value, e: value, f: value,

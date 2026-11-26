@@ -50,36 +50,36 @@ export function numericAggregateSources() {
       nominal ? name : structure
     }) => return #[${projections.join(", ")}]\n`;
     main +=
-      `#entry const direct_${id} = func (seed: F32) => return shape.read_${id} (shape.make_${id} seed)\n`;
+      `io const direct_${id} = func (seed: F32) => return shape.read_${id} (shape.make_${id} seed)\n`;
     main +=
-      `#entry const callback_${id} = func (seed: F32) => return apply shape.read_${id} (shape.make_${id} seed)\n`;
-    main += `#entry const dynamic_${id} = func (choice: Bool) => return do:
+      `io const callback_${id} = func (seed: F32) => return apply shape.read_${id} (shape.make_${id} seed)\n`;
+    main += `io const dynamic_${id} = func (choice: Bool) => return do:
   let read = if choice then shape.read_${id} else shape.alternate_${id}
   return read (shape.make_${id} 5.0)
 `;
-    main += `#entry const array_${id} = func (count: U32) => return do:
+    main += `io const array_${id} = func (count: U32) => return do:
   let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
   let total = 0.0
   for value in values:
     total := self + shape.read_${id} value
   return total
-#entry const snapshot_${id} = func (count: U32) => return do:
+io const snapshot_${id} = func (count: U32) => return do:
   let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
   let old = @storage.copy values
   values[0] := shape.make_${id} 1000.0
   return shape.read_${id} values[0] + shape.read_${id} old[0]
-#entry const wire_${id} = func (seed: F32) => return shape.wire_${id} (shape.make_${id} seed)
-#entry const stored_wire_${id} = func (seed: F32) => return do:
+io const wire_${id} = func (seed: F32) => return shape.wire_${id} (shape.make_${id} seed)
+io const stored_wire_${id} = func (seed: F32) => return do:
   let values = @array.fill 2 (shape.make_${id} seed)
   return shape.wire_${id} values[1]
-#entry const constant_${id} = func () => return do:
+io const constant_${id} = func () => return do:
   let values = #[shape.make_${id} 0.0, shape.make_${id} 1.0]
   return shape.read_${id} values[1]
-#entry const nested_edit_${id} = func (seed: F32) => return do:
+io const nested_edit_${id} = func (seed: F32) => return do:
   let values = @array.fill 2 (shape.make_${id} 1.0)
   values[0].${nested ? "a.x" : "ax"} := seed
   return shape.read_${id} values[0] + shape.read_${id} values[0]
-#entry const list_${id} = func (count: U32) => return do:
+io const list_${id} = func (count: U32) => return do:
   let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
   let old = values
   values := @array.concat #[shape.make_${id} 1000.0] (@array.slice self 1 (count - 1))

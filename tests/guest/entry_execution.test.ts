@@ -2,15 +2,15 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("exported functions with signatures compose through generic closure captures", async () => {
   await compileAndRun(`
-#entry const increment = func (value: U32): U32 => return value + 1
-#entry const doubled = func (value: U32): U32 => return value * 2
+io const increment = func (value: U32): U32 => return value + 1
+io const doubled = func (value: U32): U32 => return value * 2
 const compose = func (outer: b -> c) -> (inner: a -> b) -> (value: a): c => return outer (inner value)
-#entry const composed: U32 -> U32 = compose doubled increment
-#entry const factorial = func (value: U32): U32 => return do:
+io const composed: U32 -> U32 = compose doubled increment
+io const factorial = func (value: U32): U32 => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
-#entry const floating = func (value: F32): F32 => return value + 1.5
+io const floating = func (value: F32): F32 => return value + 1.5
 `, guest => {
     for (const value of [0, 1, 20, 41, 0xffffffff]) {
       equal(guest.call("increment", value), (value + 1) >>> 0);
@@ -27,14 +27,14 @@ const compose = func (outer: b -> c) -> (inner: a -> b) -> (value: a): c => retu
 Deno.test("entry inference preserves unhandled operations and unresolved host parameters", async () => {
   await compileExpectedFailure(`
 effect Read: Unit -> U32
-#entry const invalid = func value => return do:
+io const invalid = func value => return do:
   use ignored <- Read ()
   break value + 1
 `, "entry_type", undefined, { prelude: "std/prelude.blot" });
-  await compileExpectedFailure(`#entry const identity = func value => return value\n`, "entry_type");
+  await compileExpectedFailure(`io const identity = func value => return value\n`, "entry_type");
   await compileExpectedFailure(`
 effect Read: Unit -> U32
-#entry const invalid = func (callback: Unit -> U32 ! {Read}) => return callback ()
+io const invalid = func (callback: Unit -> U32 ! {Read}) => return callback ()
 `, "entry_type");
 });
 

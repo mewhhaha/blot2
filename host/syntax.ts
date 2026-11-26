@@ -90,7 +90,15 @@ function annotationWhere(
     if (annotationDepth !== undefined && braces < annotationDepth) {
       annotationDepth = undefined;
     }
-    if (text === "func" || (text === ":" && annotationColon(index))) {
+    const isTopLevelIo = (i: number) =>
+      braces === 0 && tokens[i].text === "io" &&
+      (i === 0 || tokens[i - 1].text === "\uE000" ||
+        tokens[i - 1].text === "private" || tokens[i - 1].text === "]") &&
+      tokens[i + 1]?.text !== "const" && tokens[i + 1]?.text !== "let";
+    if (
+      text === "func" || isTopLevelIo(index) ||
+      (text === ":" && annotationColon(index))
+    ) {
       annotationDepth = braces;
     } else if (
       annotationDepth === braces &&

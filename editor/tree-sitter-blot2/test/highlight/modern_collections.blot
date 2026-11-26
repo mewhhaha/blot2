@@ -51,9 +51,9 @@ let $Done value = result else:
 //^^^^^^^ attribute
 //        ^^^^^^^^ attribute
 
-#entry const answer = 42
+io const answer = 42
 // <- keyword.storage.modifier
-//    ^^^^^ keyword.storage.type
+// ^^^^^ keyword.storage.type
 
 "#[1] @[tag] $time.Clock @demand"
 //      ^^^ string

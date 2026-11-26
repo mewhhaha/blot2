@@ -246,7 +246,7 @@ const ignoredDirectories = new Set([
   "generated",
 ]);
 const testDeclaration =
-  /^[ \t]*(?:@\[[^\r\n]*\][ \t]*)?(?:#entry[ \t]+(?:func|const|let)[ \t]+(?:test_|trap_)\w*|test[ \t]+(?:expect_trap[ \t]+)?")/m;
+  /^[ \t]*(?:@\[[^\r\n]*\][ \t]*)?(?:io[ \t]+(?:(?:const|let)[ \t]+)?(?:test_|trap_)\w*|test[ \t]+(?:expect_trap[ \t]+)?")/m;
 
 function compare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;

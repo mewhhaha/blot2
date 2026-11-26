@@ -18,8 +18,8 @@ Deno.test("completed captured callbacks preserve edits and rejection recovery", 
     }
 const factory = func invoke => return func extra => return invoke extra
 const callback = factory add
-#entry const schema: U32 = ${schema}
-#entry const answer = func (extra: U32) : U32 => return callback extra
+io const schema: U32 = ${schema}
+io const answer = func (extra: U32) : U32 => return callback extra
 `;
   try {
     await Deno.writeTextFile(entry, source(42, 7));
@@ -82,7 +82,7 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
   try {
     await Deno.writeTextFile(
       entry,
-      'import { make } from "./library"\n#entry const answer: U32 = (make 6) 2\n',
+      'import { make } from "./library"\nio const answer: U32 = (make 6) 2\n',
     );
     await Deno.writeTextFile(library, source(2, 1));
     {
@@ -142,7 +142,7 @@ Deno.test("retained deep layered values preserve edits traps recovery and execut
   const source = (value: number) =>
     `const wrap = func value => return (value, 0)
 const ignore = func value => return 1
-#entry const answer: U32 = do:
+io const answer: U32 = do:
   let seed = ${value}
   let layer_0 = wrap seed
 ${layers}
@@ -204,11 +204,11 @@ const subtract = func value => return @u32.sub value 2
 const unused = func value => return @u32.${unrelated} value 2
 const even: U32 -> U32 = func value => return if @u32.eq value 0 then 41 else odd (@u32.sub value 1)
 const odd: U32 -> U32 = func value => return if @u32.eq value 0 then 41 else even (@u32.sub value 1)
-#entry const first: U32 = do:
+io const first: U32 = do:
   let identity = func value => return value
   break identity (@u32.div 8 ${seed})
-#entry const second: U32 = local (even ${seed})
-#entry const third: U32 = local (odd ${seed})
+io const second: U32 = local (even ${seed})
+io const third: U32 = local (odd ${seed})
 `;
   try {
     await Deno.writeTextFile(entry, source(2));
@@ -287,7 +287,7 @@ Deno.test("checked interfaces execute changed bodies and preserve traps and reco
 const sub = func (x: U32) : U32 => return @u32.sub x 1
 const div = func (x: U32) : U32 => return @u32.div x 1
 const local = func (x: U32) : U32 => return @u32.${operation} x ${operand}
-#entry const answer: U32 = local 41
+io const answer: U32 = local 41
 `;
   try {
     await Deno.writeTextFile(entry, source("add", 1));
@@ -357,7 +357,7 @@ const ceil_impl = func value => return @f32.ceil value
 const floor = floor_impl
 const ceil = ceil_impl
 const local = func value => return from (${rounding} value)
-#entry const answer: U32 = case local 41.25 of
+io const answer: U32 = case local 41.25 of
   $Token value => value
 `;
   try {

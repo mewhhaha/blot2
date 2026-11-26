@@ -4,4 +4,4 @@ const make_tree = func (depth: U32) -> (seed: U32) : Tree => return
 const sum_tree = func (tree: Tree) : U32 => return case tree of
   $Leaf value => value
   $Branch (left, right) => sum_tree left + sum_tree right
-#entry const run = func (seed: U32) : U32 => return sum_tree (make_tree 10 seed)
+io const run = func (seed: U32) : U32 => return sum_tree (make_tree 10 seed)

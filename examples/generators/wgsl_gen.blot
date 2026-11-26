@@ -240,7 +240,7 @@ func generate_declarations (tokens: #[Text]): Result [Text, Text] =>
   return $Ok (text.finish out)
 
 
-#entry func generate (source: Text): Result [Text, Text] =>
+io generate (source: Text): Result [Text, Text] =>
   return case tokenize source of
     $Ok tokens => generate_declarations tokens
     $Err message => $Err (copy message)

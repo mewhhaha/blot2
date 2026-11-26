@@ -1,4 +1,4 @@
-#entry func collect (count: U32): Array U32 => return do:
+io collect (count: U32): Array U32 => return do:
   let rows: Array U32 = #[]
   for i in 0..count:
     case i % 5 of

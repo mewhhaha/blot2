@@ -24,14 +24,14 @@ Deno.test("first-class test blocks are stripped in normal builds and emitted wit
     const withTests = `${dir}/with_tests.blot`;
     const prodSource = [
       "private func helper (x: U32): U32 => x * 2",
-      "#entry func prod (x: U32): U32 => helper x + 1",
+      "io prod (x: U32): U32 => helper x + 1",
       "",
     ].join("\n");
     const fullSource = [
       'import * as test from "std/test"',
       "",
       "private func helper (x: U32): U32 => x * 2",
-      "#entry func prod (x: U32): U32 => helper x + 1",
+      "io prod (x: U32): U32 => helper x + 1",
       "",
       "@[test.suite]",
       'test "private helper suite":',
@@ -190,7 +190,7 @@ Deno.test("imported modules keep first-class tests private and contextual test/e
         'import * as lib from "./lib"',
         "const test = 40",
         "const expect_trap = 2",
-        "#entry func main (): U32 => lib.answer () + test - 40 + expect_trap - 2",
+        "io main (): U32 => lib.answer () + test - 40 + expect_trap - 2",
         "",
       ].join("\n"),
     );

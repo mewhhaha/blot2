@@ -3,7 +3,7 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 Deno.test("plain name templates and one-use destructured functions execute independently", async () => {
   await compileAndRun(`
 const selected: U32 -> U32 where {type_rep U32} = func value => return value
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let identity = func value => return value
   let (field, extracted) = (0.5, func value => return value)
   let (_, qualified) = ((), selected)
@@ -19,7 +19,7 @@ Deno.test("destructured callable aliases cannot select two argument types", asyn
     "let original = func value => return value\n  let (x, identity) = (0, original)",
     "let (identity, ()) = (func value => return value, ())",
     "let (_, identity) = (0, func value => return value)",
-  ]) await compileExpectedFailure(`#entry const answer = func () => return do:
+  ]) await compileExpectedFailure(`io const answer = func () => return do:
   ${binding}
   let first = identity 41
   break @f32.add (@u32.to_f32 first) (identity 1.5)

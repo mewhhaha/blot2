@@ -4,7 +4,7 @@ Deno.test("source storage admission covers a reached library beyond 128 declarat
   const helpers = Array.from({length: 150}, (_, index) => `const part_${index} = func (value: U32): U32 => return value + ${index}`).join("\n");
   const calls = Array.from({length: 150}, (_, index) => `  total := self + part_${index} 1`).join("\n");
   await compileAndRun(`${helpers}
-#entry const sum = func () => return do:
+io const sum = func () => return do:
   let anchor: Array U32 = #[]
   let total = 0
 ${calls}
@@ -21,7 +21,7 @@ const sum_pool = func values => return do:
   for value in values:
     total := self + value
   return total
-#entry const lengths = func () => return do:
+io const lengths = func () => return do:
   let growing: Array U32 = #[10, 20]
   let changing: Array U32 = #[30]
   let pushed = @storage.push growing 40
@@ -45,7 +45,7 @@ const bump = func (own access) => return do:
   access.rows[0] := access.rows[0] + 1
   return access
 const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) -> (access: own {rows: Array U32}) => return callback access
-#entry const inspect = func (present: Bool) => return do:
+io const inspect = func (present: Bool) => return do:
   let calls: Array U32 = #[]
   let rows: Array {label: U32, item: Maybe (U32, F32)} = #[
     {label: 7, item: if present then $Some (40, 2.0) else $Nothing}
@@ -57,7 +57,7 @@ const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) ->
     $Some _ => @panic "unchosen payload"
     $Nothing => 9
   return amount + @storage.length calls
-#entry const generic_update = func (chosen: Bool) => return do:
+io const generic_update = func (chosen: Bool) => return do:
   let rows: Array U32 = #[0]
   let access = run_known bump {rows}
   let selected = case chosen of
@@ -67,7 +67,7 @@ const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) ->
       break true
     false => false
   return access.rows[0] + (if selected then 1 else 0)
-#entry const inferred_field = func () => return do:
+io const inferred_field = func () => return do:
   let rows: Array (Maybe Span) = #[$Some ($Span {start: 7, count: 11})]
   let $Some found = read_optional rows 0 else:
     return 0
@@ -84,13 +84,13 @@ const run_known = func (callback: own {rows: Array U32} -> {rows: Array U32}) ->
 Deno.test("normal branch joins array results while exits and aggregate carries retain meaning", async () => {
   await compileAndRun(`
 type Change is data = $Plus U32 | $Set U32 | $Scale U32 | $Skip
-#entry const branch = func (early: Bool) => return do:
+io const branch = func (early: Bool) => return do:
   let anchor: Array U32 = #[]
   let rows = if early then (do:
     return 7
   ) else #[40, 2]
   return rows[0] + rows[1]
-#entry const traverse = func (count: U32) => return do:
+io const traverse = func (count: U32) => return do:
   let anchor: Array U32 = #[]
   let state = (1, 2)
   for index in 0..count:
@@ -104,7 +104,7 @@ type Change is data = $Plus U32 | $Set U32 | $Scale U32 | $Skip
   for row in rows:
     total := self + row.amount
   return left * 10 + total
-#entry const sort_three = func () => return do:
+io const sort_three = func () => return do:
   let anchor: Array U32 = #[]
   let rows: Array U32 = #[3, 1, 2]
   for i in 1..3:
@@ -117,7 +117,7 @@ type Change is data = $Plus U32 | $Set U32 | $Scale U32 | $Skip
       rows[j - 1] := saved
       j := self - 1
   return rows[0] * 100 + rows[1] * 10 + rows[2]
-#entry const match_rebind = func () => return do:
+io const match_rebind = func () => return do:
   let anchor: Array U32 = #[]
   let rows: Array U32 = #[0]
   let total = 0
@@ -149,7 +149,7 @@ Deno.test("scope and loop frames recover scratch allocated before a transferred 
 const create = func (n: U32) => return do:
   let scratch = #[n, n]
   return #[scratch[0]]
-#entry const repeat = func () => return do:
+io const repeat = func () => return do:
   let anchor: Array U32 = #[]
   let total = 0
   for index in 0..5000:

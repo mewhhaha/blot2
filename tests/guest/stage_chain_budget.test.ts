@@ -21,7 +21,7 @@ function chain(length: number): string {
     );
   }
   return `const holder = func () => return {\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
-    stages.join("\n") + `\n#entry const e = func () => return s${length - 1} ()\n`;
+    stages.join("\n") + `\nio const e = func () => return s${length - 1} ()\n`;
 }
 
 function budget(issue: ZigProjectDiagnostic, entry: string, source: string) {

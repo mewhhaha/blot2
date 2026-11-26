@@ -24,7 +24,7 @@ func launch io =>
 
 // The single host callback uses disjoint scalar command ranges. The wrappers
 // grant only the specific operations needed by each guest capability record.
-#entry func main (dispatch: U32 -> U32 ! {Foreign}) =>
+io main (dispatch: U32 -> U32 ! {Foreign}) =>
   let set_title = func title_id =>
     if title_id >= 1000:
       return 1
@@ -38,6 +38,6 @@ func launch io =>
     render: $RenderIo { submit },
   })
 
-#entry func render_only (submit: U32 -> U32 ! {Foreign}) => render_frame ($RenderIo { submit }) 42
+io render_only (submit: U32 -> U32 ! {Foreign}) => render_frame ($RenderIo { submit }) 42
 
-#entry const uses_host = @effect.has (@effect.of main) Foreign
+io const uses_host = @effect.has (@effect.of main) Foreign

@@ -405,7 +405,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
     // 1. SPENT_VALUE with secondary relatedInformation pointing to move line + `.copy` quick-fix
     const spentSource = [
       "func consume (xs: own #[U32]): U32 => return xs.length",
-      "#entry func main (): U32 =>",
+      "io main (): U32 =>",
       "  let a = #[1, 2, 3]",
       "  let n = consume a",
       "  return n + a.length",
@@ -445,7 +445,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
     // 2. Missing `$` constructor hint -> quick-fix `$Some`
     const ctorSource = [
       "type Opt is data = $Some U32 | $Nothing",
-      "#entry func main (): Opt => return Some 1",
+      "io main (): Opt => return Some 1",
       "",
     ].join("\n");
     await send("textDocument/didChange", {
@@ -489,7 +489,7 @@ Deno.test("LSP resolves manifest generators and completes fields from a live ass
       ),
       Deno.writeTextFile(
         directory + "/generator.blot",
-        "#entry func generate (bytes: #[U32]): #[U32] => return bytes\n",
+        "io generate (bytes: #[U32]): #[U32] => return bytes\n",
       ),
       Deno.writeTextFile(
         directory + "/shape.txt",
@@ -550,7 +550,7 @@ Deno.test("LSP suppresses spurious no_entry on library modules while reporting r
     await output.messages();
     await send("initialized");
 
-    // Valid library file without #entry must produce 0 diagnostics
+    // Valid library file without io entries must produce 0 diagnostics
     await send("textDocument/didOpen", {
       textDocument: {
         uri,

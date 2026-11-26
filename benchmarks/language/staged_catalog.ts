@@ -42,7 +42,7 @@ func catalog_entry () => return do:
   let index = include catalog
   let image = include (if ${alternate} then checker else aim)
   return { size: @array.length index, signature: @array.get image 0 }
-#entry func answer () => return #do:
+io answer () => return #do:
   let row = catalog_entry ()
   break @u32.add row.signature row.size
 `;

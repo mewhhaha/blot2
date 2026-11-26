@@ -2,18 +2,18 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("comprehensions preserve nesting scope short circuiting and result order", async () => {
   await compileAndRun(`
-#entry const cartesian = func (offset: U32) => return
+io const cartesian = func (offset: U32) => return
   #[a * 10 + b + offset | a <- #[1, 2], b <- #[3, 4]]
-#entry const dependent = func (count: U32) => return
+io const dependent = func (count: U32) => return
   #[b | a <- @array.generate count (func i => return i + 1), b <- @array.generate a (func i => return i)]
-#entry const guarded = func (count: U32) => return
+io const guarded = func (count: U32) => return
   #[squared | x <- @array.generate count (func i => return i), x > 1, let squared = x * x, squared < 20]
-#entry const empty = func () : Array U32 => return #[b | a <- #[], b <- #[1 / 0]]
-#entry const skip = func () : Array U32 => return #[y | x <- #[1, 2], false, let y = 1 / 0]
-#entry const shadow = func (x: U32) => return do:
+io const empty = func () : Array U32 => return #[b | a <- #[], b <- #[1 / 0]]
+io const skip = func () : Array U32 => return #[y | x <- #[1, 2], false, let y = 1 / 0]
+io const shadow = func (x: U32) => return do:
   let ys = #[x | x <- #[x, x + 1], let x = x + 10]
   break #[x, ys[0], ys[1]]
-#entry const captured = func (xs: Array U32) => return
+io const captured = func (xs: Array U32) => return
   #[xs[0] + x | x <- xs]
 `, guest => {
     equal([...(guest.call("cartesian", 100) as Uint32Array)].join(","), "113,114,123,124");
@@ -29,8 +29,8 @@ Deno.test("comprehensions preserve nesting scope short circuiting and result ord
 Deno.test("array spreads and aggregate element updates", async () => {
   await compileAndRun(`
 type Item is data = $Item { value: U32 }
-#entry const array_spread = func (x: U32) => return #[x, ...#[2, 3], 4]
-#entry const aggregate = func (x: U32) => return do:
+io const array_spread = func (x: U32) => return #[x, ...#[2, 3], 4]
+io const aggregate = func (x: U32) => return do:
   let xs = #[$Item { value: x }, $Item { value: 2 }]
   xs[0].value := 42
   break xs[0].value
@@ -46,22 +46,22 @@ const staged = #[x + 1 | x <- #[40, 41]]
 const large = @array.generate 513 (func i => return i)
 type Item is data = $Item { value: U32 }
 const stored = @array.generate 8193 (func i => return $Item { value: i })
-#entry const frozen_item = func (index: U32) => return stored[index].value
-#entry const frozen_edit = func (value: U32) => return do:
+io const frozen_item = func (index: U32) => return stored[index].value
+io const frozen_edit = func (value: U32) => return do:
   let xs = @storage.copy stored
   xs[8192].value := value
   break #[stored[8192].value, xs[8192].value]
-#entry const answer = staged[1]
-#entry const frozen_chunks = func (index: U32) => return large[index]
-#entry const floats = func (count: U32) => return
+io const answer = staged[1]
+io const frozen_chunks = func (index: U32) => return large[index]
+io const floats = func (count: U32) => return
   #[x | x <- @array.generate count (func i => return @f32.add (@u32.to_f32 i) 0.5)]
-#entry const float_update = func (x: F32) => return do:
+io const float_update = func (x: F32) => return do:
   let xs = #[x, 2.5]
   let before = xs.copy
   xs[0] := 4.5
   break #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
 @[func value => return value + 1]
-#entry const tagged = 41
+io const tagged = 41
 `, guest => {
     equal(guest.read("answer"), 42);
     equal(guest.read("tagged"), 42);
@@ -76,7 +76,7 @@ const stored = @array.generate 8193 (func i => return $Item { value: i })
 
 Deno.test("owned comprehensions keep the selected elements in order", async () => {
   await compileAndRun(`
-#entry const compact = func (count: U32) => return
+io const compact = func (count: U32) => return
   #[i + 1 | i <- @array.generate count (func i => return i), i % 2 == 0]
 `, guest => {
     const count = 4097;
@@ -87,8 +87,8 @@ Deno.test("owned comprehensions keep the selected elements in order", async () =
 });
 
 Deno.test("retired list syntax and intrinsics are rejected", async () => {
-  await compileExpectedFailure("#entry const run = [1, 2]\n", "unsupported_expression");
+  await compileExpectedFailure("io const run = [1, 2]\n", "unsupported_expression");
   for (const source of ["@list.get #[1] 0", "@list.set #[1] 0 2", "@list.append #[1] 2"]) {
-    await compileExpectedFailure(`#entry const run = ${source}\n`, "unknown_intrinsic");
+    await compileExpectedFailure(`io const run = ${source}\n`, "unknown_intrinsic");
   }
 });

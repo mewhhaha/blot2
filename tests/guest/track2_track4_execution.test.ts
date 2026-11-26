@@ -97,10 +97,10 @@ func step_fn (k: U32): U32 =>
     return 777
   return dispatch_loop step_fn k 0
 
-#entry func test_indirect_tco (n: U32): U32 =>
+io test_indirect_tco (n: U32): U32 =>
   return dispatch_loop step_fn n 0
 
-#entry func test_relaxed_ops (n: U32): Array U32 =>
+io test_relaxed_ops (n: U32): Array U32 =>
   let a = @array.fill n 0.0
   let b = @array.fill n 0.0
   for i in 0 .. n:
@@ -163,13 +163,13 @@ func sum_post_trap (a: #[n; U32]) -> (b: #[n; U32]) -> (c: #[n; U32]) -> (idx: U
   let z = c[idx]
   return x + y + z
 
-#entry func test_guarded (idx: U32): U32 =>
+io test_guarded (idx: U32): U32 =>
   let a: #[4; U32] = #[10, 20, 30, 40]
   let b: #[4; U32] = #[1, 2, 3, 4]
   let c: #[4; U32] = #[100, 200, 300, 400]
   return sum_three a b c idx
 
-#entry func test_post_trap (idx: U32): U32 =>
+io test_post_trap (idx: U32): U32 =>
   let a: #[4; U32] = #[10, 20, 30, 40]
   let b: #[4; U32] = #[1, 2, 3, 4]
   let c: #[4; U32] = #[100, 200, 300, 400]
@@ -198,7 +198,7 @@ func f32_bits (x: F32): U32 =>
 type Vec2 = { x: F32, y: F32 }
 type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
 
-#entry func test_vec2_euler (n: U32): Array U32 =>
+io test_vec2_euler (n: U32): Array U32 =>
   let pos = @array.fill n { x: 0.0, y: 0.0 }
   let vel = @array.fill n { x: 0.0, y: 0.0 }
   for i in 0 .. n:
@@ -216,7 +216,7 @@ type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
     out[i * 2 + 1] := f32_bits pos[i].y
   return out
 
-#entry func test_vec4_nominal (n: U32): Array U32 =>
+io test_vec4_nominal (n: U32): Array U32 =>
   let pos = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
   let vel = @array.fill n ($Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 })
   for i in 0 .. n:

@@ -47,7 +47,7 @@ Deno.test("formatter preserves named private entry tagged and local curried func
 private func hidden_keep value=> return value
 @[test]
 func tagged ()=> return add 20 22
-#entry func answer ()=> do:
+io answer ()=> do:
   func local (value:U32)->extra=> return add value extra
   let anonymous=func value=> return value
   return local (anonymous 40) 2
@@ -67,7 +67,7 @@ func tagged ()=> return add 20 22
     formatted.includes("@[test]\nfunc tagged () => return add 20 22"),
     true,
   );
-  equal(formatted.includes("#entry func answer () => do:"), true);
+  equal(formatted.includes("io answer () => do:"), true);
   equal(
     formatted.includes(
       "  func local (value: U32) -> extra => return add value extra",
@@ -105,14 +105,14 @@ func keep value where{Eq a}=> return value
 
 Deno.test("formatter preserves spark and receive boundaries", async () => {
   const source =
-    `#entry const sparked = func () => return @task.scope (func group => return do:
+    `io const sparked = func () => return @task.scope (func group => return do:
   let pending = *(work 42)
   return |pending|)
 `;
   const formatted = await formatSource(source);
   equal(
     formatted.includes(
-      "#entry const sparked = func () => return @task.scope (func group => return do:",
+      "io const sparked = func () => return @task.scope (func group => return do:",
     ),
     true,
   );
@@ -129,8 +129,8 @@ func step_p (st:own U32)->(cmd:U32):(U32,U32)=> return (st,cmd)
 #kernel func mix (x:U32):U32=> return x
 #kernel const plan:Kernel [Array F32,U32,U32]={prepare:prep,run:step_item}
 #process const planner:Process [U32,U32,U32]={init:init_p,step:step_p}
-#entry func double(xs:Array U32):Array U32=> return spark #[@u32.add x x | x<-xs]
-#entry func indexed(n:U32):Array U32=> return spark #[x | x<-0..n]
+io double(xs:Array U32):Array U32=> return spark #[@u32.add x x | x<-xs]
+io indexed(n:U32):Array U32=> return spark #[x | x<-0..n]
 `;
   const formatted = await formatSource(source);
   equal(
@@ -158,7 +158,7 @@ Deno.test("formatter preserves grouped curried parameter lists and named record 
   const source =
     `const area=func (width:U32) -> (height:U32)=> return @u32.mul width height
 const named=func (fields:{width:U32,height:U32})=> return area fields.width fields.height
-#entry const answer=func ()=> return named {height:3,width:4}
+io const answer=func ()=> return named {height:3,width:4}
 `;
   const formatted = await formatSource(source);
   equal(
@@ -171,7 +171,7 @@ const named=func (fields:{width:U32,height:U32})=> return area fields.width fiel
 
 Deno.test("formatter preserves continue and a flat pattern guard", async () => {
   const source = `type Candidate is data= $Keep U32| $Skip
-#entry const kept=func (values:Array Candidate)=> return do:
+io const kept=func (values:Array Candidate)=> return do:
   let total=0
   for candidate in values:
     let $Keep value=candidate else:
@@ -190,7 +190,7 @@ const descriptor=func code=> return code
 const left:code [U32,row {}]=@code.quote 40
 const shape:descriptor (code [U32,row {Foreign}])=@code.describe left
 const answer=@code.quote (@u32.add (@code.splice left) (@code.lift 2))
-#entry const run=func ()=> return @code.emit answer
+io const run=func ()=> return @code.emit answer
 `;
   const formatted = await formatSource(source);
   equal(formatted.includes("code [U32, row {}]"), true);
@@ -234,7 +234,7 @@ private type Read a is contract={type_rep a}
 private effect Hidden:Unit->U32
 private type HiddenFamily is effect={ask:Unit->U32}
 private const private=func opaque=> return opaque
-private #entry const answer=func export=> return private export
+private io const answer=func export=> return private export
 const unwrap=func ($Box value)=> return value.value
 const typed=func (value:U32)=> return value
 const pattern=func ((left,right))=> return left
@@ -246,7 +246,7 @@ export {Box} from "./tokens"
   equal(formatted.includes("private type Token is opaque = F32"), true);
   equal(
     formatted.includes(
-      "private #entry const answer = func export => return private export",
+      "private io const answer = func export => return private export",
     ),
     true,
   );
@@ -274,7 +274,7 @@ Deno.test({
       const entry = `${directory}/main.blot`;
       const sources = {
         [entry]:
-          'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\n#entry const answer=func (value:F32)=> return facade.read (make value)\n#entry const folded=facade.read (make 40.0)\n',
+          'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nio const answer=func (value:F32)=> return facade.read (make value)\nio const folded=facade.read (make 40.0)\n',
         [`${directory}/tokens.blot`]:
           "type Token is opaque=F32\nprivate const offset=2.0\nconst make:F32->Token=func value=> return $Token (@f32.add value offset)\nconst read:Token->F32=func ($Token value)=> return value\nprivate const Token.hidden=read\n",
         [`${directory}/facade.blot`]:
@@ -318,7 +318,7 @@ import * as array from "std/array"
 type Point is data =
   | $Point {x:U32,y:U32}
 const from = func value=> return value
-#entry const answer=func ()=> return do:
+io const answer=func ()=> return do:
   let point= $Point {x: 1,y:2} // keep this
   let values = array.map (.x) #[point]
   let choose = if :point==:($Point {x:2,y:3}) then 40 else 0
@@ -338,7 +338,7 @@ Deno.test("formatter separates variants and preserves arithmetic and call groupi
   const source =
     `type Drag is data = $Idle | $Draw { x: F32, y: F32, width: F32, height: F32 } | $Move { x: F32, y: F32 }
 const apply = func f => return func value => return f value
-#entry const answer = func x => return do:
+io const answer = func x => return do:
     let total = (1 + 2) * x
     let value = apply (func value => return value) (total + 1)
     break ((value))
@@ -544,7 +544,7 @@ Deno.test("formatter preserves quantified binders and package opening scope", as
 Deno.test("formatter preserves primitive boolean words and bare patterns", async () => {
   const source =
     `const choose=func (left:Bool)->(right:Bool)=> return left or right and false
-#entry const classify=func (value:Bool)=> return case value of
+io const classify=func (value:Bool)=> return case value of
   true=>1
   false=>0
 `;

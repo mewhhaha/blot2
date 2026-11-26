@@ -50,7 +50,7 @@ func quote (value: Text): Text =>
     out := text.append (escaped ch) self
   return text.finish (text.push 34 out)
 
-#entry func generate (source: Text): Result [Text, Text] =>
+io generate (source: Text): Result [Text, Text] =>
   let out = text.builder ()
   out := text.append "type UnitSpec is data = $UnitSpec { name: #[U32], hp: U32, speed: F32 }\nconst specs: #[UnitSpec] = #[" self
   let header = false

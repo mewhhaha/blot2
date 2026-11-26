@@ -1,5 +1,5 @@
 const select = func (first: &[U32]) -> (second: &[U32]): &[U32] => return first
-#entry const answer = func (input: U32): U32 => return do:
+io const answer = func (input: U32): U32 => return do:
   let retained: Array (&[U32]) = #[]
   do:
     let owner: Array U32 = #[input]

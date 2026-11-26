@@ -14,7 +14,7 @@ Deno.test("qualified aliases and local templates instantiate separate concrete e
     `
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const alias = twice
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let local = func value => return alias value
   let integer = local 20
   let choose: a -> a where { type_rep a } = func value => return value
@@ -27,7 +27,7 @@ const alias = twice
     `
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const alias = twice
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let local = alias
   let integer = local 20
   let choose: a -> a where { type_rep a } = func value => return value
@@ -45,7 +45,7 @@ Deno.test("qualified operation arguments share written open row identities", asy
 type Signal a is effect = { get: Unit -> a }
 const read: Unit -> a ! {| e} where { operation Signal.get a } = func () => return Signal.get a ()
 const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = func callback => return callback ()
-#entry const answer = func () : U32 => return do (@effect.provider (Signal.get U32) (func () => return 42)):
+io const answer = func () : U32 => return do (@effect.provider (Signal.get U32) (func () => return 42)):
   break invoke (func () => return read ())
 `,
     (guest) => equal(guest.call("answer", null), 42),
@@ -57,11 +57,11 @@ Deno.test("predicate-only variables and closed extra clauses narrow reached sche
     `
 const identity: U32 -> U32 where { associated "add" U32 U32 a } = func value => return value
 const unused: a -> a where { associated "missing" a a a } = func value => return value
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let increment: U32 -> U32 where { associated "add" F32 F32 F32 ! {} } = func value => return value + 1
   break identity (increment 41)
-#entry const number: U32 where { type_rep U32 } = 42
-#entry let runtime: U32 where { effect_rep ! {} } = 7
+io const number: U32 where { type_rep U32 } = 42
+io let runtime: U32 where { effect_rep ! {} } = 7
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -76,31 +76,31 @@ Deno.test("written clauses reject malformed shapes missing body coverage and par
   for (
     const [source, code] of [
       [
-        "#entry const answer: U32 where { mystery U32 } = 42\n",
+        "io const answer: U32 where { mystery U32 } = 42\n",
         "invalid_constraint",
       ],
       [
-        '#entry const answer: U32 where { associated "add" U32 U32 } = 42\n',
+        'io const answer: U32 where { associated "add" U32 U32 } = 42\n',
         "invalid_constraint",
       ],
       [
-        '#entry const answer: U32 where { field "x" U32 U32 ! {} } = 42\n',
+        'io const answer: U32 where { field "x" U32 U32 ! {} } = 42\n',
         "invalid_constraint",
       ],
       [
-        "#entry const answer = func (callback: U32 -> U32 where {}) => return 42\n",
+        "io const answer = func (callback: U32 -> U32 where {}) => return 42\n",
         "higher_rank_constraint",
       ],
       [
-        "const twice: a -> a where {} = func value => return value + value\n#entry const answer = 42\n",
+        "const twice: a -> a where {} = func value => return value + value\nio const answer = 42\n",
         "missing_predicate",
       ],
       [
-        "const identity: e -> e where { effect_rep ! {| e} } = func value => return value\n#entry const answer = 42\n",
+        "const identity: e -> e where { effect_rep ! {| e} } = func value => return value\nio const answer = 42\n",
         "annotation_kind_mismatch",
       ],
       [
-        "type Signal a is effect = {get: Unit -> a}\n#entry const answer: U32 where {operation Signal.get} = 42\n",
+        "type Signal a is effect = {get: Unit -> a}\nio const answer: U32 where {operation Signal.get} = 42\n",
         "effect_arity",
       ],
     ]
@@ -111,15 +111,15 @@ Deno.test("written clauses reject malformed shapes missing body coverage and par
 Deno.test.ignore("reached extra clauses require exact concrete type and effect evidence", async () => {
   for (
     const source of [
-      '#entry const answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
-      '#entry const answer: Unit -> U32 where { associated "missing" Bool Bool Bool } = func () => return 42\n',
-      '#entry let answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
+      'io const answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
+      'io const answer: Unit -> U32 where { associated "missing" Bool Bool Bool } = func () => return 42\n',
+      'io let answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
     ]
   ) await compileExpectedFailure(source, "missing_associated");
   await compileExpectedFailure(
     `
 const identity: a -> a where { effect_rep ! {| e} } = func value => return value
-#entry const answer = func () => return identity 42
+io const answer = func () => return identity 42
 `,
     "ambiguous_qualified",
   );
@@ -128,7 +128,7 @@ const identity: a -> a where { effect_rep ! {| e} } = func value => return value
 type Tick is effect = Unit -> Unit
 const identity: a -> a where { associated "add" U32 U32 U32 ! {Tick} } = func value => return value
 const alias = identity
-#entry const answer = func () => return alias 42
+io const answer = func () => return alias 42
 `,
     "effect_mismatch",
     undefined,
@@ -139,7 +139,7 @@ const alias = identity
 Deno.test("qualified computed values retain one evidence instance", async () => {
   const header =
     'const twice: a -> a where { associated "add" a a a } = func value => return value + value\n';
-  const selected = `#entry const answer = func () => return do:
+  const selected = `io const answer = func () => return do:
   let selected = case true of
     true => twice
     false => twice
@@ -178,8 +178,8 @@ Deno.test.ignore("qualified imports preserve representation predicates and callb
 type Read is effect = Unit -> U32
 const pure_callback: Unit -> U32 = func () => return 37
 const read_callback: Unit -> U32 ! {Read} = func () => return Read ()
-#entry const pure = func () => return invoke pure_callback
-#entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
+io const pure = func () => return invoke pure_callback
+io const answer = func () => return do (@effect.provider Read (func () => return 42)):
   break invoke read_callback
 `,
     );
@@ -209,7 +209,7 @@ const read_callback: Unit -> U32 ! {Read} = func () => return Read ()
     await Deno.writeTextFile(
       main,
       `import {invoke} from "./library"
-#entry const answer = func () => return invoke (func () => return 42)
+io const answer = func () => return invoke (func () => return 42)
 `,
     );
     const rejected = await new Deno.Command(compiler, {

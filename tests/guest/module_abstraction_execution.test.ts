@@ -13,12 +13,12 @@ const unbox = func ($Box value) => return value
 const captured = func () => return do:
   let constructor = $Floating
   break func value => return read_floating (constructor value)
-#entry const unsigned = func (value: U32) => return read_count (make_count value)
-#entry const floating = func (value: F32) => return read_floating (make_floating value)
-#entry const generic_unsigned = func (value: U32) => return unbox (box value)
-#entry const generic_floating = func (value: F32) => return unbox (box value)
-#entry const captured_floating = func (value: F32) => return (captured ()) value
-#entry const folded = read_floating ($Floating 42.5)
+io const unsigned = func (value: U32) => return read_count (make_count value)
+io const floating = func (value: F32) => return read_floating (make_floating value)
+io const generic_unsigned = func (value: U32) => return unbox (box value)
+io const generic_floating = func (value: F32) => return unbox (box value)
+io const captured_floating = func (value: F32) => return (captured ()) value
+io const folded = read_floating ($Floating 42.5)
 `;
 
 for (const asynchronous of [false, true]) {
@@ -59,8 +59,8 @@ const read = func ($Box value) => return value.value
 const field = func value => return value.value
 const wrap = func (own value) => return $Wrapped value
 const unwrap = func ($Wrapped value) => return @storage.copy value
-#entry const answer = func (value: U32) => return @u32.add (read (make value)) (field (make 2))
-#entry const shared = func (value: U32) => return do:
+io const answer = func (value: U32) => return @u32.add (read (make value)) (field (make 2))
+io const shared = func (value: U32) => return do:
   let original = #[value, 2]
   let copied = unwrap (wrap (@storage.copy original))
   break @u32.add (@array.get original 0) (@array.get copied 1)
@@ -80,7 +80,7 @@ Deno.test("opaque callback captures preserve effects and scalar wrapping adds no
 type Token is opaque = U32
 const make: U32 -> Token = func value => return $Token value
 const read: Token -> U32 = func ($Token value) => return value
-private #entry const run = func (value: U32) => return read (make value)
+private io const run = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       equal(guest.call("run", 42), 42);
@@ -99,7 +99,7 @@ private #entry const run = func (value: U32) => return read (make value)
 type Callback a is opaque = a
 const wrap = $Callback
 const unwrap = func ($Callback value) => return value
-#entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const run = func (host: U32 -> U32 ! {Foreign}) => return do:
   let saved = wrap (func value => return host value)
   use result <- (unwrap saved) 41
   break @u32.add result 1
@@ -132,9 +132,9 @@ const read_second = func ($Second value) => return value
 type Float is opaque = F32
 const floats = #[$Float 40.0, $Float 2.5]
 const read = func ($Float value) => return value
-#entry const tuple = func (value: F32) => return read_first (first value)
-#entry const record = func (value: F32) => return read_second (second value)
-#entry const folded = @f32.add (read (@array.get floats 0)) (read (@array.get floats 1))
+io const tuple = func (value: F32) => return read_first (first value)
+io const record = func (value: F32) => return read_second (second value)
+io const folded = @f32.add (read (@array.get floats 0)) (read (@array.get floats 1))
 `,
     (guest) => {
       equal(guest.call("tuple", 42.5), 42.5);

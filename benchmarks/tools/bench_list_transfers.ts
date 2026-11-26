@@ -18,7 +18,7 @@ const skip = func count => return func cursor => return do:
 let values = @list.generate 200000 identity
 let origin = values.iter
 let distant = skip 100000 origin
-#entry const run = func count => return do:
+io const run = func count => return do:
   let left = origin
   let right = distant
   let total = 0
@@ -40,7 +40,7 @@ const sum = func (values: List U32) => return do:
   for value in values:
     result := self + value
   break result
-#entry const run = func count => return do:
+io const run = func count => return do:
   let result = 0
   for index in 0..count:
     result := self + sum (pair index)
@@ -58,7 +58,7 @@ const build = func count => return do:
     for y in 0..count:
       result := [...self, x + y]
   break @array.from_list result
-#entry const run = func count => return (build count).length
+io const run = func count => return (build count).length
 `,
   },
 ];

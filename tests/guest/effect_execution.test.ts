@@ -9,15 +9,15 @@ const read = func () => return Read ()
 const invoke = func callback => return callback ()
 const force = func value => return value ()
 const ignore = func value => return 42
-#entry const constant = do provider:
+io const constant = do provider:
   break Read ()
-#entry const direct = func () => return do provider:
+io const direct = func () => return do provider:
   break read ()
-#entry const callback = func () => return do provider:
+io const callback = func () => return do provider:
   break invoke (func () => return Read ())
-#entry const delayed = func () => return do provider:
+io const delayed = func () => return do provider:
   break force (func () => return Read ())
-#entry const ignored = func () => return ignore (func () => return Read ())
+io const ignored = func () => return ignore (func () => return Read ())
 `,
     (guest) => {
       equal(guest.read("constant"), 42);
@@ -37,7 +37,7 @@ type Read is effect = { first: Unit -> U32, second: Unit -> U32 }
 const outer = @effect.provider Read.first (func () => return 20)
 const second = @effect.provider Read.second (func () => return Read.first ())
 const younger = @effect.provider Read.first (func () => return 99)
-#entry const answer = func () => return do outer:
+io const answer = func () => return do outer:
   break do second:
     break do younger:
       use first <- Read.first ()
@@ -55,7 +55,7 @@ Deno.test("state providers start fresh and preserve earlier immutable snapshots"
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 const provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[41]
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let (state, old) = do provider:
     use old <- State.get (Array U32) ()
     let next = @array.set old 0 42
@@ -74,7 +74,7 @@ Deno.test("state cells and operation trampolines preserve F32 arguments and resu
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 const provider = @effect.state (State.get F32) (State.set F32) 1.75
-#entry const answer = func (value: F32) => return do:
+io const answer = func (value: F32) => return do:
   let (state, old) = do provider:
     use old <- State.get F32 ()
     use State.set F32 (@f32.add old value)
@@ -93,7 +93,7 @@ Deno.test("phantom operation type arguments select distinct provider frames", as
 type Signal a is effect = { ping: U32 -> U32 }
 const first = @effect.provider (Signal.ping U32) (func value => return @u32.add value 1)
 const second = @effect.provider (Signal.ping F32) (func value => return @u32.add value 100)
-#entry const answer = func (value: U32) => return do first:
+io const answer = func (value: U32) => return do first:
   break do second:
     use a <- Signal.ping U32 value
     use b <- Signal.ping F32 value
@@ -126,15 +126,15 @@ const selected = func (flag: Bool) => return choose flag (func () => return do:
 const merge = func () => return combine 20 22
 const reader = @effect.provider Read (func () => return 42)
 const touch = @effect.provider Touch (func value => return ())
-#entry const answer = do touch:
+io const answer = do touch:
   use receive true
   break combine 20 22
-#entry const loaded = do reader:
+io const loaded = do reader:
   break selected true
-#entry const unforced = choose false (func () => return @panic "unused callback")
+io const unforced = choose false (func () => return @panic "unused callback")
 type Holder a is data = $Holder a
 const callbacks = $Holder receive
-#entry const run = func (flag: Bool) : U32 => return do touch:
+io const run = func (flag: Bool) : U32 => return do touch:
   let $Holder action = callbacks
   use action flag
   break combine 20 22

@@ -27,7 +27,7 @@ func f32_bits (x: F32): U32 =>
 type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
 // 1. SoA spark loop with deferred NaN canonicalization (steps = 0, 1, 2, 10)
-#entry func soa_deferred_nan (packed: U32): #[F32] =>
+io soa_deferred_nan (packed: U32): #[F32] =>
   let n = packed & 65535
   let steps = packed >> 16
   let px = @array.fill n 0.0
@@ -48,7 +48,7 @@ type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
   return px
 
 // 2. Maybe Vec3 if-let loop with deferred NaN canonicalization (preserves $Nothing and exact 0x7fc00000)
-#entry func maybe_vec3_deferred_nan (packed: U32): #[U32] =>
+io maybe_vec3_deferred_nan (packed: U32): #[U32] =>
   let n = packed & 65535
   let steps = packed >> 16
   let pos: #[Maybe Vec3] = @array.fill n $Nothing
@@ -81,7 +81,7 @@ type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
   return out
 
 // 3. Conditional write depending on F32 comparison must NOT skip canonicalization
-#entry func conditional_write_nan (n: U32): #[F32] =>
+io conditional_write_nan (n: U32): #[F32] =>
   let arr = @array.fill n 0.0
   let zero = U32.to_f32 (n & 0)
   let inf = 1.0 / zero
@@ -181,7 +181,7 @@ Deno.test("Tier 4B: variant tag-store skip vs tag-change write and CheckedLe bou
     `type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
 // 4B-1: same-tag overwrite skips tag store; different-tag overwrite MUST still write tag
-#entry func tag_skip_and_change (n: U32): #[U32] =>
+io tag_skip_and_change (n: U32): #[U32] =>
   let pool: #[Maybe Vec3] = @array.fill n $Nothing
   for i in 0 .. n:
     let f = U32.to_f32 (i + 1)
@@ -202,7 +202,7 @@ Deno.test("Tier 4B: variant tag-store skip vs tag-change write and CheckedLe bou
   return out
 
 // 4B-2: range loop CheckedLe (a.length <= b.length fast path + slow-path trap when b is shorter)
-#entry func range_pair_sum (packed: U32): U32 =>
+io range_pair_sum (packed: U32): U32 =>
   let na = packed & 65535
   let nb = packed >> 16
   let a = @array.fill na 0
@@ -218,7 +218,7 @@ Deno.test("Tier 4B: variant tag-store skip vs tag-change write and CheckedLe bou
   return sum
 
 // 4B-2: for-ever early-exit CheckedLe (mid <= src.length && hi <= src.length fast path + trap when hi > src.length)
-#entry func merge_bounds_check (packed: U32): U32 =>
+io merge_bounds_check (packed: U32): U32 =>
   let n = packed & 255
   let mid = (packed >> 8) & 255
   let hi = (packed >> 16) & 255
@@ -262,7 +262,7 @@ Deno.test("Tier 4B: variant tag-store skip vs tag-change write and CheckedLe bou
 Deno.test("Tier 4C: 4x v128 register-blocked matmul k-loop across tails, NaNs, aliasing fallback, and OOB trap", async () => {
   const dir = await Deno.makeTempDir({ prefix: "blot-tier4c-matmul-" });
   const entry = `${dir}/main.blot`;
-  const src = `#entry func matmul_rect (packed: U32): #[F32] =>
+  const src = `io matmul_rect (packed: U32): #[F32] =>
   let rows = packed & 255
   let inner = (packed >> 8) & 255
   let cols = (packed >> 16) & 255
@@ -288,7 +288,7 @@ Deno.test("Tier 4C: 4x v128 register-blocked matmul k-loop across tails, NaNs, a
   return c
 
 // NaN canonicalization at both SIMD tile column (col=5) and scalar tail column (col=17)
-#entry func matmul_nan (m: U32): #[F32] =>
+io matmul_nan (m: U32): #[F32] =>
   let a = @array.fill (2 * 2) 1.0
   let b = @array.fill (2 * m) 1.0
   let c = @array.fill (2 * m) 0.0
@@ -311,7 +311,7 @@ Deno.test("Tier 4C: 4x v128 register-blocked matmul k-loop across tails, NaNs, a
   return c
 
 // Aliased c == b MUST fall back to exact sequential semantics
-#entry func matmul_aliased (n: U32): #[F32] =>
+io matmul_aliased (n: U32): #[F32] =>
   let a = @array.fill (n * n) 0.5
   let c = @array.fill (n * n) 0.0
   for i in 0 .. (n * n):
@@ -327,7 +327,7 @@ Deno.test("Tier 4C: 4x v128 register-blocked matmul k-loop across tails, NaNs, a
   return c
 
 // OOB b MUST fall back and trap cleanly
-#entry func matmul_oob (m: U32): F32 =>
+io matmul_oob (m: U32): F32 =>
   let a = @array.fill 4 1.0
   let b = @array.fill (m + 1) 1.0
   let c = @array.fill (2 * m) 0.0
@@ -428,7 +428,7 @@ func mid_push (arr: own #[U32]) -> (v: U32): (#[U32], U32) =>
 func top_push (arr: own #[U32]) -> (v: U32): (#[U32], U32) =>
   return mid_push arr (v * 2)
 
-#entry func nested_grow_ops (n: U32): U32 =>
+io nested_grow_ops (n: U32): U32 =>
   let arr: #[U32] = #[]
   let acc: U32 = 0
   for i in 0 .. n:
@@ -444,7 +444,7 @@ func top_push (arr: own #[U32]) -> (v: U32): (#[U32], U32) =>
     acc := self + arr[i]
   return acc
 
-#entry func nested_grow_oob (n: U32): U32 =>
+io nested_grow_oob (n: U32): U32 =>
   let arr: #[U32] = #[]
   for i in 0 .. n:
     @storage.push arr i
@@ -455,7 +455,7 @@ func step_spark (px: #[F32]) -> (vx: #[F32]): #[F32] =>
   return spark #[px[i] + vx[i] | i <- 0 .. px.length]
 
 // Uniquely-owned array forwarded into inlined spark helper (in-place reuse!)
-#entry func spark_inline_unique (n: U32): #[F32] =>
+io spark_inline_unique (n: U32): #[F32] =>
   let px = @array.fill n 0.0
   let vx = @array.fill n 0.0
   for i in 0 .. n:
@@ -467,7 +467,7 @@ func step_spark (px: #[F32]) -> (vx: #[F32]): #[F32] =>
   return out
 
 // Aliased array passed to inlined spark helper MUST NOT corrupt alias 'saved'!
-#entry func spark_inline_aliased (n: U32): #[F32] =>
+io spark_inline_aliased (n: U32): #[F32] =>
   let px = @array.fill n 0.0
   let vx = @array.fill n 0.0
   for i in 0 .. n:
@@ -484,7 +484,7 @@ func step_spark (px: #[F32]) -> (vx: #[F32]): #[F32] =>
   return res
 
 // Direct spark inside loop referencing outer loop-invariant array MUST NOT overwrite outer array!
-#entry func spark_direct_invariant_safe (n: U32): #[F32] =>
+io spark_direct_invariant_safe (n: U32): #[F32] =>
   let vx = @array.fill n 10.0
   let out = @array.fill n 1.0
   for _ in 0 .. 4:
@@ -525,7 +525,7 @@ Deno.test("Tier 4E: exact 2.0*x->x+x, 2x unroll pure-scalar for-ever, and 4x unr
     `import * as simd from "std/simd"
 
 // 4E-1: 2.0 * x and x * 2.0 bit-identical across signed zero, subnormal, Inf, NaN
-#entry func mul_two_bits (bits: U32): #[U32] =>
+io mul_two_bits (bits: U32): #[U32] =>
   let (x, _, _, _) = simd.f32_from_bits (bits, 0, 0, 0)
   let a = 2.0 * x
   let b = x * 2.0
@@ -533,7 +533,7 @@ Deno.test("Tier 4E: exact 2.0*x->x+x, 2x unroll pure-scalar for-ever, and 4x unr
   return #[ab, bb]
 
 // 4E-2: 2x unrolled pure-scalar for-ever loop across odd/even limits and early exit
-#entry func forever_unroll2 (limit: U32): U32 =>
+io forever_unroll2 (limit: U32): U32 =>
   let zr = 0.25
   let zi = 0.125
   let it: U32 = 0
@@ -551,7 +551,7 @@ Deno.test("Tier 4E: exact 2.0*x->x+x, 2x unroll pure-scalar for-ever, and 4x unr
   return it * 1000 + F32.to_u32 ((zr + zi + 10.0) * 100.0)
 
 // 4E-3: 4x unrolled strided fill on Bool, U32, and F32 across strides and limits
-#entry func strided_fill_bool (packed: U32): #[U32] =>
+io strided_fill_bool (packed: U32): #[U32] =>
   let n = packed & 255
   let start = (packed >> 8) & 255
   let stride = (packed >> 16) & 255
@@ -568,7 +568,7 @@ Deno.test("Tier 4E: exact 2.0*x->x+x, 2x unroll pure-scalar for-ever, and 4x unr
       out[i] := 1
   return out
 
-#entry func strided_fill_u32 (packed: U32): #[U32] =>
+io strided_fill_u32 (packed: U32): #[U32] =>
   let n = packed & 255
   let start = (packed >> 8) & 255
   let stride = (packed >> 16) & 255
@@ -581,7 +581,7 @@ Deno.test("Tier 4E: exact 2.0*x->x+x, 2x unroll pure-scalar for-ever, and 4x unr
     m := self + stride
   return xs
 
-#entry func strided_fill_oob (n: U32): U32 =>
+io strided_fill_oob (n: U32): U32 =>
   let flags = @array.fill n true
   let limit = n + 3
   let m: U32 = 0

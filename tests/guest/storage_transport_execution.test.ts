@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const source = `#entry const transport = func (input: U32): Array U32 => return do:
+const source = `io const transport = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   let first = input
   let second = @u32.add input 10
@@ -17,7 +17,7 @@ const source = `#entry const transport = func (input: U32): Array U32 => return 
       if @u32.eq inner 0:
         break
   return #[rows[0], first, second, @u32.add 19 (@u32.add first second)]
-#entry const typed = func (input: F32): F32 => return do:
+io const typed = func (input: F32): F32 => return do:
   let marker: Array U32 = #[0]
   let first = input
   let second = -0.0

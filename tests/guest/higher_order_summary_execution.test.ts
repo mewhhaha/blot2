@@ -50,21 +50,21 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
       "const tick: U32 -> U32 ! {Tick} = func value => return do:",
       "  use extra <- Tick ()",
       `  break @u32.add value ${invalid === "body" ? "true" : "extra"}`,
-      "#entry const pure = func (delta: U32) => return ",
+      "io const pure = func (delta: U32) => return ",
       "  library.apply_factory (func current => return @u32.add current delta) 7",
-      "#entry const reducer = func (delta: U32) => return ",
+      "io const reducer = func (delta: U32) => return ",
       "  library.reduce_factory (func current => return func ignored => return @u32.add current delta) 7",
-      "#entry const returned = func (delta: U32) => return ",
+      "io const returned = func (delta: U32) => return ",
       "  library.returned_factory (func () => return func current => return @u32.add current delta) 7",
-      `#entry const handled: U32 -> U32 ! {} = func value => return do (@effect.provider ${
+      `io const handled: U32 -> U32 ! {} = func value => return do (@effect.provider ${
         invalid === "row" ? "Other" : "Tick"
       } (func () => return ${provider})):`,
       "  use result <- library.apply_factory tick value",
       "  break result",
-      "#entry const unused: U32 -> U32 ! {} = func value => return library.unused tick value",
+      "io const unused: U32 -> U32 ! {} = func value => return library.unused tick value",
       invalid === "result"
-        ? "#entry const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return true) value"
-        : "#entry const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return current) value",
+        ? "io const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return true) value"
+        : "io const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return current) value",
       "",
     ].join("\n");
   const options = { executable, entry, prelude: null };
@@ -178,7 +178,7 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
   const program = (unused: boolean) =>
     [
       'import { Count, callback, factory, unused } from "./library"',
-      "#entry const answer = func (value: U32) => return do:",
+      "io const answer = func (value: U32) => return do:",
       "  let checked: Count -> Count = callback",
       `  let $Count result = ${
         unused ? "unused" : "factory"

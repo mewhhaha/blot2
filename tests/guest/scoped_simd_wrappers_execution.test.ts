@@ -7,7 +7,7 @@ const executable = Deno.args[0] ??
 const source = `
 import * as simd from "std/simd"
 const shuffled = simd.f32_shuffle
-#entry const floating = func (values: Array F32): Array U32 => return do:
+io const floating = func (values: Array F32): Array U32 => return do:
   let input = &values[0..8]
   let left = (input[0], input[1], input[2], input[3])
   let right = (input[4], input[5], input[6], input[7])
@@ -17,7 +17,7 @@ const shuffled = simd.f32_shuffle
   let (m, n, o, p) = simd.f32_bits (simd.f32_broadcast 0 left)
   let (q, r, s, t) = simd.f32_bits (simd.f32_broadcast 3 left)
   return #[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t]
-#entry const integers = func (values: Array U32): Array U32 => return do:
+io const integers = func (values: Array U32): Array U32 => return do:
   let input = &values[0..8]
   let left = (input[0], input[1], input[2], input[3])
   let right = (input[4], input[5], input[6], input[7])
@@ -136,7 +136,7 @@ Deno.test.ignore("scoped standard SIMD wrappers require literal in-range selecto
       const rejected = await compiler.build({
         sources: {
           [entry]: `${source}
-#entry const invalid = func (input: U32): Array U32 => return do:
+io const invalid = func (input: U32): Array U32 => return do:
   let lanes = (input, 2, 3, 4)
   let (a, b, c, d) = ${selection}
   return #[a, b, c, d]

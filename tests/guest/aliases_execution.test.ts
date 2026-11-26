@@ -15,8 +15,8 @@ type Box a is data = $Box { value: a }
 const Box.read = func box => return func () => return box.value
 const first = func (pair: Pair a) => return @product.get pair 0
 const number: Value = $Box { value: 40 }
-#entry const answer = func () => return @u32.add (number.read ()) (first (2, 3))
-#entry const fraction = func () => return first (1.5, 2.5)
+io const answer = func () => return @u32.add (number.read ()) (first (2, 3))
+io const fraction = func () => return first (1.5, 2.5)
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -34,7 +34,7 @@ Deno.test("imported aliases survive retained revisions, type changes and fresh b
     "type Number = U32\ntype Pair a = (a, a)\nconst read = func (pair: Pair Number) => return @product.get pair 0\n";
   const sources = {
     [entry]:
-      'import { Number, Pair, read } from "./types"\nconst pair: Pair Number = (42, 0)\n#entry const answer = func () => return read pair\n',
+      'import { Number, Pair, read } from "./types"\nconst pair: Pair Number = (42, 0)\nio const answer = func () => return read pair\n',
     [dependency]: original,
   };
   try {
@@ -82,9 +82,9 @@ const first = func (pair: Pair [a, b]) => return @product.get pair 0
 const invoke = func (action: Action a) => return action ()
 const packed = func (carry: Carry (Action a)) => return case carry of
   $Carry action => action ()
-#entry const answer = func () => return invoke (func () => return first (42, true))
-#entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return invoke (func () => return send 41)
-#entry const carried = func (send: U32 -> U32 ! {Foreign}) => return packed ($Carry (func () => return send 41))
+io const answer = func () => return invoke (func () => return first (42, true))
+io const effectful = func (send: U32 -> U32 ! {Foreign}) => return invoke (func () => return send 41)
+io const carried = func (send: U32 -> U32 ! {Foreign}) => return packed ($Carry (func () => return send 41))
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -98,7 +98,7 @@ const packed = func (carry: Carry (Action a)) => return case carry of
     },
   );
   await compileExpectedFailure(
-    "type Action a = Unit -> a ! {| e}\ntype Box is data = $Box (Action U32)\n#entry const answer = 42\n",
+    "type Action a = Unit -> a ! {| e}\ntype Box is data = $Box (Action U32)\nio const answer = 42\n",
     "unbound_alias_row",
   );
 });
@@ -115,7 +115,7 @@ Deno.test("aliases preserve interfaces in serialized dependency bundles", async 
     );
     await Deno.writeTextFile(
       entry,
-      'import { first, Pair, Number } from "./library"\nconst input: Pair Number = (42, 0)\n#entry const answer = func () => return first input\n',
+      'import { first, Pair, Number } from "./library"\nconst input: Pair Number = (42, 0)\nio const answer = func () => return first input\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -158,9 +158,9 @@ type Identity a = a
 type Signal a is effect = { get: Unit -> a }
 const read: Unit -> a ! {Signal.get a} = func () => return Signal.get a ()
 const number: Unit -> Number ! {Signal.get Number} = func () => return Signal.get Number ()
-#entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
+io const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
   break @u32.add (read ()) (number ())
-#entry const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):
+io const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):
   break read ()
 `,
     (guest) => {

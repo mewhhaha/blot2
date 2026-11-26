@@ -1,2 +1,2 @@
-#entry let earlier: Array U32 = #[]
-#entry const answer = @array.get #[] 0
+io let earlier: Array U32 = #[]
+io const answer = @array.get #[] 0

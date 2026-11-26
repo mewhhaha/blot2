@@ -2,4 +2,4 @@
 func trim (rows: #[U32]): U32 =>
   @storage.truncate rows 0
   return @storage.pop rows
-#entry func run (): U32 => return trim #[1, 2]
+io run (): U32 => return trim #[1, 2]

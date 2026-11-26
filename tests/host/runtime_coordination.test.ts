@@ -84,7 +84,7 @@ func acc_step (s: own AccState) -> (cmd: AccCmd): (AccState, AccReply) =>
   step: acc_step,
 }
 
-#entry func main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
+io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
     // Run stateless scalar kernel
     use doubled_res <- kernel.run double_u32 #[1, 2, 3, 4]
     let $Ok doubled = doubled_res else:
@@ -162,7 +162,7 @@ func c_step (s: own Counter) -> (inc: U32): (Counter, U32) =>
   step: c_step,
 }
 
-#entry func main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
+io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
     // Fan out two kernel jobs concurrently, then await both
     use j1_res <- kernel.submit square #[2, 3]
     let $Ok j1 = j1_res else:
@@ -235,7 +235,7 @@ func p_step (s: own S) -> (cmd: U32): (S, U32) =>
   step: p_step,
 }
 
-#entry func main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
+io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
     let flags = 0
     // Kernel trap returns $Err ($Trap _) without crashing the coordinator
     use k_res <- kernel.run risky_k #[1, 99]
@@ -284,7 +284,7 @@ func mock_host (req: #[U32]): #[U32] =>
   // Return [BRT1, STATUS_OK, 30, 60] for any kernel run
   return #[runtime.magic, runtime.status_ok, 30, 60]
 
-#entry func main (): U32 => do (@effect.provider runtime.Runtime.call mock_host):
+io main (): U32 => do (@effect.provider runtime.Runtime.call mock_host):
     use vals_res <- kernel.run triple #[10, 20]
     let $Ok vals = vals_res else:
       break 0
@@ -322,7 +322,7 @@ func log_step (s: own LogState) -> (batch: #[U32]): (LogState, #[U32]) =>
   step: log_step,
 }
 
-#entry func main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
+io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
   let r0: #[4; F32] = #[1.0, 2.0, 3.0, 4.0]
   let r1: #[4; F32] = #[10.0, 20.0, 30.0, 40.0]
   let rows: #[#[4; F32]] = #[r0, r1]

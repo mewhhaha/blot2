@@ -30,7 +30,7 @@ func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
   @storage.push items factor
   return items
 
-#entry func main (): F32 =>
+io main (): F32 =>
   let base = #[1.0, 2.0, 3.0]
   let snapshot = copy base             // explicit deep snapshot
   let updated = scale_and_append base 2.0
@@ -69,7 +69,7 @@ func encode_record (val: t): #[U32] =>
         @storage.push out word
   return out
 
-#entry func main (): #[U32] =>
+io main (): #[U32] =>
   // Defaults fill in `hp`, `alive`, and `cached_score` automatically.
   let p = $Player { id: 7 }
   return encode_record p               // #[10, 7, 20, 100, 30, 1]
@@ -89,7 +89,7 @@ func roll_loot (count: U32): Unit !{ Rng, Log } =>
     use Log.write (r % 100)
   return ()
 
-#entry func main (): U32 =>
+io main (): U32 =>
   let seed: U32 = 42
   let total: U32 = 0
   let step_rng = func () =>
@@ -116,7 +116,7 @@ func score_move (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]
   // `board` is back to its exact pre-fork contents and length.
   return (score, board)
 
-#entry func main (): #[U32] =>
+io main (): #[U32] =>
   let board: #[U32] = #[1, 2, 3]
   let (preview, restored) = score_move board 1 99
   return #[preview, restored[1], restored.length]   // #[202, 2, 3]

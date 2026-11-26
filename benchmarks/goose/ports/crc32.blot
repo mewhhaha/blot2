@@ -2,7 +2,7 @@
 // Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
 // Byte values use U32 storage: four bytes per byte, with the same 0..255 values.
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 const prepare = func (bytes: own Array U32) -> (size: U32): Array U32 => return do:
   for index in 0 .. size:
@@ -24,7 +24,7 @@ const crc32 = func (bytes: Array U32) -> (size: U32): U32 => return do:
         crc := self >> 1
   return crc ^ 0xFFFFFFFF
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let size = inputs[0]
   let iterations = inputs[1]

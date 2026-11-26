@@ -1,23 +1,23 @@
 // This file is executable: just compile examples/prelude.blot
 // std/prelude.blot supplies Maybe, Result, combinators, and numeric operators.
 
-#entry func increment (value: U32): U32 => value + 1
-#entry func doubled (value: U32): U32 => value * 2
+io increment (value: U32): U32 => value + 1
+io doubled (value: U32): U32 => value * 2
 
 // A closure captures its immutable argument; functions are ordinary values.
-#entry const add_two = U32.add 2
-#entry const transform = compose doubled increment
+io const add_two = U32.add 2
+io const transform = compose doubled increment
 
-#entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ $Some 20
+io const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ $Some 20
 
-#entry func answer () =>
+io answer () =>
   let candidate = Maybe.map add_two ($Some 40)
   let $Some value = candidate else:
     return 0
   return Result.unwrap_or 0 $ Result.map identity $ $Ok value
 
 // One generic function and one local lambda each work at distinct types.
-#entry func generic_identity () =>
+io generic_identity () =>
   let same = func value => value
   let enabled = same (identity true)
   if enabled:
@@ -25,16 +25,16 @@
   return 0
 
 func plus left -> right => left + right
-#entry func named_operator () => plus 20 22
+io named_operator () => plus 20 22
 
-#entry func inspect (enabled: Bool) =>
+io inspect (enabled: Bool) =>
   let candidate = $Some (if enabled then $Some 42 else $Nothing)
   return case candidate of
     $Some ($Some value) => value
     $Some $Nothing => 0
     $Nothing => 0
 
-#entry func recover (enabled: Bool) =>
+io recover (enabled: Bool) =>
   let candidate = if enabled then $Ok 42 else $Err false
   if let $Ok value = candidate:
     return value

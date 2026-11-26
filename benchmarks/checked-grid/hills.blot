@@ -41,7 +41,7 @@ func distances (map: grid.Grid) -> (finish: U32): Array U32 => do:
       tail := self + 1
   return steps
 
-#entry func solve (source: Text): Array U32 => do:
+io solve (source: Text): Array U32 => do:
   let map = grid.parse source
   for ch in map.cells:
     let level = elevation ch

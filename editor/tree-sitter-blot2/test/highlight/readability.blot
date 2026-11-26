@@ -3,8 +3,8 @@ import { Vec3 } from "std/vector.blot"
 
 const from = func value => return value
 //    ^ function
-#entry const normalized = func value => return from value / 6555.0
-//                                             ^ variable
+io const normalized = func value => return from value / 6555.0
+//                                         ^ variable
 
 const and_then = func left => return func right => return if left then right () else false
 

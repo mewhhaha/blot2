@@ -8,5 +8,5 @@ func bump (access: own Array U32): Array U32 => return do:
   return access
 const application = stages no_action bump no_action
 func with_columns (body: own Array U32 -> U32) => return body #[5, 6]
-#entry func top (n: U32): U32 => return start application #[n]
-#entry func nested (n: U32): U32 => return with_columns (func (access: own Array U32) => return start application access) + n
+io top (n: U32): U32 => return start application #[n]
+io nested (n: U32): U32 => return with_columns (func (access: own Array U32) => return start application access) + n

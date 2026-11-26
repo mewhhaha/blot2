@@ -11,8 +11,8 @@ type State a is effect = { get: Unit -> a }
 const invoke: (Unit -> a ! {| e}) -> a ! {| e} = func callback => return callback ()
 const read = func (callback: Unit -> U32 ! {State.get U32 | e}) => return callback ()
 const provider = @effect.provider (State.get U32) (func () => return 42)
-#entry const pure = func () => return invoke (func () => return 37)
-#entry const answer = func () => return do provider:
+io const pure = func () => return invoke (func () => return 37)
+io const answer = func () => return do provider:
   break invoke (func () => return read (func () => return State.get U32 ()))
 `,
     (guest) => {
@@ -25,7 +25,7 @@ const provider = @effect.provider (State.get U32) (func () => return 42)
 Deno.test("written row binders stay local across sibling bindings", async () => {
   await compileAndRun(
     `
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let invoke = func (callback: Unit -> U32 ! {| e}) => return callback ()
   let first = invoke (func () => return 40)
   let invoke = func (callback: Unit -> F32 ! {| e}) => return callback ()
@@ -41,7 +41,7 @@ Deno.test("written open rows reject kind collisions and effect erasure", async (
   await compileExpectedFailure(
     `
 const bad: e -> U32 ! {| e} = func value => return 1
-#entry const answer = 42
+io const answer = 42
 `,
     "annotation_kind_mismatch",
   );
@@ -49,7 +49,7 @@ const bad: e -> U32 ! {| e} = func value => return 1
     `
 const pure = func (callback: Unit -> U32) => return callback ()
 const bad = func (callback: Unit -> U32 ! {Foreign | e}) => return pure callback
-#entry const answer = 42
+io const answer = 42
 `,
     "effect_mismatch",
   );

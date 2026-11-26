@@ -865,7 +865,7 @@ fn message(self_:Diagnostic)->const u8[:] {
         request_case_scope => {return "Request cases require a request loop";},
         record_constructor => {return "named fields require a declared record constructor";},
         missing_record_field => {return "missing record field";},
-        unknown_modifier => {return "only `#entry` may precede `func`, `const`, or `let`";},
+        unknown_modifier => {return "only `io` may declare an entry point (`io name (...) => ...`, `io const`, or `io let`)";},
         guard_fallthrough => {return "let-else fallback must exit its enclosing do block";},
         product_arity => {return "cannot unify products with different element counts";},
         unknown_value => {if self_.implicit_type_witness {return "unknown value: Type";}return "unknown value";},
@@ -5352,7 +5352,7 @@ fn validateTestsAndEntries(self_:Engine&)->blot_error::Error {
     if has_sized {
      let derr=self_.diagnostic(Code.entry_type,decl);
      if derr!=blot_error::Error.none {return derr;}
-     self_.diagnostics[self_.diagnostics.len-1].detail=blot_support::some<const u8[:]>(ownDiagnosticText("Fixed-size array #[N; T] is not supported as an #entry parameter; use #[T] instead"));
+     self_.diagnostics[self_.diagnostics.len-1].detail=blot_support::some<const u8[:]>(ownDiagnosticText("Fixed-size array #[N; T] is not supported as an io entry parameter; use #[T] instead"));
      break;
     }
     let next,nerr=self_.types.resolve(fn_node.b,0);

@@ -40,7 +40,7 @@ let rows4 = @array.generate ${count} (func i => return {a:i,b:i+1,c:i+2,d:i+3})
 let refs = @array.generate ${count} (func i => return @array.fill 2 i)
 let list_inputs = @list.from_array inputs
 let list_rows2 = @list.from_array rows2
-#entry const triangle_array = func count => return do:
+io const triangle_array = func count => return do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
@@ -52,16 +52,16 @@ const list = func count => return do:
     for y in 0..x:
       values := [...self, x * 10 + y]
   break values
-#entry const triangle_list = func count => return @list.length (list count)
-#entry const filter_none = func (count: U32) => return #[x | x <- inputs, false]
-#entry const filter_half = func count => return #[x | x <- inputs, @u32.lt x (@u32.shr count 1)]
-#entry const filter_all = func (count: U32) => return #[x | x <- inputs, true]
-#entry const packed2 = func count => return @array.length (#[row | row <- rows2, row.a < count])
-#entry const packed4 = func count => return @array.length (#[row | row <- rows4, row.a < count])
-#entry const references = func (count: U32) => return @array.length (#[value | value <- refs, true])
-#entry const list_packed2 = func count => return @array.length (#[row | row <- list_rows2, row.a < count])
-#entry const list_nested = func (count: U32) => return #[y | x <- list_inputs, y <- list_inputs, y < x]
-#entry const exhausted = func (count: U32) => return do:
+io const triangle_list = func count => return @list.length (list count)
+io const filter_none = func (count: U32) => return #[x | x <- inputs, false]
+io const filter_half = func count => return #[x | x <- inputs, @u32.lt x (@u32.shr count 1)]
+io const filter_all = func (count: U32) => return #[x | x <- inputs, true]
+io const packed2 = func count => return @array.length (#[row | row <- rows2, row.a < count])
+io const packed4 = func count => return @array.length (#[row | row <- rows4, row.a < count])
+io const references = func (count: U32) => return @array.length (#[value | value <- refs, true])
+io const list_packed2 = func count => return @array.length (#[row | row <- list_rows2, row.a < count])
+io const list_nested = func (count: U32) => return #[y | x <- list_inputs, y <- list_inputs, y < x]
+io const exhausted = func (count: U32) => return do:
   let result: List U32 = []
   for x in 0..count:
     if false:
@@ -363,7 +363,7 @@ for (let pair = 0; pair < 7; pair++) {
           ["first", original],
           ["edit", original.replaceAll("x * 10 + y", "x * 11 + y")],
           ["no_op", original.replaceAll("x * 10 + y", "x * 11 + y")],
-          ["failure", "#entry const broken = absent\n"],
+          ["failure", "io const broken = absent\n"],
           ["recovery", original],
         ] as const
       ) {

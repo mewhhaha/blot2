@@ -9,10 +9,9 @@ import {
 } from "../../host/zig_project_client.ts";
 
 export function demoteEntries(source: string): string {
-  return source.replace(
-    /^([ \t]*)#entry[ \t]+(const|let|func)(?=[ \t])/gm,
-    "$1$2",
-  );
+  return source
+    .replace(/^([ \t]*)io[ \t]+(const|let)(?=[ \t])/gm, "$1$2")
+    .replace(/^([ \t]*)io[ \t]+(?=[A-Za-z_])/gm, "$1func ");
 }
 
 type Expected = {
@@ -265,7 +264,7 @@ export async function auditProject(options: Options) {
         sources[entry] = group.map((file, index) =>
           `import * as target_${index} from "__migration_repo/${file}"\n`
         ).join("") +
-          "#entry func migration_frontend_probe () : U32 => return 0\n";
+          "io migration_frontend_probe () : U32 => return 0\n";
         try {
           const result = await compiler.build({
             sources,

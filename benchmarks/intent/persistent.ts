@@ -68,7 +68,7 @@ function entry(variant: string) {
     hash := scan_${layout} self chunk`;
   }
   return `
-#entry func ${variant} (observe: U32 -> U32): U32 => return do:
+io ${variant} (observe: U32 -> U32): U32 => return do:
   use count <- observe 0
   use control <- observe 1
   let source = if control == 0 then trace_input () else control_input ()
@@ -106,7 +106,7 @@ function chain(name: string) {
       `let hash = 1\n  for chunk in joined:\n    hash := scan_${layout} self chunk`;
   }
   return `
-#entry func ${name} (observe: U32 -> U32): U32 => return do:
+io ${name} (observe: U32 -> U32): U32 => return do:
   use count <- observe 0
   use control <- observe 1
   let source = if control == 0 then trace_input () else control_input ()
@@ -129,7 +129,7 @@ function chain(name: string) {
 const appendSites = ["homes_in_arms", "homes_after_match"];
 function appendSiteEntry(name: string) {
   return `
-#entry func test_${name} (observe: U32 -> U32): U32 => return do:
+io test_${name} (observe: U32 -> U32): U32 => return do:
   use count <- observe 0
   use dataset <- observe 1
   let source = control_input ()
@@ -467,8 +467,8 @@ for (let round = 0; round < 6; round++) {
     const layout = layouts[(i + round) % layouts.length];
     const entries = ["flat", "chunks"].map((kind) =>
       entry(layout + "_" + kind).replace(
-        "#entry func " + layout + "_" + kind,
-        "#entry func " + kind,
+        "io " + layout + "_" + kind,
+        "io " + kind,
       )
     );
     const result = await compile(entries.join("\n"));

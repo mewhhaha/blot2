@@ -1,5 +1,5 @@
 effect Read: Unit -> U32
 const make = func () => return func () => return Read ()
 const saved = make ()
-#entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
+io const answer = func () => return do (@effect.provider Read (func () => return 42)):
   break saved ()

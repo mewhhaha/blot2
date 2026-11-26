@@ -1,17 +1,29 @@
 # Working on Blot and Gdev
 
-## Current frontier: Compiler-Backed Documentation Generator (`blot doc`), Stage-0 Pen Generators & Waves 1–4 Soundness (26 November 2026)
+## Current frontier: In-Language Kernel/Process Coordination (`eb4d3d89`) & `io` Entry Syntax (26 November 2026)
 
-Compiler-backed library documentation (`blotc doc-project` + `blot doc`), Stage-0
-Pen virtual module generators (`../pen` `92e2ef7`), and all four audit waves
-(`c5109160`, `7157f22a`, `../pen` `f2047ec`) are complete and verified at
-`blotc-goose` SHA-256
-`9cc6fd25f80273caac15c9bef783e31a2aac1c4d747875a05ead5e09d773ec8b`
-(`9,905,280` B; `generated/compiler/blotc.gz` SHA-256
-`ce506c355e4f8aad99ace10efd0e720bd9b7028129e03859911ec68354be08a9`,
-`4,190,404` B):
+Typed in-language `#kernel` / `#process` coordination (`eb4d3d89`) and the greenfield
+`io` entry syntax (`io main (...) => ...`, `io const`, `io let` replacing `#entry`)
+are complete and verified in `blot2` at `blotc-goose` SHA-256
+`e472c8c23e89b5169ca268c68b55ef9f5ff1161a6cf3fa1857f885851545f4a0`
+(`9,951,256` B; `generated/compiler/blotc.gz` SHA-256
+`f4f366c0bf335613d610220a763e1a9cbd429bd5fe9bae844a16095235d3a0f8`,
+`4,204,540` B):
 
-- **Compiler-Backed Documentation Generator (`blotc doc-project` + `blot doc`, 26 November 2026):**
+- **Typed In-Language `#kernel` & `#process` Coordination (`eb4d3d89`, 26 November 2026):**
+  - Upgraded opaque `Process [cfg, cmd, reply]` in [std/prelude.blot](std/prelude.blot) to `(U32, (U32, U32))` carrying `(process_id, binding_hash)` (FNV-1a-64 domain tag `0x13` over config/cmd/reply schema hashes) and added 6 `std`-only `@flat.*` intrinsics (`@flat.process_id`, `@flat.process_binding_hash`, `@flat.encode_wire`, `@flat.decode_wire`, `@flat.encode_batch`, `@flat.decode_batch`) with zero ABI 8 changes.
+  - Added [std/runtime.blot](std/runtime.blot) (`Runtime` effect over `BRT1` packets), [std/process.blot](std/process.blot) (`spawn`, `call`, `send`, `poll`, `advance`, `close`), coordination APIs in [std/kernel.blot](std/kernel.blot) (`run`, `prepare`, `run_prepared`, `clear`, `submit`, `submit_prepared`, `poll`, `await_job`), and Deno coordinator [host/runtime.ts](host/runtime.ts) (`BlotRuntime`, `createRuntime`, `computeProcessBindingHash`) exported via [mod.ts](mod.ts) and [deno.json](deno.json).
+  - Verified in [tests/host/runtime_coordination.test.ts](tests/host/runtime_coordination.test.ts) (5 end-to-end executed-Wasm tests covering stateless/prepared kernels, multi-core `KernelPool`, stateful `#process` actors, concurrent `submit`/`send`/`advance`/`poll`, trap containment, and pure-Blot mocked `Runtime.call`).
+
+- **Contextual `io` Entry Syntax Replacing `#entry` (this commit, 26 November 2026):**
+  - Replaced `#entry func <name>`, `#entry const`, and `#entry let` across all four grammar/tooling layers with contextual top-level `io <name> (...) => ...`, `io const`, and `io let` (supporting `private io` and `@[attr] io`, keeping `io` an ordinary identifier everywhere else, and rejecting legacy `#entry` and `io func`):
+    1. Native compiler: [parser.goose](compiler-goose/src/parse/parser.goose), [source_operators.goose](compiler-goose/src/parse/source_operators.goose), [check.goose](compiler-goose/src/check/check.goose), [diagnostic_code.goose](compiler-goose/src/check/diagnostic_code.goose), [direct.goose](compiler-goose/src/direct/direct.goose), [function_entry.goose](compiler-goose/src/direct/function_entry.goose).
+    2. Baba parser & formatter: [host/parser_source.ts](host/parser_source.ts) (`iO` marker), [host/syntax.ts](host/syntax.ts), [host/parser/grammar.baba](host/parser/grammar.baba), [host/parser/baba.json](host/parser/baba.json), regenerated `generated/parser/wasm/*`.
+    3. Tree-sitter editor grammar: [editor/tree-sitter-blot2/grammar.js](editor/tree-sitter-blot2/grammar.js), [queries/highlights.scm](editor/tree-sitter-blot2/queries/highlights.scm), corpus & highlight suites (zero warnings, 11/11 corpus, 19/19 highlight).
+    4. Host tooling, docs, skills, tests, benchmarks & fixtures: [host/doc.ts](host/doc.ts), [host/doc_html.ts](host/doc_html.ts), [host/generators.ts](host/generators.ts), [host/test_runner.ts](host/test_runner.ts), [host/diagnostics.ts](host/diagnostics.ts), [scripts/integration/migration_audit.ts](scripts/integration/migration_audit.ts), and all `blot2` `.blot`/`.ts`/`.md` files (`test_fixtures.py` verified **zero Wasm byte diffs across all 109 fixtures** before re-recording offsets/metadata).
+  - **Sibling checkouts & installed CLI note:** `~/.local/bin/blotc` and `~/.local/bin/blot` were intentionally NOT overwritten yet so sibling checkouts `../pen`, `../ink`, and `../gdev` (which still use `#entry` and contain concurrent uncommitted edits) remain unbroken until explicitly migrated in lockstep.
+
+- **Compiler-Backed Documentation Generator (`blotc doc-project` + `blot doc`, `df207b98`, 26 November 2026):**
   - Added `blotc doc-project ENTRY [--include-private]` in [cli.goose](compiler-goose/src/driver/cli.goose) and [cli_project.goose](compiler-goose/src/driver/cli_project.goose) to emit checked `doc_module` JSON lines directly from `CheckedProject` (skipping lowering/emit so libraries without `#entry` succeed cleanly), including inferred types, `own` parameter masks, `where` clauses, effect rows, `is data` constructors/fields/defaults/spans, `is opaque` hiding private representations, `is trait`, `is effect`, associated members, and trait `impl`s.
   - Added [host/doc.ts](host/doc.ts), [host/doc_html.ts](host/doc_html.ts), and [docs/host/doc.md](docs/host/doc.md), wired `blot doc` into [host/cli.ts](host/cli.ts), [host/installed_cli.ts](host/installed_cli.ts), [mod.ts](mod.ts), and [deno.json](deno.json): supports `std`, `blot.json` and `pen.json` alias/library discovery (verified on `std/` and `../ink/lib/codec.blot`), `//!` / `//` / `///` Markdown comments, Rustdoc-style intra-doc links (`[`Symbol`]`, `[label](`mod/Symbol`)`, `--check-links`), local runnable doctests (`--test`, `// => expected`, `test` / `test expect_trap`, `check`/`no_run`/`ignore`), static Markdown (`--out`: `INDEX.md`, `API.md`, `modules/*.md`), `--search`, `--json`, and static HTML (`--html --out`) with precompiled base64 ABI 8 `.wasm` examples and a zero-dependency pure-JS browser runner (`runner.js` decoding ABI 8 returns, `blot:traps` v1 panics, and BTST v1 reports).
   - Added runnable doc comments and intra-doc links to [std/vector.blot](std/vector.blot) and [std/text.blot](std/text.blot) (with two `source_bytes`-only fixture updates in [expected.json](compiler-goose/tests/fixtures/expected.json)) and 7 unit/integration tests in [tests/host/doc.test.ts](tests/host/doc.test.ts) (including live execution of generated `runner.js` against precompiled base64 Wasm).
@@ -39,7 +51,7 @@ Pen virtual module generators (`../pen` `92e2ef7`), and all four audit waves
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `0f4a5cd4`) | `blotc doc-project` + `blot doc` Markdown/HTML/doctest/browser-Wasm generator (this commit); Stage-0 Pen pointer (`0f4a5cd4`); Wave 4 Solid-2 agent diagnostics & `blot:traps` v1 (`7157f22a`); Waves 1–3 soundness, SIMD relocations, formatter & stdlib (`c5109160`) |
+| `blot2` | this commit (after `eb4d3d89`) | Contextual `io` entry syntax across compiler/Baba/Tree-sitter/tooling (this commit); typed in-language `#kernel`/`#process` coordination (`eb4d3d89`); `blotc doc-project` + `blot doc` (`df207b98`); Stage-0 Pen pointer (`0f4a5cd4`); Wave 4 Solid-2 agent diagnostics & `blot:traps` v1 (`7157f22a`) |
 | `../pen` | `92e2ef7` | Stage-0 Blot virtual module generators (`pen:plugin@0.3.0`, `compiler.settings.generators`, `guest.run-u32-packet`, `virtual_source` / provenance in `plugin_build`) (`92e2ef7`); `blot:traps` v1 runtime trap provenance (`f2047ec`); unified `pen test-blot` (`eb8f575`) |
 | `../ink` | `46111bd` | Current checkout (`46111bd`, preserves local uncommitted edits); generic comptime decoders (`f7486d3`) |
 | `../gdev` | `4e891d2` | Current checkout (`4e891d2`); >8192 rad trig NaN fix & physical brick counts (`642ad53`) |
@@ -72,37 +84,29 @@ Pen virtual module generators (`../pen` `92e2ef7`), and all four audit waves
 
 ### Verified Identities & Qualification Evidence
 - **Compiler, CLI & host identities:**
-  - `compiler-goose/build/blotc-goose` & `~/.local/bin/blotc` SHA-256:
-    `9cc6fd25f80273caac15c9bef783e31a2aac1c4d747875a05ead5e09d773ec8b`
-    (`9,905,280` bytes)
+  - `compiler-goose/build/blotc-goose` SHA-256:
+    `e472c8c23e89b5169ca268c68b55ef9f5ff1161a6cf3fa1857f885851545f4a0`
+    (`9,951,256` bytes; `~/.local/bin/blotc` kept at prior `df207b98` until sibling repos migrate from `#entry` to `io`)
   - `generated/compiler/blotc.gz` SHA-256:
-    `ce506c355e4f8aad99ace10efd0e720bd9b7028129e03859911ec68354be08a9`
-    (`4,190,404` bytes; decompressed byte-identical to `blotc-goose`)
-  - `~/.local/bin/blot` SHA-256:
-    `7b27bcbf042a6dce9b855483a9fb879fe23e2f596f9d790c5aacfbc15a75279d`
-    (`145,450,720` bytes; embeds `blotc.gz`, parser Wasm, `std/`, `guide.md`,
-    `CHEATSHEET.md`, `host/generators.ts`, `host/test_worker.ts`, `host/doc.ts`,
-    and `host/doc_html.ts`)
+    `f4f366c0bf335613d610220a763e1a9cbd429bd5fe9bae844a16095235d3a0f8`
+    (`4,204,540` bytes; decompressed byte-identical to `blotc-goose`)
   - `std/prelude.blot` SHA-256:
-    `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
+    `dcd26873026cd23ac7d53b9b17df8e23b95d84bb95d56c525d277e72a87784b7`
   - `../pen/target/release/pen` & `~/.local/lib/pen-runtime/pen` SHA-256:
     `deec51f8d7c689701dcc6c21d70888f59e59b86b9016cfa3353edf2de0bfe0f6`
     (`pen:plugin@0.3.0`; `plugins/blot.wasm` SHA-256
     `3f291f7a3e6c203b959ceaf19d1b808e77e35dbb3c79522a52380a88b103c901`)
 - **Qualification gates:**
-  - `blot2` (this commit): `deno fmt --check` (95 files), `deno check`,
-    `test:editor` (**6/6**), `harness` (`2.92 s`), `release-build` (`121.28 s`,
-    `run-d4f87d700c45d16`), `reference-direct` (**2/2**), `reference-uniqueness`
-    (**206/206**), `reference-fixtures` (**109/109**, 2 `source_bytes`-only
-    updates from `std/vector.blot` doc comments), `pack` OK, `test:guest` exit 0
-    (`20.44 s`, incl. new 7-test `tests/host/doc.test.ts` with live browser
-    `runner.js` Wasm execution), `test:std` (**7 modules, 18 tests, 146
-    assertions, 0 failed**, `92.6 ms`), `check:editor` (**11/11** corpus +
-    **19/19** highlight suites). External `/tmp` standalone binary verification
-    passed `blot doc std --test --check-links` (**3/3**, `45 ms`), `blot doc std --search Vec2.dot`,
-    and `blot doc std --html --out ...` (14 modules, 3 runnable Wasm examples,
-    20 files); `blot doc ../ink/lib/codec.blot --compact` auto-discovered
-    `../ink/pen.json` and checked cleanly.
+  - `blot2` (this commit): `deno fmt --check` (97 files), `deno check`,
+    `test:editor` (**6/6**), `harness` (`2.44 s`), `release-build` (`101.68 s`,
+    `run-8bf13ff522c80c98`), `reference-direct` (**2/2**), `reference-uniqueness`
+    (**206/206**), `reference-fixtures` (**109/109**, zero Wasm diffs across all
+    109 fixtures), `pack` OK, `preflight-regressions` OK, `test:guest` exit 0
+    (`23.78 s`, incl. `runtime_coordination.test.ts`, `doc.test.ts`, `format.test.ts`,
+    `syntax.test.ts`, `diagnostics_agent.test.ts`), `test:std` (**7 modules, 18
+    tests, 146 assertions, 0 failed**, `137.9 ms`), `check:editor` (**11/11**
+    corpus + **19/19** highlight suites, zero grammar warnings), and
+    `deno task blot doc std --test --check-links` (**3/3** passed).
   - `../pen` (`92e2ef7`): `plugins/blot` (**24/24** unit), `pen-plugins`
     (**9/9** unit + **10/10** real-WASI integration incl. Stage-0 WGSL/CSV/record/bytes
     generators, two-level caching spawn counts, `$Err`/`@panic`/bounds `blot:traps` v1

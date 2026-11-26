@@ -1,2 +1,2 @@
 import {index} from "./library"
-#entry const answer = index #[]
+io const answer = index #[]

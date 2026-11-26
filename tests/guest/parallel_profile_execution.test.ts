@@ -6,7 +6,7 @@ for (const profileBackend of [false, true]) {
   Deno.test(`profiled sessions preserve executed output and failed-edit recovery (backend profile ${profileBackend})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-heap-profile-" });
     const entry = `${directory}/main.blot`;
-    const source = "#entry const answer = func (value: U32): U32 => return @u32.add value 1\n";
+    const source = "io const answer = func (value: U32): U32 => return @u32.add value 1\n";
     const options = {
       executable: Deno.args[0],
       entry,
@@ -45,7 +45,7 @@ for (const profileBackend of [false, true]) {
           }
         }
         const rejected = await profiled.build({
-          sources: { [entry]: "#entry const answer: U32 = 1.5\n" },
+          sources: { [entry]: "io const answer: U32 = 1.5\n" },
           signal: AbortSignal.timeout(5000),
         });
         assert(!rejected.success);

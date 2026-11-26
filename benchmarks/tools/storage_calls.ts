@@ -39,7 +39,7 @@ export function storageCallSource(
     }
   }
   lines.push(
-    "#entry const answer = func (input: U32) => return do:",
+    "io const answer = func (input: U32) => return do:",
     "  let first: Array U32 = #[input, @u32.add input 11]",
     "  let second: Array U32 = #[@u32.add input 101, @u32.add input 211]",
     "  let index = @u32.rem input 2",

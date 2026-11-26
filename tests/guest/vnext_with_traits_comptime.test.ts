@@ -53,7 +53,7 @@ func same_generic (x: a) -> (y: a): Bool where { Eq a } => x.eq y
 
 func use_explicit_dict (d: Eq a) -> (x: a) -> (y: a): Bool => d.eq x y
 
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = square 7
   let v = $Vec2 { x: 3, y: 4 }
   let v2 = v * 5
@@ -89,7 +89,7 @@ Deno.test("vNext 3A: missing trait impl is rejected", async () => {
 type Eq a is trait = { eq: a -> a -> Bool }
 type Foo is data = $Foo U32
 func same (x: a) -> (y: a): Bool where { Eq a } => x.eq y
-#entry func main (): U32 =>
+io main (): U32 =>
   return if same ($Foo 1) ($Foo 1) then 1 else 0
 `,
     "missing_implementation",
@@ -129,7 +129,7 @@ func push_grow (a: own #[U32]) -> (x: U32): #[U32] =>
   @storage.push a x
   return a
 
-#entry func main (): U32 =>
+io main (): U32 =>
   // 1. Pre-built effect record and passing Log as parameter
   let r1 = run_with_log quiet 9
 
@@ -174,7 +174,7 @@ type State s is effect = {
   put: s -> Unit,
 }
 
-#entry func main (): U32 =>
+io main (): U32 =>
   let n = 10
   let dummy = #[1]
   let preview = 0
@@ -200,7 +200,7 @@ Deno.test("vNext 3B: suite cannot read or rebind a local shadowed by an active w
   await compileExpectedFailure(
     `
 type Log is effect = { write: U32 -> Unit }
-#entry func main (): U32 =>
+io main (): U32 =>
   let count = 0
   with Log = { write: func x => count := count + x }:
     use Log.write 1
@@ -214,7 +214,7 @@ type Log is effect = { write: U32 -> Unit }
 Deno.test("vNext 3B: with Foreign is rejected as sealed_effect", async () => {
   await compileExpectedFailure(
     `
-#entry func main (): U32 =>
+io main (): U32 =>
   with Foreign = { x: func () => () }:
     let a = 1
   return 0
@@ -286,7 +286,7 @@ func sum_structural (r: { a: U32, b: U32 }): U32 =>
     s := s + r.(f)
   return s
 
-#entry func main (): U32 =>
+io main (): U32 =>
   // Omit defaulted fields (name, hp, ratio), supply only required bonus
   let p1 = $Player { bonus: 5 }
   // Override defaulted hp while omitting name & ratio
@@ -338,7 +338,7 @@ func inspect_colors (): U32 =>
       acc := acc + v.tag $Weight
   return acc
 
-#entry func main (): U32 =>
+io main (): U32 =>
   // Red: index 0 + len 3 + weight 10 = 13
   // Green: index 1 + len 5 + deprecated 1000 + weight 20 = 1026
   // Blue: index 2 + len 4 = 6
@@ -355,7 +355,7 @@ Deno.test("vNext 3C: omitting a required non-defaulted field is rejected", async
   await compileExpectedFailure(
     `
 type Boxed is data = $Boxed { a: U32 = 1, b: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let x = $Boxed { a: 2 }
   return x.a
 `,
@@ -367,7 +367,7 @@ Deno.test("vNext 3C: field default type mismatch is rejected", async () => {
   await compileExpectedFailure(
     `
 type Bad is data = $Bad { hp: U32 = true }
-#entry func main (): U32 =>
+io main (): U32 =>
   let x = $Bad { hp: 1 }
   return x.hp
 `,
@@ -389,7 +389,7 @@ func encode_packet (p: Packet): Unit ! {Emit U32} =>
     use Encode.encode p.(field)
   return ()
 
-#entry func main (): U32 =>
+io main (): U32 =>
   let total = 0
   let p = $Packet { id: 10, flag: true }
   with Emit U32 = func v => total := total + v:
@@ -426,7 +426,7 @@ func bump (value: t): t =>
     r.(field) := Bump.bump self
   return r
 
-#entry func main (): Bool =>
+io main (): Bool =>
   let r: { n: U32, m: U32 } = { n: 3, m: 5 }
   #for field in #fields { n: U32, m: U32 }:
     r.(field) := self + 1
@@ -538,7 +538,7 @@ type WithFallback is data = $WithFallback { @[$Skip] cached: U32 }
 type Wrapped a is data = $Wrapped { item: a }
 type Row = { alpha: U32, beta: F32, flag: Bool }
 
-#entry func main (): Bool =>
+io main (): Bool =>
   let p = $Packet { ratio: 2.5, flag: true, id: 9, position: $Vec2 { x: 7.0, y: 8.0 }, revision: 1 }
   let lanes = encode p
   let result: Maybe Packet = decode lanes
@@ -628,7 +628,7 @@ func nested_loop (): U32 =>
       break count
   return count
 
-#entry func main (): Bool =>
+io main (): Bool =>
   let large = indexed ()
   let flat = count_flat ()
   let $Empty = empty ()
@@ -668,7 +668,7 @@ func build (): t =>
       `
 import * as model from "./model"
 import { build } from "./builder"
-#entry func main (): U32 =>
+io main (): U32 =>
   let item: model.Item = build ()
   return model.amount item
 `,
@@ -714,7 +714,7 @@ func bad (r: ${parameter}): U32 =>
   #for field in #fields Row:
     ${receiver}.(field) := 3
   return 0
-#entry func main (): U32 => 0
+io main (): U32 => 0
 `,
       "type_mismatch",
     );
@@ -722,7 +722,7 @@ func bad (r: ${parameter}): U32 =>
   await compileExpectedFailure(
     `
 type Choice is data = $First { x: U32 } | $Second { x: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let value = $First { x: 1 }
   #for variant in #variants Choice:
     value.(variant) := 2
@@ -732,7 +732,7 @@ type Choice is data = $First { x: U32 } | $Second { x: U32 }
   );
   await compileExpectedFailure(
     `
-#entry func main (): U32 =>
+io main (): U32 =>
   let value = { x: 1 }
   value.(field) := 2
   return value.x
@@ -745,7 +745,7 @@ Deno.test("comptime writes preserve aliased_update and spent_value", async () =>
   await compileExpectedFailure(
     `
 type Row = { items: #[U32] }
-#entry func main (): U32 =>
+io main (): U32 =>
   let row: Row = { items: #[1] }
   let alias = row
   #for field in #fields Row:
@@ -757,7 +757,7 @@ type Row = { items: #[U32] }
   await compileExpectedFailure(
     `
 type Row = { x: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let rows: #[Row] = #[{ x: 1 }]
   let alias = rows
   #for field in #fields Row:
@@ -770,7 +770,7 @@ type Row = { x: U32 }
     `
 type Row = { items: #[U32] }
 func consume (row: own Row): U32 => row.items.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let items: #[U32] = #[1, 2]
   let row: Row = { items }
   let size = consume (own row)
@@ -786,7 +786,7 @@ Deno.test("comptime builders reject variants, missing defaults, and non-Unit fal
   await compileExpectedFailure(
     `
 type Choice is data = $First | $Second
-#entry func main (): U32 =>
+io main (): U32 =>
   let _ = #for variant in #variants Choice:
     break variant.index
   return 0
@@ -796,7 +796,7 @@ type Choice is data = $First | $Second
   await compileExpectedFailure(
     `
 type Row is data = $Row { x: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let row = #for field in #fields Row:
     break field.default
   return row.x
@@ -805,7 +805,7 @@ type Row is data = $Row { x: U32 }
   );
   await compileExpectedFailure(
     `
-#entry func main (): U32 =>
+io main (): U32 =>
   let row = #for field in #fields { x: U32 }:
     let _ = field.index
   return row.x

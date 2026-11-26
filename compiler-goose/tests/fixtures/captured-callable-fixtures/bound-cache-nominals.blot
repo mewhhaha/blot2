@@ -5,5 +5,5 @@ const Second.plus = func box => return func delta => return @u32.add box.value (
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = func box => return do:
   let bound = box.plus
   break bound 1
-#entry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))
-#entry const folded = answer ()
+io const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))
+io const folded = answer ()

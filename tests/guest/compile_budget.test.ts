@@ -194,7 +194,7 @@ Deno.test("inference shares repeated aggregate shapes across generic calls", asy
   }
   layers.push("func both x -> y => return {left: (x, y), right: (x, y)}");
   const main = `import { both, layer2 } from "./library"
-#entry func answer (n: U32): U32 => return do:
+io answer (n: U32): U32 => return do:
   let a = both n true
   let b = both false n
   let (number, flag) = a.right

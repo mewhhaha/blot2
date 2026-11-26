@@ -17,17 +17,17 @@ Deno.test("source Foreign callbacks use named, captured, higher-order and provid
 effect Advance: U32 -> U32
 const invoke = func action => return func value => return action value
 const retain = func action => return func value => return invoke action value
-#entry const direct = func (host: U32 -> U32 ! {Foreign}) => return host 41
-#entry const named = func (host: U32 -> U32 ! {Foreign}) => return invoke host 41
-#entry const captured = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const direct = func (host: U32 -> U32 ! {Foreign}) => return host 41
+io const named = func (host: U32 -> U32 ! {Foreign}) => return invoke host 41
+io const captured = func (host: U32 -> U32 ! {Foreign}) => return do:
   let callback = retain host
   use next <- callback 41
   break next
-#entry const provided = func (host: U32 -> U32 ! {Foreign}) => return do (@effect.provider Advance host):
+io const provided = func (host: U32 -> U32 ! {Foreign}) => return do (@effect.provider Advance host):
   use next <- Advance 41
   break next
-#entry const ignored = func (host: U32 -> U32 ! {Foreign}) => return 42
-#entry const pure = func () => return 7
+io const ignored = func (host: U32 -> U32 ! {Foreign}) => return 42
+io const pure = func () => return 7
 `,
     async (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -63,12 +63,12 @@ const retain = func action => return func value => return invoke action value
 Deno.test("source Foreign scalar entries recover after repeated host exceptions, bad results and Wasm panics", async () => {
   await compileAndRun(
     `
-#entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   use next <- host 41
   if @u32.eq next 0:
     break @panic "host requested panic"
   break next
-#entry const pure = func () => return 7
+io const pure = func () => return 7
 `,
     (guest) => {
       const cause = new Error("host failed");
@@ -90,10 +90,10 @@ Deno.test("source Foreign scalar entries recover after repeated host exceptions,
 Deno.test("source Foreign trampolines preserve F32, mixed scalar, Bool and Unit signatures", async () => {
   await compileAndRun(
     `
-#entry const floating = func (host: F32 -> F32 ! {Foreign}) => return host 1.25
-#entry const mixed = func (host: U32 -> F32 ! {Foreign}) => return host 41
-#entry const boolean = func (host: Bool -> Bool ! {Foreign}) => return host true
-#entry const unit = func (host: Unit -> Unit ! {Foreign}) => return host ()
+io const floating = func (host: F32 -> F32 ! {Foreign}) => return host 1.25
+io const mixed = func (host: U32 -> F32 ! {Foreign}) => return host 41
+io const boolean = func (host: Bool -> Bool ! {Foreign}) => return host true
+io const unit = func (host: Unit -> Unit ! {Foreign}) => return host ()
 `,
     (guest) => {
       const floating = guest.capability({ parameter: "F32", result: "F32", call: value => { equal(value, 1.25); return value + 3.5; } });
@@ -114,7 +114,7 @@ Deno.test("source Foreign numeric-array callbacks copy retained inputs and retur
   await compileAndRun(
     `
 const invoke = func action => return func value => return action value
-#entry const main = func (host: Array F32 -> Array F32 ! {Foreign}) => return do:
+io const main = func (host: Array F32 -> Array F32 ! {Foreign}) => return do:
   let retained = @array.fill 70000 9.5
   use first <- invoke host #[1.5, 2.5]
   use second <- invoke host first
@@ -158,11 +158,11 @@ Deno.test({
   fn: async () => {
     await compileAndRun(
       `
-#entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 40
   use second <- host first
   break @u32.add first second
-#entry const pure = func () => return 7
+io const pure = func () => return 7
 `,
       async (guest) => {
         let resume!: (value: number) => void;

@@ -20,15 +20,15 @@ func unwrap_or_else candidate -> fallback => case candidate of
   $Some value => value
   $Nothing => fallback ()
 
-#entry func short_circuit () =>
+io short_circuit () =>
   let empty: #[U32] = #[]
   return false and (empty[0] > 0)
 
-#entry func lazy_fallback () =>
+io lazy_fallback () =>
   let empty: #[U32] = #[]
   return unwrap_or_else ($Some 42) (func () => empty[0])
 
-#entry func factorial (value: U32): U32 =>
+io factorial (value: U32): U32 =>
   if value <= 1:
     return 1
   return value * factorial (value - 1)
@@ -49,17 +49,17 @@ func react event -> ticks => case event of
   $SetMode $Paused => ticks
   $Reset => 0
 
-#entry const operator_example = 1 + 2 * 3
-#entry func recursive_example (value: U32) => factorial value
-#entry func matching_example () => choose $Nothing false ($Some (double_or_zero ($Some 21)))
-#entry func event_example () => react ($Tick 2) 40
+io const operator_example = 1 + 2 * 3
+io recursive_example (value: U32) => factorial value
+io matching_example () => choose $Nothing false ($Some (double_or_zero ($Some 21)))
+io event_example () => react ($Tick 2) 40
 
-#entry func vector_example () =>
+io vector_example () =>
   let position = $Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
   return dot position scaled
 
-#entry func array_snapshot () =>
+io array_snapshot () =>
   let original = #[1, 2, 3]
   let next = original.copy
   next[1] := 20
@@ -69,7 +69,7 @@ func set_second (items: own #[U32]) -> (value: U32): #[U32] =>
   items[1] := value
   return items
 
-#entry func array_update () =>
+io array_update () =>
   let original = #[1, 2, 3]
   let updated = set_second original 20
   return updated[0] + updated[1] + updated[2]
@@ -77,6 +77,6 @@ func set_second (items: own #[U32]) -> (value: U32): #[U32] =>
 type Counter a is effect = { advance: a -> a }
 const local_counter = @effect.provider (Counter.advance U32) (func value => value + 1)
 
-#entry func provider_example () => do local_counter:
+io provider_example () => do local_counter:
   use next <- Counter.advance U32 41
   break next

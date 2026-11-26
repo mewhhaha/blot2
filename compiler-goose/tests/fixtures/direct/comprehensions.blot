@@ -1,17 +1,17 @@
 func pair (a: Array U32) -> (b: Array U32) => return a[0] + b[0]
-#entry func comp (n: U32): U32 => return do:
+io comp (n: U32): U32 => return do:
   let rows = #[pair #[t] #[t + n] | t <- #[1, 2, 3]]
   let total = 0
   for r in rows:
     total := self + r
   break total + rows.length
-#entry func simple (n: U32): U32 => return do:
+io simple (n: U32): U32 => return do:
   let rows = #[t * n | t <- #[1, 2, 3]]
   break rows[0] + rows[1] + rows[2] + rows.length
-#entry func guarded (n: U32): U32 => return do:
+io guarded (n: U32): U32 => return do:
   let rows = #[t * n | t <- #[1, 2, 3, 4], t > 1]
   break rows[0] + rows.length
-#entry func from_view (n: U32): U32 => return do:
+io from_view (n: U32): U32 => return do:
   let items = #[5, 6, 7]
   let v = &items[0..3]
   let rows = #[t + n | t <- v, t > 5]
@@ -21,6 +21,6 @@ func maker (destination: Array U32) => return func faces => return do:
   let points = #[1, 2]
   let kept = #[plane | plane <- faces, touching plane (points.view 0 points.length) >= 3]
   return kept.length + destination.length
-#entry func nested (n: U32): U32 => return do:
+io nested (n: U32): U32 => return do:
   let destination: Array U32 = #[9]
   break maker destination #[n, 1, 5, 7]

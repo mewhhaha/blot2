@@ -42,21 +42,21 @@ const merge_logged = func (dst: own Array U32) -> (log: Array U32 -> U32 ! {Fore
     k := @u32.add self 1
   return dst
 const src: Array U32 = #[1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12]
-#entry const run = func (bounds: Array U32): Array U32 => return do:
+io const run = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill 12 99
   return merge target src bounds[0] bounds[1] bounds[2]
-#entry const run_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const run_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 12 99
   use _ <- merge_logged target log src src 0 5 12 0
   return ()
-#entry const short_target = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const short_target = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let small: Array U32 = @array.fill 3 99
   use _ <- merge_logged small log src src 0 5 11 0
   return ()
-#entry const alias = func (): Array U32 => return do:
+io const alias = func (): Array U32 => return do:
   let rows: Array U32 = #[1, 3, 5, 2, 4, 6]
   return merge rows rows.copy 0 2 5
-#entry const ties = func (): Array U32 => return do:
+io const ties = func (): Array U32 => return do:
   let rows: Array U32 = #[2, 2, 2, 2, 2, 2]
   let result: Array U32 = @array.fill 6 99
   return merge result rows 0 2 5
@@ -95,33 +95,33 @@ const right_rows: Array U32 = @array.generate 64 (func index => return do:
   if @u32.lt index 32:
     return 0
   return @u32.add (@u32.mul (@u32.sub index 32) 2) 1)
-#entry const wide = func (bounds: Array U32): Array U32 => return do:
+io const wide = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill bounds[3] 99
   return merge_offset target wide_src bounds[0] bounds[1] bounds[2] bounds[4]
-#entry const wide_store_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const wide_store_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 48 99
   use offset <- log #[]
   use _ <- merge_logged target log wide_src wide_src 0 23 47 offset
   return ()
-#entry const wide_source_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const wide_source_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 48 99
   use _ <- merge_logged target log late_src late_src 0 23 63 0
   return ()
-#entry const wide_alias = func (): Array U32 => return do:
+io const wide_alias = func (): Array U32 => return do:
   let rows = @storage.copy wide_src
   return merge rows rows.copy 0 23 47
-#entry const wide_ties = func (right: U32): Array U32 => return do:
+io const wide_ties = func (right: U32): Array U32 => return do:
   let rows: Array U32 = @array.fill 48 7
   let target: Array U32 = @array.fill 24 99
   return merge target rows 0 23 right
-#entry const separate = func (): Array U32 => return do:
+io const separate = func (): Array U32 => return do:
   let target: Array U32 = @array.fill 63 99
   return merge_separate target right_rows left_rows 0 31 63
-#entry const separate_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const separate_trap = func (log: Array U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   let target: Array U32 = @array.fill 64 99
   use _ <- merge_logged target log right_rows left_rows 0 39 63 0
   return ()
-#entry const positions = func (bounds: Array U32): U32 => return do:
+io const positions = func (bounds: Array U32): U32 => return do:
   let target: Array U32 = @array.fill 64 99
   if @u32.eq bounds[5] 1:
     return merge_positions target late_src bounds[0] bounds[1] bounds[2] bounds[4]

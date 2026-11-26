@@ -3,8 +3,8 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("two large records share their child across loop iterations", async () => {
   await compileAndRun(`
-#entry const memory = func () : Array U32 => return #[]
-#entry const fold = func (count: U32) => return do:
+io const memory = func () : Array U32 => return #[]
+io const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let child = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -37,8 +37,8 @@ const make = func value => return { a: value, b: value, c: value, d: value, e: v
 const read = func record => return record.a + record.b + record.c + record.d + record.e + record.f +
   record.g + record.h + record.i + record.j + record.k + record.l + record.m + record.n +
   record.o + record.p + record.q + record.r
-#entry const storage_probe = func (value: U32) => return #[value]
-#entry const fold = func (count: U32) => return do:
+io const storage_probe = func (value: U32) => return #[value]
+io const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = make value
@@ -56,8 +56,8 @@ const read = func record => return record.a + record.b + record.c + record.d + r
 
 Deno.test("large local records keep their fields through aliased reads", async () => {
   await compileAndRun(`
-#entry const storage_probe = func (value: U32) => return #[value]
-#entry const fold = func (count: U32) => return do:
+io const storage_probe = func (value: U32) => return #[value]
+io const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -78,23 +78,23 @@ async function replacements(count: number) {
     `
 import * as array from "../../std/array"
 const replace = array.replace
-#entry const wrapped = func (count: U32) => return do:
+io const wrapped = func (count: U32) => return do:
   let values = array.fill count 0
   for i in 0..count:
     values := replace i (i + 1) values
   break values
-#entry const direct = func (count: U32) => return do:
+io const direct = func (count: U32) => return do:
   let values = array.fill count 0.0
   for i in 0..count:
     values := @array.set values i (F32.from i)
   break values
-#entry const snapshots = func () => return do:
+io const snapshots = func () => return do:
   let original = #[1, 2, 3]
   let values = original
   let saved = func () => return values[0]
   values := replace 0 99 values
   break #[original[0], saved (), values[0]]
-#entry const nested = func () => return do:
+io const nested = func () => return do:
   let original = #[#[1], #[2]]
   let changed = replace 0 99 original[0]
   break #[original[0][0], changed[0]]
@@ -130,15 +130,15 @@ Deno.test("array replacement evaluates written arguments before bounds checks an
   await compileAndRun(
     `
 import * as array from "../../std/array"
-#entry const order = func (host: U32 -> U32 ! {Foreign}) => return
+io const order = func (host: U32 -> U32 ! {Foreign}) => return
   array.replace (host 0) (host 1) (do:
     use value <- host 2
     break #[value])
-#entry const bounds = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const bounds = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = #[1]
   use changed <- array.replace 1 (host 42) values
   break changed
-#entry const borrowed = func () => return do:
+io const borrowed = func () => return do:
   let values = #[1, 2, 3]
   let sum = 0
   for item in values:
@@ -176,9 +176,9 @@ const build = func (count: U32) : Array U32 => return do:
     packed := array.push i self
   break packed
 const grown = build ${count}
-#entry const ends = grown[${count - 1}]
+io const ends = grown[${count - 1}]
 const selected = array.filter_map (func x => return if x % 2 == 0 then $Some x else $Nothing) (array.generate 4097 identity)
-#entry const selected_last = selected[2048]
+io const selected_last = selected[2048]
 `,
     (guest) => {
       equal(guest.read("ends"), count - 1);
@@ -199,9 +199,9 @@ Deno.test.ignore("staged appends preserve immutable versions within bounded stor
 Deno.test("Result iteration stops on errors and allows distinct state result and error types without loop scaffolding", async () => {
   await compileAndRun(
     `
-#entry const run = func (count: U32) => return Result.unwrap_or 0 (Result.iterate 0 (func i => return
+io const run = func (count: U32) => return Result.unwrap_or 0 (Result.iterate 0 (func i => return
   $Ok (if i < count then $Continue (i + 1) else $Done i)))
-#entry const stop = func (host: U32 -> Bool ! {Foreign}) => return do:
+io const stop = func (host: U32 -> Bool ! {Foreign}) => return do:
   use outcome <- Result.iterate 0 (func i => return do:
     use failed <- host i
     if failed:
@@ -217,7 +217,7 @@ const keep = func host => return func candidate => return case candidate of
     use observed <- host value
     break $Ok value
   $Err error => $Err error
-#entry const prefix = func (host: U32 -> Bool ! {Foreign}) => return do:
+io const prefix = func (host: U32 -> Bool ! {Foreign}) => return do:
   use candidate <- keep host ($Ok 7)
   break Result.unwrap_or 0 candidate
 `,

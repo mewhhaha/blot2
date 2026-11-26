@@ -13,13 +13,13 @@ Deno.test("Phase 1 executable controls: k==1 tuple Box, escape-safe nested spark
 func unwrap_pos (b: Box): U32 => return case b of
   $Box (a, c) => @u32.add a c
 
-#entry func test_k1_box (x: U32): U32 =>
+io test_k1_box (x: U32): U32 =>
   let mk = $Box
   let b1 = $Box (x, 10)
   let b2 = mk (x, 4)
   return @u32.add (unwrap_pos b1) (unwrap_pos b2)
 
-#entry func test_nested_spark (): Array U32 =>
+io test_nested_spark (): Array U32 =>
   let rows = spark #[#[x, @u32.add x 1] | x <- 0..2]
   return #[rows[0][0], rows[0][1], rows[1][0], rows[1][1]]
 
@@ -30,7 +30,7 @@ func scratch_iter (x: U32): U32 =>
     acc := @u32.add self tmp[i]
   return acc
 
-#entry func test_scratch_spark (n: U32): Array U32 => return spark #[scratch_iter x | x <- 0..n]
+io test_scratch_spark (n: U32): Array U32 => return spark #[scratch_iter x | x <- 0..n]
 `,
     (guest) => {
       // (5 + 10) + (5 + 4) = 24
@@ -46,7 +46,7 @@ func scratch_iter (x: U32): U32 =>
 });
 
 Deno.test("Phase 1 #kernel / #process syntax, represented handles, visibility, wire types, and opacity bans", async () => {
-  // Positive: private #entry func preserved, dynamic Kernel handle selection, stateless & prepared kernel, process
+  // Positive: private io preserved, dynamic Kernel handle selection, stateless & prepared kernel, process
   await compileAndRun(
     `type Query is data = $Query { x: U32, y: F32 }
 type Ctx is data = $Ctx { scale: U32, weights: #[U32] }
@@ -65,14 +65,14 @@ func proc_step (st: own PState) -> (cmd: U32): (PState, U32) =>
   let next = @u32.add total cmd
   return ($PState { total: next, log: log }, next)
 
-private #entry func keep_private (x: U32): U32 => return @u32.add x 1
+private io keep_private (x: U32): U32 => return @u32.add x 1
 #kernel func double_u32 (x: U32): U32 => return @u32.mul x 2
 #kernel const plan_a: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item }
 #kernel const plan_b: Kernel [#[U32], Query, U32] = { prepare: prep_ctx, run: run_item_alt }
 #process const counter: Process [U32, U32, U32] = { init: proc_init, step: proc_step }
 
 func select_kernel (flag: Bool): Kernel [#[U32], Query, U32] => return if flag then plan_a else plan_b
-#entry func ok (x: U32): U32 =>
+io ok (x: U32): U32 =>
   let _ = select_kernel true
   let _ = counter
   let _ = double_u32
@@ -86,7 +86,7 @@ func select_kernel (flag: Bool): Kernel [#[U32], Query, U32] => return if flag t
 
   // Reject $Kernel / $Process forging outside std/prelude
   await compileExpectedFailure(
-    `#entry func forge () => return $Process 0\n`,
+    `io forge () => return $Process 0\n`,
     "unknown_value",
   );
 
@@ -168,7 +168,7 @@ func r (c: U32) -> (x: U32): U32 => return x
   // (host entries are exempt from `ownedResult` and could otherwise leak a static global into `own State`).
   await compileExpectedFailure(
     `const pool: #[U32] = #[10, 20, 30]
-#entry func p_init (_: U32): #[U32] => return pool
+io p_init (_: U32): #[U32] => return pool
 func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   s[0] := cmd
   return (s, s[0])
@@ -177,7 +177,7 @@ func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
     "kernel_callable",
   );
   await compileExpectedFailure(
-    `#entry func prep (w: U32): U32 => return w
+    `io prep (w: U32): U32 => return w
 func r (c: U32) -> (x: U32): U32 => return @u32.add c x
 #kernel const k: Kernel [U32, U32, U32] = { prepare: prep, run: r }
 `,
@@ -187,7 +187,7 @@ func r (c: U32) -> (x: U32): U32 => return @u32.add c x
   // Reject shallow `@storage.copy` mutating nested inner arrays on composites or shared nested arrays
   await compileExpectedFailure(
     `const nested: #[#[U32]] = #[#[1, 2]]
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let c = copy { box: nested }
   c.box[0][0] := 99
   return nested[0][0]
@@ -195,7 +195,7 @@ func r (c: U32) -> (x: U32): U32 => return @u32.add c x
     "aliased_update",
   );
   await compileExpectedFailure(
-    `#entry func bad (): U32 =>
+    `io bad (): U32 =>
   let s: *#[#[U32]] = freeze #[#[1, 2]]
   let c: #[#[U32]] = copy s
   c[0][0] := 99
@@ -206,7 +206,7 @@ func r (c: U32) -> (x: U32): U32 => return @u32.add c x
   await compileExpectedFailure(
     `type Boxed is data = $Boxed { rows: #[#[U32]] }
 const nested: #[#[U32]] = #[#[1, 2]]
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let c = copy ($Boxed { rows: nested })
   c.rows[0][0] := 99
   return nested[0][0]
@@ -217,7 +217,7 @@ const nested: #[#[U32]] = #[#[1, 2]]
   // Reject @flat.* outside std/
   await compileExpectedFailure(
     `#kernel func k (x: U32): U32 => return x
-#entry func bad (): U32 => return @flat.kernel_id k
+io bad (): U32 => return @flat.kernel_id k
 `,
     "std_only_intrinsic",
   );
@@ -239,7 +239,7 @@ func run_fill (): U32 =>
 `;
   await compileExpectedFailure(
     fillDecls +
-      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_fill () | x <- xs]\n`,
+      `io bad (xs: #[U32]): #[U32] => return spark #[run_fill () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -272,7 +272,7 @@ func pick (): Unit -> Unit => return touch_pool
 func body (x: U32): U32 =>
 ${snippet}
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
       "aliased_update",
     );
@@ -283,7 +283,7 @@ ${snippet}
     `func touch (row: #[U32]): U32 =>
   @storage.push row 1
   return row[0]
-#entry func bad (): #[U32] =>
+io bad (): #[U32] =>
   let seed: #[U32] = #[0]
   return spark #[touch row | row <- #[seed]]
 `,
@@ -293,7 +293,7 @@ ${snippet}
     `func touch (row: #[U32]): U32 =>
   @storage.push row 1
   return row[0]
-#entry func bad (): #[U32] =>
+io bad (): #[U32] =>
   let seed: #[U32] = #[0]
   let xs: #[#[U32]] = #[seed]
   return spark #[touch row | row <- xs]
@@ -352,7 +352,7 @@ func p_step (s: own #[U32]) -> (cmd: U32): (#[U32], U32) =>
   let v = s[0]
   return (s, v)
 #process const good: Process [U32, U32, U32] = { init: p_init, step: p_step }
-#entry func ok (): U32 => return 1
+io ok (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("ok", null), 1);
@@ -385,7 +385,7 @@ func prep (w: #[U32]): #[U32] =>
     @storage.push out (@u32.add ctx[0] (@u32.add a b))
     return out[@u32.sub out.length 1]) x 1
 #kernel const k: Kernel [#[U32], U32, U32] = { prepare: prep, run: good_run }
-#entry func ok (): U32 => return 1
+io ok (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("ok", null), 1);
@@ -404,7 +404,7 @@ func body (x: U32): U32 =>
   let scratch: #[U32] = #[0, 0]
   ${body}
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
 
   const cases: [string, string, string][] = [
@@ -527,7 +527,7 @@ func run_with_cell (): U32 =>
 `;
   await compileExpectedFailure(
     withCellDecls +
-      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_with_cell () | x <- xs]\n`,
+      `io bad (xs: #[U32]): #[U32] => return spark #[run_with_cell () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -546,7 +546,7 @@ func run_state_prov (): U32 =>
 `;
   await compileExpectedFailure(
     stateProvDecls +
-      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_state_prov () | x <- xs]\n`,
+      `io bad (xs: #[U32]): #[U32] => return spark #[run_state_prov () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -564,7 +564,7 @@ func run_stored_op (): U32 =>
 `;
   await compileExpectedFailure(
     storedOpDecls +
-      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_stored_op () | x <- xs]\n`,
+      `io bad (xs: #[U32]): #[U32] => return spark #[run_stored_op () | x <- xs]\n`,
     "aliased_update",
   );
 
@@ -581,7 +581,7 @@ func run_nested_with (): U32 =>
 `;
   await compileExpectedFailure(
     nestedWithDecls +
-      `#entry func bad (xs: #[U32]): #[U32] => return spark #[run_nested_with () | x <- xs]\n`,
+      `io bad (xs: #[U32]): #[U32] => return spark #[run_nested_with () | x <- xs]\n`,
     "aliased_update",
   );
 });
@@ -597,7 +597,7 @@ func write_first (rows: #[#[U32]]): U32 =>
 func body (_: U32): U32 =>
   let rows = array.slice 0 1 #[pool]
   return write_first rows
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
     undefined,
@@ -612,7 +612,7 @@ func body (x: U32): U32 =>
   let popped = @storage.pop stack
   @storage.push popped 99
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -641,7 +641,7 @@ func fill_nested (dst: own #[Unit -> Unit]) -> (p: #[U32]): #[Unit -> Unit] =>
 func body (x: U32): U32 =>
   ${body}
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
         "aliased_update",
       );
@@ -658,7 +658,7 @@ func body (x: U32): U32 =>
   let ys = #[...#[pool]]
   push_grow ys[0] 99
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -671,7 +671,7 @@ func body (sw: *Holder) -> (x: U32): U32 =>
   let r: Holder = copy sw
   let _ = @simd.store r.arr[0] 0 (99, 0, 0, 0)
   return x
-#entry func bad (xs: #[U32]): #[U32] =>
+io bad (xs: #[U32]): #[U32] =>
   let sw: *Holder = freeze ($Holder { arr: #[#[1, 2, 3, 4]] })
   return spark #[body sw x | x <- xs]
 `,
@@ -683,7 +683,7 @@ func body (sw: *Holder) -> (x: U32): U32 =>
   let r: Holder = copy sw
   let _ = @simd.store r.arr 0 (@u32.add x 10, 0, 0, 0)
   return @u32.add r.arr[0] sw.arr[0]
-#entry func good (xs: #[U32]): #[U32] =>
+io good (xs: #[U32]): #[U32] =>
   let sw: *Holder = freeze ($Holder { arr: #[1, 2, 3, 4] })
   return spark #[body sw x | x <- xs]
 `,
@@ -703,7 +703,7 @@ func body (x: U32): U32 =>
   let p = @storage.load r
   push_grow p 99
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `,
     "aliased_update",
   );
@@ -711,7 +711,7 @@ func body (x: U32): U32 =>
   // External entry mutating const pool -> rejected everywhere by ownership (`aliased_update`)
   await compileExpectedFailure(
     `const table: #[U32] = #[1, 2, 3]
-#entry func mutate_outside (v: U32): U32 =>
+io mutate_outside (v: U32): U32 =>
   @storage.push table v
   return table[0]
 #kernel func read_table (x: U32): U32 => return @u32.add x table[0]
@@ -726,7 +726,7 @@ const view_table: #[&[U32]] = #[&base_table[0..1]]
 const pure_table: #[U32] = #[10, 20, 30]
 #kernel func read_view (x: U32): U32 => return @u32.add x view_table[0][0]
 #kernel func read_pure (x: U32): U32 => return @u32.add x pure_table[1]
-#entry func ok (): U32 => return @u32.add base_table[0] pure_table[1]
+io ok (): U32 => return @u32.add base_table[0] pure_table[1]
 `,
     (guest) => equal(guest.call("ok", null), 21),
   );
@@ -748,7 +748,7 @@ func body (x: U32): U32 =>
   let p = f0 pool (x == 0)
   @storage.push p 99
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
   await compileExpectedFailure(diamondSrc, "aliased_update");
 
@@ -769,7 +769,7 @@ func body (x: U32): U32 =>
   let w = dispatch x pool
   @storage.push w[0] 99
   return x
-#entry func bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
+io bad (xs: #[U32]): #[U32] => return spark #[body x | x <- xs]
 `;
   await compileExpectedFailure(widenSrc, "aliased_update");
 });
@@ -849,7 +849,7 @@ func precise_body (x: U32): U32 =>
 
   return @u32.add x (@u32.add copied[0] computed_lut[1])
 
-#entry func precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x | x <- xs]
+io precise_spark (xs: #[U32]): #[U32] => return spark #[precise_body x | x <- xs]
 `,
     (guest) => {
       // copied[0] = 91, computed_lut[1] = 10 -> x + 101
@@ -889,7 +889,7 @@ func solve (ctx: PreparedCtx) -> (idx: U32): F32 =>
   return 0.0
 
 #kernel const k: Kernel [#[F32], U32, F32] = { prepare: prep, run: solve }
-#entry func smoke (): U32 => return 1
+io smoke (): U32 => return 1
 `,
     (guest) => {
       equal(guest.call("smoke", null), 1);

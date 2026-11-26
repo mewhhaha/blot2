@@ -26,7 +26,7 @@ async function verified(directory: string): Promise<string> {
   await Deno.writeTextFile(seed + "/library.blot", "const value = 42\n");
   await Deno.writeTextFile(
     entry,
-    'import {value} from "./library"\n#entry const answer = value\n',
+    'import {value} from "./library"\nio const answer = value\n',
   );
   const rows = await command(directory, "identity-bundle", [
     "dependencies",
@@ -254,7 +254,7 @@ while (true) {
     } "$@"\n`,
   );
   await Deno.chmod(executable, 0o755);
-  await Deno.writeTextFile(entry, "#entry const answer = 1\n");
+  await Deno.writeTextFile(entry, "io const answer = 1\n");
   try {
     await rejects(
       createZigProjectCompiler({
@@ -365,7 +365,7 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
   const { directory } = item;
   const entry = directory + "/main.blot";
   let compiler: ZigProjectCompiler | undefined;
-  const original = "#entry const answer: Unit -> U32 = func () => return 42\n";
+  const original = "io const answer: Unit -> U32 = func () => return 42\n";
   try {
     await Deno.writeTextFile(entry, original);
     const identity = await verified(directory);
@@ -391,7 +391,7 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
     equal(edited.revision, 3);
     await answer(edited, 43);
     await fresh(directory, entry, edited, "edited");
-    await Deno.writeTextFile(entry, "// 🌧\n#entry const answer = missing\n");
+    await Deno.writeTextFile(entry, "// 🌧\nio const answer = missing\n");
     const rejected = await compiler.build();
     ok(!rejected.success);
     equal(rejected.revision, 3);
@@ -447,7 +447,7 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     const entry = directory + "/main.blot";
     await Deno.writeTextFile(
       entry,
-      'import {exported_value} from "lib/library"\n#entry const answer: Unit -> U32 = func () => return @u32.add exported_value 2\n',
+      'import {exported_value} from "lib/library"\nio const answer: Unit -> U32 = func () => return @u32.add exported_value 2\n',
     );
     const aliases = ["--alias", "lib/=" + link],
       options: ZigProjectCompilerOptions = {
@@ -522,7 +522,7 @@ Deno.test("Zig project client rejects an incompatible dependency schema during o
   const item = await fixture("blot-zig-project-decline-");
   const { directory } = item, entry = directory + "/main.blot";
   try {
-    await Deno.writeTextFile(entry, "#entry const answer = 42\n");
+    await Deno.writeTextFile(entry, "io const answer = 42\n");
     const identity = await verified(directory);
     const valid = await Deno.readFile(
       directory + "/identity/dependencies.blotdep",
@@ -546,7 +546,7 @@ Deno.test("Zig project client rejects an incompatible dependency schema during o
       /SchemaMismatch/,
     );
     equal(await Deno.readFile(bundle), incompatible);
-    equal(await Deno.readTextFile(entry), "#entry const answer = 42\n");
+    equal(await Deno.readTextFile(entry), "io const answer = 42\n");
   } finally {
     await item.cleanup();
   }
@@ -558,7 +558,7 @@ Deno.test("chunk runtime and static chains survive dependency bundles and retain
   let compiler: ZigProjectCompiler | undefined;
   const source = (offset: number) =>
     `import * as lists from "./lists"
-#entry const answer = func () => return @u32.add (lists.read 40) ${offset}
+io const answer = func () => return @u32.add (lists.read 40) ${offset}
 `;
   try {
     await Deno.writeTextFile(
@@ -599,7 +599,7 @@ const read = func (seed: U32) => return do:
         await answer(result, 40 + offset);
         await fresh(directory, entry, result, `${label}-${result.revision}`);
       }
-      await Deno.writeTextFile(entry, "#entry const broken: Array U32 = 1\n");
+      await Deno.writeTextFile(entry, "io const broken: Array U32 = 1\n");
       ok(!(await compiler.build()).success);
       await Deno.writeTextFile(entry, source(2));
       await answer(await compiler.build(), 42);

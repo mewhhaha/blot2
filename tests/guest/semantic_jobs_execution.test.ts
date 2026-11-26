@@ -11,8 +11,8 @@ const c = func value => return @u32.add value 3
 const d = func value => return @u32.add value 4
 const even: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
 const odd: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else even (@u32.sub value 1)
-#entry const run: U32 -> U32 = func value => return @u32.add (@u32.add (a value) (b value)) (@u32.add (c value) (d value))
-#entry const recursive: U32 -> U32 = func value => return even value
+io const run: U32 -> U32 = func value => return @u32.add (@u32.add (a value) (b value)) (@u32.add (c value) (d value))
+io const recursive: U32 -> U32 = func value => return even value
 `;
 
 Deno.test("private semantic workers preserve fresh retained edited Wasm and failed source diagnostics", async () => {

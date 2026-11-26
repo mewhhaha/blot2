@@ -34,4 +34,4 @@ private func equality_checks (): Unit ! { test.Test } =>
   use test.holds_not "structural record mismatch" (equality.eq_struct { a: true, b: 7 } { a: false, b: 7 })
   return ()
 
-#entry func test_equality (): test.Report => test.run equality_checks
+io test_equality (): test.Report => test.run equality_checks

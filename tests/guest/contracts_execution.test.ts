@@ -27,8 +27,8 @@ const Wrapped.Read: convert.Read Wrapped = {
   read: func value => return doubled value,
 }
 func invoke (callback: Wrapped -> U32) -> (value: Wrapped): U32 => return callback value
-#entry func run (value: U32): U32 => return convert.generic ($Wrapped value) + convert.closed value
-#entry func as_value (value: U32): U32 => return invoke convert.Read.read ($Wrapped value)
+io run (value: U32): U32 => return convert.generic ($Wrapped value) + convert.closed value
+io as_value (value: U32): U32 => return invoke convert.Read.read ($Wrapped value)
 `);
     const compiler = await createZigProjectCompiler({
       executable,
@@ -79,8 +79,8 @@ const Box.Read: Read Box = { read: func box => return box.value }
 const local: a -> U32 where { Read a } = func box => return Read.read box
 const qualified: a -> U32 where { contracts.Read a } = func box => return contracts.Read.read box
 const call = func (action: Action U32) => return invoke action
-#entry const answer = func () => return call (func () => return qualified ($Box { value: local ($Box { value: 42 }) }))
-#entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func () => return send 41)
+io const answer = func () => return call (func () => return qualified ($Box { value: local ($Box { value: 42 }) }))
+io const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func () => return send 41)
 `;
   await Deno.writeTextFile(library, librarySource);
   await Deno.writeTextFile(entry, source);

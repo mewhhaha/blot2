@@ -2,7 +2,7 @@
 // Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
 // Flags use U32 storage, four times Goose's U8 payload. Same 0/1 values.
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 const run = func (primes: own Array U32) -> (limit: U32): (Array U32, U32) => return do:
   for index in 0 .. @u32.add limit 1:
@@ -30,7 +30,7 @@ const run = func (primes: own Array U32) -> (limit: U32): (Array U32, U32) => re
     n := @u32.add self 2
   return (primes, @u32.add last_prime count)
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let limit = inputs[0]
   let iterations = inputs[1]

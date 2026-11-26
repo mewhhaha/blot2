@@ -1,1 +1,1 @@
-#entry func solve (values: Array U32): Array U32 => return #[values.length, 0]
+io solve (values: Array U32): Array U32 => return #[values.length, 0]

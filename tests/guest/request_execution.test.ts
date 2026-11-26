@@ -29,7 +29,7 @@ const programs: readonly Program[] = [
     name:
       "nested do cannot intercept an ordinary loop break at colliding offsets",
     source: collidingDo(
-      "#entry const answer = func () => return do:\n  for index in 0 .. 1:\n",
+      "io const answer = func () => return do:\n  for index in 0 .. 1:\n",
       14,
       '      break\n    @panic "inner do intercepted the loop break"\n  break 42\n',
     ),
@@ -40,7 +40,7 @@ const programs: readonly Program[] = [
 for (const program of programs) {
   Deno.test(`do runtime: ${program.name}`, async () => {
     const source = program.source +
-      `\n#entry const expected = ${program.constantCall ?? "answer ()"}\n`;
+      `\nio const expected = ${program.constantCall ?? "answer ()"}\n`;
     await compileAndRun(source, (guest) => {
       const abi = guest.abi.functions.find((fn) => fn.name === "answer");
       for (

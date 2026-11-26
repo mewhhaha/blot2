@@ -82,10 +82,10 @@ const big: U32 = 4294967295
 
 ```blot
 // Before
-#entry func main (): #[U32] => return [1, 2, 3]
+io main (): #[U32] => return [1, 2, 3]
 
 // After
-#entry func main (): #[U32] => return #[1, 2, 3]
+io main (): #[U32] => return #[1, 2, 3]
 ```
 
 ---
@@ -102,11 +102,11 @@ const big: U32 = 4294967295
 ```blot
 // Before
 type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return Some 1
+io main (): Opt => return Some 1
 
 // After
 type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1
+io main (): Opt => return $Some 1
 ```
 
 ---
@@ -122,12 +122,12 @@ type Opt is data = $Some U32 | $Nothing
 
 ```blot
 // Before
-#entry func main (): U32 =>
+io main (): U32 =>
   let xs = #[1, 2, 3]
   return xs.len
 
 // After
-#entry func main (): U32 =>
+io main (): U32 =>
   let xs = #[1, 2, 3]
   return xs.length
 ```
@@ -144,13 +144,13 @@ type Opt is data = $Some U32 | $Nothing
 ```blot
 // Before
 type Pt = { x: U32, y: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let p: Pt = { x: 1, z: 2 }
   return p.x
 
 // After
 type Pt = { x: U32, y: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let p: Pt = { x: 1, y: 2 }
   return p.x
 ```
@@ -207,11 +207,11 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v
 ```blot
 // Before
 type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1 2
+io main (): Opt => return $Some 1 2
 
 // After
 type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1
+io main (): Opt => return $Some 1
 ```
 
 ---
@@ -226,10 +226,10 @@ type Opt is data = $Some U32 | $Nothing
 
 ```blot
 // Before
-#entry func main (): U32 => return 1.5
+io main (): U32 => return 1.5
 
 // After
-#entry func main (): F32 => return 1.5
+io main (): F32 => return 1.5
 ```
 
 ---
@@ -243,10 +243,10 @@ type Opt is data = $Some U32 | $Nothing
 
 ```blot
 // Before
-#entry func main (s: String): U32 => return s.length
+io main (s: String): U32 => return s.length
 
 // After
-#entry func main (s: Text): U32 => return s.length
+io main (s: Text): U32 => return s.length
 ```
 
 ---
@@ -258,14 +258,14 @@ type Opt is data = $Some U32 | $Nothing
 ```blot
 // Before
 func consume (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let n = consume a
   return n + a.length
 
 // After
 func consume (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let n = consume a.copy
   return n + a.length
@@ -281,14 +281,14 @@ For a moved field projection in call position (`fill row.xs`), parenthesize the 
 
 ```blot
 // Before
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let b = a
   a[0] := 99
   return a[0] + b[0]
 
 // After
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let b = a.copy
   a[0] := 99
@@ -346,21 +346,21 @@ func pick (xs: #[U32]): #[U32] => return xs.copy
 
 ## ENTRY_TYPE
 
-**Cause:** A declaration marked `#entry` leaves an algebraic effect unhandled (`(unhandled: Effect.op)`) or uses a parameter/result type outside raw ABI 8.
+**Cause:** A declaration marked `io` leaves an algebraic effect unhandled (`(unhandled: Effect.op)`) or uses a parameter/result type outside raw ABI 8.
 
-- Raw `#entry` accepts ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback).
-- `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `#entry`.
+- Raw `io` entries accept ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback).
+- `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `io`.
 
 ```blot
 // Before
 type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   use t <- Clock.now ()
   return t
 
 // After
 type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t
@@ -401,13 +401,13 @@ func read_time (): U32 =>
 ```blot
 // Before
 type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { wrong: func () => return 0 }:
     return 0
 
 // After
 type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t
@@ -455,10 +455,10 @@ type Clock is effect = { now: Unit -> U32 }
 
 ## NO_ENTRY
 
-**Cause:** `blot build` was invoked on a module with no `#entry`, `#kernel`, or `#process` declaration (or `#entry` was placed in a non-entry imported module).
+**Cause:** `blot build` was invoked on a module with no `io`, `#kernel`, or `#process` declaration (or `io` was placed in a non-entry imported module).
 
-- Use `blot check` to check library modules without `#entry`.
-- Add an `#entry func`, `#kernel`, or `#process` to the root entry module when building a Wasm artifact.
+- Use `blot check` to check library modules without `io` entries.
+- Add an `io`, `#kernel`, or `#process` declaration to the root entry module when building a Wasm artifact.
 
 ```blot
 // Before
@@ -466,7 +466,7 @@ func helper (x: U32): U32 => return x + 1
 
 // After
 func helper (x: U32): U32 => return x + 1
-#entry func main (x: U32): U32 => return helper x
+io main (x: U32): U32 => return helper x
 ```
 
 ---
@@ -542,12 +542,12 @@ const y: U32 = 2
 ```blot
 // Before
 const count: U32 = 0
-#entry func main (): U32 =>
+io main (): U32 =>
   count := 1
   return count
 
 // After
-#entry func main (): U32 =>
+io main (): U32 =>
   let count = 0
   count := 1
   return count
@@ -571,11 +571,11 @@ const count: U32 = 0
 
 ```blot
 // Before
-#entry func main (): U32 =>
+io main (): U32 =>
   break 1
 
 // After
-#entry func main (): U32 =>
+io main (): U32 =>
   return do:
     break 1
 ```
@@ -592,13 +592,13 @@ const count: U32 = 0
 ```blot
 // Before
 func take (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let f = take
   return f #[1, 2]
 
 // After
 func take (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   return take #[1, 2]
 ```
 

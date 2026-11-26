@@ -18,8 +18,8 @@ const main = `import {Token, make} from "./tokens"
 import * as facade from "./outward"
 type Alias = facade.Ticket
 const pass: Token -> Alias = func value => return value
-#entry const answer = func (value: F32) => return facade.read (pass (make value))
-#entry const associated = func (value: F32) => return (make value).observe
+io const answer = func (value: F32) => return facade.read (pass (make value))
+io const associated = func (value: F32) => return (make value).observe
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>, expected: number) {
   const guest = await instantiateGuest(bytes);
@@ -88,7 +88,7 @@ Deno.test("opaque source and compiled forwarding keep privacy through failed edi
             "facade.read (pass (make value))",
             "reveal (make value)",
           ) + "const reveal = func value => return value.hidden\n",
-          'import {Token} from "./tokens"\n#entry const answer = $Token 42.0\n',
+          'import {Token} from "./tokens"\nio const answer = $Token 42.0\n',
         ]
       ) {
         const fromSource = await source.build({
@@ -148,7 +148,7 @@ Deno.test("opaque generic field requirements cannot derive hidden producer paylo
     );
     await Deno.writeTextFile(
       entry,
-      'import {make} from "./library"\nconst reveal = func value => return value.value\n#entry const runtime = func (value:U32) => return reveal (make value)\n#entry const staged = reveal (make 42)\n',
+      'import {make} from "./library"\nconst reveal = func value => return value.value\nio const runtime = func (value:U32) => return reveal (make value)\nio const staged = reveal (make 42)\n',
     );
     const compiler = await createZigProjectCompiler({
       executable,
@@ -174,7 +174,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
   try {
     await Deno.writeTextFile(
       entry,
-      'import {make, read} from "./library"\n#entry const answer = func (value:U32) => return read (make value)\n#entry const folded = read (make 42)\n',
+      'import {make, read} from "./library"\nio const answer = func (value:U32) => return read (make value)\nio const folded = read (make 42)\n',
     );
     await Deno.writeTextFile(
       library,
@@ -243,7 +243,7 @@ async function writeForwardedReaders(dir: string, reader: string) {
   }
   await Deno.writeTextFile(
     dir + "/main.blot",
-    imports.join("\n") + "\n#entry func answer (n: U32): U32 => return " + sum +
+    imports.join("\n") + "\nio answer (n: U32): U32 => return " + sum +
       "\n",
   );
 }

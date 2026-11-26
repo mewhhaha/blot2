@@ -40,7 +40,7 @@ private func number_checks (): Unit ! { test.Test } =>
   use test.is_nothing "invalid fixed precision" (text.from_f32_fixed 7 1.0)
   return ()
 
-#entry func test_numbers (): test.Report => test.run number_checks
+io test_numbers (): test.Report => test.run number_checks
 
 private func format_checks (): Unit ! { test.Test } =>
   use test.eq_text "escaped scalars" "\"世界🙂\\\\\\\"\\n\\r\\t\"" (text.quote "世界🙂\\\"\n\r\t")
@@ -58,7 +58,7 @@ private func format_checks (): Unit ! { test.Test } =>
   use test.eq_text "Text uses array format" "[233, 128578]" (text.format "é🙂")
   return ()
 
-#entry func test_formats (): test.Report => test.run format_checks
+io test_formats (): test.Report => test.run format_checks
 
 private func copy_tokens tokens: #[Text] =>
   let result: #[Text] = #[]
@@ -90,4 +90,4 @@ private func collection_checks (): Unit ! { test.Test } =>
   use test.eq "text as scalars" #[0x96ea] (text.scalars owned)
   return ()
 
-#entry func test_collections (): test.Report => test.run collection_checks
+io test_collections (): test.Report => test.run collection_checks

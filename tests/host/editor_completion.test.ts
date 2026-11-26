@@ -78,7 +78,7 @@ Deno.test("completion replies own their fields and reject malformed ranges graph
 Deno.test("completion has no entry or build dependency and never publishes its repaired overlays", async () => {
   const directory = await Deno.makeTempDir();
   const entry = directory + "/main.blot";
-  await Deno.writeTextFile(entry, "#entry const answer = 42\n");
+  await Deno.writeTextFile(entry, "io const answer = 42\n");
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -181,7 +181,7 @@ Deno.test("asset completion reads generated names without publishing parser cach
   await Deno.writeTextFile(directory + "/config.json", '{"offset":42}');
   await Deno.writeTextFile(
     entry,
-    'import * as config from "./asset"\n#entry const answer = (config.value).offset\n',
+    'import * as config from "./asset"\nio const answer = (config.value).offset\n',
   );
   let parses = 0;
   const compiler = await createZigProjectCompiler({

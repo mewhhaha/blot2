@@ -39,7 +39,7 @@ function entrySource(): string {
     lines.push(`import {${names.join(", ")}} from "./m${m}"`);
     for (const name of names) sum = `@u32.add (${sum}) (${name} value)`;
   }
-  lines.push(`#entry const run: U32 -> U32 = func value => return ${sum}`);
+  lines.push(`io const run: U32 -> U32 = func value => return ${sum}`);
   return lines.join("\n") + "\n";
 }
 
@@ -198,7 +198,7 @@ Deno.test("project workers preserve the exact associated type budget across impo
       lines.push(`import { read0 as value${index} } from "./m${index}"`);
       sum = `@u32.add (${sum}) (value${index} value)`;
     }
-    lines.push(`#entry func run (value: U32): U32 => return ${sum}`);
+    lines.push(`io run (value: U32): U32 => return ${sum}`);
     const entry = `${directory}/main.blot`;
     await Deno.writeTextFile(entry, lines.join("\n") + "\n");
     for (const inferenceBudget of [18_136, 18_135]) {
@@ -247,7 +247,7 @@ Deno.test("staged imports use parallel workers and observe current Core after a 
       imports.push(`import * as side${index} from "./side${index}"`);
       await Deno.writeTextFile(`${directory}/side${index}.blot`, `const v = ${index}\n`);
     }
-    const main = (expr: string) => imports.join("\n") + "\n#entry func answer (arg: U32): U32 => return " + expr + "\n";
+    const main = (expr: string) => imports.join("\n") + "\nio answer (arg: U32): U32 => return " + expr + "\n";
     const source = (base: number) => `const base: Bool = ${base === 40}\nfunc plus (a: U32) -> (b: U32): U32 => return @u32.add a b\nfunc spin (n: U32): U32 => return spin n\n`;
     const staged = main("(#run (plus (if base then 40 else 41) 2))");
     await Deno.writeTextFile(entry, staged);

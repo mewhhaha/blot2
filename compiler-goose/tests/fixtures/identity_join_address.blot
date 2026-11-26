@@ -1,5 +1,5 @@
 const joined_hook = func (saved: U32) => return func (argument: U32): U32 => return @u32.add saved argument
-#entry const active_address = func (input: U32): Array U32 => return do:
+io const active_address = func (input: U32): Array U32 => return do:
   let scalar = input
   let cell: Array U32 = #[input]
   let rows: Array U32 = #[input]

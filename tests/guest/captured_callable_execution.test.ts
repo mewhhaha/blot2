@@ -3,105 +3,105 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 Deno.test("retained callable bound-method sync", async () => {
-  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\n#entry const answer = func () => return invoke ($Box { value: 41 })\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nio const answer = func () => return invoke ($Box { value: 41 })\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-method JSPI", async () => {
-  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\n#entry const answer = func () => return invoke ($Box { value: 41 })\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nio const answer = func () => return invoke ($Box { value: 41 })\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable bound-snapshot sync", async () => {
-  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\n#entry const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nio const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-snapshot JSPI", async () => {
-  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\n#entry const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nio const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable captured-snapshot sync", async () => {
-  await compileAndRun("#entry const answer = func () => return do:\n  let bias = 40\n  let bound = func value => return @u32.add bias value\n  bias := 99\n  break bound 2\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("io const answer = func () => return do:\n  let bias = 40\n  let bound = func value => return @u32.add bias value\n  bias := 99\n  break bound 2\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable captured-snapshot JSPI", async () => {
-  await compileAndRun("#entry const answer = func () => return do:\n  let bias = 40\n  let bound = func value => return @u32.add bias value\n  bias := 99\n  break bound 2\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("io const answer = func () => return do:\n  let bias = 40\n  let bound = func value => return @u32.add bias value\n  bias := 99\n  break bound 2\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable bound-cache-nominals sync", async () => {
-  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\n#entry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nio const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 83);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-cache-nominals JSPI", async () => {
-  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\n#entry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nio const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 83);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable bound-cache-effects sync", async () => {
-  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst call = func callback => return do:\n  let bound = func value => return callback value\n  break bound 1\nconst provider = @effect.provider Read.get (func () => return 41)\n#entry const answer = func () => return do provider:\n  let pure = call (func value => return @u32.add value 40)\n  use effectful <- call (func value => return do:\n    use seed <- Read.get ()\n    break @u32.add seed value\n  )\n  break @u32.add pure effectful\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst call = func callback => return do:\n  let bound = func value => return callback value\n  break bound 1\nconst provider = @effect.provider Read.get (func () => return 41)\nio const answer = func () => return do provider:\n  let pure = call (func value => return @u32.add value 40)\n  use effectful <- call (func value => return do:\n    use seed <- Read.get ()\n    break @u32.add seed value\n  )\n  break @u32.add pure effectful\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 83);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-cache-effects JSPI", async () => {
-  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst call = func callback => return do:\n  let bound = func value => return callback value\n  break bound 1\nconst provider = @effect.provider Read.get (func () => return 41)\n#entry const answer = func () => return do provider:\n  let pure = call (func value => return @u32.add value 40)\n  use effectful <- call (func value => return do:\n    use seed <- Read.get ()\n    break @u32.add seed value\n  )\n  break @u32.add pure effectful\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst call = func callback => return do:\n  let bound = func value => return callback value\n  break bound 1\nconst provider = @effect.provider Read.get (func () => return 41)\nio const answer = func () => return do provider:\n  let pure = call (func value => return @u32.add value 40)\n  use effectful <- call (func value => return do:\n    use seed <- Read.get ()\n    break @u32.add seed value\n  )\n  break @u32.add pure effectful\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 83);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable captured-builtin sync", async () => {
-  await compileAndRun("const make_adder = func value => return func other => return @u32.add value other\nconst compose = func first => return func second => return func value => return first (second value)\n#entry const add_forty = make_adder 40\n#entry const expected = add_forty 2\n#entry const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("const make_adder = func value => return func other => return @u32.add value other\nconst compose = func first => return func second => return func value => return first (second value)\nio const add_forty = make_adder 40\nio const expected = add_forty 2\nio const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable captured-builtin JSPI", async () => {
-  await compileAndRun("const make_adder = func value => return func other => return @u32.add value other\nconst compose = func first => return func second => return func value => return first (second value)\n#entry const add_forty = make_adder 40\n#entry const expected = add_forty 2\n#entry const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("const make_adder = func value => return func other => return @u32.add value other\nconst compose = func first => return func second => return func value => return first (second value)\nio const add_forty = make_adder 40\nio const expected = add_forty 2\nio const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable captured-effect sync", async () => {
-  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst compose = func first => return func second => return func value => return first (second value)\nconst add_forty = make 40\nconst provider = @effect.provider Read.get (func () => return 1)\n#entry const answer = func () => return do provider:\n  let increment = func value => return @u32.add value 1\n  use result <- (compose increment add_forty) 0\n  break result\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst compose = func first => return func second => return func value => return first (second value)\nconst add_forty = make 40\nconst provider = @effect.provider Read.get (func () => return 1)\nio const answer = func () => return do provider:\n  let increment = func value => return @u32.add value 1\n  use result <- (compose increment add_forty) 0\n  break result\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable captured-effect JSPI", async () => {
-  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst compose = func first => return func second => return func value => return first (second value)\nconst add_forty = make 40\nconst provider = @effect.provider Read.get (func () => return 1)\n#entry const answer = func () => return do provider:\n  let increment = func value => return @u32.add value 1\n  use result <- (compose increment add_forty) 0\n  break result\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst compose = func first => return func second => return func value => return first (second value)\nconst add_forty = make 40\nconst provider = @effect.provider Read.get (func () => return 1)\nio const answer = func () => return do provider:\n  let increment = func value => return @u32.add value 1\n  use result <- (compose increment add_forty) 0\n  break result\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable captured-original sync", async () => {
-  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\n#entry const add_forty: U32 -> U32 = make_adder 40\n#entry const expected: U32 = add_forty 2\n#entry const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\nio const add_forty: U32 -> U32 = make_adder 40\nio const expected: U32 = add_forty 2\nio const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     equal(guest.read("expected"), 42);
     for (let count = 0; count < 100; count++) {
@@ -112,7 +112,7 @@ Deno.test("retained callable captured-original sync", async () => {
 });
 
 Deno.test("retained callable captured-original JSPI", async () => {
-  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\n#entry const add_forty: U32 -> U32 = make_adder 40\n#entry const expected: U32 = add_forty 2\n#entry const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\n#entry const folded = answer ()\n", async guest => {
+  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\nio const add_forty: U32 -> U32 = make_adder 40\nio const expected: U32 = add_forty 2\nio const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nio const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     equal(guest.read("expected"), 42);
     for (let count = 0; count < 100; count++) {
@@ -124,19 +124,19 @@ Deno.test("retained callable captured-original JSPI", async () => {
 
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("retained callable rejects bound-cache-missing", async () => {
-  await compileExpectedFailure("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\n#entry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\n#entry const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [387, 393] });
+  await compileExpectedFailure("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nio const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nio const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [387, 393] });
 });
 
 Deno.test("retained callable rejects captured-wrong-row", async () => {
-  await compileExpectedFailure("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst add_forty = make 40\n#entry const answer: Unit -> U32 ! {} = func () => return add_forty 2\n", "effect_mismatch", undefined, { prelude: "none" });
+  await compileExpectedFailure("type Read is effect = { get: Unit -> U32 }\nconst make = func value => return func other => return do:\n  use seed <- Read.get ()\n  break @u32.add value (@u32.add seed other)\nconst add_forty = make 40\nio const answer: Unit -> U32 ! {} = func () => return add_forty 2\n", "effect_mismatch", undefined, { prelude: "none" });
 });
 
 Deno.test("retained callable rejects captured-wrong-input", async () => {
-  await compileExpectedFailure("const make = func value => return func other => return @u32.add value other\nconst add_forty = make 40\n#entry const answer = func () => return add_forty 2.5\n", "type_mismatch", undefined, { prelude: "none" });
+  await compileExpectedFailure("const make = func value => return func other => return @u32.add value other\nconst add_forty = make 40\nio const answer = func () => return add_forty 2.5\n", "type_mismatch", undefined, { prelude: "none" });
 });
 
 Deno.test("retained callable rejects captured-unknown-source", async () => {
-  await compileExpectedFailure("const make = func value => return func other => return value\nconst ignored = make (func value => return value)\n#entry const answer = func () => return ignored 1\n", "entry_type", undefined, { prelude: "none" });
+  await compileExpectedFailure("const make = func value => return func other => return value\nconst ignored = make (func value => return value)\nio const answer = func () => return ignored 1\n", "entry_type", undefined, { prelude: "none" });
 });
 
 Deno.test("curried callable environments keep results and memory stable across invocations", async () => {
@@ -147,8 +147,8 @@ const Box.plus = func box => return func delta => return @u32.add box.value delt
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = func box => return do:
   let bound = box.plus
   break bound 1
-#entry const answer = func (value: U32) => return invoke ($Box { value: value })
-#entry const memory = func () : Array U32 => return #[]
+io const answer = func (value: U32) => return invoke ($Box { value: value })
+io const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       for (let index = 0; index < 64; index++) equal(guest.call("answer", 41), 42);
@@ -168,7 +168,7 @@ Deno.test("single-reference named captures preserve static aliases and later cur
 const add = func (values: Array U32) => return func (bias: U32) => return func (index: U32) => return @u32.add values[index] bias
 const first = func (values: Array U32) => return func (index: U32) => return values[index]
 const saved = first #[41, 8192]
-#entry const run = func (count: U32) => return do:
+io const run = func (count: U32) => return do:
   let original = #[41, 8192]
   let shared = add original
   let biased = shared 8192
@@ -214,13 +214,13 @@ const read = func (values: Array U32) => return func (index: U32) => return valu
 const scalar = func (value: U32) => return func (index: U32) => return @u32.add value index
 const offset = func (value: F32) => return func (other: F32) => return @f32.add value other
 const saved = read #[41, 8192]
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let choices = #[saved, read #[seed, 65536]]
   let selected = choices[@u32.rem seed 2]
   let arithmetic = #[scalar 8192, scalar seed]
   let calculate = arithmetic[@u32.rem seed 2]
   break @u32.add (selected 0) (calculate 1)
-#entry const floating = func (values: Array F32) => return do:
+io const floating = func (values: Array F32) => return do:
   let choices = #[offset values[0], offset 8192.0]
   let selected = choices[@u32.rem (@array.length values) 2]
   break selected 1.0

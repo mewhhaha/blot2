@@ -4,7 +4,7 @@ const nested = func (row: {__TYPES__}) => return do:
   for index in 0 .. 3:
     tick row.f0
   return row
-#entry const answer = func (input: U32): Array U32 => return do:
+io const answer = func (input: U32): Array U32 => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[@u32.add input 10]
   let original = {__DISTINCT__}

@@ -195,8 +195,8 @@ async function write(
   return path;
 }
 
-const unit = "#entry func test_unit (): Unit => return ()\n";
-const infiniteLoop = `#entry func test_a_loop (): Unit =>
+const unit = "io test_unit (): Unit => return ()\n";
+const infiniteLoop = `io test_a_loop (): Unit =>
   for ever:
     continue
   return ()
@@ -330,19 +330,19 @@ Deno.test("runner executes Unit, Bool and BTST checks and expected traps", () =>
       "checks.blot",
       `
 ${unit}
-#entry func test_true (): Bool => return true
-#entry func test_false (): Bool => return false
-#entry func test_report_ok (): #[U32] => return #[${packet(3, []).join(", ")}]
-#entry func test_report_bad (): #[U32] => return #[${
+io test_true (): Bool => return true
+io test_false (): Bool => return false
+io test_report_ok (): #[U32] => return #[${packet(3, []).join(", ")}]
+io test_report_bad (): #[U32] => return #[${
         packet(2, [asciiFailure]).join(", ")
       }]
-#entry func test_empty_report (): #[U32] => return #[]
-#entry func test_traps (): Unit => return @panic "check failed"
-#entry func test_argument (value: U32): U32 => return value
-#entry const test_scalar = 12
-#entry func test_return (): U32 => return 4
-#entry func trap_divide (): U32 => return @u32.div 1 0
-#entry func trap_returns (): U32 => return 42
+io test_empty_report (): #[U32] => return #[]
+io test_traps (): Unit => return @panic "check failed"
+io test_argument (value: U32): U32 => return value
+io const test_scalar = 12
+io test_return (): U32 => return 4
+io trap_divide (): U32 => return @u32.div 1 0
+io trap_returns (): U32 => return 42
 `,
     );
     const report = await runBlotTests({
@@ -389,9 +389,9 @@ Deno.test("default discovery classifies traps and rejections and skips helpers",
     await write(
       root,
       "tests/traps/divide.blot",
-      "#entry func test_divide (): U32 => return @u32.div 1 0\n",
+      "io test_divide (): U32 => return @u32.div 1 0\n",
     );
-    const bad = "#entry func demo (): Bool => return missing_value\n";
+    const bad = "io demo (): Bool => return missing_value\n";
     await write(
       root,
       "tests/rejected/a_code.blot",
@@ -467,14 +467,14 @@ Deno.test("filter skips unrelated compilation and bail stops queued tests and mo
     await write(
       root,
       "tests/a.blot",
-      `#entry func test_a_fails (): Bool => return false
-#entry func test_b_target (): Bool => return true
+      `io test_a_fails (): Bool => return false
+io test_b_target (): Bool => return true
 `,
     );
     await write(
       root,
       "tests/b.blot",
-      "#entry func test_other (): Bool => return unknown\n",
+      "io test_other (): Bool => return unknown\n",
     );
     await write(
       root,
@@ -556,7 +556,7 @@ Deno.test("manifest discovery compiles each test with its own relative imports a
     await write(
       app,
       "tests/ignored.blot",
-      "#entry func test_ignored (): Bool => return false\n",
+      "io test_ignored (): Bool => return false\n",
     );
     await write(app, "a/helper.blot", "const local = 2\n");
     await write(app, "b/helper.blot", "const local = 3\n");
@@ -566,7 +566,7 @@ Deno.test("manifest discovery compiles each test with its own relative imports a
         path,
         `import { local } from "./helper"
 import { shared } from "math/value"
-#entry func test_imports () => return shared + local == ${42 + index}
+io test_imports () => return shared + local == ${42 + index}
 `,
       );
     }
@@ -918,10 +918,10 @@ Deno.test("repeated calls on the same guest after a trap never leak a stale trap
     const entry = await write(
       root,
       "trap_reuse.blot",
-      `#entry func first_panic (): U32 => return @panic "first panic"
-#entry func second_panic (): U32 => return @panic "second panic"
-#entry func div_zero (): U32 => return @u32.div 1 0
-#entry func ok_value (): U32 => return 42
+      `io first_panic (): U32 => return @panic "first panic"
+io second_panic (): U32 => return @panic "second panic"
+io div_zero (): U32 => return @u32.div 1 0
+io ok_value (): U32 => return 42
 `,
     );
     const compiler = await createCompiler({ executable, entry });

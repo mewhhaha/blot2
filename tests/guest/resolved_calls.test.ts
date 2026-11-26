@@ -22,13 +22,13 @@ const adder = func (x: U32) => return do:
   break func (y: U32) : U32 => return x + y + ${offset}
 const twice = func (f: U32 -> U32) => return func (x: U32) : U32 => return f (f x)
 const shift = (func (k: U32) => return func (y: U32) : U32 => return y + k) ${offset + 3}
-#entry const named_over = func (v: U32) : U32 => return adder v 2
-#entry const indirect = func (v: U32) : U32 => return twice (func (y: U32) => return y + 3) v
-#entry const closure_constant = func (v: U32) : U32 => return twice shift v
-#entry const operator = func (v: U32) : U32 => return do:
+io const named_over = func (v: U32) : U32 => return adder v 2
+io const indirect = func (v: U32) : U32 => return twice (func (y: U32) => return y + 3) v
+io const closure_constant = func (v: U32) : U32 => return twice shift v
+io const operator = func (v: U32) : U32 => return do:
   let $Vec total = $Vec v + $Vec 5
   break total
-#entry const captured = func (v: U32) : U32 => return do:
+io const captured = func (v: U32) : U32 => return do:
   let step = func (y: U32) => return y * 2
   let apply = func (g: U32 -> U32) => return g v
   break apply step + adder 1 1

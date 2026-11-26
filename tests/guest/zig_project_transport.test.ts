@@ -168,7 +168,7 @@ Deno.test("source buffers reject unsupported peers without consuming a request I
   try {
     await rejects(
       compiler.build({
-        sources: { [String(item.options.entry)]: "#entry const answer = 42\n" },
+        sources: { [String(item.options.entry)]: "io const answer = 42\n" },
       }),
       /does not support source overlays/,
     );

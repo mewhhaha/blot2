@@ -44,7 +44,7 @@ Deno.test("audit: trait associated output constraints are enforced at concrete c
 type Mul left { right, out } is trait = { mul: left -> right -> out }
 const U32.Mul: Mul U32 { right: U32, out: U32 } = { mul: U32.mul }
 func bad (x: a): F32 where { Mul a { right: a, out: F32 } } => x * x
-#entry func main (): F32 => bad 5
+io main (): F32 => bad 5
 `,
     "type_mismatch",
   );
@@ -54,7 +54,7 @@ func bad (x: a): F32 where { Mul a { right: a, out: F32 } } => x * x
 type Conv a { out } is trait = { conv: a -> out }
 const Array.Conv: Conv #[F32] { out: #[F32] } = { conv: func xs => xs.copy }
 func transmute (x: a): b where { Conv a { out: b } } => Conv.conv x
-#entry func main (): U32 =>
+io main (): U32 =>
   let arr: #[U32] = transmute #[1.0, 2.0, -0.0]
   return arr[0]
 `,
@@ -70,7 +70,7 @@ func arr_set0 (v: U32) -> (xs: own #[U32]): #[U32] =>
   xs[0] := v
   return xs
 const Array.Mut2: Mut2 #[U32] = { set0: arr_set0 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let xs: #[U32] = #[10, 20]
   let f: *#[U32] = freeze xs
   let alias: *#[U32] = f
@@ -90,7 +90,7 @@ func make (): Secret => $Secret { key: 123 }
   for (
     const main of [
       `import * as sec from "./sec"
-#entry func main (): U32 =>
+io main (): U32 =>
   let s = sec.make ()
   let acc: U32 = 0
   #for f in #fields sec.Secret:
@@ -103,17 +103,17 @@ func dump (v: t): U32 =>
   #for f in #fields t:
     acc := acc + v.(f)
   return acc
-#entry func main (): U32 => dump (sec.make ())
+io main (): U32 => dump (sec.make ())
 `,
       `import * as sec from "./sec"
-#entry func main (): U32 =>
+io main (): U32 =>
   let vlen: U32 = 0
   #for v in #variants sec.Secret:
     vlen := vlen + v.name.length
   return vlen
 `,
       `import * as sec from "./sec"
-#entry func main (): U32 =>
+io main (): U32 =>
   let _forged: sec.Secret = #for f in #fields sec.Secret:
     break f.default
   return 0
@@ -129,7 +129,7 @@ Deno.test("audit: fork rejects indirect Foreign via enclosing with handler", asy
   await compileExpectedFailure(
     `
 type Boom is effect = { fire: U32 -> U32 }
-#entry func main (cb: U32 -> U32 ! {Foreign}): U32 =>
+io main (cb: U32 -> U32 ! {Foreign}): U32 =>
   let xs = #[1, 2]
   let v = 0
   with Boom = { fire: func x => return use cb x }:
@@ -147,7 +147,7 @@ type Boom is effect = { fire: U32 -> U32 }
 Deno.test("audit: exiting branch arms do not end live borrows (C1)", async () => {
   await compileExpectedFailure(
     `
-#entry func main (cond: Bool): U32 =>
+io main (cond: Bool): U32 =>
   let xs = #[10, 20]
   let alias = xs
   if cond:
@@ -168,7 +168,7 @@ type Box1 = { a: #[U32] }
 func launder (x: a): t =>
   return #for f in #fields t:
     break x
-#entry func main (): U32 =>
+io main (): U32 =>
   let b: Box1 = launder POOL
   b.a[0] := 99
   return POOL[0]
@@ -183,7 +183,7 @@ func set_all (val: own t) -> (x: a): t =>
   #for f in #fields t:
     val.(f) := x
   return val
-#entry func main (): U32 =>
+io main (): U32 =>
   let xs = #[10, 20]
   let p: Pair = set_all (own { left: #[0], right: #[0] }) xs
   p.left[0] := 77
@@ -201,7 +201,7 @@ func bump_frozen (s: own *#[U32]): U32 =>
   let v = s[0]
   let _ = @simd.store s 0 (v + 1, 20, 30, 40)
   return v
-#entry func main (): U32 => bump_frozen (own frozen_pool)
+io main (): U32 => bump_frozen (own frozen_pool)
 `,
     "type_mismatch",
   );
@@ -212,7 +212,7 @@ Deno.test("audit: generic freeze cannot freeze closures capturing linear arrays 
     `
 func generic_freeze (x: a): *a =>
   return freeze x
-#entry func main (): U32 =>
+io main (): U32 =>
   let xs = #[10, 20, 30]
   let f: *(U32 -> U32) = generic_freeze (func i => xs[i])
   let v1 = f 0
@@ -254,7 +254,7 @@ func set_last (xs: own ArrList) -> (v: U32): ArrList =>
   let next = set_last (own rest) v
   return $Cons { head, tail: next }
 
-#entry func run (n: U32): U32 =>
+io run (n: U32): U32 =>
   let orig = build n
   let cloned = copy orig
   let cloned2 = set_last (own cloned) 999
@@ -272,7 +272,7 @@ Deno.test("audit: with shadowing records, returning cells, and inside fork are s
   await compileExpectedFailure(
     `
 type Ping is effect = { ping: Unit -> *#[U32] }
-#entry func main (): U32 =>
+io main (): U32 =>
   let r = { a: #[10, 20], b: #[30, 40] }
   let leaked: *#[U32] = freeze #[0]
   with Ping = { ping: func () =>
@@ -291,7 +291,7 @@ type Ping is effect = { ping: Unit -> *#[U32] }
   await compileExpectedFailure(
     `
 type Store is effect = { get: Unit -> #[U32] }
-#entry func main (): U32 =>
+io main (): U32 =>
   let arr = #[10, 20]
   let alias: #[U32] = #[]
   with Store = { get: func () =>
@@ -309,7 +309,7 @@ type Store is effect = { get: Unit -> #[U32] }
   await compileExpectedFailure(
     `
 type Store is effect = { get: Unit -> { x: #[U32] } }
-#entry func main (): U32 =>
+io main (): U32 =>
   let arr = #[10, 20]
   let alias: #[U32] = #[]
   with Store = { get: func () =>
@@ -327,7 +327,7 @@ type Store is effect = { get: Unit -> { x: #[U32] } }
   await compileExpectedFailure(
     `
 type FreezeEff is effect = { go: Unit -> Unit }
-#entry func main (): U32 =>
+io main (): U32 =>
   let arr = #[10, 20]
   with FreezeEff = { go: func () =>
       arr[1] := 21
@@ -344,7 +344,7 @@ type FreezeEff is effect = { go: Unit -> Unit }
   await compileAndRun(
     `
 type Bump is effect = { step: Unit -> Unit }
-#entry func main (): U32 =>
+io main (): U32 =>
   let arr = #[10, 20]
   with Bump = { step: func () =>
       arr[0] := 11
@@ -362,7 +362,7 @@ type Bump is effect = { step: Unit -> Unit }
   await compileExpectedFailure(
     `
 type Mod is effect = { touch: Unit -> Unit }
-#entry func main (): U32 =>
+io main (): U32 =>
   let x = #[1, 2]
   let y = #[10, 20]
   let z: #[U32] = fork x:
@@ -400,7 +400,7 @@ func mutate_copy (orig: Big): U32 =>
   c.b := 999
   return c.b
 
-#entry func test_c10a (): U32 =>
+io test_c10a (): U32 =>
   let base = big 10 0
   let sum = 0
   for idx in 0..3:
@@ -409,7 +409,7 @@ func mutate_copy (orig: Big): U32 =>
     sum := sum + next.a
   return sum
 
-#entry func test_c10b (flag: Bool): U32 =>
+io test_c10b (flag: Bool): U32 =>
   let x = big 10 0
   let k = 0
   if flag:
@@ -420,7 +420,7 @@ func mutate_copy (orig: Big): U32 =>
     x := big 20 0
   return x.a * 1000 + k
 
-#entry func test_c10c (flag: Bool): U32 =>
+io test_c10c (flag: Bool): U32 =>
   let a = #[10, 20]
   let b: #[U32] = #[]
   if flag:
@@ -430,12 +430,12 @@ func mutate_copy (orig: Big): U32 =>
   b[0] := 777
   return a.length * 1000 + a[0]
 
-#entry func test_c11 (): U32 =>
+io test_c11 (): U32 =>
   let orig = big 1 2
   let res = mutate_copy orig
   return orig.b * 1000 + res
 
-#entry func test_c12 (): U32 =>
+io test_c12 (): U32 =>
   let x: Outer = $Wrap (big 11 2)
   let saved = big 0 0
   let out: Outer = $None
@@ -447,7 +447,7 @@ func mutate_copy (orig: Big): U32 =>
       out := $None
   return saved.a
 
-#entry func test_c13 (): U32 =>
+io test_c13 (): U32 =>
   let shared = $Node { left: $Leaf 1, value: 42, right: $Leaf 2 }
   let cur = $Node { left: $Leaf 1, value: 10, right: $Leaf 2 }
   for i in 0..2:
@@ -476,14 +476,14 @@ func bits (x: F32): U32 =>
   let (b, _, _, _) = simd.f32_bits (x, 0.0, 0.0, 0.0)
   return b
 
-#entry func test_simd_store (idx: U32): U32 =>
+io test_simd_store (idx: U32): U32 =>
   let a = #[10, 20, 30, 40]
   let before = a[idx]
   let _ = @simd.store a idx (99, 88, 77, 66)
   let after = a[idx]
   return before * 100 + after
 
-#entry func test_defer_nan (zero: F32): #[U32] =>
+io test_defer_nan (zero: F32): #[U32] =>
   let a: #[F32] = #[zero, zero, zero]
   let out: #[F32] = #[0.0, 0.0, 0.0]
   let ctr: #[U32] = #[0]
@@ -525,7 +525,7 @@ func make_has_arr (): HasArr =>
   return #for f in #fields HasArr:
     break f.default
 
-#entry func test_staging_eq (): U32 =>
+io test_staging_eq (): U32 =>
   let c_negz = if #run (eq 0.0 (-0.0)) then 1 else 0
   let c_nan  = if #run (eq (0.0 / 0.0) (0.0 / 0.0)) then 10 else 0
   let c_mod  = if #run (eq ($Mod10 { v: 12 }) ($Mod10 { v: 22 })) then 100 else 0
@@ -538,7 +538,7 @@ func make_has_arr (): HasArr =>
     if_nan := 100000
   return c_negz + c_nan + c_mod + c_gen + if_negz + if_nan
 
-#entry func test_carries (): U32 =>
+io test_carries (): U32 =>
   let misses: U32 = 0
   for i in 0..5:
     let $Some _ = maybe_even i else:
@@ -568,7 +568,7 @@ func make_has_arr (): HasArr =>
     false => { a: 0, b: 0 }
   return misses * 1000000 + (p1.a * 1000 + p1.b * 10 + at1) + (p2.a * 100 + p2.b * 10 + at2) * 1 + (arr[0].a * 100 + arr[0].b * 10 + at3) * 1 + (p4.a * 100 + p4.b * 10 + at4) * 1
 
-#entry func test_comptime_misc (): U32 =>
+io test_comptime_misc (): U32 =>
   let w: Wrap U32 = #for f in #fields (Wrap U32):
     break f.default
   let ha = make_has_arr ()
@@ -599,7 +599,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
   const cases: Array<{ name: string; v1: string; v2: string; arg: number }> = [
     {
       name: "affine_init",
-      v1: `#entry func run (n: U32): U32 =>
+      v1: `io run (n: U32): U32 =>
   let arr = @array.fill n 0
   let s: U32 = 1
   for i in 0..n:
@@ -607,7 +607,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
     arr[i] := s
   return arr[0] ^ arr[n - 1]
 `,
-      v2: `#entry func run (n: U32): U32 =>
+      v2: `io run (n: U32): U32 =>
   let arr = @array.fill n 0
   let s: U32 = 1
   for i in 0..n:
@@ -619,7 +619,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
     },
     {
       name: "affine_unroll",
-      v1: `#entry func run (n: U32): U32 =>
+      v1: `io run (n: U32): U32 =>
   let s: U32 = 1
   let acc: U32 = 0
   for _ in 0..n:
@@ -627,7 +627,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
     acc := acc ^ (s & 255)
   return acc
 `,
-      v2: `#entry func run (n: U32): U32 =>
+      v2: `io run (n: U32): U32 =>
   let s: U32 = 1
   let acc: U32 = 0
   for _ in 0..n:
@@ -640,7 +640,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
     {
       name: "aos_f32_record",
       v1: `type Vec2 = { x: F32, y: F32 }
-#entry func run (n: U32): U32 =>
+io run (n: U32): U32 =>
   let p = @array.fill n { x: 4.0, y: 8.0 }
   for i in 0..n:
     let q = p[i]
@@ -648,7 +648,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
   return @f32.to_u32 (p[0].x + p[n - 1].x)
 `,
       v2: `type Vec2 = { x: F32, y: F32 }
-#entry func run (n: U32): U32 =>
+io run (n: U32): U32 =>
   let p = @array.fill n { x: 4.0, y: 8.0 }
   for i in 0..n:
     let q = p[i]
@@ -659,7 +659,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
     },
     {
       name: "vector_reduction",
-      v1: `#entry func run (n: U32): U32 =>
+      v1: `io run (n: U32): U32 =>
   let flags = @array.fill n true
   let acc: U32 = 0
   for i in 0..flags.length:
@@ -667,7 +667,7 @@ Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vec
       acc := @type.call "add" acc 1
   return acc
 `,
-      v2: `#entry func run (n: U32): U32 =>
+      v2: `io run (n: U32): U32 =>
   let flags = @array.fill n true
   let acc: U32 = 0
   for i in 0..flags.length:
@@ -733,14 +733,14 @@ Deno.test("audit: frontend validation rejects invalid test return types, #[N; T]
   equal(badTest.success, false);
 
   await compileExpectedFailure(
-    `#entry func main (xs: #[3; U32]): U32 => xs[0]\n`,
+    `io main (xs: #[3; U32]): U32 => xs[0]\n`,
     "entry_type",
   );
 
   await compileExpectedFailure(
     `
 type Ask is effect = { get: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let r: U32 = 0
   with Ask = { get: func () => 1 }, Ask = { get: func () => 2 }:
     use v <- Ask.get ()
@@ -753,7 +753,7 @@ type Ask is effect = { get: Unit -> U32 }
   await compileExpectedFailure(
     `
 type Pair = { a: U32, b: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   #for f in #fields Pair:
     let _g = func () => f.index
   return 0
@@ -782,7 +782,7 @@ func build_set (values: #[k]) -> (table: own Set k): Set k =>
     table := push_key values[i] table
   return table
 
-#entry func main (): U32 =>
+io main (): U32 =>
   let init: Set U32 = $Map { rows: #[], count: #[0] }
   let out = build_set #[10, 20, 30] init
   out.count[0] := out.count[0] + 100
@@ -797,7 +797,7 @@ func build_set (values: #[k]) -> (table: own Set k): Set k =>
     `
 func leak (candidate: Result [U32, #[U32]]): Result [U32, #[U32]] =>
   return Result.map (func value => return value + 1) candidate
-#entry func main (x: U32): U32 =>
+io main (x: U32): U32 =>
   let child = #[x, x + 1]
   let mapped = leak ($Err child)
   return case mapped of

@@ -1,15 +1,25 @@
 ["import" "from" "as"] @keyword.control.import
 (export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
-[(entry_modifier) (kernel_modifier) (process_modifier)] @keyword.storage.modifier
-(entry_binding (binding_keyword) @keyword.storage.type)
+[(kernel_modifier) (process_modifier)] @keyword.storage.modifier
 (private_modifier) @variable
+(io_modifier) @variable
+((io_function_header
+    (io_modifier) @keyword.storage.modifier) @_io_function
+  (#match? @_io_function "^(private[ \t]+)?io[ \t]+"))
+((io_function_header
+    (private_modifier) @keyword.storage.modifier) @_io_private_function
+  (#match? @_io_private_function "^private[ \t]+io[ \t]+"))
+((entry_binding
+    (io_modifier) @keyword.storage.modifier) @_io_binding
+  (#match? @_io_binding "^io[ \t]+(const|let)"))
+(entry_binding (binding_keyword) @keyword.storage.type)
 ((named_function_header
     (private_modifier) @keyword.storage.modifier) @_named_function
-  (#match? @_named_function "^(private[ \t]+)?(#entry[ \t]+)?func"))
+  (#match? @_named_function "^(private[ \t]+)?func"))
 "func" @keyword.function
 ((private_binding (private_modifier) @keyword.storage.modifier) @_private
-  (#match? @_private "^private[ \t]+(#entry[ \t]+)?(const|let)"))
+  (#match? @_private "^private[ \t]+(io[ \t]+)?(const|let)"))
 ((private_effect_header (private_modifier) @keyword.storage.modifier) @_private_effect
   (#match? @_private_effect "^private[ \t]+effect"))
 ((type_header . (private_modifier) @keyword.storage.modifier) @_private_type
@@ -49,6 +59,9 @@
 (entry_kernel_function_header name: (identifier) @function)
 (entry_kernel_function_header parameter: (identifier) @variable.parameter)
 (entry_kernel_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
+(io_function_header name: (identifier) @function)
+(io_function_header parameter: (identifier) @variable.parameter)
+(io_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))
 (named_function_header name: (identifier) @function)
 (named_function_header parameter: (identifier) @variable.parameter)
 (named_function_header parameter: (parenthesized . (keyword "own")? . (identifier) @variable.parameter))

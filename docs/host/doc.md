@@ -58,10 +58,10 @@ Pass `--check-links` in CI to fail on any unresolved symbol link.
 
 Fenced ```` ```blot ```` blocks inside doc comments are checked and executed by `blot doc --test` and precompiled into self-contained ABI 8 `.wasm` bundles by `blot doc --html --out <dir>`:
 
-- **```` ```blot ````** (or ```` ```blot run ````) — compiles to ABI 8 Wasm and runs. Bare expressions/statements automatically import referenced public items from the documented module and wrap into `#entry`.
+- **```` ```blot ````** (or ```` ```blot run ````) — compiles to ABI 8 Wasm and runs. Bare expressions/statements automatically import referenced public items from the documented module and wrap into `io`.
   - Add a trailing `// => <expected>` comment on the final expression to assert its output (supports `U32`, `F32`, `Bool`, `Unit`, `Text`, `#[U32]`, and `#[F32]`).
   - First-class `test "..."` and `test expect_trap "..."` blocks compile with `--test` and run every test.
-- **```` ```blot check ````** / **```` ```blot no_run ````** — type-checked without requiring an ABI 8 `#entry` return type or executing at runtime.
+- **```` ```blot check ````** / **```` ```blot no_run ````** — type-checked without requiring an ABI 8 `io` return type or executing at runtime.
 - **```` ```blot ignore ````** — displayed in docs without compiling.
 
 The generated HTML site embeds compiled examples in `examples.js` alongside a zero-dependency pure-JS ABI 8 + `blot:traps` v1 + BTST v1 runner (`runner.js`). Clicking **▶ Run** executes the WebAssembly module directly in the browser with no backend server (compatible with GitHub Pages, static CDNs, and local `file://` previews).

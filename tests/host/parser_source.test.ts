@@ -37,6 +37,12 @@ function previous(prepared: PreparedSource, range: ParseRange = {}) {
     if (token.text === "import") importDeclaration = true;
     if (token.text === "\uE000") importDeclaration = false;
     if (
+      token.text === "io" &&
+      (index === 0 || prepared.tokens[index - 1]?.text === "\uE000")
+    ) {
+      neutral[token.span.start - start + 1] = "O";
+    }
+    if (
       importDeclaration && token.text === "froM" &&
       prepared.tokens[index + 1]?.text.startsWith('"')
     ) {
@@ -81,7 +87,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
       "const fraction = 1.25",
       "const bounded: U32 where { self < 100 } = 42",
       "const same = func (value: U32 where { self < 1000 }) => return value",
-      "#entry const result = func () => return do:",
+      "io const result = func () => return do:",
       "  let value = 19",
       "  break @u32.add value 23",
       "",

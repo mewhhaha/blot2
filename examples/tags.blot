@@ -4,17 +4,17 @@ func twice value => value * 2
 
 @[add 1]
 @[twice]
-#entry const answer: U32 = 20
+io const answer: U32 = 20
 
-@[func value => @u32.eq value 42] #entry const truth: Bool = 42
+@[func value => @u32.eq value 42] io const truth: Bool = 42
 
 // A let tag runs once when the module starts.
-@[add 1] #entry let initialized: U32 = 41
+@[add 1] io let initialized: U32 = 41
 
 // The annotation describes the decorated function.
 @[func function => func value => function value + 1]
-#entry func next (value: U32): U32 => value
+io next (value: U32): U32 => value
 
 // A syntactic lambda can become a scalar after decoration.
 @[func function => function 41]
-#entry const reduced: U32 = func (value: U32) => value + 1
+io const reduced: U32 = func (value: U32) => value + 1

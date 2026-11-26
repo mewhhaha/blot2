@@ -7,7 +7,7 @@ Deno.test("effectful callback rows cannot be erased when passed to pure callback
   await compileExpectedFailure(
     `effect Read: Unit -> U32
 const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()
-#entry const answer: Unit -> U32 ! {Read} = func unit => return consume Read
+io const answer: Unit -> U32 ! {Read} = func unit => return consume Read
 `,
     "effect_mismatch",
     undefined,
@@ -20,7 +20,7 @@ Deno.test("effectful callback mismatch names the expected and actual argument in
   const entry = `${directory}/main.blot`;
   const invalid = `effect Read: Unit -> U32
 const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()
-#entry const answer: Unit -> U32 = func unit => return consume Read
+io const answer: Unit -> U32 = func unit => return consume Read
 `;
   const corrected = invalid.replace("consume Read", "consume (func () => return 42)");
   const executable = Deno.args[0] ??

@@ -3,7 +3,7 @@
 // LangArena's custom eight-lane digest; this is not cryptographic SHA-256.
 // Byte values use U32 storage: four bytes per byte, with the same 0..255 values.
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 const prepare = func (bytes: own Array U32) -> (size: U32): Array U32 => return do:
   for index in 0 .. size:
@@ -34,7 +34,7 @@ const run = func (bytes: Array U32) -> (size: U32): U32 => return do:
   let digest: Array U32 = simple_digest bytes size (@array.fill 32 0)
   return digest[0] | (digest[1] << 8) | (digest[2] << 16) | (digest[3] << 24)
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let size = inputs[0]
   let iterations = inputs[1]

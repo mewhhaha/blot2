@@ -63,7 +63,7 @@ func f32_bits (x: F32): U32 =>
 
 type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
-#entry func contig_step (packed: U32): #[U32] =>
+io contig_step (packed: U32): #[U32] =>
   let n = packed & 255
   let steps = (packed >> 8) & 255
   let mode = (packed >> 16) & 255
@@ -113,7 +113,7 @@ type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
         out[b] := 0
   return out
 
-#entry func indirect_step (packed: U32): #[U32] =>
+io indirect_step (packed: U32): #[U32] =>
   let n = packed & 255
   let m = (packed >> 8) & 255
   let steps = (packed >> 16) & 15
@@ -314,7 +314,7 @@ func f32_bits (x: F32): U32 =>
   let (b, _, _, _) = simd.f32_bits (x, 0.0, 0.0, 0.0)
   return b
 
-#entry func matmul_rect (packed: U32): #[U32] =>
+io matmul_rect (packed: U32): #[U32] =>
   let rows = packed & 63
   let inner = (packed >> 6) & 63
   let cols = (packed >> 12) & 63
@@ -477,7 +477,7 @@ func f32_bits (x: F32): U32 =>
   let (b, _, _, _) = simd.f32_bits (x, 0.0, 0.0, 0.0)
   return b
 
-#entry func init_u32_1step (packed: U32): #[U32] =>
+io init_u32_1step (packed: U32): #[U32] =>
   let start = packed & 255
   let end = (packed >> 8) & 255
   let cap = (packed >> 16) & 255
@@ -492,7 +492,7 @@ func f32_bits (x: F32): U32 =>
   out[cap] := s
   return out
 
-#entry func init_f32_2step (n: U32): #[U32] =>
+io init_f32_2step (n: U32): #[U32] =>
   let a = @array.fill n 0.0
   let b = @array.fill n 0.0
   let s: U32 = 12345
@@ -563,7 +563,7 @@ func f32_bits (x: F32): U32 =>
 });
 
 Deno.test("Tier 6C: dual-stream 8-pixel v128 escape SIMD across 8-pixel, 4-pixel tail & scalar tail", async () => {
-  const src = `#entry func mandel_check (packed: U32): U32 =>
+  const src = `io mandel_check (packed: U32): U32 =>
   let size = packed & 255
   let limit = (packed >> 8) & 255
   let inv = 1.0 / U32.to_f32 size

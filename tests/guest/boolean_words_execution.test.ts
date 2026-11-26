@@ -2,13 +2,13 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("primitive boolean words preserve precedence patterns and short circuit without a prelude", async () => {
   await compileAndRun(`
-#entry const precedence = func () => return true or false and false
-#entry const conjunction = func (value: Bool) => return value and (@panic "evaluated right")
-#entry const disjunction = func (value: Bool) => return value or (@panic "evaluated right")
-#entry const classify = func (value: Bool) => return case value of
+io const precedence = func () => return true or false and false
+io const conjunction = func (value: Bool) => return value and (@panic "evaluated right")
+io const disjunction = func (value: Bool) => return value or (@panic "evaluated right")
+io const classify = func (value: Bool) => return case value of
   true => 42
   false => 7
-#entry const scoped = func (value: Bool) => return do:
+io const scoped = func (value: Bool) => return do:
   let calls: Array U32 = #[0]
   let result = value and (do:
     calls[0] := @u32.add calls[0] 1
@@ -30,6 +30,6 @@ Deno.test("primitive boolean words preserve precedence patterns and short circui
 });
 
 Deno.test("boolean operands remain checked on skipped branches", async () => {
-  await compileExpectedFailure("#entry const value = false and 42\n", "type_mismatch", undefined, { prelude: "none" });
-  await compileExpectedFailure("#entry const value = true or 42\n", "type_mismatch", undefined, { prelude: "none" });
+  await compileExpectedFailure("io const value = false and 42\n", "type_mismatch", undefined, { prelude: "none" });
+  await compileExpectedFailure("io const value = true or 42\n", "type_mismatch", undefined, { prelude: "none" });
 });

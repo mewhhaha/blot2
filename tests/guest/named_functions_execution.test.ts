@@ -15,8 +15,8 @@ Deno.test("named functions execute curried calls and partial applications alongs
     `func add (left: U32) -> (right: U32) : U32 => return @u32.add left right
 const plus_two = add 2
 const identity = func value => return value
-#entry func apply (value: U32) : U32 => return identity (plus_two value)
-#entry func answer () : U32 => return add 20 22
+io apply (value: U32) : U32 => return identity (plus_two value)
+io answer () : U32 => return add 20 22
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -30,12 +30,12 @@ const identity = func value => return value
 
 Deno.test("named forward references and direct and mutual recursion execute their base cases", async () => {
   await compileAndRun(
-    `#entry func forward (value: U32) : U32 => return later value
+    `io forward (value: U32) : U32 => return later value
 func sum (value: U32) : U32 => return if @u32.eq value 0 then 0 else @u32.add value (sum (@u32.sub value 1))
 func even (value: U32) : Bool => return if @u32.eq value 0 then true else odd (@u32.sub value 1)
 func odd (value: U32) : Bool => return if @u32.eq value 0 then false else even (@u32.sub value 1)
 func later (value: U32) : U32 => return sum value
-#entry func parity (value: U32) : Bool => return even value
+io parity (value: U32) : Bool => return even value
 `,
     (guest) => {
       for (const value of [0, 1, 2, 6, 12]) {
@@ -51,7 +51,7 @@ Deno.test("a tag decorates the whole named function without flattening its param
   await compileAndRun(
     `const decorate = func function => return func (value: U32) => return @u32.add (function value) 1
 @[decorate]
-#entry func increment (value: U32) : U32 => return value
+io increment (value: U32) : U32 => return value
 `,
     (guest) => {
       for (const value of [0, 1, 41, 100]) {
@@ -71,7 +71,7 @@ Deno.test("named function tags reject changed dispatch parameters and written re
     ]
   ) {
     await compileExpectedFailure(
-      `const replace = ${wrapper}\n@[replace]\n#entry func identity (x: U32): U32 => return x\n`,
+      `const replace = ${wrapper}\n@[replace]\nio identity (x: U32): U32 => return x\n`,
       "type_mismatch",
       undefined,
       { prelude: "none" },
@@ -84,7 +84,7 @@ Deno.test("project imports expose public named functions while private helpers s
   const entry = `${directory}/main.blot`;
   const accepted = `import { increment as renamed } from "./library"
 import * as library from "./library"
-#entry func answer (value: U32) : U32 => return @u32.add (renamed value) (library.increment value)
+io answer (value: U32) : U32 => return @u32.add (renamed value) (library.increment value)
 `;
   try {
     await Deno.writeTextFile(
@@ -114,15 +114,15 @@ func increment (value: U32) : U32 => return hidden value
       for (
         const [source, code] of [
           [
-            'import { hidden } from "./library"\n#entry func answer () : U32 => return hidden 40\n',
+            'import { hidden } from "./library"\nio answer () : U32 => return hidden 40\n',
             "unknown_export",
           ],
           [
-            'import * as library from "./library"\n#entry func answer () : U32 => return library.hidden 40\n',
+            'import * as library from "./library"\nio answer () : U32 => return library.hidden 40\n',
             "unknown_value",
           ],
           [
-            'export { hidden } from "./library"\n#entry func answer () : U32 => return 42\n',
+            'export { hidden } from "./library"\nio answer () : U32 => return 42\n',
             "unknown_export",
           ],
         ] as const
@@ -176,10 +176,10 @@ type Trace is effect = { trace: U32 -> Unit }
 func traced (value: U32): U32 ! {Trace} => return do:
   Trace.trace value
   break value
-#entry func equal (value: U32): Bool => return eq value 42
-#entry func answer (): U32 => return @u32.add (unbox (from 42)) (unbox Box.zero)
+io equal (value: U32): Bool => return eq value 42
+io answer (): U32 => return @u32.add (unbox (from 42)) (unbox Box.zero)
 const provider = @effect.provider Trace.trace (func value => return ())
-#entry func effectful (value: U32): U32 => return do provider:
+io effectful (value: U32): U32 => return do provider:
   break traced value
 `,
       (guest) => {

@@ -18,7 +18,7 @@ const read_first = func (fallback: F32) -> (pool: Array (Envelope F32)): (F32, U
   let box_val = unbox fallback first.box
   let $Pair (id, amount) = pair_or ($Pair (0, 0.0)) first.pair
   return (box_val, id, amount)
-#entry const answer = func (input: F32) => return do:
+io const answer = func (input: F32) => return do:
   let floats: Array (Envelope F32) = #[$Envelope {box: $Some ($Box {value: input}), pair: $Some ($Pair (7, input + 1.0))}]
   let integers: Array (Envelope U32) = #[$Envelope {box: $Some ($Box {value: 13}), pair: $Nothing}]
   let (first_box, first_id, first_amount) = read_first (-1.0) floats

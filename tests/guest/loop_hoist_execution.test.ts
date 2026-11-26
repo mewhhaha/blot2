@@ -5,7 +5,7 @@ Deno.test("loop check hoisting, element address reuse, and zero-alloc loop elisi
 type Cell is data = $Cell { x: F32, y: F32 }
 
 // 1. Nested loop + if-let in-place updates (hoisted array checks + CheckedElem read-then-write)
-#entry func nested_match_update (n: U32): U32 =>
+io nested_match_update (n: U32): U32 =>
   let xs: #[Maybe Cell] = @array.fill n ($Some ($Cell { x: 1.0, y: 2.0 }))
   let ys: #[Maybe Cell] = @array.fill n ($Some ($Cell { x: 0.5, y: 0.25 }))
   for _ in 0 .. 4:
@@ -21,7 +21,7 @@ type Cell is data = $Cell { x: F32, y: F32 }
 
 // 2. Non-in-place array carry swapping between two arrays in a noStorageResize loop
 //    (must NOT hoist the carried handle across the swap!)
-#entry func swap_array_carry (steps: U32): U32 =>
+io swap_array_carry (steps: U32): U32 =>
   let a = #[10, 20, 30]
   let b = #[100, 200, 300]
   let cur = a
@@ -36,7 +36,7 @@ type Cell is data = $Cell { x: F32, y: F32 }
   return sum
 
 // 3. Resizing loop inside a nested match/loop (must invalidate cached base/len on push!)
-#entry func nested_resize_growth (n: U32): U32 =>
+io nested_resize_growth (n: U32): U32 =>
   let out: #[U32] = #[1]
   for outer in 0 .. 2:
     for i in 0 .. n:
@@ -46,7 +46,7 @@ type Cell is data = $Cell { x: F32, y: F32 }
 
 // 4. Zero-alloc inner \`for ever:\` with \`break\` nested inside an allocating outer loop
 //    (outer loop must still reclaim its per-iteration scratch allocations safely)
-#entry func zero_alloc_inner_forever (rounds: U32): U32 =>
+io zero_alloc_inner_forever (rounds: U32): U32 =>
   let total: U32 = 0
   for r in 0 .. rounds:
     let scratch = @array.fill 2048 r
@@ -59,7 +59,7 @@ type Cell is data = $Cell { x: F32, y: F32 }
   return total
 
 // 5. Same-index read-then-write and array spread in one function
-#entry func spread_and_reuse (seed: U32): U32 =>
+io spread_and_reuse (seed: U32): U32 =>
   let base = #[seed, seed + 1, seed + 2]
   let expanded = #[99, ...base, 77]
   let dst = expanded.copy

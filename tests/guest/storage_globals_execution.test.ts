@@ -13,9 +13,9 @@ const value_of = func (sample: Sample): F32 => return case sample of
 const word_of = func (sample: Sample): U32 => return case sample of
   $Reading {word, value} => word
   $Empty => 7
-#entry const values = func () => return #[value_of saved[0], value_of saved[2]]
-#entry const words = func () => return #[word_of saved[0], word_of saved[1], word_of saved[2]]
-#entry const change_copy = func () => return do:
+io const values = func () => return #[value_of saved[0], value_of saved[2]]
+io const words = func () => return #[word_of saved[0], word_of saved[1], word_of saved[2]]
+io const change_copy = func () => return do:
   let local = @storage.copy samples
   @storage.truncate local 0
   @storage.push local $Empty
@@ -46,8 +46,8 @@ const build = func (items: Array U32): Array U32 => return do:
   return result
 const rows: Array U32 = build seed
 const saved: Array U32 = @storage.copy seed
-#entry const read = func () => return rows[@u32.sub (@storage.length rows) 1] + saved[0]
-#entry const change_copy = func (value: U32) => return do:
+io const read = func () => return rows[@u32.sub (@storage.length rows) 1] + saved[0]
+io const change_copy = func (value: U32) => return do:
   let local_seed = @storage.copy seed
   let local_rows = @storage.copy rows
   @storage.push local_seed value
@@ -69,7 +69,7 @@ Deno.test("failed computed initialization traps at instantiation", async () => {
     `
 const build = func (): Array U32 => return @panic "initialization fails"
 const rows: Array U32 = build ()
-#entry const answer = func () => return rows[0]
+io const answer = func () => return rows[0]
 `,
     () => {},
   ), WebAssembly.RuntimeError);

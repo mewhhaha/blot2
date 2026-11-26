@@ -54,7 +54,7 @@ type GeneratorCompilerOptions = {
 export interface BlotGeneratorOptions extends GeneratorCompilerOptions {
   /** Path to the Stage 0 Blot entry file, relative to the working directory. */
   readonly generator: string | URL;
-  /** Name of the generator function marked #entry. Defaults to generate. */
+  /** Name of the generator function marked io. Defaults to generate. */
   readonly exportName?: string;
   /** Raw bytes by default, or strict UTF-8 decoded to Unicode scalars. */
   readonly inputMode?: BlotGeneratorInputMode;
@@ -520,7 +520,7 @@ async function compile(
     if (!fn) {
       throw new BlotGeneratorError(
         "compile",
-        `Missing #entry function ${name} in generator ${entry}`,
+        `Missing io entry function ${name} in generator ${entry}`,
       );
     }
     if (
@@ -559,22 +559,39 @@ async function compile(
     const filename = captured.entry;
     const original = captured.sources[filename];
     const tokens = scan(original);
-    const marker = tokens.findIndex((token, i) =>
-      token.text === "#" && tokens[i + 1]?.text === "entry" &&
-      (tokens[i + 2]?.text === "private"
-          ? tokens[i + 4]?.text
-          : tokens[i + 3]?.text) === name
-    );
+    const marker = tokens.findIndex((token, i) => {
+      if (token.text !== "io") return false;
+      const prev = tokens[i - 1];
+      if (
+        prev &&
+        prev.text !== "private" &&
+        prev.text !== "]" &&
+        !/[\r\n]/.test(
+          original.slice(prev.start + prev.text.length, token.start),
+        )
+      ) return false;
+      const next = tokens[i + 1];
+      if (!next) return false;
+      if (next.text === "const" || next.text === "let") {
+        return tokens[i + 2]?.text === name;
+      }
+      return next.text === name;
+    });
     if (marker === -1) {
       throw new BlotGeneratorError(
         "compile",
-        `Missing #entry function ${name} in generator ${entry}`,
+        `Missing io entry function ${name} in generator ${entry}`,
       );
     }
-    // Keep the declaration at column one after stripping the entry marker.
+    // Keep the declaration at column one after demoting the io entry marker.
     const start = tokens[marker].start;
-    const end = tokens[marker + 2].start;
-    const source = original.slice(0, start) + original.slice(end);
+    const isValueDecl = tokens[marker + 1]?.text === "const" ||
+      tokens[marker + 1]?.text === "let";
+    const end = isValueDecl
+      ? tokens[marker + 1].start
+      : tokens[marker].start + tokens[marker].text.length;
+    const replacement = isValueDecl ? "" : "func";
+    const source = original.slice(0, start) + replacement + original.slice(end);
     const usedNames = new Set(tokens.map((token) => token.text));
     let adapter = "_blot_stage0";
     while (usedNames.has(adapter)) adapter += "_";
@@ -606,7 +623,7 @@ async function compile(
           sources: {
             ...captured.sources,
             [filename]: source +
-              `\n#entry func ${adapter} (packet: #[U32]): #[U32] =>\n` +
+              `\nio ${adapter} (packet: #[U32]): #[U32] =>\n` +
               unpack +
               pack,
           },

@@ -146,11 +146,10 @@ Deno.test("diagnostics: canonical codes and explain catalog", async () => {
 });
 
 Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point column", () => {
-  const source =
-    "#entry func main (): U32 =>\n  // café ✓\n  return bad_name\n";
+  const source = "io main (): U32 =>\n  // café ✓\n  return bad_name\n";
   const bytes = new TextEncoder().encode(source);
   const start = new TextEncoder().encode(
-    "#entry func main (): U32 =>\n  // café ✓\n  return ",
+    "io main (): U32 =>\n  // café ✓\n  return ",
   ).length;
   const end = start + "bad_name".length;
   equal(bytes.length > end, true);
@@ -163,7 +162,7 @@ Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point colu
   };
   const rendered = formatDiagnostic(record, { source });
   match(rendered, /\[UNKNOWN_VALUE\]/);
-  match(rendered, /in unicode\.blot › #entry func main/);
+  match(rendered, /in unicode\.blot › io main/);
   match(rendered, /at unicode\.blot:3:10/);
   match(rendered, /3 \|   return bad_name/);
   match(rendered, /\^\^\^\^\^\^\^\^ did you mean `good_name`\?/);
@@ -194,11 +193,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
       {
         name: "bare_list.blot",
         cmd: "check",
-        source: "#entry func main (): #[U32] => return [1, 2, 3]\n",
+        source: "io main (): #[U32] => return [1, 2, 3]\n",
         patterns: [
           /\[UNSUPPORTED_EXPRESSION\]/,
-          /in bare_list\.blot › #entry func main/,
-          /at .*bare_list\.blot:1:39/,
+          /in bare_list\.blot › io main/,
+          /at .*bare_list\.blot:1:30/,
           /use `#\[\.\.\.\]` here/,
           /fix: Replace bare `\[\.\.\.\]` with `#\[\.\.\.\]`/,
           /doc: blot explain UNSUPPORTED_EXPRESSION/,
@@ -208,11 +207,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "missing_dollar.blot",
         cmd: "check",
         source:
-          "type Opt is data = $Some U32 | $Nothing\n#entry func main (): Opt => return Some 1\n",
+          "type Opt is data = $Some U32 | $Nothing\nio main (): Opt => return Some 1\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in missing_dollar\.blot › #entry func main/,
-          /at .*missing_dollar\.blot:2:36/,
+          /in missing_dollar\.blot › io main/,
+          /at .*missing_dollar\.blot:2:27/,
           /add `\$` -> `\$Some`/,
           /fix: Prefix the data constructor with `\$`: use `\$Some`/,
         ],
@@ -221,11 +220,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "typo_name.blot",
         cmd: "check",
         source:
-          "func compute_total (x: U32): U32 => return x + 1\n#entry func main (): U32 => return compute_totla 5\n",
+          "func compute_total (x: U32): U32 => return x + 1\nio main (): U32 => return compute_totla 5\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in typo_name\.blot › #entry func main/,
-          /at .*typo_name\.blot:2:36/,
+          /in typo_name\.blot › io main/,
+          /at .*typo_name\.blot:2:27/,
           /did you mean `compute_total`\?/,
           /fix: Replace `compute_totla` with `compute_total`\./,
         ],
@@ -234,11 +233,11 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "missing_field.blot",
         cmd: "check",
         source:
-          "type Pt = { x: U32, y: U32 }\n#entry func main (): U32 =>\n  let p: Pt = { x: 1, y: 2 }\n  return p.z\n",
+          "type Pt = { x: U32, y: U32 }\nio main (): U32 =>\n  let p: Pt = { x: 1, y: 2 }\n  return p.z\n",
         patterns: [
           /\[MISSING_MEMBER\]/,
           /Type `\{ x: U32, y: U32 \}` has no field or member `\.z`/,
-          /in missing_field\.blot › #entry func main/,
+          /in missing_field\.blot › io main/,
           /at .*missing_field\.blot:4:10/,
           /fix: Available fields on `\{ x: U32, y: U32 \}`: `x`, `y`\./,
         ],
@@ -246,7 +245,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
       {
         name: "type_mismatch.blot",
         cmd: "check",
-        source: "#entry func main (): U32 => return 1.5\n",
+        source: "io main (): U32 => return 1.5\n",
         patterns: [
           /\[TYPE_MISMATCH\]/,
           /F32.*U32|U32.*F32/,
@@ -258,10 +257,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "spent_value.blot",
         cmd: "build",
         source:
-          "func consume (xs: own #[U32]): U32 => return xs.length\n#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
+          "func consume (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
         patterns: [
           /\[SPENT_VALUE\] `a` was already moved at line 4/,
-          /in spent_value\.blot › #entry func main/,
+          /in spent_value\.blot › io main/,
           /at .*spent_value\.blot:5:14/,
           /--------- `a` moved here/,
           /\^\^\^\^\^\^\^\^ `a` used after move/,
@@ -273,10 +272,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "aliased_update.blot",
         cmd: "build",
         source:
-          "#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
+          "io main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate `a` in place while `b` still borrows it/,
-          /in aliased_update\.blot › #entry func main/,
+          /in aliased_update\.blot › io main/,
           /at .*aliased_update\.blot:4:3/,
           /--------- borrowed by `b` here/,
           /\^\^\^\^\^\^\^\^\^\^ mutated while borrowed/,
@@ -288,7 +287,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "param_update.blot",
         cmd: "build",
         source:
-          "func bad (a: #[U32]): #[U32] =>\n  a[0] := 99\n  return a\n#entry func main (): U32 => return (bad #[1, 2])[0]\n",
+          "func bad (a: #[U32]): #[U32] =>\n  a[0] := 99\n  return a\nio main (): U32 => return (bad #[1, 2])[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate borrowed parameter `a` in place without `own`/,
           /in param_update\.blot › func bad/,
@@ -301,10 +300,10 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
         name: "unhandled_effect.blot",
         cmd: "build",
         source:
-          "type Clock is effect = { now: Unit -> U32 }\n#entry func main (): U32 =>\n  use t <- Clock.now ()\n  return t\n",
+          "type Clock is effect = { now: Unit -> U32 }\nio main (): U32 =>\n  use t <- Clock.now ()\n  return t\n",
         patterns: [
           /\[ENTRY_TYPE\] Entry function leaves effect `Clock\.now` unhandled/,
-          /in unhandled_effect\.blot › #entry func main/,
+          /in unhandled_effect\.blot › io main/,
           /unhandled effect `Clock\.now`/,
           /fix: Handle `Clock\.now` inside the entry function with `with Clock = \{ now:/,
           /doc: blot explain ENTRY_TYPE/,
@@ -351,7 +350,7 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
       {
         name: "bare_list.blot",
         cmd: "build",
-        source: "#entry func main (): #[U32] => return [1, 2, 3]\n",
+        source: "io main (): #[U32] => return [1, 2, 3]\n",
         expectedSnippet: /#\[1, 2, 3\]/,
       },
       {
@@ -371,42 +370,41 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
         name: "typo_ident.blot",
         cmd: "build",
         source:
-          "func compute_total (x: U32): U32 => return x + 1\n#entry func main (): U32 => return compute_totla 5\n",
+          "func compute_total (x: U32): U32 => return x + 1\nio main (): U32 => return compute_totla 5\n",
         expectedSnippet: /return compute_total 5/,
       },
       {
         name: "dot_len.blot",
         cmd: "build",
-        source:
-          "#entry func main (): U32 =>\n  let xs = #[1, 2, 3]\n  return xs.len\n",
+        source: "io main (): U32 =>\n  let xs = #[1, 2, 3]\n  return xs.len\n",
         expectedSnippet: /return xs\.length/,
       },
       {
         name: "spent_whole_local.blot",
         cmd: "build",
         source:
-          "func consume (xs: own #[U32]): U32 => return xs.length\n#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
+          "func consume (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
         expectedSnippet: /consume a\.copy/,
       },
       {
         name: "spent_field_projection.blot",
         cmd: "build",
         source:
-          "type Row = { xs: #[U32] }\nfunc fill (xs: own #[U32]): U32 => return xs.length\n#entry func main (): U32 =>\n  let row: Row = { xs: #[1, 2, 3] }\n  let n = fill row.xs\n  return n + row.xs.length\n",
+          "type Row = { xs: #[U32] }\nfunc fill (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let row: Row = { xs: #[1, 2, 3] }\n  let n = fill row.xs\n  return n + row.xs.length\n",
         expectedSnippet: /fill \(row\.xs\.copy\)/,
       },
       {
         name: "aliased_local_borrow.blot",
         cmd: "build",
         source:
-          "#entry func main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
+          "io main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
         expectedSnippet: /let b = a\.copy/,
       },
       {
         name: "aliased_nested_param.blot",
         cmd: "build",
         source:
-          "func f (xs: #[(U32, U32)]): #[(U32, U32)] =>\n  xs[0] := (1, 2)\n  return xs\n#entry func main (): U32 =>\n  let out = f #[(0, 0)]\n  let (a, b) = out[0]\n  return a + b\n",
+          "func f (xs: #[(U32, U32)]): #[(U32, U32)] =>\n  xs[0] := (1, 2)\n  return xs\nio main (): U32 =>\n  let out = f #[(0, 0)]\n  let (a, b) = out[0]\n  return a + b\n",
         expectedSnippet:
           /func f \(xs: own #\[\(U32, U32\)\]\): #\[\(U32, U32\)\]/,
       },
@@ -414,14 +412,14 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
         name: "own_argument_param.blot",
         cmd: "build",
         source:
-          "func consume (xs: own #[U32]): #[U32] => return xs\nfunc forward (xs: #[U32]): #[U32] => return consume xs\n#entry func main (): U32 => return (forward #[1, 2]).length\n",
+          "func consume (xs: own #[U32]): #[U32] => return xs\nfunc forward (xs: #[U32]): #[U32] => return consume xs\nio main (): U32 => return (forward #[1, 2]).length\n",
         expectedSnippet: /func forward \(xs: own #\[U32\]\): #\[U32\]/,
       },
       {
         name: "result_not_owned.blot",
         cmd: "build",
         source:
-          "func pick (xs: #[U32]): #[U32] => return xs\n#entry func main (): U32 => return (pick #[1, 2]).length\n",
+          "func pick (xs: #[U32]): #[U32] => return xs\nio main (): U32 => return (pick #[1, 2]).length\n",
         expectedSnippet: /return xs\.copy/,
       },
     ];
@@ -550,7 +548,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
     const checkFile = join(tempDir, "check_err.blot");
     await Deno.writeTextFile(
       checkFile,
-      "#entry func main (): U32 => return 1.5\n",
+      "io main (): U32 => return 1.5\n",
     );
     const checkRun = await runCapturedCli(["check", checkFile, "--json"]);
     equal(checkRun.code, 1);
@@ -568,7 +566,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
     equal(typeof checkDiag.end, "number");
     equal(typeof checkDiag.message, "string");
     equal(typeof checkDiag.headline, "string");
-    equal(checkDiag.scope, "#entry func main");
+    equal(checkDiag.scope, "io main");
     equal(checkDiag.primarySpan.line, 1);
     ok(checkDiag.primarySpan.col >= 1);
     ok(Array.isArray(checkDiag.related));
@@ -579,7 +577,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
     const buildWasm = join(tempDir, "build_err.wasm");
     await Deno.writeTextFile(
       buildFile,
-      "type Row = { xs: #[U32] }\nfunc fill (xs: own #[U32]): U32 => return xs.length\n#entry func main (): U32 =>\n  let row: Row = { xs: #[1, 2, 3] }\n  let n = fill row.xs\n  return n + row.xs.length\n",
+      "type Row = { xs: #[U32] }\nfunc fill (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let row: Row = { xs: #[1, 2, 3] }\n  let n = fill row.xs\n  return n + row.xs.length\n",
     );
     const buildRun = await runCapturedCli([
       "build",
@@ -658,7 +656,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
   }
 });
 
-Deno.test("diagnostics: generator-backed blot check succeeds on libraries without #entry and fails on real errors", async () => {
+Deno.test("diagnostics: generator-backed blot check succeeds on libraries without io entries and fails on real errors", async () => {
   const tempDir = await Deno.makeTempDir({ prefix: "blot-gen-lib-check-" });
   try {
     await Deno.writeTextFile(
@@ -673,7 +671,7 @@ Deno.test("diagnostics: generator-backed blot check succeeds on libraries withou
     );
     await Deno.writeTextFile(
       join(tempDir, "generator.blot"),
-      "#entry func generate (bytes: #[U32]): #[U32] => return bytes\n",
+      "io generate (bytes: #[U32]): #[U32] => return bytes\n",
     );
     await Deno.writeTextFile(
       join(tempDir, "shape.txt"),
@@ -788,20 +786,20 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
     equal(strDiag.fix?.includes("#[U8]") ?? false, false);
   }
 
-  // 4. ENTRY_TYPE reflects raw #entry ABI-8 vs #kernel/#process
+  // 4. ENTRY_TYPE reflects raw io ABI-8 vs #kernel/#process
   const entryDiag = analyzeDiagnostic({
     filename: "e.blot",
     code: "entry_type",
     start: 0,
-    end: 5,
-    message: "Invalid #entry signature",
-  }, "#entry");
+    end: 2,
+    message: "Invalid io entry signature",
+  }, "io");
   match(entryDiag.fix ?? "", /#\[U32\]/);
   match(entryDiag.fix ?? "", /#kernel/);
 
   // 5. ALIASED_UPDATE inside a `with` handler or origin_kind === "aliased" gives distinct advice
   const withSrc = [
-    "#entry func main (): U32 =>",
+    "io main (): U32 =>",
     "  let xs = #[1, 2]",
     "  with Eff = { step: func () =>",
     "    xs[0] := 9",
@@ -856,7 +854,7 @@ Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile 
       if (idx >= 0) {
         const after = m[1].slice(idx + "// After\n".length).trim() + "\n";
         if (
-          /^(?:type|func|const|import|#entry|#kernel|#process)\b/.test(after)
+          /^(?:type|func|const|import|io|#kernel|#process)\b/.test(after)
         ) {
           afterBlocks.push(after);
         }

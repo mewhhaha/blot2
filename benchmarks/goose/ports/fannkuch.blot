@@ -1,7 +1,7 @@
 // From LangArena goose/src/fannkuchredux.goose and its Goose arena port.
 // Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 const fannkuchredux = func (n: U32): U32 => return do:
   let perm1: Array U32 = @array.generate 32 (func index => return index)
@@ -59,7 +59,7 @@ const fannkuchredux = func (n: U32): U32 => return do:
     perm_count := self + 1
   return 0
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let n = inputs[0]
   let iterations = inputs[1]

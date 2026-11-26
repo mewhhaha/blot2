@@ -20,13 +20,13 @@ import { instantiateGuest } from "../../host/guest.ts";
     const caller = `import * as left from "./palette"
 import * as right from "./other"
 type Noise is data = $Noise {m: Bool, unrelated: U32, z: F32, a: U32}
-#entry const answer = func (input: U32): Array U32 => return do:
+io const answer = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   return #[left.palette.z, left.palette.m, right.palette.z, right.palette.m, marker[0]]
-#entry const floating = func (): Array F32 => return do:
+io const floating = func (): Array F32 => return do:
   let marker: Array F32 = #[0.0]
   return #[left.palette.a, right.palette.a, marker[0]]
-#entry const trapped = func (): U32 => return do:
+io const trapped = func (): U32 => return do:
   let marker: Array U32 = #[0]
   return left.poison.z
 `;

@@ -20,7 +20,7 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
   );
   await Deno.writeTextFile(
     entry,
-    'import { lit } from "./middle"\n#entry func answer () => return if lit () then 41 else 17\n',
+    'import { lit } from "./middle"\nio answer () => return if lit () then 41 else 17\n',
   );
   const compiler = await createZigProjectCompiler(options);
   async function compare(request: ZigProjectBuildOptions) {
@@ -132,7 +132,7 @@ Deno.test("a function edit only invalidates its own callers when an independent 
   await Deno.writeTextFile(
     entry,
     'import { enabled } from "./reader"\nimport { tune } from "./tuning"\n' +
-      "#entry func answer () => return if enabled () then 0 else tune ()\n",
+      "io answer () => return if enabled () then 0 else tune ()\n",
   );
   const compiler = await createZigProjectCompiler(options);
   const fresh = await createZigProjectCompiler(options);
@@ -173,13 +173,13 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
   const values = dir + "/values.blot";
   const base = "const flag: Bool = true\nconst a: U32 = 7\nconst b: U32 = 13\n";
   const main = 'import * as v from "./values"\n' +
-    "#entry func answer (n: U32): U32 => return do:\n" +
+    "io answer (n: U32): U32 => return do:\n" +
     "  let rows: Array U32 = #[]\n" +
     "  for i in 0..n:\n" +
     "    rows := @array.append self (v.a + 3)\n" +
     "  return rows.length + (if (#run v.flag) then v.a else v.b)\n" +
-    "#entry func selected (): U32 => return (#run (if v.flag then v.a else v.b))\n" +
-    "#entry func scale (): F32 => return 0.25\n";
+    "io selected (): U32 => return (#run (if v.flag then v.a else v.b))\n" +
+    "io scale (): F32 => return 0.25\n";
   const options = {
     executable: Deno.args[0],
     entry,
@@ -256,7 +256,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits"
   await Deno.writeTextFile(
     entry,
     'import { left } from "./first"\nimport { right } from "./last"\n' +
-      "#entry func answer (): U32 => return combine (left () - right ()) 1\n",
+      "io answer (): U32 => return combine (left () - right ()) 1\n",
   );
   await Deno.writeTextFile(first, original);
   await Deno.writeTextFile(
@@ -341,7 +341,7 @@ Deno.test("entry names can change while dependency fields and imported bindings 
   }
   const body = (arg: string, expr: string) =>
     'import { read } from "./m14"\n' +
-    "#entry func answer (" + arg + ": U32): U32 => return " + expr + "\n";
+    "io answer (" + arg + ": U32): U32 => return " + expr + "\n";
   await Deno.writeTextFile(entry, body("host", "@u32.add host (read ())"));
   const options = {
     entry,
@@ -428,7 +428,7 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
   await Deno.writeTextFile(
     entry,
     imports.join("\n") +
-      "\n#entry func answer (n: U32): U32 => return @u32.add (bridge n) (v15 ())\n",
+      "\nio answer (n: U32): U32 => return @u32.add (bridge n) (v15 ())\n",
   );
   const options = {
     entry,
@@ -508,7 +508,7 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
     );
     await compare({ [bridge]: initialBridge.replace("./v0", "./other") }, 25);
     const small =
-      'import { bridge } from "./bridge"\n#entry func answer (n: U32): U32 => return bridge n\n';
+      'import { bridge } from "./bridge"\nio answer (n: U32): U32 => return bridge n\n';
     await compare({ [entry]: small }, 9, 3);
     await compare({}, 24);
   } finally {
@@ -528,7 +528,7 @@ Deno.test("an integer call argument can reuse a checked body across edits and re
     imports.push("import * as d" + i + ' from "./d' + i + '"');
   }
   const source = imports.join("\n") +
-    "\n#entry func answer (): U32 => return do:\n" +
+    "\nio answer (): U32 => return do:\n" +
     "  let a = numbers.sum 64 17\n" +
     "  let b = numbers.sum 64 17\n" +
     "  return @u32.add a b\n";
@@ -592,8 +592,8 @@ Deno.test("an integer call argument can reuse a checked body across edits and re
     );
     await compare(store, 162);
     await compare(store.replace("a = numbers.sum 64", "a = numbers.sum 65"), 163, true);
-    const staged = source.replace("#entry func answer", "func total") +
-      "#entry func answer (): U32 => return #run (total ())\n";
+    const staged = source.replace("io answer", "func total") +
+      "io answer (): U32 => return #run (total ())\n";
     await compare(staged, 162);
     await compare(staged.replace("a = numbers.sum 64", "a = numbers.sum 65"), 163, true);
   } finally {
@@ -636,8 +636,8 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
     'import * as w from "./worker"',
     'import * as k from "./kernel_dep"',
     "#kernel func kstep (x: U32): U32 => return k.scale x",
-    "#entry func answer (n: U32): U32 => return @u32.add (w.checked n) (w.bonus n)",
-    "#entry func run_k (x: U32): U32 => return k.scale x",
+    "io answer (n: U32): U32 => return @u32.add (w.checked n) (w.bonus n)",
+    "io run_k (x: U32): U32 => return k.scale x",
     "",
   ].join("\n");
   await Deno.writeTextFile(worker, baseWorker);
@@ -759,8 +759,8 @@ Deno.test("persistent trivia and single U32/F32 literal edits skip check and low
   const mainSource = [
     ...dummyImports,
     'import * as c from "./calc"',
-    "#entry func run_u32 (n: U32): U32 => return c.mix n",
-    "#entry func run_f32 (x: F32): F32 => return c.gain x",
+    "io run_u32 (n: U32): U32 => return c.mix n",
+    "io run_f32 (x: F32): F32 => return c.gain x",
     "",
   ].join("\n");
   await Deno.writeTextFile(calc, baseCalc);
@@ -858,7 +858,7 @@ Deno.test("structural body edits before data/effect declarations with new locals
   const mainSource = [
     ...dummyImports,
     'import { run_mid } from "./mid"',
-    "#entry func answer (n: U32): U32 => return run_mid n",
+    "io answer (n: U32): U32 => return run_mid n",
     "",
   ].join("\n");
   await Deno.writeTextFile(leaf, baseLeaf);
@@ -953,7 +953,7 @@ func odd (n: U32) => even n
     entry,
     `${imports.join("\n")}
 import { edited, evolving, even } from "./leaf"
-#entry func answer (n: U32): U32 =>
+io answer (n: U32): U32 =>
   let unused_evolving = evolving n
   let unused_recursive = even n
   return edited n

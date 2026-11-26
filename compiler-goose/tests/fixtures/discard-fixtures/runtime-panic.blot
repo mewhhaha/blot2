@@ -1,4 +1,4 @@
 const identity = func value => return value
-#entry const answer = func (value: U32) => return do:
+io const answer = func (value: U32) => return do:
   let ignored = (identity, (func input => return @panic "runtime operand") value, @u32.div 1 0)
   break 0

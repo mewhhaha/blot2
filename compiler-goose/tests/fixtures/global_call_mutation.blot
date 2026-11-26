@@ -4,15 +4,15 @@ const append_own = func (xs: own Array U32) -> (value: U32): Array U32 => return
   @storage.push xs (@u32.add (top xs) value)
   return xs
 const nested = func (xs: own Array U32) -> (value: U32): Array U32 => return append_own xs value
-#entry const mutate = func (value: U32): Array U32 => return do:
+io const mutate = func (value: U32): Array U32 => return do:
   let local = @storage.copy pool
   let before = @storage.length local
   local := nested self value
   let after = @storage.length local
   @storage.push local (@u32.add (top local) 2)
   return #[before, after, top pool, top local, @storage.length local]
-#entry const observe = func (index: U32): U32 => return pool[index]
-#entry const count = func (): U32 => return @storage.length pool
+io const observe = func (index: U32): U32 => return pool[index]
+io const count = func (): U32 => return @storage.length pool
 type Choice is data = $Empty | $Words {values: Array U32}
 const read_mixed = func (first: Array U32): U32 => return @u32.add (top first) (top pool)
 const read_choice = func (choice: Choice): U32 => return do:
@@ -20,13 +20,13 @@ const read_choice = func (choice: Choice): U32 => return do:
     $Empty => 7
     $Words {values} => top values
   return @u32.add before (top pool)
-#entry const mixed = func (flag: Bool): U32 => return do:
+io const mixed = func (flag: Bool): U32 => return do:
   let local: Array U32 = #[99]
   let selected = pool
   if flag:
     selected := local
   return read_mixed selected
-#entry const inactive = func (flag: Bool): U32 => return do:
+io const inactive = func (flag: Bool): U32 => return do:
   let choice = $Empty
   if flag:
     choice := $Words {values: pool}

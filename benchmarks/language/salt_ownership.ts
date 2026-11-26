@@ -18,7 +18,7 @@ const source = `import * as salt from "game/world/salt"
 import * as math from "ink/math"
 import * as pages from "ink/pages"
 import * as fixture from "test/support/owned_world"
-#entry func measure (observe: U32 -> U32): U32 => return fixture.with_salt (func access => return do:
+io measure (observe: U32 -> U32): U32 => return fixture.with_salt (func access => return do:
   access.salt.state[0].ready := true
   access.salt.state[0].cleaning_reset := false
   for i in 0 .. 8:

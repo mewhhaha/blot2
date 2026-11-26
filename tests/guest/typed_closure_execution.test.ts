@@ -21,23 +21,23 @@ const make_scalar = func (captured: U32) => return do:
 const invoke_left = func (callback: U32 -> U32) -> (argument: U32): U32 => return callback argument
 const invoke_right = func (callback: U32 -> U32) -> (argument: U32): U32 => return callback argument
 const invoke_twice = func (callback: U32 -> U32) -> (argument: U32): U32 => return @u32.add (invoke_left callback argument) (invoke_right callback argument)
-#entry const shared_parents = func (input: U32): U32 => return do:
+io const shared_parents = func (input: U32): U32 => return do:
   let marker: Array U32 = #[input]
   let first = invoke_twice (make_scalar marker[0]) 3
   let second = invoke_twice (make_scalar (@u32.add marker[0] 11)) 7
   return @u32.add first second
-#entry const integers = func (input: U32) => return do:
+io const integers = func (input: U32) => return do:
   let marker: Array U32 = #[input]
   let first = outer {value: marker[0], stamp: 3} {value: @u32.add marker[0] 7, stamp: 5}
   let second = outer {stamp: 11, value: @u32.add marker[0] 13} {stamp: 17, value: @u32.add marker[0] 19}
   return #[first.captured.value, first.captured.stamp, first.argument.value, first.argument.stamp, second.captured.value, second.captured.stamp, second.argument.value, second.argument.stamp]
-#entry const floating = func (input: F32) => return do:
+io const floating = func (input: F32) => return do:
   let first = outer {value: input, stamp: 23} {value: -0.0, stamp: 29}
   let second = outer {stamp: 31, value: @f32.add input 1.5} {stamp: 37, value: input}
   return #[first.captured.value, @u32.to_f32 first.captured.stamp, first.argument.value, @u32.to_f32 first.argument.stamp, second.captured.value, @u32.to_f32 second.captured.stamp, second.argument.value, @u32.to_f32 second.argument.stamp]
 type First is data = $First {value: U32}
 type Second is data = $Second {value: U32}
-#entry const nominals = func (input: U32) => return do:
+io const nominals = func (input: U32) => return do:
   let first = outer ($First {value: input}) ($Second {value: @u32.add input 1})
   let second = outer ($Second {value: @u32.add input 2}) ($First {value: @u32.add input 3})
   return #[first.captured.value, first.argument.value, second.captured.value, second.argument.value]
@@ -48,7 +48,7 @@ const update = func (captured: Array U32) -> (argument: own Array U32) -> (amoun
   let value = (reading captured) argument
   argument[0] := @u32.add value amount
   return argument
-#entry const descriptors = func (input: U32) => return do:
+io const descriptors = func (input: U32) => return do:
   let first: Array U32 = #[input, 31]
   let second: Array U32 = #[@u32.add input 10, 37]
   first := update (@storage.copy first) first 1
@@ -58,7 +58,7 @@ const update = func (captured: Array U32) -> (argument: own Array U32) -> (amoun
     second := update first second index
     total := @u32.add total ((reading second) first)
   return #[first[0], second[0], total, first[1], second[1]]
-#entry const snapshots = func (input: U32) => return do:
+io const snapshots = func (input: U32) => return do:
   let base = input
   let bound: U32 -> U32 = func value => return @u32.add base value
   let before = bound 1
@@ -69,7 +69,7 @@ const inspect = func (choice: Choice): U32 => return case choice of
   $Whole number => number
   $Fraction number => @u32.add 100 (@f32.to_u32 number)
   $Absent => 31
-#entry const variants = func (input: U32) => return do:
+io const variants = func (input: U32) => return do:
   let marker: Array U32 = #[input]
   let missing = inspect $Absent
   let whole = inspect ($Whole marker[0])

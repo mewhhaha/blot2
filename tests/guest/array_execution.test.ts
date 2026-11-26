@@ -3,11 +3,11 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("nested array spreads select inline result-directed conversions", async () => {
   await compileAndRun(`
-#entry const prefix = func (n: U32) : F32 => return do:
+io const prefix = func (n: U32) : F32 => return do:
   let rows: Array (Array F32) = #[#[1.0]]
   let xs: Array (Array F32) = #[#[from n], ...rows]
   break xs[0][0]
-#entry const suffix = func (n: U32) : F32 => return do:
+io const suffix = func (n: U32) : F32 => return do:
   let rows: Array (Array F32) = #[#[1.0]]
   let xs: Array (Array F32) = #[...rows, #[from n]]
   break xs[1][0]
@@ -23,13 +23,13 @@ Deno.test("generated arrays call captured scalar and aggregate callbacks in inde
   await compileAndRun(`
 type Item is data = $Item { value: U32 }
 const indices = @array.generate 3 (func index => return @u32.add index 40)
-#entry const staged: U32 = @array.get indices 2
-#entry const generated = func (offset: U32) : Array U32 => return @array.generate 4 (func index => return @u32.add index offset)
-#entry const floating = func (offset: F32) : Array F32 => return @array.generate 3 (func index => return @f32.add (@u32.to_f32 index) offset)
-#entry const nested = func (offset: U32) : U32 => return do:
+io const staged: U32 = @array.get indices 2
+io const generated = func (offset: U32) : Array U32 => return @array.generate 4 (func index => return @u32.add index offset)
+io const floating = func (offset: F32) : Array F32 => return @array.generate 3 (func index => return @f32.add (@u32.to_f32 index) offset)
+io const nested = func (offset: U32) : U32 => return do:
   let items = @array.generate 3 (func index => return $Item { value: @u32.add index offset })
   break (@array.get items 2).value
-#entry const empty = func () : Array U32 => return @array.generate 0 (func (index: U32) : U32 => return @panic "uncalled generator")
+io const empty = func () : Array U32 => return @array.generate 0 (func (index: U32) : U32 => return @panic "uncalled generator")
 `, guest => {
     equal(guest.read("staged"), 42);
     equal([...(guest.call("generated", 40) as Uint32Array)].join(","), "40,41,42,43");
@@ -41,21 +41,21 @@ const indices = @array.generate 3 (func index => return @u32.add index 40)
 
 // Constants run at instantiation, so a panicking generator traps there.
 Deno.test("array generation traps at instantiation on a panicking generator argument", async () => {
-  await rejects(compileAndRun(`#entry const value: U32 = @array.length (@array.generate 0 (@panic "generator argument"))\n`, () => {}), WebAssembly.RuntimeError);
+  await rejects(compileAndRun(`io const value: U32 = @array.length (@array.generate 0 (@panic "generator argument"))\n`, () => {}), WebAssembly.RuntimeError);
 });
 
 Deno.test("array generation traps at instantiation on a panicking first callback", async () => {
-  await rejects(compileAndRun(`#entry const value: U32 = @array.get (@array.generate 1 (func (index: U32) : U32 => return @panic "first index")) 0\n`, () => {}), WebAssembly.RuntimeError);
+  await rejects(compileAndRun(`io const value: U32 = @array.get (@array.generate 1 (func (index: U32) : U32 => return @panic "first index")) 0\n`, () => {}), WebAssembly.RuntimeError);
 });
 
 Deno.test("native arrays preserve snapshots through the existing array guest ABI", async () => {
   await compileAndRun(`
-#entry const fill = func (count: U32) : Array U32 => return @array.fill count 7
-#entry const empty = func () : Array U32 => return #[]
-#entry const replace = func (values: Array U32) : Array U32 => return @array.set values 0 42
-#entry const first = func (values: Array F32) : F32 => return @array.get values 0
-#entry const length = func (values: Array F32) : U32 => return @array.length values
-#entry const alias = func (value: U32) : U32 => return do:
+io const fill = func (count: U32) : Array U32 => return @array.fill count 7
+io const empty = func () : Array U32 => return #[]
+io const replace = func (values: Array U32) : Array U32 => return @array.set values 0 42
+io const first = func (values: Array F32) : F32 => return @array.get values 0
+io const length = func (values: Array F32) : U32 => return @array.length values
+io const alias = func (value: U32) : U32 => return do:
   let before = #[value, 2]
   let after = @array.set before 0 40
   break @u32.add (@array.get before 0) (@array.get after 0)
@@ -91,13 +91,13 @@ const place = func index => return do:
   let x = scaled index + 0.5
   break (x, x, index)
 const generate = func count => return func make => return @array.generate count make
-#entry const run = func (count: U32) : Bool => return do:
+io const run = func (count: U32) : Bool => return do:
   let positions = generate count place
   let flags = generate count (func index => return do:
     let (x, y, _) = positions[index]
     break @f32.eq (@f32.add x y) 1.0)
   break flags[0]
-#entry const independent = func () => return do:
+io const independent = func () => return do:
   let identity = func value => return value
   break @f32.add (@u32.to_f32 (identity 41)) (identity 1.5)
 `, guest => {
@@ -110,7 +110,7 @@ const generate = func count => return func make => return @array.generate count 
 Deno.test.ignore("a selected F32 local cannot acquire a U32 type from a later use", async () => {
   await compileExpectedFailure(`
 const scaled = func (value: U32) => return from value / 65536.0
-#entry const wrong = func (index: U32) : U32 => return do:
+io const wrong = func (index: U32) : U32 => return do:
   let x = scaled index + 0.5
   break @u32.add x 1
 `, "type_mismatch", undefined, { prelude: "std/prelude.blot" });
@@ -120,7 +120,7 @@ const scaled = func (value: U32) => return from value / 65536.0
 Deno.test.ignore("selected F32 data remains typed beside a callable in a destructured product", async () => {
   await compileAndRun(`
 const scaled = func (value: U32) => return from value / 65536.0
-#entry const run = func (index: U32) => return do:
+io const run = func (index: U32) => return do:
   let pair = (scaled index + 0.5, func value => return value)
   let (x, identity) = pair
   let first = identity 41
@@ -130,7 +130,7 @@ const scaled = func (value: U32) => return from value / 65536.0
   }, { prelude: "std/prelude.blot" });
   await compileExpectedFailure(`
 const scaled = func (value: U32) => return from value / 65536.0
-#entry const wrong = func (index: U32) : U32 => return do:
+io const wrong = func (index: U32) : U32 => return do:
   let pair = (scaled index + 0.5, func value => return value)
   let (value, identity) = pair
   break @u32.add value (identity 41)

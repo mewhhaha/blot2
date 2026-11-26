@@ -10,7 +10,7 @@ ${
     "  total := @u32.add total 1\n".repeat(250)
   }  use reply <- host #[total, input]
   return reply[0]
-#entry const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let marker: Array U32 = #[0]
   let total: U32 = 0
 ${

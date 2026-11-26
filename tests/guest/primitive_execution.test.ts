@@ -5,8 +5,8 @@ Deno.test("runtime ordinary scalar wrappers support partial and higher-order cal
 const add = func left => return func right => return @u32.add left right
 const plus_one = add 1
 const apply = func callable => return func value => return callable value
-#entry const run = func (value: U32) : U32 => return add (apply plus_one value) 1
-#entry const convert = func (value: U32) : F32 => return do:
+io const run = func (value: U32) : U32 => return add (apply plus_one value) 1
+io const convert = func (value: U32) : F32 => return do:
   let conversion = func (input: U32) : F32 => return @u32.to_f32 input
   break conversion value
 `, guest => {
@@ -19,7 +19,7 @@ const apply = func callable => return func value => return callable value
 Deno.test("runtime panic remains lazy while unused definitions still pass semantic checking", async () => {
   await compileAndRun(`
 const unused = @panic "unused trap"
-#entry const run = func (flag: Bool) : U32 => return if flag then 42 else @panic "runtime trap"
+io const run = func (flag: Bool) : U32 => return if flag then 42 else @panic "runtime trap"
 `, guest => {
     equal(guest.call("run", true), 42);
     let trapped = false;

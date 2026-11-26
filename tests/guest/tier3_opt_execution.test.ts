@@ -19,7 +19,7 @@ Deno.test("Tier 3A: 4x unrolled 16-element v128 SIMD across tails, offsets, Bool
   const dir = await Deno.makeTempDir({ prefix: "blot-tier3a-simd-" });
   const entry = `${dir}/main.blot`;
   const src = `// 1. 4x unrolled spark F32 with in-place reuse and duplicate stream
-#entry func spark_f32_unroll (n: U32): #[F32] =>
+io spark_f32_unroll (n: U32): #[F32] =>
   let px = @array.fill n 0.0
   let vx = @array.fill n 0.0
   for i in 0 .. n:
@@ -30,7 +30,7 @@ Deno.test("Tier 3A: 4x unrolled 16-element v128 SIMD across tails, offsets, Bool
   return px
 
 // 2. 4x unrolled spark Bool mask load/store across arbitrary counts
-#entry func spark_bool_unroll (n: U32): #[U32] =>
+io spark_bool_unroll (n: U32): #[U32] =>
   let a = @array.fill n 0
   let b = @array.fill n 0
   for i in 0 .. n:
@@ -44,7 +44,7 @@ Deno.test("Tier 3A: 4x unrolled 16-element v128 SIMD across tails, offsets, Bool
   return out
 
 // 3. 4x unrolled in-place for-loop SAXPY with affine offsets
-#entry func for_saxpy_unroll (n: U32): #[F32] =>
+io for_saxpy_unroll (n: U32): #[F32] =>
   let total = n * 2
   let c = @array.fill total 2.0
   let b = @array.fill total 0.0
@@ -58,7 +58,7 @@ Deno.test("Tier 3A: 4x unrolled 16-element v128 SIMD across tails, offsets, Bool
   return c
 
 // 4. Loop-carried forward overlap across >16 elements must still fall back to scalar
-#entry func overlap_large_fallback (n: U32): #[U32] =>
+io overlap_large_fallback (n: U32): #[U32] =>
   let a = @array.fill n 0
   if n > 0:
     a[0] := 7
@@ -146,7 +146,7 @@ func small_sum_loop (arr: #[U32]) -> (n: U32): U32 =>
   return acc
 
 // 3B: branchless if-to-select carry updates (U32, F32, Bool) + cross-loop CheckedArray
-#entry func branchless_carries (n: U32): U32 =>
+io branchless_carries (n: U32): U32 =>
   let flags = @array.fill n false
   for i in 0 .. n:
     flags[i] := (i % 3) != 0
@@ -164,7 +164,7 @@ func small_sum_loop (arr: #[U32]) -> (n: U32): U32 =>
   return (sum ^ (count * 31) ^ F32.to_u32 (fsum * 10.0)) + pbit
 
 // 3B: if-branch bounds (idx < len, idx >= len else, logical and/or, compound or early exit)
-#entry func branch_bounds_checks (n: U32): U32 =>
+io branch_bounds_checks (n: U32): U32 =>
   let xs = @array.fill n 0
   for i in 0 .. n:
     xs[i] := i * 7 + 3
@@ -193,7 +193,7 @@ func small_sum_loop (arr: #[U32]) -> (n: U32): U32 =>
 
 // 3C: selective invalidation on push/pop/truncate while reading another array,
 // plus OOB trap preservation after pop/truncate!
-#entry func selective_invalidation (n: U32): U32 =>
+io selective_invalidation (n: U32): U32 =>
   let src = @array.fill n 0
   for i in 0 .. n:
     src[i] := i + 10
@@ -208,7 +208,7 @@ func small_sum_loop (arr: #[U32]) -> (n: U32): U32 =>
   let $Counter { rev, count } = meta
   return small_sum_loop dst dst.length + rev + count
 
-#entry func truncated_oob_trap (n: U32): U32 =>
+io truncated_oob_trap (n: U32): U32 =>
   let arr = @array.fill n 5
   let last = arr.length - 1
   let _ = arr[last]
@@ -221,7 +221,7 @@ func mutate_slot (xs: own #[U32]) -> (idx: U32) -> (v: U32): #[U32] =>
   xs[idx] := v
   return xs
 
-#entry func elem_cache_invalidation (n: U32): U32 =>
+io elem_cache_invalidation (n: U32): U32 =>
   let xs = @array.fill n 10
   let before = xs[2]
   xs[2] := 99
@@ -243,7 +243,7 @@ func mutate_slot (xs: own #[U32]) -> (idx: U32) -> (v: U32): #[U32] =>
   return before + after_write + pick + pick2 + after_call
 
 // 3C regression (GOAP shape): pre-loop array updated in-place AND pushed inside nested loop/if
-#entry func nested_update_and_push (max_steps: U32): U32 =>
+io nested_update_and_push (max_steps: U32): U32 =>
   let vals: #[U32] = #[10]
   let closed: #[Bool] = #[false]
   let stop = false
@@ -301,7 +301,7 @@ func mutate_slot (xs: own #[U32]) -> (idx: U32) -> (v: U32): #[U32] =>
 
 Deno.test("Tier 3D: 4x algebraic parallel-power affine LCG unrolling exactness across counts and non-zero starts", async () => {
   await compileAndRun(
-    `#entry func lcg_n (n: U32): U32 =>
+    `io lcg_n (n: U32): U32 =>
   let state: U32 = 43
   let acc: U32 = 0
   for _ in 0 .. n:
@@ -309,7 +309,7 @@ Deno.test("Tier 3D: 4x algebraic parallel-power affine LCG unrolling exactness a
     acc := self ^ (state >> 16)
   return acc
 
-#entry func lcg_range (packed: U32): U32 =>
+io lcg_range (packed: U32): U32 =>
   let start = packed >> 16
   let end = packed & 65535
   let state: U32 = 99
@@ -359,7 +359,7 @@ Deno.test("Tier 3E: bounded finite F32 NaN canon elision preserves 0x7fc00000 on
   await compileAndRun(
     `type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
-#entry func finite_f32_math (n: U32): #[F32] =>
+io finite_f32_math (n: U32): #[F32] =>
   let f = U32.to_f32 (n & 1023)
   let a = f * 0.25
   let b = f * 0.5 + 1.0
@@ -375,7 +375,7 @@ Deno.test("Tier 3E: bounded finite F32 NaN canon elision preserves 0x7fc00000 on
   return #[a, b, c, nan_sub, nan_mul, nan_big, nan_div]
 
 // Lazy variant payload load: tag checked before loading payload words; wildcard skips payload; OOB still traps
-#entry func lazy_variant_scan (n: U32): U32 =>
+io lazy_variant_scan (n: U32): U32 =>
   let pool: #[Maybe Vec3] = @array.fill n $Nothing
   for i in 0 .. n:
     if (i % 4) == 0:
@@ -391,7 +391,7 @@ Deno.test("Tier 3E: bounded finite F32 NaN canon elision preserves 0x7fc00000 on
       $Nothing => 0)
   return F32.to_u32 sum * 100 + present
 
-#entry func lazy_variant_oob (n: U32): U32 =>
+io lazy_variant_oob (n: U32): U32 =>
   let pool: #[Maybe Vec3] = @array.fill n $Nothing
   if let $Some ($Vec3 { x, y, z }) = pool[n]:
     return F32.to_u32 (x + y + z)

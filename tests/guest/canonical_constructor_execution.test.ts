@@ -18,23 +18,23 @@ const ready = invoke $Box
 const retain = func () => return do:
   let constructor = $Box
   break func value => return unbox (constructor value)
-#entry const unsigned = func (value:U32) => return ready value
-#entry const floating = func (value:F32) => return unbox (box value)
-#entry const captured = func (value:F32) => return (retain ()) value
-#entry const local = func (value:F32) => return do:
+io const unsigned = func (value:U32) => return ready value
+io const floating = func (value:F32) => return unbox (box value)
+io const captured = func (value:F32) => return (retain ()) value
+io const local = func (value:F32) => return do:
   let constructor = $Box
   break unbox (constructor value)
-#entry const mixed = func (value:U32) => return total (pair (value,2.5))
-#entry const wrapped = func (value:F32) => return case $Wrapped (40,value) of
+io const mixed = func (value:U32) => return total (pair (value,2.5))
+io const wrapped = func (value:F32) => return case $Wrapped (40,value) of
   $Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-#entry const function_field = func (value:U32) => return case $Action (func item=> return @u32.to_f32 item) of
+io const function_field = func (value:U32) => return case $Action (func item=> return @u32.to_f32 item) of
   $Action action => action value
-#entry const old_version = func (value:U32) => return do:
+io const old_version = func (value:U32) => return do:
   let original = (value,2.5)
   let selected = pair original
   selected.x := 99
   break @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
-#entry const folded = total ($Pair (40,2.5))
+io const folded = total ($Pair (40,2.5))
 `;
 for (const asynchronous of [false,true]) Deno.test(`callable record constructors preserve canonical arrows and owned storage (${asynchronous?"JSPI":"sync"})`,async()=>{
  await compileAndRun(constructorSource,async guest=>{
@@ -66,12 +66,12 @@ const first = func host => return do:
 const second = func host => return do:
   use host 1
   break 2.5
-#entry const ordered = func (host:U32 -> U32 ! {Foreign}) => return do:
+io const ordered = func (host:U32 -> U32 ! {Foreign}) => return do:
   use selected <- pair (first host,second host)
   break total selected
-#entry const boxed = func (host:Unit -> F32 ! {Foreign}) => return case callback host of
+io const boxed = func (host:Unit -> F32 ! {Foreign}) => return case callback host of
   $Callback action => action ()
-#entry const pure = func () => return 7
+io const pure = func () => return 7
 `;
 Deno.test("callable record constructor arguments run once in source order and retain selected callback rows",async()=>{
  for(const asynchronous of [false,true])await compileAndRun(orderedSource,async guest=>{
@@ -96,9 +96,9 @@ Deno.test("callable record constructor arguments run once in source order and re
 });
 Deno.test("callable record constructors reject incompatible argument shapes and latent rows",async()=>{
  for(const [source,code]of[
-  ["type Pair is data= $Pair {x:U32,y:F32}\n#entry const answer= $Pair 42\n","type_mismatch"],
-  ["type Box is data= $Box {value:F32}\n#entry const answer= $Box 42\n","type_mismatch"],
-  ["type Read is effect={read:Unit -> U32}\ntype Box is data= $Box {action:Unit -> U32}\n#entry const answer= $Box (func()=> return Read.read ())\n","effect_mismatch"],
+  ["type Pair is data= $Pair {x:U32,y:F32}\nio const answer= $Pair 42\n","type_mismatch"],
+  ["type Box is data= $Box {value:F32}\nio const answer= $Box 42\n","type_mismatch"],
+  ["type Read is effect={read:Unit -> U32}\ntype Box is data= $Box {action:Unit -> U32}\nio const answer= $Box (func()=> return Read.read ())\n","effect_mismatch"],
  ]as const)await compileExpectedFailure(source,code);
 });
 
@@ -107,7 +107,7 @@ type Cell a is data = $Cell { value:a }
 const cell = $Cell
 const unsigned_witness = func () : Cell U32 => return @panic "type witness executed"
 const floating_witness = func () : Cell F32 => return @panic "type witness executed"
-#entry const unsigned_state = func (value:U32) => return do:
+io const unsigned_state = func (value:U32) => return do:
   let ($Cell final,selected) = @state.run (cell value) (func () => return do:
     use @state.set (cell (@u32.add value 1))
     use box <- @state.get unsigned_witness
@@ -115,7 +115,7 @@ const floating_witness = func () : Cell F32 => return @panic "type witness execu
     break result
   )
   break @u32.add final selected
-#entry const floating_state = func (value:F32) => return do:
+io const floating_state = func (value:F32) => return do:
   let ($Cell final,selected) = @state.run (cell value) (func () => return do:
     use @state.set (cell (@f32.add value 1.0))
     use box <- @state.get floating_witness
@@ -123,7 +123,7 @@ const floating_witness = func () : Cell F32 => return @panic "type witness execu
     break result
   )
   break @f32.add final selected
-#entry const folded_state = @f32.add (@u32.to_f32 (unsigned_state 20)) (floating_state 20.25)
+io const folded_state = @f32.add (@u32.to_f32 (unsigned_state 20)) (floating_state 20.25)
 `;
 Deno.test("canonical generic constructors preserve independent quantified State identities",async()=>{
  for(const asynchronous of [false,true])await compileAndRun(stateSource,async guest=>{

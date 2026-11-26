@@ -10,7 +10,7 @@ Use this operating loop whenever writing, refactoring, or debugging Blot code. P
 ## 1. Fast Verification Loop
 
 ```sh
-# 1. Type-check & ownership-check (works on libraries without #entry, including generator projects)
+# 1. Type-check & ownership-check (works on libraries without io entries, including generator projects)
 deno task blot check path/to/module.blot --json
 
 # 2. Run Blot unit & trap tests with structured output
@@ -23,7 +23,7 @@ deno task blot explain <CODE>
 deno task blot fmt path/to/module.blot
 ```
 
-For Wasm compilation of an `#entry` / `#kernel` / `#process` root:
+For Wasm compilation of an `io` / `#kernel` / `#process` root:
 
 ```sh
 deno task blot build path/to/entry.blot build/out.wasm --json
@@ -41,7 +41,7 @@ Both `blot check --json` and `blot build --json` emit newline-delimited JSON. Ev
   "canonicalCode": "SPENT_VALUE",
   "rawCode": "spent_value",
   "headline": "`row.xs` was already moved at line 5 and can no longer be used here.",
-  "scope": "#entry func main",
+  "scope": "io main",
   "primarySpan": {
     "filename": "/abs/path/app.blot",
     "startByte": 177,

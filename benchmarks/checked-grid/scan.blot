@@ -1,4 +1,4 @@
-#entry func solve (values: Array U32): Array U32 => do:
+io solve (values: Array U32): Array U32 => do:
   let sum = 0
   let weighted = 0
   for i in 0..values.length:

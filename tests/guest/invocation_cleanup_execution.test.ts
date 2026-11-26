@@ -3,7 +3,7 @@ import { GuestError } from "../../host/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const source = `
-#entry func run (host: U32 -> U32 ! {Foreign}) : U32 ! {Foreign} => return do:
+io run (host: U32 -> U32 ! {Foreign}) : U32 ! {Foreign} => return do:
   let values: Array U32 = #[7, 11]
   use at <- host values[0]
   if at >= values.length:

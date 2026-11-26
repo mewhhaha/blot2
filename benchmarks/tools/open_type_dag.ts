@@ -44,7 +44,7 @@ for (const depth of depths) {
     );
   }
   lines.push(
-    "#entry const answer = func (input: U32): U32 => return do:\n  let marker: GrowArray U32 = #[input]\n  return marker[0]",
+    "io const answer = func (input: U32): U32 => return do:\n  let marker: GrowArray U32 = #[input]\n  return marker[0]",
   );
   const source = `${lines.join("\n")}\n`;
   const sourceSha256 = await hash(new TextEncoder().encode(source));

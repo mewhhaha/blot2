@@ -14,7 +14,7 @@ type Ping () is effect = Unit -> U32
 const convert = func value => return Convert value
 const explicit = func (value:a) : b => return Named {output:b,input:a} value
 const curried = Curried
-#entry const answer = func () => return do (@effect.provider (Convert [U32,F32]) (func value => return @u32.to_f32 value)):
+io const answer = func () => return do (@effect.provider (Convert [U32,F32]) (func value => return @u32.to_f32 value)):
   break do (@effect.provider ((Curried U32) F32) (func value => return @u32.to_f32 value)):
     break do (@effect.provider (Named {output:F32,input:U32}) (func value => return @u32.to_f32 value)):
       break do (@effect.provider (Ping ()) (func () => return 42)):
@@ -35,7 +35,7 @@ Deno.test("empty runtime arrays remain operands of implicitly instantiated effec
   await compileAndRun(
     `
 type Inspect a is effect = Array a -> a
-#entry const answer = func () => return do (@effect.provider (Inspect U32) (func values => return @array.length values)):
+io const answer = func () => return do (@effect.provider (Inspect U32) (func values => return @array.length values)):
   use first <- Inspect #[]
   use second <- Inspect #[1,2,3]
   break @u32.add first second
@@ -49,9 +49,9 @@ type Inspect a is effect = Array a -> a
 Deno.test("bare structural annotations and mismatched source argument patterns are rejected", async () => {
   for (
     const source of [
-      "type Box [a,b] is data = $Box\nconst value: Box (U32,F32) = $Box\n#entry const answer = 42\n",
-      "type Box (a,b) is data = $Box\nconst value: Box [U32,F32] = $Box\n#entry const answer = 42\n",
-      "type Read is effect = Unit -> [U32,F32]\n#entry const answer = 42\n",
+      "type Box [a,b] is data = $Box\nconst value: Box (U32,F32) = $Box\nio const answer = 42\n",
+      "type Box (a,b) is data = $Box\nconst value: Box [U32,F32] = $Box\nio const answer = 42\n",
+      "type Read is effect = Unit -> [U32,F32]\nio const answer = 42\n",
     ]
   ) {
     await compileExpectedFailure(source, "type_argument", undefined, {

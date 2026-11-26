@@ -14,8 +14,8 @@ ${bindings.join("\n")}
   break func value => return @u32.add value ${sum}
 const first = make 1
 const second = make 2
-#entry const one: U32 -> U32 = func value => return first value
-#entry const two: U32 -> U32 = func value => return second value
+io const one: U32 -> U32 = func value => return first value
+io const two: U32 -> U32 = func value => return second value
 `;
   await compileAndRun(source, (guest) => {
     for (const value of [0, 42, 0xFFFF_FFFF]) {

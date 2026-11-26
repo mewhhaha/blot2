@@ -63,7 +63,7 @@ for (const kind of ["matrix", "settings"]) {
         previous = next;
       }
       lines.push(
-        "#entry const answer = func (input: F32): F32 => return do:",
+        "io const answer = func (input: F32): F32 => return do:",
         "  let pose = $transform.Pose3 {position: math.zero3, rotation: math.identity_quat, scale: math.vec3 input 1.0 1.0}",
         "  let rows: GrowArray transform.Pose3 = #[pose]",
         `  let result = ${previous} rows 0`,
@@ -72,7 +72,7 @@ for (const kind of ["matrix", "settings"]) {
     } else {
       lines.push(
         'import * as render from "ink/render"',
-        "#entry const answer = func (input: F32): F32 => return do:",
+        "io const answer = func (input: F32): F32 => return do:",
         "  let rows: Array render.Settings = #[render.defaults]",
       );
       for (let n = 0; n < size; n++) {

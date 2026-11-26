@@ -34,7 +34,7 @@ This is the implemented host boundary. See
 [the executable host example](../../examples/host_io.blot).
 
 ```blot
-#entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
+io const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   return next
 ```
@@ -55,8 +55,8 @@ try {
 }
 ```
 
-`main` and `advance` are ordinary names. `#entry` makes `main` a host entrypoint.
-The entry module's `#entry const` and `#entry let` declarations are exactly the
+`main` and `advance` are ordinary names. `io` makes `main` a host entrypoint.
+The entry module's `io`, `io const` and `io let` declarations are exactly the
 module's exports. The host selects one and supplies its callable argument; there
 is no implicit entrypoint, ambient registry, operation-name dispatcher, or
 game-specific import. Declaring a source effect does not create host authority.

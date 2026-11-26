@@ -20,11 +20,11 @@ effect Number.advance: U32 -> U32
 const tick = func value => return do:
   use next <- Number.advance value
   break next
-#entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do (@effect.provider Number.advance advance):
+io const main = func (advance: U32 -> U32 ! {Foreign}) => return do (@effect.provider Number.advance advance):
   use next <- tick 41
   break next
-#entry const pure = func () => return 7
-#entry const count = 12
+io const pure = func () => return 7
+io const count = 12
 `;
 
 function compiled(text = source) {
@@ -96,7 +96,7 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
   };
   const definitions = types.flatMap((parameter) =>
     types.map((result) =>
-      `#entry const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = func (io: ${parameter} -> ${result} ! {Foreign}) => return do:
+      `io const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = func (io: ${parameter} -> ${result} ! {Foreign}) => return do:
   use result <- io ${literals[parameter]}
   break result`
     )
@@ -299,14 +299,14 @@ Deno.test("same-instance reentry and disposal are rejected while another guest c
 
 Deno.test("scalar-only guests remain import-free and validate arguments and constants", async () => {
   const { bytes } = await compiled(`
-#entry const integer = func (value: U32) => return value
-#entry const boolean = func (value: Bool) => return value
-#entry const float = func (value: F32) => return value
-#entry const unit = func () => return ()
-#entry const flag = true
-#entry const maximum = 4_294_967_295
-#entry const fraction = 1.25
-#entry const nothing = ()
+io const integer = func (value: U32) => return value
+io const boolean = func (value: Bool) => return value
+io const float = func (value: F32) => return value
+io const unit = func () => return ()
+io const flag = true
+io const maximum = 4_294_967_295
+io const fraction = 1.25
+io const nothing = ()
 `);
   equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
   const guest = await instantiateGuest(bytes);

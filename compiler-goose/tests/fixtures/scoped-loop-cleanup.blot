@@ -4,7 +4,7 @@ const scratch = func (value: U32): U32 => return do:
   let rows: Array U32 = #[value, @u32.add value 1]
   return @u32.add rows[0] rows[1]
 
-#entry const scalar = func (count: U32): U32 => return do:
+io const scalar = func (count: U32): U32 => return do:
   let total = 0
   for index in 0 .. count:
     if @u32.eq (@u32.rem index 2) 0:
@@ -15,7 +15,7 @@ const scratch = func (value: U32): U32 => return do:
       total := @u32.add self (@u32.add index lane)
   return @u32.add total anchor[0]
 
-#entry const forever = func (count: U32): U32 => return do:
+io const forever = func (count: U32): U32 => return do:
   let remaining = count
   let total = 0
   for ever:
@@ -27,7 +27,7 @@ const scratch = func (value: U32): U32 => return do:
     total := @u32.add self remaining
   return total
 
-#entry const temporary = func (count: U32): U32 => return do:
+io const temporary = func (count: U32): U32 => return do:
   let kept: Array U32 = #[7]
   let total = 0
   for index in 0 .. count:
@@ -51,7 +51,7 @@ const choose = func (count: U32): Array U32 => return do:
       return #[index, @u32.add index 1]
   return #[99]
 
-#entry const conditional = func (count: U32): Array U32 => return choose count
+io const conditional = func (count: U32): Array U32 => return choose count
 
 const choose_scratch = func (count: U32): Array U32 => return do:
   for index in 0 .. count:
@@ -60,9 +60,9 @@ const choose_scratch = func (count: U32): Array U32 => return do:
       return #[rows[0], rows[1]]
   return #[99]
 
-#entry const conditional_scratch = func (count: U32): Array U32 => return choose_scratch count
+io const conditional_scratch = func (count: U32): Array U32 => return choose_scratch count
 
-#entry const bounds = func (index: U32): U32 => return do:
+io const bounds = func (index: U32): U32 => return do:
   let rows: Array U32 = #[41, 42]
   return rows[index]
 
@@ -71,7 +71,7 @@ const append_rhs = func (rows: own Array U32) -> (value: U32): Array U32 => retu
   rows[0] := @u32.add value 10
   return rows
 
-#entry const grow_rhs = func (value: U32): Array U32 => return do:
+io const grow_rhs = func (value: U32): Array U32 => return do:
   let rows: Array U32 = #[value]
   rows := append_rhs self value
   return rows
@@ -81,12 +81,12 @@ const mutate_sibling = func (rows: own Array {left: U32, right: U32}) -> (value:
   rows[0].left := value
   return rows
 
-#entry const sibling_rhs = func (value: U32): Array U32 => return do:
+io const sibling_rhs = func (value: U32): Array U32 => return do:
   let rows: Array {left: U32, right: U32} = #[{left: 1, right: 2}]
   rows := mutate_sibling self value
   return #[rows[0].left, rows[0].right]
 
-#entry const checked_order = func (index: U32): Array U32 => return do:
+io const checked_order = func (index: U32): Array U32 => return do:
   let rows: Array U32 = #[1]
   let trace: Array U32 = #[]
   rows[index] := do:
@@ -94,7 +94,7 @@ const mutate_sibling = func (rows: own Array {left: U32, right: U32}) -> (value:
     break 42
   return #[rows[0], @storage.length trace]
 
-#entry const checked_order_trap = func (index: U32): U32 => return do:
+io const checked_order_trap = func (index: U32): U32 => return do:
   let rows: Array U32 = #[1]
   rows[index] := @u32.div 42 0
   return rows[0]

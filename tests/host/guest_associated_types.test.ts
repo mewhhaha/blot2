@@ -10,10 +10,10 @@ const U32.Identity: Identity U32 { item: U32 } = { id: func value => return valu
 type RecordBox a = { value: Identity.item a, items: #[Identity.item a] }
 const keep: a -> a.item where { Identity a } = func value => return Identity.id value
 const relay: (Unit -> a ! {Foreign}) -> (Unit -> a ! {Foreign}) = func value => return value
-#entry const count: U32 -> U32 = func (value: U32) => return do:
+io const count: U32 -> U32 = func (value: U32) => return do:
   let record: RecordBox U32 = { value: keep value, items: #[value] }
   break @u32.add record.value (@array.length record.items)
-#entry const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
+io const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
   let selected = relay callback
   use value <- selected ()
   break keep value
@@ -44,7 +44,7 @@ Deno.test("trait output type edits preserve the last good revision", async () =>
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source = `import { Identity, make } from "./library"
-#entry const answer: Unit -> (Identity.item U32) = func () => return make 42
+io const answer: Unit -> (Identity.item U32) = func () => return make 42
 `;
   const producer = `type Identity a { item } is trait = { id: a -> item }
 const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }

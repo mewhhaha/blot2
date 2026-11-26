@@ -16,7 +16,7 @@ Deno.test("production million-step budget rejects adversarial stage chains", asy
   }
   const source =
     `const holder = func () => return {\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
-    stages.join("\n") + "\n#entry const e = func () => return s100 ()\n";
+    stages.join("\n") + "\nio const e = func () => return s100 ()\n";
   const directory = await Deno.makeTempDir({ prefix: "blot-stage-stress-" });
   const entry = `${directory}/main.blot`;
   const output = `${directory}/main.wasm`;

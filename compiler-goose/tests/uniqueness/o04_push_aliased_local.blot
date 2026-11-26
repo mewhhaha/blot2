@@ -1,5 +1,5 @@
 // @storage.push on a local while an alias is still live is rejected.
-#entry func run (): U32 =>
+io run (): U32 =>
   let rows: #[U32] = #[1]
   let alias = rows
   @storage.push rows 2

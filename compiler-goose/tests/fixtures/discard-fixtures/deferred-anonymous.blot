@@ -1,4 +1,4 @@
 const identity = func value => return value
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let unused = (identity, func value => return value.no_such_member)
   break 42

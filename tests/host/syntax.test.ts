@@ -94,14 +94,15 @@ Deno.test("named functions retain declaration names parameters and local boundar
 private func hidden_keep value => return value
 @[test]
 func tagged () => return add 20 22
-private #entry func answer () => do:
+private io answer () => do:
   func local (value: U32) -> extra => return add value extra
   let anonymous = func value => return value
   return local (anonymous 40) 2
 `;
   try {
     const rows = normalizedNodes(frontend.parse(source).root, source);
-    equal(rows.filter((row) => row.kind === "named_function").length, 5);
+    equal(rows.filter((row) => row.kind === "named_function").length, 4);
+    equal(rows.filter((row) => row.kind === "io_function").length, 1);
     equal(
       rows.filter((row) => row.kind === "named_function_declaration").length,
       4,
@@ -110,8 +111,8 @@ private #entry func answer () => do:
     equal(rows.filter((row) => row.kind === "declaration_attribute").length, 1);
     ok(
       rows.some((row) =>
-        row.field === "modifier" && row.kind === "entry_modifier" &&
-        source.startsWith("#entry", row.offset)
+        row.field === "modifier" && row.kind === "io_modifier" &&
+        source.startsWith("io", row.offset)
       ),
     );
     equal(
@@ -121,11 +122,16 @@ private #entry func answer () => do:
       ),
       rows,
     );
-    for (const modifier of ["#entry", "private"]) {
+    for (
+      const nestedDecl of [
+        "io local () => return 1",
+        "private func local () => return 1",
+      ]
+    ) {
       throws(
         () =>
           frontend.parse(
-            `func outer () => do:\n  ${modifier} func local () => return 1\n  return local ()\n`,
+            `func outer () => do:\n  ${nestedDecl}\n  return local ()\n`,
           ),
         SourceError,
       );
@@ -350,7 +356,7 @@ private type Read a is contract = {type_rep a}
 private effect Hidden: Unit -> U32
 private type HiddenFamily is effect = {ask: Unit -> U32}
 private const private = func opaque => return opaque
-private #entry const exported = func export => return private export
+private io const exported = func export => return private export
 const unwrap = func ($Box value) => return value.value
 const typed = func (value: U32) => return value
 const ordinary = func opaque => return func private => return func export => return (opaque, private, export)
@@ -524,7 +530,7 @@ Deno.test("implementation headers are contextual and retain explicit row and typ
         "impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }\n",
         "private impl Arrow (a,b,e) : Callable (a -> b ! {| e}) where { type_eq a U32 } = { type Run = a -> b ! {| e} }\n",
         "impl Curried a => type b : Pair (a,b) = { type Item = a }\n",
-        "const impl = func impl => return impl\n#entry const answer = impl 42\n",
+        "const impl = func impl => return impl\nio const answer = impl 42\n",
       ]
     ) frontend.parse(source);
     throws(() => frontend.parse("impL Name : Source U32 = {}\n"), SourceError);
@@ -565,12 +571,12 @@ const process = 2
 const prepare = 3
 const init = 4
 const step = 5
-private #entry func keep () => return 1
+private io keep () => return 1
 #kernel func mix (x: U32): U32 => return x
 #kernel const plan: Kernel [#[F32], U32, U32] = { prepare: routes.Planner.prep, run: Planner.step }
 #process const planner: Process [U32, U32, U32] = { init: routes.init_p, step: step_p }
-#entry func mapped (xs: #[U32]): #[U32] => return spark #[x | x <- xs]
-#entry func ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
+io mapped (xs: #[U32]): #[U32] => return spark #[x | x <- xs]
+io ranged (n: U32): #[U32] => return spark #[x | x <- 0..n]
 `;
   try {
     const rows = normalizedNodes(frontend.parse(source).root, source);
@@ -589,7 +595,11 @@ private #entry func keep () => return 1
         "#process bad: Process [U32, U32, U32] = { init: i, step: s }\n",
         "entry func old (): U32 => return 1\n",
         "entry kernel func old (x: U32): U32 => return x\n",
-        "#entry private func bad (): U32 => return 1\n",
+        "#entry func old (): U32 => return 1\n",
+        "#entry const old = 1\n",
+        "io func bad (): U32 => return 1\n",
+        "io private bad (): U32 => return 1\n",
+        "iO reserved (): U32 => return 1\n",
       ]
     ) {
       throws(() => frontend.parse(invalid), SourceError, invalid);

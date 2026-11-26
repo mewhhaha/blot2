@@ -33,37 +33,37 @@ const mark_odd_logged = func (rows: own Array U32) -> (log: Array U32 -> U32 ! {
     use _ <- log #[cursor]
     cursor := @u32.add self 2
   return cursor
-#entry const run = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const run = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use first <- log #[0, 0]
   use last <- log #[0, 1]
   use stride <- log #[0, 2]
   use out <- mark_logged (@array.fill 96 9) log first last stride
   return out
-#entry const odd = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const odd = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use first <- log #[0, 0]
   use last <- log #[0, 1]
   use out <- mark_odd_logged (@array.fill 96 9) log first last
   return out
-#entry const same_start_and_stride = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const same_start_and_stride = func (log: Array U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use first <- log #[0, 0]
   use out <- mark_logged (@array.fill 96 9) log first 95 first
   return out
-#entry const local_run = func (bounds: Array U32) => return do:
+io const local_run = func (bounds: Array U32) => return do:
   let (target, _) = mark (@array.fill 96 9) bounds[0] bounds[1] bounds[2]
   return target
-#entry const local_cursor = func (bounds: Array U32): U32 => return do:
+io const local_cursor = func (bounds: Array U32): U32 => return do:
   let (_, cursor) = mark (@array.fill 96 9) bounds[0] bounds[1] bounds[2]
   return cursor
-#entry const local_odd = func (bounds: Array U32) => return do:
+io const local_odd = func (bounds: Array U32) => return do:
   let (target, _) = mark_odd (@array.fill 96 9) bounds[0] bounds[1] 2
   return target
-#entry const local_odd_cursor = func (bounds: Array U32): U32 => return do:
+io const local_odd_cursor = func (bounds: Array U32): U32 => return do:
   let (_, cursor) = mark_odd (@array.fill 96 9) bounds[0] bounds[1] 2
   return cursor
-#entry const local_same_start_and_stride = func (first: U32) => return do:
+io const local_same_start_and_stride = func (first: U32) => return do:
   let (target, _) = mark (@array.fill 96 9) first 95 first
   return target
-#entry const local_same_cursor = func (first: U32): U32 => return do:
+io const local_same_cursor = func (first: U32): U32 => return do:
   let (_, cursor) = mark (@array.fill 96 9) first 95 first
   return cursor
 `;

@@ -1,10 +1,9 @@
-#entry func add (left: U32) -> (right: U32): U32 => return left
+io add (left: U32) -> (right: U32): U32 => return left
 // <- keyword.storage.modifier
-//    ^^^^ keyword.function
-//         ^^^ function
-//              ^^^^ variable.parameter
-//                         ^^ operator
-//                             ^^^^^ variable.parameter
+// ^^^ function
+//      ^^^^ variable.parameter
+//                 ^^ operator
+//                     ^^^^^ variable.parameter
 
 private func Vec2.add (left: Vec2) -> (right: Vec2): Vec2 => return left
 // <- keyword.storage.modifier
@@ -25,7 +24,7 @@ let closure = func (value: a) => return value
 //                  ^^^^^ variable.parameter
 //                         ^ !variable.parameter
 
-entry
+io
 // <- variable
 // <- !keyword.storage.modifier
 func following value => return value
@@ -39,7 +38,7 @@ func separate value => return value
 // <- keyword.function
 //   ^^^^^^^^ function
 
-"#entry func hidden (value: U32) => return value"
+"io hidden (value: U32) => return value"
 // ^ string
 // ^ !keyword.storage.modifier
 

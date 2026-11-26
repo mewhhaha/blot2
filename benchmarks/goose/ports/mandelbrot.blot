@@ -3,7 +3,7 @@
 // F32 adaptation: the original Goose workload uses F64, so compare with its
 // explicit F32 control. Each retained PBM byte occupies one U32 (four bytes).
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 const append_byte = func (image: own Array U32) -> (size: U32) -> (value: U32): (Array U32, U32) => return do:
   image[size] := value
@@ -74,7 +74,7 @@ const run = func (image: own Array U32) -> (size: U32) -> (w: U32) -> (h: U32): 
           bit_num := 0
   return (state.image, state.result_size)
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let w = inputs[0]
   let h = inputs[1]

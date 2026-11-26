@@ -81,7 +81,7 @@ fn depth_limit() {
 fn named_functions() {
  var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
  var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
- parse_source("private func helper (first: U32) -> (second: U32) : U32 => return @u32.add first second\n@[decorate]\n#entry func main () => do:\n  func local a -> b -> c -> d -> e -> f -> g -> h -> i => return i\n  return local 1 2 3 4 5 6 7 8 9\nconst function_value = func value => return value\n",names,tree);
+ parse_source("private func helper (first: U32) -> (second: U32) : U32 => return @u32.add first second\n@[decorate]\nio main () => do:\n  func local a -> b -> c -> d -> e -> f -> g -> h -> i => return i\n  return local 1 2 3 4 5 6 7 8 9\nconst function_value = func value => return value\n",names,tree);
  assert(tree.diagnostics.len==0&&tree.roots.len==3);
  let helper_id=tree.roots.items[0];let helper=tree.value_decl(helper_id);
  assert(helper.function_declaration&&!helper.runtime&&!helper.exported&&blot_parse_ast::declaration_traits(tree,helper_id).private);
@@ -89,7 +89,7 @@ fn named_functions() {
  let first=tree.node(helper.body);let second=tree.node(first.b);
  assert(first.tag==blot_parse_ast::tag_lambda&&second.tag==blot_parse_ast::tag_lambda&&first.c==0&&second.c!=0);
  let main_id=tree.roots.items[1];let main_decl=tree.value_decl(main_id);
- assert(main_decl.function_declaration&&main_decl.exported&&main_decl.attributes.len==1&&names.get(main_decl.modifier)=="#entry"&&tree.extra.items[tree.node(main_id).c+7]==3);
+ assert(main_decl.function_declaration&&main_decl.exported&&main_decl.attributes.len==1&&names.get(main_decl.modifier)=="io"&&tree.extra.items[tree.node(main_id).c+7]==3);
  let main_lambda=tree.node(main_decl.body);let parameter=tree.parameter(main_lambda.a);assert(parameter.is_unit&&parameter.requires_return);
  let statements=tree.children(main_lambda.b);assert(statements.len==2&&tree.node(statements[0]).tag==blot_parse_ast::tag_value_decl);
  let local=tree.value_decl(statements[0]);assert(local.function_declaration&&names.get(local.name)=="local");

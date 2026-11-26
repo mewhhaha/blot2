@@ -111,7 +111,7 @@ function sourceFor(
     lines.push(`  result := @u32.add self (callback_${index} ())`);
   }
   lines.push("  return result");
-  lines.push("#entry const answer = func (input: U32): U32 => return do:");
+  lines.push("io const answer = func (input: U32): U32 => return do:");
   lines.push("  let marker: Array U32 = #[0]", "  marker[0] := input");
 
   const bundleNames: string[] = [];

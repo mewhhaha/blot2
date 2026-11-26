@@ -3,7 +3,7 @@
 // Prepared values are nonnegative and below 1,000,000, so U32 comparisons
 // preserve the Goose I32 ordering. Keep the original recursive algorithm.
 const arena_revision = 0
-#entry const revision = func (): U32 => return arena_revision
+io const revision = func (): U32 => return arena_revision
 
 // Exact floor(next * maximum / 139968) without overflowing U32. Goose uses
 // F64 for this conversion; base-8192 limbs keep each intermediate below 2^32.
@@ -69,7 +69,7 @@ const run = func (prepared: Array U32) -> (working: own Array U32) -> (rng: own 
   let after = working[second_idx]
   return (working, rng, @u32.add before after)
 
-#entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use inputs <- host #[0]
   let size = inputs[0]
   let iterations = inputs[1]

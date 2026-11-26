@@ -9,7 +9,7 @@ const empty: #[U32] = #[]
 const read = func (item: &U32) => return @storage.load item
 const slice = func (items: &[U32]) => return @storage.read items 0
 const follow = func (item: ^U32) => return @storage.load item
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let items: Array U32 = #[42]
   let first: &U32 = &items[0]
   let view: &[U32] = &items[0..1]

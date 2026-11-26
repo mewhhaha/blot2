@@ -17,7 +17,7 @@ Deno.test.ignore("retained text modules preserve literal capability shapes throu
   await Deno.writeTextFile(entry, `
 import * as text from "std/text"
 import * as words from "./words"
-#entry const answer = func () => return text.concat (words.words true) (text.format false)
+io const answer = func () => return text.concat (words.words true) (text.format false)
 `);
   try {
     {
@@ -50,34 +50,34 @@ type Ticket is data = $Ticket U32
 impl TicketFormat : text.Format Ticket = {
   const format = func ($Ticket number) => return text.concat "ticket " (text.from_u32 number),
 }
-#entry const empty = func () => return ""
-#entry const unicode = func () => return "Hi, 世界🙂"
-#entry const length = func () => return Array.length "Hi, 世界🙂"
-#entry const same = func () => return text.equal "世界" "世界"
-#entry const different = func () => return text.equal "e\u0301" "é"
-#entry const joined = func () => return text.join ":" #["hi", "世界", "🙂"]
-#entry const built = func (count: U32) => return do:
+io const empty = func () => return ""
+io const unicode = func () => return "Hi, 世界🙂"
+io const length = func () => return Array.length "Hi, 世界🙂"
+io const same = func () => return text.equal "世界" "世界"
+io const different = func () => return text.equal "e\u0301" "é"
+io const joined = func () => return text.join ":" #["hi", "世界", "🙂"]
+io const built = func (count: U32) => return do:
   let out = text.builder ()
   for index in 0..count:
     out := text.append "x" self
   break text.finish out
-#entry const decimal = func (number: U32) => return text.format number
-#entry const custom = func (number: U32) => return text.format ($Ticket number)
-#entry const fixed = func (value: F32) => return case text.from_f32_fixed 2 value of
+io const decimal = func (number: U32) => return text.format number
+io const custom = func (number: U32) => return text.format ($Ticket number)
+io const fixed = func (value: F32) => return case text.from_f32_fixed 2 value of
   $Some formatted => formatted
   $Nothing => "invalid"
-#entry const bad_precision = func () => return case text.from_f32_fixed 7 1.0 of
+io const bad_precision = func () => return case text.from_f32_fixed 7 1.0 of
   $Nothing => 1
   $Some _ => 0
-#entry const invalid = func (host: U32 -> Array U32 ! {Foreign}) => return do:
+io const invalid = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use input <- host 0
   break case text.from_scalars input of
     $Nothing => 0
     $Some _ => 1
-#entry const roundtrip = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
+io const roundtrip = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   use output <- host "Hi, 世界🙂"
   break output
-#entry const assertion = func (host: Array U32 -> U32 ! {Foreign}) => return do:
+io const assertion = func (host: Array U32 -> U32 ! {Foreign}) => return do:
   let message = text.join "" #["expected ", text.from_u32 42, ", got ", text.from_u32 41]
   use code <- host message
   break code

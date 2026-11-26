@@ -9,7 +9,7 @@ const Box.get = func box => return case box of
 const read = func value => return value.get
 const first = read ($Box 40)
 const second = @u32.add first 2
-#entry const answer = func () => return @u32.add first second
+io const answer = func () => return @u32.add first second
 `, guest => equal(guest.call("answer", null), 82));
 });
 
@@ -20,13 +20,13 @@ type Pair is data = $Pair { zebra: U32, apple: F32 }
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 const get = func (witness: p -> a) : a => return State.get ()
 const state = @effect.state (State.get Pair) (State.set Pair) ($Pair { zebra: 42, apple: 1.5 })
-#entry const integer = func (value: U32) => return do:
+io const integer = func (value: U32) => return do:
   let (_, result) = do state:
     use State.set ($Pair { apple: 1.5, zebra: value })
     use current <- get $Pair
     break current.zebra
   break result
-#entry const floating = func (value: F32) => return do:
+io const floating = func (value: F32) => return do:
   let (_, result) = do state:
     use State.set ($Pair { apple: value, zebra: 42 })
     use current <- get $Pair
@@ -45,7 +45,7 @@ type Box is data = $Box U32
 const Box.add: Box -> U32 -> U32 = func box => return func offset => return case box of
   $Box value => @u32.add value offset
 const reader = @effect.provider Read (func () => return 2)
-#entry const answer = func () => return do reader:
+io const answer = func () => return do reader:
   use offset <- Read ()
   break ($Box 40).add offset
 `, guest => equal(guest.call("answer", null), 42));
@@ -69,7 +69,7 @@ const insert = func initial => return func builder => return do:
     break ((next,previous_next),result)
   break $Builder { initial: (initial,previous_initial), scope }
 const built = insert 42 (insert 1.5 (empty ()))
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let $Builder { initial,scope } = built
   let (_,result) = scope initial (func () => return #[42])
   break result
@@ -88,7 +88,7 @@ const make${index} = func (cell: Cell${index}) => return func (value: U32) => re
   await compileAndRun(`${declarations.join("\n")}
 type Table is data = $Table { ${types.join(", ")} }
 const staged = $Table { ${values.join(", ")} }
-#entry const answer = func (value: U32) => return @u32.add (staged.f000 value) (staged.f047 value)
+io const answer = func (value: U32) => return @u32.add (staged.f000 value) (staged.f047 value)
 `, guest => {
     for (let value = 0; value < 100; value++) equal(guest.call("answer", value), 2 * value + 47);
   });
@@ -97,10 +97,10 @@ const staged = $Table { ${values.join(", ")} }
 Deno.test("exported function aliases and staged or initialized closures retain their values", async () => {
   await compileAndRun(`
 const identity = func value => return value
-#entry const alias: U32 -> U32 = identity
+io const alias: U32 -> U32 = identity
 const build = func base => return func value => return @u32.add base value
-#entry const captured = build 40
-#entry let initialized = build 20
+io const captured = build 40
+io let initialized = build 20
 `, guest => {
     for (let value = 0; value < 100; value++) {
       equal(guest.call("alias", value), value);
@@ -122,13 +122,13 @@ const staged = do:
   builder := add_step 20 self
   break builder
 const unused = @panic "unreachable constant"
-#entry const answer = func (value: U32) : U32 => return do:
+io const answer = func (value: U32) : U32 => return do:
   let $Builder { run } = staged
   break run value
 const worker = do:
   let base = 40
   break func (value: U32) => return @u32.add base value
-#entry const work = func (value: U32) : U32 => return worker value
+io const work = func (value: U32) : U32 => return worker value
 `, guest => {
     for (let i = 0; i < 2000; i++) {
       equal(guest.call("answer", i), i + 30);
@@ -154,10 +154,10 @@ const floating = do:
   builder := add_step 1.5 self
   builder := add_step 2.5 self
   break builder
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let $Builder { run } = staged
   break run 12
-#entry const float = func () => return do:
+io const float = func () => return do:
   let $Builder { run } = floating
   break run 8.0
 `, guest => {
@@ -194,7 +194,7 @@ const snapshot = func initial => return func builder => return do:
     break ()
   break $Builder { initial: previous_initial, scope: previous_scope, checkpoint }
 const built = snapshot 41 (empty ())
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let $Builder { initial,scope,checkpoint } = built
   let (world,_) = scope initial checkpoint
   let (current,_) = world
@@ -215,7 +215,7 @@ const touch = @effect.provider Touch (func value => return ())
 const run = func () => return do touch:
   use checkpoint ()
   break 42
-#entry const answer = func () => return do reader:
+io const answer = func () => return do reader:
   break run ()
 `,
   ];
@@ -254,11 +254,11 @@ const Deferred.mix = func left => return do:
   break func right => return func weight => return @f32.add (@f32.add base offset) (@f32.mul right weight)
 const mix = func left => return func right => return @type.call "mix" left right
 const reader = @effect.provider Read (func () => return 2.0)
-#entry const nominal = func (value: F32) => return mix ($Box value) 2.0 1.0
-#entry const partial = func (value: F32) => return do:
+io const nominal = func (value: F32) => return mix ($Box value) 2.0 1.0
+io const partial = func (value: F32) => return do:
   let blend = mix ($Box value) 4.0
   break blend 0.5
-#entry const deferred = func (value: F32) => return do reader:
+io const deferred = func (value: F32) => return do reader:
   break mix ($Deferred value) 4.0 0.5
 type Live is data = $Live F32
 const Live.mix = func left => return func right => return func () => return do:
@@ -266,7 +266,7 @@ const Live.mix = func left => return func right => return func () => return do:
   use value <- Read ()
   break @f32.add base (@f32.add right value)
 const earlier = @effect.provider Read (func () => return 100.0)
-#entry const live = func (value: F32) => return do:
+io const live = func (value: F32) => return do:
   let callback = do earlier:
     break mix ($Live value) 0.0
   break do reader:
@@ -283,8 +283,8 @@ const earlier = @effect.provider Read (func () => return 100.0)
 
 Deno.test("the prelude lerp method returns a callable after binary selection", async () => {
   await compileAndRun(`
-#entry const answer = func (left: F32) => return lerp left 42.0 0.5
-#entry const partial = func () => return do:
+io const answer = func (left: F32) => return lerp left 42.0 0.5
+io const partial = func () => return do:
   let blend = lerp 10.0 30.0
   break blend 0.75
 `, guest => {
@@ -301,7 +301,7 @@ func twice (n: U32): U32 => return sum n n
 `;
   async function answer(expression: string, expected: number) {
     let emitted: Uint8Array | undefined;
-    await compileAndRun(prefix + "#entry func answer () => return " + expression + "\n", (guest, bytes) => {
+    await compileAndRun(prefix + "io answer () => return " + expression + "\n", (guest, bytes) => {
       equal(guest.call("answer", null), expected);
       emitted = bytes;
     }, { prelude: "none" });
@@ -319,11 +319,11 @@ Deno.test("#run constructs nested arrays, records and variants across ordinary f
 type Catalog is data = $Catalog { ids: Array U32, enabled: Bool }
 func build (n: U32): Catalog => return $Catalog {enabled: true, ids: #[n, @u32.add n 1]}
 func first (value: Catalog): U32 => return @array.get value.ids 0
-#entry func answer () => return #run (first (build 42))
-#entry func rows () => return do:
+io answer () => return #run (first (build 42))
+io rows () => return do:
   let value = #run (build 41)
   return value.ids
-#entry func field () => return #do:
+io field () => return #do:
   let values = { z: #[40, 42], a: false }
   break @array.get values.z 1
 `, guest => {
@@ -341,11 +341,11 @@ func add_table (bias: U32): (U32 -> U32) => return do:
   let rows: Array U32 = table bias
   return func (index: U32): U32 => return @array.get rows index
 func choose (flag: Bool): (U32 -> U32) => return if flag then square else (func (n: U32): U32 => return n)
-#entry func rows (): Array U32 => return #run (table 2)
-#entry func generated (i: U32): U32 => return (#run (add_table 2)) i
-#entry func selected (i: U32): U32 => return (#run (choose true)) i
-#entry func empty (): U32 => return #run (@array.length (@array.generate 0 (func (i: U32): U32 => return @u32.div i 0)))
-#entry func filled (): Array U32 => return #run (@array.fill 3 7)
+io rows (): Array U32 => return #run (table 2)
+io generated (i: U32): U32 => return (#run (add_table 2)) i
+io selected (i: U32): U32 => return (#run (choose true)) i
+io empty (): U32 => return #run (@array.length (@array.generate 0 (func (i: U32): U32 => return @u32.div i 0)))
+io filled (): Array U32 => return #run (@array.fill 3 7)
 `, guest => {
     deepStrictEqual(Array.from(guest.call("rows", null) as Uint32Array), [2, 3, 6, 11]);
     equal(guest.call("generated", 3), 11);

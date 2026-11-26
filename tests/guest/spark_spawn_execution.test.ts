@@ -14,8 +14,8 @@ const program = await Deno.readTextFile(
 Deno.test("spark source maps and KernelPool execution preserve bits, cardinality and order", async () => {
   await compileAndRun(
     program + `
-#entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
-#entry func keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
+io snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return spark #[@u32.add x x | x <- read 7]
+io keep_float (xs: Array F32): Array F32 => return spark #[x | x <- xs]
 #kernel func negative (x: U32): F32 => return @f32.neg (@u32.to_f32 x)
 #kernel func reciprocal (x: U32): F32 => return @f32.div 1.0 (@u32.to_f32 x)
 `,
@@ -313,8 +313,8 @@ Deno.test("spark accepts pure helpers and captures while rejecting invalid gener
   await compileAndRun(
     `func hidden (x: U32): U32 => return @u32.add x 1
 const captured: U32 = 5
-#entry func pure_spark (xs: Array U32): Array U32 => return spark #[@u32.add (hidden x) captured | x <- xs]
-#entry func range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <- 0..n]
+io pure_spark (xs: Array U32): Array U32 => return spark #[@u32.add (hidden x) captured | x <- xs]
+io range_spark (n: U32): Array U32 => return spark #[@u32.add x 10 | x <- 0..n]
 `,
     (guest) => {
       equal(String(guest.call("pure_spark", Uint32Array.of(1, 2, 3))), "7,8,9");
@@ -322,28 +322,28 @@ const captured: U32 = 5
     },
   );
   await compileExpectedFailure(
-    "#entry func nope (xs: Array U32) => return spark #[x | x <- xs, x <- xs]\n",
+    "io nope (xs: Array U32) => return spark #[x | x <- xs, x <- xs]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "#entry func nope (xs: Array U32) => return spark #[x | x <- xs, x < 8]\n",
+    "io nope (xs: Array U32) => return spark #[x | x <- xs, x < 8]\n",
     "spark_generator",
   );
   await compileExpectedFailure(
-    "#entry func nope (xs: U32) => return spark #[x | x <- xs]\n",
+    "io nope (xs: U32) => return spark #[x | x <- xs]\n",
     "type_mismatch",
   );
   await compileExpectedFailure(
-    "#entry func nope (xs: Array U32) => return @spark #[x | x <- xs]\n",
+    "io nope (xs: Array U32) => return @spark #[x | x <- xs]\n",
     "unknown_intrinsic",
   );
   await compileExpectedFailure(
-    "#entry func nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
+    "io nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
     "unknown_intrinsic",
   );
   await compileExpectedFailure(
     `effect Ping: Unit -> U32
-#entry func nope (xs: Array U32): Array U32 ! { Ping } => return spark #[Ping () | x <- xs]
+io nope (xs: Array U32): Array U32 ! { Ping } => return spark #[Ping () | x <- xs]
 `,
     "spark_effectful",
   );

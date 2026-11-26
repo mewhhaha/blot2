@@ -132,9 +132,9 @@ func count_ghosts (world: World): U32 =>
     return count)
   return count
 
-#entry func run (ticks: U32): F32 => checksum (simulate ticks (create ()))
-#entry func ghost_count (ticks: U32): U32 => count_ghosts (simulate ticks (create ()))
-#entry func snapshot (): F32 =>
+io run (ticks: U32): F32 => checksum (simulate ticks (create ()))
+io ghost_count (ticks: U32): U32 => count_ghosts (simulate ticks (create ()))
+io snapshot (): F32 =>
   let original = create ()
   let next = simulate 1 original.copy
   return checksum next - checksum original

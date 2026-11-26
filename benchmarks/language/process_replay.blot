@@ -24,17 +24,17 @@ func bad_step_fn (st: own U32) -> (delta: U32): (U32, U32) => return @panic "ste
 
 func request (seed: U32): U32 ! { Start } => return Start #[seed, 112, 108, 97, 110, 110, 101, 114]
 
-#entry func local (seed: U32): U32 => return do @effect.provider Start (func packet => return if packet[0] < 5 then packet[0] else 0):
+io local (seed: U32): U32 => return do @effect.provider Start (func packet => return if packet[0] < 5 then packet[0] else 0):
   use admission <- request seed
   return admission
 
-#entry func live (start: Array U32 -> U32 ! { Foreign }): Array U32 => return do @effect.provider Start start:
+io live (start: Array U32 -> U32 ! { Foreign }): Array U32 => return do @effect.provider Start start:
   use a <- request 10
   use b <- request 100
   use refused <- request 500
   return #[a, b, refused]
 
-#entry func apply_tick (input: Array U32): U32 => return do:
+io apply_tick (input: Array U32): U32 => return do:
   let world = input[0]
   for index in 1..input.length:
     world := @u32.add (@u32.mul self 33) input[index]

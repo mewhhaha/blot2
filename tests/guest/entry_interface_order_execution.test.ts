@@ -9,34 +9,34 @@ import {
 Deno.test("generic value interfaces reject before constant bounds while explicit scalar entries trap at instantiation", async () => {
   for (
     const source of [
-      "#entry const answer = @array.get #[] 0\n",
-      '#entry const answer = @panic "boom"\n',
-      '#entry const earlier: U32 = @panic "earlier"\n#entry const answer = @array.get #[] 0\n',
+      "io const answer = @array.get #[] 0\n",
+      'io const answer = @panic "boom"\n',
+      'io const earlier: U32 = @panic "earlier"\nio const answer = @array.get #[] 0\n',
     ]
   ) await compileExpectedFailure(source, "entry_type");
   for (const type of ["U32", "F32"]) {
     await assert.rejects(
-      compileAndRun(`#entry const answer: ${type} = @array.get #[] 0\n`, () => {}),
+      compileAndRun(`io const answer: ${type} = @array.get #[] 0\n`, () => {}),
       WebAssembly.RuntimeError,
     );
   }
   const prelude =
     new URL("./entry-interface-order/prelude.blot", import.meta.url).pathname;
   await compileExpectedFailure(
-    "#entry const answer = #[].first\n",
+    "io const answer = #[].first\n",
     "entry_type",
     undefined,
     { prelude },
   );
   await assert.rejects(
-    compileAndRun("#entry const answer: U32 = #[].first\n", () => {}, { prelude }),
+    compileAndRun("io const answer: U32 = #[].first\n", () => {}, { prelude }),
     WebAssembly.RuntimeError,
   );
 });
 
 Deno.test("explicit scalar entries initialized by a panic trap at instantiation", async () => {
   await assert.rejects(
-    compileAndRun('#entry const answer: U32 = @panic "boom"\n', () => {}),
+    compileAndRun('io const answer: U32 = @panic "boom"\n', () => {}),
     WebAssembly.RuntimeError,
   );
 });
@@ -44,7 +44,7 @@ Deno.test("explicit scalar entries initialized by a panic trap at instantiation"
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("written associated requirements reject before the generic value interface", async () => {
   await compileExpectedFailure(
-    `#entry const answer = do:
+    `io const answer = do:
   let selected: U32 where {associated "missing" Bool Bool Bool} = 42
   break @array.get #[] 0
 `,
@@ -53,9 +53,9 @@ Deno.test.ignore("written associated requirements reject before the generic valu
 });
 const source =
   `const maker = func captured => return func (value: U32) => return @u32.add captured value
-#entry const selected = maker 21
-#entry const answer = if true then 42 else @panic "unreachable"
-#entry const typed: Unit -> U32 = func () => return @array.get #[] 0
+io const selected = maker 21
+io const answer = if true then 42 else @panic "unreachable"
+io const typed: Unit -> U32 = func () => return @array.get #[] 0
 `;
 for (const asynchronous of [false, true]) {
   Deno.test(`interface preflight preserves staged closures and runtime traps (${asynchronous ? "JSPI" : "sync"})`, async () => {

@@ -50,7 +50,7 @@ const replaced = func (rows: Array U32) -> (limit: U32): U32 => return do:
     if @u32.eq step 3:
       break
   return @u32.add state.total state.nested.rows[0]
-#entry const varying = func (limit: U32): U32 => return do:
+io const varying = func (limit: U32): U32 => return do:
   let total = 0
   for turn in 0..limit:
     let count = @u32.rem turn 4
@@ -60,19 +60,19 @@ const replaced = func (rows: Array U32) -> (limit: U32): U32 => return do:
     let value = read_if rows (@u32.lt 0 count) (@u32.sub count 1)
     total := @u32.add self (@u32.add value (@u32.add ignored zero))
   return total
-#entry const fresh = func (limit: U32): Array U32 => return #[fresh_fixed limit, fresh_frozen limit]
-#entry const carried = func (limit: U32): Array U32 => return do:
+io const fresh = func (limit: U32): Array U32 => return #[fresh_fixed limit, fresh_frozen limit]
+io const carried = func (limit: U32): Array U32 => return do:
   let rows: Array U32 = #[10]
   return nested rows limit
-#entry const replacement = func (limit: U32): U32 => return do:
+io const replacement = func (limit: U32): U32 => return do:
   let rows: Array U32 = #[10]
   return replaced rows limit
-#entry const ordered = func (index: U32): Array U32 => return do:
+io const ordered = func (index: U32): Array U32 => return do:
   let rows: Array U32 = #[7, 8]
   return write rows index
-#entry const ordered_trap = func (index: U32): U32 => return do:
+io const ordered_trap = func (index: U32): U32 => return do:
   let rows: Array U32 = #[7, 8]
   rows[index] := @u32.div 42 0
   return rows[0]
-#entry const filtered = func (cutoff: U32): Array U32 => return
+io const filtered = func (cutoff: U32): Array U32 => return
   #[value | value <- @array.generate 513 (func index => return index), @u32.lt cutoff value]

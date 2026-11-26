@@ -31,7 +31,7 @@ try {
   }
   await Deno.writeTextFile(
     entry,
-    [...imports, `#entry func answer (n: U32): U32 => return ${sum}`].join(
+    [...imports, `io answer (n: U32): U32 => return ${sum}`].join(
       "\n",
     ) + "\n",
   );

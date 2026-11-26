@@ -181,7 +181,9 @@ Item        = Reexport
             | "private"? Tag* Declaration
             | Tag* (EntryKernelDecl | EntryProcessDecl)
 Reexport    = "export" "{" ImportName,+ "}" "from" String
-Declaration = "#entry"? (FuncDecl | ConstDecl | LetDecl) | TypeDecl
+Declaration = IoFuncDecl | "io"? (ConstDecl | LetDecl) | FuncDecl | TypeDecl
+IoFuncDecl  = "io" ValuePath Param ("->" Param)* (":" Type ("!" EffectSet)?)?
+              Where? "=>" Body
 CallablePath     = (LowerName ".")? (UpperName ".")* LowerName
 EntryKernelDecl  = "#kernel" FuncDecl
                  | "#kernel" "const" LowerName ":" Type "=" "{" "prepare" ":" CallablePath "," "run" ":" CallablePath ","? "}"
@@ -191,9 +193,10 @@ EntryProcessDecl = "#process" "const" LowerName ":" Type "=" "{" "init" ":" Call
 - Imports precede all declarations. Import cycles are errors.
 - Declarations are public by default; `private` restricts to the defining module.
 - A public signature cannot expose a private type or effect.
-- `#entry` marks host Wasm exports on the entry module only (at least one entry
-  required). Only the entry module may declare entries. `private #entry func` is
-  allowed; `private #kernel` and `private #process` are errors.
+- `io` marks host Wasm exports on the entry module only (`io name (...) => ...`,
+  `io const`, `io let`; at least one entry required). Only the entry module may
+  declare entries. `private io` is allowed; `private #kernel` and `private #process`
+  are errors.
 - `#kernel` declares a pure, compiler-verified multi-core batch kernel
   (stateless or prepared-context) and binds its entry-module `Kernel [ctx, item, out]`
   handle. `#process` declares an isolated stateful actor (`init` + `step`
@@ -634,7 +637,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
    - `own` parameter = **taken linearly**. The argument must be linear (or a
      disjoint linear field of a linear local). The caller's name/field is spent
      until shadowed again (`let (plan, w) = step world dt; world := w`).
-   - Every non-`#entry` call result is linear and belongs solely to the caller.
+   - Every non-`io` call result is linear and belongs solely to the caller.
    - Partial application cannot supply an `own` parameter unless the whole call
      is saturated.
 4. **Explicit `copy` and `freeze`:**

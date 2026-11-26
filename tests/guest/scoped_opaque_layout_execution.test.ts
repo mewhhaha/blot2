@@ -88,11 +88,11 @@ Deno.test(`opaque variant layouts preserve private identity and representation e
 
     const rejections = [
       [
-        "#entry const invalid = func () => return (token.make () 1 2 3 4).region\n",
+        "io const invalid = func () => return (token.make () 1 2 3 4).region\n",
         "private_access",
       ],
       [
-        "#entry const invalid = func () => return $token.Handle {kind: (), region: 1, origin: 2, slot: 3, generation: 4}\n",
+        "io const invalid = func () => return $token.Handle {kind: (), region: 1, origin: 2, slot: 3, generation: 4}\n",
         "private_access",
       ],
     ];

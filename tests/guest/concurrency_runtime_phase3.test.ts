@@ -411,13 +411,13 @@ func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
     @storage.push out v
   return out
 
-#entry func logical_oom (_: #[U32]): #[U32] =>
+io logical_oom (_: #[U32]): #[U32] =>
   // Two 64 MiB blocks during second realloc -> logical heap_live_bytes (64+32+64 = 160 MiB > 128 MiB) -> offset 640 MUST be 0!
   let a = alloc_heap_u32 16000000 1
   let b = alloc_heap_u32 16000000 2
   return #[a[0], b[0]]
 
-#entry func warm_class_a (_: #[U32]): #[U32] =>
+io warm_class_a (_: #[U32]): #[U32] =>
   // Carve 4 x 16 MiB blocks (64 MiB total in heap_top, freed to 16 MiB free list on return)
   let a = alloc_heap_u32 4000000 1
   let b = alloc_heap_u32 4000000 2
@@ -425,7 +425,7 @@ func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
   let d = alloc_heap_u32 4000000 4
   return #[a[0], b[0], c[0], d[0]]
 
-#entry func alloc_64m (_: #[U32]): #[U32] =>
+io alloc_64m (_: #[U32]): #[U32] =>
   // Fresh: needs 64M+32M+16M+... = 128M -> succeeds!
   // Warm after warm_class_a: 64M already sitting in 16 MiB free list -> logical heap_live_bytes <= 96 MiB passes,
   // yet physical heap_top + 64M > 128M -> traps with Page-0 offset 640 == 1!
@@ -541,7 +541,7 @@ func l_step (st: own List) -> (add_head: U32): (List, U32) =>
 
 Deno.test("Phase 3 Law #2: array-to-array callback growth, heap-at-limit packet, and scalar-only process unexported memory", async () => {
   const bytes = await compileToWasm(`
-#entry func roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
+io roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
   // 2-word (8B payload + 4B hdr = 12B) fits in 16B bank; host replies with 3 words (16B) and 5 words (24B) without blot:reset!
   let r1 = cb #[11, 22]
   let r2 = cb #[33, 44]
@@ -553,7 +553,7 @@ func alloc_heap_u32 (n: U32) -> (v: U32): #[U32] =>
     @storage.push out v
   return out
 
-#entry func heap_at_limit_packet (xs: #[U32]): #[U32] =>
+io heap_at_limit_packet (xs: #[U32]): #[U32] =>
   // Fill heap_live_bytes to 127.75 MiB (only 256 KiB free in 128 MiB heap_budget!)
   let a = alloc_heap_u32 16000000 1
   let b = alloc_heap_u32 8000000 2
@@ -658,7 +658,7 @@ func helper_simd_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   let d = #[@u32.add v 3]
   return @simd.store dst 0 (a, b, c, d)
 
-#entry func test_escape_helpers (x: U32): #[U32] =>
+io test_escape_helpers (x: U32): #[U32] =>
   let holder: #[#[U32]] = #[#[0], #[0], #[0], #[0]]
   holder := helper_store_fresh holder x
   let a0 = holder[0][0]
@@ -666,7 +666,7 @@ func helper_simd_store_fresh (dst: own #[#[U32]]) -> (v: U32): #[#[U32]] =>
   holder := helper_simd_store_fresh holder (@u32.add x 10)
   return #[a0, a2, holder[0][0], holder[1][0], holder[2][0], holder[3][0]]
 
-#entry func test_box_simd_and_fork (x: U32): #[U32] =>
+io test_box_simd_and_fork (x: U32): #[U32] =>
   let mk = func (k: U32): Big5 => return $Big5 { a: k, b: @u32.add k 1, c: @u32.add k 2, d: @u32.add k 3, e: @u32.add k 4 }
   let arr: #[Big5] = #[mk x, mk (@u32.add x 10), mk (@u32.add x 20), mk (@u32.add x 30)]
   let (b0, b1, b2, b3) = @simd.load arr 0
@@ -742,7 +742,7 @@ func run_var (n: U32): #[U32] => return @array.fill n 7
 #kernel const prepared_k: Kernel [#[U32], KItem, KOut] = { prepare: prep_k, run: run_k }
 #kernel func var_k (n: U32): #[U32] => return run_var n
 
-#entry func test_flat_roundtrip (seed: U32): #[U32] =>
+io test_flat_roundtrip (seed: U32): #[U32] =>
   let r0: #[3; U32] = #[seed, @u32.add seed 1, @u32.add seed 2]
   let r1: #[3; U32] = #[10, 20, 30]
   let grid: #[2; #[3; U32]] = #[r0, r1]
@@ -904,7 +904,7 @@ ${useRun ? "func staged_factor (): U32 => return #run dep.factor" : "func staged
 
 #kernel func work (x: U32): U32 => return @u32.add (helper x) (staged_factor ())
 
-#entry func get_meta (_: Unit): #[U32] =>
+io get_meta (_: Unit): #[U32] =>
   let (bh_lo, bh_hi) = flat.kernel_binding_hash work
   return #[${nonKernelConst}, bh_lo, bh_hi]
 `;
@@ -1031,15 +1031,15 @@ func scope_pair (n1: U32) -> (n2: U32): U32 =>
   let b = @array.fill n2 5
   return @u32.add a[@u32.sub n1 1] b[@u32.sub n2 1]
 
-#entry func fill_60m (_: #[U32]): #[U32] =>
+io fill_60m (_: #[U32]): #[U32] =>
   let a = @array.fill 15000000 7
   return #[a[0], a[14999999]]
 
-#entry func fill_80m (_: #[U32]): #[U32] =>
+io fill_80m (_: #[U32]): #[U32] =>
   let a = @array.fill 20000000 9
   return #[a[0], a[19999999]]
 
-#entry func reversed_rewind (_: #[U32]): #[U32] =>
+io reversed_rewind (_: #[U32]): #[U32] =>
   // Warmup (32K, 10M, 80M) -> Scope 1 (80M, 10M) -> rewind -> Scope 2 (10M, 80M)
   let s1 = scope_pair 20000000 2500000
   let s2 = scope_pair 2500000 20000000

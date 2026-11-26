@@ -6,13 +6,13 @@ Deno.test("data-stack host arrays copy packets and preserve application owners a
   await compileAndRun(
     `
 const world: Array U32 = #[40]
-#entry const exchange = func (input: Array U32): Array U32 => return do:
+io const exchange = func (input: Array U32): Array U32 => return do:
   let next = input[0]
   let out = @storage.copy world
   @storage.push out next
   return out
-#entry const read = func () => return world[0]
-#entry const floats = func (input: Array F32): Array F32 => return do:
+io const read = func () => return world[0]
+io const floats = func (input: Array F32): Array F32 => return do:
   let scratch: Array F32 = #[input[1], input[0]]
   return scratch
 `,
@@ -75,7 +75,7 @@ Deno.test("data-stack callbacks exchange independent packets without retaining h
   await compileAndRun(
     `
 const invoke = func host -> packet => return host packet
-#entry const exchange = func (host: Array F32 -> Array F32 ! {Foreign}): Array F32 => return do:
+io const exchange = func (host: Array F32 -> Array F32 ! {Foreign}): Array F32 => return do:
   let request: Array F32 = #[1.5, 2.5]
   use first <- invoke host request
   use second <- host first
@@ -123,12 +123,12 @@ Deno.test("ordinary suspended host calls keep data stacks alive and exclude reen
   await compileAndRun(
     `
 const world: Array U32 = #[7]
-#entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
+io const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   let scratch: Array U32 = #[40]
   use next <- host (@storage.load (&scratch[0]))
   scratch[0] := next
   return @storage.load (&scratch[0])
-#entry const read = func () => return world[0]
+io const read = func () => return world[0]
 `,
     async (guest) => {
       let resolve!: (value: number) => void;
@@ -167,7 +167,7 @@ const world: Array U32 = #[7]
 Deno.test("Foreign transport budgets both sides of a large copied packet", async () => {
   await compileAndRun(
     `
-#entry const exchange = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
+io const exchange = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let request: Array U32 = #[]
   for 0 .. 153600:
     @storage.push request 42
@@ -205,7 +205,7 @@ Deno.test("data-stack ABI identifies scalar-only exports without transport", asy
   await compileAndRun(
     `
 const state: Array U32 = #[41]
-#entry const next = func (delta: U32) => return @u32.add state[0] delta
+io const next = func (delta: U32) => return @u32.add state[0] delta
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);

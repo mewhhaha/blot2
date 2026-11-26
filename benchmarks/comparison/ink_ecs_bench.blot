@@ -190,7 +190,7 @@ func world_step (st: own EcsWorld) -> (cmd: U32): (EcsWorld, U32) =>
 #process const ink_world: Process [U32, U32, U32] = { init: build_world, step: world_step }
 
 // Standalone batch spawn + insert benchmark (10,000 entities with Pos + Vel + Active).
-#entry func ecs_spawn_batch (count: U32): U32 =>
+io ecs_spawn_batch (count: U32): U32 =>
   let alive = ecs.entities ()
   let entity_meta = ecs.metadata 1
   let (ids, alive, entity_meta) = ecs.spawn_many alive entity_meta count

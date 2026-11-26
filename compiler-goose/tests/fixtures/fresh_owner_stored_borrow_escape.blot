@@ -3,7 +3,7 @@ const bad = func (rows: own Array Row) -> (input: U32): (Array Row, Array U32) =
   let local: Array U32 = #[input]
   @storage.push rows ($Row {values: &local[0..1]})
   return (rows, local)
-#entry const answer = func (input: U32): U32 => return do:
+io const answer = func (input: U32): U32 => return do:
   let seed: Array U32 = #[1]
   let rows: Array Row = #[$Row {values: &seed[0..1]}]
   let (next_rows, local) = bad rows input

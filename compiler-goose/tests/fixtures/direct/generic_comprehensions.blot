@@ -10,6 +10,6 @@ func generic_view faces => return do:
   let points = #[1, 2]
   let kept = #[plane | plane <- faces, touching plane (points.view 0 points.length) >= 3]
   return kept.length
-#entry func annotated_count (n: U32): U32 => return annotated #[n, 1, 5, 7]
-#entry func generic_count (n: U32): U32 => return generic #[n, 1, 5, 7]
-#entry func generic_view_count (n: U32): U32 => return generic_view #[n, 1, 5, 7]
+io annotated_count (n: U32): U32 => return annotated #[n, 1, 5, 7]
+io generic_count (n: U32): U32 => return generic #[n, 1, 5, 7]
+io generic_view_count (n: U32): U32 => return generic_view #[n, 1, 5, 7]

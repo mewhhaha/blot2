@@ -29,7 +29,7 @@ func step_branch (s: State) -> (flag: U32): State =>
 
 // Statement-match FBIP inside a loop on a copiedBox carry initialized from a
 // shared value: must leave the original untouched AND stay zero-allocation.
-#entry func loop_stmt_fbip (iters: U32): U32 =>
+io loop_stmt_fbip (iters: U32): U32 =>
   let initial = make_active 10 20 30 40
   let cur = initial
   for idx in 0..iters:
@@ -46,14 +46,14 @@ func step_branch (s: State) -> (flag: U32): State =>
   return init_sum * 1000000 + cur_sum
 
 // Expression-match with do: return and branching if/else tails.
-#entry func branch_return_fbip (iters: U32): U32 =>
+io branch_return_fbip (iters: U32): U32 =>
   let cur = make_active 1 2 3 4
   for idx in 0..iters:
     cur := step_branch cur (idx & 1)
   return sum_state cur
 
 // Expression-match with do: break (Tag.block_ -> Tag.return_) on a boxed value.
-#entry func block_break_fbip (iters: U32): U32 =>
+io block_break_fbip (iters: U32): U32 =>
   let cur = do:
     let init = make_active 2 4 6 8
     break init
@@ -67,7 +67,7 @@ func step_branch (s: State) -> (flag: U32): State =>
   return sum_state cur
 
 // Aliasing soundness: when cur is referenced twice, FBIP must NOT fire.
-#entry func alias_soundness (n: U32): U32 =>
+io alias_soundness (n: U32): U32 =>
   let cur = make_active n 2 3 4
   let saved = cur
   let next = case cur of

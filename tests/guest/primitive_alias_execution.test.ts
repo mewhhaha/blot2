@@ -5,12 +5,12 @@ import { instantiateGuest } from "../../host/guest.ts";
 const fixture = new URL("../../compiler-goose/tests/fixtures/primitive-aliases.blot", import.meta.url);
 const importedSource = `import * as primitives from "./primitives"
 const apply = func operation -> left -> right => return operation left right
-#entry const imported = func (value: U32): Array U32 => return do:
+io const imported = func (value: U32): Array U32 => return do:
   let owner: Array U32 = #[value]
   let alias = primitives.add
   let partial = primitives.subtract owner[0]
   return #[alias owner[0] 7, apply primitives.multiply value 7, partial 7]
-#entry const imported_float = func (value: F32): F32 => return primitives.negate value
+io const imported_float = func (value: F32): F32 => return primitives.negate value
 `;
 const librarySource = `const add = @u32.add
 const subtract = @u32.sub
@@ -22,7 +22,7 @@ const Number.add = func (left: Number) -> (right: Number): Number => return do:
   let $Number a = left
   let $Number b = right
   return $Number (a + b + 100)
-#entry const operators = func (value: U32): Array U32 => return do:
+io const operators = func (value: U32): Array U32 => return do:
   let owner: Array U32 = #[value]
   let partial = U32.add owner[0]
   let $Number nominal = $Number value + $Number 2
@@ -31,9 +31,9 @@ const Number.add = func (left: Number) -> (right: Number): Number => return do:
     if value > 7 then 1 else 0, if value >= 7 then 1 else 0,
     if true == false then 1 else 0, if true != false then 1 else 0]
 const apply_bound = func operation -> (value: U32): U32 => return operation value
-#entry const receiver_callbacks = func (value: U32): Array U32 => return
+io const receiver_callbacks = func (value: U32): Array U32 => return
   #[apply_bound (2.add) value, apply_bound (9.add) value, apply_bound (2.mul) value, apply_bound (9.mul) value]
-#entry const float_operators = func (value: F32): F32 => return do:
+io const float_operators = func (value: F32): F32 => return do:
   let partial = F32.mul value
   return partial (2.0 * 2.0) + F32.square value
 `;

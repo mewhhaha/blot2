@@ -3,14 +3,14 @@ import { GuestError, instantiateGuest } from "../../host/guest.ts";
 import { compile } from "./test_compile.ts";
 
 const source = `
-#entry const integers = func (values: Array U32) => return values
-#entry const floats = func (values: Array F32) => return values
-#entry const change = func (values: Array F32) => return @array.set values 0 42.5
-#entry const first = func (values: Array F32) => return @array.get values 0
-#entry const filled = func (count: U32) => return @array.fill count 3.5
-#entry const empty = func () => return @array.fill 0 0
-#entry const constant = func () => return #[1, 4_294_967_295]
-#entry const callback = func (io: U32 -> U32 ! {Foreign}) => return do:
+io const integers = func (values: Array U32) => return values
+io const floats = func (values: Array F32) => return values
+io const change = func (values: Array F32) => return @array.set values 0 42.5
+io const first = func (values: Array F32) => return @array.get values 0
+io const filled = func (count: U32) => return @array.fill count 3.5
+io const empty = func () => return @array.fill 0 0
+io const constant = func () => return #[1, 4_294_967_295]
+io const callback = func (io: U32 -> U32 ! {Foreign}) => return do:
   use value <- io 40
   break value
 `;

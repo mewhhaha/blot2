@@ -4,13 +4,13 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const controls = `import * as array from "std/array"
 type Range is data = $Range {start: U32, count: U32}
 type Command is data = $Command {lanes: Range, audit: U32}
-#entry const saved = func (count: U32) => return do:
+io const saved = func (count: U32) => return do:
   let payload = array.generate (count * 3) (func i => return i)
   let commands = array.generate count (func i => return $Command {lanes: $Range {start: i * 3, count: 3}, audit: i})
   let chunks = array.map (func c => return c.lanes) commands
   let lanes = array.flatten chunks payload
   break lanes.length + (if count == 0 then 0 else commands[0].audit + payload[chunks[0].start + 2])
-#entry const ragged = func (count: U32) => return do:
+io const ragged = func (count: U32) => return do:
   let commands = array.generate count (func i => return $Command {lanes: $Range {start: i * (i + 1) / 2, count: i + 1}, audit: i})
   let payload = array.fill (count * (count + 1) / 2) 0
   for i in 0 .. count:
@@ -19,16 +19,16 @@ type Command is data = $Command {lanes: Range, audit: U32}
   let chunks = array.map (func c => return c.lanes) commands
   let lanes = array.flatten chunks payload
   break lanes.length
-#entry const trap = func (divisor: U32) => return do:
+io const trap = func (divisor: U32) => return do:
   let commands = array.generate 2 (func i => return $Command {lanes: $Range {start: i * 3, count: 3}, audit: 1 / divisor})
   let payload = array.generate 6 (func i => return i / 3 + i % 3)
   let chunks = array.map (func c => return c.lanes) commands
   let lanes = array.flatten chunks payload
   break lanes[0]
 const constant = array.flatten #[$Range {start: 0, count: 2}, $Range {start: 2, count: 0}, $Range {start: 2, count: 1}] #[3, 4, 5]
-#entry const constant_read = func (index: U32) => return constant[index]
+io const constant_read = func (index: U32) => return constant[index]
 type Floating is data = $Floating {lanes: Range}
-#entry const floats = func (seed: F32) => return do:
+io const floats = func (seed: F32) => return do:
   let commands = array.generate 3 (func i => return $Floating {lanes: $Range {start: i * 24, count: 24}})
   let payload = array.generate 72 (func i => return (seed + @u32.to_f32 (i / 24)) * @u32.to_f32 (i % 24))
   let chunks = array.map (func c => return c.lanes) commands

@@ -71,20 +71,20 @@ async function sortSource(): Promise<string> {
   };
   return extract(merge, "const merge =", "const merge_sort_inplace =") +
     extract(quick, "const quick_sort:", "const run =") + `
-#entry const merge_sorted = func (input: Array U32): Array U32 => return do:
+io const merge_sorted = func (input: Array U32): Array U32 => return do:
   let values = @storage.copy input
   let temp: Array U32 = @array.fill 64 0
   if @u32.lt 0 values.length:
     let (sorted, _) = merge_sort_helper values temp 0 (@u32.sub values.length 1)
     return sorted
   return values
-#entry const quick_sorted = func (input: Array U32): Array U32 => return do:
+io const quick_sorted = func (input: Array U32): Array U32 => return do:
   let values = @storage.copy input
   return quick_sort values 0 values.length
-#entry const empty_range = func (): Array U32 => return do:
+io const empty_range = func (): Array U32 => return do:
   let values: Array U32 = #[9, 5, 3]
   return quick_sort values 1 1
-#entry const singleton_range = func (): Array U32 => return do:
+io const singleton_range = func (): Array U32 => return do:
   let values: Array U32 = #[9, 5, 3]
   let temp: Array U32 = #[0, 0, 0]
   let values = quick_sort values 1 2
@@ -121,19 +121,19 @@ const touch: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) ->
     values := touch own values (@u32.sub remaining 1)
   values[remaining] := remaining
   return values
-#entry const answer = func (depth: U32): Array U32 => return do:
+io const answer = func (depth: U32): Array U32 => return do:
   let values: Array U32 = #[0, 0, 0, 0]
   let unused: Array U32 = #[]
   let caller = @u32.add depth 900
   values := descend values unused depth 0 0
   values := descend values unused depth depth 3
   return #[values[0], values[1], values[2], values[3], caller]
-#entry const distinct = func (depth: U32): Array U32 => return do:
+io const distinct = func (depth: U32): Array U32 => return do:
   let left: Array U32 = #[1]
   let right: Array U32 = #[2]
   let (left, right) = pair left right depth
   return #[left[0], right[0]]
-#entry const checked = func (depth: U32): U32 => return do:
+io const checked = func (depth: U32): U32 => return do:
   let values: Array U32 = #[0, 0, 0, 0]
   values := touch values depth
   return @u32.add (@u32.add values[0] values[1]) (@u32.add values[2] values[3])
@@ -184,7 +184,7 @@ const recursive: {
 const second: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -> (n: U32): Array U32 => return do:
   values[0] := @u32.add values[0] n
   return first own values n
-#entry const bad = func (n: U32) => return do:
+io const bad = func (n: U32) => return do:
   let values: Array U32 = #[0]
   values := first values n
   return values[0]
@@ -236,7 +236,7 @@ const second: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -
     let (next_right, next_left) = walk own right own left (@u32.sub n 1)
     return (next_left, next_right)
   return (left, right)
-#entry const bad = func (n: U32) => return do:
+io const bad = func (n: U32) => return do:
   let left: Array U32 = #[1]
   let right: Array U32 = #[2]
   let (left, _) = walk left right n
@@ -267,7 +267,7 @@ const second: own Array U32 -> U32 -> Array U32 = func (values: own Array U32) -
   if @u32.lt 0 n:
     return walk value own sink (@u32.sub n 1)
   return sink
-#entry const bad = func (n: U32) => return do:
+io const bad = func (n: U32) => return do:
   let values: Array U32 = #[1]
   let sink: Array U32 = #[0]
   sink := walk (&values[0]) sink n
@@ -285,7 +285,7 @@ function recursiveSource(item: typeof recursive[number]): string {
   return `${prefix}const walk: own ${mode} U32 -> U32 -> ${mode} U32 = func (values: own ${mode} U32) -> (n: U32): ${mode} U32 => return do:
 ${item.body}
   return values
-#entry const bad = func (n: U32) => return do:
+io const bad = func (n: U32) => return do:
   let values: ${mode} U32 = #[0]
   let _ = walk values n
   return n
@@ -314,7 +314,7 @@ ${
   }  rows[0] := @u32.add rows[0] 1
   let result = @u32.add total values[0]
   return (rows, values, result)
-#entry const answer = func (input: U32): Array U32 => return do:
+io const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
   let values: Array U32 = #[input, 0]
   let saved = @u32.add input 333

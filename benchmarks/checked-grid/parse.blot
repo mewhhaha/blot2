@@ -1,4 +1,4 @@
 import * as grid from "./grid"
-#entry func solve (source: Text): Array U32 => do:
+io solve (source: Text): Array U32 => do:
   let map = grid.parse source
   return #[map.width, map.height]

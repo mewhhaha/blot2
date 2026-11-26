@@ -4,19 +4,19 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const source = `import * as array from "std/array"
-#entry const boxed = func (count: U32) : Array U32 => return #[count, count + 1]
-#entry const copied = func (count: U32) => return do:
+io const boxed = func (count: U32) : Array U32 => return #[count, count + 1]
+io const copied = func (count: U32) => return do:
   let values = array.generate count (func index => return index + 1)
   let old = values.copy
   values[0] := 99
   break old[0] + values[0] + old.length
-#entry const trapped = func (index: U32) => return do:
+io const trapped = func (index: U32) => return do:
   let values = array.generate 8 (func i => return i + 1)
   break values[index]
 `;
 
 const closures = `import * as array from "std/array"
-#entry const closures = func (steps: U32) => return do:
+io const closures = func (steps: U32) => return do:
   let saved = array.generate 8 (func index => return func offset => return index + offset)
   let total = 0
   for step in 0..steps:

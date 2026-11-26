@@ -14,8 +14,8 @@ Deno.test("retained callers validate scalar constants through edits traps and re
   const source = (offset: string, other: number) =>
     `const offset = ${offset}
 const other = ${other}
-#entry const answer = func (x: U32) => return @u32.add (@u32.add x offset) (@u32.add offset x)
-#entry const unrelated = func () => return other
+io const answer = func (x: U32) => return @u32.add (@u32.add x offset) (@u32.add offset x)
+io const unrelated = func () => return other
 `;
   const retained = await createZigProjectCompiler(options);
   try {
@@ -70,9 +70,9 @@ Deno.test("runtime body cutoff rebuilds executable and staged results through tr
   };
   const main = `import * as values from "./values"
 const unused = func (value: U32) => return @u32.sub (@u32.div value 1) 1
-#entry const warm = func (value: U32) => return values.adjust value
-#entry const answer = func (value: U32) => return @u32.add (values.adjust value) 40
-#entry const folded: U32 = values.adjust 20
+io const warm = func (value: U32) => return values.adjust value
+io const answer = func (value: U32) => return @u32.add (values.adjust value) 40
+io const folded: U32 = values.adjust 20
 `;
   const retained = await createZigProjectCompiler(options);
   try {

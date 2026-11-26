@@ -1,5 +1,5 @@
 import * as array from "std/array"
-#entry const run = func (seed: U32) : U32 => return do:
+io const run = func (seed: U32) : U32 => return do:
   let left = array.generate 8192 (func index => return (seed + index * 17) % 1024)
   let right = array.generate 8192 (func index => return (seed + index * 31) % 1024)
   let total = 0

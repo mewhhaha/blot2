@@ -76,7 +76,7 @@
         }
       },
       {
-        "rule": "entry_modifier",
+        "rule": "io_modifier",
         "boundary": {
           "kind": "root"
         }
@@ -101,6 +101,12 @@
       },
       {
         "rule": "named_function",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "io_function",
         "boundary": {
           "kind": "root"
         }

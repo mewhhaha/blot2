@@ -43,10 +43,11 @@ implementation_type_member = ("type" name:TYPE_IDENT "=" value:type_expression) 
 implementation_value_member = ("const" name:(source_identifier | TYPE_IDENT) annotation:(":" type_expression)? "=" value:lambda) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
-entry_modifier = ("#" "entry") ;
-value_declaration = (modifier:entry_modifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
-named_function_declaration = (modifier:entry_modifier? value:named_function) ;
+io_modifier = ("iO") ;
+value_declaration = (modifier:io_modifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
+named_function_declaration = (value:named_function | value:io_function) ;
 named_function = ("func" name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:suite | body:rebinding | body:effect_step | body:expression)) ;
+io_function = (modifier:io_modifier name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:suite | body:rebinding | body:effect_step | body:expression)) ;
 function_name = (root:source_identifier rest:("." (source_identifier | TYPE_IDENT))* | root:TYPE_IDENT rest:("." (source_identifier | TYPE_IDENT))+) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom* ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
@@ -183,10 +184,10 @@ collection_if = ("if" condition:collection_infix "then" consequence:collection_e
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
 collection_infix_tail = (operator:(SYMBOL | "+" | "~" | "&" | "$" | "*" | "^" | "and" | "or" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
-source_identifier = (IDENT | "entry" | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
+source_identifier = (IDENT | "expect_trap" | "own" | "run" | "kernel" | "process" | "prepare" | "init" | "step" | "fields" | "variants" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 
 quantified_type = (kind:("forall" | "exists") "[" binders:quantified_binder ("," binders:quantified_binder)* "]" where:quantified_where? "=>" body:type_expression) ;
-quantified_binder = (sort:("row" | "region")? name:(IDENT | "entry" | "expect_trap" | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
+quantified_binder = (sort:("row" | "region")? name:(IDENT | "expect_trap" | "kernel" | "process" | "prepare" | "init" | "step" | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;
 quantified_where = (("where" | "wherE") body:constraint_body) ;
 package_pack = ("pack" "[" witnesses:type_expression ("," witnesses:type_expression)* "]" value:expression "as" annotation:type_expression) ;
 package_unpack = ("unpack" package:expression "as" "[" binders:quantified_binder ("," binders:quantified_binder)* "]" name:source_identifier "in" body:expression) ;

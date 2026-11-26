@@ -400,8 +400,8 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     summary: "This expression form is not supported in executable Blot code.",
     why:
       "Bare `[1, 2, 3]` list literals are retired. Blot has one unified owned array type `#[T]` constructed with `#[1, 2, 3]`.",
-    before: `#entry func main (): #[U32] => return [1, 2, 3]`,
-    after: `#entry func main (): #[U32] => return #[1, 2, 3]`,
+    before: `io main (): #[U32] => return [1, 2, 3]`,
+    after: `io main (): #[U32] => return #[1, 2, 3]`,
     checklist: [
       "Prefix array literals with `#`: `#[1, 2, 3]` and empty typed arrays `let xs: #[U32] = #[]`.",
       "Prefix array types with `#`: `#[U32]` or `Array U32`.",
@@ -416,9 +416,9 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     why:
       "Most commonly caused by omitting `$` on a sum-type constructor (`Some 1` instead of `$Some 1`), using `None` instead of `$Nothing`, using `String` instead of `Text`, a typo in a local/global name, or forgetting an `import`.",
     before: `type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return Some 1`,
+io main (): Opt => return Some 1`,
     after: `type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1`,
+io main (): Opt => return $Some 1`,
     checklist: [
       "Prefix every data constructor with `$` in expressions and patterns (`$Some x`, `$Nothing`, `$Vec2 { x: 1.0, y: 2.0 }`).",
       "Use `Text` (prelude alias for `#[U32]` with `std/text`) instead of `String`/`str`, and capitalized scalar types (`U32`, `F32`, `Bool`, `Unit`).",
@@ -433,10 +433,10 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
       "The `.member` projection or associated call does not exist on the receiver's inferred type.",
     why:
       "Blot arrays expose `.length` (not `.len`), records only expose declared fields, and module functions like `F32.sqrt x` are namespaced rather than implicit receiver methods unless declared as associated functions.",
-    before: `#entry func main (): U32 =>
+    before: `io main (): U32 =>
   let xs = #[1, 2, 3]
   return xs.len`,
-    after: `#entry func main (): U32 =>
+    after: `io main (): U32 =>
   let xs = #[1, 2, 3]
   return xs.length`,
     checklist: [
@@ -461,11 +461,11 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     why:
       "Blot records are statically checked against their exact declared field set. Every field in a record literal must match the target type, and record updates (`r.field := ...`) require a physical field on `r`.",
     before: `type Pt = { x: U32, y: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let p: Pt = { x: 1, z: 2 }
   return p.x`,
     after: `type Pt = { x: U32, y: U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   let p: Pt = { x: 1, y: 2 }
   return p.x`,
     checklist: [
@@ -546,9 +546,9 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
     why:
       "Every algebraic data constructor in Blot starts with `$`, must match a variant declared in a `type ... is data` definition, and must receive the exact number of payload arguments.",
     before: `type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1 2`,
+io main (): Opt => return $Some 1 2`,
     after: `type Opt is data = $Some U32 | $Nothing
-#entry func main (): Opt => return $Some 1`,
+io main (): Opt => return $Some 1`,
     checklist: [
       "Verify the `$Constructor` spelling matches a declared `type ... is data` variant in scope.",
       "Pass the exact payload expected by the variant (e.g. `$Some 1`, `$Nothing`, `$Pair (1, 2)`).",
@@ -563,8 +563,8 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
       "Two types that must be equal failed unification (for example, returning `F32` where `U32` was declared).",
     why:
       "Blot has strict static typing with zero implicit numeric conversions (`U32` vs `F32` vs `Bool` vs `Unit`), and curried functions apply one argument at a time.",
-    before: `#entry func main (): U32 => return 1.5`,
-    after: `#entry func main (): F32 => return 1.5`,
+    before: `io main (): U32 => return 1.5`,
+    after: `io main (): F32 => return 1.5`,
     checklist: [
       "Convert explicitly between `U32` and `F32` with `@u32.to_f32` or `@f32.to_u32` (or `U32.to_f32` / `F32.to_u32`).",
       "Remember curried call syntax: `add a b` passes two curried args, whereas `f (a, b)` passes one 2-tuple.",
@@ -600,8 +600,8 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
       "A type expression failed well-formedness, arity, kind, occurs-check, rank, or concrete-representation checking.",
     why:
       "Blot requires finite, well-kinded types with concrete representations for code emission. Common causes include writing `String` instead of `Text`, passing the wrong number of type arguments (e.g. `Maybe` without `U32`), cyclic type aliases, or letting a local type variable escape.",
-    before: `#entry func main (s: String): U32 => return s.length`,
-    after: `#entry func main (s: Text): U32 => return s.length`,
+    before: `io main (s: String): U32 => return s.length`,
+    after: `io main (s: Text): U32 => return s.length`,
     checklist: [
       "Use `Text` (not `String`/`str`) for Unicode scalar strings, and `U32`/`F32`/`Bool`/`Unit`/`#[T]` for built-ins.",
       "Supply the exact number of type arguments required by generic types (`Maybe U32`, `Result [U32, Text]`).",
@@ -617,12 +617,12 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
     why:
       "Blot achieves zero-GC in-place mutation by enforcing single ownership of mutable storage. Once an `own` call takes a binding, the callee may mutate or reallocate its backing memory in place.",
     before: `func consume (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let n = consume a
   return n + a.length`,
     after: `func consume (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let a = #[1, 2, 3]
   let n = consume a.copy
   return n + a.length`,
@@ -640,12 +640,12 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
       "This `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live name, borrow, `with` capture, or caller may still observe.",
     why:
       "Blot's `:=` operator updates array storage in place only when the compiler statically proves unique ownership. Updating through a borrowed parameter or while `let alias = arr` is still used later would expose mutation through an immutable alias.",
-    before: `#entry func main (): U32 =>
+    before: `io main (): U32 =>
   let a = #[1, 2, 3]
   let b = a
   a[0] := 99
   return a[0] + b[0]`,
-    after: `#entry func main (): U32 =>
+    after: `io main (): U32 =>
   let a = #[1, 2, 3]
   let b = a.copy
   a[0] := 99
@@ -696,22 +696,22 @@ func good (xs: own #[U32]): #[U32] => return consume_and_grow xs`,
     title:
       "Entry function has unhandled effects or invalid ABI-8 boundary type",
     summary:
-      "Declarations marked `#entry` cannot leave algebraic effects unhandled or use parameter/result types outside the raw ABI-8 boundary contract.",
+      "Declarations marked `io` cannot leave algebraic effects unhandled or use parameter/result types outside the raw ABI-8 boundary contract.",
     why:
-      "Raw `#entry` accepts ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback), while `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `#entry`, and every effect must be handled lexically with `with ...:` or `do <provider>:`.",
+      "Raw `io` entry points accept ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback), while `#kernel` and `#process` accept FlatNumeric / PersistentSafe structs and numeric arrays; fixed-size arrays `#[N; T]` and closures cannot cross raw `io`, and every effect must be handled lexically with `with ...:` or `do <provider>:`.",
     before: `type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   use t <- Clock.now ()
   return t`,
     after: `type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t`,
     checklist: [
       "Handle every effect reported in `(unhandled: Effect.op)` with `with Effect = { op: func ... => ... }:` or `do provider:`.",
-      "Use ABI-8 boundary types on raw `#entry`: `Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback.",
-      "For FlatNumeric / PersistentSafe structs and typed packets, use `#kernel` or `#process` (fixed-size `#[N; T]` and closures cannot cross raw `#entry`).",
+      "Use ABI-8 boundary types on raw `io` entries: `Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback.",
+      "For FlatNumeric / PersistentSafe structs and typed packets, use `#kernel` or `#process` (fixed-size `#[N; T]` and closures cannot cross raw `io`).",
     ],
   },
   EFFECT_MISMATCH: {
@@ -769,11 +769,11 @@ func read_time (): U32 =>
     why:
       "Effect declarations must be declared with `type Name is effect = { op: In -> Out }`, handler operations must match their declared signatures, and scoped capabilities or resolvers cannot escape their lexical handler.",
     before: `type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { missing: func () => return 0 }:
     return 0`,
     after: `type Clock is effect = { now: Unit -> U32 }
-#entry func main (): U32 =>
+io main (): U32 =>
   with Clock = { now: func () => return 42 }:
     use t <- Clock.now ()
     return t`,
@@ -827,18 +827,18 @@ func read_time (): U32 =>
   NO_ENTRY: {
     code: "NO_ENTRY",
     rawCodes: ["no_entry", "entry_let_type", "entry_module"],
-    title: "Missing or misplaced `#entry`, `#kernel`, or `#process` export",
+    title: "Missing or misplaced `io`, `#kernel`, or `#process` export",
     summary:
-      "Building a Wasm binary requires at least one `#entry`, `#kernel`, or `#process` declaration in the entry module with a supported export signature.",
+      "Building a Wasm binary requires at least one `io`, `#kernel`, or `#process` declaration in the entry module with a supported export signature.",
     why:
       "Library modules can be checked with `blot check`, but `blot build` needs an exported entry point declared in the entry module itself (not only in imported modules).",
     before: `func helper (x: U32): U32 => return x + 1`,
     after: `func helper (x: U32): U32 => return x + 1
-#entry func main (x: U32): U32 => return helper x`,
+io main (x: U32): U32 => return helper x`,
     checklist: [
-      "Add an `#entry func main (...): ... => ...`, `#kernel`, or `#process` declaration to the entry module before running `blot build`.",
-      "Use `blot check` to type-check library modules without `#entry`.",
-      "Keep `#entry` declarations in the root entry module, not inside imported library modules.",
+      "Add an `io main (...): ... => ...`, `#kernel`, or `#process` declaration to the entry module before running `blot build`.",
+      "Use `blot check` to type-check library modules without `io` entries.",
+      "Keep `io` declarations in the root entry module, not inside imported library modules.",
     ],
   },
   NON_EXHAUSTIVE_MATCH: {
@@ -919,10 +919,10 @@ const y = 2`,
     why:
       "Only local `let` bindings and parameters can be updated with `:=`. Module-level `const` bindings are immutable.",
     before: `const count = 0
-#entry func main (): U32 =>
+io main (): U32 =>
   count := 1
   return count`,
-    after: `#entry func main (): U32 =>
+    after: `io main (): U32 =>
   let count = 0
   count := 1
   return count`,
@@ -987,9 +987,9 @@ const y = 2`,
       "A `break`/`continue`/`return`/`else:` statement, function/intrinsic call, or tuple/pattern expression violated scoping or arity rules.",
     why:
       "`break` and `continue` require an enclosing loop or `do:` block, refutable `let ... else:` fallbacks must exit, and intrinsics, patterns, and tuples require exact arities and valid names.",
-    before: `#entry func main (): U32 =>
+    before: `io main (): U32 =>
   break 1`,
-    after: `#entry func main (): U32 =>
+    after: `io main (): U32 =>
   return do:
     break 1`,
     checklist: [
@@ -1024,11 +1024,11 @@ const y = 2`,
     why:
       "Blot compiles without a garbage collector by statically proving every allocation has a clear owner, no borrowed storage escapes its owner, and `own` functions are called directly rather than passed as first-class values.",
     before: `func take (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   let f = take
   return f #[1, 2]`,
     after: `func take (xs: own #[U32]): U32 => return xs.length
-#entry func main (): U32 =>
+io main (): U32 =>
   return take #[1, 2]`,
     checklist: [
       "Call functions with `own` parameters directly rather than storing or passing them as first-class function values.",
@@ -1359,7 +1359,7 @@ function findEnclosingScope(
   line1Based: number,
 ): string | null {
   const declRe =
-    /^(?:private\s+)?(#entry\s+(?:func|const|let)|#kernel(?:\s+(?:func|const))?|#process(?:\s+const)?|func|const|let|type|impl|contract|effect)\s+([A-Za-z_][A-Za-z0-9_.]*)/;
+    /^(?:private\s+)?(io(?:\s+(?:const|let))?|#kernel(?:\s+(?:func|const))?|#process(?:\s+const)?|func|const|let|type|impl|contract|effect)\s+([A-Za-z_][A-Za-z0-9_.]*)/;
   for (let i = Math.min(line1Based - 1, index.lines.length - 1); i >= 0; i--) {
     const line = index.lines[i];
     if (!line || line.startsWith(" ") || line.startsWith("\t")) continue;
@@ -1639,6 +1639,9 @@ function buildHeadlineAndFix(
     if (/^fn\b/.test(trimmedLine) || snippet === "fn") {
       fix =
         "Blot uses `func`, not `fn` (e.g. `func add (a: U32) -> (b: U32): U32 => return a + b`).";
+    } else if (/^(?:private\s+)?#entry\b/.test(trimmedLine)) {
+      fix =
+        "Blot declares entry points with `io name (...) => ...`, `io const`, or `io let` instead of `#entry`.";
     } else if (/^type\s+[A-Z][A-Za-z0-9_]*\s*=.*\|/.test(trimmedLine)) {
       fix =
         "Sum types require `is data` and `$`-prefixed constructors: `type Opt is data = $Some U32 | $Nothing`.";
@@ -1646,14 +1649,14 @@ function buildHeadlineAndFix(
       fix =
         "Algebraic data types require `is data`: `type Opt is data = $Some U32 | $Nothing`.";
     } else if (
-      /^(?:private\s+)?(?:#entry\s+|#kernel\s+)?func\b.*->\s*[A-Z][A-Za-z0-9_]*\s*(?:=>|:|$)/
+      /^(?:private\s+)?(?:io\s+|(?:#kernel\s+)?func\s+).*->\s*[A-Z][A-Za-z0-9_]*\s*(?:=>|:|$)/
         .test(trimmedLine) && !trimmedLine.includes("): ")
     ) {
       fix =
         "Write the return type after `:` before `=>` (`func f (x: U32): U32 => ...`); `->` separates curried parameters.";
     } else if (
       trimmedLine.includes("{") &&
-      /^(?:private\s+)?(?:#entry\s+|#kernel\s+)?(?:func|if|for|while|else)\b/
+      /^(?:private\s+)?(?:io\s+|#kernel\s+func\s+|func\s+|if\b|for\b|while\b|else\b)/
         .test(trimmedLine)
     ) {
       fix =
@@ -1980,7 +1983,7 @@ function buildHeadlineAndFix(
       headline: record.message,
       primaryLabel: "invalid entry signature",
       fix:
-        "Raw `#entry` accepts ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback); use `#kernel` / `#process` for FlatNumeric / PersistentSafe structs and avoid fixed-size `#[N; T]` or closures on raw `#entry`.",
+        "Raw `io` entries accept ABI-8 boundary types (`Unit`, `Bool`, `U32`, `F32`, `#[U32]`, `#[F32]`, or one `! {Foreign}` host callback); use `#kernel` / `#process` for FlatNumeric / PersistentSafe structs and avoid fixed-size `#[N; T]` or closures on raw `io`.",
     };
   }
 

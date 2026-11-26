@@ -517,21 +517,27 @@ export function formatValueSignature(raw: RawDocValue): {
     renamer,
   );
   const formattedWhere = raw.where.map((w) => renamer.rename(w));
-  const prefix = raw.modifier ? `#${raw.modifier} ` : "";
-  const kw = raw.kind === "const"
-    ? "const"
-    : raw.kind === "kernel"
-    ? "kernel"
-    : raw.kind === "process"
-    ? "process"
-    : "func";
   const whereSuffix = formattedWhere.length
     ? ` where { ${formattedWhere.join(", ")} }`
     : "";
+  let declHead: string;
+  if (raw.modifier === "io") {
+    declHead = raw.kind === "const" ? "io const" : "io";
+  } else {
+    const prefix = raw.modifier ? `#${raw.modifier} ` : "";
+    const kw = raw.kind === "const"
+      ? "const"
+      : raw.kind === "kernel"
+      ? "kernel"
+      : raw.kind === "process"
+      ? "process"
+      : "func";
+    declHead = `${prefix}${kw}`;
+  }
   return {
     type: formattedType,
     where: formattedWhere,
-    signature: `${prefix}${kw} ${raw.name}: ${formattedType}${whereSuffix}`,
+    signature: `${declHead} ${raw.name}: ${formattedType}${whereSuffix}`,
   };
 }
 
@@ -1831,7 +1837,7 @@ function buildExampleSource(
 
   const joined = rawLines.join("\n");
   const isTestSuite = /^\s*test(?:\s+expect_trap)?\s+"/m.test(joined);
-  const hasEntry = /^\s*#entry\b/m.test(joined);
+  const hasEntry = /^\s*(?:private\s+)?io\s+/m.test(joined);
   const isTextHint = (block.expected !== null &&
     block.expected.startsWith('"') && block.expected.endsWith('"')) ||
     /:\s*Text\s*=>/.test(joined) ||
@@ -1883,7 +1889,7 @@ function buildExampleSource(
   }
 
   // Wrap bare expression / statements
-  const declPrefix = options.forCheckOnly ? "func" : "#entry func";
+  const declPrefix = options.forCheckOnly ? "func" : "io";
   const nonEmptyBody = bodyLines.filter((l) =>
     l.trim() && !l.trim().startsWith("//")
   );

@@ -1,36 +1,36 @@
-#entry const create = func () => return 1
+io const create = func () => return 1
 // <- keyword.storage.modifier
-//     ^^^^^ keyword.storage.type
-//           ^ function
+// ^^^^^ keyword.storage.type
+//       ^ function
 
-#entry let count: U32 = 2
+io let count: U32 = 2
 // <- keyword.storage.modifier
-//     ^^^ keyword.storage.type
-//         ^ variable
+// ^^^ keyword.storage.type
+//     ^ variable
 
-const entry = func entry => return entry
+const io = func io => return io
 // <- keyword.storage.type
 //    ^ function
-//                 ^ variable.parameter
-//                                 ^ variable
+//              ^ variable.parameter
+//                           ^ variable
 
 const read = func value => return do:
-  let entry = value
+  let io = value
 //    ^ variable
-  break entry
-//       ^ variable
+  break io
+//      ^ variable
 
-entry
+io
 // <- variable
 // <- !keyword.storage.modifier
 const next = 1
 
-entry constancy
+io constancy
 // <- variable
 // <- !keyword.storage.modifier
-//    ^^^^^^^^^ variable
+// ^^^^^^^^^ variable
 
-"#entry const answer = 42"
+"io const answer = 42"
 // ^ string
 // ^ !keyword.storage.modifier
 

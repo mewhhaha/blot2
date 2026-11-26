@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const source = `#entry const ordered = func (input: U32): Array U32 => return do:
+const source = `io const ordered = func (input: U32): Array U32 => return do:
   let marker: Array U32 = #[input]
   let before = marker[0]
   let reused = @u32.sub input 7
@@ -14,7 +14,7 @@ const source = `#entry const ordered = func (input: U32): Array U32 => return do
   let saved = @u32.add current 9
   current := @u32.add self 1
   return #[before, after, reused, @u32.add reused mixed, chosen, saved, current]
-#entry const floating = func (input: F32): F32 => return do:
+io const floating = func (input: F32): F32 => return do:
   let marker: Array U32 = #[0]
   marker[0] := 1
   let value = @f32.mul input 1.0

@@ -15,7 +15,7 @@ func declare_all (access: own { labels: Array U32 }) -> (open: Bool): { labels: 
       else:
         access.labels := declare (node 9 (part 2)) self
   return access
-#entry func run (n: U32): U32 => return do:
+io run (n: U32): U32 => return do:
   let labels: Array U32 = #[]
   let access = declare_all { labels } (n > 0)
   let total = 0

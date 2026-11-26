@@ -5,35 +5,35 @@ Deno.test("checked scalar ranges keep source bounds, early exits and visible wri
   await compileAndRun(
     `
 func half (values: Array U32): U32 => return values.length / 2
-#entry func scan (values: Array U32): U32 => do:
+io scan (values: Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
     sum := self + values[i]
   return sum
-#entry func suffix (values: Array U32): U32 => do:
+io suffix (values: Array U32): U32 => do:
   let sum = 0
   for i in 3..@array.length values:
     sum := self + values[i]
   return sum
-#entry func prefix (values: Array U32): U32 => do:
+io prefix (values: Array U32): U32 => do:
   let sum = 0
   for i in 0..(half values):
     sum := self + values[i]
   return sum
-#entry func stop (values: Array U32): U32 => do:
+io stop (values: Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
     if values[i] == 7:
       break
     sum := self + values[i]
   return sum
-#entry func replace (values: own Array U32): U32 => do:
+io replace (values: own Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
     values[i] := values[i] + 1
     sum := self + values[i]
   return sum
-#entry func next (values: Array U32): U32 => do:
+io next (values: Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
     sum := self + values[i + 1]
@@ -89,7 +89,7 @@ Deno.test("an array length member supplied by a prelude keeps its own semantics"
     );
     await compileAndRun(
       `
-#entry func scan (values: Array U32): U32 => do:
+io scan (values: Array U32): U32 => do:
   let sum = 0
   for i in 0..values.length:
     sum := self + values[i]

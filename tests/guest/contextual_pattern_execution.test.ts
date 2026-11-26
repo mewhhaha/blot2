@@ -4,15 +4,15 @@ for(const asynchronous of [false,true])Deno.test(`contextual record schemas and 
 type Pair is data= $Pair {x:U32,y:U32}
 type Empty is data= $Empty {}
 type Choice a is data= $Some a| $None
-#entry const empty=func()=> return case $Empty {} of
+io const empty=func()=> return case $Empty {} of
   $Empty {}=>42
-#entry const selected=func (value:U32)=> return do:
+io const selected=func (value:U32)=> return do:
   let $Some chosen= $Some value else:
     break 0
   break chosen
-#entry const reordered=func (value:U32)=> return case $Pair {y:2,x:value} of
+io const reordered=func (value:U32)=> return case $Pair {y:2,x:value} of
   $Pair {x}=>x
-#entry const generic=func()=> return do:
+io const generic=func()=> return do:
   let identity=func value=> return value
   let first=identity 42
   let second=identity 1.5
@@ -25,31 +25,35 @@ type Choice a is data= $Some a| $None
 });
 Deno.test('record and guarded-pattern errors retain their actual source context',async()=>{
  for(const[source,code,message]of[
-  ['type Pair is data= $Pair {x:U32,y:U32}\n#entry const answer= $Pair {x:42}\n','missing_record_field','missing record field: y'],
-  ['type Pair is data= $Pair {x:U32,y:U32}\n#entry const answer= $Pair {z:missing}\n','unknown_record_field','record has no field named z'],
-  ['type Box is data= $Box U32\n#entry const answer= $Box {x:missing}\n','record_constructor','named fields require a declared record constructor'],
-  ['type Empty is data= $Empty\n#entry const answer= $Empty {}\n','record_constructor','named fields require a declared record constructor'],
-  ['pub const answer=missing\n','unknown_modifier','only `#entry` may precede `func`, `const`, or `let`'],
-  ['#entry const answer=func()=> return do:\n  let (true,value)=(true,42)\n  break value\n','non_exhaustive_match',undefined],
-  ['#entry const answer=func()=> return do:\n  let value=42 else:\n    0\n  break value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
-  ['#entry const answer=func()=> return do:\n  let (x,y,z)=(1,2)\n  break x\n','product_arity','cannot unify products with different element counts'],
+  ['type Pair is data= $Pair {x:U32,y:U32}\nio const answer= $Pair {x:42}\n','missing_record_field','missing record field: y'],
+  ['type Pair is data= $Pair {x:U32,y:U32}\nio const answer= $Pair {z:missing}\n','unknown_record_field','record has no field named z'],
+  ['type Box is data= $Box U32\nio const answer= $Box {x:missing}\n','record_constructor','named fields require a declared record constructor'],
+  ['type Empty is data= $Empty\nio const answer= $Empty {}\n','record_constructor','named fields require a declared record constructor'],
+  ['pub const answer=missing\n','unknown_modifier','only `io` may declare an entry point (`io name (...) => ...`, `io const`, or `io let`)'],
+  ['io const answer=func()=> return do:\n  let (true,value)=(true,42)\n  break value\n','non_exhaustive_match',undefined],
+  ['io const answer=func()=> return do:\n  let value=42 else:\n    0\n  break value\n','guard_fallthrough','let-else fallback must exit its enclosing do block'],
+  ['io const answer=func()=> return do:\n  let (x,y,z)=(1,2)\n  break x\n','product_arity','cannot unify products with different element counts'],
  ]as const)await compileExpectedFailure(source,code,message,{prelude:'none'});
 });
 
-Deno.test('bare entry declarations report an unknown modifier', async () => {
+Deno.test('bare entry, legacy #entry, and io func declarations report an unknown modifier', async () => {
   for (const source of [
     'entry func f () => return 1\n',
     'entry const x = 1\n',
+    '#entry func f () => return 1\n',
+    '#entry const x = 1\n',
+    'io func f () => return 1\n',
   ]) {
     await compileExpectedFailure(source, 'unknown_modifier', undefined, { prelude: 'none' });
   }
 });
 
-Deno.test('entry, kernel, and process are ordinary identifiers', async () => {
+Deno.test('io, entry, kernel, and process are ordinary identifiers', async () => {
   await compileAndRun(`
-const entry: U32 = 40
-func kernel (process: U32): U32 => return @u32.add process entry
-#entry func answer (): U32 =>
+const entry: U32 = 30
+const io: U32 = 10
+func kernel (process: U32): U32 => return @u32.add process (@u32.add entry io)
+io answer (): U32 =>
   let process: U32 = 2
   return kernel process
 `, guest => {

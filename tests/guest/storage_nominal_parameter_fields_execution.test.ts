@@ -29,7 +29,7 @@ const caller = `import * as left from "./left"
 import * as right from "./right"
 import * as access from "./common"
 type DictionaryNoise is data = $Noise {tick: F32, z_kept: Bool, close: U32, a_omitted: F32}
-#entry const answer = func (input: U32): Array U32 => return do:
+io const answer = func (input: U32): Array U32 => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[10]
   first[0] := @u32.add input 3
@@ -41,7 +41,7 @@ type DictionaryNoise is data = $Noise {tick: F32, z_kept: Bool, close: U32, a_om
   let selected_alias = access.choose (left.make (@storage.at first 0) (@storage.at first 0))
   let scoped = access.temporary_omitted (@storage.at first 0)
   return #[@storage.load selected_a, @storage.load selected_b, @storage.load selected_alias, @storage.load scoped, left.direct a, right.direct b]
-#entry const fallback = func (input: U32): Array U32 => return do:
+io const fallback = func (input: U32): Array U32 => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[10]
   let original = left.make (@storage.at first 0) (@storage.at second 0)

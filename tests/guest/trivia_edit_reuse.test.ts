@@ -17,8 +17,8 @@ Deno.test("retained trivia and real edits match fresh builds", async () => {
     const firstLine = original.indexOf("\n");
     const lines = original.split("\n");
     const code = lines.findIndex((line) =>
-      line.startsWith("const ") || line.startsWith("#entry const ") ||
-      line.startsWith("func ") || line.startsWith("#entry func ")
+      line.startsWith("const ") || line.startsWith("io const ") ||
+      line.startsWith("func ") || line.startsWith("io ")
     );
     assert(code >= 0, name);
     const withComment = [

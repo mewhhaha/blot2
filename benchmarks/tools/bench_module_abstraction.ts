@@ -19,7 +19,7 @@ const cases = [
     opaque:
       "type Token is opaque = F32\nconst make: F32 -> Token = func value => return $Token value\nconst read: Token -> F32 = func ($Token value) => return value\n",
     body:
-      "#entry const run = func (count: U32) => return do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  break sum\n",
+      "io const run = func (count: U32) => return do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  break sum\n",
     expected: Math.fround(4999890432),
   },
   {
@@ -30,7 +30,7 @@ const cases = [
     opaque:
       "type Token is opaque = Array U32\nconst make: Array U32 -> Token = func value => return $Token value\nconst read: Token -> Array U32 = func ($Token value) => return value\n",
     body:
-      "#entry const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  break @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
+      "io const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  break @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {
@@ -41,7 +41,7 @@ const cases = [
     opaque:
       "type Box a is opaque = { value: a }\nconst make: a -> Box a = func value => return $Box { value }\nconst read: Box a -> a = func ($Box box) => return box.value\n",
     body:
-      "#entry const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  original[0] := count\n  break @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
+      "io const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  original[0] := count\n  break @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {
@@ -51,7 +51,7 @@ const cases = [
       "type Token = F32\nconst make: F32 -> Token = func value => return value\nconst read: Token -> F32 = func value => return value\n",
     opaque:
       "type Token is opaque = F32\nconst make: F32 -> Token = func value => return $Token value\nconst read: Token -> F32 = func ($Token value) => return value\n",
-    body: "#entry const run = func (value: F32) => return read (make value)\n",
+    body: "io const run = func (value: F32) => return read (make value)\n",
     expected: 42,
   },
   {
@@ -61,7 +61,7 @@ const cases = [
       "type Token = U32\nconst make: U32 -> Token = func value => return value\nconst read: Token -> U32 = func value => return value\n",
     opaque:
       "type Token is opaque = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n",
-    body: "#entry const run = func (value: U32) => return read (make value)\n",
+    body: "io const run = func (value: U32) => return read (make value)\n",
     expected: 42,
   },
 ];

@@ -11,7 +11,7 @@ func run_b (ctx: #[F32]) -> (x: U32): U32 => x * 2 + F32.to_u32 ctx[0]
 #kernel const ka: Kernel [#[F32], U32, U32] = { prepare: prep, run: run_a }
 #kernel const kb: Kernel [#[F32], U32, U32] = { prepare: prep, run: run_b }
 
-#entry func check_handles (flag: U32): #[U32] =>
+io check_handles (flag: U32): #[U32] =>
   let selected = if flag == 0 then ka else kb
   let kid = kernel.id selected
   let bh = kernel.binding_hash selected
@@ -19,20 +19,20 @@ func run_b (ctx: #[F32]) -> (x: U32): U32 => x * 2 + F32.to_u32 ctx[0]
   let ih = kernel.io_hash selected
   return #[kid, bh.lo, bh.hi, ch.lo, ch.hi, ih.lo, ih.hi]
 
-#entry func check_pack_u32 (v: U32): U32 =>
+io check_pack_u32 (v: U32): U32 =>
   let (lo, hi) = kernel.pack_u32 v
   return case kernel.unpack_u32 lo hi of
     $Some out => out
     $Nothing => 0
 
-#entry func check_pack_hash (pair: #[U32]): #[U32] =>
+io check_pack_hash (pair: #[U32]): #[U32] =>
   let h = $kernel.Hash64 { lo: pair[0], hi: pair[1] }
   let (w0, w1, w2, w3) = kernel.pack_hash h
   return case kernel.unpack_hash w0 w1 w2 w3 of
     $Some out => #[out.lo, out.hi]
     $Nothing => #[0, 0]
 
-#entry func check_fnv_f32 (xs: #[F32]): #[U32] =>
+io check_fnv_f32 (xs: #[F32]): #[U32] =>
   let h = kernel.fnv1a64_f32s (&xs[0..xs.length])
   return #[h.lo, h.hi]
 `,

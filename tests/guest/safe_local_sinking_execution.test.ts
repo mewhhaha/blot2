@@ -5,7 +5,7 @@ import { compileAndRun } from "./compile_helpers.ts";
 
 Deno.test("safe scalar work after its consuming branch keeps its value", async () => {
   await compileAndRun(`
-#entry const heavy = func (input: U32) => return do:
+io const heavy = func (input: U32) => return do:
   let work = @u32.add (@u32.mul (@u32.add (@u32.mul input 1664525) 1013904223) 22695477) 1
   if @u32.eq input 0:
     return 0
@@ -22,17 +22,17 @@ Deno.test("safe scalar work after its consuming branch keeps its value", async (
 
 Deno.test("safe single-use locals can move into a branch without changing aliases or loops", async () => {
   await compileAndRun(`
-#entry const branch = func (input: U32) => return do:
+io const branch = func (input: U32) => return do:
   let computed = @u32.add input 40
   if @u32.eq input 0:
     return 0
   return computed
-#entry const alias = func (input: U32) => return do:
+io const alias = func (input: U32) => return do:
   let before = input
   let computed = @u32.add before 1
   before := @u32.add self 10
   return @u32.add computed before
-#entry const repeated = func (input: U32) => return do:
+io const repeated = func (input: U32) => return do:
   let computed = @u32.add input 1
   let total = 0
   for 0..3:
@@ -48,12 +48,12 @@ Deno.test("safe single-use locals can move into a branch without changing aliase
 
 Deno.test("trapping and effectful initializers remain eager", async () => {
   await compileAndRun(`
-#entry const trap = func (input: U32) => return do:
+io const trap = func (input: U32) => return do:
   let quotient = @u32.div 7 input
   if @u32.eq input 0:
     return 0
   return quotient
-#entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return do:
+io const effectful = func (callback: U32 -> U32 ! {Foreign}) => return do:
   use result <- callback 42
   if true:
     return 7
@@ -72,10 +72,10 @@ Deno.test("an immediately consumed opaque call or trap keeps eager order", async
   await compileAndRun(`
 const divide = func (input: U32) => return @u32.div 7 input
 const predicate = func (input: U32) => return @u32.eq input 0
-#entry const direct = func (input: U32) => return do:
+io const direct = func (input: U32) => return do:
   let value = divide input
   return value
-#entry const choice = func (input: U32) => return do:
+io const choice = func (input: U32) => return do:
   let condition = predicate input
   if condition:
     return 5
@@ -94,33 +94,33 @@ Deno.test("safe sinks and eager traps preserve behavior in both codegen tiers", 
   const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
   const source = `
 const helper = func (value: U32) => return @u32.div 7 value
-#entry const branch = func (input: U32) => return do:
+io const branch = func (input: U32) => return do:
   let work = @u32.mul (@u32.add input 2) 17
   if @u32.eq input 0:
     return 0
   return work
-#entry const snapshot = func (input: U32) => return do:
+io const snapshot = func (input: U32) => return do:
   let before = input
   let work = @u32.add before 1
   before := @u32.add self 10
   return @u32.add work before
-#entry const repeated = func (input: U32) => return do:
+io const repeated = func (input: U32) => return do:
   let work = @u32.add input 1
   let total = 0
   for 0..3:
     total := @u32.add self work
   return total
-#entry const trap = func (input: U32) => return do:
+io const trap = func (input: U32) => return do:
   let quotient = @u32.div 7 input
   if @u32.eq input 0:
     return 0
   return quotient
-#entry const opaque = func (input: U32) => return do:
+io const opaque = func (input: U32) => return do:
   let quotient = helper input
   if @u32.eq input 0:
     return 0
   return quotient
-#entry const direct = func (input: U32) => return do:
+io const direct = func (input: U32) => return do:
   let quotient = helper input
   return quotient
 `;

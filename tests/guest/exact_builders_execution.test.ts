@@ -8,25 +8,25 @@ import {
 Deno.test("exact nested builders preserve arrays, empty extents and element order", async () => {
   await compileAndRun(
     `
-#entry const rectangle = func count => return do:
+io const rectangle = func count => return do:
   let result: Array U32 = #[]
   for x in 0..count:
     for y in 2..5:
       result := #[...self, x * 10 + y]
   break result
-#entry const product = func (values: Array U32) => return #[x * 10 + y | x <- values, y <- values]
-#entry const reversed = func count => return do:
+io const product = func (values: Array U32) => return #[x * 10 + y | x <- values, y <- values]
+io const reversed = func count => return do:
   let result: Array U32 = #[]
   for x in count..2:
     result := #[...self, x]
   break result
-#entry const ragged = func count => return do:
+io const ragged = func count => return do:
   let result: Array U32 = #[]
   for x in 0..count:
     for y in 0..x:
       result := #[...self, x * 10 + y]
   break result
-#entry const observed = func count => return do:
+io const observed = func count => return do:
   let result: Array U32 = #[]
   for x in 0..count:
     result := #[...self, result.length]
@@ -65,7 +65,7 @@ Deno.test("exact nested builders preserve arrays, empty extents and element orde
 Deno.test("effectful builders retain the ordinary path and nested-loop order", async () => {
   await compileAndRun(
     `
-#entry const run = func (send: U32 -> U32 ! {Foreign}) => return do:
+io const run = func (send: U32 -> U32 ! {Foreign}) => return do:
   let result: Array U32 = #[]
   for x in 0..2:
     for y in 1..3:
@@ -124,7 +124,7 @@ Deno.test("exclusive append arms grow a private loop carry and preserve the resu
 Deno.test("branch appends preserve a saved prefix, independent branches and the order of item effects", async () => {
   await compileAndRun(
     `
-#entry func build (send: U32 -> U32): Array U32 => return do:
+io build (send: U32 -> U32): Array U32 => return do:
   let prefix: Array U32 = #[11]
   let rows = @array.slice prefix 0 1
   for i in 0..9:
@@ -162,7 +162,7 @@ Deno.test("branch appends preserve a saved prefix, independent branches and the 
 Deno.test("a branch cannot grow an array observed by a live alias", async () => {
   await compileExpectedFailure(
     `
-#entry func build (count: U32): U32 => return do:
+io build (count: U32): U32 => return do:
   let rows: Array U32 = #[11]
   let snapshot = rows
   for i in 0..count:

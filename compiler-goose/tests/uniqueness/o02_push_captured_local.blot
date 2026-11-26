@@ -1,6 +1,6 @@
 // @storage.push on a local captured by an inner closure is rejected.
 func run_cb (f: U32 -> U32): U32 => return f 0
-#entry func run (): U32 =>
+io run (): U32 =>
   let rows: #[U32] = #[1]
   let _ = run_cb (func _ =>
     @storage.push rows 2

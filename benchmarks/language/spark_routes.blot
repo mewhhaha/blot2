@@ -3,7 +3,7 @@ import * as fixture from "../../test_support/path_plans"
 import * as ground from "ink/navigation/ground"
 import * as math from "ink/math"
 
-#entry func serial_shared (seed: U32) => return fixture.direct_shared seed
+io serial_shared (seed: U32) => return fixture.direct_shared seed
 
 type RouteWorld = { storage: ground.Storage, stored: ground.Stored }
 
@@ -42,6 +42,6 @@ func route_planner_step (st: own U32) -> (delta: U32): (U32, U32) =>
 #process const route_planner: Process [U32, U32, U32] = { init: route_planner_init, step: route_planner_step }
 
 func request_planner (): U32 ! { StartRoute } => return StartRoute #[11, 114, 111, 117, 116, 101, 95, 112, 108, 97, 110, 110, 101, 114]
-#entry func start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
+io start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
   use endpoint <- request_planner ()
   return endpoint

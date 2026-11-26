@@ -134,7 +134,7 @@ export function highlightBlotHtml(code: string): string {
       i = end;
       continue;
     }
-    // Intrinsic @name.op or modifier #entry / #if
+    // Intrinsic @name.op or modifier #kernel / #process / #if
     if (
       (ch === "@" || ch === "#") && i + 1 < n && /[A-Za-z_]/.test(code[i + 1])
     ) {
@@ -171,7 +171,12 @@ export function highlightBlotHtml(code: string): string {
       let end = i + 1;
       while (end < n && /[A-Za-z0-9_]/.test(code[end])) end++;
       const word = code.slice(i, end);
-      if (keywords.has(word)) {
+      const lineStart = code.lastIndexOf("\n", i - 1) + 1;
+      const beforeWord = code.slice(lineStart, i);
+      const isDeclIo = word === "io" &&
+        /^[ \t]*(?:private[ \t]+)?$/.test(beforeWord) &&
+        /[ \t]/.test(code[end] ?? "");
+      if (keywords.has(word) || isDeclIo) {
         out += `<span class="tok-kw">${escapeHtml(word)}</span>`;
       } else if (/^[A-Z]/.test(word)) {
         out += `<span class="tok-ty">${escapeHtml(word)}</span>`;
@@ -628,8 +633,9 @@ function renderValueSection(
 ): string {
   const badges: string[] = [];
   if (val.modifier) {
+    const label = val.modifier === "io" ? "io" : `#${val.modifier}`;
     badges.push(
-      `<span class="pill pill-mod">#${escapeHtml(val.modifier)}</span>`,
+      `<span class="pill pill-mod">${escapeHtml(label)}</span>`,
     );
   }
   if (val.private) badges.push(`<span class="pill pill-priv">private</span>`);

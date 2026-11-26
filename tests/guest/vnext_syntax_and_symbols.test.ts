@@ -76,20 +76,20 @@ func count_to (limit: U32): U32 =>
       return i
     i := i + 1
 
-#entry func test_add (x: U32): U32 => add x 7
-#entry func test_logic (which: U32): Bool =>
+io test_add (x: U32): U32 => add x 7
+io test_logic (which: U32): Bool =>
   case which of
     0 => logic false true 1 2
     1 => logic true true 1 2
     2 => logic false true 2 2
     _ => logic true false 2 2
-#entry func test_sum (): U32 => sum_suite #[1, 2, 3, 4]
-#entry func test_choose (n: U32): U32 => choose_suite n
-#entry func test_value_case (n: U32): U32 => value_case_indented n
-#entry func test_chain (start: U32): U32 => chain_ops start
-#entry func test_guard (x: U32): U32 => guard_nonzero x
-#entry func test_return_use (x: U32): U32 => run_counter x
-#entry func test_for_ever_return (n: U32): U32 => count_to n
+io test_sum (): U32 => sum_suite #[1, 2, 3, 4]
+io test_choose (n: U32): U32 => choose_suite n
+io test_value_case (n: U32): U32 => value_case_indented n
+io test_chain (start: U32): U32 => chain_ops start
+io test_guard (x: U32): U32 => guard_nonzero x
+io test_return_use (x: U32): U32 => run_counter x
+io test_for_ever_return (n: U32): U32 => count_to n
 `,
     (guest) => {
       equal(guest.call("test_add", 35), 42);
@@ -185,10 +185,10 @@ func linked_lengths (): U32 =>
   let p = $Pair { xs: a, ys: b }
   return sum_pair p
 
-#entry func test_seal (): U32 => build_and_read ()
-#entry func test_freeze_copy (): U32 => build_resize_and_freeze ()
-#entry func test_world (): U32 => freeze_and_copy_world ()
-#entry func test_linked (): U32 => linked_lengths ()
+io test_seal (): U32 => build_and_read ()
+io test_freeze_copy (): U32 => build_resize_and_freeze ()
+io test_world (): U32 => freeze_and_copy_world ()
+io test_linked (): U32 => linked_lengths ()
 `,
     (guest) => {
       // s1 = 30, s2 = 30 => 60
@@ -206,7 +206,7 @@ func linked_lengths (): U32 =>
 Deno.test("vNext rejections: suite fallthrough, frozen mutation, spent after freeze, linked length mismatch, _ hole", async () => {
   await compileExpectedFailure(
     `
-#entry func bad (x: U32): U32 =>
+io bad (x: U32): U32 =>
   let y = x + 1
   y
 `,
@@ -215,7 +215,7 @@ Deno.test("vNext rejections: suite fallthrough, frozen mutation, spent after fre
 
   await compileExpectedFailure(
     `
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let xs: *#[U32] = freeze #[1, 2, 3]
   xs[0] := 9
   return xs[0]
@@ -225,7 +225,7 @@ Deno.test("vNext rejections: suite fallthrough, frozen mutation, spent after fre
 
   await compileExpectedFailure(
     `
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let xs = #[1, 2, 3]
   let shared = freeze xs
   return xs[0] + shared[0]
@@ -236,7 +236,7 @@ Deno.test("vNext rejections: suite fallthrough, frozen mutation, spent after fre
   await compileExpectedFailure(
     `
 func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 => a[0] + b[0]
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let a: #[2; U32] = #[1, 2]
   let b: #[3; U32] = #[1, 2, 3]
   return dot a b
@@ -246,7 +246,7 @@ func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 => a[0] + b[0]
 
   await compileExpectedFailure(
     `
-#entry func bad (): U32 =>
+io bad (): U32 =>
   let a: #[3; U32] = #[1, 2]
   return a[0]
 `,
@@ -255,7 +255,7 @@ func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 => a[0] + b[0]
 
   await compileExpectedFailure(
     `
-#entry func bad (x: U32): U32 => _
+io bad (x: U32): U32 => _
 `,
     "typed_hole",
   );

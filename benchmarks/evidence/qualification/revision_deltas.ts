@@ -28,25 +28,25 @@ type Pair is data = $Pair { left: U32, right: U32 }
 const pair = $Pair { left: 20, right: 22 }
 const aliased = (table, table)
 const other = 0
-#entry const pick = func (i: U32) => return table[i]
-#entry const first = func () => return do:
+io const pick = func (i: U32) => return table[i]
+io const first = func () => return do:
   let $Pair { left, right } = pair
   break @u32.add left right
-#entry const sum_alias = func (i: U32) => return do:
+io const sum_alias = func (i: U32) => return do:
   let (left, right) = aliased
   break @u32.add left[i] right[i]
-#entry const from_dep = func (i: U32) => return dep.shared[i]
-#entry const unrelated = func () => return other
+io const from_dep = func (i: U32) => return dep.shared[i]
+io const unrelated = func () => return other
 `);
 await Deno.writeTextFile(`${aggregateDirectory}/witness.blot`, `type Reader a is effect = { ask: Unit -> a }
 const reader = func value => return @effect.provider (Reader.ask U32) (func () => return value)
 const forty = reader 40
 const other = 0
-#entry const answer = func () => return do forty:
+io const answer = func () => return do forty:
   use value <- Reader.ask U32 ()
   break @u32.add value 1
-#entry const plain = func (x: U32) => return @u32.add x 2
-#entry const unrelated = func () => return other
+io const plain = func (x: U32) => return @u32.add x 2
+io const unrelated = func () => return other
 `);
 // An effectful entry beside an unchanged imported module: before task 023 a
 // literal inside a function body disabled retained reuse for every module.
@@ -64,13 +64,13 @@ type Reader a is effect = { ask: Unit -> a }
 const floor_half_extent: F32 = 60.0
 const reader = func value => return @effect.provider (Reader.ask F32) (func () => return value)
 const extent = reader floor_half_extent
-#entry const reach = func (x: F32) : F32 => return do extent:
+io const reach = func (x: F32) : F32 => return do extent:
   use limit <- Reader.ask F32 ()
   break @f32.add x limit
-#entry const scale = func (x: F32) : F32 => return @f32.add x 2.5
-#entry const area = func (w: U32) : U32 => return math.square w
-#entry const total = func (n: U32) : U32 => return math.sum n
-#entry const pick = func (i: U32) : U32 => return math.pick i
+io const scale = func (x: F32) : F32 => return @f32.add x 2.5
+io const area = func (w: U32) : U32 => return math.square w
+io const total = func (n: U32) : U32 => return math.sum n
+io const pick = func (i: U32) : U32 => return math.pick i
 `);
 // The same shape over a larger unchanged import of forty looping functions.
 await Deno.writeTextFile(`${aggregateDirectory}/large.blot`, Array.from({ length: 40 }, (_, k) => `const f${k} = func (n: U32) : U32 => return do:
@@ -85,11 +85,11 @@ await Deno.writeTextFile(`${aggregateDirectory}/effects_large.blot`, `import * a
 type Reader a is effect = { ask: Unit -> a }
 const reader = func value => return @effect.provider (Reader.ask F32) (func () => return value)
 const extent = reader 60.0
-#entry const reach = func (x: F32) : F32 => return do extent:
+io const reach = func (x: F32) : F32 => return do extent:
   use limit <- Reader.ask F32 ()
   break @f32.add x limit
-#entry const scale = func (x: F32) : F32 => return @f32.add x 2.5
-` + Array.from({ length: 40 }, (_, k) => `#entry const call${k} = func (n: U32) : U32 => return large.f${k} n\n`).join(""));
+io const scale = func (x: F32) : F32 => return @f32.add x 2.5
+` + Array.from({ length: 40 }, (_, k) => `io const call${k} = func (n: U32) : U32 => return large.f${k} n\n`).join(""));
 const workloads = [
   { name: "effect-large-import", path: `${aggregateDirectory}/effects_large.blot`, search: "x 2.5", replace: "x 3.5" },
   { name: "effect-body-literal", path: `${aggregateDirectory}/effects.blot`, search: "x 2.5", replace: "x 3.5" },
@@ -98,7 +98,7 @@ const workloads = [
   { name: "scalar-body", file: "scalar", search: "return 20", replace: "return 21" },
   { name: "scalar-constant", file: "scalar", search: "@u32.add 20 21", replace: "@u32.add 20 22" },
   { name: "ecs-literal", file: "ecs", search: "x: 10.0", replace: "x: 11.0" },
-  { name: "tags-constant", file: "tags", search: "#entry const answer: U32 = 20", replace: "#entry const answer: U32 = 21" },
+  { name: "tags-constant", file: "tags", search: "io const answer: U32 = 20", replace: "io const answer: U32 = 21" },
   { name: "monads-literal", file: "monads", search: "$Some 40", replace: "$Some 41" },
   { name: "lists-literal", file: "lists", search: "[1, 2, 3]", replace: "[1, 2, 4]" },
   { name: "ecs-body-swap", file: "ecs", search: "total := self + x + y", replace: "total := self + y + x" },

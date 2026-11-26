@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun } from "./reduction_helpers.ts";
 
 const source = `
-#entry const lexical = func (seed: U32) => return do:
+io const lexical = func (seed: U32) => return do:
   let cursor = do:
     break { values: @array.fill 16 seed, index: 8192 }
   let saved = cursor
@@ -13,7 +13,7 @@ const source = `
     if pressure[8191] != index:
       @panic "lexical pressure"
   break #[saved.values[saved.index % 16], cursor.values[cursor.index % 16]]
-#entry const suspend = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
+io const suspend = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let cursor = do:
     break { values: #[41, 42], index: 1 }
   let saved = cursor

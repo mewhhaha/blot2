@@ -22,10 +22,10 @@ const reconstruct = func candidate => return case candidate of
     break $Left value
   $Right error => do:
     break $Right error
-#entry const phantom = func (value: U32) => return case reconstruct ($Left value) of
+io const phantom = func (value: U32) => return case reconstruct ($Left value) of
   $Left result => result
   $Right _ => 0
-#entry const retagged = func (value: U32) => return do:
+io const retagged = func (value: U32) => return do:
   let candidate = $Left value
   let changed = case candidate of
     $Left payload => do:
@@ -36,10 +36,10 @@ const reconstruct = func candidate => return case candidate of
     $Right payload => @u32.add payload 100
 const holder = func () => return { identity: func x => return x, g: 4 }
 const forward = func value => return (holder ()).identity value
-#entry const integer = func (value: U32) => return forward value
-#entry const fraction = func (value: F32) => return forward value
-#entry const snapshot = func (seed: U32) => return forward (@array.fill 1024 seed)
-#entry const alias = func (seed: U32) => return do:
+io const integer = func (value: U32) => return forward value
+io const fraction = func (value: F32) => return forward value
+io const snapshot = func (seed: U32) => return forward (@array.fill 1024 seed)
+io const alias = func (seed: U32) => return do:
   let kept = #[seed]
   for index in 0 .. 64:
     let original = @array.fill 1024 (@u32.add seed index)
@@ -47,7 +47,7 @@ const forward = func value => return (holder ()).identity value
     kept := forward aliased
   let final = forward kept
   break @array.get final 1023
-#entry const captured = func (seed: U32) => return do:
+io const captured = func (seed: U32) => return do:
   let original = @array.fill 1024 seed
   let alias = forward original
   let read = func () => return @array.get alias 1023
@@ -96,7 +96,7 @@ Deno.test.ignore("unobserved generic identities compile without a concrete type"
   try {
     const source = `
 type Choice [a, b] is data = $Left a | $Right b
-#entry const changed = func (value: U32) => return do:
+io const changed = func (value: U32) => return do:
   let candidate = $Right #[value]
   let changed = case candidate of
     $Left missing => $Left missing
@@ -106,7 +106,7 @@ type Choice [a, b] is data = $Left a | $Right b
     $Left _ => 0
     $Right values => values[0]
 const holder = func () => return { identity: func x => return x, unseen: func x => return x, g: 4 }
-#entry const unobserved = func () => return (holder ()).g
+io const unobserved = func () => return (holder ()).g
 `;
     const result = await compiler.build({ sources: { [entry]: source } });
     assert(result.success, JSON.stringify(result));

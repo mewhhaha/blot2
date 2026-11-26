@@ -23,7 +23,7 @@ type Vec2 is data = $Vec2 { x: F32, y: F32 }
 type SoaPair is data = $SoaPair { px: #[F32], vx: #[F32] }
 
 // 2A: inline array.generate with captures, aggregates, and early return inside closure
-#entry func gen_inline_early_return (n: U32): U32 =>
+io gen_inline_early_return (n: U32): U32 =>
   let bias: U32 = 2
   let pts = array.generate n (func i =>
     if i == 0:
@@ -37,7 +37,7 @@ type SoaPair is data = $SoaPair { px: #[F32], vx: #[F32] }
   return F32.to_u32 acc
 
 // 2A fallback: allocating generator closure (nested array inside generator)
-#entry func gen_allocating_fallback (n: U32): U32 =>
+io gen_allocating_fallback (n: U32): U32 =>
   let rows = array.generate n (func i => @array.fill 3 (i + 1))
   let total: U32 = 0
   for i in 0 .. rows.length:
@@ -45,7 +45,7 @@ type SoaPair is data = $SoaPair { px: #[F32], vx: #[F32] }
   return total
 
 // 2B: register-only F32 loop vs observable canonical NaN bit boundaries
-#entry func f32_nan_boundaries (seed: U32): #[F32] =>
+io f32_nan_boundaries (seed: U32): #[F32] =>
   let zero = U32.to_f32 (seed & 0)
   let raw_nan = zero / zero
   let neg_nan = F32.neg (zero / zero)
@@ -79,14 +79,14 @@ func step_owned_pair (st: own SoaPair) -> (steps: U32): (SoaPair, U32) =>
     sum := self + px[i]
   return ($SoaPair { px, vx }, F32.to_u32 (sum * 10.0))
 
-#entry func spark_reuse_owned (n: U32): U32 =>
+io spark_reuse_owned (n: U32): U32 =>
   let px = array.generate n (func i => U32.to_f32 i)
   let vx = @array.fill n 0.5
   let (_, out) = step_owned_pair ($SoaPair { px, vx }) 6
   return out
 
 // 2C: aliased array MUST NOT be mutated by spark
-#entry func spark_aliased_no_corrupt (n: U32): U32 =>
+io spark_aliased_no_corrupt (n: U32): U32 =>
   let px = array.generate n (func i => U32.to_f32 (i + 1))
   let saved = px
   px := spark #[px[i] * 2.0 + 1.0 | i <- 0 .. n]
@@ -98,7 +98,7 @@ func step_owned_pair (st: own SoaPair) -> (steps: U32): (SoaPair, U32) =>
   return F32.to_u32 s_old * 10000 + F32.to_u32 s_new
 
 // 2C: non-zero start / mismatched length / shifted offset fall back cleanly
-#entry func spark_reuse_guards (n: U32): U32 =>
+io spark_reuse_guards (n: U32): U32 =>
   let px = array.generate n (func i => U32.to_f32 (i + 1))
   let shifted = spark #[px[i + 1] + 10.0 | i <- 0 .. (n - 1)]
   let sub = spark #[px[i] * 2.0 | i <- 1 .. n]
@@ -108,7 +108,7 @@ func step_owned_pair (st: own SoaPair) -> (steps: U32): (SoaPair, U32) =>
   return F32.to_u32 acc
 
 // 2D: length alias + if-merge CheckedArray + guard CheckedBound + OOB trap preservation
-#entry func guard_bounds_ok (n: U32): U32 =>
+io guard_bounds_ok (n: U32): U32 =>
   let flags = @array.fill n true
   if n > 0:
     flags[0] := false
@@ -126,7 +126,7 @@ func step_owned_pair (st: own SoaPair) -> (steps: U32): (SoaPair, U32) =>
       count := self + 1
   return count
 
-#entry func guard_bounds_trap (n: U32): U32 =>
+io guard_bounds_trap (n: U32): U32 =>
   let arr = @array.fill n 7
   let bad = n + 1
   let acc: U32 = 0
@@ -169,13 +169,13 @@ Deno.test("Tier 2E: byte-packed #[Bool] arrays across fill, update, spread, ABI 
 type Flagged is data = $Flagged { flag: Bool, val: U32 }
 
 // Byte-packed #[Bool] roundtrip + flat.encode/flat.decode on #[4; Bool]
-#entry func bool_roundtrip (xs: #[U32]): #[U32] =>
+io bool_roundtrip (xs: #[U32]): #[U32] =>
   let bs = @array.generate xs.length (func i => xs[i] != 0)
   for i in 0 .. bs.length:
     bs[i] := Bool.not self
   return @array.generate bs.length (func i => if bs[i] then 1 else 0)
 
-#entry func bool_flat_roundtrip (mask: U32): U32 =>
+io bool_flat_roundtrip (mask: U32): U32 =>
   let arr: #[4; Bool] = #[
     (mask & 1) != 0,
     (mask & 2) != 0,
@@ -193,7 +193,7 @@ type Flagged is data = $Flagged { flag: Bool, val: U32 }
   return 999
 
 // Fill, slice, spread, linearAppend, self-update on odd/even/large sizes
-#entry func bool_ops_checksum (n: U32): U32 =>
+io bool_ops_checksum (n: U32): U32 =>
   let a = @array.fill n true
   let b = @array.fill n false
   for i in 0 .. n:
@@ -215,7 +215,7 @@ type Flagged is data = $Flagged { flag: Bool, val: U32 }
   return acc
 
 // Record elements containing Bool MUST keep 4-byte flat field layout (not 1-byte!)
-#entry func record_bool_field (n: U32): U32 =>
+io record_bool_field (n: U32): U32 =>
   let xs = @array.fill n ($Flagged { flag: true, val: 0x12345678 })
   for i in 0 .. n:
     if (i & 1) == 0:
@@ -231,7 +231,7 @@ type Flagged is data = $Flagged { flag: Bool, val: U32 }
   return sum
 
 // Fork rollback on 1-byte #[Bool] must restore target byte without corrupting neighbors
-#entry func bool_fork_rollback (unused: U32): U32 =>
+io bool_fork_rollback (unused: U32): U32 =>
   let flags = #[true, false, true, false, true]
   let _ = fork flags:
     flags[1] := true
@@ -273,7 +273,7 @@ Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, off
   const dir = await Deno.makeTempDir({ prefix: "blot-tier2f-simd-" });
   const entry = `${dir}/main.blot`;
   const src = `// 1. SAXPY with affine local offset alias (matmul_64 inner-loop shape)
-#entry func saxpy_offset (n: U32): #[F32] =>
+io saxpy_offset (n: U32): #[F32] =>
   let row: U32 = 1
   let total = n * 2
   let c = @array.fill total 1.0
@@ -289,7 +289,7 @@ Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, off
   return c
 
 // 2. U32 in-place elementwise for loop with non-zero start
-#entry func u32_subrange (n: U32): #[U32] =>
+io u32_subrange (n: U32): #[U32] =>
   let dst = @array.fill n 10
   let src = @array.fill n 0
   for i in 0 .. n:
@@ -300,7 +300,7 @@ Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, off
 
 // 3. Loop-carried forward overlap dependency a[i + 1] := a[i] + 1
 //    MUST NOT mis-vectorize; runtime overlap guard must fall back to sequential scalar!
-#entry func overlap_forward (n: U32): #[U32] =>
+io overlap_forward (n: U32): #[U32] =>
   let a = @array.fill n 0
   if n > 0:
     a[0] := 1
@@ -309,7 +309,7 @@ Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, off
   return a
 
 // 4. Loop-carried stride-2 overlap dependency a[i + 2] := a[i] + 10
-#entry func overlap_stride2 (n: U32): #[U32] =>
+io overlap_stride2 (n: U32): #[U32] =>
   let a = @array.fill n 0
   if n > 0:
     a[0] := 1
@@ -320,7 +320,7 @@ Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, off
   return a
 
 // 5. Out-of-bounds stream inside vectorizable for loop must trap cleanly
-#entry func oob_for_simd (n: U32): #[F32] =>
+io oob_for_simd (n: U32): #[F32] =>
   let dst = @array.fill n 0.0
   let short = @array.fill (if n > 2 then n - 2 else 0) 1.0
   for i in 0 .. n:

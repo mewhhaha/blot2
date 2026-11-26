@@ -4,7 +4,7 @@ import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 Deno.test("data stack SIMD preserves masks lane selection and exact floating bits", async () => {
   await compileAndRun(`
 const broadcast = func values -> lane => return @simd.u32x4.broadcast values lane
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let owner: Array U32 = #[]
   let floats = @simd.u32x4.from_bits (0x80000000, 0x7FC00000, 0x3F800000, 0x40800000)
   let limits = (0.0, 3.0, 2.0, 4.0)
@@ -34,11 +34,11 @@ const broadcast = func values -> lane => return @simd.u32x4.broadcast values lan
 Deno.test("data stack SIMD stores validate the whole span and write only the copy they were given", async () => {
   await compileAndRun(`
 const words = #[11,22,33,44,55,66]
-#entry const write = func (index: U32) => return do:
+io const write = func (index: U32) => return do:
   let owner: Array U32 = #[]
   let changed = @simd.store (@storage.copy words) index (9,8,7,6)
   return changed[0]
-#entry const read = func () => return do:
+io const read = func () => return do:
   let (a,b,c,d) = @simd.load words 1
   return #[words[0],a,b,c,d,words[5]]
 `, guest => {
@@ -55,7 +55,7 @@ Deno.test.ignore("scalar references cannot supply stale or fabricated SIMD liter
   for (const selector of ["lane", "@storage.load place"]) {
     await compileExpectedFailure(`
 const broadcast = func values -> selector => return @simd.u32x4.broadcast values selector
-#entry const answer = func () => return do:
+io const answer = func () => return do:
   let lane = 0
   let place = @storage.ref lane
   let (chosen, _, _, _) = broadcast (10,20,30,40) (${selector})

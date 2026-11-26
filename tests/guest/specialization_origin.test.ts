@@ -26,7 +26,7 @@ Deno.test.ignore("specialization uses survive fresh CLI, retained project reject
   try {
     const good = {
       [entry]:
-        'import { plus } from "./library"\n#entry const answer=func()=> return plus 20 22\n',
+        'import { plus } from "./library"\nio const answer=func()=> return plus 20 22\n',
       [library]: "const plus=func a=> return func b=> return a + b\n",
     };
     const baseline = await compiler.build({ sources: good });
@@ -34,22 +34,22 @@ Deno.test.ignore("specialization uses survive fresh CLI, retained project reject
     const cases = [
       {
         source:
-          "type Box is data= $Box U32\n#entry const answer=func()=> return do:\n  let result= $Box 1 + $Box 2\n  break 7\n",
+          "type Box is data= $Box U32\nio const answer=func()=> return do:\n  let result= $Box 1 + $Box 2\n  break 7\n",
         use: "$Box 1 + $Box 2",
       },
       {
         source:
-          'import { plus } from "./library"\ntype Box is data= $Box U32\n#entry const answer=func()=> return do:\n  let result=plus ($Box 1) ($Box 2)\n  break 7\n',
+          'import { plus } from "./library"\ntype Box is data= $Box U32\nio const answer=func()=> return do:\n  let result=plus ($Box 1) ($Box 2)\n  break 7\n',
         use: "plus ($Box 1) ($Box 2)",
       },
       {
         source:
-          'import { nested } from "./library"\ntype Box is data= $Box U32\n#entry const answer=func()=> return do:\n  let result=nested ($Box 1) ($Box 2)\n  break 7\n',
+          'import { nested } from "./library"\ntype Box is data= $Box U32\nio const answer=func()=> return do:\n  let result=nested ($Box 1) ($Box 2)\n  break 7\n',
         use: "nested ($Box 1) ($Box 2)",
       },
       {
         source:
-          "const twice=func f=> return func x=> return f (f x)\n#entry const answer=func()=> return do:\n  let result=twice (func v=> return v + v) true\n  break 7\n",
+          "const twice=func f=> return func x=> return f (f x)\nio const answer=func()=> return do:\n  let result=twice (func v=> return v + v) true\n  break 7\n",
         use: "twice (func v=> return v + v) true",
       },
     ];
@@ -129,7 +129,7 @@ Deno.test.ignore("a concrete invalid operation in a library stays in that librar
     const result = await compiler.build({
       sources: {
         [entry]:
-          'import { broken } from "./library"\n#entry const answer=func()=> return do:\n  let result=broken 42\n  break 7\n',
+          'import { broken } from "./library"\nio const answer=func()=> return do:\n  let result=broken 42\n  break 7\n',
         [library]: source,
       },
     });
@@ -158,7 +158,7 @@ Deno.test.ignore("compiled callback definitions preserve source origins", async 
     );
     await Deno.writeTextFile(
       entry,
-      'import { twice, callback } from "./library"\n#entry const answer=7\n',
+      'import { twice, callback } from "./library"\nio const answer=7\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, dependencies, "--prelude", prelude],
@@ -167,7 +167,7 @@ Deno.test.ignore("compiled callback definitions preserve source origins", async 
     }).output();
     ok(packed.success, new TextDecoder().decode(packed.stdout));
     const source =
-      'import { twice, callback } from "./library"\n#entry const answer=func()=> return do:\n  let result=twice callback true\n  break 7\n';
+      'import { twice, callback } from "./library"\nio const answer=func()=> return do:\n  let result=twice callback true\n  break 7\n';
     await Deno.writeTextFile(entry, source);
     const compiler = await createZigProjectCompiler({
       executable,

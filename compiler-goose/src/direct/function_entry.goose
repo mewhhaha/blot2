@@ -802,7 +802,7 @@ fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body
         let kind, supported = abiKind(g, parameter);
         if !supported {
             g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
-            g.put("#entry parameters of type ");
+            g.put("io entry parameters of type ");
             g.put(blot_direct_types::tagName(g.types.node(parameter).tag));
             g.put(" are not supported");
             return g.failClose();
@@ -812,7 +812,7 @@ fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body
     let result_abi, supported = abiKind(g, result_ty);
     if !supported {
         g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
-        g.put("#entry results of type ");
+        g.put("io entry results of type ");
         g.put(blot_direct_types::tagName(g.types.node(result_ty).tag));
         g.put(" are not supported");
         return g.failClose();

@@ -12,7 +12,7 @@ const implicit_writer = func (destination: own Array U32): Array U32 => return d
 const explicit_writer = func (destination: own Array U32) -> (pool: Array U32): Array U32 => return do:
   @storage.push destination pool[@u32.sub (@storage.length pool) 1]
   return destination
-#entry const global_writer = func (input: U32) => return do:
+io const global_writer = func (input: U32) => return do:
   let pool = @storage.copy implicit_pool
   @storage.push pool (@u32.add input 7)
   let destination: Array U32 = #[input]
@@ -25,7 +25,7 @@ const region_writer = func (destination: own Array U32) -> (input: U32): Array U
   @storage.push destination first[0]
   @storage.push destination second[0]
   return destination
-#entry const region_reuse = func (input: U32) => return do:
+io const region_reuse = func (input: U32) => return do:
   let destination: Array U32 = #[input]
   destination := region_writer self input
   destination := do:
@@ -55,13 +55,13 @@ const Magnitude.abs = func (value: Magnitude) => return case value of
   $Magnitude number => number.abs + 10.0
 const Magnitude.plus = func (value: Magnitude) -> (extra: F32) => return case value of
   $Magnitude number => number + extra
-#entry const primitive_getters = func (input: F32) => return do:
+io const primitive_getters = func (input: F32) => return do:
   let rows: Array F32 = #[input]
   let value = rows[0]
   let magnitude = $Magnitude value
   let add = magnitude.plus
   return #[value.abs, abs value, magnitude.abs, add 2.0]
-#entry const nested_readers = func (input: U32) => return do:
+io const nested_readers = func (input: U32) => return do:
   let values: Array U32 = if input == 0 then #[] else if input == 1 then #[1, 99] else #[2]
   let needles: Array U32 = #[1]
   return array.any (func outer => return do:
@@ -73,22 +73,22 @@ const Shifted.length = func (value: Shifted) => return @u32.add (@storage.length
 const Shifted.at = func (value: Shifted) -> (index: U32) => return @u32.add value.rows[index] 200
 const add_three = func first -> second -> third => return first + second + third
 const compute_three = func (first: U32) -> (second: U32) -> (extra: U32) => return @u32.add first (@u32.add second extra)
-#entry const staged_effect = func (input: U32) => return do:
+io const staged_effect = func (input: U32) => return do:
   let rows: Array U32 = #[]
   let first = compute_three input
   let second = first 1
   let before = rows.length
   @storage.push rows (second 0)
   return #[before, rows.length, rows[0]]
-#entry const partial_integer = func (input: U32) => return do:
+io const partial_integer = func (input: U32) => return do:
   let first = add_three input
   let second = first 2
   return second 3
-#entry const partial_floating = func (input: F32) => return do:
+io const partial_floating = func (input: F32) => return do:
   let first = add_three input
   let second = first 2.25
   return second 3.5
-#entry const getters = func (input: U32) => return do:
+io const getters = func (input: U32) => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[10]
   first[0] := @u32.add input 2
@@ -105,7 +105,7 @@ const encoded_writer = func (destination: own Array U32) -> (input: U32): Array 
     @storage.push destination value
   @storage.push destination scratch[0]
   return destination
-#entry const scratch_writer = func (input: U32) => return do:
+io const scratch_writer = func (input: U32) => return do:
   let destination: Array U32 = #[]
   for index in 0 .. 100:
     destination := encoded_writer self (@u32.add (@u32.add input (keeper[0] - 123)) index)
@@ -115,7 +115,7 @@ const write_large = func (state: own LargeState) -> (amount: U32): LargeState =>
   state.${longField}[0] := @u32.add state.${longField}[0] amount
   return state
 const read_large = func (state: LargeState) => return state.${longField}[0]
-#entry const large_key = func (input: U32) => return do:
+io const large_key = func (input: U32) => return do:
   let rows: Array U32 = #[10]
   let state = {${longField}: rows}
   state := write_large state input
@@ -132,7 +132,7 @@ const present = func (maybe: Maybe value) => return case maybe of
   $Some value => value
   $Nothing => @panic "missing"
 const factory = func base => return func extra => return $Box (base + extra)
-#entry const answer = func (input: U32) => return do:
+io const answer = func (input: U32) => return do:
   let first: Array U32 = #[input]
   let second: Array U32 = #[@u32.add input 10]
   let before = read_research first 1
@@ -140,11 +140,11 @@ const factory = func base => return func extra => return $Box (base + extra)
   let after = read_research first 2
   let other = read_research second 3
   return #[before, after, other]
-#entry const integer = func () => return do:
+io const integer = func () => return do:
   let rows: Array U32 = #[1]
   let wrap = factory rows[0]
   return unwrap (present ($Some (wrap 2)))
-#entry const floating = func () => return do:
+io const floating = func () => return do:
   let rows: Array F32 = #[1.25]
   let wrap = factory rows[0]
   return unwrap (present ($Some (wrap 2.5)))

@@ -38,7 +38,7 @@ const ${name} = func (input: U32): U32 => return do:
     else:
       state := ${name}_mix self
   return state
-#entry const ${name}_answer = func (input: U32): U32 => return do:
+io const ${name}_answer = func (input: U32): U32 => return do:
   let marker: Array U32 = #[input]
   return ${name} marker[0]
 `;
@@ -76,7 +76,7 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
             source += recurrence(name, count, polynomial, 3);
           }
         }
-        source += `#entry const left = func (input: U32): U32 => return do:
+        source += `io const left = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   for bit in 0 .. 2:
@@ -85,13 +85,13 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
     else:
       state := self << 1
   return state
-#entry const iterator = func (input: U32): U32 => return do:
+io const iterator = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   for bit in 3 .. 11:
     state := (self >> 1) ^ bit
   return state
-#entry const multiple = func (input: U32): U32 => return do:
+io const multiple = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   let other = 1
@@ -99,14 +99,14 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
     state := self >> 1
     other := self ^ state
   return other
-#entry const memory = func (input: U32): U32 => return do:
+io const memory = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   for bit in 0 .. 8:
     rows[0] := self + 1
     state := self >> 1
   return state ^ rows[0]
-#entry const exits = func (input: U32): U32 => return do:
+io const exits = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   for bit in 0 .. 8:
@@ -114,7 +114,7 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
       return state
     state := self >> 1
   return state
-#entry const breaking = func (input: U32): U32 => return do:
+io const breaking = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = rows[0]
   for bit in 0 .. 8:
@@ -122,13 +122,13 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
       break
     state := self >> 1
   return state
-#entry const division = func (input: U32): U32 => return do:
+io const division = func (input: U32): U32 => return do:
   let rows: Array U32 = #[input]
   let state = 0xFFFFFFFF
   for bit in 0 .. 8:
     state := self / rows[0]
   return state
-#entry const effects = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const effects = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let rows: Array U32 = #[0]
   let state = rows[0]
   for bit in 0 .. 8:

@@ -84,7 +84,7 @@ for (let depth = 1; depth <= 6; depth++) {
   previous = next;
 }
 lines.push(
-  "#entry const answer = func (input: F32): F32 => return do:",
+  "io const answer = func (input: F32): F32 => return do:",
   "  let pose = $transform.Pose3 {position: math.zero3, rotation: math.identity_quat, scale: math.vec3 input 1.0 1.0}",
   "  let rows: GrowArray transform.Pose3 = #[pose]",
   `  let result = ${previous} rows 0`,

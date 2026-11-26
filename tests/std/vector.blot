@@ -34,4 +34,4 @@ private func vector_checks (): Unit ! { test.Test } =>
   use test.eq "Vec3 zero z" 0.0 zero3.z
   return ()
 
-#entry func test_vector (): test.Report => test.run vector_checks
+io test_vector (): test.Report => test.run vector_checks

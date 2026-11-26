@@ -42,7 +42,7 @@ const walk = func operation -> (seed: U32): U32 => return do:
 // The storage array constant selects storage ABI 8 for every entry.
 const profile: Array U32 = #[0]
 
-#entry const integers = func (value: U32): Array U32 => return do:
+io const integers = func (value: U32): Array U32 => return do:
   let local = add
   return #[local value 2, subtract value 2, multiply value 3,
     divide value 3, remainder value 3, bit_and value 15,
@@ -50,7 +50,7 @@ const profile: Array U32 = #[0]
     shift_right value 33, if equal value 7 then 1 else 0,
     if less value 7 then 1 else 0, profile[0]]
 
-#entry const higher_order = func (value: U32): Array U32 => return do:
+io const higher_order = func (value: U32): Array U32 => return do:
   let first = add value
   let second = subtract value
   let third = add (@u32.add value 1)
@@ -60,33 +60,33 @@ const profile: Array U32 = #[0]
     walk add value, walk bit_xor value,
     U32.combine value 2, U32.combine value 3]
 
-#entry const snapshots = func (value: U32): Array U32 => return do:
+io const snapshots = func (value: U32): Array U32 => return do:
   let current = value
   let first = add current
   current := @u32.add current 10
   let second = add current
   return #[first 2, second 2, first 3, current]
 
-#entry const references = func (value: U32): Array U32 => return do:
+io const references = func (value: U32): Array U32 => return do:
   let owner: Array U32 = #[value]
   let before = add (@storage.load (&owner[0]))
   owner[0] := apply_binary add (@storage.load (&owner[0])) 10
   let after = add (@storage.load (&owner[0]))
   return #[before 2, after 2, owner[0]]
 
-#entry const scalar_reference = func (value: U32): Array U32 => return do:
+io const scalar_reference = func (value: U32): Array U32 => return do:
   let current: Array U32 = #[value]
   let before = add (@storage.load (&current[0]))
   current[0] := apply_binary multiply (@storage.load (&current[0])) 3
   return #[before 2, add (@storage.load (&current[0])) 2, current[0]]
 
-#entry const float_reference = func (value: F32): Array F32 => return do:
+io const float_reference = func (value: F32): Array F32 => return do:
   let current: Array F32 = #[value]
   let before = float_multiply (@storage.load (&current[0]))
   current[0] := apply_unary negate (@storage.load (&current[0]))
   return #[before 2.0, float_multiply (@storage.load (&current[0])) 2.0, current[0]]
 
-#entry const floating = func (value: F32): Array F32 => return
+io const floating = func (value: F32): Array F32 => return
   #[float_add value 0.5, float_subtract value 0.5,
     float_multiply value 2.0, float_divide value 2.0,
     negate value, absolute value, square_root (absolute value),
@@ -94,7 +94,7 @@ const profile: Array U32 = #[0]
     apply_binary float_multiply value 2.0,
     F32.combine value 2.0, F32.combine value 3.0]
 
-#entry const comparisons = func (value: F32): Array U32 => return
+io const comparisons = func (value: F32): Array U32 => return
   #[if float_equal value 0.0 then 1 else 0,
     if float_unequal value 0.0 then 1 else 0,
     if float_less value 0.0 then 1 else 0,
@@ -102,19 +102,19 @@ const profile: Array U32 = #[0]
     if float_greater value 0.0 then 1 else 0,
     if float_greater_equal value 0.0 then 1 else 0]
 
-#entry const from_integer = func (value: U32): F32 => return apply_unary to_float value
-#entry const from_float = func (value: F32): U32 => return apply_unary to_integer value
-#entry const signed_zero = func (value: F32): F32 => return apply_unary negate value
-#entry const literal_product = func (): F32 => return @f32.mul 2.0 2.0
-#entry const trap_divide = func (divisor: U32): U32 => return apply_binary divide 7 divisor
-#entry const trap_remainder = func (divisor: U32): U32 => return apply_binary remainder 7 divisor
+io const from_integer = func (value: U32): F32 => return apply_unary to_float value
+io const from_float = func (value: F32): U32 => return apply_unary to_integer value
+io const signed_zero = func (value: F32): F32 => return apply_unary negate value
+io const literal_product = func (): F32 => return @f32.mul 2.0 2.0
+io const trap_divide = func (divisor: U32): U32 => return apply_binary divide 7 divisor
+io const trap_remainder = func (divisor: U32): U32 => return apply_binary remainder 7 divisor
 
-#entry const eager = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+io const eager = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
   use result <- add (host 1) (host 2)
   return result
 
 const select_partial = func operation -> value => return operation value
-#entry const partial_constants = func (value: U32): Array U32 => return do:
+io const partial_constants = func (value: U32): Array U32 => return do:
   let current: Array U32 = #[4]
   let before = add (@storage.load (&current[0]))
   current[0] := 11
@@ -123,4 +123,4 @@ const select_partial = func operation -> value => return operation value
     select_partial (add 2) value, select_partial (add 9) value,
     select_partial before value, select_partial after value]
 const nan = @f32.div 0.0 0.0
-#entry const constant_nan = func (): F32 => return nan
+io const constant_nan = func (): F32 => return nan

@@ -22,7 +22,7 @@ const get = func ($Box mapper) => return mapper
     try {
       const source = `
 type Maybe value is data = $Nothing | $Just value
-#entry const loop = func (limit: U32) => return do:
+io const loop = func (limit: U32) => return do:
   let pending = ($Nothing, #[1])
   let index = 0
   for ever:
@@ -33,7 +33,7 @@ type Maybe value is data = $Nothing | $Just value
         $Just value => @u32.add value request[0]
     pending := ($Just index, #[@u32.add index 2])
     index := @u32.add self 1
-#entry const branch = func (value: U32) => return do:
+io const branch = func (value: U32) => return do:
   let pending = ($Nothing, #[1])
   if @u32.lt 0 value:
     pending := ($Just value, #[2])
@@ -75,7 +75,7 @@ Deno.test("single-use local creators preserve selected scalar and reference fiel
   ) {
     await compileAndRun(
       definitions + `
-#entry const run = func (seed: ${type}) => return do:
+io const run = func (seed: ${type}) => return do:
   let stored = box (func value => return ${body})
   let $Box mapper = stored
   break ${read}
@@ -97,7 +97,7 @@ Deno.test("single-use local creators preserve selected scalar and reference fiel
   }
   await compileExpectedFailure(
     definitions + `
-#entry const run = func (seed: Array U32) => return do:
+io const run = func (seed: Array U32) => return do:
   let stored = box (func value => return {item: value})
   let $Box mapper = stored
   break @array.length (mapper seed).item
@@ -110,7 +110,7 @@ Deno.test("single-use local creators preserve selected scalar and reference fiel
 Deno.test.ignore("multiple generic local instances retain independent checked views", async () => {
   await compileAndRun(
     definitions + `
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: value})
   let scalar = (get stored seed).item
   let reference = (get stored #[seed, 8192]).item
@@ -125,7 +125,7 @@ Deno.test.ignore("multiple generic local instances retain independent checked vi
 Deno.test("captured closed generic local storage retains its static value and checked view", async () => {
   await compileAndRun(
     definitions + `
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: value})
   let read = func (value: U32) => return (get stored value).item
   break read seed
@@ -139,7 +139,7 @@ Deno.test("captured closed generic local storage retains its static value and ch
 Deno.test("local storage promotion preserves runtime captures traps and eager host order", async () => {
   await compileAndRun(
     definitions + `
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: @u32.add value seed})
   let $Box mapper = stored
   break (mapper 3).item
@@ -153,7 +153,7 @@ Deno.test("local storage promotion preserves runtime captures traps and eager ho
 
   await compileAndRun(
     definitions + `
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: @u32.div value 0})
   let $Box mapper = stored
   break (mapper seed).item
@@ -166,7 +166,7 @@ Deno.test("local storage promotion preserves runtime captures traps and eager ho
 
   await compileAndRun(
     definitions + `
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box ((func value => return {item: value}), @u32.div seed 0)
   let $Box (mapper, _) = stored
   break (mapper 7).item
@@ -179,7 +179,7 @@ Deno.test("local storage promotion preserves runtime captures traps and eager ho
 
   await compileAndRun(
     definitions + `
-#entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:
+io const run = func (host: Unit -> U32 ! {Foreign}) => return do:
   use before <- host ()
   use stored <- box ((func value => return {item: value}), host ())
   let $Box (mapper, during) = stored
@@ -237,7 +237,7 @@ const get = func ($Box (mapper, _)) => return mapper
 const stamp = func ($Box (_, value)) => return value
 `;
   const source = `import {Box, box, get, stamp} from "./wrapper"
-#entry const run = func (seed: U32) => return do:
+io const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: value})
   let read = func (value: U32) => return @u32.add (get stored value).item (stamp stored)
   let reference = (get stored #[seed, 8192]).item

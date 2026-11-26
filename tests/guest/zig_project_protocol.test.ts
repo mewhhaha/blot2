@@ -45,7 +45,7 @@ function fields(value: Metadata, names: string[]) {
 async function host() {
   const directory = await Deno.makeTempDir({ prefix: "blot-protocol-" });
   const entry = directory + "/main.blot";
-  await Deno.writeTextFile(entry, "#entry const answer = 42\n");
+  await Deno.writeTextFile(entry, "io const answer = 42\n");
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
     clearEnv: true,
@@ -268,10 +268,10 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
     let id = 3;
     for (
       const source of [
-        "// 雪\nconst incomplete = func (value: U32) : U32 => return @hole\n#entry const answer = 42\n",
+        "// 雪\nconst incomplete = func (value: U32) : U32 => return @hole\nio const answer = 42\n",
         // Direct backend: missing_associated for `@type.call "add" true true`
         // has no explanation details (tasks/DELETE_SCOPED.md).
-        // '#entry const answer: Bool = @type.call "add" true true\n',
+        // 'io const answer: Bool = @type.call "add" true true\n',
       ]
     ) {
       const payload = encoder.encode(source);
@@ -899,7 +899,7 @@ Deno.test("wire contract preserves Zig numeric-string and enum-tag allowances", 
       entry: peer.entry,
     });
     equal(opened.metadata, { kind: "open", id: 1, epoch: "1", revision: 0 });
-    const payload = encoder.encode("#entry const answer = 7\n");
+    const payload = encoder.encode("io const answer = 7\n");
     const built = await peer.send({
       kind: "1",
       id: 2.0,

@@ -13,9 +13,11 @@ export default grammar({
     [$.function_binding, $._syntax],
     [$.import_declaration, $.keyword],
     [$.export_declaration, $.identifier],
+    [$.entry_binding, $.identifier],
+    [$.io_function_header, $.identifier],
+    [$.io_function_header, $.private_binding, $.identifier],
     [$.private_binding, $.identifier],
     [$.private_effect_header, $.identifier],
-    [$.implementation_header, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
 
@@ -30,6 +32,7 @@ export default grammar({
         $.entry_kernel_function_header,
         $.entry_kernel_binding,
         $.entry_process_binding,
+        $.io_function_header,
         $.named_function_header,
         $.lambda_header,
         $.type_header,
@@ -165,6 +168,35 @@ export default grammar({
         ),
       ),
 
+    io_function_header: ($) =>
+      choice(
+        prec.dynamic(
+          2,
+          seq(
+            alias("private", $.private_modifier),
+            alias("io", $.io_modifier),
+            field("name", choice($.identifier, $.qualified_function_name)),
+            field("parameter", $._parameter),
+            repeat(seq("->", field("parameter", $._parameter))),
+            optional($.binding_annotation),
+            optional($.where_clause),
+            alias("=>", $.operator),
+          ),
+        ),
+        prec.dynamic(
+          1,
+          seq(
+            alias("io", $.io_modifier),
+            field("name", choice($.identifier, $.qualified_function_name)),
+            field("parameter", $._parameter),
+            repeat(seq("->", field("parameter", $._parameter))),
+            optional($.binding_annotation),
+            optional($.where_clause),
+            alias("=>", $.operator),
+          ),
+        ),
+      ),
+
     named_function_header: ($) =>
       prec.dynamic(
         3,
@@ -172,7 +204,6 @@ export default grammar({
           3,
           seq(
             optional(alias("private", $.private_modifier)),
-            optional($.entry_modifier),
             "func",
             field("name", choice($.identifier, $.qualified_function_name)),
             field("parameter", $._parameter),
@@ -192,11 +223,11 @@ export default grammar({
 
     binding_keyword: (_) => choice("const", "let"),
 
-    entry_modifier: (_) => "#entry",
     kernel_modifier: (_) => "#kernel",
     process_modifier: (_) => "#process",
 
-    entry_binding: ($) => seq($.entry_modifier, $.binding_keyword),
+    entry_binding: ($) =>
+      prec.dynamic(1, seq(alias("io", $.io_modifier), $.binding_keyword)),
 
     private_binding: ($) =>
       prec.dynamic(
@@ -275,10 +306,12 @@ export default grammar({
           $.type_identifier,
           $.parenthesized,
           $.bracketed,
+          $.array,
           $.braced,
           $.member,
           alias("->", $.operator),
           alias("!", $.operator),
+          alias("|", $.operator),
         )),
       ),
 
@@ -437,6 +470,7 @@ export default grammar({
     identifier: ($) =>
       choice(
         $._identifier,
+        "io",
         "complete",
         "private",
         "opaque",

@@ -32,7 +32,7 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
     );
     await Deno.writeTextFile(
       `${dir}/main.blot`,
-      'import { inc as imported } from "./lib"\nimport * as lib from "./lib"\nconst alias=imported\n@[alias] #entry const local:U32=41\n@[imported] #entry const named:U32=41\n@[lib.add 1] #entry const qualified:U32=41\n',
+      'import { inc as imported } from "./lib"\nimport * as lib from "./lib"\nconst alias=imported\n@[alias] io const local:U32=41\n@[imported] io const named:U32=41\n@[lib.add 1] io const qualified:U32=41\n',
     );
     const run = await new Deno.Command(compiler, {
       args: [
@@ -76,17 +76,17 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
 });
 Deno.test("undemanded tagged declarations and uncalled tagged function bodies stay unevaluated", async () => {
   await compileAndRun(
-    '@[func value=> return @panic "unused const"] const unused:U32=1\n@[func value=> return @panic "unused let"] let unused_let:U32=1\n@[func function=> return function] const uncalled=func ()=> return @panic "uncalled"\n#entry const answer=42\n',
+    '@[func value=> return @panic "unused const"] const unused:U32=1\n@[func value=> return @panic "unused let"] let unused_let:U32=1\n@[func function=> return function] const uncalled=func ()=> return @panic "uncalled"\nio const answer=42\n',
     (guest) => equal(guest.read("answer"), 42),
   );
   await compileExpectedFailure(
-    "@[func value=> return value ()] #entry const answer:U32=42\n",
+    "@[func value=> return value ()] io const answer:U32=42\n",
     "type_mismatch",
   );
 });
 Deno.test("tag startup closures wrap the original initializer without flattening its parameters", async () => {
   await compileAndRun(
-    "const decorate=func function=> return func value=> return @u32.add (function value) 1\n@[decorate] let next:U32->U32=func(value:U32)=> return value\n#entry const answer=func(value:U32)=> return next value\n",
+    "const decorate=func function=> return func value=> return @u32.add (function value) 1\n@[decorate] let next:U32->U32=func(value:U32)=> return value\nio const answer=func(value:U32)=> return next value\n",
     (guest) => {
       for (const value of [0, 1, 41, 100]) {
         equal(guest.call("answer", value), value + 1);
@@ -98,9 +98,9 @@ Deno.test("tag startup closures wrap the original initializer without flattening
 Deno.test("named and inline tag panics trap at instantiation", async () => {
   for (
     const source of [
-      '@[func value=> return @panic "tag"] #entry const answer:U32=42\n',
-      'const decorator=func value=> return @panic "tag"\n@[decorator] #entry const answer:U32=42\n',
-      'const decorator=func value=> return @panic "tag"\n@[func value=> return value]\n@[decorator] #entry const answer:U32=42\n',
+      '@[func value=> return @panic "tag"] io const answer:U32=42\n',
+      'const decorator=func value=> return @panic "tag"\n@[decorator] io const answer:U32=42\n',
+      'const decorator=func value=> return @panic "tag"\n@[func value=> return value]\n@[decorator] io const answer:U32=42\n',
     ]
   ) {
     await rejects(

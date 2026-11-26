@@ -36,20 +36,20 @@ const recur_logged = func (state: own Array U32) -> (src: Array U32) -> (log: U3
     state[slot] := word
     use _ <- log word
   return state
-#entry const run = func (bounds: Array U32): Array U32 => return do:
+io const run = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy saved
   let local_input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
   return recur state local_input bounds[0] bounds[1]
-#entry const alias = func (bounds: Array U32): Array U32 => return do:
+io const alias = func (bounds: Array U32): Array U32 => return do:
   let state = @storage.copy input
   return recur state state.copy bounds[0] bounds[1]
-#entry const trap_input = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const trap_input = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   use _ <- recur_logged (@storage.copy saved) short_input log 40
   return ()
-#entry const trap_state = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
+io const trap_state = func (log: U32 -> U32 ! {Foreign}): Unit ! {Foreign} => return do:
   use _ <- recur_logged (@storage.copy short_state) input log 40
   return ()
-#entry const empty = func (bounds: Array U32): Array U32 => return do:
+io const empty = func (bounds: Array U32): Array U32 => return do:
   let state: Array U32 = #[]
   let rows: Array U32 = #[]
   return recur state rows bounds[0] bounds[1]
@@ -60,7 +60,7 @@ const dynamicSource = kernel.replace("const recur =", "const dynamic_recur =")
     "word := (self << 5) + self + input[index]",
     "word := (self << input[index]) ^ self",
   ).replace("    word := (self + (self << 10)) ^ (self >> 6)\n", "") + `
-#entry const dynamic = func (end: U32): Array U32 => return do:
+io const dynamic = func (end: U32): Array U32 => return do:
   let state = @storage.copy saved
   let local_input: Array U32 = @array.generate 96 (func index => return @u32.add (@u32.mul index 123456789) 0xF0000000)
   return dynamic_recur state local_input 0 end

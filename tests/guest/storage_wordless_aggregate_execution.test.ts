@@ -9,7 +9,7 @@ const wrap = func (n: U32) => return $Box {inner: {n: n, left: 2, right: 3}, sta
 const unpack = func (box: Box) => return case box of
   $Box {inner, stamp} => {inner, stamp}
 const advance = func (state: {inner: {n: U32, left: U32, right: U32}, stamp: U32}) => return {inner: {n: @u32.add state.inner.n 1, left: state.inner.left, right: state.inner.right}, stamp: state.stamp}
-#entry const answer = func (count: U32): Array U32 => return do:
+io const answer = func (count: U32): Array U32 => return do:
   let rows: Array Box = #[wrap 1]
   let state = unpack rows[0]
   for index in 0 .. count:
@@ -20,7 +20,7 @@ const advance = func (state: {inner: {n: U32, left: U32, right: U32}, stamp: U32
     $None => {payload: state, code: 7}
     $Some box => {payload: unpack box, code: 42}
   return #[result.payload.inner.n, result.payload.inner.left, result.payload.inner.right, result.code]
-#entry const scalar = func (): U32 => return do:
+io const scalar = func (): U32 => return do:
   let value = {nested: {answer: 42}}
   return value.nested.answer
 `,

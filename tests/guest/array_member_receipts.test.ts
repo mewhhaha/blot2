@@ -42,9 +42,9 @@ const measured = do:
   for index in 0..8:
     total := @u32.add total rows.measure
   break total
-#entry const answer = measured
-#entry const callback = func (value: U32) => return rows[0].callback value
-#entry const sibling = ${sibling}
+io const answer = measured
+io const callback = func (value: U32) => return rows[0].callback value
+io const sibling = ${sibling}
 `,
           };
           const fresh = await createZigProjectCompiler(options);
@@ -102,9 +102,9 @@ Deno.test("array member receipts preserve executed sibling, method, input and fa
     input = "#[]",
   ) =>
     `const Array.count = func values => return ${body}
-#entry const warm: U32 = #[].count
-#entry const result: U32 = ${input}.count
-#entry const sibling = ${sibling}
+io const warm: U32 = #[].count
+io const result: U32 = ${input}.count
+io const sibling = ${sibling}
 `;
   const compiler = await createZigProjectCompiler({
     executable,

@@ -96,7 +96,7 @@ const make = func (offset: math.Vec4) => return do:
     math.Mat4.from_columns captured (math.vec4 0.0 0.0 0.0 0.0) (math.vec4 0.0 0.0 0.0 0.0) w
 const scalar = func (captured: F32) => return func (value: F32): F32 => return captured
 
-#entry const main = func (x: F32) => return do:
+io const main = func (x: F32) => return do:
   let offset = math.vec4 x 1.0 2.0 3.0
   let scalar_x = scalar x
   let output: GrowArray F32 = #[]

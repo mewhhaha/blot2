@@ -20,8 +20,8 @@ const update = func (index: U32) : Array U32 => return do:
 const replace = func (own values) => return func index => return func value => return do:
   values[index] := value
   break values
-#entry const run = func (index: U32) : Array U32 => return update index
-#entry const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value
+io const run = func (index: U32) : Array U32 => return update index
+io const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value
 `;
 Deno.test(`body path update receipts preserve selector order and writes through the alias`, async () => {
   const directory = await Deno.makeTempDir();

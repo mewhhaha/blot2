@@ -17,7 +17,7 @@ const replace = func record => return do:
   record.x := true
   break record
 const identity = func (point: Point) => return point
-#entry const answer = func (value: U32) => return do:
+io const answer = func (value: U32) => return do:
   let original = { y: 2.5, x: value }
   let point = identity original
   let { y, x } = point
@@ -27,8 +27,8 @@ const identity = func (point: Point) => return point
   let { point: { x: fraction } } = nested
   let $Box boxed = $Box original
   break if updated.x then @f32.add fraction (@u32.to_f32 (@u32.add nested.retained (@u32.sub (read boxed) x))) else y
-#entry const reordered = func () => return read { y: true, x: 42 }
-#entry const array = func () => return do:
+io const reordered = func () => return read { y: true, x: 42 }
+io const array = func () => return do:
   let values: Array { x: U32 } = #[{ x: 42 }]
   break (@array.get values 0).x
 `,
@@ -50,7 +50,7 @@ Deno.test("structural record construction evaluates fields once in source order 
   await compileAndRun(
     `
 const invoke = func record => return record.callback ()
-#entry const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
+io const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
   use record <- do:
     break { z: send 1, a: send 2, callback: func () => return send 3 }
   use last <- invoke record
@@ -76,10 +76,10 @@ const invoke = func record => return record.callback ()
 Deno.test("structural shapes reject duplicates, absent fields and mismatched exact annotations", async () => {
   for (
     const [source, code] of [
-      ["#entry const answer = ({ x: 1, x: 2 }).x\n", "duplicate_record_field"],
-      ["#entry const answer = ({ x: 1 }).y\n", "missing_member"],
+      ["io const answer = ({ x: 1, x: 2 }).x\n", "duplicate_record_field"],
+      ["io const answer = ({ x: 1 }).y\n", "missing_member"],
       [
-        "const exact: { x: U32 } = { x: 1, y: 2 }\n#entry const answer = exact.x\n",
+        "const exact: { x: U32 } = { x: 1, y: 2 }\nio const answer = exact.x\n",
         "type_mismatch",
       ],
     ]
@@ -88,7 +88,7 @@ Deno.test("structural shapes reject duplicates, absent fields and mismatched exa
 
 Deno.test("retired @record.merge intrinsic is rejected", async () => {
   await compileExpectedFailure(
-    "#entry const answer = @record.merge { x: 1 } { y: 2 }\n",
+    "io const answer = @record.merge { x: 1 } { y: 2 }\n",
     "unknown_intrinsic",
     undefined,
     { prelude: "none" },

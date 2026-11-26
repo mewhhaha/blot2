@@ -4,15 +4,15 @@ type Counter a is effect = { advance: a -> a }
 func tick value =>
   return use Counter.advance U32 value
 
-#entry func main (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider (Counter.advance U32) advance):
+io main (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider (Counter.advance U32) advance):
   use next <- tick 41
   break next
 
 // Reflection describes the requirement; it does not create a capability.
-#entry const uses_host = @effect.has (@effect.of main) Foreign
+io const uses_host = @effect.has (@effect.of main) Foreign
 
 // Tests can handle the same source effect without any host authority.
 const local_counter = @effect.provider (Counter.advance U32) (func value => value + 1)
-#entry func mocked () => do local_counter:
+io mocked () => do local_counter:
   use next <- tick 41
   break next
