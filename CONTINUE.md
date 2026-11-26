@@ -35,7 +35,7 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
 | `blot2` | this commit (after `c5109160`) | Wave 4 Solid-2 agent diagnostics, `blot:traps` v1 runtime provenance & multi-param nominal `matchNominalArgs` (this commit); Waves 1–3 soundness, SIMD relocations, formatter, stdlib & trap metadata (`c5109160`); `#for` reflection & Stage-0 generators (`a24fc85c`) |
-| `../pen` | `f2047ec` | `blot:traps` v1 runtime trap provenance in `pen-runtime`, `blot-host`, and `pen test-blot` (`f2047ec`); meshlet/DAG prep (`8589dcc`); unified `pen test-blot` (`eb8f575`) |
+| `../pen` | `92e2ef7` | Stage-0 Blot virtual module generators (`pen:plugin@0.3.0`, `compiler.settings.generators`, `guest.run-u32-packet`, `virtual_source` / provenance in `plugin_build`) (`92e2ef7`); `blot:traps` v1 runtime trap provenance (`f2047ec`); unified `pen test-blot` (`eb8f575`) |
 | `../ink` | `46111bd` | Current checkout (`46111bd`, preserves local uncommitted edits); generic comptime decoders (`f7486d3`) |
 | `../gdev` | `4e891d2` | Current checkout (`4e891d2`); >8192 rad trig NaN fix & physical brick counts (`642ad53`) |
 
@@ -80,7 +80,9 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` & `~/.local/lib/pen-runtime/pen` SHA-256:
-    `6eb6fd13cedb9a8b3666b0f3894f4c0850b6e47ff3a691c9b3c893ee377765da`
+    `deec51f8d7c689701dcc6c21d70888f59e59b86b9016cfa3353edf2de0bfe0f6`
+    (`pen:plugin@0.3.0`; `plugins/blot.wasm` SHA-256
+    `3f291f7a3e6c203b959ceaf19d1b808e77e35dbb3c79522a52380a88b103c901`)
 - **Qualification gates:**
   - `blot2` (this commit): `deno fmt --check` (92 files), `deno check`,
     `test:editor` (**6/6**), `harness` (`4.05 s`), `release-build` (`138.67 s`,
@@ -94,11 +96,14 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
     highlight suites). External `/tmp` verification passed `blot explain --list`,
     `blot explain SPENT_VALUE`, `blot check wgsl_gen.blot`, and
     `blot test tests/std` (**18/18, 146 assertions**, `148.5 ms`).
-  - `../pen` (`f2047ec`): `pen-runtime` (**218 passed, 0 failed**), `blot-host`
-    (**33 unit + 11 integration passed, 0 failed**), `pen blot_test` (**17/17
-    passed**, incl. `runs_real_trap_provenance_tests`,
-    `reports_trap_provenance_and_source_locations`, and
-    `runs_the_checkouts_pilot`).
+  - `../pen` (`92e2ef7`): `plugins/blot` (**24/24** unit), `pen-plugins`
+    (**9/9** unit + **10/10** real-WASI integration incl. Stage-0 WGSL/CSV/record/bytes
+    generators, two-level caching spawn counts, `$Err`/`@panic`/bounds `blot:traps` v1
+    spans, `virtual_source`, and `watch_changes`), `pen plugin_build` (**4/4**),
+    `pen blot_test` Stage-0 WGSL/CSV execution test, and installed `/tmp`
+    `pen test-blot` Stage-0 smoke run (**1/1**, `0.1 s`); preceding `f2047ec`
+    qualified `pen-runtime` (**218/218**), `blot-host` (**33 unit + 11 integration**),
+    and `pen blot_test` (**17/17**).
   - `../ink` (`46111bd` + local edits): `pen test-blot --project ../ink` exit 0
     — **493 passed, 0 failed** in 108 Blot modules (`1.7 s`, `436` checks, `53`
     must-trap, `4` must-not-compile) + **257 passed, 0 failed** native
@@ -122,17 +127,15 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
 
 ## Remaining work
 
-All planned frontier tracks (Waves 1–4) are complete, installed, and green
-across `blot2`, `../pen`, `../ink`, and `../gdev`. Optional future directions:
+All planned frontier tracks (Waves 1–4 + Stage-0 Blot generators in Pen) are
+complete, installed, and verified across `blot2` and `../pen`. Optional future
+directions:
 
-1. **Wire Stage-0 Blot generators into `../pen` (`pen.json`):** Extend
-   `pen-plugins` / `plugins/blot` to discover and run Stage-0 `.blot`
-   generators in Pen projects (mirroring `blot.json` `"generators"`).
-2. **Incremental uniqueness validation & backend replay for Track 5:** Scoping
+1. **Incremental uniqueness validation & backend replay for Track 5:** Scoping
    uniqueness validation to the spliced binding's dependency cone and
    broadening backend body-image replay on behavior-changing edits would push
    single-body structural edits on `robots.blot` below `20 ms`.
-3. **Migrate remaining flat lane decoders in Ink & Gdev:** Adopt the new
+2. **Migrate remaining flat lane decoders in Ink & Gdev:** Adopt the new
    generic `codec.decode_lanes` / `codec.decode_record` across simple flat
    records where no extra domain range clamps are needed.
 
