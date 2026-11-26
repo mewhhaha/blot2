@@ -127,6 +127,7 @@ fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
         if source.units.len>=16 && source.source_bytes>=65536 {
             var cap:u8=4;
             if source.source_bytes>=524288 {cap=8;}
+            if source.source_bytes>=2097152 {cap=16;}
             width=min(cap,blot_native::available_workers());
         }
     }

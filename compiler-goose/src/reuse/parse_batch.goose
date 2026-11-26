@@ -63,7 +63,7 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
 }
 fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
     let batch .= loader.parse_batch;
-    if batch.inputs.items.len>=min(4096,loader.options.max_files) {return;}
+    if batch.inputs.items.len>=min(16384,loader.options.max_files) {return;}
     if batch.raw_paths.contains(path) || batch.paths.contains(path) {return;}
     let limit=min(loader.options.max_source_bytes,loader.options.max_total_source_bytes-batch.total-loader.project.source_bytes);
     if limit<=0 {return;}
@@ -140,9 +140,7 @@ fn runParseLane<P>(loader:Loader<P>&)->bool {
     }
 }
 fn prepareParseBatch<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {
-    var width=min(16,workers);
-    if width==0 {width=min(8,blot_native::available_workers());}
-    if width<=1 || blot_native::platform_is_linux()==0 {return;}
+    if workers==1 || blot_native::platform_is_linux()==0 {return;}
     let batch .= loader.parse_batch;
     if loader.project.entry==0 {
         addParseInput(loader,entry);
@@ -158,6 +156,14 @@ fn prepareParseBatch<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {
     var i:i64=0;
     while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item);i++;}
     if batch.inputs.items.len<16 || batch.total<65536 {return;}
+    var width=min(16,workers);
+    if width==0 {
+        var cap:u8=4;
+        if batch.total>=524288 {cap=8;}
+        if batch.total>=2097152 {cap=16;}
+        width=min(cap,blot_native::available_workers());
+    }
+    if width<=1 {return;}
 
     let shared=blot_native::persist_open(batch.inputs.items.len as u32);
     if shared==0 {return;}

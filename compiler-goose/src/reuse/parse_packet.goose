@@ -126,9 +126,57 @@ fn read_table_u32<B>(packet: const u8[:], at:i64&, table: B&) -> bool {
     return true;
 }
 
+fn read_table_nodes(packet: const u8[:], at:i64&, table: blot_parse_ast::NodeBuffer&) -> bool {
+    var length:u64=0;
+    var shift:u64=0;
+    while true {
+        if at>=packet.len || shift>=63 {return false;}
+        let byte=packet[at]; at++;
+        length|=((byte & 127) as u64)<<shift;
+        if byte<128 {break;}
+        shift+=7;
+    }
+    if length>(packet.len-at) as u64 || (length & 15)!=0 {return false;}
+    let count=(length>>4) as i64;
+    if table.ensure(count)!=ok {return false;}
+    let target=table.storage[..count];
+    if count!=0 {
+        assert(bytes_of(target).len==length as i64);
+        blot_native::copy_u32(target[0].tag,packet[at],(count*4) as u64);
+        at+=length as i64;
+    }
+    table.items=target;
+    table.len=count;
+    return true;
+}
+
+fn read_table_spans(packet: const u8[:], at:i64&, table: blot_parse_ast::SpanBuffer&) -> bool {
+    var length:u64=0;
+    var shift:u64=0;
+    while true {
+        if at>=packet.len || shift>=63 {return false;}
+        let byte=packet[at]; at++;
+        length|=((byte & 127) as u64)<<shift;
+        if byte<128 {break;}
+        shift+=7;
+    }
+    if length>(packet.len-at) as u64 || (length & 7)!=0 {return false;}
+    let count=(length>>3) as i64;
+    if table.ensure(count)!=ok {return false;}
+    let target=table.storage[..count];
+    if count!=0 {
+        assert(bytes_of(target).len==length as i64);
+        blot_native::copy_u32(target[0].start,packet[at],(count*2) as u64);
+        at+=length as i64;
+    }
+    table.items=target;
+    table.len=count;
+    return true;
+}
+
 fn read_tree(packet: const u8[:], at:i64&, tree: Tree&) -> bool {
-    return read_table(packet,at,tree.nodes,default<blot_parse_ast::Node>()) &&
-        read_table(packet,at,tree.spans,default<blot_parse_ast::Span>()) &&
+    return read_table_nodes(packet,at,tree.nodes) &&
+        read_table_spans(packet,at,tree.spans) &&
         read_table_u32(packet,at,tree.extra) &&
         read_table_u32(packet,at,tree.roots) &&
         read_table(packet,at,tree.runtime_names,default<blot_parse_ast::RuntimeName>()) &&

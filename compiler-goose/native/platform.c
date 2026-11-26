@@ -437,7 +437,7 @@ int64_t blot_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errn
 
 /* Each checker process gets one bounded, demand-paged reply area. It writes
  * frames in order. The parent reads them only after joining that process. */
-#define CHECK_REPLY_CAPACITY (128u * 1024u * 1024u)
+#define CHECK_REPLY_CAPACITY (512u * 1024u * 1024u)
 struct check_reply {
     uint64_t used;
     uint8_t bytes[];

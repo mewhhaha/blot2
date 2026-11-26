@@ -104,10 +104,13 @@ fn runProjectChecks(self_:Workers&,parent:Engine&,order:const u32[:],width:i64,j
     // The caller orders larger syntax trees first. Balance their estimated
     // work across groups and give the first group to the parent.
     var groups:u8[>..<]=[];
+    var seen:bool[>..<]=[];
+    seen.resize(jobs.len,false);
     var load:i64[16]=[0;16];
     for unit,position in order {
         if unit==0 || unit>jobs.len {return totals,blot_error::Error.invalid_request;}
-        for previous in order[..position] {if previous==unit {return totals,blot_error::Error.invalid_request;}}
+        if seen[unit-1] {return totals,blot_error::Error.invalid_request;}
+        seen[unit-1]=true;
         var group:i64=0;
         for index in 1..width {if load[index]<load[group] {group=index;}}
         let count=parent.source.unit(unit).tree.nodes.len;

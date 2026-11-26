@@ -25,15 +25,16 @@ extern uint64_t blot_clock_ns(void);
  * shared, while the arena commits pages only as producers publish bytes. */
 #ifdef __linux__
 enum {
-    PERSIST_MAX_NODES = 2048,
-    PERSIST_ARENA_CAPACITY = 192 * 1024 * 1024,
+    PERSIST_MAX_NODES = 16384,
     PERSIST_WAIT_NS = 20 * 1000 * 1000,
 };
+/* Demand-paged virtual reservation: untouched pages consume zero RSS. */
+static const size_t PERSIST_ARENA_CAPACITY = (size_t)2 * 1024 * 1024 * 1024;
 static const uint64_t persist_timeout = UINT64_C(15000000000);
 
 struct persist_packet {
-    uint32_t offset;
-    uint32_t length;
+    uint64_t offset;
+    uint64_t length;
     bool ready;
 };
 struct persist_node {
@@ -50,12 +51,12 @@ struct persist_queue {
     _Atomic uint32_t generation;
     uint64_t deadline;
     size_t map_length;
+    uint64_t arena_used;
     uint32_t count;
     uint32_t edge_words;
     uint32_t configured;
     uint32_t active;
     uint32_t finished;
-    uint32_t arena_used;
     int failure;
     bool sealed;
     struct persist_node nodes[];
@@ -105,7 +106,7 @@ uint8_t blot_available_workers(void) {
     if (sched_getaffinity(0, sizeof(cpus), &cpus) < 0) return 1;
     int count = CPU_COUNT(&cpus);
     if (count < 1) return 1;
-    if (count > 8) return 8;
+    if (count > 16) return 16;
     return (uint8_t)count;
 }
 
@@ -269,10 +270,10 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
         pthread_mutex_unlock(&queue->mutex);
         return false;
     }
-    uint32_t offset = queue->arena_used;
+    uint64_t offset = queue->arena_used;
     packet->offset = offset;
-    packet->length = (uint32_t)len;
-    queue->arena_used += (uint32_t)len;
+    packet->length = len;
+    queue->arena_used += len;
     pthread_mutex_unlock(&queue->mutex);
 
     /* Readers only see a length after the copy commits under the mutex. */

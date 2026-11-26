@@ -210,7 +210,7 @@ fn run(args:const Argument[:])->bool,Error {
    if arg=="--wasm3" {if !isBuild(command) {return false,blot_error::Error.none;}relaxed_simd=true;tail_calls=true;at+=1;continue;}
    if at+1>=args.len {return false,blot_error::Error.none;}let value=args[at+1];at+=2;
    if arg=="--semantic-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.semantic_workers=workers;semantic_workers=true;}
-   else if arg=="--frontend-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.frontend_workers=workers;}
+   else if arg=="--frontend-workers" {if !isBuild(command)&&command!=Command.check_project&&command!=Command.parse_project&&command!=Command.doc_project {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.frontend_workers=workers;}
    else if arg=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {return false,error;}}
    else if arg=="--std-root" {options.std_root=blot_support::some<const u8[:]>(value);}
    else if arg=="--alias" {var split:i64=-1;for byte,index in value {if byte=='=' {split=index;break;}}if split<0 {return false,blot_error::Error.none;}aliases.push(blot_reuse_project::Alias{value[..split],value[split+1..]});}

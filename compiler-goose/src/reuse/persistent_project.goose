@@ -150,14 +150,14 @@ fn gatherPersistent(source:const Project&,handle:u64,ready:Prepared&,children:u6
   ready.paths[unit-1]=path;
   let size=blot_native::persist_size(handle,unit,2);
   if size<=0 {return blot_error::Error.invalid_artifact;}
-  bytes.resize(size,0);
+  if size>bytes.len {bytes.resize(size,0);}
   if !blot_native::persist_read(handle,unit,2,bytes[0],size as u64) {return blot_error::Error.invalid_artifact;}
   counts.parallel_worker_reply_bytes+=size as u64;
   let interface_size=blot_native::persist_size(handle,unit,1);
   if interface_size>0 {counts.parallel_worker_reply_bytes+=interface_size as u64;}
   let before=resolution;
   let before_associated=associated;
-  let failure=readPersistentCore(bytes[..],unit,ready,resolution,associated,counts);
+  let failure=readPersistentCore(bytes[..size],unit,ready,resolution,associated,counts);
   if failure!=blot_error::Error.none {return failure;}
   if stored.len!=0 {
    if interface_size<=0 {return blot_error::Error.invalid_artifact;}

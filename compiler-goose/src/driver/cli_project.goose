@@ -9,10 +9,12 @@ import check.check;
 import check.types;
 import check.core;
 import check.core_builder;
+import check.wire_schema;
 import compile;
 import parse.ast;
 import parse.symbols;
 import reuse.project;
+import reuse.partial_dependency;
 import reuse.principal_interface;
 import reuse.type_display;
 import reuse.dependency_consumer;
@@ -67,14 +69,93 @@ fn processProject(writer:blot_io::Writer,command:Command,filename:const u8[:],op
  var written=error;if error==blot_error::Error.none {stats.success=accepted;stats.total_us=elapsed(started);if profile.present {stats.phase_profile=profile.value.record();}stats.memory=meter.counts();written=emit(writer,stats);}
  if installation.present {installation.value.restore();}if profile.present {profile.value.deinit();}return accepted&&written==blot_error::Error.none,written;
 }
+fn effectiveWorkers(policy:Policy,units:i64,source_bytes:i64)->u8 {
+ if policy.frontend_workers!=0 {return policy.frontend_workers;}
+ if units>=16 && source_bytes>=65536 {
+  var cap:u8=4;
+  if source_bytes>=524288 {cap=8;}
+  if source_bytes>=2097152 {cap=16;}
+  return min(cap,blot_native::available_workers());
+ }
+ return 1;
+}
 fn projectLoad(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,output:Text,policy:Policy,started:u64,stats:ProjectStats&,error_detail:u8[>..]&,check_only:bool,include_private:bool)->bool,Error {
- var loaded,error=blot_reuse_project::load(filename,options);if error!=blot_error::Error.none {formatIoError(error_detail,"load",filename,error);return false,error;}loaded.checking=blot_reuse_project::Lowering{io:true,workers:max(1 as u8,policy.frontend_workers)};
+ var loaded,error=blot_reuse_project::loadParallel(filename,options,policy.frontend_workers);if error!=blot_error::Error.none {formatIoError(error_detail,"load",filename,error);return false,error;}
+ loaded.checking=blot_reuse_project::Lowering{io:true,workers:effectiveWorkers(policy,loaded.units.len,loaded.source_bytes)};
  let accepted,error=projectLoaded(writer,command,filename,output,policy,started,stats,loaded,error_detail,check_only,include_private);let release_start=now();loaded.deinit();stats.teardown_us+=elapsed(release_start);return accepted,error;
+}
+fn emitPrepared(writer:blot_io::Writer,output:Text,stats:ProjectStats&,loaded:Project&,prepared:const blot_reuse_partial_dependency::Prepared&,error_detail:u8[>..]&)->bool,Error {
+ let emit_start=now();
+ let backend=blot_phase_profile::enter(blot_phase_profile::Phase.backend);
+ var pinfo=blot_check_wire_schema::ProgramInfo{};
+ blot_check_wire_schema::analyzeWithForkFlags(prepared.units,prepared.entry,prepared.unit_has_fork,pinfo);
+ var compiled=blot_reuse_dependency_consumer::Compiled{};
+ var cerr=blot_error::Error.none;
+ if !pinfo.issue.failed {
+  compiled,cerr=blot_reuse_dependency_consumer::compileUnitsWithAnalysis(prepared.units,prepared.entry,pinfo);
+ } else {
+  compiled,cerr=blot_reuse_dependency_consumer::compileUnits(prepared.units,prepared.entry);
+ }
+ backend.exit();
+ if cerr!=blot_error::Error.none {return false,cerr;}
+ stats.emitted_functions=compiled.emitted_functions;
+ if compiled.failed {
+  let diag_err=diagnostic(writer,loaded.filename(compiled.diagnostic.unit),"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,compiled.text());
+  stats.emit_us=elapsed(emit_start);
+  blot_reuse_dependency_consumer::freeBytes(compiled.message);
+  blot_reuse_dependency_consumer::freeU32s(compiled.staged_dep_units);
+  return false,diag_err;
+ }
+ stats.wasm_bytes=compiled.bytes.len;
+ stats.emit_us=elapsed(emit_start);
+ let write_start=now();
+ assert(output.present);
+ let werr=blot_io::write_file(output.value,compiled.bytes);
+ blot_reuse_dependency_consumer::freeBytes(compiled.bytes);
+ blot_reuse_dependency_consumer::freeU32s(compiled.staged_dep_units);
+ if werr!=blot_error::Error.none {formatIoError(error_detail,"write",output.value,werr);return false,werr;}
+ stats.write_us=elapsed(write_start);
+ return true,blot_error::Error.none;
+}
+fn projectPersistent(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:ProjectStats&,loaded:Project&,error_detail:u8[>..]&)->bool,bool,Error {
+ let prep_start=now();
+ var prep,error=blot_reuse_partial_dependency::preparePersistent(loaded,null);
+ if error==blot_error::Error.out_of_memory {prep.deinit();return false,true,error;}
+ if error!=blot_error::Error.none {prep.deinit();return false,false,blot_error::Error.none;}
+ match prep {
+  ready payload=>{
+   var prepared=payload.value;
+   prep=blot_reuse_partial_dependency::Preparation.inactive;
+   stats.body_elaborations=prepared.stats.body_elaborations;
+   stats.imported_schemes=prepared.stats.imported_schemes;
+   stats.body_lowerings=prepared.stats.body_lowerings;
+   for unit in prepared.units {if unit.nodes.len!=0 {stats.core_nodes+=unit.nodes.len-1;}}
+   stats.check_us=elapsed(prep_start);
+   if command==Command.check_project {
+    let release_start=now();prepared.deinit();stats.teardown_us+=elapsed(release_start);
+    return true,true,blot_error::Error.none;
+   }
+   let release_start=now();
+   for &unit in loaded.units.items {unit.tree.deinit();blot_reuse_project::releaseSource(unit.source);unit.source=default<const u8[:]>();}
+   stats.teardown_us+=elapsed(release_start);
+   let accepted,err=emitPrepared(writer,output,stats,loaded,prepared,error_detail);
+   let rel=now();prepared.deinit();stats.teardown_us+=elapsed(rel);
+   return accepted,true,err;
+  },
+  _=>{
+   prep.deinit();
+   return false,false,blot_error::Error.none;
+  },
+ }
 }
 fn projectLoaded(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,policy:Policy,started:u64,stats:ProjectStats&,loaded:Project&,error_detail:u8[>..]&,check_only:bool,include_private:bool)->bool,Error {
  stats.source_bytes=loaded.source_bytes;stats.files=loaded.units.len;stats.symbol_bytes=loaded.symbols.bytes.len;for unit in loaded.units.items {if unit.tree.nodes.len!=0 {stats.syntax_nodes+=unit.tree.nodes.len-1;}}
  for item in loaded.diagnostics.items {let path=if item.unit!=0 {loaded.filename(item.unit)}else {filename};var error=blot_error::Error.none;if item.publication.present {let unit .= loaded.unit(item.unit);if item.parse_code.present {error=frontendDiagnostic(writer,path,"parse-project",unit.source,item.publication.value,unit.tree.diagnostics.items);}else {error=frontendDiagnostic(writer,path,"parse-project",unit.source,item.publication.value,item.lexical_details);}}else {error=diagnostic(writer,path,"parse-project",item.codeName(),item.span.start,item.span.end,item.message());}if error!=blot_error::Error.none {return false,error;}}
  stats.load_us=elapsed(started);if loaded.diagnostics.len!=0 {return false,blot_error::Error.none;}if command==Command.parse_project {return true,blot_error::Error.none;}
+ if (command==Command.build_project || (command==Command.check_project && !check_only)) && loaded.checking.workers>1 && loaded.checking.io && loaded.units.len>=16 && loaded.compiled_modules.len==0 && loaded.input_mode==blot_reuse_project::InputMode.project {
+  let accepted,handled,perr=projectPersistent(writer,command,filename,output,stats,loaded,error_detail);
+  if handled {return accepted,perr;}
+ }
  let check_start=now();var executor=blot_reuse_project_check::Workers{..};var checked,error=blot_reuse_project_check::checkProject(executor,loaded);if error!=blot_error::Error.none {return false,error;}var checked_live=true;
  let accepted,error=projectChecked(writer,command,filename,output,policy,check_start,stats,loaded,checked,checked_live,error_detail,check_only,include_private);if checked_live {let release_start=now();checked.deinit();stats.teardown_us+=elapsed(release_start);}return accepted,error;
 }

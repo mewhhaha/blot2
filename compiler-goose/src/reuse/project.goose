@@ -539,6 +539,10 @@ fn load(entrypath:const u8[:],options:Options)->Project,Error {
     var inputs=FileInputs {..};var context=LoadContext {entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSource);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
+fn loadParallel(entrypath:const u8[:],options:Options,workers:u8)->Project,Error {
+    var inputs=FileInputs {..};var context=LoadContext {parse_workers:workers,entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSourceParallel);
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
+}
 fn loadWithInputs<P>(entrypath:const u8[:],options:Options,inputs:P&)->Project,Error {
     var context=LoadContext {entrypath:entrypath,provided:true, ..};
     let error=withLoader(options,inputs,context,loadSource);
