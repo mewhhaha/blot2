@@ -66,6 +66,7 @@ struct ProcessInfo {
     config_schema: WireSchema = WireSchema {},
     cmd_schema: WireSchema = WireSchema {},
     reply_schema: WireSchema = WireSchema {},
+    binding_hash: u64 = 0,
 }
 
 struct Issue {
@@ -1472,7 +1473,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
         },
         flat_op => {
             fnvU32Le(ctx.h, n.c);
-            if n.c <= blot_check_core::flat_op_kernel_io_hash {
+            if n.c <= blot_check_core::flat_op_process_binding_hash {
                 hashNode(ctx, units, m, n.a, depth + 1);
             } else {
                 fnvU32Le(ctx.h, n.a);
@@ -1818,6 +1819,12 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         pinfo.config_schema = cfg_s;
         pinfo.cmd_schema = cmd_s;
         pinfo.reply_schema = rep_s;
+        var pbh = Hasher {};
+        fnvByte(pbh, 0x13);
+        fnvU64Le(pbh, cfg_s.schema_hash);
+        fnvU64Le(pbh, cmd_s.schema_hash);
+        fnvU64Le(pbh, rep_s.schema_hash);
+        pinfo.binding_hash = pbh.h;
         fnvU64Le(pch, computeProcessClosureHash(units, entry, decl, info.dep_units));
         info.processes.push(pinfo);
     }

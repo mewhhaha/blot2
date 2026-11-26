@@ -787,6 +787,30 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatDecodeVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
                             }
+                            if fn_node.c == blot_check_core::flat_op_encode_wire && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                                let out_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatEncodeWireVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
+                            }
+                            if fn_node.c == blot_check_core::flat_op_decode_wire && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                                let maybe_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatDecodeWireVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
+                            }
+                            if fn_node.c == blot_check_core::flat_op_encode_batch && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                                let out_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatEncodeBatchVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
+                            }
+                            if fn_node.c == blot_check_core::flat_op_decode_batch && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                                let maybe_ty, ty_err = typeOf(g, f, id);
+                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                g.recordInlined(resolved_f.unit, resolved_f.binding);
+                                return emitFlatDecodeBatchVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
+                            }
                             if fn_node.c == blot_check_core::flat_op_schema_hash && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
                                 let out_ty, ty_err = typeOf(g, f, id);
                                 if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
@@ -1177,7 +1201,7 @@ recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32,
             return usesTypeIn(g, f, info.body, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         flat_op => {
-            if n.c == blot_check_core::flat_op_encode || n.c == blot_check_core::flat_op_decode {
+            if n.c <= blot_check_core::flat_op_decode_batch {
                 return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1);
             }
             return blot_direct_types::Error.none;

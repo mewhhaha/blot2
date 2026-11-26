@@ -55,7 +55,7 @@ fn edge(self_: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> 
             comptime_for => { if slot == 0 { return self_.to(Kind.node,v.b); } },
             comptime_meta => { if v.c == 0 && slot == 0 { return self_.to(Kind.node,v.a); } if (v.c == 8 || v.c == 9) && slot == 0 { return self_.to(Kind.node,v.b); } },
             spark => { if slot == 0 { return self_.to(Kind.spark,v.a); } },
-            flat_op => { if v.c <= blot_check_core::flat_op_kernel_io_hash && slot == 0 { return self_.to(Kind.node,v.a); } },
+            flat_op => { if v.c <= blot_check_core::flat_op_process_binding_hash && slot == 0 { return self_.to(Kind.node,v.a); } },
             block_,suite,product,record,array,array_op,storage => { if slot < v.b { return self_.to(Kind.node,m.extra[v.a+slot]); } },
             call,contract_method,break_ => { if slot < v.c { return self_.to(Kind.node,m.extra[v.b+slot]); } },
             bind,construct => { if slot == 0 { return self_.to(Kind.node,v.b); } },

@@ -10088,12 +10088,35 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
     }
     if n.c == blot_check_core::flat_op_process_handle {
+        let pidx = n.a;
+        if (pidx as i64) >= g.s.processes.len {
+            return neverVal(), g.fail(m, id, "unknown process declaration index");
+        }
+        let pinfo = g.s.processes[pidx];
         let ty, ty_err = typeOf(g, f, id);
         if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
-        let loc = constLocal(g, f, n.a);
-        return valOf1(g, ty, loc), blot_direct_types::Error.none;
+        let w0 = constLocal(g, f, pidx);
+        let w1 = constLocal(g, f, (pinfo.binding_hash & 0xffffffff) as u32);
+        let w2 = constLocal(g, f, (pinfo.binding_hash >> 32) as u32);
+        let boxed, berr = isBoxed(g, f, ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if boxed {
+            let blk, merr = newBlock(g, f, ty, id);
+            if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+            let vals: u32[3] = [w0, w1, w2];
+            for wi in 0..3 {
+                lget(g, blk);
+                lget(g, vals[wi]);
+                op(g, OP_i32_store);
+                uleb(g, 2);
+                uleb(g, (wi * 4) as u32);
+            }
+            return valOf1(g, ty, blk), blot_direct_types::Error.none;
+        }
+        let words = g.saveWords([w0, w1, w2]);
+        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_kernel_id {
+    if n.c == blot_check_core::flat_op_kernel_id || n.c == blot_check_core::flat_op_process_id {
         let kval, kerr = expr(g, f, n.a);
         if kerr != blot_direct_types::Error.none { return kval, kerr; }
         let boxed, berr = isBoxed(g, f, kval.ty, id);
@@ -10109,7 +10132,7 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         return valOf1(g, blot_direct_types::u32_, w(g, kval, 0)), blot_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_kernel_binding_hash || n.c == blot_check_core::flat_op_kernel_ctx_hash || n.c == blot_check_core::flat_op_kernel_io_hash {
+    if n.c == blot_check_core::flat_op_kernel_binding_hash || n.c == blot_check_core::flat_op_kernel_ctx_hash || n.c == blot_check_core::flat_op_kernel_io_hash || n.c == blot_check_core::flat_op_process_binding_hash {
         let kval, kerr = expr(g, f, n.a);
         if kerr != blot_direct_types::Error.none { return kval, kerr; }
         let ty, ty_err = typeOf(g, f, id);
@@ -10168,6 +10191,34 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let maybe_ty, ty_err = typeOf(g, f, id);
         if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatDecodeVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
+    }
+    if n.c == blot_check_core::flat_op_encode_wire {
+        let arg_val, aerr = expr(g, f, n.a);
+        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        let out_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatEncodeWireVal(g, f, arg_val, n.b, out_ty, id);
+    }
+    if n.c == blot_check_core::flat_op_decode_wire {
+        let src_val, serr = expr(g, f, n.a);
+        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        let maybe_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatDecodeWireVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
+    }
+    if n.c == blot_check_core::flat_op_encode_batch {
+        let arg_val, aerr = expr(g, f, n.a);
+        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        let out_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatEncodeBatchVal(g, f, arg_val, n.b, out_ty, id);
+    }
+    if n.c == blot_check_core::flat_op_decode_batch {
+        let src_val, serr = expr(g, f, n.a);
+        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        let maybe_ty, ty_err = typeOf(g, f, id);
+        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        return emitFlatDecodeBatchVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
     }
     return neverVal(), g.fail(m, id, "unknown @flat intrinsic");
 }

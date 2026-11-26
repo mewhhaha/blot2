@@ -1,7 +1,9 @@
-// Represented Kernel handle metadata, 64-bit FNV-1a hashing, and exact wire
-// integer packing for Pen `service::KERNEL` (code 15) and standalone hosts.
+//! Multi-core `#kernel` handle metadata, wire helpers, and typed in-language
+//! orchestration (`run`, `prepare`, `run_prepared`, `submit`, `poll`, `await_job`)
+//! over [`Runtime`](`std/runtime/Runtime`).
 
 import * as flat from "./flat"
+import * as runtime from "./runtime"
 
 type Hash64 is data = $Hash64 { lo: U32, hi: U32 }
 
@@ -26,6 +28,163 @@ func io_hash k =>
 func encode value => return flat.encode value
 func decode words => return flat.decode words
 func schema_hash value => return flat.schema_hash value
+
+// Opaque handle for a prepared kernel context uploaded to the host pool.
+type Prepared [ctx, item, out] is opaque = {
+  kernel_id: U32,
+  slot: U32,
+  hash_lo: U32,
+  hash_hi: U32,
+}
+
+// Opaque handle for an in-flight non-blocking kernel batch job.
+type KernelJob out is opaque = { job_id: U32 }
+
+// Typed failure modes returned by host kernel execution.
+type KernelErr is data =
+  | $Oom
+  | $Trap Text
+  | $Timeout
+  | $BudgetExceeded
+  | $InvalidHandle
+  | $DecodeError
+  | $HostError Text
+
+private func decode_kernel_err (code: U32) -> (msg: own Text): KernelErr =>
+  if code == runtime.err_oom:
+    return $Oom
+  if code == runtime.err_trap:
+    return $Trap msg
+  if code == runtime.err_timeout:
+    return $Timeout
+  if code == runtime.err_budget:
+    return $BudgetExceeded
+  if code == runtime.err_invalid_handle:
+    return $InvalidHandle
+  return $HostError msg
+
+// Run a stateless `#kernel` synchronously/suspending on the host `KernelPool`.
+func run (k: Kernel [Unit, item, out]) -> (items: #[item]): Result [#[out], KernelErr] ! { runtime.Runtime } =>
+  let kid = flat.kernel_id k
+  let (hlo, hhi) = flat.kernel_binding_hash k
+  let payload = flat.encode_batch items
+  let req = runtime.pack_request runtime.op_kernel_run #[kid, hlo, hhi, items.length] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  let body = runtime.tail_words resp 2
+  let $Some decoded = flat.decode_batch body else:
+    return $Err $DecodeError
+  return $Ok decoded
+
+// Upload and prepare context for a prepared-context `#kernel`.
+func prepare (k: Kernel [ctx, item, out]) -> (wire_ctx: ctx): Result [Prepared [ctx, item, out], KernelErr] ! { runtime.Runtime } =>
+  let kid = flat.kernel_id k
+  let (hlo, hhi) = flat.kernel_binding_hash k
+  let payload = flat.encode_wire wire_ctx
+  let req = runtime.pack_request runtime.op_kernel_prepare #[kid, hlo, hhi] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  if resp.length < 3:
+    return $Err $DecodeError
+  return $Ok ($Prepared { kernel_id: kid, slot: resp[2], hash_lo: hlo, hash_hi: hhi })
+
+// Run a batch against a [`Prepared`] kernel context.
+func run_prepared (p: Prepared [ctx, item, out]) -> (items: #[item]): Result [#[out], KernelErr] ! { runtime.Runtime } =>
+  let $Prepared { kernel_id, slot, hash_lo, hash_hi } = p
+  let payload = flat.encode_batch items
+  let req = runtime.pack_request runtime.op_kernel_run_prepared #[kernel_id, slot, hash_lo, hash_hi, items.length] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  let body = runtime.tail_words resp 2
+  let $Some decoded = flat.decode_batch body else:
+    return $Err $DecodeError
+  return $Ok decoded
+
+// Release a [`Prepared`] kernel context on the host pool (consumes handle).
+func clear (p: own Prepared [ctx, item, out]): Unit ! { runtime.Runtime } =>
+  let $Prepared { kernel_id, slot, hash_lo: _, hash_hi: _ } = p
+  let req = runtime.pack_request runtime.op_kernel_clear #[kernel_id, slot] #[]
+  use _ <- runtime.Runtime.call req
+  return ()
+
+// Submit a stateless `#kernel` batch without blocking; collect with [`poll`] or [`await_job`].
+func submit (k: Kernel [Unit, item, out]) -> (items: #[item]): Result [KernelJob out, KernelErr] ! { runtime.Runtime } =>
+  let kid = flat.kernel_id k
+  let (hlo, hhi) = flat.kernel_binding_hash k
+  let payload = flat.encode_batch items
+  let req = runtime.pack_request runtime.op_kernel_submit #[kid, hlo, hhi, items.length] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  if resp.length < 3:
+    return $Err $DecodeError
+  return $Ok ($KernelJob { job_id: resp[2] })
+
+// Submit a prepared-context `#kernel` batch without blocking.
+func submit_prepared (p: Prepared [ctx, item, out]) -> (items: #[item]): Result [KernelJob out, KernelErr] ! { runtime.Runtime } =>
+  let $Prepared { kernel_id, slot, hash_lo, hash_hi } = p
+  let payload = flat.encode_batch items
+  let req = runtime.pack_request runtime.op_kernel_submit_prepared #[kernel_id, slot, hash_lo, hash_hi, items.length] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  if resp.length < 3:
+    return $Err $DecodeError
+  return $Ok ($KernelJob { job_id: resp[2] })
+
+// Non-blocking poll for a submitted [`KernelJob`].
+func poll (job: KernelJob out): Maybe (Result [#[out], KernelErr]) ! { runtime.Runtime } =>
+  let $KernelJob { job_id } = job
+  let req = runtime.pack_request runtime.op_kernel_poll #[job_id] #[]
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 3):
+    return $Some ($Err $DecodeError)
+  if resp[1] != runtime.status_ok:
+    return $Some ($Err (decode_kernel_err resp[1] (runtime.tail_words resp 2)))
+  let state = resp[2]
+  if state == 0:
+    return $Nothing
+  if state == 1:
+    let body = runtime.tail_words resp 3
+    let $Some decoded = flat.decode_batch body else:
+      return $Some ($Err $DecodeError)
+    return $Some ($Ok decoded)
+  if resp.length < 4:
+    return $Some ($Err $DecodeError)
+  return $Some ($Err (decode_kernel_err resp[3] (runtime.tail_words resp 4)))
+
+// Wait for a submitted [`KernelJob`] to finish (consumes the job handle).
+func await_job (job: own KernelJob out): Result [#[out], KernelErr] ! { runtime.Runtime } =>
+  let $KernelJob { job_id } = job
+  let req = runtime.pack_request runtime.op_kernel_await #[job_id] #[]
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_kernel_err status (runtime.tail_words resp 2))
+  let body = runtime.tail_words resp 2
+  let $Some decoded = flat.decode_batch body else:
+    return $Err $DecodeError
+  return $Ok decoded
 
 // Lossless 32-bit <-> two 16-bit exact-integer F32 lanes (zero precision loss
 // above 16,777,215).

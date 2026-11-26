@@ -3844,7 +3844,7 @@ fn exactIntrinsicArity(name:const u8[:])->blot_support::Option<i64> {if startsBy
 fn intrinsicArity(name:const u8[:])->blot_support::Option<i64> {
  let storage=blot_check_storage_ops::lookup(name);if storage.present {return blot_support::some(blot_check_storage_ops::arity(storage.value) as i64);}let staging,present=blot_check_typed_staging::lookup(name);if present {return blot_support::some(blot_check_typed_staging::arity(staging) as i64);}let simd_=blot_backend_simd_intrinsics::lookup(name);if simd_.present {return blot_support::some(simd_.value.arity as i64);}let collection=blot_backend_collection_ops::lookup(name);if collection.present {return blot_support::some(collection.value.arity as i64);}
  if name=="@hole" {return blot_support::some(0 as i64);}
- for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@u32.to_f32","@f32.to_u32","@f32.neg","@f32.abs","@f32.sqrt","@f32.floor","@f32.ceil","@f32.trunc","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash"] {if name==candidate {return blot_support::some(1 as i64);}}
+ for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@u32.to_f32","@f32.to_u32","@f32.neg","@f32.abs","@f32.sqrt","@f32.floor","@f32.ceil","@f32.trunc","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
  for candidate in ["@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@u32.add","@u32.sub","@u32.mul","@u32.div","@u32.rem","@u32.bit_and","@u32.bit_or","@u32.bit_xor","@u32.shl","@u32.shr","@u32.eq","@u32.lt","@f32.add","@f32.sub","@f32.mul","@f32.div","@f32.eq","@f32.ne","@f32.lt","@f32.le","@f32.gt","@f32.ge","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
  for candidate in ["@state.reader","@state.writer","@effect.state","@array.set","@type.call"] {if name==candidate {return blot_support::some(3 as i64);}}
  for candidate in ["@effect.run","@effect.reader","@effect.writer"] {if name==candidate {return blot_support::some(4 as i64);}}return blot_support::none<i64>();
@@ -3913,6 +3913,41 @@ recursive fn intrinsic(self_:Engine&,id:u32,name:u32)->u32,blot_error::Error {
    let kty,kerr=self_.makeNominalTriple(kernel_nom.value,c,i,o);if kerr!=blot_error::Error.none {return 0,kerr;}
    if text=="@flat.kernel_id" {return self_.types.function(kty,blot_check_types::u32_type);}
    return self_.types.function(kty,pair_u32);
+  }
+  if text=="@flat.process_id" || text=="@flat.process_binding_hash" {
+   let proc_nom=self_.lookupBuiltinNominal("Process",3);if !proc_nom.present {return self_.diagnosticFresh(Code.unsupported,id);}
+   let c,cerr=self_.types.fresh();if cerr!=blot_error::Error.none {return 0,cerr;}
+   let m,merr=self_.types.fresh();if merr!=blot_error::Error.none {return 0,merr;}
+   let r,rerr=self_.types.fresh();if rerr!=blot_error::Error.none {return 0,rerr;}
+   let pty,perr2=self_.makeNominalTriple(proc_nom.value,c,m,r);if perr2!=blot_error::Error.none {return 0,perr2;}
+   if text=="@flat.process_id" {return self_.types.function(pty,blot_check_types::u32_type);}
+   return self_.types.function(pty,pair_u32);
+  }
+  if text=="@flat.encode_wire" {
+   let a,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
+   let arr,seqerr=self_.types.sequence(blot_check_types::Tag.array,blot_check_types::u32_type);if seqerr!=blot_error::Error.none {return 0,seqerr;}
+   return self_.types.function(a,arr);
+  }
+  if text=="@flat.decode_wire" {
+   let a,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
+   let arr,seqerr=self_.types.sequence(blot_check_types::Tag.array,blot_check_types::u32_type);if seqerr!=blot_error::Error.none {return 0,seqerr;}
+   let maybe_nom=self_.lookupBuiltinNominal("Maybe",1);if !maybe_nom.present {return self_.diagnosticFresh(Code.unsupported,id);}
+   let maybe_a,merr=self_.types.nominal(self_.nominals[maybe_nom.value].identity,[a]);if merr!=blot_error::Error.none {return 0,merr;}
+   return self_.types.function(arr,maybe_a);
+  }
+  if text=="@flat.encode_batch" {
+   let a,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
+   let in_arr,inerr=self_.types.sequence(blot_check_types::Tag.array,a);if inerr!=blot_error::Error.none {return 0,inerr;}
+   let out_arr,outerr=self_.types.sequence(blot_check_types::Tag.array,blot_check_types::u32_type);if outerr!=blot_error::Error.none {return 0,outerr;}
+   return self_.types.function(in_arr,out_arr);
+  }
+  if text=="@flat.decode_batch" {
+   let a,aerr=self_.types.fresh();if aerr!=blot_error::Error.none {return 0,aerr;}
+   let in_arr,inerr=self_.types.sequence(blot_check_types::Tag.array,blot_check_types::u32_type);if inerr!=blot_error::Error.none {return 0,inerr;}
+   let out_arr,outerr=self_.types.sequence(blot_check_types::Tag.array,a);if outerr!=blot_error::Error.none {return 0,outerr;}
+   let maybe_nom=self_.lookupBuiltinNominal("Maybe",1);if !maybe_nom.present {return self_.diagnosticFresh(Code.unsupported,id);}
+   let maybe_arr,merr=self_.types.nominal(self_.nominals[maybe_nom.value].identity,[out_arr]);if merr!=blot_error::Error.none {return 0,merr;}
+   return self_.types.function(in_arr,maybe_arr);
   }
  }
  if text=="@hole" {let scope,err=self_.holeScope();if err!=blot_error::Error.none {return 0,err;}self_.holes.push(Engine_holes{id,scope,self_.current, ..});return self_.types.fresh();}if exactIntrinsicArity(text).present && self_.permitted_intrinsic!=id {let err=self_.diagnostic(Code.call_arity,id);if err!=blot_error::Error.none {return 0,err;}return self_.types.fresh();}

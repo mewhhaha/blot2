@@ -1633,7 +1633,7 @@ fn appendChildren(out: u32[>..<]&, m: const Module&, id: u32) {
     if tag == blot_check_core::Tag.update { let update = m.updateInfo(id); out.append([update.root, update.value]); for selector in m.updateSelectors(id) { if selector.kind == blot_check_core::UpdateKind.index { out.push(selector.index); } } return; }
     if tag == blot_check_core::Tag.effect_reflection { if n.a == 2 || n.a == 3 || n.a == 4 { out.push(n.b); } if n.c != 0 { out.push(n.c); } return; }
     if tag == blot_check_core::Tag.spark { let info = m.sparkInfo(id); out.push(info.source); if info.end != 0 { out.push(info.end); } out.push(info.body); return; }
-    if tag == blot_check_core::Tag.flat_op { if n.c <= blot_check_core::flat_op_kernel_io_hash { out.push(n.a); } return; }
+    if tag == blot_check_core::Tag.flat_op { if n.c <= blot_check_core::flat_op_process_binding_hash { out.push(n.a); } return; }
 }
 recursive fn visitChildren(self_: Analyzer&, m: const Module&, id: u32) -> bool {
     let start = self_.children.len;
@@ -2029,14 +2029,14 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.spark { return sparkNode(self_, m, id); }
     if tag == blot_check_core::Tag.flat_op {
         var exits = false;
-        if n.c <= blot_check_core::flat_op_kernel_io_hash {
+        if n.c <= blot_check_core::flat_op_process_binding_hash {
             self_.brief_node = n.a;
             let arg = visit(self_, m, n.a);
             self_.brief_node = 0;
             exits = arg.exits;
         }
         var fact: Fact = none;
-        if n.c == blot_check_core::flat_op_encode || n.c == blot_check_core::flat_op_decode { fact = deep; }
+        if n.c <= blot_check_core::flat_op_decode_batch { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
     }
     if tag == blot_check_core::Tag.closure {

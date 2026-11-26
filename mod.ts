@@ -35,6 +35,14 @@ export {
 } from "./host/generators.ts";
 export { decodeText, encodeText } from "./host/text.ts";
 export {
+  BlotRuntime,
+  type BlotRuntimeOptions,
+  computeProcessBindingHash,
+  createRuntime,
+  RUNTIME_MAGIC,
+  RUNTIME_VERSION,
+} from "./host/runtime.ts";
+export {
   buildSymbolResolver,
   type DocCodeBlock,
   type DocConstructor,

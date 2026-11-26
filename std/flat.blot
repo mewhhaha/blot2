@@ -1,11 +1,18 @@
-// Canonical FlatNumeric codecs and kernel handle metadata accessors.
+// Canonical FlatNumeric & wire codecs plus Kernel/Process handle accessors.
 // Wraps compiler-internal @flat.* intrinsics for std and user modules.
 
 func encode value => return @flat.encode value
 func decode words => return @flat.decode words
+func encode_wire value => return @flat.encode_wire value
+func decode_wire words => return @flat.decode_wire words
+func encode_batch items => return @flat.encode_batch items
+func decode_batch words => return @flat.decode_batch words
 func schema_hash value => return @flat.schema_hash value
 
 func kernel_id k => return @flat.kernel_id k
 func kernel_binding_hash k => return @flat.kernel_binding_hash k
 func kernel_ctx_hash k => return @flat.kernel_ctx_hash k
 func kernel_io_hash k => return @flat.kernel_io_hash k
+
+func process_id p => return @flat.process_id p
+func process_binding_hash p => return @flat.process_binding_hash p

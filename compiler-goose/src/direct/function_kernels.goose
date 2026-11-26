@@ -726,6 +726,528 @@ fn emitFlatDecodeVal(g: Generator&, f: Fn&, src: Val, result_core_ty: TId, maybe
     return result, blot_direct_types::Error.none;
 }
 
+fn isSizedCoreArray(g: const Generator&, unit: u32, core_tid: TId) -> bool {
+    if !g.hasUnit(unit) || core_tid == 0 { return false; }
+    let cm .= g.units[unit - 1];
+    if (core_tid as i64) >= cm.types.nodes.len { return false; }
+    var ct = core_tid;
+    for _ in 0..16 {
+        if (ct as i64) >= cm.types.nodes.len { return false; }
+        let cn = cm.types.node(ct);
+        if cn.tag == blot_check_types::Tag.usage || cn.tag == blot_check_types::Tag.forall { ct = cn.a; continue; }
+        break;
+    }
+    let sinfo = blot_check_storage_types::info(cm.types, ct);
+    return sinfo.present && sinfo.value.kind == blot_check_storage_types::sized_array;
+}
+
+fn extractMaybeInner(g: Generator&, f: const Fn&, result_core_ty: TId, maybe_ty: Ty, id: u32) -> u32, u32, Ty, TId, Error {
+    let cases, cerr = g.types.variants(maybe_ty);
+    if cerr != blot_direct_types::Error.none || cases.len != 2 {
+        return 0, 0, 0, 0, g.failCode(g.units[f.unit - 1], id, blot_check_diagnostic_code::Code.kernel_type, "@flat wire decode requires a Maybe result type");
+    }
+    // `type Maybe a is data = $Some a | $Nothing`: tag 0 is $Some, tag 1 is $Nothing.
+    var some_tag: u32 = 0;
+    var nothing_tag: u32 = 1;
+    var target_ty: Ty = blot_direct_types::unit;
+    for ci in 0..2 {
+        let pty = g.types.variant_payloads[cases.payloads + ci];
+        let vtag = g.types.variant_tags[cases.tags + ci];
+        if vtag == 0 { some_tag = vtag; target_ty = pty; }
+        else { nothing_tag = vtag; }
+    }
+    var target_core_ty: TId = 0;
+    if result_core_ty != 0 && g.hasUnit(f.unit) {
+        let m .= g.units[f.unit - 1];
+        var cur_rt = result_core_ty;
+        for _ in 0..16 {
+            if (cur_rt as i64) >= m.types.nodes.len { break; }
+            let rn = m.types.node(cur_rt);
+            if rn.tag == blot_check_types::Tag.usage || rn.tag == blot_check_types::Tag.forall { cur_rt = rn.a; continue; }
+            if rn.tag == blot_check_types::Tag.nominal {
+                let rargs = m.types.nominalArguments(rn);
+                if rargs.len == 1 { target_core_ty = rargs[0]; }
+            }
+            break;
+        }
+    }
+    return some_tag, nothing_tag, target_ty, target_core_ty, blot_direct_types::Error.none;
+}
+
+fn emitCopyWordsArray(g: Generator&, f: Fn&, src: Val, out_ty: Ty, id: u32) -> Val, Error {
+    let rt = g.runtime_();
+    let src_entry = local32(g, f);
+    lget(g, w(g, src, 0));
+    lget(g, w(g, src, 1));
+    callf(g, rt.check);
+    lset(g, src_entry);
+    let len = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lset(g, len);
+    let src_base = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, src_base);
+    let handle, dst_base, cerr = createUninit(g, f, out_ty, len, id);
+    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+    lget(g, dst_base);
+    lget(g, src_base);
+    lget(g, len);
+    i32Const(g, 2);
+    op(g, OP_i32_shl);
+    memoryCopyOp(g);
+    return handle, blot_direct_types::Error.none;
+}
+
+// Lower `@flat.encode_wire val` -> fresh `#[U32]` supporting Unit, #[U32], #[F32], and FlatNumeric.
+fn emitFlatEncodeWireVal(g: Generator&, f: Fn&, val: Val, arg_core_ty: TId, out_ty: Ty, id: u32) -> Val, Error {
+    let tn = g.types.node(val.ty);
+    if tn.tag == blot_direct_types::Tag.unit {
+        let zero = constLocal(g, f, 0);
+        let handle, _, cerr = createUninit(g, f, out_ty, zero, id);
+        if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+        return handle, blot_direct_types::Error.none;
+    }
+    if tn.tag == blot_direct_types::Tag.array && !isSizedCoreArray(g, f.unit, arg_core_ty) {
+        let et = g.types.node(tn.a).tag;
+        if et == blot_direct_types::Tag.u32_ || et == blot_direct_types::Tag.f32_ {
+            return emitCopyWordsArray(g, f, val, out_ty, id);
+        }
+    }
+    return emitFlatEncodeVal(g, f, val, arg_core_ty, out_ty, id);
+}
+
+// Lower `@flat.decode_wire src` -> `Maybe a` supporting Unit, #[U32], #[F32], and FlatNumeric.
+fn emitFlatDecodeWireVal(g: Generator&, f: Fn&, src: Val, result_core_ty: TId, maybe_ty: Ty, id: u32) -> Val, Error {
+    let some_tag, nothing_tag, target_ty, target_core_ty, eerr = extractMaybeInner(g, f, result_core_ty, maybe_ty, id);
+    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    let tn = g.types.node(target_ty);
+    if tn.tag == blot_direct_types::Tag.unit {
+        let rt = g.runtime_();
+        let result, rerr = fresh(g, f, maybe_ty, id);
+        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        lget(g, w(g, src, 0));
+        lget(g, w(g, src, 1));
+        callf(g, rt.check);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+        op(g, OP_i32_eqz);
+        let ok_if = open(g, f, OP_if_);
+        let sv, swerr = wrapVariant(g, f, maybe_ty, some_tag, unitVal(), id);
+        if swerr != blot_direct_types::Error.none { return neverVal(), swerr; }
+        let scerr = copy(g, f, sv, result, id);
+        if scerr != blot_direct_types::Error.none { return neverVal(), scerr; }
+        popCheckedArraysAt(f, ok_if);
+        op(g, OP_else_);
+        let nv, nwerr = wrapVariant(g, f, maybe_ty, nothing_tag, unitVal(), id);
+        if nwerr != blot_direct_types::Error.none { return neverVal(), nwerr; }
+        let ncerr = copy(g, f, nv, result, id);
+        if ncerr != blot_direct_types::Error.none { return neverVal(), ncerr; }
+        close(g, f);
+        return result, blot_direct_types::Error.none;
+    }
+    if tn.tag == blot_direct_types::Tag.array && !isSizedCoreArray(g, f.unit, target_core_ty) {
+        let et = g.types.node(tn.a).tag;
+        if et == blot_direct_types::Tag.u32_ || et == blot_direct_types::Tag.f32_ {
+            let copied, cerr = emitCopyWordsArray(g, f, src, target_ty, id);
+            if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+            return wrapVariant(g, f, maybe_ty, some_tag, copied, id);
+        }
+    }
+    return emitFlatDecodeVal(g, f, src, result_core_ty, maybe_ty, id);
+}
+
+// Lower `@flat.encode_batch items` (`#[Item] -> #[U32]`) packing all items contiguously.
+fn emitFlatEncodeBatchVal(g: Generator&, f: Fn&, src: Val, arg_core_ty: TId, out_ty: Ty, id: u32) -> Val, Error {
+    let elem_ty, eerr = elementOf(g, f, src.ty, id);
+    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    var elem_core_ty: TId = 0;
+    if arg_core_ty != 0 && g.hasUnit(f.unit) {
+        let cm .= g.units[f.unit - 1];
+        if (arg_core_ty as i64) < cm.types.nodes.len {
+            let cn = cm.types.node(arg_core_ty);
+            if cn.tag == blot_check_types::Tag.array { elem_core_ty = cn.a; }
+        }
+    }
+    let rt = g.runtime_();
+    let src_entry = local32(g, f);
+    lget(g, w(g, src, 0));
+    lget(g, w(g, src, 1));
+    callf(g, rt.check);
+    lset(g, src_entry);
+    let count = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lset(g, count);
+    let src_base = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, src_base);
+    let elem_step, serr = stride(g, f, elem_ty, id);
+    if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+
+    var subst: CoreSubstEntry[>..] = [];
+    let words, ok = flatNumericWordCount(g, f.unit, elem_core_ty, elem_ty, subst, 0);
+    if !ok {
+        // Fallback for monomorphized `#[#[K; U32]]` / `#[#[K; F32]]` where K was erased on direct Ty.
+        let etn = g.types.node(elem_ty);
+        if etn.tag == blot_direct_types::Tag.array {
+            let inner_t = g.types.node(etn.a).tag;
+            if inner_t == blot_direct_types::Tag.u32_ || inner_t == blot_direct_types::Tag.f32_ {
+                let result, rerr = fresh(g, f, out_ty, id);
+                if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                lget(g, count);
+                op(g, OP_i32_eqz);
+                let empty_if = open(g, f, OP_if_);
+                let zero = constLocal(g, f, 0);
+                let eh, _, ecerr = createUninit(g, f, out_ty, zero, id);
+                if ecerr != blot_direct_types::Error.none { return neverVal(), ecerr; }
+                let ecopy = copy(g, f, eh, result, id);
+                if ecopy != blot_direct_types::Error.none { return neverVal(), ecopy; }
+                popCheckedArraysAt(f, empty_if);
+                op(g, OP_else_);
+                let first_elem, ferr = loadElement(g, f, src_base, 0, elem_ty, id);
+                if ferr != blot_direct_types::Error.none { return neverVal(), ferr; }
+                lget(g, w(g, first_elem, 0));
+                lget(g, w(g, first_elem, 1));
+                callf(g, rt.check);
+                let k_words = local32(g, f);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+                lset(g, k_words);
+                let total_words = local32(g, f);
+                lget(g, count);
+                lget(g, k_words);
+                op(g, OP_i32_mul);
+                lset(g, total_words);
+                let handle, dst_base, ccerr = createUninit(g, f, out_ty, total_words, id);
+                if ccerr != blot_direct_types::Error.none { return neverVal(), ccerr; }
+                let dst_cursor = local32(g, f);
+                lget(g, dst_base);
+                lset(g, dst_cursor);
+                let k_bytes = local32(g, f);
+                lget(g, k_words);
+                i32Const(g, 2);
+                op(g, OP_i32_shl);
+                lset(g, k_bytes);
+                let idx = constLocal(g, f, 0);
+                let src_ptr = local32(g, f);
+                lget(g, src_base);
+                lset(g, src_ptr);
+                let done_blk = open(g, f, OP_block);
+                let top = open(g, f, OP_loop);
+                lget(g, idx);
+                lget(g, count);
+                op(g, OP_i32_ge_u);
+                br(g, f, OP_br_if, done_blk);
+                let row_val, lerr = loadElement(g, f, src_ptr, 0, elem_ty, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                let row_entry = local32(g, f);
+                lget(g, w(g, row_val, 0));
+                lget(g, w(g, row_val, 1));
+                callf(g, rt.check);
+                ltee(g, row_entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+                lget(g, k_words);
+                op(g, OP_i32_ne);
+                trap(g, f);
+                lget(g, dst_cursor);
+                lget(g, row_entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+                lget(g, k_bytes);
+                memoryCopyOp(g);
+                lget(g, dst_cursor);
+                lget(g, k_bytes);
+                op(g, OP_i32_add);
+                lset(g, dst_cursor);
+                lget(g, src_ptr);
+                i32Const(g, elem_step);
+                op(g, OP_i32_add);
+                lset(g, src_ptr);
+                lget(g, idx);
+                i32Const(g, 1);
+                op(g, OP_i32_add);
+                lset(g, idx);
+                br(g, f, OP_br, top);
+                close(g, f);
+                close(g, f);
+                let rcopy = copy(g, f, handle, result, id);
+                if rcopy != blot_direct_types::Error.none { return neverVal(), rcopy; }
+                close(g, f);
+                return result, blot_direct_types::Error.none;
+            }
+        }
+        return neverVal(), g.failCode(g.units[f.unit - 1], id, blot_check_diagnostic_code::Code.kernel_type, "@flat.encode_batch requires a non-zero-width FlatNumeric item type");
+    }
+
+    let max_items = blot_check_wire_schema::MAX_WIRE_WORDS / (words as u64);
+    lget(g, count);
+    i32Const(g, max_items as u32);
+    op(g, OP_i32_gt_u);
+    trap(g, f);
+    let total_words = local32(g, f);
+    lget(g, count);
+    i32Const(g, words);
+    op(g, OP_i32_mul);
+    lset(g, total_words);
+    let handle, dst_base, cerr = createUninit(g, f, out_ty, total_words, id);
+    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+    let dst_cursor = local32(g, f);
+    lget(g, dst_base);
+    lset(g, dst_cursor);
+    let src_ptr = local32(g, f);
+    lget(g, src_base);
+    lset(g, src_ptr);
+    let idx = constLocal(g, f, 0);
+    let done_blk = open(g, f, OP_block);
+    let top = open(g, f, OP_loop);
+    lget(g, idx);
+    lget(g, count);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, done_blk);
+    let item_val, lerr = loadElement(g, f, src_ptr, 0, elem_ty, id);
+    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+    let perr = emitPackFlatNumeric(g, f, f.unit, elem_core_ty, elem_ty, item_val, dst_cursor, subst, id, 0);
+    if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+    lget(g, src_ptr);
+    i32Const(g, elem_step);
+    op(g, OP_i32_add);
+    lset(g, src_ptr);
+    lget(g, idx);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    lset(g, idx);
+    br(g, f, OP_br, top);
+    close(g, f);
+    close(g, f);
+    return handle, blot_direct_types::Error.none;
+}
+
+// Lower `@flat.decode_batch src` (`#[U32] -> Maybe #[Out]`) supporting fixed FlatNumeric
+// and variable-length `[len_0, w..., len_1, w...]` (`#[U32]` / `#[F32]`) kernel outputs.
+fn emitFlatDecodeBatchVal(g: Generator&, f: Fn&, src: Val, result_core_ty: TId, maybe_ty: Ty, id: u32) -> Val, Error {
+    let some_tag, nothing_tag, arr_ty, arr_core_ty, eerr = extractMaybeInner(g, f, result_core_ty, maybe_ty, id);
+    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    let elem_ty, elerr = elementOf(g, f, arr_ty, id);
+    if elerr != blot_direct_types::Error.none { return neverVal(), elerr; }
+    var elem_core_ty: TId = 0;
+    if arr_core_ty != 0 && g.hasUnit(f.unit) {
+        let cm .= g.units[f.unit - 1];
+        if (arr_core_ty as i64) < cm.types.nodes.len {
+            let cn = cm.types.node(arr_core_ty);
+            if cn.tag == blot_check_types::Tag.array { elem_core_ty = cn.a; }
+        }
+    }
+    let rt = g.runtime_();
+    let result, rerr = fresh(g, f, maybe_ty, id);
+    if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+    let src_entry = local32(g, f);
+    lget(g, w(g, src, 0));
+    lget(g, w(g, src, 1));
+    callf(g, rt.check);
+    lset(g, src_entry);
+    let src_len = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lset(g, src_len);
+    let src_base = local32(g, f);
+    lget(g, src_entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, src_base);
+    let outer_step, oserr = stride(g, f, elem_ty, id);
+    if oserr != blot_direct_types::Error.none { return neverVal(), oserr; }
+
+    let etn = g.types.node(elem_ty);
+    if etn.tag == blot_direct_types::Tag.array && !isSizedCoreArray(g, f.unit, elem_core_ty) {
+        let inner_t = g.types.node(etn.a).tag;
+        if inner_t == blot_direct_types::Tag.u32_ || inner_t == blot_direct_types::Tag.f32_ {
+            // Variable-length framing: [len_0, word_0..., len_1, word_1...]
+            let cursor = constLocal(g, f, 0);
+            let rows = constLocal(g, f, 0);
+            let valid = constLocal(g, f, 1);
+            let scan_done = open(g, f, OP_block);
+            let scan_top = open(g, f, OP_loop);
+            lget(g, cursor);
+            lget(g, src_len);
+            op(g, OP_i32_ge_u);
+            br(g, f, OP_br_if, scan_done);
+            let rlen = local32(g, f);
+            lget(g, src_base);
+            lget(g, cursor);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+            lset(g, rlen);
+            let rem = local32(g, f);
+            lget(g, src_len);
+            lget(g, cursor);
+            op(g, OP_i32_sub);
+            i32Const(g, 1);
+            op(g, OP_i32_sub);
+            lset(g, rem);
+            lget(g, rlen);
+            lget(g, rem);
+            op(g, OP_i32_gt_u);
+            let bad_if = open(g, f, OP_if_);
+            i32Const(g, 0);
+            lset(g, valid);
+            br(g, f, OP_br, scan_done);
+            close(g, f);
+            lget(g, cursor);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lget(g, rlen);
+            op(g, OP_i32_add);
+            lset(g, cursor);
+            lget(g, rows);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lset(g, rows);
+            br(g, f, OP_br, scan_top);
+            close(g, f);
+            close(g, f);
+
+            lget(g, valid);
+            let ok_if = open(g, f, OP_if_);
+            let outer_handle, outer_base, ocerr = createUninit(g, f, arr_ty, rows, id);
+            if ocerr != blot_direct_types::Error.none { return neverVal(), ocerr; }
+            let rcursor = constLocal(g, f, 0);
+            let ridx = constLocal(g, f, 0);
+            let dst_ptr = local32(g, f);
+            lget(g, outer_base);
+            lset(g, dst_ptr);
+            let fill_done = open(g, f, OP_block);
+            let fill_top = open(g, f, OP_loop);
+            lget(g, ridx);
+            lget(g, rows);
+            op(g, OP_i32_ge_u);
+            br(g, f, OP_br_if, fill_done);
+            let rlen2 = local32(g, f);
+            lget(g, src_base);
+            lget(g, rcursor);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+            lset(g, rlen2);
+            let inner_handle, inner_base, icerr = createUninit(g, f, elem_ty, rlen2, id);
+            if icerr != blot_direct_types::Error.none { return neverVal(), icerr; }
+            lget(g, inner_base);
+            lget(g, src_base);
+            lget(g, rcursor);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            op(g, OP_i32_add);
+            lget(g, rlen2);
+            i32Const(g, 2);
+            op(g, OP_i32_shl);
+            memoryCopyOp(g);
+            let werr = writeElement(g, f, dst_ptr, 0, inner_handle, id);
+            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            lget(g, dst_ptr);
+            i32Const(g, outer_step);
+            op(g, OP_i32_add);
+            lset(g, dst_ptr);
+            lget(g, rcursor);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lget(g, rlen2);
+            op(g, OP_i32_add);
+            lset(g, rcursor);
+            lget(g, ridx);
+            i32Const(g, 1);
+            op(g, OP_i32_add);
+            lset(g, ridx);
+            br(g, f, OP_br, fill_top);
+            close(g, f);
+            close(g, f);
+            let sv, swerr = wrapVariant(g, f, maybe_ty, some_tag, outer_handle, id);
+            if swerr != blot_direct_types::Error.none { return neverVal(), swerr; }
+            let scerr = copy(g, f, sv, result, id);
+            if scerr != blot_direct_types::Error.none { return neverVal(), scerr; }
+            popCheckedArraysAt(f, ok_if);
+            op(g, OP_else_);
+            let nv, nwerr = wrapVariant(g, f, maybe_ty, nothing_tag, unitVal(), id);
+            if nwerr != blot_direct_types::Error.none { return neverVal(), nwerr; }
+            let ncerr = copy(g, f, nv, result, id);
+            if ncerr != blot_direct_types::Error.none { return neverVal(), ncerr; }
+            close(g, f);
+            return result, blot_direct_types::Error.none;
+        }
+    }
+
+    var subst: CoreSubstEntry[>..] = [];
+    let words, ok = flatNumericWordCount(g, f.unit, elem_core_ty, elem_ty, subst, 0);
+    if !ok {
+        return neverVal(), g.failCode(g.units[f.unit - 1], id, blot_check_diagnostic_code::Code.kernel_type, "@flat.decode_batch requires a FlatNumeric, #[U32], or #[F32] output element type");
+    }
+    lget(g, src_len);
+    i32Const(g, words);
+    op(g, OP_i32_rem_u);
+    op(g, OP_i32_eqz);
+    let rem_if = open(g, f, OP_if_);
+    let count = local32(g, f);
+    lget(g, src_len);
+    i32Const(g, words);
+    op(g, OP_i32_div_u);
+    lset(g, count);
+    let outer_handle, outer_base, ocerr = createUninit(g, f, arr_ty, count, id);
+    if ocerr != blot_direct_types::Error.none { return neverVal(), ocerr; }
+    let src_cursor = local32(g, f);
+    lget(g, src_base);
+    lset(g, src_cursor);
+    let dst_ptr = local32(g, f);
+    lget(g, outer_base);
+    lset(g, dst_ptr);
+    let bad_bool = constLocal(g, f, 0);
+    let idx = constLocal(g, f, 0);
+    let done_blk = open(g, f, OP_block);
+    let top = open(g, f, OP_loop);
+    lget(g, idx);
+    lget(g, count);
+    op(g, OP_i32_ge_u);
+    br(g, f, OP_br_if, done_blk);
+    let unpacked, uerr = emitUnpackFlatNumeric(g, f, f.unit, elem_core_ty, elem_ty, src_cursor, false, false, bad_bool, subst, id, 0);
+    if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
+    let werr = writeElement(g, f, dst_ptr, 0, unpacked, id);
+    if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+    lget(g, dst_ptr);
+    i32Const(g, outer_step);
+    op(g, OP_i32_add);
+    lset(g, dst_ptr);
+    lget(g, idx);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    lset(g, idx);
+    br(g, f, OP_br, top);
+    close(g, f);
+    close(g, f);
+    lget(g, bad_bool);
+    op(g, OP_i32_eqz);
+    let bool_if = open(g, f, OP_if_);
+    let sv, swerr = wrapVariant(g, f, maybe_ty, some_tag, outer_handle, id);
+    if swerr != blot_direct_types::Error.none { return neverVal(), swerr; }
+    let scerr = copy(g, f, sv, result, id);
+    if scerr != blot_direct_types::Error.none { return neverVal(), scerr; }
+    popCheckedArraysAt(f, bool_if);
+    op(g, OP_else_);
+    let nv1, nwerr1 = wrapVariant(g, f, maybe_ty, nothing_tag, unitVal(), id);
+    if nwerr1 != blot_direct_types::Error.none { return neverVal(), nwerr1; }
+    let ncerr1 = copy(g, f, nv1, result, id);
+    if ncerr1 != blot_direct_types::Error.none { return neverVal(), ncerr1; }
+    close(g, f);
+    popCheckedArraysAt(f, rem_if);
+    op(g, OP_else_);
+    let nv2, nwerr2 = wrapVariant(g, f, maybe_ty, nothing_tag, unitVal(), id);
+    if nwerr2 != blot_direct_types::Error.none { return neverVal(), nwerr2; }
+    let ncerr2 = copy(g, f, nv2, result, id);
+    if ncerr2 != blot_direct_types::Error.none { return neverVal(), ncerr2; }
+    close(g, f);
+    return result, blot_direct_types::Error.none;
+}
+
 // --- ABI 8 helpers & WireSchema custom section encoding (§3.1 & §3.2) ---
 
 fn abiFromWireTag(wire_tag: u8) -> Abi {

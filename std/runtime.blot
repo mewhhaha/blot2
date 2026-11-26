@@ -1,0 +1,68 @@
+//! Typed host-runtime coordination effect (`Runtime`) for orchestrating
+//! `#kernel` batch compute and `#process` isolated actors directly from Blot.
+//!
+//! Provide `Runtime` from a host ABI 8 callback using [`provider`], or swap
+//! in a pure mock provider inside unit tests without any host authority.
+
+// Versioned packet magic (`BRT1` = 0x42525431).
+const magic: U32 = 0x4252_5431
+const version: U32 = 1
+
+// Request opcodes.
+const op_kernel_run: U32 = 1
+const op_kernel_prepare: U32 = 2
+const op_kernel_run_prepared: U32 = 3
+const op_kernel_clear: U32 = 4
+const op_kernel_submit: U32 = 5
+const op_kernel_submit_prepared: U32 = 6
+const op_kernel_poll: U32 = 7
+const op_kernel_await: U32 = 8
+const op_proc_spawn: U32 = 9
+const op_proc_call: U32 = 10
+const op_proc_send: U32 = 11
+const op_proc_poll: U32 = 12
+const op_proc_advance: U32 = 13
+const op_proc_close: U32 = 14
+
+// Response status codes.
+const status_ok: U32 = 0
+const err_oom: U32 = 1
+const err_trap: U32 = 2
+const err_timeout: U32 = 3
+const err_budget: U32 = 4
+const err_invalid_handle: U32 = 5
+const err_host: U32 = 6
+const err_proc_failed: U32 = 10
+const err_proc_cancelled: U32 = 11
+const err_proc_overrun: U32 = 12
+const err_proc_invalid_handle: U32 = 13
+const err_proc_host: U32 = 14
+
+// Single ABI 8 packet-exchange effect used by `std/kernel` and `std/process`.
+type Runtime is effect = {
+  call: #[U32] -> #[U32]
+}
+
+// Wrap a host `#[U32] -> #[U32] ! {Foreign}` capability as a [`Runtime`] provider.
+func provider (host: #[U32] -> #[U32] ! {Foreign}) =>
+  @effect.provider Runtime.call host
+
+// Build a request packet `[magic, version, opcode, ...header, ...payload]`.
+func pack_request (op: U32) -> (header: #[U32]) -> (payload: #[U32]): #[U32] =>
+  let out: #[U32] = #[magic, version, op]
+  for word in header:
+    @storage.push out word
+  for word in payload:
+    @storage.push out word
+  return out
+
+// Copy a slice `words[start..words.length]` into a fresh `#[U32]`.
+func tail_words (words: #[U32]) -> (start: U32): #[U32] =>
+  if start >= words.length:
+    return #[]
+  let count = words.length - start
+  return @array.generate count (func i => words[start + i])
+
+// Check that `resp` has at least `min_len` words and starts with [`magic`].
+func valid_response (resp: #[U32]) -> (min_len: U32): Bool =>
+  resp.length >= min_len and resp[0] == magic

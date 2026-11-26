@@ -35,13 +35,19 @@ struct FieldName {
 enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, operation_value, effect_provider, state_provider, handle, effect_reflection, contract_method, staging, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta, spark, flat_op }
 let flat_op_encode: u32 = 0;
 let flat_op_decode: u32 = 1;
-let flat_op_schema_hash: u32 = 2;
-let flat_op_kernel_id: u32 = 3;
-let flat_op_kernel_binding_hash: u32 = 4;
-let flat_op_kernel_ctx_hash: u32 = 5;
-let flat_op_kernel_io_hash: u32 = 6;
-let flat_op_kernel_handle: u32 = 7;
-let flat_op_process_handle: u32 = 8;
+let flat_op_encode_wire: u32 = 2;
+let flat_op_decode_wire: u32 = 3;
+let flat_op_encode_batch: u32 = 4;
+let flat_op_decode_batch: u32 = 5;
+let flat_op_schema_hash: u32 = 6;
+let flat_op_kernel_id: u32 = 7;
+let flat_op_kernel_binding_hash: u32 = 8;
+let flat_op_kernel_ctx_hash: u32 = 9;
+let flat_op_kernel_io_hash: u32 = 10;
+let flat_op_process_id: u32 = 11;
+let flat_op_process_binding_hash: u32 = 12;
+let flat_op_kernel_handle: u32 = 13;
+let flat_op_process_handle: u32 = 14;
 enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,

@@ -1,0 +1,121 @@
+//! Typed in-language coordination for isolated stateful `#process` actors
+//! (`spawn`, `call`, `send`, `poll`, `advance`, `close`) over
+//! [`Runtime`](`std/runtime/Runtime`).
+
+import * as flat from "./flat"
+import * as runtime from "./runtime"
+
+// Read the compile-time 0-based process index from a `Process` handle.
+func id p => return flat.process_id p
+
+// Read the compile-time 64-bit `(lo, hi)` schema binding hash of a `Process` handle.
+func binding_hash p => return flat.process_binding_hash p
+
+// Opaque handle identifying a live isolated process instance.
+type Pid [cmd, reply] is opaque = { endpoint: U32, epoch: U32 }
+
+// Opaque ticket identifying a pending command sent to a [`Pid`].
+type Ticket reply is opaque = { endpoint: U32, epoch: U32, ticket_id: U32 }
+
+// Typed failure modes returned by host process orchestration.
+type ProcessErr is data =
+  | $Failed
+  | $Cancelled
+  | $Overrun
+  | $InvalidHandle
+  | $DecodeError
+  | $HostError Text
+
+private func decode_process_err (code: U32) -> (msg: own Text): ProcessErr =>
+  if code == runtime.err_proc_failed:
+    return $Failed
+  if code == runtime.err_proc_cancelled:
+    return $Cancelled
+  if code == runtime.err_proc_overrun:
+    return $Overrun
+  if code == runtime.err_proc_invalid_handle:
+    return $InvalidHandle
+  return $HostError msg
+
+// Spawn a new isolated instance of `#process` `p` with initial `config`.
+func spawn (p: Process [cfg, cmd, reply]) -> (config: cfg): Result [Pid [cmd, reply], ProcessErr] ! { runtime.Runtime } =>
+  let pid = flat.process_id p
+  let (hlo, hhi) = flat.process_binding_hash p
+  let payload = flat.encode_wire config
+  let req = runtime.pack_request runtime.op_proc_spawn #[pid, hlo, hhi] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_process_err status (runtime.tail_words resp 2))
+  if resp.length < 4:
+    return $Err $DecodeError
+  return $Ok ($Pid { endpoint: resp[2], epoch: resp[3] })
+
+// Send a command to `pid` and wait for its reply (suspending call).
+func call (pid: Pid [cmd, reply]) -> (command: cmd): Result [reply, ProcessErr] ! { runtime.Runtime } =>
+  let $Pid { endpoint, epoch } = pid
+  let payload = flat.encode_wire command
+  let req = runtime.pack_request runtime.op_proc_call #[endpoint, epoch] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_process_err status (runtime.tail_words resp 2))
+  let body = runtime.tail_words resp 2
+  let $Some decoded = flat.decode_wire body else:
+    return $Err $DecodeError
+  return $Ok decoded
+
+// Enqueue a command on `pid` without waiting; drive with [`advance`] and read with [`poll`].
+func send (pid: Pid [cmd, reply]) -> (command: cmd): Result [Ticket reply, ProcessErr] ! { runtime.Runtime } =>
+  let $Pid { endpoint, epoch } = pid
+  let payload = flat.encode_wire command
+  let req = runtime.pack_request runtime.op_proc_send #[endpoint, epoch] payload
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 2):
+    return $Err $DecodeError
+  let status = resp[1]
+  if status != runtime.status_ok:
+    return $Err (decode_process_err status (runtime.tail_words resp 2))
+  if resp.length < 3:
+    return $Err $DecodeError
+  return $Ok ($Ticket { endpoint, epoch, ticket_id: resp[2] })
+
+// Non-blocking poll for a previously sent [`Ticket`].
+func poll (ticket: Ticket reply): Maybe (Result [reply, ProcessErr]) ! { runtime.Runtime } =>
+  let $Ticket { endpoint, epoch, ticket_id } = ticket
+  let req = runtime.pack_request runtime.op_proc_poll #[endpoint, epoch, ticket_id] #[]
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 3):
+    return $Some ($Err $DecodeError)
+  if resp[1] != runtime.status_ok:
+    return $Some ($Err (decode_process_err resp[1] (runtime.tail_words resp 2)))
+  let state = resp[2]
+  if state == 0:
+    return $Nothing
+  if state == 1:
+    let body = runtime.tail_words resp 3
+    let $Some decoded = flat.decode_wire body else:
+      return $Some ($Err $DecodeError)
+    return $Some ($Ok decoded)
+  if resp.length < 4:
+    return $Some ($Err $DecodeError)
+  return $Some ($Err (decode_process_err resp[3] (runtime.tail_words resp 4)))
+
+// Advance pending process mailboxes deterministically up to `budget` turns.
+func advance (budget: U32): U32 ! { runtime.Runtime } =>
+  let req = runtime.pack_request runtime.op_proc_advance #[budget] #[]
+  use resp <- runtime.Runtime.call req
+  if not (runtime.valid_response resp 3) or resp[1] != runtime.status_ok:
+    return 0
+  return resp[2]
+
+// Close an isolated process instance (consumes the handle).
+func close (pid: own Pid [cmd, reply]): Unit ! { runtime.Runtime } =>
+  let $Pid { endpoint, epoch } = pid
+  let req = runtime.pack_request runtime.op_proc_close #[endpoint, epoch] #[]
+  use _ <- runtime.Runtime.call req
+  return ()
