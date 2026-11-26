@@ -1,0 +1,171 @@
+// Scene graph: arena of nodes with 3x3 F32 rotation + vec3 translation and
+// up to 4 inline child indices, animated and propagated top-down for 16 frames.
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 13 // BENCH_N
+const FRAMES: U32 = 16
+const MAXKIDS: U32 = 4
+
+type Xf is data = $Xf { m0: F32, m1: F32, m2: F32, m3: F32, m4: F32, m5: F32, m6: F32, m7: F32, m8: F32, tx: F32, ty: F32, tz: F32 }
+type SNode is data = $SNode { id: U32, local: Xf, world: Xf, klen: U32, k0: U32, k1: U32, k2: U32, k3: U32 }
+
+func ident_xf (): Xf => $Xf { m0: 1.0, m1: 0.0, m2: 0.0, m3: 0.0, m4: 1.0, m5: 0.0, m6: 0.0, m7: 0.0, m8: 1.0, tx: 0.0, ty: 0.0, tz: 0.0 }
+
+func make_rotation (seed: rng.U64) -> (tx: F32) -> (ty: F32) -> (tz: F32): Xf =>
+  let axis = rng.xs_mod_small seed 3
+  let quarter = rng.xs_mod_small (rng.xs_shr seed 8) 4
+  let c: F32 = if quarter == 0 then 1.0 else if quarter == 2 then 0.0 - 1.0 else 0.0
+  let s: F32 = if quarter == 1 then 1.0 else if quarter == 3 then 0.0 - 1.0 else 0.0
+  if axis == 0:
+    return $Xf { m0: 1.0, m1: 0.0, m2: 0.0, m3: 0.0, m4: c, m5: 0.0 - s, m6: 0.0, m7: s, m8: c, tx, ty, tz }
+  if axis == 1:
+    return $Xf { m0: c, m1: 0.0, m2: s, m3: 0.0, m4: 1.0, m5: 0.0, m6: 0.0 - s, m7: 0.0, m8: c, tx, ty, tz }
+  return $Xf { m0: c, m1: 0.0 - s, m2: 0.0, m3: s, m4: c, m5: 0.0, m6: 0.0, m7: 0.0, m8: 1.0, tx, ty, tz }
+
+func build_scene (max_depth: U32) -> (init_seed: rng.U64): #[SNode] =>
+  let pool: #[SNode] = #[]
+  let cap: U32 = 24
+  let st_depth = @array.fill cap 0
+  let st_lo = @array.fill cap 0
+  let st_hi = @array.fill cap 0
+  let st_idx = @array.fill cap 0
+  let st_n = @array.fill cap 0
+  let st_i = @array.fill cap 0
+  let st_stage = @array.fill cap 0
+  let st_k0 = @array.fill cap 0
+  let st_k1 = @array.fill cap 0
+  let st_k2 = @array.fill cap 0
+  let st_k3 = @array.fill cap 0
+
+  let $rng.U64 { lo: slo, hi: shi } = init_seed
+  st_depth[0] := max_depth
+  st_lo[0] := slo
+  st_hi[0] := shi
+  st_stage[0] := 0
+  let sp: U32 = 1
+  let ident = ident_xf ()
+
+  for ever:
+    if sp == 0:
+      break
+    let top = sp - 1
+    let d = st_depth[top]
+    if st_stage[top] == 0:
+      let r = rng.xs_next (rng.u64_make st_lo[top] st_hi[top])
+      let idx = pool.length
+      let tx = U32.to_f32 (rng.xs_mod_small (rng.xs_shr r 16) 9)
+      let ty = U32.to_f32 (rng.xs_mod_small (rng.xs_shr r 24) 9)
+      let tz = U32.to_f32 (rng.xs_mod_small (rng.xs_shr r 32) 9)
+      let loc = make_rotation r tx ty tz
+      pool := self.push ($SNode { id: idx, local: loc, world: ident, klen: 0, k0: 0, k1: 0, k2: 0, k3: 0 })
+      if d == 0:
+        sp := self - 1
+      else:
+        let $rng.U64 { lo: rlo, hi: rhi } = r
+        st_lo[top] := rlo
+        st_hi[top] := rhi
+        st_idx[top] := idx
+        st_n[top] := 1 + rng.xs_mod_small (rng.xs_shr r 40) MAXKIDS
+        st_i[top] := 0
+        st_stage[top] := 1
+    else:
+      let ci = st_i[top]
+      let cn = st_n[top]
+      if ci < cn:
+        let cidx = pool.length
+        if ci == 0:
+          st_k0[top] := cidx
+        else:
+          if ci == 1:
+            st_k1[top] := cidx
+          else:
+            if ci == 2:
+              st_k2[top] := cidx
+            else:
+              st_k3[top] := cidx
+        st_i[top] := ci + 1
+        let r = rng.u64_make st_lo[top] st_hi[top]
+        let $rng.U64 { lo: clo, hi: chi } = rng.xs_next (rng.u64_add_u32 r ci)
+        st_depth[sp] := d - 1
+        st_lo[sp] := clo
+        st_hi[sp] := chi
+        st_stage[sp] := 0
+        sp := self + 1
+      else:
+        let idx = st_idx[top]
+        let nd = pool[idx]
+        pool[idx] := $SNode { id: nd.id, local: nd.local, world: nd.world, klen: cn, k0: st_k0[top], k1: st_k1[top], k2: st_k2[top], k3: st_k3[top] }
+        sp := self - 1
+  return pool
+
+func compose (p: Xf) -> (l: Xf): Xf => $Xf {
+  m0: p.m0 * l.m0 + p.m1 * l.m3 + p.m2 * l.m6,
+  m1: p.m0 * l.m1 + p.m1 * l.m4 + p.m2 * l.m7,
+  m2: p.m0 * l.m2 + p.m1 * l.m5 + p.m2 * l.m8,
+  m3: p.m3 * l.m0 + p.m4 * l.m3 + p.m5 * l.m6,
+  m4: p.m3 * l.m1 + p.m4 * l.m4 + p.m5 * l.m7,
+  m5: p.m3 * l.m2 + p.m4 * l.m5 + p.m5 * l.m8,
+  m6: p.m6 * l.m0 + p.m7 * l.m3 + p.m8 * l.m6,
+  m7: p.m6 * l.m1 + p.m7 * l.m4 + p.m8 * l.m7,
+  m8: p.m6 * l.m2 + p.m7 * l.m5 + p.m8 * l.m8,
+  tx: p.m0 * l.tx + p.m1 * l.ty + p.m2 * l.tz + p.tx,
+  ty: p.m3 * l.tx + p.m4 * l.ty + p.m5 * l.tz + p.ty,
+  tz: p.m6 * l.tx + p.m7 * l.ty + p.m8 * l.tz + p.tz,
+}
+
+func update_all (pool: own #[SNode]) -> (ident: Xf): #[SNode] =>
+  let st_idx = @array.fill 80 0
+  let st_parent = @array.fill 80 ident
+  st_idx[0] := 0
+  st_parent[0] := ident
+  let sp: U32 = 1
+  for ever:
+    if sp == 0:
+      break
+    sp := self - 1
+    let idx = st_idx[sp]
+    let parent = st_parent[sp]
+    let nd = pool[idx]
+    let w = compose parent nd.local
+    pool[idx] := $SNode { id: nd.id, local: nd.local, world: w, klen: nd.klen, k0: nd.k0, k1: nd.k1, k2: nd.k2, k3: nd.k3 }
+    let kl = nd.klen
+    if kl > 3:
+      st_idx[sp] := nd.k3
+      st_parent[sp] := w
+      sp := self + 1
+    if kl > 2:
+      st_idx[sp] := nd.k2
+      st_parent[sp] := w
+      sp := self + 1
+    if kl > 1:
+      st_idx[sp] := nd.k1
+      st_parent[sp] := w
+      sp := self + 1
+    if kl > 0:
+      st_idx[sp] := nd.k0
+      st_parent[sp] := w
+      sp := self + 1
+  return pool
+
+io bench (): #[U32] =>
+  let pool = build_scene BENCH_N (rng.u64_from_u32 12345)
+  let total = rng.u64_zero ()
+  let ident = ident_xf ()
+  for f in 0 .. FRAMES:
+    let step = U32.to_f32 (f % 5)
+    let fmod = f % 7
+    for i in 0 .. pool.length:
+      let nd = pool[i]
+      if (nd.id % 7) == fmod:
+        let loc = nd.local
+        let nloc = $Xf { m0: loc.m0, m1: loc.m1, m2: loc.m2, m3: loc.m3, m4: loc.m4, m5: loc.m5, m6: loc.m6, m7: loc.m7, m8: loc.m8, tx: step, ty: loc.ty, tz: 8.0 - step }
+        pool[i] := $SNode { id: nd.id, local: nloc, world: nd.world, klen: nd.klen, k0: nd.k0, k1: nd.k1, k2: nd.k2, k3: nd.k3 }
+    pool := update_all self ident
+    for i in 0 .. pool.length:
+      let w = pool[i].world
+      total := rng.i64_add_f32 self (w.tx + w.ty + w.tz)
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self pool.length
+  out := rng.emit_i64 self total
+  return out

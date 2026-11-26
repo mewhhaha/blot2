@@ -1,0 +1,303 @@
+// Generate N s-expressions into a packed 4-bytes/U32 buffer, parse into a
+// compact 8-byte/node AST arena with error checks, then walk 4 times.
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 200000 // BENCH_N
+const DEPTH: U32 = 4
+const PASSES: U32 = 4
+const NONE_IDX: U32 = 0x3FFFFFFF
+
+const TAG_SYM: U32 = 0
+const TAG_NUM: U32 = 1
+const TAG_LIST: U32 = 2
+
+// 8 bytes per node:
+//   b = (next << 2) | tag
+//   a = (start << 4) | len  for Sym; v for Num; first for List.
+type Sexp is data = $Sexp { a: U32, b: U32 }
+
+func get_byte (buf: #[U32]) -> (idx: U32): U32 =>
+  return (buf[idx >> 2] >> ((idx & 3) << 3)) & 255
+
+func push_word (words: own #[U32]) -> (wlen: U32) -> (w: U32): (#[U32], U32) =>
+  if wlen < words.length:
+    words[wlen] := w
+    return (words, wlen + 1)
+  words := self.push w
+  return (words, wlen + 1)
+
+func push_byte (words: own #[U32]) -> (wlen: U32) -> (len: U32) -> (cur: U32) -> (b: U32): (#[U32], U32, U32, U32) =>
+  let sh = (len & 3) << 3
+  let next_cur = if sh == 0 then b else cur | (b << sh)
+  let next_len = len + 1
+  if (next_len & 3) == 0:
+    let (w1, wl1) = push_word words wlen next_cur
+    return (w1, wl1, next_len, next_cur)
+  return (words, wlen, next_len, next_cur)
+
+func emit_sym (words: own #[U32]) -> (wlen: U32) -> (len: U32) -> (cur: U32) -> (sym_seed: rng.U64): (#[U32], U32, U32, U32) =>
+  let r = sym_seed
+  let n = 3 + rng.xs_mod_small r 12
+  for _ in 0 .. n:
+    r := rng.xs_next self
+    let (w1, wl1, l1, c1) = push_byte words wlen len cur (97 + rng.xs_mod_small r 26)
+    words := w1
+    wlen := wl1
+    len := l1
+    cur := c1
+  return (words, wlen, len, cur)
+
+func emit_uint (words: own #[U32]) -> (wlen: U32) -> (len: U32) -> (cur: U32) -> (v: U32): (#[U32], U32, U32, U32) =>
+  if v == 0:
+    return push_byte words wlen len cur 48
+  // Max value is 99999 (5 digits) — format in scalar locals (zero allocation).
+  let d0: U32 = 0
+  let d1: U32 = 0
+  let d2: U32 = 0
+  let d3: U32 = 0
+  let d4: U32 = 0
+  let n: U32 = 0
+  let x = v
+  for ever:
+    if x == 0:
+      break
+    let dig = 48 + (x % 10)
+    if n == 0:
+      d0 := dig
+    else:
+      if n == 1:
+        d1 := dig
+      else:
+        if n == 2:
+          d2 := dig
+        else:
+          if n == 3:
+            d3 := dig
+          else:
+            d4 := dig
+    n := self + 1
+    x := self / 10
+  for ever:
+    if n == 0:
+      break
+    n := self - 1
+    let ch = if n == 0 then d0 else if n == 1 then d1 else if n == 2 then d2 else if n == 3 then d3 else d4
+    let (w1, wl1, l1, c1) = push_byte words wlen len cur ch
+    words := w1
+    wlen := wl1
+    len := l1
+    cur := c1
+  return (words, wlen, len, cur)
+
+func build_text (): (#[U32], U32) =>
+  // ~480 bytes per depth-4 form = ~120 U32 words; pre-size to avoid doubling spike.
+  let words = @array.fill (BENCH_N * 124) 0
+  let wlen: U32 = 0
+  let len: U32 = 0
+  let cur: U32 = 0
+  let seed = rng.u64_from_u32 12345
+
+  let st_depth = @array.fill 16 0
+  let st_rem = @array.fill 16 0
+  let st_active = @array.fill 16 0
+
+  for _ in 0 .. BENCH_N:
+    st_depth[0] := DEPTH
+    st_rem[0] := 0
+    st_active[0] := 0
+    let sp: U32 = 1
+    for ever:
+      if sp == 0:
+        break
+      let top = sp - 1
+      if st_active[top] == 0:
+        seed := rng.xs_next self
+        let d = st_depth[top]
+        if d == 0 or rng.xs_mod_small seed 4 == 0:
+          if rng.xs_mod_small (rng.xs_shr seed 8) 2 == 0:
+            let (w1, wl1, l1, c1) = emit_sym words wlen len cur seed
+            words := w1
+            wlen := wl1
+            len := l1
+            cur := c1
+          else:
+            let (w1, wl1, l1, c1) = emit_uint words wlen len cur (rng.xs_mod (rng.xs_shr seed 16) 100000)
+            words := w1
+            wlen := wl1
+            len := l1
+            cur := c1
+          let (w2, wl2, l2, c2) = push_byte words wlen len cur 32
+          words := w2
+          wlen := wl2
+          len := l2
+          cur := c2
+          sp := self - 1
+        else:
+          let (w1, wl1, l1, c1) = push_byte words wlen len cur 40
+          words := w1
+          wlen := wl1
+          len := l1
+          cur := c1
+          st_rem[top] := 2 + rng.xs_mod_small (rng.xs_shr seed 24) 4
+          st_active[top] := 1
+      else:
+        let rem = st_rem[top]
+        if rem > 0:
+          st_rem[top] := rem - 1
+          st_depth[sp] := st_depth[top] - 1
+          st_active[sp] := 0
+          sp := self + 1
+        else:
+          let (w1, wl1, l1, c1) = push_byte words wlen len cur 41
+          let (w2, wl2, l2, c2) = push_byte w1 wl1 l1 c1 32
+          words := w2
+          wlen := wl2
+          len := l2
+          cur := c2
+          sp := self - 1
+
+  if (len & 3) != 0:
+    let (w1, _) = push_word words wlen cur
+    words := w1
+  return (words, len)
+
+func push_node (pool: own #[Sexp]) -> (plen: U32) -> (nd: Sexp): (#[Sexp], U32) =>
+  if plen < pool.length:
+    pool[plen] := nd
+    return (pool, plen + 1)
+  pool := self.push nd
+  return (pool, plen + 1)
+
+func walk_root (pool: #[Sexp]) -> (buf: #[U32]) -> (root: U32) -> (p: U32) -> (stack: own #[U32]): (U32, #[U32]) =>
+  stack[0] := root
+  let sp: U32 = 1
+  let acc: U32 = 0
+  for ever:
+    if sp == 0:
+      break
+    sp := self - 1
+    let cur = stack[sp]
+    for ever:
+      if cur == NONE_IDX:
+        break
+      let $Sexp { a, b } = pool[cur]
+      let tag = b & 3
+      if tag == TAG_SYM:
+        let start = a >> 4
+        let slen = a & 15
+        acc := self + slen + get_byte buf start + p
+      else:
+        if tag == TAG_NUM:
+          acc := self + (a ^ p)
+        else:
+          acc := self + 1
+          if a != NONE_IDX:
+            stack[sp] := a
+            sp := self + 1
+      cur := b >> 2
+  return (acc, stack)
+
+io bench (): #[U32] =>
+  let (text_words, text_len) = build_text ()
+  // ~76 nodes per depth-4 form; pre-size to avoid doubling spike.
+  let pool = @array.fill (BENCH_N * 78) ($Sexp { a: 0, b: 0 })
+  let plen: U32 = 0
+  let roots = @array.fill BENCH_N 0
+  let rlen: U32 = 0
+  let st_chain = @array.fill 16 NONE_IDX
+  let sp: U32 = 0
+  let pos: U32 = 0
+  let err_len: U32 = 0
+
+  for ever:
+    for ever:
+      if pos >= text_len:
+        break
+      if get_byte text_words pos != 32:
+        break
+      pos := self + 1
+    if pos >= text_len:
+      if sp > 0:
+        err_len := 8
+      break
+    let c = get_byte text_words pos
+    if c == 41:
+      if sp == 0:
+        err_len := 8
+        break
+      pos := self + 1
+      let first = st_chain[sp]
+      sp := self - 1
+      let prev = if sp == 0 then NONE_IDX else st_chain[sp]
+      let idx = plen
+      let (p1, pl1) = push_node pool plen ($Sexp { a: first, b: (prev << 2) | TAG_LIST })
+      pool := p1
+      plen := pl1
+      if sp == 0:
+        if rlen < roots.length:
+          roots[rlen] := idx
+        else:
+          roots := self.push idx
+        rlen := self + 1
+      else:
+        st_chain[sp] := idx
+    else:
+      if c == 40:
+        pos := self + 1
+        sp := self + 1
+        st_chain[sp] := NONE_IDX
+      else:
+        let start = pos
+        let prev = if sp == 0 then NONE_IDX else st_chain[sp]
+        let idx = plen
+        if c >= 48 and c <= 57:
+          let v: U32 = 0
+          for ever:
+            if pos >= text_len:
+              break
+            let ch = get_byte text_words pos
+            if ch >= 48 and ch <= 57:
+              v := self * 10 + (ch - 48)
+              pos := self + 1
+            else:
+              break
+          let (p1, pl1) = push_node pool plen ($Sexp { a: v, b: (prev << 2) | TAG_NUM })
+          pool := p1
+          plen := pl1
+        else:
+          for ever:
+            if pos >= text_len:
+              break
+            let ch = get_byte text_words pos
+            if ch != 32 and ch != 40 and ch != 41:
+              pos := self + 1
+            else:
+              break
+          let slen = pos - start
+          let (p1, pl1) = push_node pool plen ($Sexp { a: (start << 4) | slen, b: (prev << 2) | TAG_SYM })
+          pool := p1
+          plen := pl1
+        if sp == 0:
+          if rlen < roots.length:
+            roots[rlen] := idx
+          else:
+            roots := self.push idx
+          rlen := self + 1
+        else:
+          st_chain[sp] := idx
+
+  let total = rng.u64_zero ()
+  let walk_stack = @array.fill 16 0
+  for p in 0 .. PASSES:
+    for ri in 0 .. rlen:
+      let (wsum, ws1) = walk_root pool text_words roots[ri] p walk_stack
+      walk_stack := ws1
+      total := rng.u64_add_u32 self wsum
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self text_len
+  out := rng.emit_u32 self plen
+  out := rng.emit_u32 self rlen
+  out := rng.emit_u32 self err_len
+  out := rng.emit_i64 self total
+  return out

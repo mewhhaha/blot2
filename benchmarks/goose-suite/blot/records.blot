@@ -1,0 +1,85 @@
+// Event log of variant records (Tick, Move, Say, Quit) with a packed byte pool
+// for Say strings, scanned 4 times.
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 2000000 // BENCH_N
+const PASSES: U32 = 4
+
+type Event is data = $Tick | $Move { id: U32, dx_bias: U32, dy_bias: U32 } | $Say { id: U32, start: U32, len: U32 } | $Quit { id: U32, code: U32 }
+
+func get_byte (buf: #[U32]) -> (idx: U32): U32 =>
+  return (buf[idx >> 2] >> ((idx & 3) << 3)) & 255
+
+io bench (): #[U32] =>
+  let log = @array.fill BENCH_N $Tick
+  let text_words: #[U32] = #[]
+  let text_len: U32 = 0
+  let cur_word: U32 = 0
+  let r = rng.u64_from_u32 12345
+
+  for i in 0 .. BENCH_N:
+    r := rng.xs_next self
+    let k = rng.xs_mod_small r 8
+    let id = rng.xs_mod (rng.xs_shr r 3) 100000
+    if k < 4:
+      let dx_bias = rng.xs_mod_small (rng.xs_shr r 20) 201
+      let dy_bias = rng.xs_mod_small (rng.xs_shr r 40) 201
+      log[i] := $Move { id, dx_bias, dy_bias }
+    else:
+      if k < 6:
+        let wr = rng.xs_next r
+        let n = 4 + rng.xs_mod_small wr 12
+        let start = text_len
+        for _ in 0 .. n:
+          wr := rng.xs_next self
+          let ch = 97 + rng.xs_mod_small wr 26
+          let sh = (text_len & 3) << 3
+          if sh == 0:
+            cur_word := ch
+          else:
+            cur_word := self | (ch << sh)
+          text_len := self + 1
+          if (text_len & 3) == 0:
+            text_words := self.push cur_word
+        log[i] := $Say { id, start, len: n }
+      else:
+        if k < 7:
+          let code = rng.xs_mod_small (rng.xs_shr r 20) 256
+          log[i] := $Quit { id, code }
+        else:
+          log[i] := $Tick
+
+  if (text_len & 3) != 0:
+    text_words := self.push cur_word
+
+  let total = rng.u64_zero ()
+  for _ in 0 .. PASSES:
+    let chunk: U32 = 0
+    let bias: U32 = 0
+    let count: U32 = 0
+    for i in 0 .. log.length:
+      case log[i] of
+        $Tick => do:
+          chunk := self + 1
+        $Move { id, dx_bias, dy_bias } => do:
+          chunk := self + id + dx_bias + dy_bias
+          bias := self + 200
+        $Say { id, start, len } => do:
+          chunk := self + id + len + get_byte text_words start
+        $Quit { id, code } => do:
+          chunk := self + id + code
+      count := self + 1
+      if count == 16384:
+        total := rng.u64_add_u32 self chunk
+        total := rng.u64_sub_u32 self bias
+        chunk := 0
+        bias := 0
+        count := 0
+    if count > 0:
+      total := rng.u64_add_u32 self chunk
+      total := rng.u64_sub_u32 self bias
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self log.length
+  out := rng.emit_i64 self total
+  return out

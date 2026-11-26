@@ -1,0 +1,53 @@
+// 16 passes of a 3x3 Gaussian blur over a WxW 8-bit image using a 3-column
+// sliding window (3 loads per pixel instead of 9).
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 1024 // BENCH_N
+const PASSES: U32 = 16
+
+func blur_pass (src: #[U32]) -> (dst: own #[U32]) -> (w: U32): #[U32] =>
+  let wm1 = w - 1
+  for y in 1 .. wm1:
+    let row = y * w
+    let up = row - w
+    let dn = row + w
+    let c0 = src[up] + (src[row] << 1) + src[dn]
+    let c1 = src[up + 1] + (src[row + 1] << 1) + src[dn + 1]
+    for x in 1 .. wm1:
+      let c2 = src[up + x + 1] + (src[row + x + 1] << 1) + src[dn + x + 1]
+      dst[row + x] := (c0 + (c1 << 1) + c2) >> 4
+      c0 := c1
+      c1 := c2
+  return dst
+
+io bench (): #[U32] =>
+  let total_px = BENCH_N * BENCH_N
+  let a = @array.fill total_px 0
+  let b = @array.fill total_px 0
+  let r = rng.u64_from_u32 12345
+  for i in 0 .. total_px:
+    r := rng.xs_next self
+    let $rng.U64 { lo, hi: _ } = r
+    a[i] := lo & 255
+
+  for _ in 0 .. (PASSES / 2):
+    b := blur_pass a self BENCH_N
+    a := blur_pass b self BENCH_N
+
+  let total = rng.u64_zero ()
+  let chunk: U32 = 0
+  let count: U32 = 0
+  for i in 0 .. total_px:
+    chunk := self + a[i]
+    count := self + 1
+    if count == 8388608:
+      total := rng.u64_add_u32 self chunk
+      chunk := 0
+      count := 0
+  if count > 0:
+    total := rng.u64_add_u32 self chunk
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self BENCH_N
+  out := rng.emit_i64 self total
+  return out

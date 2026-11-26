@@ -1,0 +1,47 @@
+// Integrate N particles for 200 steps of exact binary32 vector math (AoS).
+// All arithmetic is exact in IEEE 754 binary32 so checksums match bit-for-bit.
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 100000 // BENCH_N
+const STEPS: U32 = 200
+
+type Particle is data = $P { px: F32, py: F32, pz: F32, vx: F32, vy: F32, vz: F32 }
+
+io bench (): #[U32] =>
+  let ps = @array.fill BENCH_N ($P { px: 0.0, py: 0.0, pz: 0.0, vx: 0.0, vy: 0.0, vz: 0.0 })
+  let r = rng.u64_from_u32 12345
+  for i in 0 .. BENCH_N:
+    r := rng.xs_next self
+    let $rng.U64 { lo, hi } = r
+    ps[i] := $P {
+      px: U32.to_f32 (lo & 1023),
+      py: U32.to_f32 ((lo >> 12) & 1023),
+      pz: U32.to_f32 (((lo >> 24) | (hi << 8)) & 1023),
+      vx: (U32.to_f32 ((hi >> 4) & 255) - 128.0) * 0.0625,
+      vy: (U32.to_f32 ((hi >> 12) & 255) - 128.0) * 0.0625,
+      vz: (U32.to_f32 ((hi >> 20) & 255) - 128.0) * 0.0625,
+    }
+
+  for _ in 0 .. STEPS:
+    for i in 0 .. BENCH_N:
+      let $P { px, py, pz, vx, vy, vz } = ps[i]
+      let nvy = vy - 0.0625
+      let npx = px + vx
+      let npy = py + nvy
+      let npz = pz + vz
+      if npy < 0.0:
+        ps[i] := $P { px: npx, py: 0.0 - npy, pz: npz, vx, vy: 0.0 - nvy * 0.5, vz }
+      else:
+        ps[i] := $P { px: npx, py: npy, pz: npz, vx, vy: nvy, vz }
+
+  let total = rng.u64_zero ()
+  for i in 0 .. BENCH_N:
+    let $P { px, py, pz, vx: _, vy: _, vz: _ } = ps[i]
+    total := rng.i64_add_f32 self (px * 16.0)
+    total := rng.i64_add_f32 self (py * 16.0)
+    total := rng.i64_add_f32 self (pz * 16.0)
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self BENCH_N
+  out := rng.emit_i64 self total
+  return out

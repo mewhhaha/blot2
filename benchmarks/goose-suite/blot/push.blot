@@ -1,0 +1,53 @@
+// Push N records while keeping indices to every 64th one.
+// Uses pre-sized storage (`@array.fill`, matching Rust's `Vec::with_capacity`
+// and C++'s `vector::reserve`) so N=16M (128 MB) fits cleanly inside Blot's
+// stock 128 MiB Wasm32 stack region while `marks` grows dynamically on heap.
+import * as rng from "./rng"
+
+const BENCH_N: U32 = 1000000 // BENCH_N
+
+type Item is data = $Item { key: U32, val: U32 }
+
+io bench (): #[U32] =>
+  let items = @array.fill BENCH_N ($Item { key: 0, val: 0 })
+  let marks: #[U32] = #[]
+  let r = rng.u64_from_u32 12345
+  for i in 0 .. BENCH_N:
+    r := rng.xs_next self
+    items[i] := $Item { key: rng.xs_mod r 1000000, val: i % 97 }
+    if (i & 63) == 0:
+      marks := self.push i
+
+  let total = rng.u64_zero ()
+  let chunk: U32 = 0
+  let count: U32 = 0
+  for i in 0 .. BENCH_N:
+    chunk := self + items[i].key
+    count := self + 1
+    if count == 2048:
+      total := rng.u64_add_u32 self chunk
+      chunk := 0
+      count := 0
+  if count > 0:
+    total := rng.u64_add_u32 self chunk
+
+  let mt = rng.u64_zero ()
+  let mchunk: U32 = 0
+  let mcount: U32 = 0
+  for i in 0 .. marks.length:
+    let idx = marks[i]
+    mchunk := self + items[idx].val
+    mcount := self + 1
+    if mcount == 16777216:
+      mt := rng.u64_add_u32 self mchunk
+      mchunk := 0
+      mcount := 0
+  if mcount > 0:
+    mt := rng.u64_add_u32 self mchunk
+
+  let out: #[U32] = #[]
+  out := rng.emit_u32 self items.length
+  out := rng.emit_u32 self marks.length
+  out := rng.emit_i64 self total
+  out := rng.emit_i64 self mt
+  return out

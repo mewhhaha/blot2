@@ -1,0 +1,213 @@
+// Shared exact 64-bit xorshift64 RNG and 64-bit arithmetic over (lo, hi) U32
+// pairs so every Blot benchmark generates byte-identical input and prints
+// bit-identical 64-bit checksums matching Goose, C++, and Rust.
+
+type U64 is data = $U64 { lo: U32, hi: U32 }
+
+func u64_zero (): U64 => $U64 { lo: 0, hi: 0 }
+
+func u64_from_u32 (v: U32): U64 => $U64 { lo: v, hi: 0 }
+
+func u64_make (lo: U32) -> (hi: U32): U64 => $U64 { lo, hi }
+
+func u64_add (a: U64) -> (b: U64): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  let lo = alo + blo
+  let carry: U32 = if lo < alo then 1 else 0
+  return $U64 { lo, hi: ahi + bhi + carry }
+
+func u64_add_u32 (a: U64) -> (b: U32): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let lo = alo + b
+  let carry: U32 = if lo < alo then 1 else 0
+  return $U64 { lo, hi: ahi + carry }
+
+func u64_sub (a: U64) -> (b: U64): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  let borrow: U32 = if alo < blo then 1 else 0
+  return $U64 { lo: alo - blo, hi: ahi - bhi - borrow }
+
+func u64_sub_u32 (a: U64) -> (b: U32): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let borrow: U32 = if alo < b then 1 else 0
+  return $U64 { lo: alo - b, hi: ahi - borrow }
+
+// Add a two's-complement signed 32-bit integer (carried in U32) to signed 64-bit `a`.
+func i64_add_i32 (a: U64) -> (x: U32): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let lo = alo + x
+  let carry: U32 = if lo < alo then 1 else 0
+  let sign: U32 = if x >= 0x80000000 then 0xFFFFFFFF else 0
+  return $U64 { lo, hi: ahi + sign + carry }
+
+// Add exact truncated signed F32 to signed 64-bit `a` (assumes |x| < 2^31).
+func i64_add_f32 (a: U64) -> (x: F32): U64 =>
+  if x < 0.0:
+    return u64_sub_u32 a (F32.to_u32 (0.0 - x))
+  return u64_add_u32 a (F32.to_u32 x)
+
+func u64_neg (a: U64): U64 =>
+  return u64_sub ($U64 { lo: 0, hi: 0 }) a
+
+func u64_xor (a: U64) -> (b: U64): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  return $U64 { lo: alo ^ blo, hi: ahi ^ bhi }
+
+func u64_eq (a: U64) -> (b: U64): Bool =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  return alo == blo and ahi == bhi
+
+func u64_ge (a: U64) -> (b: U64): Bool =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  if ahi != bhi:
+    return ahi > bhi
+  return alo >= blo
+
+// Exact 32x32 -> 64 unsigned multiply.
+func u32_mul_wide (a: U32) -> (b: U32): U64 =>
+  let a0 = a & 65535
+  let a1 = a >> 16
+  let b0 = b & 65535
+  let b1 = b >> 16
+  let p00 = a0 * b0
+  let p01 = a0 * b1
+  let p10 = a1 * b0
+  let p11 = a1 * b1
+  let mid = (p00 >> 16) + (p01 & 65535) + (p10 & 65535)
+  let lo = (p00 & 65535) | (mid << 16)
+  let hi = p11 + (p01 >> 16) + (p10 >> 16) + (mid >> 16)
+  return $U64 { lo, hi }
+
+func u64_mul (a: U64) -> (b: U64): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  let $U64 { lo, hi: w_hi } = u32_mul_wide alo blo
+  return $U64 { lo, hi: w_hi + alo * bhi + ahi * blo }
+
+// Exact (a * 31) = (a << 5) - a.
+func u64_mul_31 (a: U64): U64 =>
+  let $U64 { lo, hi } = a
+  let s_lo = lo << 5
+  let s_hi = (hi << 5) | (lo >> 27)
+  let borrow: U32 = if s_lo < lo then 1 else 0
+  return $U64 { lo: s_lo - lo, hi: s_hi - hi - borrow }
+
+// Exact 64-bit FNV-1a step: (h ^ byte) * 1099511628211 (= 2^40 + 435).
+func fnv_step (h: U64) -> (byte: U32): U64 =>
+  let $U64 { lo, hi } = h
+  let xlo = lo ^ byte
+  let out_lo = xlo * 435
+  let carry = ((xlo >> 16) * 435 + (((xlo & 65535) * 435) >> 16)) >> 16
+  let out_hi = hi * 435 + carry + (xlo << 8)
+  return $U64 { lo: out_lo, hi: out_hi }
+
+// Exact 64-bit unsigned division a / b (b != 0).
+func u64_div (a: U64) -> (b: U64): U64 =>
+  let $U64 { lo: alo, hi: ahi } = a
+  let $U64 { lo: blo, hi: bhi } = b
+  if ahi == 0 and bhi == 0:
+    return $U64 { lo: alo / blo, hi: 0 }
+  if ahi < bhi or (ahi == bhi and alo < blo):
+    return $U64 { lo: 0, hi: 0 }
+  let q_lo: U32 = 0
+  let q_hi: U32 = 0
+  let r_lo: U32 = 0
+  let r_hi: U32 = 0
+  for step in 0 .. 64:
+    let bit_idx = 63 - step
+    let bit: U32 = if bit_idx >= 32 then (ahi >> (bit_idx - 32)) & 1 else (alo >> bit_idx) & 1
+    let nr_hi = (r_hi << 1) | (r_lo >> 31)
+    let nr_lo = (r_lo << 1) | bit
+    r_lo := nr_lo
+    r_hi := nr_hi
+    if r_hi > bhi or (r_hi == bhi and r_lo >= blo):
+      let borrow: U32 = if r_lo < blo then 1 else 0
+      r_lo := r_lo - blo
+      r_hi := r_hi - bhi - borrow
+      if bit_idx >= 32:
+        q_hi := self | (1 << (bit_idx - 32))
+      else:
+        q_lo := self | (1 << bit_idx)
+  return $U64 { lo: q_lo, hi: q_hi }
+
+// Exact xorshift64: v ^= v << 13; v ^= v >> 7; v ^= v << 17.
+func xs_next (x: U64): U64 =>
+  let $U64 { lo, hi } = x
+  let hi1 = hi ^ ((hi << 13) | (lo >> 19))
+  let lo1 = lo ^ (lo << 13)
+  let lo2 = lo1 ^ ((lo1 >> 7) | (hi1 << 25))
+  let hi2 = hi1 ^ (hi1 >> 7)
+  let hi3 = hi2 ^ ((hi2 << 17) | (lo2 >> 15))
+  let lo3 = lo2 ^ (lo2 << 17)
+  return $U64 { lo: lo3, hi: hi3 }
+
+// Exact right shift of U64 by n (0 < n < 64).
+func xs_shr (x: U64) -> (n: U32): U64 =>
+  let $U64 { lo, hi } = x
+  if n == 0:
+    return x
+  if n >= 32:
+    return $U64 { lo: hi >> (n - 32), hi: 0 }
+  return $U64 { lo: (lo >> n) | (hi << (32 - n)), hi: hi >> n }
+
+// Exact (x % k) for 1 <= k <= 65535 (3 u32 remainders, zero overflow).
+func xs_mod_small (x: U64) -> (k: U32): U32 =>
+  let $U64 { lo, hi } = x
+  let r1 = ((hi % k) << 16) | (lo >> 16)
+  let r2 = ((r1 % k) << 16) | (lo & 65535)
+  return r2 % k
+
+// Exact (x % k) for 1 <= k <= 16_777_215 (24-bit k, covers 100000, 1000000, V, KEYS).
+func xs_mod (x: U64) -> (k: U32): U32 =>
+  let $U64 { lo, hi } = x
+  if hi == 0:
+    return lo % k
+  let r0 = hi % k
+  let r1 = ((r0 << 8) | (lo >> 24)) % k
+  let r2 = ((r1 << 8) | ((lo >> 16) & 255)) % k
+  let r3 = ((r2 << 8) | ((lo >> 8) & 255)) % k
+  return ((r3 << 8) | (lo & 255)) % k
+
+// Exact floor(a * a / d) for 0 <= a < d <= 16_777_215 (4 u32 divides, zero overflow).
+func sq_div_u32 (a: U32) -> (d: U32): U32 =>
+  let $U64 { lo, hi } = u32_mul_wide a a
+  if hi == 0:
+    return lo / d
+  let b3 = (hi << 8) | (lo >> 24)
+  let q3 = b3 / d
+  let r3 = b3 % d
+  let b2 = (r3 << 8) | ((lo >> 16) & 255)
+  let q2 = b2 / d
+  let r2 = b2 % d
+  let b1 = (r2 << 8) | ((lo >> 8) & 255)
+  let q1 = b1 / d
+  let r1 = b1 % d
+  let b0 = (r1 << 8) | (lo & 255)
+  let q0 = b0 / d
+  return (q3 << 24) | (q2 << 16) | (q1 << 8) | q0
+
+// Append one checksum line to the ABI 8 output packet.
+func emit_u64 (out: own #[U32]) -> (v: U64): #[U32] =>
+  let $U64 { lo, hi } = v
+  out := self.push 0
+  out := self.push lo
+  out := self.push hi
+  return out
+
+func emit_i64 (out: own #[U32]) -> (v: U64): #[U32] =>
+  let $U64 { lo, hi } = v
+  out := self.push 1
+  out := self.push lo
+  out := self.push hi
+  return out
+
+func emit_u32 (out: own #[U32]) -> (v: U32): #[U32] =>
+  out := self.push 2
+  out := self.push v
+  out := self.push 0
+  return out
