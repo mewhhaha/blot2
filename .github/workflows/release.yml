@@ -1,0 +1,42 @@
+name: Publish Blot compiler
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang cmake ninja-build
+      - name: Build the compiler and test the standard library
+        run: |
+          deno task build:compiler
+          deno task test:std
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p bundle
+          install -m 755 compiler-goose/build/blotc-goose bundle/blotc
+          cp -R std LICENSE bundle/
+          printf '%s\n' "$GITHUB_SHA" > bundle/source-commit
+          archive="blot-${GITHUB_REF_NAME#v}-ubuntu-24.04-x86_64.tar.gz"
+          tar -czf "$archive" -C bundle .
+          sha256sum "$archive" > "$archive.sha256"
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Blot ${GITHUB_REF_NAME#v}" \
+            --notes 'Native compiler and matching standard library for Ubuntu 24.04 x86_64. Extract the archive and run `./blotc --help`.' \
+            "$archive" "$archive.sha256"
