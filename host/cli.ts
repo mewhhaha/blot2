@@ -19,6 +19,7 @@ import {
   runBlotTests,
   type TestRunOptions,
 } from "./test_runner.ts";
+import { runDocCli } from "./doc.ts";
 
 const usage =
   `Usage: blot guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
@@ -27,6 +28,8 @@ const usage =
        blot dependencies ENTRY OUTPUT.blotdep [project options]
        blot test [PATHS...] [--filter TEXT] [--jobs N] [--bail] [--release]
                  [--deadline SEC] [--json] [project options]
+       blot doc [TARGET] [--out DIR [--html]] [--test] [--check-links]
+                [--search QUERY] [--compact] [--json] [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source,
                  --relaxed-simd, --tail-calls, --wasm3, --json`;
@@ -343,6 +346,7 @@ export async function runCli(
   let library: Awaited<ReturnType<typeof extractStandardLibrary>> | undefined;
   try {
     if (command === "test") return await runTestCli(executable, args.slice(1));
+    if (command === "doc") return await runDocCli(executable, args.slice(1));
     if (
       command === "fmt" && filename &&
       (rest.length === 0 || rest.length === 1 && rest[0] === "--check")

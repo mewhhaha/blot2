@@ -28,8 +28,8 @@ type Error=blot_error::Error;
 type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
-enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--check-only] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --check-only (check, check-project) stops after semantic checking and skips ownership/uniqueness lowering.\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed SIMD (FMA, min/max, trunc).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
+enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project,doc_project}
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--check-only] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc doc-project ENTRY [--include-private] [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --check-only (check, check-project) stops after semantic checking and skips ownership/uniqueness lowering.\n       --include-private (check-exports, doc-project) includes private declarations in the output.\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --test (build, build-project, serve-project) exports test declarations and their metadata.\n       --relaxed-simd (build, build-project, serve-project) enables Wasm 3.0 relaxed SIMD (FMA, min/max, trunc).\n       --tail-calls (build, build-project, serve-project) enables Wasm 3.0 return_call for non-self tail calls.\n       --wasm3 (build, build-project, serve-project) enables both --relaxed-simd and --tail-calls.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -48,8 +48,8 @@ fn unsigned(text:const u8[:],maximum:u64)->u64,Error {
 fn workerCount(value:const u8[:])->u8,bool {let workers,error=unsigned(value,255);if error!=blot_error::Error.none||workers==0||workers>16 {return 0,false;}return workers as u8,true;}
 fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=blot_error::Error.none {return error;}return blot_main::configureInferenceBudget(limit);}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len&&text[..prefix.len]==prefix;}
-fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",lex=>"lex",parse=>"parse",check_exports=>"check-exports",check=>"check",build=>"build",dependencies=>"dependencies"}}
-fn parseCommand(text:const u8[:])->Command,bool {for command in [Command.lex,Command.parse,Command.check,Command.build,Command.dependencies,Command.parse_project,Command.check_project,Command.build_project] {if text==commandName(command) {return command,true;}}return Command.lex,false;}
+fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",doc_project=>"doc-project",lex=>"lex",parse=>"parse",check_exports=>"check-exports",check=>"check",build=>"build",dependencies=>"dependencies"}}
+fn parseCommand(text:const u8[:])->Command,bool {for command in [Command.lex,Command.parse,Command.check,Command.build,Command.dependencies,Command.parse_project,Command.check_project,Command.build_project,Command.doc_project] {if text==commandName(command) {return command,true;}}return Command.lex,false;}
 fn isBuild(command:Command)->bool {return command==Command.build||command==Command.build_project;}
 struct Stats {
  source_bytes:i64=0,
@@ -153,7 +153,7 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  if compiled.has_diagnostic {var message:u8[>..]=[];message.append(blot_compile::message(compiled.diagnostic,detail[..]));let error=diagnostic(writer,filename,"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,message[..]);lowered.deinit();return false,error;}
  stats.wasm_bytes=wasm.len;let written=blot_io::write_file(output.value,wasm[..]);lowered.deinit();if written!=blot_error::Error.none {formatIoError(error_detail,"write",output.value,written);return false,written;}return true,blot_error::Error.none;
 }
-fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}
+fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}if command==Command.doc_project {return "doc-project";}return "build-project";}
 fn run(args:const Argument[:])->bool,Error {
  let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}
  if args[1]=="check-exports" {
@@ -192,16 +192,17 @@ fn run(args:const Argument[:])->bool,Error {
  }
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
  if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
- let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.dependencies;
+ let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.doc_project||command==Command.dependencies;
  var first_option:i64=3;if isBuild(command)||command==Command.dependencies {first_option=4;}
  if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
  if project_command||first_option<args.len {
   if command==Command.lex {return false,blot_error::Error.none;}
-  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var check_only=false;var policy=Policy{..};var at=first_option;
+  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var relaxed_simd=false;var tail_calls=false;var test_mode=false;var check_only=false;var include_private=false;var policy=Policy{..};var at=first_option;
   while at<args.len {
    let arg=args[at];
    // Boolean flags taking no value.
    if arg=="--check-only" {if command!=Command.check&&command!=Command.check_project {return false,blot_error::Error.none;}check_only=true;at+=1;continue;}
+   if arg=="--include-private" {if command!=Command.doc_project {return false,blot_error::Error.none;}include_private=true;at+=1;continue;}
    if arg=="--profile" {if !isBuild(command) {return false,blot_error::Error.none;}profile=true;at+=1;continue;}
    if arg=="--test" {if !isBuild(command) {return false,blot_error::Error.none;}test_mode=true;at+=1;continue;}
    if arg=="--relaxed-simd" {if !isBuild(command) {return false,blot_error::Error.none;}relaxed_simd=true;at+=1;continue;}
@@ -222,11 +223,11 @@ fn run(args:const Argument[:])->bool,Error {
   blot_main::configureTestMode(test_mode);
   options.aliases=aliases[..];
   if command==Command.dependencies||dependency_path.present {if profile||semantic_workers||relaxed_simd||tail_calls {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
-  var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}
+  var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}else if command==Command.doc_project {selected=Command.doc_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}
    var error_detail:u8[>..]=[];
-   let accepted,error=processProject(stdout,selected,filename,options,profile,output,policy,error_detail,check_only);
+   let accepted,error=processProject(stdout,selected,filename,options,profile,output,policy,error_detail,check_only,include_private);
    if error!=blot_error::Error.none {var written=blot_error::Error.none;if error_detail.len!=0 {written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,error_detail[..]);}else {written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,"Compiler operation failed");}return false,written;}
    success=success&&accepted;}
   return success,blot_error::Error.none;

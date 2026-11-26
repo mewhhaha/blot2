@@ -34,6 +34,42 @@ export {
   expandGeneratorRules,
 } from "./host/generators.ts";
 export { decodeText, encodeText } from "./host/text.ts";
+export {
+  buildSymbolResolver,
+  type DocCodeBlock,
+  type DocConstructor,
+  type DocEffect,
+  type DocEffectOperation,
+  type DocField,
+  type DocImplementation,
+  type DocLinkRef,
+  type DocModule,
+  type DocPackage,
+  type DocProjectContext,
+  type DocTestReport,
+  type DocTestResult,
+  type DocTrait,
+  type DocTraitMember,
+  type DocType,
+  type DocValue,
+  formatBlotType,
+  type GenerateDocOptions,
+  generateDocs,
+  precompileDocExamples,
+  renderCompactApi,
+  type ResolvedDocSymbol,
+  runDocCli,
+  runDocTests,
+  searchDocPackage,
+  type SymbolResolver,
+  writeMarkdownDocs,
+} from "./host/doc.ts";
+export {
+  DOC_RUNNER_JS,
+  generateHtmlDocs,
+  type HtmlDocOptions,
+  type PrecompiledDocExample,
+} from "./host/doc_html.ts";
 export type {
   AssetBuildStats,
   AssetContext,

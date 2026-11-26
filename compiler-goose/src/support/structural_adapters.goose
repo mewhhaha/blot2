@@ -917,6 +917,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::BasicDiagnostic)->b
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::BasicDiagnostic,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ContextDetails)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ContextDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::DocDisplay)->bool {return equalFields(left,right);}
+fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::DocDisplay,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ExplanationContexts)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ExplanationContexts,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ExplanationDetail)->bool {return equalFields(left,right);}

@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "86aa2cf7ab545c51c466bf9ef3b46caf87152f931883483564e1da1513ada3ce",
+  "digest": "9acecf6011218c4c01b25a2308b1b0d6f70fe18695180a9db88cc93e0caced4a",
   "goose": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -512,9 +512,9 @@
       "sha256": "0ce35e0f65e8d3e3e73d5b06e93c5556814b349f09c44e0c3abcae9767b05b5c"
     },
     {
-      "bytes": 22920,
+      "bytes": 23526,
       "path": "src/driver/cli.goose",
-      "sha256": "41f36c1779d9ee53eb70094815c3fabf8c064a2b913d692df6a65dafb0c6556d"
+      "sha256": "7510107d2ea075da535a080f7cf3911e659b195daaf2f7c55d3c0a09c36905ce"
     },
     {
       "bytes": 10857,
@@ -522,9 +522,9 @@
       "sha256": "bb08e51146a16d871dea6d470fa3ef3fe3e262e05875ba8a55d2935fec7b1a88"
     },
     {
-      "bytes": 9656,
+      "bytes": 26468,
       "path": "src/driver/cli_project.goose",
-      "sha256": "68fb4103fb35d4cbef24c79f21015d382911cc6359cb8dcc67ebdbec9a83fa4a"
+      "sha256": "b5fb8f25639c46ca6865d00e0ab4a421f360421fe14a6f5a11fcc72da4b65af1"
     },
     {
       "bytes": 419,
@@ -902,9 +902,9 @@
       "sha256": "517b550f0e8224a693249bbf85663b0ffdb17aeda00174cc0cd711453a89d173"
     },
     {
-      "bytes": 333745,
+      "bytes": 334062,
       "path": "src/support/json_adapters.goose",
-      "sha256": "12fb452e1dd2a1fe47b4e3ced5453acd67879d2afc2ef5adb86002c034dbe202"
+      "sha256": "9434f194670c7d172512eaae39fdad453f1ad99eece23792585aa663267296ed"
     },
     {
       "bytes": 6404,
@@ -962,9 +962,9 @@
       "sha256": "7388b0102bb7fce41a2be7678739c71ffb4524edcf87bed877f6dd9b1edf4368"
     },
     {
-      "bytes": 239621,
+      "bytes": 239874,
       "path": "src/support/structural_adapters.goose",
-      "sha256": "24571bdeb5d298182dfdb163437eeaa28644a9d58cc8fcac5b4fe2a232614063"
+      "sha256": "1377121f96a09db2e82a0274b528b0cc5650e04b37eeed29ffa4fbd93c36036c"
     },
     {
       "bytes": 264,

@@ -1,5 +1,19 @@
-// Small geometry values. Import the types; their operators follow their owner.
+//! Small 2D and 3D geometry vectors ([`Vec2`], [`Vec3`]).
+//!
+//! Import the types directly; arithmetic operators (`+`, `-`, `*`, `/`) follow
+//! their owning type automatically.
+//!
+//! ```blot
+//! let a = $Vec2 { x: 3.0, y: 4.0 }
+//! a.length // => 5.0
+//! ```
+
+// Two-dimensional `F32` vector with componentwise `+`, `-`, scalar `*`/`/`,
+// [`Vec2.dot`], [`Vec2.lerp`], [`Vec2.length`], and [`Vec2.normalized`].
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
+
+// Three-dimensional `F32` vector with [`Vec3.dot`], [`Vec3.cross`],
+// [`Vec3.length`], and [`Vec3.normalized`].
 type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
 func Vec2.add (a: Vec2) -> (b: Vec2): Vec2 => return
@@ -12,6 +26,13 @@ func Vec2.div (value: Vec2) -> (scale: F32): Vec2 => return
   $Vec2 { x: value.x / scale, y: value.y / scale }
 func Vec2.lerp (a: Vec2) -> (b: Vec2) -> (weight: F32): Vec2 => return
   $Vec2 { x: F32.lerp a.x b.x weight, y: F32.lerp a.y b.y weight }
+// Dot product of two [`Vec2`] values.
+//
+// ```blot
+// let a = $Vec2 { x: 2.0, y: 3.0 }
+// let b = $Vec2 { x: 4.0, y: 5.0 }
+// a.dot b // => 23.0
+// ```
 func Vec2.dot (a: Vec2) -> (b: Vec2): F32 => a.x * b.x + a.y * b.y
 func Vec2.length_squared (value: Vec2): F32 => Vec2.dot value value
 func Vec2.length (value: Vec2): F32 => sqrt (Vec2.length_squared value)

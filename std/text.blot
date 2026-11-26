@@ -1,3 +1,11 @@
+//! Unicode scalar text utilities (`Text = #[U32]`), zero-copy [`Builder`],
+//! borrowed iterators ([`Words`], [`Lines`]), numeric parsing/formatting, and
+//! the [`Format`] trait.
+//!
+//! ```blot
+//! join ", " #["blot", "wasm", "docs"] // => "blot, wasm, docs"
+//! ```
+
 import * as simd from "./simd"
 
 // Text is a #[U32] of Unicode scalar values. Equality compares scalar

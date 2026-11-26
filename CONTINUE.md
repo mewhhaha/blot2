@@ -1,15 +1,20 @@
 # Working on Blot and Gdev
 
-## Current frontier: Language Soundness, SIMD/Staging Fixes, Formatter/Stdlib Hardening, Solid-2 Agent Diagnostics & `blot:traps` v1 Provenance (Waves 1–4, 25 November 2026)
+## Current frontier: Compiler-Backed Documentation Generator (`blot doc`), Stage-0 Pen Generators & Waves 1–4 Soundness (26 November 2026)
 
-All four audit waves (Waves 1–3 at `c5109160`; Wave 4 + multi-parameter nominal
-`[k, v]` ownership fix in this commit; Pen runtime trap provenance in `../pen`
-`f2047ec`), local toolchain reinstall, and fresh live NVIDIA Vulkan Gdev
-hardware frame qualification are complete and verified at `blotc-goose` SHA-256
-`466e8006c16dfcf65b56c1873cf99d61153d1fc77372ff1c9fe67514bd90affa`
-(`9,867,480` B; `generated/compiler/blotc.gz` SHA-256
-`320abaf8c0ba767bddae7e82c9d820668511a2a651aefd0a006c71df70f5dbf2`,
-`4,175,148` B):
+Compiler-backed library documentation (`blotc doc-project` + `blot doc`), Stage-0
+Pen virtual module generators (`../pen` `92e2ef7`), and all four audit waves
+(`c5109160`, `7157f22a`, `../pen` `f2047ec`) are complete and verified at
+`blotc-goose` SHA-256
+`9cc6fd25f80273caac15c9bef783e31a2aac1c4d747875a05ead5e09d773ec8b`
+(`9,905,280` B; `generated/compiler/blotc.gz` SHA-256
+`ce506c355e4f8aad99ace10efd0e720bd9b7028129e03859911ec68354be08a9`,
+`4,190,404` B):
+
+- **Compiler-Backed Documentation Generator (`blotc doc-project` + `blot doc`, 26 November 2026):**
+  - Added `blotc doc-project ENTRY [--include-private]` in [cli.goose](compiler-goose/src/driver/cli.goose) and [cli_project.goose](compiler-goose/src/driver/cli_project.goose) to emit checked `doc_module` JSON lines directly from `CheckedProject` (skipping lowering/emit so libraries without `#entry` succeed cleanly), including inferred types, `own` parameter masks, `where` clauses, effect rows, `is data` constructors/fields/defaults/spans, `is opaque` hiding private representations, `is trait`, `is effect`, associated members, and trait `impl`s.
+  - Added [host/doc.ts](host/doc.ts), [host/doc_html.ts](host/doc_html.ts), and [docs/host/doc.md](docs/host/doc.md), wired `blot doc` into [host/cli.ts](host/cli.ts), [host/installed_cli.ts](host/installed_cli.ts), [mod.ts](mod.ts), and [deno.json](deno.json): supports `std`, `blot.json` and `pen.json` alias/library discovery (verified on `std/` and `../ink/lib/codec.blot`), `//!` / `//` / `///` Markdown comments, Rustdoc-style intra-doc links (`[`Symbol`]`, `[label](`mod/Symbol`)`, `--check-links`), local runnable doctests (`--test`, `// => expected`, `test` / `test expect_trap`, `check`/`no_run`/`ignore`), static Markdown (`--out`: `INDEX.md`, `API.md`, `modules/*.md`), `--search`, `--json`, and static HTML (`--html --out`) with precompiled base64 ABI 8 `.wasm` examples and a zero-dependency pure-JS browser runner (`runner.js` decoding ABI 8 returns, `blot:traps` v1 panics, and BTST v1 reports).
+  - Added runnable doc comments and intra-doc links to [std/vector.blot](std/vector.blot) and [std/text.blot](std/text.blot) (with two `source_bytes`-only fixture updates in [expected.json](compiler-goose/tests/fixtures/expected.json)) and 7 unit/integration tests in [tests/host/doc.test.ts](tests/host/doc.test.ts) (including live execution of generated `runner.js` against precompiled base64 Wasm).
 
 - **Wave 1 — Compiler Type, Trait, Opaque, Ownership, Uniqueness & FBIP Soundness (`c5109160` + this commit):**
   - Enforced trait associated output `type_eq`, full-parameter & nested `traitIsReadOnly`, `is opaque` reflection (`#fields`, `#variants`, `.(field)`, builders), indirect `fork`+`with` `Foreign` rejection, `@simd.store` uniqueness/cache invalidation, duplicate `with` rejection, single `ambiguous_member` on dot-calls, `test` return validation, `#[N; T]` `#entry` rejection, and comptime closure checks.
@@ -34,7 +39,7 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
 ### Checkpoints on `origin/main`
 | Repo | Current `origin/main` | Frontier Commits |
 |---|---|---|
-| `blot2` | this commit (after `c5109160`) | Wave 4 Solid-2 agent diagnostics, `blot:traps` v1 runtime provenance & multi-param nominal `matchNominalArgs` (this commit); Waves 1–3 soundness, SIMD relocations, formatter, stdlib & trap metadata (`c5109160`); `#for` reflection & Stage-0 generators (`a24fc85c`) |
+| `blot2` | this commit (after `0f4a5cd4`) | `blotc doc-project` + `blot doc` Markdown/HTML/doctest/browser-Wasm generator (this commit); Stage-0 Pen pointer (`0f4a5cd4`); Wave 4 Solid-2 agent diagnostics & `blot:traps` v1 (`7157f22a`); Waves 1–3 soundness, SIMD relocations, formatter & stdlib (`c5109160`) |
 | `../pen` | `92e2ef7` | Stage-0 Blot virtual module generators (`pen:plugin@0.3.0`, `compiler.settings.generators`, `guest.run-u32-packet`, `virtual_source` / provenance in `plugin_build`) (`92e2ef7`); `blot:traps` v1 runtime trap provenance (`f2047ec`); unified `pen test-blot` (`eb8f575`) |
 | `../ink` | `46111bd` | Current checkout (`46111bd`, preserves local uncommitted edits); generic comptime decoders (`f7486d3`) |
 | `../gdev` | `4e891d2` | Current checkout (`4e891d2`); >8192 rad trig NaN fix & physical brick counts (`642ad53`) |
@@ -68,15 +73,16 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
 ### Verified Identities & Qualification Evidence
 - **Compiler, CLI & host identities:**
   - `compiler-goose/build/blotc-goose` & `~/.local/bin/blotc` SHA-256:
-    `466e8006c16dfcf65b56c1873cf99d61153d1fc77372ff1c9fe67514bd90affa`
-    (`9,867,480` bytes)
+    `9cc6fd25f80273caac15c9bef783e31a2aac1c4d747875a05ead5e09d773ec8b`
+    (`9,905,280` bytes)
   - `generated/compiler/blotc.gz` SHA-256:
-    `320abaf8c0ba767bddae7e82c9d820668511a2a651aefd0a006c71df70f5dbf2`
-    (`4,175,148` bytes; decompressed byte-identical to `blotc-goose`)
+    `ce506c355e4f8aad99ace10efd0e720bd9b7028129e03859911ec68354be08a9`
+    (`4,190,404` bytes; decompressed byte-identical to `blotc-goose`)
   - `~/.local/bin/blot` SHA-256:
-    `3088e66cce1a36402acd6300a14031e6f9612c63918438ad192342fffa7be629`
-    (`145,097,680` bytes; embeds `blotc.gz`, parser Wasm, `std/`, `guide.md`,
-    `CHEATSHEET.md`, `host/generators.ts`, and `host/test_worker.ts`)
+    `7b27bcbf042a6dce9b855483a9fb879fe23e2f596f9d790c5aacfbc15a75279d`
+    (`145,450,720` bytes; embeds `blotc.gz`, parser Wasm, `std/`, `guide.md`,
+    `CHEATSHEET.md`, `host/generators.ts`, `host/test_worker.ts`, `host/doc.ts`,
+    and `host/doc_html.ts`)
   - `std/prelude.blot` SHA-256:
     `eef42c717a9c644a7930f4fc20a646879f5c1afd1f1140f3d945d0d48c4ccdd7`
   - `../pen/target/release/pen` & `~/.local/lib/pen-runtime/pen` SHA-256:
@@ -84,18 +90,19 @@ hardware frame qualification are complete and verified at `blotc-goose` SHA-256
     (`pen:plugin@0.3.0`; `plugins/blot.wasm` SHA-256
     `3f291f7a3e6c203b959ceaf19d1b808e77e35dbb3c79522a52380a88b103c901`)
 - **Qualification gates:**
-  - `blot2` (this commit): `deno fmt --check` (92 files), `deno check`,
-    `test:editor` (**6/6**), `harness` (`4.05 s`), `release-build` (`138.67 s`,
-    `run-469b37a4bceb9c69`), `reference-direct` (**2/2**, `runtime.expected`
-    `7,765` B, `writer` `352` B), `reference-uniqueness` (**206/206**),
-    `reference-fixtures` (**109/109**), `pack` OK, `test:guest` exit 0
-    (`run-fd332201cacf971d`, **1,210 passed, 0 failed**, `23.28 s`, incl.
-    `audit_soundness_regressions`, `diagnostics_agent`, `test_runner`, `lsp`,
-    and `generators`), `test:std` (**7 modules, 18 tests, 146 assertions, 0
-    failed**, `146.1 ms`), `check:editor` (**11/11** corpus + **19/19**
-    highlight suites). External `/tmp` verification passed `blot explain --list`,
-    `blot explain SPENT_VALUE`, `blot check wgsl_gen.blot`, and
-    `blot test tests/std` (**18/18, 146 assertions**, `148.5 ms`).
+  - `blot2` (this commit): `deno fmt --check` (95 files), `deno check`,
+    `test:editor` (**6/6**), `harness` (`2.92 s`), `release-build` (`121.28 s`,
+    `run-d4f87d700c45d16`), `reference-direct` (**2/2**), `reference-uniqueness`
+    (**206/206**), `reference-fixtures` (**109/109**, 2 `source_bytes`-only
+    updates from `std/vector.blot` doc comments), `pack` OK, `test:guest` exit 0
+    (`20.44 s`, incl. new 7-test `tests/host/doc.test.ts` with live browser
+    `runner.js` Wasm execution), `test:std` (**7 modules, 18 tests, 146
+    assertions, 0 failed**, `92.6 ms`), `check:editor` (**11/11** corpus +
+    **19/19** highlight suites). External `/tmp` standalone binary verification
+    passed `blot doc std --test --check-links` (**3/3**, `45 ms`), `blot doc std --search Vec2.dot`,
+    and `blot doc std --html --out ...` (14 modules, 3 runnable Wasm examples,
+    20 files); `blot doc ../ink/lib/codec.blot --compact` auto-discovered
+    `../ink/pen.json` and checked cleanly.
   - `../pen` (`92e2ef7`): `plugins/blot` (**24/24** unit), `pen-plugins`
     (**9/9** unit + **10/10** real-WASI integration incl. Stage-0 WGSL/CSV/record/bytes
     generators, two-level caching spawn counts, `$Err`/`@panic`/bounds `blot:traps` v1
