@@ -360,6 +360,7 @@ fn extractView(self_: Store&, value: Row, label: Label) -> ExtractionView, Error
         expanded: blot_support::Option<u32> { true, variable , ..} , ..}, blot_error::Error.none;
 }
 fn unify(self_: Store&, left: Id, right: Id) -> Error {
+    if left == 0 && right == 0 { return blot_error::Error.none; }
     let point = mark(self_);
     let error = unifyInner(self_, left, right);
     if error != blot_error::Error.none { rollback(self_, point); }

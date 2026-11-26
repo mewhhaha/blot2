@@ -190,6 +190,17 @@ exit-code changes; 9 library-only fixtures updated from `storage_unsupported`
 to `no_entry`; uniform `+4 effect_rows / +13 type_nodes` and `+29B` runtime
 guard deltas).
 
+Compile Throughput Batch B (26 November 2026) upgraded
+`reuse/composite_resolution_cache.goose` from 16 direct-mapped slots to a
+dynamic 256..2048 4-way set-associative cache, added zero-allocation fast paths
+in `check/types.goose` (`unifyMode`, `unifyWalk`, `unifyEffects`,
+`openCovariant`/`openFunctionEffect`, pure-row `resolveSelected`) and
+`check/effects.goose` (`unify`), added reusable adopt scratch in
+`reuse/parse_batch.goose`, and switched one-shot `loadParallel` to in-place AST
+relocation in `reuse/project.goose`. Re-recorded `expected.json`: all 109
+fixtures keep 100% identical exit codes, diagnostics, and Wasm SHA-256 while
+strictly reducing allocated `effect_rows` (e.g. -28% to -42%) and `type_nodes`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

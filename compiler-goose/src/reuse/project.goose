@@ -518,7 +518,7 @@ fn walk<P>(self_:Loader<P>&,root:UnitId)->Error {
     return blot_error::Error.none;
 }
 struct LoadContext {
-    previous:const Project?=null,parse_workers:u8=1,entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
+    previous:const Project?=null,parse_workers:u8=1,retain_parser_trees:bool=true,entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
 }
 fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_reuse_frozen_dependency::Module[:]) {
  if context.reuse.present {context.result=blot_support::some<Project>(canonicalLoaded(project,modules,context.reuse.value));}
@@ -540,7 +540,7 @@ fn load(entrypath:const u8[:],options:Options)->Project,Error {
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadParallel(entrypath:const u8[:],options:Options,workers:u8)->Project,Error {
-    var inputs=FileInputs {..};var context=LoadContext {parse_workers:workers,entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSourceParallel);
+    var inputs=FileInputs {..};var context=LoadContext {parse_workers:workers,retain_parser_trees:false,entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSourceParallel);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadWithInputs<P>(entrypath:const u8[:],options:Options,inputs:P&)->Project,Error {
@@ -579,7 +579,7 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
     loader.reading_entry=loader.options.input_mode==InputMode.project;
     let entry,failure=loader.read(context.entrypath,Origin {..});loader.reading_entry=false;if failure!=blot_error::Error.none {return failure;}if !entry.present {return blot_error::Error.none;}
     loader.project.entry=entry.value;
-    if entryPacket(loader.project).len!=0 {return loadEntryDependencies(loader,entry.value,parallel);}
+    if entryPacket(loader.project).len!=0 {return loadEntryDependencies(loader,entry.value,parallel,context.retain_parser_trees);}
     // A new symbol at the root invalidates the IDs of the remaining syntax.
     // Start the ordinary worker batch at its imports before walking them.
     if parallel && previous && loader.visits.items[entry.value-1]!=Visit.finished && loader.project.diagnostics.len==0 {
@@ -639,7 +639,7 @@ fn sameSymbolPool(a:const blot_parse_symbols::Pool&,b:const blot_parse_symbols::
 
 // A producer sees its entire dependency chain, including generated names.
 // Keep parser coordinates separately so unchanged syntax can serve both views.
-fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?)->Error {
+fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?,retain_parser_trees:bool=true)->Error {
     let pool,error=blot_parse_symbols::initPooled();
     if error!=blot_error::Error.none {return error;}
     let original .= projects[project.lease-1].parser_symbols;
@@ -782,18 +782,22 @@ fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?
             if error!=blot_error::Error.none {return error;}
             if same_tree && names[old]!=old_map[old] {same_tree=false;}
         }
-        var linked=blot_parse_ast::Tree{..};
-        var error=blot_error::Error.none;
-        if previous && same_tree {
-            linked,error=previous.unit(id).tree.retainParsed();
+        if !previous && !retain_parser_trees {
+            if !blot_reuse_parse_packet::relocate_tree(unit.tree,0,names[1..]) {return blot_error::Error.invalid_artifact;}
         } else {
-            linked,error=blot_parse_ast::initPooled();
-            if error==blot_error::Error.none {error=linked.copyParsed(unit.tree);}
-            if error==blot_error::Error.none && !blot_reuse_parse_packet::relocate_tree(linked,0,names[1..]) {error=blot_error::Error.invalid_artifact;}
+            var linked=blot_parse_ast::Tree{..};
+            var error=blot_error::Error.none;
+            if previous && same_tree {
+                linked,error=previous.unit(id).tree.retainParsed();
+            } else {
+                linked,error=blot_parse_ast::initPooled();
+                if error==blot_error::Error.none {error=linked.copyParsed(unit.tree);}
+                if error==blot_error::Error.none && !blot_reuse_parse_packet::relocate_tree(linked,0,names[1..]) {error=blot_error::Error.invalid_artifact;}
+            }
+            if error!=blot_error::Error.none {linked.deinit();return error;}
+            unit.parser_tree=blot_parse_ast::canonical(unit.tree);
+            unit.tree=blot_parse_ast::canonical(linked);
         }
-        if error!=blot_error::Error.none {linked.deinit();return error;}
-        unit.parser_tree=blot_parse_ast::canonical(unit.tree);
-        unit.tree=blot_parse_ast::canonical(linked);
         let range=unit.imports;
         for &edge in project.imports.items[range.start..range.start+range.len] {
             edge.namespace_=unit.tree.import_decl(edge.declaration.node).namespace_;
@@ -806,7 +810,7 @@ fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?
     return blot_error::Error.none;
 }
 
-fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId,parallel:bool)->Error {
+fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId,parallel:bool,retain_parser_trees:bool=true)->Error {
     let project .= loader.project;
     // Keep only the prelude and entry filename. DFS needs the paths spelled
     // by the entry's edges, but never inspects its body.
@@ -827,7 +831,7 @@ fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId,parallel:bool)->Error
     if walked!=blot_error::Error.none {return walked;}
     if project.diagnostics.len==0 {
         if parallel && project.units.len>=16 {
-            let failure=linkCheckingNames(project,entry,prefix,loader.previous);
+            let failure=linkCheckingNames(project,entry,prefix,loader.previous,retain_parser_trees);
             if failure!=blot_error::Error.none {return failure;}
         } else {
             let prepared,failure=blot_reuse_project_check::preparePersistentNames(project,entry);

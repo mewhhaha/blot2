@@ -15,11 +15,13 @@ struct ParseBatch {
     raw_paths:blot_support_pooled_map::Map<const u8[:],u32> =blot_support_pooled_map::Map<const u8[:],u32>{},
     raw_keys:blot_support_pooled_buffer::Buffer<const u8[:]> =blot_support_pooled_buffer::Buffer<const u8[:]>{},
     inputs:blot_support_pooled_buffer::Buffer<ParseInput> =blot_support_pooled_buffer::Buffer<ParseInput>{},
+    scratch:u8[:]=default<u8[:]>(),
     total:i64=0,
     shared:u64=0,
 }
 fn deinit(batch:ParseBatch&) {
     if batch.shared!=0 {blot_native::persist_close(batch.shared);}
+    if batch.scratch.len!=0 {owned_source.free_slice(batch.scratch);batch.scratch=default<u8[:]>();}
     batch.paths.deinit(parse_paths);
     batch.raw_paths.deinit(parse_paths);
     for key in batch.raw_keys.items {releaseSource(key);}
@@ -57,9 +59,13 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
     let id=index+1;
     let size=blot_native::persist_size(batch.shared,id,2);
     if size<=1 {return false;}
-    var bytes:u8[>..<]=[];bytes.resize(size,0);
-    if !blot_native::persist_read(batch.shared,id,2,bytes[0],size as u64) {return false;}
-    return blot_reuse_parse_packet::decode(bytes[..],symbols,tree,recorded);
+    if size>batch.scratch.len {
+        let next_cap=max(size,batch.scratch.len*2);
+        if batch.scratch.len!=0 {owned_source.free_slice(batch.scratch);}
+        batch.scratch=owned_source.alloc_slice(next_cap);
+    }
+    if !blot_native::persist_read(batch.shared,id,2,batch.scratch[0],size as u64) {return false;}
+    return blot_reuse_parse_packet::decode(batch.scratch[..size],symbols,tree,recorded);
 }
 fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
     let batch .= loader.parse_batch;

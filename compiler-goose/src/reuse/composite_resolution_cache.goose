@@ -54,19 +54,30 @@ fn activate(cache: Cache&, physical: u16, effects_physical: u64) -> bool {
     }
     return true;
 }
-fn slot(root: u32, at: u32) -> i64 { ((root * 2654435769 ^ at * 2246822507) >> 28) as i64 }
+fn setBase(root: u32, at: u32, sets_mask: i64) -> i64 {
+    let h = (root * 2654435769) ^ (at * 2246822507);
+    return ((((h ^ (h >> 16)) as i64) & sets_mask) << 2);
+}
 fn get(cache: const Cache&, root: u32, at: u32) -> blot_support::Option<Record> {
     assert(valid(cache));
     let state:const State& =states[cache.lease-1];
     if state.entries.len == 0 { return blot_support::none<Record>(); }
-    let entry = state.entries.items[slot(root, at)];
-    if entry.root == root && entry.at == at { return blot_support::some(entry.record); }
+    let base = setBase(root, at, (state.entries.len >> 2) - 1);
+    for w in 0..4 {
+        let entry = state.entries.items[base + w];
+        if entry.root == root && entry.at == at { return blot_support::some(entry.record); }
+    }
     return blot_support::none<Record>();
 }
 fn occupied(cache: const Cache&, root: u32, at: u32) -> bool {
     assert(valid(cache));
     let state:const State& =states[cache.lease-1];
-    state.entries.len != 0 && state.entries.items[slot(root, at)].root != 0
+    if state.entries.len == 0 { return false; }
+    let base = setBase(root, at, (state.entries.len >> 2) - 1);
+    for w in 0..4 {
+        if state.entries.items[base + w].root == 0 { return false; }
+    }
+    return true;
 }
 fn probeHit(cache: Cache&, physical: u16, effects_physical: u64, root: u32, at: u32, collision: bool&) -> i64 {
     if cache.entries.len == 0 || physical == 65535 || effects_physical == 18446744073709551615 { return -1; }
@@ -75,16 +86,65 @@ fn probeHit(cache: Cache&, physical: u16, effects_physical: u64, root: u32, at: 
         cache.physical = physical; cache.effects_physical = effects_physical;
         return -1;
     }
-    let idx = slot(root, at);
-    let entry .= cache.entries.items[idx];
-    if entry.root == root && entry.at == at { return idx; }
-    if entry.root != 0 { collision = true; }
+    let base = setBase(root, at, (cache.entries.len >> 2) - 1);
+    var filled: i64 = 0;
+    for w in 0..4 {
+        let idx = base + w;
+        let entry .= cache.entries.items[idx];
+        if entry.root == root && entry.at == at { return idx; }
+        if entry.root != 0 { filled += 1; }
+    }
+    if filled == 4 { collision = true; }
     return -1;
+}
+fn growEntries(entries: EntryBuffer&, next_len: i64) {
+    let replacement = entry_runs.alloc_slice(next_len);
+    for &slot in replacement { slot = Entry {..}; }
+    let sets_mask = (next_len >> 2) - 1;
+    for entry in entries.items {
+        if entry.root == 0 { continue; }
+        let base = setBase(entry.root, entry.at, sets_mask);
+        var placed = false;
+        for w in 0..4 {
+            if replacement[base + w].root == 0 { replacement[base + w] = entry; placed = true; break; }
+        }
+        if !placed { replacement[base + (((entry.root ^ entry.at) & 3) as i64)] = entry; }
+    }
+    clear(entries);
+    entries.items = replacement;
+    entries.len = next_len;
 }
 fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
     assert(valid(cache));
     let state:State& =states[cache.lease-1];
-    if state.entries.len == 0 { state.entries.resize(16, Entry {..}); }
-    state.entries.items[slot(root, at)] = Entry { root, at, record , ..};
+    if state.entries.len == 0 { state.entries.resize(256, Entry {..}); }
+    let base = setBase(root, at, (state.entries.len >> 2) - 1);
+    var empty: i64 = -1;
+    for w in 0..4 {
+        let idx = base + w;
+        let entry = state.entries.items[idx];
+        if entry.root == root && entry.at == at {
+            state.entries.items[idx] = Entry { root, at, record , ..};
+            return blot_error::Error.none;
+        }
+        if entry.root == 0 && empty < 0 { empty = idx; }
+    }
+    if empty >= 0 {
+        state.entries.items[empty] = Entry { root, at, record , ..};
+        return blot_error::Error.none;
+    }
+    if state.entries.len < 2048 {
+        growEntries(state.entries, state.entries.len * 2);
+        let base2 = setBase(root, at, (state.entries.len >> 2) - 1);
+        for w in 0..4 {
+            if state.entries.items[base2 + w].root == 0 {
+                state.entries.items[base2 + w] = Entry { root, at, record , ..};
+                return blot_error::Error.none;
+            }
+        }
+        state.entries.items[base2 + (((root ^ at) & 3) as i64)] = Entry { root, at, record , ..};
+        return blot_error::Error.none;
+    }
+    state.entries.items[base + (((root ^ at) & 3) as i64)] = Entry { root, at, record , ..};
     return blot_error::Error.none;
 }

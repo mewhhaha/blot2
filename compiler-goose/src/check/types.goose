@@ -867,7 +867,32 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
         function => {
             let parameter, pe = resolveFunctionChild(self_, value.a, position, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
             let result, re = resolveFunctionChild(self_, value.b, position, depth + 1); if re != blot_error::Error.none { return 0, re; }
-            let effect_row, ee = resolveOperationRow(self_, value.c, position, depth + 1); if ee != blot_error::Error.none { return 0, ee; }
+            var effect_row = value.c;
+            if effect_row != 0 {
+                var row_done = false;
+                if depth < 1023 {
+                    let r = row(self_, effect_row);
+                    if r.labels.len == 0 {
+                        match r.tail {
+                            variable v => {
+                                let w = self_.effects.variables.items[v.value];
+                                if position <= r.cursor && (w.last == blot_check_effects::none || self_.effects.versions.items[w.last].position < r.cursor) {
+                                    row_done = true;
+                                } else if w.first != blot_check_effects::none {
+                                    let fw = self_.effects.versions.items[w.first];
+                                    if fw.position >= max(position, r.cursor) && fw.replacement == 0 {
+                                        effect_row = 0; row_done = true;
+                                    }
+                                }
+                            },
+                            _ => { row_done = true; },
+                        }
+                    }
+                }
+                if !row_done {
+                    let next_row, ee = resolveOperationRow(self_, effect_row, position, depth + 1); if ee != blot_error::Error.none { return 0, ee; } effect_row = next_row;
+                }
+            }
             if parameter == value.a && result == value.b && effect_row == value.c { return id, blot_error::Error.none; }
             return functionWithEffects(self_, parameter, result, effect_row);
         },
@@ -1010,6 +1035,60 @@ fn occursResolved(self_: Store&, variable: u32, resolved_root: Id) -> bool, Erro
 }
 fn snapshotResolutionIds(values:const Id[:])->Id[:] {let result=resolution_arguments.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
 recursive fn unifyEffects(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
+    if left == 0 && right == 0 { return blot_error::Error.none; }
+    if left == 0 {
+        let r = row(self_, right);
+        if r.labels.len == 0 {
+            match r.tail {
+                variable v => {
+                    if self_.effects.variables.items[v.value].first == blot_check_effects::none {
+                        return effectError(self_.effects.appendVersion(v.value, 0));
+                    }
+                },
+                _ => {},
+            }
+        }
+    } else if right == 0 {
+        let l = row(self_, left);
+        if l.labels.len == 0 {
+            match l.tail {
+                variable v => {
+                    if self_.effects.variables.items[v.value].first == blot_check_effects::none {
+                        return effectError(self_.effects.appendVersion(v.value, 0));
+                    }
+                },
+                _ => {},
+            }
+        }
+    } else {
+        let l = row(self_, left);
+        let r = row(self_, right);
+        if l.labels.len == 0 && r.labels.len == 0 {
+            if left == right {
+                match l.tail {
+                    variable v => { if self_.effects.variables.items[v.value].first == blot_check_effects::none { return blot_error::Error.none; } },
+                    _ => { return blot_error::Error.none; },
+                }
+            } else if l.cursor == 0 && r.cursor == 0 {
+                match l.tail {
+                    variable lv => {
+                        if self_.effects.variables.items[lv.value].first == blot_check_effects::none {
+                            match r.tail {
+                                variable rv => {
+                                    if self_.effects.variables.items[rv.value].first == blot_check_effects::none {
+                                        if lv.value == rv.value { return blot_error::Error.none; }
+                                        return effectError(self_.effects.appendVersion(lv.value, right));
+                                    }
+                                },
+                                _ => {},
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
     let point = mark(self_); let error = unifyEffectsInner(self_, left, right); if error != blot_error::Error.none { rollback(self_, point); } return error;
 }
 recursive fn unifyEffectsInner(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
@@ -1324,6 +1403,35 @@ fn resolveUnification(self_: Store&, root: Id) -> Id, Error {
     let result, error = resolve(self_, root, 0); saturatedAdd(self_.normalization.unify_resolve_entries, self_.normalization.resolve_depth_entries - entries); saturatedAdd(self_.normalization.unify_resolve_nodes, (self_.nodes.len - nodes) as u64); return result, error;
 }
 recursive fn unifyMode<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool) -> Error {
+    if !associated && !self_.has_projections {
+        if left == right && (left <= never || !self_.has_rank_types) {
+            increment(self_.normalization.unify_pairs);
+            return blot_error::Error.none;
+        }
+        if left <= never && right <= never {
+            increment(self_.normalization.unify_pairs);
+            if left == never || right == never { return blot_error::Error.none; }
+            return mismatch(self_, reporter, left, right);
+        }
+        if !self_.has_rank_types && self_.associated_equations.count == 0 {
+            if right > absent && right < never {
+                let ln = node(self_, left);
+                if ln.tag == Tag.variable && ln.b == 0 && self_.variables.items[ln.a].first == none {
+                    increment(self_.normalization.unify_pairs);
+                    self_.occurs_steps += 1;
+                    return appendVersion(self_, left, right);
+                }
+            }
+            if left > absent && left < never {
+                let rn = node(self_, right);
+                if rn.tag == Tag.variable && rn.b == 0 && self_.variables.items[rn.a].first == none {
+                    increment(self_.normalization.unify_pairs);
+                    self_.occurs_steps += 1;
+                    return appendVersion(self_, right, left);
+                }
+            }
+        }
+    }
     let point = mark(self_); let error = unifyInner(self_, left, right, reporter, associated); if error != blot_error::Error.none { rollback(self_, point); } return error;
 }
 type UnificationSeen=blot_support_pooled_map::Map<Pair,bool>;
@@ -1364,8 +1472,10 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
             let error = unifyEffects(self_, pair.a, pair.b); if error != blot_error::Error.none { return error; } continue;
         }
         increment(self_.normalization.unify_pairs); if self_.has_projections { increment(self_.normalization.unify_projected_pairs); }
-        let a, ae = resolveUnification(self_, pair.a); if ae != blot_error::Error.none { return ae; }
-        let b, be = resolveUnification(self_, pair.b); if be != blot_error::Error.none { return be; }
+        var a = pair.a;
+        if a > never || self_.has_projections { let ra, ae = resolveUnification(self_, a); if ae != blot_error::Error.none { return ae; } a = ra; }
+        var b = pair.b;
+        if b > never || self_.has_projections { let rb, be = resolveUnification(self_, b); if be != blot_error::Error.none { return be; } b = rb; }
         let an = node(self_, a); let bn = node(self_, b);
         // Only stores with rank types can contain a row or region identity.
         if self_.has_rank_types {
@@ -1400,10 +1510,22 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
             bound => { return mismatch(self_, reporter, a, b); },
             rigid, instance_version => { if an.a != bn.a || an.b != bn.b || an.c != bn.c { return mismatch(self_, reporter, a, b); } },
             forall, existential => { return mismatch(self_, reporter, a, b); },
-            function => { let pending_failure_2=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_2!=blot_error::Error.none {return pending_failure_2;} },
+            function => {
+                if an.c == 0 && bn.c == 0 {
+                    let pending_failure_2=appendUnification(pending,[Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_2!=blot_error::Error.none {return pending_failure_2;}
+                } else {
+                    let pending_failure_2=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_2!=blot_error::Error.none {return pending_failure_2;}
+                }
+            },
             product => { if an.b != bn.b { return mismatch(self_, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; let pending_failure_3=pushUnification(pending,Pair { self_.extra.items[an.a + i], self_.extra.items[bn.a + i] , ..});if pending_failure_3!=blot_error::Error.none {return pending_failure_3;} } },
             array, list, cursor, resolver => { let pending_failure_4=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_4!=blot_error::Error.none {return pending_failure_4;} },
-            provider => { let pending_failure_5=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_5!=blot_error::Error.none {return pending_failure_5;} },
+            provider => {
+                if an.c == 0 && bn.c == 0 {
+                    let pending_failure_5=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_5!=blot_error::Error.none {return pending_failure_5;}
+                } else {
+                    let pending_failure_5=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_5!=blot_error::Error.none {return pending_failure_5;}
+                }
+            },
             state_provider => { let pending_failure_6=appendUnification(pending,[Pair { an.c, bn.c , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_6!=blot_error::Error.none {return pending_failure_6;} },
             scoped => {
                 if an.b == 0 && node(self_, an.c).tag == Tag.variable && !regionIdentity(self_, an.c) { if bn.b != 0 || an.c != bn.c { let pending_failure_7=pushUnification(pending,Pair { an.c, b , ..});if pending_failure_7!=blot_error::Error.none {return pending_failure_7;} } }
@@ -1996,11 +2118,54 @@ recursive fn covariantInputsSeen(self_: Store&, root: Id, out: u32[>..]&, depth:
     }
     return blot_error::Error.none;
 }
+fn isCovariantContainer(tag: Tag) -> bool {
+    match tag {
+        function, provider, product, record, usage, array, list, cursor => { return true; },
+        _ => { return false; },
+    }
+}
+fn openFunctionEffect(self_: Store&, effect_row: blot_check_effects::Id) -> blot_check_effects::Id, Error {
+    let existing = self_.effects.node(effect_row);
+    if existing.tail != blot_check_effects::Tail.closed { return effect_row, blot_error::Error.none; }
+    let opened, oe = freshEffects(self_); if oe != blot_error::Error.none { return 0, oe; }
+    if existing.labels.len == 0 { return opened, blot_error::Error.none; }
+    let next, error = self_.effects.rowWithList(existing.labels, self_.effects.node(opened).tail);
+    if error != blot_error::Error.none { return 0, effectError(error); }
+    return next, blot_error::Error.none;
+}
 fn openCovariant(self_: Store&, root: Id) -> Id, Error {
     if !self_.has_projections {
-        match node(self_, root).tag {
-            function, provider, product, record, usage, array, list, cursor => {},
-            _ => { increment(self_.normalization.open_depth_entries); return root, blot_error::Error.none; },
+        let value = node(self_, root);
+        if !isCovariantContainer(value.tag) {
+            increment(self_.normalization.open_depth_entries);
+            return root, blot_error::Error.none;
+        }
+        if value.tag == Tag.function {
+            let bn = node(self_, value.b);
+            if !isCovariantContainer(bn.tag) {
+                increment(self_.normalization.open_depth_entries);
+                let before = self_.nodes.len;
+                let effect_row, oe = openFunctionEffect(self_, value.c); if oe != blot_error::Error.none { return 0, oe; }
+                if effect_row == value.c { return root, blot_error::Error.none; }
+                let res, err = functionWithEffects(self_, value.a, value.b, effect_row);
+                if err == blot_error::Error.none { saturatedAdd(self_.normalization.open_nodes_added, (self_.nodes.len - before) as u64); }
+                return res, err;
+            }
+            if bn.tag == Tag.function && !isCovariantContainer(node(self_, bn.b).tag) {
+                increment(self_.normalization.open_depth_entries);
+                let before = self_.nodes.len;
+                let inner_row, ie = openFunctionEffect(self_, bn.c); if ie != blot_error::Error.none { return 0, ie; }
+                var inner_res = value.b;
+                if inner_row != bn.c {
+                    let made, me = functionWithEffects(self_, bn.a, bn.b, inner_row); if me != blot_error::Error.none { return 0, me; }
+                    inner_res = made;
+                }
+                let outer_row, oe = openFunctionEffect(self_, value.c); if oe != blot_error::Error.none { return 0, oe; }
+                if inner_res == value.b && outer_row == value.c { return root, blot_error::Error.none; }
+                let res, err = functionWithEffects(self_, value.a, inner_res, outer_row);
+                if err == blot_error::Error.none { saturatedAdd(self_.normalization.open_nodes_added, (self_.nodes.len - before) as u64); }
+                return res, err;
+            }
         }
     }
     let attribution_start = self_.nodes.len; var memo = dictionary<CovariantInput, Id> {}; let result, error = openCovariantDepth(self_, root, memo, 0);
@@ -2019,18 +2184,12 @@ recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<Covaria
     let value = node(self_, root);
     match value.tag {
         provider => {
-            var effect_row = value.c; if self_.effects.node(effect_row).tail == blot_check_effects::Tail.closed {
-                let opened, oe = freshEffects(self_); if oe != blot_error::Error.none { return 0, oe; }
-                let next, error = self_.effects.rowWithList(self_.effects.node(effect_row).labels, self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
-            }
+            let effect_row, oe = openFunctionEffect(self_, value.c); if oe != blot_error::Error.none { return 0, oe; }
             if effect_row == value.c { return root, blot_error::Error.none; } return provider(self_, value.a, effect_row);
         },
         function => {
             let result, re = openCovariantDepth(self_, value.b, memo, depth + 1); if re != blot_error::Error.none { return 0, re; }
-            var effect_row = value.c; if self_.effects.node(effect_row).tail == blot_check_effects::Tail.closed {
-                let opened, oe = freshEffects(self_); if oe != blot_error::Error.none { return 0, oe; }
-                let next, error = self_.effects.rowWithList(self_.effects.node(effect_row).labels, self_.effects.node(opened).tail); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
-            }
+            let effect_row, oe = openFunctionEffect(self_, value.c); if oe != blot_error::Error.none { return 0, oe; }
             if result == value.b && effect_row == value.c { return root, blot_error::Error.none; } return functionWithEffects(self_, value.a, result, effect_row);
         },
         product, record => {
