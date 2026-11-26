@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-25-rust-and-bevy-ecs-wtime-0.1.3.json"
+DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.6.json"
 OUT_DIR = ROOT / "benchmarks/evidence/measurements"
 
 FONT = "'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
@@ -137,7 +137,7 @@ def build_compile_and_size(data: dict) -> str:
         text(
             28,
             304,
-            f"wtime-aot 0.1.3 x64 AOT-compiles Blot Wasm in {aot_k:.1f} ms. On a 319-module / 6.19 MB 3D game: ~0.63 s cold, 61–90 ms structural edits, ~20 ms literal edits.",
+            f"wtime-aot 0.1.6 x64 AOT-compiles Blot Wasm in {aot_k:.1f} ms. On a 319-module / 6.19 MB 3D game: ~0.63 s cold, 61–90 ms structural edits, ~20 ms literal edits.",
             size=10.8,
             fill=TEXT_MUTED,
         )
@@ -223,7 +223,7 @@ def build_kernels_chart(data: dict) -> str:
         text(
             28,
             h - 16,
-            "Linear 0..max scale per card. Executed via wtime-aot 0.1.3 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
+            "Linear 0..max scale per card. Executed via wtime-aot 0.1.6 (--backend x64, x64-v3, explicit software bounds). Blot enforces canonical 0x7fc00000 NaN.",
             size=10.5,
             fill=TEXT_MUTED,
         )
@@ -387,8 +387,8 @@ def build_ecs_chart(data: dict) -> str:
 def main() -> None:
     data = json.loads(DATA_PATH.read_text())
     outputs = {
-        "2026-11-25-compile-and-size.svg": build_compile_and_size(data),
-        "2026-11-25-blot-vs-rust-kernels.svg": build_kernels_chart(data),
+        "2026-11-26-compile-and-size.svg": build_compile_and_size(data),
+        "2026-11-26-blot-vs-rust-kernels.svg": build_kernels_chart(data),
     }
     for fname, content in outputs.items():
         path = OUT_DIR / fname

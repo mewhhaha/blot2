@@ -674,7 +674,7 @@ fn main() {
         "checksum_bevy": bevy_snap_chk,
     }));
 
-    // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot v0.1.2,
+    // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot 0.1.6,
     //    generalized AoS Vec2/Vec4 record auto-SIMD, multi-core isolated-guest scaling,
     //    and persistent #process throughput.
     let blot_kernels_w3_wasm = Path::new("/tmp/blot_kernels_w3.wasm");
@@ -910,7 +910,7 @@ fn main() {
         }));
     }
 
-    // 4d. Persistent ABI 8 `#process` zero-alloc step throughput on wtime-aot v0.1.2.
+    // 4d. Persistent ABI 8 `#process` zero-alloc step throughput on wtime-aot 0.1.6.
     let (proc_noop_us, proc_phys_us) = {
         let mut g = mc_def_mod.instantiate();
         g.call_proc_init("particle_sim", 4096);
@@ -942,14 +942,22 @@ fn main() {
                 .and_then(|l| l.split('"').nth(1))
                 .map(|v| v.to_string())
         })
-        .unwrap_or_else(|| "0.1.3".to_string());
+        .unwrap_or_else(|| "0.1.6".to_string());
+    let rustc_version = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.split_whitespace().nth(1).map(|v| v.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
             "blot_commit": blot_commit,
             "wtime_aot": format!("{wtime_version} (x64-v3, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
-            "rustc": "1.96.0-nightly",
+            "rustc": rustc_version,
         },
         "compile_speed_ms": {
             "blot_6_kernels_ms": blot_compile_ms,
