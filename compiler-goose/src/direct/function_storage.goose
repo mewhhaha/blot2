@@ -1022,8 +1022,7 @@ fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: 
     let elem_tag = tagOf(g, element);
     // 7B: Skip dead zero/constant memory.fill when an immediately following 0..count loop
     // unconditionally initializes every element before any read.
-    if is_fill && skip_fill && source.len == 1 && (step == 1 || step == 4) &&
-        (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.f32_ || byteElement(elem_tag)) {
+    if is_fill && skip_fill && source.len == 1 && (step == 1 || step == 4 || step == 8) && isScalarTag(elem_tag) {
         return handle, blot_direct_types::Error.none;
     }
     if is_fill && step == 1 && source.len == 1 && byteElement(elem_tag) {
@@ -1033,7 +1032,49 @@ fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: 
         memoryFillOp(g);
         return handle, blot_direct_types::Error.none;
     }
-    if is_fill && step == 4 && source.len == 1 && (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.boolean || elem_tag == blot_direct_types::Tag.f32_) {
+    if is_fill && step == 8 && source.len == 1 &&
+        (elem_tag == blot_direct_types::Tag.u64_ || elem_tag == blot_direct_types::Tag.i64_ || elem_tag == blot_direct_types::Tag.f64_) {
+        let bytes = emitScaledBytes(g, f, count, 8);
+        lget(g, w(g, source, 0));
+        if elem_tag == blot_direct_types::Tag.f64_ { op(g, OP_i64_reinterpret_f64); }
+        op(g, OP_i64_eqz);
+        let opened = open(g, f, OP_if_);
+        lget(g, base);
+        i32Const(g, 0);
+        lget(g, bytes);
+        memoryFillOp(g);
+        popCheckedArraysAt(f, opened);
+        op(g, OP_else_);
+        let ptr = local32(g, f);
+        let end_ptr = local32(g, f);
+        lget(g, base);
+        ltee(g, ptr);
+        lget(g, bytes);
+        op(g, OP_i32_add);
+        lset(g, end_ptr);
+        let exit = open(g, f, OP_block);
+        let top = open(g, f, OP_loop);
+        lget(g, ptr);
+        lget(g, end_ptr);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, exit);
+        lget(g, ptr);
+        lget(g, w(g, source, 0));
+        if elem_tag == blot_direct_types::Tag.f64_ { op(g, OP_f64_store); } else { op(g, OP_i64_store); }
+        uleb(g, 2);
+        uleb(g, 0);
+        lget(g, ptr);
+        i32Const(g, 8);
+        op(g, OP_i32_add);
+        lset(g, ptr);
+        br(g, f, OP_br, top);
+        close(g, f);
+        close(g, f);
+        popCheckedArraysAt(f, opened);
+        close(g, f);
+        return handle, blot_direct_types::Error.none;
+    }
+    if is_fill && step == 4 && source.len == 1 && (elem_tag == blot_direct_types::Tag.u32_ || elem_tag == blot_direct_types::Tag.i32_ || elem_tag == blot_direct_types::Tag.boolean || elem_tag == blot_direct_types::Tag.f32_) {
         let bytes = emitScaledBytes(g, f, count, 4);
         let bits = local32(g, f);
         lget(g, w(g, source, 0));

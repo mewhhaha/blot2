@@ -106,9 +106,33 @@ fn isPureSelectOp(op_: Op) -> bool {
         bit_and, bit_or, bit_xor, shift_left, shift_right, shift_right_signed,
         neg, abs, ceil, floor, trunc, sqrt, min, max,
         convert_u32_f32, convert_f32_u32, convert_f32_i32, convert_i32_f32,
+        numeric_convert, bits, from_bits,
         bit_andnot, bit_not, not_ => { return true; },
         _ => { return false; },
     }
+}
+// True when `id` is a `Tag.project` method on a concrete numeric/boolean scalar
+// that resolves directly to a unary scalar primitive (e.g. `.to_u32`, `.to_u8`,
+// `.to_u64`, `.to_i64`, `.to_f32`, `.to_f64`, `.abs`). Such projections never
+// allocate, never mutate memory, and never resize storage.
+fn isPureScalarProject(g: const Generator&, m: const Module&, id: u32) -> bool {
+    let n = m.node(id);
+    if n.tag != blot_check_core::Tag.project { return false; }
+    let proj = m.projection(n.b);
+    if m.projectionVariants(n.b).len != 0 { return false; }
+    let receiver_node = m.types.node(m.typeOf(n.a));
+    if !blot_check_types::isNumeric(receiver_node.tag) && receiver_node.tag != blot_check_types::Tag.boolean {
+        return false;
+    }
+    let ident = blot_check_types::receiverIdentity(receiver_node);
+    if !ident.present { return false; }
+    let target, has_target = g.dispatchTarget(m, ident.value, proj.field, blot_check_types::Operator.none);
+    if !has_target || !g.hasUnit(target.unit) { return false; }
+    let tm .= g.units[target.unit - 1];
+    let alias, is_prim = primitiveAlias(tm, target.binding);
+    if !is_prim { return false; }
+    let p = tm.primitive(alias);
+    return p.kind == blot_check_core::PrimitiveKind.scalar && p.arity == 1;
 }
 recursive fn isPureSelectExpr(g: const Generator&, f: const Fn&, m: const Module&, id: u32, budget: i64&) -> bool {
     if id == 0 { return true; }
@@ -126,6 +150,10 @@ recursive fn isPureSelectExpr(g: const Generator&, f: const Fn&, m: const Module
         scalar => {
             if !isPureSelectOp(n.op) { return false; }
             return isPureSelectExpr(g, f, m, n.a, budget) && isPureSelectExpr(g, f, m, n.b, budget);
+        },
+        project => {
+            if !isPureScalarProject(g, m, id) { return false; }
+            return isPureSelectExpr(g, f, m, n.a, budget);
         },
         bind => {
             if n.c >= 2 || m.binding(n.a).scheme.variables.len != 0 { return false; }
@@ -908,6 +936,10 @@ recursive fn deadFillExprUsesOrCalls(g: Generator&, m: const Module&, id: u32, b
         logical => {
             return deadFillExprUsesOrCalls(g, m, n.a, b1, b2, b3, budget) ||
                 deadFillExprUsesOrCalls(g, m, n.b, b1, b2, b3, budget);
+        },
+        project => {
+            if !isPureScalarProject(g, m, id) { return true; }
+            return deadFillExprUsesOrCalls(g, m, n.a, b1, b2, b3, budget);
         },
         call => {
             let info = m.call(id);
@@ -3535,6 +3567,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
         },
         constant, reference, panic => { return true; },
         project => {
+            if isPureScalarProject(g, m, id) { return noStorageResize(g, m, n.a, left); }
             let proj = m.projection(n.b);
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return noStorageResize(g, m, n.a, left); }
@@ -3806,6 +3839,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             return true;
         },
         project => {
+            if isPureScalarProject(g, m, id) { return scanLoopResize(g, m, n.a, resized, resized_len, left); }
             let proj = m.projection(n.b);
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return scanLoopResize(g, m, n.a, resized, resized_len, left); }
@@ -4817,6 +4851,7 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
             return true;
         },
         project => {
+            if isPureScalarProject(g, m, id) { return bodyNoAlloc(g, f, m, n.a, left); }
             let proj = m.projection(n.b);
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.a, left); }
@@ -6202,6 +6237,8 @@ recursive fn bodyValidDeferF32Nan(
             return bodyValidDeferF32Nan(g, m, ctx, n.b, required_ctor, false, false, has_f32_write, budget, inline_depth);
         },
         project => {
+            let sp = m.fieldSpelling(m.projection(n.b).field);
+            if sp.present && sp.value == "to_bits" { return false; }
             return bodyValidDeferF32Nan(g, m, ctx, n.a, required_ctor, false, false, has_f32_write, budget, inline_depth);
         },
         scalar, associated => {

@@ -372,6 +372,68 @@ fn emitU32StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, le
     return false;
 }
 
+fn floorLog2U64(value: u64) -> u64 {
+    var bits = value;
+    var log: u64 = 0;
+    while bits > 1 { bits >>= 1; log += 1; }
+    return log;
+}
+fn emitU64Pow2Reduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, left: Val, right_id: u32, right: Val) -> bool {
+    if machine != blot_check_core::Op.mul && machine != blot_check_core::Op.div && machine != blot_check_core::Op.rem { return false; }
+    let m .= g.units[f.unit - 1];
+    if machine == blot_check_core::Op.mul {
+        var input = left;
+        var input_id = left_id;
+        var cnode: u32 = 0;
+        var factor: u64 = 0;
+        if right.len == 0 {
+            let rn = m.node(right_id);
+            let rv = (rn.a as u64) | ((rn.b as u64) << 32);
+            if rv == 0 || (rv & (rv - 1)) == 0 { factor = rv; cnode = right_id; }
+        }
+        if cnode == 0 && left.len == 0 {
+            let ln = m.node(left_id);
+            let lv = (ln.a as u64) | ((ln.b as u64) << 32);
+            if lv == 0 || (lv & (lv - 1)) == 0 {
+                factor = lv;
+                cnode = left_id;
+                input = right;
+                input_id = right_id;
+            }
+        }
+        if cnode == 0 { return false; }
+        blot_direct_relocations::unpatchableOperand(m.unit, cnode);
+        if factor == 0 { i64Const(g, 0); }
+        else {
+            pushScalarOperand(g, f, input_id, input);
+            if factor > 1 {
+                i64Const(g, floorLog2U64(factor) as i64);
+                op(g, OP_i64_shl);
+            }
+        }
+        return true;
+    }
+    if right.len != 0 { return false; }
+    let rn = m.node(right_id);
+    let d = (rn.a as u64) | ((rn.b as u64) << 32);
+    if d == 0 || (d & (d - 1)) != 0 { return false; }
+    blot_direct_relocations::unpatchableOperand(m.unit, right_id);
+    if d == 1 {
+        if machine == blot_check_core::Op.rem { i64Const(g, 0); }
+        else { pushScalarOperand(g, f, left_id, left); }
+        return true;
+    }
+    pushScalarOperand(g, f, left_id, left);
+    if machine == blot_check_core::Op.rem {
+        i64Const(g, (d - 1) as! i64);
+        op(g, OP_i64_and);
+    } else {
+        i64Const(g, floorLog2U64(d) as i64);
+        op(g, OP_i64_shr_u);
+    }
+    return true;
+}
+
 recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, stack_result: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -532,6 +594,10 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     }
     if has_right && left.ty == blot_direct_types::u32_ &&
         emitU32StrengthReduction(g, f, machine, n.a, left, n.b, right) {
+        return pop(g, f, result, id);
+    }
+    if has_right && left.ty == blot_direct_types::u64_ &&
+        emitU64Pow2Reduction(g, f, machine, n.a, left, n.b, right) {
         return pop(g, f, result, id);
     }
     pushScalarOperand(g, f, n.a, left);
