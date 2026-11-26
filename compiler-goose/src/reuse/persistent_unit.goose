@@ -225,9 +225,11 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
         if node.tag==blot_check_core::Tag.fork_ {has_fork_byte=2;break;}
     }
     packet.clear();
+    var hdr:u8[64]=[0;64];
+    packet.append(hdr);
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,unit);
-    blot_project_packet::putExecutionCore(writer,core.value);
+    blot_project_packet::putExecutionCoreHeader(writer,core.value);
     blot_project_packet::put(writer,module.checked.body_elaborations);
     blot_project_packet::put(writer,module.checked.imported_schemes);
     blot_project_packet::put(writer,module.checked.types.normalization);
@@ -238,6 +240,7 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     blot_project_packet::put(writer,freeze_elapsed);
     blot_project_packet::put(writer,lower_elapsed);
     blot_project_packet::put(writer,has_fork_byte);
+    blot_project_packet::putExecutionCoreTables(writer,core.value);
     core.deinit();
     if writer.failure!=blot_error::Error.none {return writer.failure;}
     if !blot_native::persist_publish(shared,unit,2,packet[0],packet.len as u64) {return blot_error::Error.invalid_artifact;}

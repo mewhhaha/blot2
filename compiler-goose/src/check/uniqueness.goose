@@ -1714,21 +1714,24 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         based = self_.base_node == id;
         self_.base_node = 0;
     }
-    if tag == blot_check_core::Tag.state_provider || tag == blot_check_core::Tag.effect_provider || tag == blot_check_core::Tag.handle {
+    match tag {
+    state_provider, effect_provider, handle => {
         // A provider names the operations it answers; that is not a use
         // of them as functions.
         let start = self_.children.len;
         appendChildren(self_.children, m, id);
         for child in self_.children[start..] { if m.node(child).tag == blot_check_core::Tag.operation_value { self_.heads[child] = true; } }
         self_.children.resize(start);
-    }
-    if tag == blot_check_core::Tag.constructor_function || tag == blot_check_core::Tag.primitive_function || tag == blot_check_core::Tag.operation_value {
+        let exits = visitChildren(self_, m, id);
+        return Value { exits: exits, .. };
+    },
+    constructor_function, primitive_function, operation_value => {
         if !self_.heads[id] { keeperValue(self_, m, id, n.ty); }
         return Value { .. };
-    }
-    if tag == blot_check_core::Tag.constant || tag == blot_check_core::Tag.type_constructor || tag == blot_check_core::Tag.invalid { return Value { .. }; }
-    if tag == blot_check_core::Tag.panic { return Value { exits: true, .. }; }
-    if tag == blot_check_core::Tag.reference {
+    },
+    constant, type_constructor, invalid => { return Value { .. }; },
+    panic => { return Value { exits: true, .. }; },
+    reference => {
         let target = m.reference(id);
         // A function that takes over a parameter is only ever called in
         // full, which `apply` and `call` see before this.
@@ -1751,14 +1754,14 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // Read as a whole while a field of it is given away.
         if !based && !self_.dry && partSpent(self_, self_.facts[target.binding]) { rejectSubject(self_, m, id, blot_check_core::Code.spent_value, target.binding); return Value { .. }; }
         return Value { origin: target.binding, .. };
-    }
-    if tag == blot_check_core::Tag.suite {
+    },
+    suite => {
         let exits = statements(self_, m, id);
         return Value { exits: exits, .. };
-    }
-    if tag == blot_check_core::Tag.block_ { return block_(self_, m, id); }
-    if tag == blot_check_core::Tag.fork_ { return forkNode(self_, m, id); }
-    if tag == blot_check_core::Tag.with_handle {
+    },
+    block_ => { return block_(self_, m, id); },
+    fork_ => { return forkNode(self_, m, id); },
+    with_handle => {
         let mark = self_.with_cells.len;
         var outers: u32[16] = [0; 16];
         var afters: u32[16] = [0; 16];
@@ -1833,8 +1836,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
         }
         return Value { exits: body_val.exits, .. };
-    }
-    if tag == blot_check_core::Tag.bind {
+    },
+    bind => {
         let value = m.node(n.b);
         if value.tag == blot_check_core::Tag.update {
             let upd = update(self_, m, n.b, n.a);
@@ -1907,9 +1910,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if closureNonFreezable(self_, m, n.b) { setNonFreezable(self_, n.a, true); }
         }
         return Value { exits: result.exits, .. };
-    }
-    if tag == blot_check_core::Tag.update { return update(self_, m, id, 0); }
-    if tag == blot_check_core::Tag.return_ {
+    },
+    update => { return update(self_, m, id, 0); },
+    return_ => {
         let leaves = self_.function_roots.len != 0 && n.b == self_.function_roots[self_.function_roots.len - 1];
         // A local that leaves with the function has no later use, so the
         // value keeps the local's fact; so does one a tail block breaks with.
@@ -2031,9 +2034,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             break;
         }
         return Value { exits: field_break, .. };
-    }
-    if tag == blot_check_core::Tag.if_value || tag == blot_check_core::Tag.if_stmt || tag == blot_check_core::Tag.comptime_if { return conditional(self_, m, id); }
-    if tag == blot_check_core::Tag.comptime_meta {
+    },
+    if_value, if_stmt, comptime_if => { return conditional(self_, m, id); },
+    comptime_meta => {
         if n.c == 0 {
             let base = visit(self_, m, n.a);
             return Value { origin: base.origin, exits: base.exits, .. };
@@ -2041,10 +2044,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if n.c == 1 || n.c == 10 { return Value { fact: deep, .. }; }
         if n.c == 8 || n.c == 9 { return visit(self_, m, n.b); }
         return Value { .. };
-    }
-    if tag == blot_check_core::Tag.comptime_for { return comptimeFor(self_, m, id); }
-    if tag == blot_check_core::Tag.match_ { return match_(self_, m, id); }
-    if tag == blot_check_core::Tag.pattern_bind {
+    },
+    comptime_for => { return comptimeFor(self_, m, id); },
+    match_ => { return match_(self_, m, id); },
+    pattern_bind => {
         // Taking a value apart: the parts of a value nothing else holds
         // are each their name's alone. A wildcard `_` binds nothing and
         // does not retain an alias to `whole.origin`.
@@ -2065,11 +2068,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if fallback.exits { undo(self_, mark); undoLoanEnded(self_, loan_mark); }
         }
         return Value { .. };
-    }
-    if tag == blot_check_core::Tag.loop_ { return loop_(self_, m, id); }
-    if tag == blot_check_core::Tag.break_ { return breakNode(self_, m, id); }
-    if tag == blot_check_core::Tag.spark { return sparkNode(self_, m, id); }
-    if tag == blot_check_core::Tag.flat_op {
+    },
+    loop_ => { return loop_(self_, m, id); },
+    break_ => { return breakNode(self_, m, id); },
+    spark => { return sparkNode(self_, m, id); },
+    flat_op => {
         var exits = false;
         if n.c <= blot_check_core::flat_op_process_binding_hash {
             self_.brief_node = n.a;
@@ -2080,8 +2083,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var fact: Fact = none;
         if n.c <= blot_check_core::flat_op_decode_batch { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
-    }
-    if tag == blot_check_core::Tag.closure {
+    },
+    closure => {
         // A spent capture is reported where the body reads it.
         let body = m.closure(id).body;
         let parameter = m.closure(id).parameter.binding;
@@ -2146,8 +2149,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         self_.rebinding_cell_slot = outer_rebind_slot;
         self_.function_roots.resize(self_.function_roots.len - 1);
         return Value { .. };
-    }
-    if tag == blot_check_core::Tag.project {
+    },
+    project => {
         if m.dispatchSignature(id) != 0 {
             let named = calleeBinding(self_, m, id);
             var taking: u64 = 0;
@@ -2211,8 +2214,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if !based && !holds(self_, m, n.ty) { return Value { exits: value.exits, .. }; }
         return Value { origin: value.origin, exits: value.exits, .. };
-    }
-    if tag == blot_check_core::Tag.array {
+    },
+    array => {
         var elements_deep = true;
         var exits = false;
         for child in m.children(id) {
@@ -2223,8 +2226,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         let fact = freshContainer(self_, m, n.ty, elements_deep);
         return Value { fact: fact, exits: exits, .. };
-    }
-    if tag == blot_check_core::Tag.product {
+    },
+    product => {
         // A tuple nothing else holds: every part that can hold an array
         // is fresh or moved in.
         var parts_deep = true;
@@ -2241,9 +2244,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var fact: Fact = none;
         if parts_deep { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
-    }
-    if tag == blot_check_core::Tag.record { return recordLiteral(self_, m, id); }
-    if tag == blot_check_core::Tag.construct {
+    },
+    record => { return recordLiteral(self_, m, id); },
+    construct => {
         if id == self_.result_node { self_.result_node = n.b; }
         let payload = visit(self_, m, n.b);
         let literal = n.b != 0 && m.node(n.b).tag == blot_check_core::Tag.record;
@@ -2254,86 +2257,90 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // and a payload nothing else holds stays that way inside it.
         if n.b == 0 || ownedAs(self_, m, held, m.typeOf(n.b), 0) { fact = deep; }
         return Value { fact: fact, exits: payload.exits, .. };
-    }
-    if tag == blot_check_core::Tag.staging && (n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) || n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.evaluate)) {
-        let input = visit(self_, m, n.a);
-        return Value { fact: deep, exits: input.exits, .. };
-    }
-    if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false, brief, lends_to); }
-    if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
-    if tag == blot_check_core::Tag.call && m.call(id).own != 0 {
-        var call_binding: u32 = 0;
-        let target = m.call(id).target;
-        let found_cb .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
-        if found_cb { let idx: u32 = found_cb; call_binding = idx; }
-        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, call_binding, lends_to, brief);
-        // Every return of the callee gave a value nothing else holds, unless
-        // the instantiated result is a shared handle or borrowing view/closure.
-        var fact: Fact = deep;
-        if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
-        return Value { fact: fact, exits: exits, .. };
-    }
-    if tag == blot_check_core::Tag.apply {
-        // `f a b` and `a.f b` reach a function through its value: a
-        // chain of applications, one argument each. Its type says which
-        // parameters it takes over.
-        var arguments: u32[32] = [0; 32];
-        var count: i64 = 0;
-        var callee = id;
-        while count < 32 && m.node(callee).tag == blot_check_core::Tag.apply {
-            arguments[count] = m.node(callee).b;
-            count += 1;
-            callee = m.node(callee).a;
+    },
+    staging => {
+        if n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) || n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.evaluate) {
+            let input = visit(self_, m, n.a);
+            return Value { fact: deep, exits: input.exits, .. };
         }
-        let member = m.node(callee).tag == blot_check_core::Tag.project && m.dispatchSignature(callee) != 0;
-        var taking: u64 = 0;
-        if m.node(callee).tag != blot_check_core::Tag.apply {
-            if member {
-                // The member the value's type selects says it itself; the
-                // signature the checker wrote for the use need not.
-                let named = calleeBinding(self_, m, callee);
-                if named != 0 && m.bindings[named].capability_parameters.own != 0 {
-                    taking = ((m.bindings[named].capability_parameters.own_count as u64) << 32) | m.bindings[named].capability_parameters.own;
-                } else {
-                    taking = typeTaking(m, m.dispatchSignature(callee));
-                }
-            } else {
-                taking = typeTaking(m, m.typeOf(callee));
-            }
-        }
-        let mask = taking as! u32;
-        // The value of `value.member` is the first argument.
-        if mask != 0 && member && count < 32 {
-            arguments[count] = m.node(callee).a;
-            count += 1;
-        }
-        if mask != 0 && count == (taking >> 32) as i64 {
-            for at in 0..count / 2 {
-                let other = arguments[count - 1 - at];
-                arguments[count - 1 - at] = arguments[at];
-                arguments[at] = other;
-            }
-            var exits = false;
-            if !member {
-                self_.heads[callee] = true;
-                let held = visit(self_, m, callee);
-                exits = held.exits;
-            }
-            let call_binding = calleeBinding(self_, m, callee);
-            exits = ownArguments(self_, m, arguments[..count], mask, n.ty, call_binding, lends_to, brief) || exits;
+        let exits = visitChildren(self_, m, id);
+        return Value { exits: exits, .. };
+    },
+    array_op => { return arrayOp(self_, m, id, false, brief, lends_to); },
+    storage => { return storageOp(self_, m, id); },
+    call, apply => {
+        if tag == blot_check_core::Tag.call && m.call(id).own != 0 {
+            var call_binding: u32 = 0;
+            let target = m.call(id).target;
+            let found_cb .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+            if found_cb { let idx: u32 = found_cb; call_binding = idx; }
+            let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, call_binding, lends_to, brief);
             // Every return of the callee gave a value nothing else holds, unless
             // the instantiated result is a shared handle or borrowing view/closure.
             var fact: Fact = deep;
             if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
             return Value { fact: fact, exits: exits, .. };
         }
-        // Given a parameter it takes over but not all its arguments, the
-        // function would hold the argument for any number of calls.
-        if mask != 0 && count < (taking >> 32) as i64 && count < 32 && mask & (((1 as u32) << (count as! u32)) - 1) != 0 && !self_.inner[id] {
-            reject(self_, m, id, blot_check_core::Code.own_function_value);
+        if tag == blot_check_core::Tag.apply {
+            // `f a b` and `a.f b` reach a function through its value: a
+            // chain of applications, one argument each. Its type says which
+            // parameters it takes over.
+            var arguments: u32[32] = [0; 32];
+            var count: i64 = 0;
+            var callee = id;
+            while count < 32 && m.node(callee).tag == blot_check_core::Tag.apply {
+                arguments[count] = m.node(callee).b;
+                count += 1;
+                callee = m.node(callee).a;
+            }
+            let member = m.node(callee).tag == blot_check_core::Tag.project && m.dispatchSignature(callee) != 0;
+            var taking: u64 = 0;
+            if m.node(callee).tag != blot_check_core::Tag.apply {
+                if member {
+                    // The member the value's type selects says it itself; the
+                    // signature the checker wrote for the use need not.
+                    let named = calleeBinding(self_, m, callee);
+                    if named != 0 && m.bindings[named].capability_parameters.own != 0 {
+                        taking = ((m.bindings[named].capability_parameters.own_count as u64) << 32) | m.bindings[named].capability_parameters.own;
+                    } else {
+                        taking = typeTaking(m, m.dispatchSignature(callee));
+                    }
+                } else {
+                    taking = typeTaking(m, m.typeOf(callee));
+                }
+            }
+            let mask = taking as! u32;
+            // The value of `value.member` is the first argument.
+            if mask != 0 && member && count < 32 {
+                arguments[count] = m.node(callee).a;
+                count += 1;
+            }
+            if mask != 0 && count == (taking >> 32) as i64 {
+                for at in 0..count / 2 {
+                    let other = arguments[count - 1 - at];
+                    arguments[count - 1 - at] = arguments[at];
+                    arguments[at] = other;
+                }
+                var exits = false;
+                if !member {
+                    self_.heads[callee] = true;
+                    let held = visit(self_, m, callee);
+                    exits = held.exits;
+                }
+                let call_binding = calleeBinding(self_, m, callee);
+                exits = ownArguments(self_, m, arguments[..count], mask, n.ty, call_binding, lends_to, brief) || exits;
+                // Every return of the callee gave a value nothing else holds, unless
+                // the instantiated result is a shared handle or borrowing view/closure.
+                var fact: Fact = deep;
+                if isNonUniqueStorage(m, n.ty) || (!owns(self_, m, n.ty) && lends(self_, m, n.ty)) { fact = none; }
+                return Value { fact: fact, exits: exits, .. };
+            }
+            // Given a parameter it takes over but not all its arguments, the
+            // function would hold the argument for any number of calls.
+            if mask != 0 && count < (taking >> 32) as i64 && count < 32 && mask & (((1 as u32) << (count as! u32)) - 1) != 0 && !self_.inner[id] {
+                reject(self_, m, id, blot_check_core::Code.own_function_value);
+            }
         }
-    }
-    if tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply {
         // A call only borrows its arguments, and the arrays its result
         // owns are the caller's alone. A part of the result that borrows
         // (a view, a function) may hold the arguments, so then they are
@@ -2521,8 +2528,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if !returns_lent && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
             return Value { fact: fact, exits: exits, .. };
         }
-    }
-    if tag == blot_check_core::Tag.scalar || tag == blot_check_core::Tag.logical {
+        let exits = visitChildren(self_, m, id);
+        return Value { exits: exits, .. };
+    },
+    scalar, logical => {
         let primitive_result = n.ty != 0 && n.ty <= blot_check_types::never;
         let holder = !primitive_result && lends(self_, m, n.ty);
         let base = self_.captured.len;
@@ -2548,9 +2557,12 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var fact: Fact = none;
         if !primitive_result && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
+    },
+    _ => {
+        let exits = visitChildren(self_, m, id);
+        return Value { exits: exits, .. };
+    },
     }
-    let exits = visitChildren(self_, m, id);
-    return Value { exits: exits, .. };
 }
 
 // Whether `binding` is a named function of a module without stores: its

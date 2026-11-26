@@ -72,8 +72,7 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
     let id=index+1;
     let size=blot_native::persist_size(batch.shared,id,2);
     if size<=1 {return false;}
-    var tail_scratch:u8[>..<]=[];
-    return blot_reuse_parse_packet::decodeFromPersist(batch.shared,id,2,size,symbols,tree,tail_scratch,recorded);
+    return blot_reuse_parse_packet::decodeFromPersist(batch.shared,id,2,size,symbols,tree,recorded);
 }
 fn addParseInput<P>(loader:Loader<P>&,path:const u8[:],dir_map:dictionary<const u8[:],const u8[:]>&,dir_owned:const u8[:][>..<]&,name:u8[>..<]&) {
     let batch .= loader.parse_batch;

@@ -179,6 +179,17 @@ uint64_t blot_persist_open(uint32_t count) {
     struct persist_queue *queue = mmap(NULL, map_length, PROT_READ | PROT_WRITE,
                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (queue == MAP_FAILED) return 0;
+#ifdef MADV_HUGEPAGE
+    if (count >= 16) {
+        uintptr_t arena_start = (uintptr_t)queue + graph_bytes;
+        uintptr_t huge_mask = (uintptr_t)(2 * 1024 * 1024 - 1);
+        uintptr_t aligned = (arena_start + huge_mask) & ~huge_mask;
+        uintptr_t map_end = (uintptr_t)queue + map_length;
+        if (aligned < map_end) {
+            (void)madvise((void *)aligned, map_end - aligned, MADV_HUGEPAGE);
+        }
+    }
+#endif
 
     pthread_mutexattr_t attrs;
     int error = pthread_mutexattr_init(&attrs);

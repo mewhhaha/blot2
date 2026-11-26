@@ -413,10 +413,28 @@ fn get(receiver:Reader&,value:blot_check_core::HandleEffects[:]&) {
     value=run;
 }
 
-// Only the Wasm preparation path sends this image. The parent resolves a
-// constructor's signature in its defining module. Each importing module still
-// needs its own catalog index, tag and payload type to interpret its Core.
-fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
+// Split execution Core wire layout:
+//   [0..64]            prefix_len: u32, followed by 15 bulk table byte lengths (u32 each)
+//   [64..64+prefix]    compact header (Core without bulk/stripped slices, constructors, metadata)
+//   [64+prefix..end]   15 bulk flat tables concatenated raw for zero-double-copy persist_read_at.
+let execution_core_header_bytes:i64=64;
+
+fn writeU32LeAt(buf:u8[>..<]&,at:i64,v:u32) {
+    buf[at]=v as! u8;
+    buf[at+1]=(v>>8) as! u8;
+    buf[at+2]=(v>>16) as! u8;
+    buf[at+3]=(v>>24) as! u8;
+}
+
+fn appendExecutionTable<T>(writer:Writer&,values:const T[:])->u32,bool {
+    if values.len==0 {return 0,true;}
+    let raw=bytes_of(values);
+    if raw.len>0xffffffff || !writer.room(raw.len) {return 0,false;}
+    writer.output.append(raw);
+    return raw.len as u32,true;
+}
+
+fn putExecutionCoreHeader(writer:Writer&,module:blot_check_core::Module) {
     var header=module;
     header.constructors=default<blot_check_core::Constructor[:]>();
     header.runtime_names=default<blot_check_core::RuntimeName[:]>();
@@ -425,6 +443,22 @@ fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
     header.dependency_references=default<blot_check_core::BindingRef[:]>();
     header.dependency_members=default<blot_check_core::DependencyMember[:]>();
     header.erased_declaration_references=default<blot_check_core::ErasedDeclarationReference[:]>();
+    // The 15 bulk tables are appended raw after the prefix.
+    header.nodes=default<blot_check_core::Node[:]>();
+    header.spans=default<blot_check_core::Span[:]>();
+    header.extra=default<blot_check_core::Id[:]>();
+    header.bindings=default<blot_check_core::Binding[:]>();
+    header.bodies=default<blot_check_core::Body[:]>();
+    header.parameters=default<blot_check_core::Parameter[:]>();
+    header.references=default<blot_check_core::BindingRef[:]>();
+    header.calls=default<blot_check_core::CallInfo[:]>();
+    header.names=default<u8[:]>();
+    header.types.nodes=default<const blot_check_types::Node[:]>();
+    header.types.extra=default<const blot_check_types::Id[:]>();
+    header.patterns=default<blot_check_core::Pattern[:]>();
+    header.obligations=default<blot_check_core::Obligation[:]>();
+    header.merges=default<blot_check_core::Merge[:]>();
+    header.merge_ranges=default<blot_check_core::List[:]>();
     put(writer,header);
     count(writer,module.constructors.len);
     for c in module.constructors {
@@ -443,7 +477,33 @@ fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
     }
 }
 
-fn getExecutionCore(reader:Reader&,module:blot_check_core::Module&) {
+fn putExecutionCoreTables(writer:Writer&,module:blot_check_core::Module) {
+    if writer.failure!=blot_error::Error.none {return;}
+    let prefix_len=writer.output.len-execution_core_header_bytes;
+    if prefix_len<0 || prefix_len>0xffffffff {writer.failure=blot_error::Error.artifact_limit;return;}
+    writeU32LeAt(writer.output,0,prefix_len as u32);
+    var lens:u32[15]=[0;15];
+    var ok=true;
+    if ok {let l,s=appendExecutionTable(writer,module.nodes);lens[0]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.spans);lens[1]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.extra);lens[2]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.bindings);lens[3]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.bodies);lens[4]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.parameters);lens[5]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.references);lens[6]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.calls);lens[7]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.names);lens[8]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.types.nodes);lens[9]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.types.extra);lens[10]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.patterns);lens[11]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.obligations);lens[12]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.merges);lens[13]=l;ok=s;}
+    if ok {let l,s=appendExecutionTable(writer,module.merge_ranges);lens[14]=l;ok=s;}
+    if !ok {if writer.failure==blot_error::Error.none {writer.failure=blot_error::Error.artifact_limit;}return;}
+    for i in 0..15 {writeU32LeAt(writer.output,4+i*4,lens[i]);}
+}
+
+fn getExecutionCoreHeader(reader:Reader&,module:blot_check_core::Module&) {
     get(reader,module);
     if reader.failure!=blot_error::Error.none {return;}
     if module.unit==0 || module.constructors.len!=0 {reader.failure=blot_error::Error.invalid_artifact;return;}
@@ -468,4 +528,41 @@ fn getExecutionCore(reader:Reader&,module:blot_check_core::Module&) {
         }
     }
     module.constructors=constructors;
+}
+
+fn readPersistTable<T>(shared:u64,id:u32,kind:u32,at:i64&,total:i64,byte_len:i64,owner:Owner,witness:T)->T[:],Error {
+    if byte_len==0 {return default<T[:]>(),blot_error::Error.none;}
+    if byte_len<0 || byte_len>total-at || byte_len>limit {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    var sample:T[1]=[witness];
+    let elem_size=bytes_of(sample[..]).len;
+    if elem_size<=0 || byte_len%elem_size!=0 {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    let count=byte_len/elem_size;
+    if count>element_limit {return default<T[:]>(),blot_error::Error.artifact_limit;}
+    let run,error=allocate(owner,count,witness);
+    if error!=blot_error::Error.none {return default<T[:]>(),error;}
+    let dst=bytes_of(run);
+    assert(dst.len==byte_len);
+    if !blot_native::persist_read_at(shared,id,kind,at as u64,dst[0],byte_len as u64) {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    at+=byte_len;
+    return run,blot_error::Error.none;
+}
+
+fn getExecutionCoreTablesFromPersist(shared:u64,id:u32,kind:u32,at:i64&,total:i64,lens:const i64[:],owner:Owner,module:blot_check_core::Module&)->Error {
+    let nodes,e0=readPersistTable(shared,id,kind,at,total,lens[0],owner,default<blot_check_core::Node>());if e0!=blot_error::Error.none {return e0;}module.nodes=nodes;
+    let spans,e1=readPersistTable(shared,id,kind,at,total,lens[1],owner,default<blot_check_core::Span>());if e1!=blot_error::Error.none {return e1;}module.spans=spans;
+    let extra,e2=readPersistTable(shared,id,kind,at,total,lens[2],owner,0 as u32);if e2!=blot_error::Error.none {return e2;}module.extra=extra;
+    let bindings,e3=readPersistTable(shared,id,kind,at,total,lens[3],owner,default<blot_check_core::Binding>());if e3!=blot_error::Error.none {return e3;}module.bindings=bindings;
+    let bodies,e4=readPersistTable(shared,id,kind,at,total,lens[4],owner,default<blot_check_core::Body>());if e4!=blot_error::Error.none {return e4;}module.bodies=bodies;
+    let parameters,e5=readPersistTable(shared,id,kind,at,total,lens[5],owner,default<blot_check_core::Parameter>());if e5!=blot_error::Error.none {return e5;}module.parameters=parameters;
+    let references,e6=readPersistTable(shared,id,kind,at,total,lens[6],owner,default<blot_check_core::BindingRef>());if e6!=blot_error::Error.none {return e6;}module.references=references;
+    let calls,e7=readPersistTable(shared,id,kind,at,total,lens[7],owner,default<blot_check_core::CallInfo>());if e7!=blot_error::Error.none {return e7;}module.calls=calls;
+    let names,e8=readPersistTable(shared,id,kind,at,total,lens[8],owner,0 as u8);if e8!=blot_error::Error.none {return e8;}module.names=names;
+    let tnodes,e9=readPersistTable(shared,id,kind,at,total,lens[9],owner,default<blot_check_types::Node>());if e9!=blot_error::Error.none {return e9;}module.types.nodes=tnodes;
+    let textra,e10=readPersistTable(shared,id,kind,at,total,lens[10],owner,0 as u32);if e10!=blot_error::Error.none {return e10;}module.types.extra=textra;
+    let patterns,e11=readPersistTable(shared,id,kind,at,total,lens[11],owner,default<blot_check_core::Pattern>());if e11!=blot_error::Error.none {return e11;}module.patterns=patterns;
+    let obligations,e12=readPersistTable(shared,id,kind,at,total,lens[12],owner,default<blot_check_core::Obligation>());if e12!=blot_error::Error.none {return e12;}module.obligations=obligations;
+    let merges,e13=readPersistTable(shared,id,kind,at,total,lens[13],owner,default<blot_check_core::Merge>());if e13!=blot_error::Error.none {return e13;}module.merges=merges;
+    let merge_ranges,e14=readPersistTable(shared,id,kind,at,total,lens[14],owner,default<blot_check_core::List>());if e14!=blot_error::Error.none {return e14;}module.merge_ranges=merge_ranges;
+    if at!=total {return blot_error::Error.invalid_artifact;}
+    return blot_error::Error.none;
 }

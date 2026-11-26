@@ -3,6 +3,7 @@ namespace blot_reuse_partial_dependency;
 import .partial_dependency;
 import reuse.persistent_names;
 import reuse.persistent_unit;
+import binary;
 import support.native;
 import support.project_packet;
 import inference_limits;
@@ -150,15 +151,13 @@ fn gatherPersistent(source:const Project&,handle:u64,ready:Prepared&,children:u6
   if error!=blot_error::Error.none {return error;}
   ready.paths[unit-1]=path;
   let size=blot_native::persist_size(handle,unit,2);
-  if size<=0 {return blot_error::Error.invalid_artifact;}
-  if size>bytes.len {bytes.resize(size,0);}
-  if !blot_native::persist_read(handle,unit,2,bytes[0],size as u64) {return blot_error::Error.invalid_artifact;}
+  if size<blot_project_packet::execution_core_header_bytes {return blot_error::Error.invalid_artifact;}
   counts.parallel_worker_reply_bytes+=size as u64;
   let interface_size=blot_native::persist_size(handle,unit,1);
   if interface_size>0 {counts.parallel_worker_reply_bytes+=interface_size as u64;}
   let before=resolution;
   let before_associated=associated;
-  let failure=readPersistentCore(bytes[..size],unit,ready,resolution,associated,counts);
+  let failure=readPersistentCoreFromPersist(handle,unit,size,bytes,ready,resolution,associated,counts);
   if failure!=blot_error::Error.none {return failure;}
   if stored.len!=0 {
    if interface_size<=0 {return blot_error::Error.invalid_artifact;}
@@ -178,8 +177,23 @@ fn gatherPersistent(source:const Project&,handle:u64,ready:Prepared&,children:u6
  return blot_error::Error.none;
 }
 
-fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&,associated:i64&,counts:blot_work_counters::Frontend&)->Error {
- var reader=blot_project_packet::Reader{bytes,ready.wire_owner};
+fn readPersistentCoreFromPersist(handle:u64,unit:u32,total_size:i64,prefix_scratch:u8[>..]&,ready:Prepared&,resolution:i64&,associated:i64&,counts:blot_work_counters::Frontend&)->Error {
+ let hdr_len=blot_project_packet::execution_core_header_bytes;
+ if total_size<hdr_len {return blot_error::Error.invalid_artifact;}
+ var hdr:u8[64]=[0;64];
+ if !blot_native::persist_read_at(handle,unit,2,0,hdr[0],hdr_len as u64) {return blot_error::Error.invalid_artifact;}
+ let prefix_len=binary::u32le(hdr[..],0) as i64;
+ var lens:i64[15]=[0;15];
+ var table_total:i64=0;
+ for i in 0..15 {
+  let l=binary::u32le(hdr[..],4+i*4) as i64;
+  lens[i]=l;
+  table_total+=l;
+ }
+ if prefix_len<=0 || prefix_len>blot_project_packet::limit || hdr_len+prefix_len+table_total!=total_size {return blot_error::Error.invalid_artifact;}
+ if prefix_len>prefix_scratch.len {prefix_scratch.resize(prefix_len,0);}
+ if !blot_native::persist_read_at(handle,unit,2,hdr_len as u64,prefix_scratch[0],prefix_len as u64) {return blot_error::Error.invalid_artifact;}
+ var reader=blot_project_packet::Reader{prefix_scratch[..prefix_len],ready.wire_owner};
  var id:u32=0;
  var core=default<Core>();
  var bodies:i64=0;var schemes:i64=0;
@@ -188,7 +202,7 @@ fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&
  var debit:i64=0;var candidates:i64=0;
  var check_cpu:u64=0;var freeze_cpu:u64=0;var lower_cpu:u64=0;var has_fork_byte:u8=0;
  blot_project_packet::get(reader,id);
- blot_project_packet::getExecutionCore(reader,core);
+ blot_project_packet::getExecutionCoreHeader(reader,core);
  blot_project_packet::get(reader,bodies);
  blot_project_packet::get(reader,schemes);
  blot_project_packet::get(reader,norm);
@@ -200,6 +214,9 @@ fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&
  blot_project_packet::get(reader,lower_cpu);
  blot_project_packet::get(reader,has_fork_byte);
  if reader.failure!=blot_error::Error.none || reader.at!=reader.bytes.len || unit!=id || core.unit!=unit || core.diagnostics.len!=0 || bodies<0 || schemes<0 || debit<0 || candidates<0 || debit>resolution || candidates>associated {return blot_error::Error.invalid_artifact;}
+ var at:i64=hdr_len+prefix_len;
+ let terr=blot_project_packet::getExecutionCoreTablesFromPersist(handle,unit,2,at,total_size,lens[..],ready.wire_owner,core);
+ if terr!=blot_error::Error.none {return terr;}
  ready.units[unit-1]=core;
  ready.unit_has_fork[unit-1]=has_fork_byte;
  ready.stats.body_elaborations+=bodies;

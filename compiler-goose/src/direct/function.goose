@@ -275,14 +275,19 @@ fn opIndex(g: Generator&, value: u8, index: u32) {
     blot_direct_writer::uleb(g.s.code, index);
 }
 fn uleb(g: Generator&, value: u32) { blot_direct_writer::uleb(g.s.code, value); }
-fn lget(g: Generator&, id: u32) { opIndex(g, OP_local_get, id); }
-fn lset(g: Generator&, id: u32) { opIndex(g, OP_local_set, id); }
-fn ltee(g: Generator&, id: u32) { opIndex(g, OP_local_tee, id); }
-fn gget(g: Generator&, id: u32) { opIndex(g, OP_global_get, id); }
-fn gset(g: Generator&, id: u32) { opIndex(g, OP_global_set, id); }
+fn opIndexRaw(g: Generator&, value: u8, index: u32) {
+    g.s.code.push(value);
+    if index < 128 { g.s.code.push(index as u8); } else { blot_direct_writer::uleb(g.s.code, index); }
+}
+fn lget(g: Generator&, id: u32) { opIndexRaw(g, OP_local_get, id); }
+fn lset(g: Generator&, id: u32) { opIndexRaw(g, OP_local_set, id); }
+fn ltee(g: Generator&, id: u32) { opIndexRaw(g, OP_local_tee, id); }
+fn gget(g: Generator&, id: u32) { opIndexRaw(g, OP_global_get, id); }
+fn gset(g: Generator&, id: u32) { opIndexRaw(g, OP_global_set, id); }
 fn callf(g: Generator&, function: u32) { opIndex(g, OP_call, function); }
 fn i32Const(g: Generator&, value: u32) {
     g.s.code.push(OP_i32_const);
+    if value < 64 { g.s.code.push(value as u8); return; }
     blot_direct_writer::sleb(g.s.code, (value as! i32));
 }
 fn f32Const(g: Generator&, bits: u32) {
@@ -713,6 +718,21 @@ fn bindGet(g: const Generator&, f: const Fn&, binding: u32) -> Val, bool {
 fn polyKey(f: const Fn&, binding: u32) -> u64 { return blot_direct_emit::key64(f.serial, binding); }
 
 fn fresh(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Val, Error {
+    if ty == blot_direct_types::u32_ || ty == blot_direct_types::boolean {
+        let start = g.s.words.len as u32;
+        let base_local = (g.s.locals.len - f.locals_base) as u32;
+        g.s.locals.push(blot_direct_writer::VT_i32);
+        g.s.words.push(base_local);
+        return Val { ty, start, 1 }, blot_direct_types::Error.none;
+    }
+    if ty == blot_direct_types::f32_ {
+        let start = g.s.words.len as u32;
+        let base_local = (g.s.locals.len - f.locals_base) as u32;
+        g.s.locals.push(blot_direct_writer::VT_f32);
+        g.s.words.push(base_local);
+        return Val { ty, start, 1 }, blot_direct_types::Error.none;
+    }
+    if ty == blot_direct_types::unit { return Val { ty, 0, 0 }, blot_direct_types::Error.none; }
     let words, error = g.types.layout(ty);
     if error != blot_direct_types::Error.none { return Val {}, g.typeFailure(g.units[f.unit - 1], id); }
     let n = words.len;
@@ -729,6 +749,13 @@ fn fresh(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Val, Error {
     return Val { ty, start, n as u32 }, blot_direct_types::Error.none;
 }
 fn lower(g: Generator&, f: Fn&, ty: TId, id: u32) -> Ty, Error {
+    if ty <= blot_check_types::never && ty != 0 {
+        if ty == blot_check_types::u32_type { return blot_direct_types::u32_, blot_direct_types::Error.none; }
+        if ty == blot_check_types::f32_type { return blot_direct_types::f32_, blot_direct_types::Error.none; }
+        if ty == blot_check_types::boolean { return blot_direct_types::boolean, blot_direct_types::Error.none; }
+        if ty == blot_check_types::unit { return blot_direct_types::unit, blot_direct_types::Error.none; }
+        return blot_direct_types::never, blot_direct_types::Error.none;
+    }
     let m .= g.units[f.unit - 1];
     let lowered, error = g.types.lower(m, ty, f.env);
     if error == blot_direct_types::Error.none { return lowered, blot_direct_types::Error.none; }
@@ -834,7 +861,10 @@ recursive fn stmt(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         f.field_value = field_value;
         return neverVal(), blot_direct_types::Error.none;
     }
-    if value.ty != blot_direct_types::never && id != 0 { refine(g, f, m.typeOf(id), value.ty); }
+    if value.ty != blot_direct_types::never && id != 0 {
+        let rty = m.typeOf(id);
+        if rty > blot_check_types::never { refine(g, f, rty, value.ty); }
+    }
     f.field_value = field_value;
     return value, blot_direct_types::Error.none;
 }
@@ -952,8 +982,9 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = m.node(id);
     // A generalized local closure is built at each use, at that use's types;
     // its captures are already immutable values.
+    let rhs_tag = m.node(n.b).tag;
     var deferred = false;
-    match m.node(n.b).tag {
+    match rhs_tag {
         closure, constructor_function, primitive_function, reference => { deferred = true; },
         // A pure partial application, rebuilt at each use's types.
         call => { deferred = partialCall(g, f, n.b); },
@@ -964,20 +995,26 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         g.s.polymorphic.put(polyKey(f, n.a), n.b);
         return unitVal(), blot_direct_types::Error.none;
     }
-    let grown, has_grown, error = linearAppend(g, f, n.b);
-    if error != blot_direct_types::Error.none { return grown, error; }
-    var value = grown;
+    var value = neverVal();
+    var has_grown = false;
+    if rhs_tag == blot_check_core::Tag.array_op {
+        let grown, ok_grown, error = linearAppend(g, f, n.b);
+        if error != blot_direct_types::Error.none { return grown, error; }
+        value = grown;
+        has_grown = ok_grown;
+    }
     var had_noop = false;
     if !has_grown {
         // A generalized local value is computed once: its uses decide the one
         // type it is computed at.
-        if m.binding(n.a).scheme.variables.len != 0 {
+        let bnd = m.binding(n.a);
+        if bnd.scheme.variables.len != 0 {
             let typed = typeByUses(g, f, n.a, n.b);
             if typed != blot_direct_types::Error.none { return neverVal(), typed; }
             // Nothing reads an unused local, so its open types are Unit.
-            if uses(g, f, n.a) == 0 { defaultUnused(g, f, m.binding(n.a).ty, 0); }
+            if uses(g, f, n.a) == 0 { defaultUnused(g, f, bnd.ty, 0); }
         }
-        if n.c < 2 && m.types.node(m.binding(n.a).ty).tag == blot_check_types::Tag.floating32 && bindingIgnoresNanPayload(g, f, n.a) {
+        if n.c < 2 && (bnd.ty == blot_check_types::f32_type || (bnd.ty > blot_check_types::never && m.types.node(bnd.ty).tag == blot_check_types::Tag.floating32)) && bindingIgnoresNanPayload(g, f, n.a) {
             f.elide_f32_nan_node = n.b;
         }
         let prev_noop = f.boxed_noop_alias;
@@ -1006,14 +1043,16 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
     }
     if !has_grown && value.ty != blot_direct_types::never {
-        refine(g, f, m.binding(n.a).ty, value.ty);
-        if !had_noop && isFreshBoxedRhs(g, f, m, n.b, value.ty) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, f.loop_depth + 1);
-        }
-        if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
-        }
-        if n.c == 0 && tagOf(g, value.ty) == blot_direct_types::Tag.f32_ && isBoundedFiniteF32(g, f, m, n.b) {
+        let bty = m.binding(n.a).ty;
+        if bty > blot_check_types::never { refine(g, f, bty, value.ty); }
+        if value.ty > blot_direct_types::never {
+            if !had_noop && isFreshBoxedRhs(g, f, m, n.b, value.ty) {
+                blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, f.loop_depth + 1);
+            }
+            if isFreshOwnedArrayRhs(g, f, m, n.b, value.ty) {
+                blot_support_zigmap::put(g.s.map_pool, f.unique_owned, n.a, f.loop_depth + 1);
+            }
+        } else if n.c == 0 && value.ty == blot_direct_types::f32_ && isBoundedFiniteF32(g, f, m, n.b) {
             recordFiniteF32(f, n.a);
         }
     }

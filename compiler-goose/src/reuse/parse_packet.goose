@@ -298,8 +298,8 @@ fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&, recorded: blot_parse
 }
 
 // Decode directly from the shared persist_queue arena into the tree's pooled
-// tables, copying only the 53-byte header and small symbol tail through scratch.
-fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: Pool&, tree: Tree&, tail_scratch: u8[>..<]&, recorded: blot_parse_parser::ScratchIdBuffer?=null) -> bool {
+// tables, copying only the 53-byte header and small symbol tail through stack/scratch.
+fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: Pool&, tree: Tree&, recorded: blot_parse_parser::ScratchIdBuffer?=null) -> bool {
     if total_size < header_bytes { return false; }
     var hdr: u8[53] = [0; 53];
     if !blot_native::persist_read_at(shared, id, kind, 0, hdr[0], header_bytes as u64) { return false; }
@@ -340,29 +340,54 @@ fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: 
         tree = blot_parse_ast::canonical(parsed);
         return true;
     }
-    if tail_len > tail_scratch.len { tail_scratch.resize(tail_len, 0); }
-    if tail_len != 0 && !blot_native::persist_read_at(shared, id, kind, at as u64, tail_scratch[0], tail_len as u64) {
-        parsed.deinit();
-        return false;
-    }
-    let tail = tail_scratch[..tail_len];
+    var stack_tail: u8[4096] = [0; 4096];
+    var heap_tail: u8[>..<] = [];
     var small_names: u32[256] = [0; 256];
     var heap_names: u32[>..<] = [];
     var names_ok = false;
     var reloc_ok = false;
-    if count <= 256 {
-        let slice = small_names[..count];
-        names_ok = read_names_into(tail, count, symbols, slice);
-        if names_ok {
-            reloc_ok = relocate_tree(parsed, prefix, slice);
-            if reloc_ok && recorded { recorded.append(slice); }
+    if tail_len <= 4096 {
+        if tail_len != 0 && !blot_native::persist_read_at(shared, id, kind, at as u64, stack_tail[0], tail_len as u64) {
+            parsed.deinit();
+            return false;
+        }
+        let tail = stack_tail[..tail_len];
+        if count <= 256 {
+            let slice = small_names[..count];
+            names_ok = read_names_into(tail, count, symbols, slice);
+            if names_ok {
+                reloc_ok = relocate_tree(parsed, prefix, slice);
+                if reloc_ok && recorded { recorded.append(slice); }
+            }
+        } else {
+            heap_names.resize(count as i64, 0);
+            names_ok = read_names_into(tail, count, symbols, heap_names[..]);
+            if names_ok {
+                reloc_ok = relocate_tree(parsed, prefix, heap_names[..]);
+                if reloc_ok && recorded { recorded.append(heap_names[..]); }
+            }
         }
     } else {
-        heap_names.resize(count as i64, 0);
-        names_ok = read_names_into(tail, count, symbols, heap_names[..]);
-        if names_ok {
-            reloc_ok = relocate_tree(parsed, prefix, heap_names[..]);
-            if reloc_ok && recorded { recorded.append(heap_names[..]); }
+        heap_tail.resize(tail_len, 0);
+        if !blot_native::persist_read_at(shared, id, kind, at as u64, heap_tail[0], tail_len as u64) {
+            parsed.deinit();
+            return false;
+        }
+        let tail = heap_tail[..tail_len];
+        if count <= 256 {
+            let slice = small_names[..count];
+            names_ok = read_names_into(tail, count, symbols, slice);
+            if names_ok {
+                reloc_ok = relocate_tree(parsed, prefix, slice);
+                if reloc_ok && recorded { recorded.append(slice); }
+            }
+        } else {
+            heap_names.resize(count as i64, 0);
+            names_ok = read_names_into(tail, count, symbols, heap_names[..]);
+            if names_ok {
+                reloc_ok = relocate_tree(parsed, prefix, heap_names[..]);
+                if reloc_ok && recorded { recorded.append(heap_names[..]); }
+            }
         }
     }
     if !names_ok || !reloc_ok { parsed.deinit(); return false; }

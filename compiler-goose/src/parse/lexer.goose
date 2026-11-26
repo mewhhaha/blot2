@@ -1,5 +1,6 @@
 // Source contract: compiler/src/parse/lexer.zig. Byte spans and layout are public.
 namespace blot_parse_lexer;
+import binary;
 import .token;
 import support.error;
 import support.native;
@@ -177,8 +178,25 @@ fn decode_point(bytes: const u8[:]) -> u32,Error {
  if (bytes.len==2&&point<0x80)||(bytes.len==3&&point<0x800)||(bytes.len==4&&point<0x10000)||point>0x10ffff||(point>=0xd800&&point<=0xdfff) { return 0,blot_error::Error.invalid_utf8; }
  return point,blot_error::Error.none;
 }
+// ASCII identifier lookup: 1 = lower/digit/'_', 2 = upper, 0 = other.
+let ident_table: u8[128] = [
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+ 0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+ 2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,1,
+ 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+];
 fn validate_source(source: const u8[:],result: Result&) {
  var at=0;
+ let limit8=source.len-8;
+ while at<=limit8 {
+  let word=binary::u64le(source,at);
+  if (word & 0x8080808080808080)==0 { at+=8; continue; }
+  break;
+ }
  while at<source.len {
   // An ASCII byte is one valid scalar outside the reserved range.
   if source[at]<128 { at++; continue; }
@@ -191,63 +209,93 @@ fn validate_source(source: const u8[:],result: Result&) {
 }
 fn scan(source: const u8[:],result: Result&) {
  var at=0;
- while at<source.len {
-  let start=at; let c=source[at];
-  if c==' '||c=='\t'||c=='\r'||c=='\n' { at++; continue; }
-  if c=='/'&&at+1<source.len&&source[at+1]=='/' { at+=2; while at<source.len&&source[at]!='\r'&&source[at]!='\n' { at++; } emit(result.comments,blot_parse_token::comment,start,at); continue; }
+ let slen=source.len;
+ while at<slen {
+  let c=source[at];
+  if c==' '||c=='\t'||c=='\r'||c=='\n' {
+   at++;
+   while at<slen {
+    let w=source[at];
+    if w!=' '&&w!='\t'&&w!='\r'&&w!='\n' { break; }
+    at++;
+   }
+   continue;
+  }
+  let start=at;
+  if lower(c)||c=='_' {
+   if (c=='f' && at+3<slen && source[at+3]=='M' && starts(source,at,"froM")) ||
+      (c=='w' && at+4<slen && source[at+4]=='E' && starts(source,at,"wherE")) {
+    var tag=blot_parse_token::private_where; var size=5; if c=='f' { tag=blot_parse_token::private_from; size=4; } at+=size; emit(result.tokens,tag,start,at); continue;
+   }
+   at++;
+   while at<slen && source[at]<128 && ident_table[source[at]]==1 { at++; }
+   emit(result.tokens,blot_parse_token::keyword(source[start..at]),start,at); continue;
+  }
+  if digit(c) { let n=scan_number(source,at); at=n.end; emit(result.tokens,n.tag,start,at); continue; }
+  if upper(c) {
+   at++;
+   while at<slen && source[at]<128 && ident_table[source[at]]!=0 { at++; }
+   emit(result.tokens,blot_parse_token::type_identifier,start,at); continue;
+  }
+  if c=='@'&&at+1<slen&&(lower(source[at+1])||source[at+1]=='_') {
+   at+=2; while at<slen&&source[at]<128&&ident_table[source[at]]==1 { at++; }
+   while at+1<slen&&source[at]=='.'&&(lower(source[at+1])||upper(source[at+1])||source[at+1]=='_') {
+    let capital=upper(source[at+1]); at+=2;
+    if capital {
+     while at<slen && source[at]<128 && ident_table[source[at]]!=0 { at++; }
+    } else {
+     while at<slen && source[at]<128 && ident_table[source[at]]==1 { at++; }
+    }
+   }
+   emit(result.tokens,blot_parse_token::intrinsic,start,at); continue;
+  }
+  if c=='/'&&at+1<slen&&source[at+1]=='/' { at+=2; while at<slen&&source[at]!='\r'&&source[at]!='\n' { at++; } emit(result.comments,blot_parse_token::comment,start,at); continue; }
   if c=='"' {
    at++; var terminated=false;
-   while at<source.len && source[at]!='\r'&&source[at]!='\n' {
+   while at<slen && source[at]!='\r'&&source[at]!='\n' {
     if source[at]=='"' { at++; terminated=true; break; }
     if source[at]=='\\' {
-     if at+1==source.len||source[at+1]=='\r'||source[at+1]=='\n' { break; }
+     if at+1==slen||source[at+1]=='\r'||source[at+1]=='\n' { break; }
      if !contains("\"\\nrt",source[at+1]) { diagnose(result,string_escape,at,at+2); } at+=2;
     } else { at++; }
    }
    if !terminated { diagnose(result,string_literal,start,at); } emit(result.tokens,blot_parse_token::string,start,at); continue;
   }
-  if digit(c) { let n=scan_number(source,at); at=n.end; emit(result.tokens,n.tag,start,at); continue; }
-  if (c=='f' && at+3<source.len && source[at+3]=='M' && starts(source,at,"froM")) ||
-     (c=='w' && at+4<source.len && source[at+4]=='E' && starts(source,at,"wherE")) {
-   var tag=blot_parse_token::private_where; var size=5; if c=='f' { tag=blot_parse_token::private_from; size=4; } at+=size; emit(result.tokens,tag,start,at); continue;
-  }
-  if lower(c)||c=='_' {
-   at++;
-   while at<source.len && ident(source[at]) { at++; }
-   emit(result.tokens,blot_parse_token::keyword(source[start..at]),start,at); continue;
-  }
-  if upper(c) {
-   at++;
-   while at<source.len && type_ident(source[at]) { at++; }
-   emit(result.tokens,blot_parse_token::type_identifier,start,at); continue;
-  }
-  if c=='@'&&at+1<source.len&&(lower(source[at+1])||source[at+1]=='_') {
-   at+=2; while at<source.len&&ident(source[at]) { at++; }
-   while at+1<source.len&&source[at]=='.'&&(lower(source[at+1])||upper(source[at+1])||source[at+1]=='_') {
-    let capital=upper(source[at+1]); at+=2;
-    while at<source.len { var valid=ident(source[at]); if capital { valid=type_ident(source[at]); } if !valid { break; } at++; }
-   }
-   emit(result.tokens,blot_parse_token::intrinsic,start,at); continue;
-  }
-  if c=='$'&&at+1<source.len&&(lower(source[at+1])||upper(source[at+1])||source[at+1]=='_') { at++; emit(result.tokens,blot_parse_token::hash,start,at); continue; }
+  if c=='$'&&at+1<slen&&(lower(source[at+1])||upper(source[at+1])||source[at+1]=='_') { at++; emit(result.tokens,blot_parse_token::hash,start,at); continue; }
   if symbolic(c)||c=='/' {
-   at++; if c!='/' { while at<source.len&&symbolic(source[at]) { at++; } }
+   at++; if c!='/' { while at<slen&&symbolic(source[at]) { at++; } }
    let spelling=source[start..at]; var kind=blot_parse_token::symbol;
    if spelling=="->" { kind=blot_parse_token::arrow; } else if spelling=="=>" { kind=blot_parse_token::fat_arrow; } else if spelling=="<-" { kind=blot_parse_token::left_arrow; }
    else if spelling.len==1 {
-    if c=='$' { kind=blot_parse_token::dollar; } else if c=='*' { kind=blot_parse_token::star; } else if c=='^' { kind=blot_parse_token::caret; } else if c=='|' { kind=blot_parse_token::pipe; } else if c=='!' { kind=blot_parse_token::bang; } else if c=='=' { kind=blot_parse_token::equal; }
+    match c {
+     '$' => { kind=blot_parse_token::dollar; },
+     '*' => { kind=blot_parse_token::star; },
+     '^' => { kind=blot_parse_token::caret; },
+     '|' => { kind=blot_parse_token::pipe; },
+     '!' => { kind=blot_parse_token::bang; },
+     '=' => { kind=blot_parse_token::equal; },
+     _ => {},
+    }
    }
    emit(result.tokens,kind,start,at); continue;
   }
   at++; var kind=blot_parse_token::eof; var recognized=true;
-  if c=='(' { kind=blot_parse_token::l_paren; } else if c==')' { kind=blot_parse_token::r_paren; }
-  else if c=='[' { kind=blot_parse_token::l_bracket; } else if c==']' { kind=blot_parse_token::r_bracket; }
-  else if c=='{' { kind=blot_parse_token::l_brace; } else if c=='}' { kind=blot_parse_token::r_brace; }
-  else if c==',' { kind=blot_parse_token::comma; } else if c==';' { kind=blot_parse_token::semicolon; } else if c=='#' { kind=blot_parse_token::hash; }
-  else if c=='@' { kind=blot_parse_token::at; } else if c=='`' { kind=blot_parse_token::backtick; }
-  else if c==':' { kind=blot_parse_token::colon; if at<source.len&&source[at]=='=' { at++; kind=blot_parse_token::colon_equal; } }
-  else if c=='.' { kind=blot_parse_token::dot; if at<source.len&&source[at]=='.' { at++; kind=blot_parse_token::dot_dot; if at<source.len&&source[at]=='.' { at++; kind=blot_parse_token::ellipsis; } } }
-  else { recognized=false; }
+  match c {
+   '(' => { kind=blot_parse_token::l_paren; },
+   ')' => { kind=blot_parse_token::r_paren; },
+   '[' => { kind=blot_parse_token::l_bracket; },
+   ']' => { kind=blot_parse_token::r_bracket; },
+   '{' => { kind=blot_parse_token::l_brace; },
+   '}' => { kind=blot_parse_token::r_brace; },
+   ',' => { kind=blot_parse_token::comma; },
+   ';' => { kind=blot_parse_token::semicolon; },
+   '#' => { kind=blot_parse_token::hash; },
+   '@' => { kind=blot_parse_token::at; },
+   '`' => { kind=blot_parse_token::backtick; },
+   ':' => { kind=blot_parse_token::colon; if at<slen&&source[at]=='=' { at++; kind=blot_parse_token::colon_equal; } },
+   '.' => { kind=blot_parse_token::dot; if at<slen&&source[at]=='.' { at++; kind=blot_parse_token::dot_dot; if at<slen&&source[at]=='.' { at++; kind=blot_parse_token::ellipsis; } } },
+   _ => { recognized=false; },
+  }
   if recognized { emit(result.tokens,kind,start,at); } else { at=start+utf8_width(c); var code=lexical_error; if source[start..at]=="·" { code=reserved_selector_marker; } diagnose(result,code,start,at); }
  }
 }

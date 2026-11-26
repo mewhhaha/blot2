@@ -492,8 +492,8 @@ fn put(receiver:Writer&,value:const blot_reuse_frozen_dependency::Export[:]) {pu
 fn get(receiver:Reader&,value:blot_reuse_frozen_dependency::Export[:]& ) {getRawFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Associated[:]) {putRawFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Associated[:]& ) {getRawFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Binding[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_reuse_principal_interface::Binding[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Binding[:]) {putRawFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_reuse_principal_interface::Binding[:]& ) {getRawFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Constructor[:]) {putRawFlat(receiver,value);}
 fn get(receiver:Reader&,value:blot_reuse_principal_interface::Constructor[:]& ) {getRawFlat(receiver,value);}
 fn put(receiver:Writer&,value:const blot_reuse_principal_interface::Contract[:]) {putRawFlat(receiver,value);}

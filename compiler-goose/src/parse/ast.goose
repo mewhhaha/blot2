@@ -321,6 +321,27 @@ fn canonical(self_:const Tree&)->Tree {
  assert(valid(self_));let state:TreeState& =tree_states[self_.lease-1];assert(self_.nodes .== state.nodes && self_.spans .== state.spans && self_.extra .== state.extra && self_.roots .== state.roots && self_.runtime_names .== state.runtime_names && self_.constant_names .== state.constant_names && self_.test_meta .== state.test_meta && self_.declaration_traits .== state.declaration_traits && self_.declaration_nodes .== state.declaration_nodes && self_.diagnostics .== state.diagnostics && self_.operator_origins .== state.operator_origins && self_.type_conversion_origins .== state.type_conversion_origins);
  return Tree{owner_id:self_.owner_id,lease:self_.lease,generation:self_.generation,has_typed_staging:self_.has_typed_staging,nodes:state.nodes,spans:state.spans,extra:state.extra,roots:state.roots,runtime_names:state.runtime_names,constant_names:state.constant_names,test_meta:state.test_meta,declaration_traits:state.declaration_traits,declaration_nodes:state.declaration_nodes,diagnostics:state.diagnostics,operator_origins:state.operator_origins,type_conversion_origins:state.type_conversion_origins};
 }
+fn pushNodeAndSpan(nodes: NodeBuffer&, spans: SpanBuffer&, node: Node, span: Span) -> Id, TreeError {
+    let n = nodes.len;
+    if n < nodes.storage.len && n < spans.storage.len && nodes.failure == blot_error::Error.none && spans.failure == blot_error::Error.none {
+        let next = n + 1;
+        nodes.storage[n] = node;
+        nodes.items = nodes.storage[..next];
+        nodes.len = next;
+        spans.storage[n] = span;
+        spans.items = spans.storage[..next];
+        spans.len = next;
+        return n as Id, blot_error::Error.none;
+    }
+    nodes.push(node);
+    if nodes.failure != blot_error::Error.none { return 0, nodes.failure; }
+    spans.push(span);
+    if spans.failure != blot_error::Error.none { return 0, spans.failure; }
+    return n as Id, blot_error::Error.none;
+}
+fn addNodeAndSpan(tree: Tree&, node: Node, span: Span) -> Id, TreeError {
+    return pushNodeAndSpan(tree.nodes, tree.spans, node, span);
+}
 fn initPooledEmpty() -> Tree,TreeError {
     if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},blot_error::Error.out_of_memory; }
     let generation=next_tree_generation; next_tree_generation++;

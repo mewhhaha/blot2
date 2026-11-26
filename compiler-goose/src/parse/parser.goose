@@ -59,12 +59,9 @@ fn enter(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool { if p.f
 fn add(p: Parser&,source: const u8[:],tokens: const Token[:],tag: u32,a: u32,b: u32,c: u32,start: u32) -> Id {
  if p.failure!=blot_error::Error.none { return 0; }
  if p.tree.nodes.len>=0xffffffff { return fail(p,source,tokens,c_table_limit); }
- let id=p.tree.nodes.len as Id;
- p.tree.nodes.push(blot_parse_ast::Node {tag,a,b,c});
- if p.tree.nodes.failure!=blot_error::Error.none { p.failure=p.tree.nodes.failure; return 0; }
  var end=start; if p.index>0 { end=tokens[p.index-1].end; }
- p.tree.spans.push(Span {start,end});
- if p.tree.spans.failure!=blot_error::Error.none { p.failure=p.tree.spans.failure; return 0; }
+ let id,err=blot_parse_ast::addNodeAndSpan(p.tree,blot_parse_ast::Node {tag,a,b,c},Span {start,end});
+ if err!=blot_error::Error.none { p.failure=err; return 0; }
  return id;
 }
 fn numeric_failure(p: Parser&,source: const u8[:],tokens: const Token[:],t: Token,code: u32) -> Id { return add(p,source,tokens,a_numeric_error,code,t.start,t.end,t.start); }
@@ -1487,6 +1484,13 @@ fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&) -> Parser {
  return Parser {pool:pool,tree:tree};
 }
 fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,recorded:ScratchIdBuffer?) -> Error {
+ if tokens.len > 64 {
+  let est = tokens.len / 2 + 16;
+  if tree.nodes.storage.len < est { let _ = tree.nodes.ensure(est); }
+  if tree.spans.storage.len < est { let _ = tree.spans.ensure(est); }
+  let extra_est = tokens.len / 4 + 16;
+  if tree.extra.storage.len < extra_est { let _ = tree.extra.ensure(extra_est); }
+ }
  var p=parser_context(pool,tree);p.recorded .= recorded;
  var declarations_seen=false; var body_declarations_seen=false;
  while !at(p,source,tokens,t_eof) {
