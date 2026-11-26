@@ -3840,24 +3840,39 @@ fn finishPreparedGlobalOwner(self_:Engine&,binding:u32,before:Global,owner:u32)-
 recursive fn globalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Error {if binding==self_.current && self_.bindings[binding].kind==blot_reuse_principal_interface::Kind.global && self_.tree.node(self_.bindings[binding].declaration).tag==blot_parse_ast::tag_value_decl {let attributes=checkedAstList(self_.tree,self_.tree.value_decl(self_.bindings[binding].declaration).attributes);if (attributes.len as i64)!=0 {let err=self_.diagnostic(Code.recursive_tag,self_.tree.list(attributes)[0]);if err!=blot_error::Error.none {return 0,err;}self_.resolved[id]=binding;return self_.types.fresh();}}let err=self_.prepareGlobal(binding);if err!=blot_error::Error.none {return 0,err;}return self_.preparedGlobalReference(binding,id);}
 fn preparedGlobalReference(self_:Engine&,binding:u32,id:u32)->u32,blot_error::Error {if self_.bindings[binding].kind==blot_reuse_principal_interface::Kind.global && self_.bindings[binding].scheme.root==0 {self_.qualification_uses.push(QualificationUse{scope:self_.qualification_scope,owner:self_.current,target:binding,source:id, ..});}self_.resolved[id]=binding;return self_.instantiate(binding,id);}
 fn startsBytes(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len && text[..prefix.len]==prefix;}
+fn scalarIntrinsicSpec(name:const u8[:])->u8 {
+ if name.len<7 || name[0]!=64 || name[4]!=46 {return 0;}
+ if name[1]==117 && name[2]==51 && name[3]==50 {
+  let m=name[5..];
+  if m.len==2 {if m=="eq" || m=="lt" {return 3;}return 0;}
+  if m.len==3 {if m=="add" || m=="sub" || m=="mul" || m=="div" || m=="rem" || m=="shl" || m=="shr" {return 2;}return 0;}
+  if m.len==6 {if m=="to_f32" {return 1;}if m=="bit_or" {return 2;}return 0;}
+  if m.len==7 && (m=="bit_and" || m=="bit_xor") {return 2;}
+  return 0;
+ }
+ if name[1]==102 && name[2]==51 && name[3]==50 {
+  let m=name[5..];
+  if m.len==2 {if m=="eq" || m=="ne" || m=="lt" || m=="le" || m=="gt" || m=="ge" {return 7;}return 0;}
+  if m.len==3 {if m=="add" || m=="sub" || m=="mul" || m=="div" {return 6;}if m=="neg" || m=="abs" {return 4;}return 0;}
+  if m.len==4 && (m=="sqrt" || m=="ceil") {return 4;}
+  if m.len==5 && (m=="floor" || m=="trunc") {return 4;}
+  if m.len==6 && m=="to_u32" {return 5;}
+  return 0;
+ }
+ return 0;
+}
 fn exactIntrinsicArity(name:const u8[:])->blot_support::Option<i64> {if startsBytes(name,"@u32.") || startsBytes(name,"@f32.") {return blot_support::none<i64>();}return intrinsicArity(name);}
 fn intrinsicArity(name:const u8[:])->blot_support::Option<i64> {
- if startsBytes(name,"@u32.") {
-  let m=name[5..];
-  if m=="to_f32" {return blot_support::some(1 as i64);}
-  for candidate in ["add","sub","mul","div","rem","bit_and","bit_or","bit_xor","shl","shr","eq","lt"] {if m==candidate {return blot_support::some(2 as i64);}}
-  return blot_support::none<i64>();
+ let spec=scalarIntrinsicSpec(name);
+ if spec!=0 {
+  if spec==1 || spec==4 || spec==5 {return blot_support::some(1 as i64);}
+  return blot_support::some(2 as i64);
  }
- if startsBytes(name,"@f32.") {
-  let m=name[5..];
-  for candidate in ["add","sub","mul","div","eq","ne","lt","le","gt","ge"] {if m==candidate {return blot_support::some(2 as i64);}}
-  for candidate in ["to_u32","neg","abs","sqrt","floor","ceil","trunc"] {if m==candidate {return blot_support::some(1 as i64);}}
-  return blot_support::none<i64>();
- }
+ if startsBytes(name,"@u32.") || startsBytes(name,"@f32.") {return blot_support::none<i64>();}
  let storage=blot_check_storage_ops::lookup(name);if storage.present {return blot_support::some(blot_check_storage_ops::arity(storage.value) as i64);}let staging,present=blot_check_typed_staging::lookup(name);if present {return blot_support::some(blot_check_typed_staging::arity(staging) as i64);}let simd_=blot_backend_simd_intrinsics::lookup(name);if simd_.present {return blot_support::some(simd_.value.arity as i64);}let collection=blot_backend_collection_ops::lookup(name);if collection.present {return blot_support::some(collection.value.arity as i64);}
  if name=="@hole" {return blot_support::some(0 as i64);}
- for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@u32.to_f32","@f32.to_u32","@f32.neg","@f32.abs","@f32.sqrt","@f32.floor","@f32.ceil","@f32.trunc","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
- for candidate in ["@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@u32.add","@u32.sub","@u32.mul","@u32.div","@u32.rem","@u32.bit_and","@u32.bit_or","@u32.bit_xor","@u32.shl","@u32.shr","@u32.eq","@u32.lt","@f32.add","@f32.sub","@f32.mul","@f32.div","@f32.eq","@f32.ne","@f32.lt","@f32.le","@f32.gt","@f32.ge","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
+ for candidate in ["@state.get","@state.set","@effect.of","@effect.descriptor","@effect.count","@array.length","@panic","@flat.encode","@flat.decode","@flat.schema_hash","@flat.kernel_id","@flat.kernel_binding_hash","@flat.kernel_ctx_hash","@flat.kernel_io_hash","@flat.process_id","@flat.process_binding_hash","@flat.encode_wire","@flat.decode_wire","@flat.encode_batch","@flat.decode_batch"] {if name==candidate {return blot_support::some(1 as i64);}}
+ for candidate in ["@effect.has","@effect.same","@state.run","@effect.provider","@type.same","@type.result","@array.get","@array.fill","@array.generate","@product.get"] {if name==candidate {return blot_support::some(2 as i64);}}
  for candidate in ["@state.reader","@state.writer","@effect.state","@array.set","@type.call"] {if name==candidate {return blot_support::some(3 as i64);}}
  for candidate in ["@effect.run","@effect.reader","@effect.writer"] {if name==candidate {return blot_support::some(4 as i64);}}return blot_support::none<i64>();
 }
@@ -3889,17 +3904,15 @@ fn arrow2(self_:Engine&,first:u32,second:u32,result:u32)->u32,blot_error::Error 
 fn arrow3(self_:Engine&,first:u32,second:u32,third:u32,result:u32)->u32,blot_error::Error {let tail,err=arrow2(self_,second,third,result);if err!=blot_error::Error.none {return 0,err;}return self_.types.function(first,tail);}
 recursive fn intrinsic(self_:Engine&,id:u32,name:u32)->u32,blot_error::Error {
  let text=self_.pool.get(name);if self_.editorAt(id) {return self_.captureEditor(id,0,0);}
- if startsBytes(text,"@u32.") {
-  let member=text[5..];
-  for candidate in ["add","sub","mul","div","rem","bit_and","bit_or","bit_xor","shl","shr"] {if member==candidate {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type);}}
-  if member=="eq" || member=="lt" {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::boolean);}
-  if member=="to_f32" {return self_.types.function(blot_check_types::u32_type,blot_check_types::f32_type);}
- } else if startsBytes(text,"@f32.") {
-  let member=text[5..];
-  for candidate in ["add","sub","mul","div"] {if member==candidate {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::f32_type);}}
-  for candidate in ["eq","ne","lt","le","gt","ge"] {if member==candidate {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::boolean);}}
-  for candidate in ["neg","abs","sqrt","floor","ceil","trunc"] {if member==candidate {return self_.types.function(blot_check_types::f32_type,blot_check_types::f32_type);}}
-  if member=="to_u32" {return self_.types.function(blot_check_types::f32_type,blot_check_types::u32_type);}
+ let spec=scalarIntrinsicSpec(text);
+ if spec!=0 {
+  if spec==2 {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type);}
+  if spec==3 {return arrow2(self_,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::boolean);}
+  if spec==1 {return self_.types.function(blot_check_types::u32_type,blot_check_types::f32_type);}
+  if spec==6 {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::f32_type);}
+  if spec==7 {return arrow2(self_,blot_check_types::f32_type,blot_check_types::f32_type,blot_check_types::boolean);}
+  if spec==4 {return self_.types.function(blot_check_types::f32_type,blot_check_types::f32_type);}
+  return self_.types.function(blot_check_types::f32_type,blot_check_types::u32_type);
  }
  let intrinsic=blot_backend_simd_intrinsics::lookup(text);if intrinsic.present {let op=intrinsic.value;var element=blot_check_types::u32_type;if op.floating {element=blot_check_types::f32_type;}let vector,err=self_.types.product([element,element,element,element]);if err!=blot_error::Error.none {return 0,err;}let lanes,err=self_.types.product([blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type,blot_check_types::u32_type]);if err!=blot_error::Error.none {return 0,err;}var result_element=blot_check_types::u32_type;if op.resultLane()==blot_backend_simd_intrinsics::Lane.floating {result_element=blot_check_types::f32_type;}let output,err=self_.types.product([result_element,result_element,result_element,result_element]);if err!=blot_error::Error.none {return 0,err;}let pair,err=self_.types.product([vector,vector]);if err!=blot_error::Error.none {return 0,err;}match op.shape {
  unary,convert => {return self_.types.function(vector,output);},
@@ -4351,8 +4364,69 @@ recursive fn lambdaExpressionBody(self_:Engine&,id:u32,saved:LambdaContext&)->u3
  }
  var taken=element_ty;if takes {let wrapped,err=self_.types.usage(element_ty,blot_parse_ast::usagekind_own,0);if err!=blot_error::Error.none {return 0,err;}taken=wrapped;}let raw,err=self_.types.functionWithEffects(taken,result,latent);if err!=blot_error::Error.none {return 0,err;}if contextual && !contextual_effects {let err=self_.constrainEffects(latent,required_arrow.c,id);if err!=blot_error::Error.none {return 0,err;}}let err=self_.certifyLambda(id,raw,saved.ambient);return raw,err;
 }
+fn hasOwnGroupMarker(tree:const blot_parse_ast::Tree&,source:u32)->bool {
+ var cur=source;
+ while tree.node(cur).tag==blot_parse_ast::tag_group {
+  if tree.node(cur).b==1 {return true;}
+  cur=tree.node(cur).a;
+ }
+ return false;
+}
+recursive fn constrainScalarIntrinsicArg(self_:Engine&,arg_id:u32,expected:u32,site_id:u32)->bool,blot_error::Error {
+ let arg,err=self_.checkArgument(arg_id);
+ if err!=blot_error::Error.none {return false,err;}
+ if arg==expected {return false,blot_error::Error.none;}
+ var given=arg;
+ let actual=self_.types.head(arg,0);
+ if actual!=expected && self_.types.node(actual).tag!=blot_check_types::Tag.variable {
+  let actual_info=blot_check_storage_types::info(self_.types,actual);
+  if actual_info.present && actual_info.value.kind==blot_check_storage_types::shared {
+   given=actual_info.value.element;
+  }
+ }
+ let cerr=self_.constrain(given,expected,site_id);
+ if cerr!=blot_error::Error.none {return false,cerr;}
+ let resolved,rerr=self_.types.resolve(arg,0);
+ if rerr!=blot_error::Error.none {return false,rerr;}
+ return resolved==blot_check_types::never,blot_error::Error.none;
+}
 recursive fn applicationExpression(self_:Engine&,id:u32)->u32,blot_error::Error {
- let node=self_.tree.node(id);var direct_source=node.a;while self_.tree.node(direct_source).tag==blot_parse_ast::tag_group {direct_source=self_.tree.node(direct_source).a;}let direct=self_.tree.node(direct_source);
+ let node=self_.tree.node(id);
+ if comptime_binder_len==0 && !self_.editor_marker.present && !self_.types.has_projections {
+  let head_node=self_.tree.node(node.a);
+  if head_node.tag==blot_parse_ast::tag_apply {
+   let leaf_node=self_.tree.node(head_node.a);
+   if leaf_node.tag==blot_parse_ast::tag_intrinsic {
+    let spec=scalarIntrinsicSpec(self_.pool.get(leaf_node.a));
+    if (spec==2 || spec==3 || spec==6 || spec==7) && !hasOwnGroupMarker(self_.tree,head_node.b) && !hasOwnGroupMarker(self_.tree,node.b) {
+     var param_ty=blot_check_types::u32_type;
+     var ret_ty=blot_check_types::u32_type;
+     if spec==3 {ret_ty=blot_check_types::boolean;}
+     else if spec==6 {param_ty=blot_check_types::f32_type;ret_ty=blot_check_types::f32_type;}
+     else if spec==7 {param_ty=blot_check_types::f32_type;ret_ty=blot_check_types::boolean;}
+     let d1,e1=constrainScalarIntrinsicArg(self_,head_node.b,param_ty,node.a);
+     if e1!=blot_error::Error.none {return 0,e1;}
+     let d2,e2=constrainScalarIntrinsicArg(self_,node.b,param_ty,id);
+     if e2!=blot_error::Error.none {return 0,e2;}
+     if d1 || d2 {return blot_check_types::never,blot_error::Error.none;}
+     return ret_ty,blot_error::Error.none;
+    }
+   }
+  } else if head_node.tag==blot_parse_ast::tag_intrinsic {
+   let spec=scalarIntrinsicSpec(self_.pool.get(head_node.a));
+   if (spec==1 || spec==4 || spec==5) && !hasOwnGroupMarker(self_.tree,node.b) {
+    var param_ty=blot_check_types::f32_type;
+    var ret_ty=blot_check_types::f32_type;
+    if spec==1 {param_ty=blot_check_types::u32_type;}
+    else if spec==5 {ret_ty=blot_check_types::u32_type;}
+    let d1,e1=constrainScalarIntrinsicArg(self_,node.b,param_ty,id);
+    if e1!=blot_error::Error.none {return 0,e1;}
+    if d1 {return blot_check_types::never,blot_error::Error.none;}
+    return ret_ty,blot_error::Error.none;
+   }
+  }
+ }
+ var direct_source=node.a;while self_.tree.node(direct_source).tag==blot_parse_ast::tag_group {direct_source=self_.tree.node(direct_source).a;}let direct=self_.tree.node(direct_source);
  if comptime_binder_len!=0 {let ctq,ctq_err=self_.checkComptimeTagQuery(id,direct_source,node.b);if ctq_err!=blot_error::Error.none {return 0,ctq_err;}if ctq.present {return ctq.value,blot_error::Error.none;}}
  let storage,err=self_.storageApplication(id);if err!=blot_error::Error.none {return 0,err;}if storage.present {return storage.value,blot_error::Error.none;}
  if self_.tree.has_typed_staging {let staging,err=self_.stagingApplication(id);if err!=blot_error::Error.none {return 0,err;}if staging.present {return staging.value,blot_error::Error.none;}}let operation,err=self_.operationApplication(id);if err!=blot_error::Error.none {return 0,err;}if operation.present {return operation.value,blot_error::Error.none;}

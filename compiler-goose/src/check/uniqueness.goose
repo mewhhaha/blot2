@@ -313,7 +313,30 @@ fn originKindName(kind: u8) -> const u8[:] {
     if kind == 4 { return "parameter"; }
     return "";
 }
+fn moduleIsPureScalar(module: const Module&) -> bool {
+    for b in module.bindings {
+        if b.capability_parameters.own != 0 { return false; }
+    }
+    for c in module.calls {
+        if c.own != 0 { return false; }
+    }
+    for tn in module.types.nodes {
+        if tn.tag == blot_check_types::Tag.usage { return false; }
+    }
+    var ni: i64 = 1;
+    while ni < module.nodes.len {
+        let n = module.nodes[ni];
+        ni += 1;
+        if n.ty > blot_check_types::never { return false; }
+        match n.tag {
+            constant, reference, call, scalar, logical, if_value, if_stmt, block_, suite, bind, return_, match_, loop_, break_, pattern_bind, panic, invalid, comptime_if => {},
+            _ => { return false; },
+        }
+    }
+    return true;
+}
 fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origins: OriginInfo[>..<]&, collect_origins: bool) {
+    if moduleIsPureScalar(module) { return; }
     var analyzer = Analyzer { .. };
     analyzer.collect_origins = collect_origins;
     {
@@ -380,26 +403,41 @@ fn analyze(module: const Module&, out: blot_check_core::Diagnostic[>..<]&, origi
     // in place (e.g. @storage.push/.push/.truncate, proven non-escaping local
     // callees, or pure downward closures returning scalars/Unit) and never
     // escape into the return value or any alias.
-    for _ in 0..8 {
-        var changed = false;
-        for body, bi in module.bodies {
-            if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
-            let params = module.bodyParameters(body);
-            if params.len == 0 || params.len > 32 { continue; }
-            analyzer.non_escaping_arity[body.binding] = params.len as! u8;
-            var next_mask: u32 = 0;
-            for p, pos in params {
-                if pos >= 32 { break; }
-                if paramNonEscaping(analyzer, module, body.root, p.binding, 0) {
-                    next_mask |= (1 as u32) << (pos as! u32);
+    var has_candidate_param = false;
+    for body, bi in module.bodies {
+        if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
+        let params = module.bodyParameters(body);
+        if params.len == 0 || params.len > 32 { continue; }
+        analyzer.non_escaping_arity[body.binding] = params.len as! u8;
+        for p, pos in params {
+            if pos >= 32 { break; }
+            if p.ty > blot_check_types::never { has_candidate_param = true; break; }
+        }
+    }
+    if has_candidate_param {
+        for _ in 0..8 {
+            var changed = false;
+            for body, bi in module.bodies {
+                if bi == 0 || body.root == 0 || !body.is_function || body.binding >= analyzer.non_escaping_params.len { continue; }
+                let params = module.bodyParameters(body);
+                if params.len == 0 || params.len > 32 { continue; }
+                let prev_mask = analyzer.non_escaping_params[body.binding];
+                var next_mask = prev_mask;
+                for p, pos in params {
+                    if pos >= 32 { break; }
+                    let bit = (1 as u32) << (pos as! u32);
+                    if (prev_mask & bit) != 0 || p.ty <= blot_check_types::never { continue; }
+                    if paramNonEscaping(analyzer, module, body.root, p.binding, 0) {
+                        next_mask |= bit;
+                    }
+                }
+                if next_mask != prev_mask {
+                    analyzer.non_escaping_params[body.binding] = next_mask;
+                    changed = true;
                 }
             }
-            if next_mask != analyzer.non_escaping_params[body.binding] {
-                analyzer.non_escaping_params[body.binding] = next_mask;
-                changed = true;
-            }
+            if !changed { break; }
         }
-        if !changed { break; }
     }
     for merge in module.merges {
         if merge.then_binding < analyzer.flows.len { analyzer.flows[merge.then_binding] = true; }
@@ -1079,6 +1117,7 @@ fn enterNominal(memo: WalkMemo&) -> u64 {
 
 // Whether a value of `ty` can hold storage. Unknown shapes can.
 fn holds(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
+    if ty != 0 && ty <= blot_check_types::never { return false; }
     let known, cached = holdsKnown(self_, ty);
     if cached { return known; }
     let result = holdsIn(self_, m, ty, [], [], 0);
@@ -1247,6 +1286,7 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
 // type, an effect type) counts as borrowing: its results are not checked
 // and not promised. So does growable storage, until `=` is gone.
 fn owns(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
+    if ty != 0 && ty <= blot_check_types::never { return false; }
     if ty < self_.owns_cache.len {
         let bit = self_.owns_cache[ty];
         if bit != 0 { return bit == 2; }
@@ -1260,6 +1300,7 @@ fn owns(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
     return result;
 }
 fn lends(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
+    if ty != 0 && ty <= blot_check_types::never { return false; }
     if ty < self_.lends_cache.len {
         let bit = self_.lends_cache[ty];
         if bit != 0 { return bit == 2; }
@@ -1274,6 +1315,7 @@ fn lends(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
 }
 // Whether a value of type `ty` can hold a function.
 fn calls(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
+    if ty != 0 && ty <= blot_check_types::never { return false; }
     if ty < self_.calls_cache.len {
         let bit = self_.calls_cache[ty];
         if bit != 0 { return bit == 2; }
@@ -2481,7 +2523,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
     }
     if tag == blot_check_core::Tag.scalar || tag == blot_check_core::Tag.logical {
-        let holder = lends(self_, m, n.ty);
+        let primitive_result = n.ty != 0 && n.ty <= blot_check_types::never;
+        let holder = !primitive_result && lends(self_, m, n.ty);
         let base = self_.captured.len;
         let ends = self_.briefs.len;
         let held_base = self_.arguments_held.len;
@@ -2495,15 +2538,15 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = lend(self_, m, n.b, holder, lends_to, brief);
             exits = exits || value.exits;
         }
-        self_.arguments_held.resize(held_base);
-        self_.argument_places.resize(place_base);
-        giveBack(self_, base);
+        if self_.arguments_held.len != held_base { self_.arguments_held.resize(held_base); }
+        if self_.argument_places.len != place_base { self_.argument_places.resize(place_base); }
+        if self_.captured.len != base { giveBack(self_, base); }
         if !holder {
-            endBriefs(self_, ends);
-            if !self_.dry && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
+            if self_.briefs.len != ends { endBriefs(self_, ends); }
+            if !self_.dry && self_.loans.len != 0 && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
         }
         var fact: Fact = none;
-        if owns(self_, m, n.ty) || openType(m, n.ty, 0) { fact = deep; }
+        if !primitive_result && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
         return Value { fact: fact, exits: exits, .. };
     }
     let exits = visitChildren(self_, m, id);

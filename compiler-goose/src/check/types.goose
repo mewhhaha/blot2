@@ -739,6 +739,10 @@ fn resolutionDependencies(self_: const Store&, result: Id) -> blot_support::Opti
     return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { true, certificate , ..};
 }
 recursive fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
+    if root >= unit && root <= never && !self_.has_projections && self_.associated_equations.count == 0 {
+        if self_.resolution_depth_limit <= 0 { return 0, blot_error::Error.type_limit; }
+        return root, blot_error::Error.none;
+    }
     let attribution_start = self_.nodes.len; let result, error = resolveRoot(self_, root, at);
     saturatedAdd(self_.normalization.resolve_nodes_added, (self_.nodes.len - attribution_start) as u64);
     return result, error;
@@ -780,6 +784,10 @@ recursive fn resolveRoot(self_: Store&, root: Id, at: Cursor) -> Id, Error {
     return result, blot_error::Error.none;
 }
 recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id, Error {
+    if root >= unit && root <= never && !self_.has_projections && self_.associated_equations.count == 0 {
+        if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+        return root, blot_error::Error.none;
+    }
     increment(self_.normalization.resolve_depth_entries);
     // A proven closed subtree has no substitutions. Projected stores still
     // pass through the charged path to preserve their exact inference budget.
@@ -1135,7 +1143,7 @@ recursive fn unifyOperationArgumentSnapshots(self_:Store&,a:const Id[:],b:const 
     return true, blot_error::Error.none;
 }
 fn freshEffects(self_: Store&) -> blot_check_effects::Id, Error { let id, error = self_.effects.fresh(); return id, effectError(error); }
-fn resolveEffects(self_: Store&, effect_row: blot_check_effects::Id, at: Cursor) -> blot_check_effects::Id, Error { if self_.use_closed_graphs { synchronizeClosedGraphs(self_); } return resolveOperationRow(self_, effect_row, at, 0); }
+fn resolveEffects(self_: Store&, effect_row: blot_check_effects::Id, at: Cursor) -> blot_check_effects::Id, Error { if effect_row == 0 { return 0, blot_error::Error.none; } if self_.use_closed_graphs { synchronizeClosedGraphs(self_); } return resolveOperationRow(self_, effect_row, at, 0); }
 recursive fn resolveOperationRow(self_: Store&, root: blot_check_effects::Id, at: Cursor, depth: i64) -> blot_check_effects::Id, Error {
     self_.normalization.row_requests += 1; if depth >= 1024 { return 0, blot_error::Error.type_limit; }
     if root == 0 { return 0, blot_error::Error.none; }

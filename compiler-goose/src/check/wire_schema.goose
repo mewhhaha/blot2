@@ -1144,9 +1144,25 @@ fn resolveBindingTarget(units: const Module[:], from_unit: u32, ref_: BindingRef
 // Transitive Core implementation hasher for `impl_hash` (§2.4 & §4.1 item 3).
 struct AssocIndexEntry {
     unit: u32 = 0,
+    identity: Identity = Identity { 0, 0 },
     target: BindingRef = BindingRef { 0, 0 },
     name: Chars = "",
     next: u32 = 0,
+}
+
+struct ImplIndexEntry {
+    unit: u32 = 0,
+    target: BindingRef = BindingRef { 0, 0 },
+    next: u32 = 0,
+}
+
+root struct SharedHashIndex {
+    assoc_indexed: bool = false,
+    assoc_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
+    assoc_entries: AssocIndexEntry[>..] = [],
+    impl_indexed: bool = false,
+    impl_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
+    impl_entries: ImplIndexEntry[>..] = [],
 }
 
 root struct ImplHashCtx {
@@ -1155,12 +1171,10 @@ root struct ImplHashCtx {
     queue: BindingRef[>..] = [],
     staging_sites: u64[>..] = [],
     dep_units: u32[>..] = [],
-    assoc_indexed: bool = false,
-    assoc_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
-    assoc_entries: AssocIndexEntry[>..] = [],
     seen_assoc_heads: dictionary<u64, u32> = dictionary<u64, u32>{},
     seen_assoc_names: Chars[>..] = [],
     seen_assoc_next: u32[>..] = [],
+    seen_contracts: dictionary<u64, bool> = dictionary<u64, bool>{},
 }
 
 fn hashCharsFnv(s: Chars) -> u64 {
@@ -1178,8 +1192,8 @@ fn enqueueBody(ctx: ImplHashCtx&, units: const Module[:], from_unit: u32, ref_: 
     }
 }
 
-fn buildAssocIndex(ctx: ImplHashCtx&, units: const Module[:]) {
-    ctx.assoc_indexed = true;
+fn buildAssocIndex(shared: SharedHashIndex&, units: const Module[:]) {
+    shared.assoc_indexed = true;
     // Traverse in reverse so linked-list prepends yield exact forward (unit, associated) order.
     var ui = units.len;
     while ui > 0 {
@@ -1193,16 +1207,45 @@ fn buildAssocIndex(ctx: ImplHashCtx&, units: const Module[:]) {
             if !asp.present { continue; }
             let h = hashCharsFnv(asp.value);
             var prev: u32 = 0;
-            let found = ctx.assoc_heads.get(h);
+            let found = shared.assoc_heads.get(h);
             if found { prev = found; }
-            let idx = (ctx.assoc_entries.len as u32) + 1;
-            ctx.assoc_entries.push(AssocIndexEntry { unit: u_mod.unit, target: assoc.target, name: asp.value, next: prev });
-            ctx.assoc_heads.insert(h, idx);
+            let idx = (shared.assoc_entries.len as u32) + 1;
+            shared.assoc_entries.push(AssocIndexEntry { unit: u_mod.unit, identity: assoc.identity, target: assoc.target, name: asp.value, next: prev });
+            shared.assoc_heads.insert(h, idx);
         }
     }
 }
 
-fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, units: const Module[:], want: Chars) {
+fn buildImplIndex(shared: SharedHashIndex&, units: const Module[:]) {
+    shared.impl_indexed = true;
+    // Traverse in reverse so linked-list prepends yield exact forward (unit, impl, member) order.
+    var ui = units.len;
+    while ui > 0 {
+        ui -= 1;
+        let u_mod .= units[ui];
+        var ii = u_mod.implementations.len;
+        while ii > 0 {
+            ii -= 1;
+            let impl_ = u_mod.implementations[ii];
+            let key = ((impl_.contract.unit as u64) << 32) | (impl_.contract.decl as u64);
+            let m_start = impl_.members.start as i64;
+            var mi = (impl_.members.len as i64);
+            while mi > 0 {
+                mi -= 1;
+                let im = u_mod.implementation_members[m_start + mi];
+                if im.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                var prev: u32 = 0;
+                let found = shared.impl_heads.get(key);
+                if found { prev = found; }
+                let idx = (shared.impl_entries.len as u32) + 1;
+                shared.impl_entries.push(ImplIndexEntry { unit: u_mod.unit, target: BindingRef { im.target.unit, im.target.binding }, next: prev });
+                shared.impl_heads.insert(key, idx);
+            }
+        }
+    }
+}
+
+fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], want: Chars) {
     let h = hashCharsFnv(want);
     var cur: u32 = 0;
     let sh = ctx.seen_assoc_heads.get(h);
@@ -1216,15 +1259,45 @@ fn enqueueAssociatedBySpelling(ctx: ImplHashCtx&, units: const Module[:], want: 
     ctx.seen_assoc_names.push(want);
     ctx.seen_assoc_next.push(cur);
     ctx.seen_assoc_heads.insert(h, sid);
-    if !ctx.assoc_indexed { buildAssocIndex(ctx, units); }
-    let head = ctx.assoc_heads.get(h);
+    if !shared.assoc_indexed { buildAssocIndex(shared, units); }
+    let head = shared.assoc_heads.get(h);
     if !head { return; }
     var entry_idx: u32 = head;
     while entry_idx != 0 {
-        let e = ctx.assoc_entries[(entry_idx - 1) as i64];
+        let e = shared.assoc_entries[(entry_idx - 1) as i64];
         if e.name == want {
             enqueueBody(ctx, units, e.unit, e.target);
         }
+        entry_idx = e.next;
+    }
+}
+
+fn enqueueAssociatedForNominal(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], nominal: Identity, want: Chars) {
+    if !shared.assoc_indexed { buildAssocIndex(shared, units); }
+    let h = hashCharsFnv(want);
+    let head = shared.assoc_heads.get(h);
+    if !head { return; }
+    var entry_idx: u32 = head;
+    while entry_idx != 0 {
+        let e = shared.assoc_entries[(entry_idx - 1) as i64];
+        if e.identity == nominal && e.name == want {
+            enqueueBody(ctx, units, e.unit, e.target);
+        }
+        entry_idx = e.next;
+    }
+}
+
+fn enqueueContractImpls(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], contract: Identity) {
+    let key = ((contract.unit as u64) << 32) | (contract.decl as u64);
+    if ctx.seen_contracts.contains(key) { return; }
+    ctx.seen_contracts.insert(key, true);
+    if !shared.impl_indexed { buildImplIndex(shared, units); }
+    let head = shared.impl_heads.get(key);
+    if !head { return; }
+    var entry_idx: u32 = head;
+    while entry_idx != 0 {
+        let e = shared.impl_entries[(entry_idx - 1) as i64];
+        enqueueBody(ctx, units, e.unit, e.target);
         entry_idx = e.next;
     }
 }
@@ -1235,32 +1308,32 @@ fn recordStagingSite(ctx: ImplHashCtx&, unit: u32, node_id: u32) {
     ctx.staging_sites.push(key);
 }
 
-recursive fn hashPattern(ctx: ImplHashCtx&, units: const Module[:], m: const Module&, pid: u32, depth: i64) {
+recursive fn hashPattern(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], m: const Module&, pid: u32, depth: i64) {
     if pid == 0 || depth > 128 || (pid as i64) >= m.patterns.len { fnvByte(ctx.h, 0); return; }
     let p = m.pattern(pid);
     fnvByte(ctx.h, blot_check_core::patternTagCode(p.tag) as u8);
     match p.tag {
         constant => { fnvU32Le(ctx.h, p.a); },
-        value => { hashNode(ctx, units, m, p.a, depth + 1); },
+        value => { hashNode(ctx, shared, units, m, p.a, depth + 1); },
         product => {
             let kids = m.patternChildren(pid);
             fnvUleb(ctx.h, kids.len as u64);
-            for k in kids { hashPattern(ctx, units, m, k, depth + 1); }
+            for k in kids { hashPattern(ctx, shared, units, m, k, depth + 1); }
         },
         constructor => {
             let c = m.constructor(p.a);
             fnvU32Le(ctx.h, c.tag);
-            hashPattern(ctx, units, m, p.b, depth + 1);
+            hashPattern(ctx, shared, units, m, p.b, depth + 1);
         },
         record_payload => {
             fnvU32Le(ctx.h, p.a);
-            hashPattern(ctx, units, m, p.b, depth + 1);
+            hashPattern(ctx, shared, units, m, p.b, depth + 1);
         },
         _ => {},
     }
 }
 
-recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module&, id: u32, depth: i64) {
+recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], m: const Module&, id: u32, depth: i64) {
     if id == 0 || depth > 256 || (id as i64) >= m.nodes.len { fnvByte(ctx.h, 0); return; }
     let n = m.node(id);
     fnvByte(ctx.h, blot_check_core::tagCode(n.tag) as u8);
@@ -1290,65 +1363,56 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             enqueueBody(ctx, units, m.unit, ci.target);
             fnvU32Le(ctx.h, ci.own);
             fnvUleb(ctx.h, ci.arguments.len as u64);
-            for arg in ci.arguments { hashNode(ctx, units, m, arg, depth + 1); }
+            for arg in ci.arguments { hashNode(ctx, shared, units, m, arg, depth + 1); }
         },
         scalar, logical, apply, type_same, effect_provider, handle => {
             fnvU32Le(ctx.h, n.c);
-            hashNode(ctx, units, m, n.a, depth + 1);
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
         staging => {
             recordStagingSite(ctx, m.unit, id);
             fnvU32Le(ctx.h, n.c);
-            hashNode(ctx, units, m, n.a, depth + 1);
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
         associated => {
             let sp = m.fieldSpelling(n.c);
             if sp.present {
                 fnvStr(ctx.h, sp.value);
-                enqueueAssociatedBySpelling(ctx, units, sp.value);
+                enqueueAssociatedBySpelling(ctx, shared, units, sp.value);
             }
-            hashNode(ctx, units, m, n.a, depth + 1);
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
         result_associated => {
             let sp = m.fieldSpelling(n.b);
             if sp.present {
                 fnvStr(ctx.h, sp.value);
-                enqueueAssociatedBySpelling(ctx, units, sp.value);
+                enqueueAssociatedBySpelling(ctx, shared, units, sp.value);
             }
-            hashNode(ctx, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
         },
         if_value, if_stmt, state_provider, comptime_if => {
-            hashNode(ctx, units, m, n.a, depth + 1);
-            hashNode(ctx, units, m, n.b, depth + 1);
-            hashNode(ctx, units, m, n.c, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.c, depth + 1);
         },
         block_, suite, product, array, array_op, storage => {
             fnvU32Le(ctx.h, n.c);
             let kids = m.children(id);
             fnvUleb(ctx.h, kids.len as u64);
-            for k in kids { hashNode(ctx, units, m, k, depth + 1); }
+            for k in kids { hashNode(ctx, shared, units, m, k, depth + 1); }
         },
         contract_method => {
             fnvU32Le(ctx.h, n.c);
             if (n.a as i64) < m.member_templates.len {
                 let tmpl = m.member_templates[n.a];
-                for u_mod in units {
-                    for impl_ in u_mod.implementations {
-                        if impl_.contract != tmpl.contract { continue; }
-                        for im in u_mod.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
-                            if im.kind == blot_reuse_principal_interface::ImplementationMemberKind.value {
-                                enqueueBody(ctx, units, u_mod.unit, BindingRef { im.target.unit, im.target.binding });
-                            }
-                        }
-                    }
-                }
+                enqueueContractImpls(ctx, shared, units, tmpl.contract);
             }
             let kids = m.children(id);
             fnvUleb(ctx.h, kids.len as u64);
-            for k in kids { hashNode(ctx, units, m, k, depth + 1); }
+            for k in kids { hashNode(ctx, shared, units, m, k, depth + 1); }
         },
         record => {
             let kids = m.children(id);
@@ -1356,19 +1420,19 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             fnvUleb(ctx.h, kids.len as u64);
             for i in 0..kids.len {
                 fnvU32Le(ctx.h, dests[i]);
-                hashNode(ctx, units, m, kids[i], depth + 1);
+                hashNode(ctx, shared, units, m, kids[i], depth + 1);
             }
         },
         bind => {
             fnvU32Le(ctx.h, n.c);
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
-        return_ => { hashNode(ctx, units, m, n.a, depth + 1); },
+        return_ => { hashNode(ctx, shared, units, m, n.a, depth + 1); },
         construct => {
             let c = m.constructor(n.a);
             fnvU32Le(ctx.h, c.tag);
             fnvU32Le(ctx.h, n.c);
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
         constructor_function => {
             let c = m.constructor(n.a);
@@ -1385,96 +1449,87 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
             if sp.present { fnvStr(ctx.h, sp.value); }
             // Also enqueue any matching associated member target on that nominal so impl changes invalidate impl_hash.
             if pr.nominal.decl != 0 && sp.present {
-                for u_mod in units {
-                    for assoc in u_mod.associated {
-                        if assoc.identity == pr.nominal {
-                            let asp = u_mod.fieldSpelling(assoc.member);
-                            if asp.present && asp.value == sp.value {
-                                enqueueBody(ctx, units, u_mod.unit, assoc.target);
-                            }
-                        }
-                    }
-                }
+                enqueueAssociatedForNominal(ctx, shared, units, pr.nominal, sp.value);
             }
-            hashNode(ctx, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
         },
         pattern_bind => {
-            hashPattern(ctx, units, m, n.a, depth + 1);
-            hashNode(ctx, units, m, n.b, depth + 1);
-            hashNode(ctx, units, m, n.c, depth + 1);
+            hashPattern(ctx, shared, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.c, depth + 1);
         },
         match_ => {
             let ins = m.matchInputs(id);
             fnvUleb(ctx.h, ins.len as u64);
-            for x in ins { hashNode(ctx, units, m, x, depth + 1); }
+            for x in ins { hashNode(ctx, shared, units, m, x, depth + 1); }
             let arms = m.matchArms(id);
             fnvUleb(ctx.h, arms.len as u64);
             for arm in arms {
                 let rows = m.armRows(arm);
                 fnvUleb(ctx.h, rows.len as u64);
                 for row in rows {
-                    for p in m.rowPatterns(row) { hashPattern(ctx, units, m, p, depth + 1); }
+                    for p in m.rowPatterns(row) { hashPattern(ctx, shared, units, m, p, depth + 1); }
                 }
-                hashNode(ctx, units, m, arm.guard_, depth + 1);
-                hashNode(ctx, units, m, arm.body, depth + 1);
+                hashNode(ctx, shared, units, m, arm.guard_, depth + 1);
+                hashNode(ctx, shared, units, m, arm.body, depth + 1);
             }
         },
         loop_ => {
             let li = m.loopInfo(id);
             fnvByte(ctx.h, blot_check_core::loopKindCode(li.kind) as u8);
-            hashNode(ctx, units, m, li.first, depth + 1);
-            hashNode(ctx, units, m, li.end, depth + 1);
-            hashPattern(ctx, units, m, li.pattern, depth + 1);
-            hashNode(ctx, units, m, li.body, depth + 1);
+            hashNode(ctx, shared, units, m, li.first, depth + 1);
+            hashNode(ctx, shared, units, m, li.end, depth + 1);
+            hashPattern(ctx, shared, units, m, li.pattern, depth + 1);
+            hashNode(ctx, shared, units, m, li.body, depth + 1);
         },
         break_ => {
-            for v in m.breakValues(id) { hashNode(ctx, units, m, v, depth + 1); }
+            for v in m.breakValues(id) { hashNode(ctx, shared, units, m, v, depth + 1); }
         },
         update => {
             let ui = m.updateInfo(id);
-            hashNode(ctx, units, m, ui.root, depth + 1);
+            hashNode(ctx, shared, units, m, ui.root, depth + 1);
             for st in m.updateSelectors(id) {
                 fnvByte(ctx.h, blot_check_core::updateKindCode(st.kind) as u8);
-                if st.kind == blot_check_core::UpdateKind.index { hashNode(ctx, units, m, st.index, depth + 1); }
+                if st.kind == blot_check_core::UpdateKind.index { hashNode(ctx, shared, units, m, st.index, depth + 1); }
             }
-            hashNode(ctx, units, m, ui.value, depth + 1);
+            hashNode(ctx, shared, units, m, ui.value, depth + 1);
         },
         closure => {
             let cl = m.closure(id);
-            hashNode(ctx, units, m, cl.body, depth + 1);
+            hashNode(ctx, shared, units, m, cl.body, depth + 1);
         },
         panic => {
             fnvStr(ctx.h, m.panicMessage(id));
         },
         fork_ => {
             fnvU32Le(ctx.h, n.b);
-            hashNode(ctx, units, m, n.a, depth + 1);
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
         },
         with_handle => {
-            for ch in m.children(id) { hashNode(ctx, units, m, ch, depth + 1); }
-            hashNode(ctx, units, m, n.a, depth + 1);
+            for ch in m.children(id) { hashNode(ctx, shared, units, m, ch, depth + 1); }
+            hashNode(ctx, shared, units, m, n.a, depth + 1);
         },
         comptime_for => {
             if m.extra[n.c + 2] == 2 { fnvByte(ctx.h, 2); }
-            hashNode(ctx, units, m, n.b, depth + 1);
+            hashNode(ctx, shared, units, m, n.b, depth + 1);
         },
         comptime_meta => {
             fnvU32Le(ctx.h, n.c);
-            if n.c == 0 { hashNode(ctx, units, m, n.a, depth + 1); }
-            else if n.c == 8 || n.c == 9 { hashNode(ctx, units, m, n.b, depth + 1); }
+            if n.c == 0 { hashNode(ctx, shared, units, m, n.a, depth + 1); }
+            else if n.c == 8 || n.c == 9 { hashNode(ctx, shared, units, m, n.b, depth + 1); }
         },
         spark => {
             let si = m.sparkInfo(id);
             fnvByte(ctx.h, boolByte(si.is_range));
-            hashNode(ctx, units, m, si.source, depth + 1);
-            if si.end != 0 { hashNode(ctx, units, m, si.end, depth + 1); }
-            hashPattern(ctx, units, m, si.pattern, depth + 1);
-            hashNode(ctx, units, m, si.body, depth + 1);
+            hashNode(ctx, shared, units, m, si.source, depth + 1);
+            if si.end != 0 { hashNode(ctx, shared, units, m, si.end, depth + 1); }
+            hashPattern(ctx, shared, units, m, si.pattern, depth + 1);
+            hashNode(ctx, shared, units, m, si.body, depth + 1);
         },
         flat_op => {
             fnvU32Le(ctx.h, n.c);
             if n.c <= blot_check_core::flat_op_process_binding_hash {
-                hashNode(ctx, units, m, n.a, depth + 1);
+                hashNode(ctx, shared, units, m, n.a, depth + 1);
             } else {
                 fnvU32Le(ctx.h, n.a);
             }
@@ -1483,7 +1538,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, units: const Module[:], m: const Module
     }
 }
 
-fn drainImplHashQueue(ctx: ImplHashCtx&, units: const Module[:]) {
+fn drainImplHashQueue(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:]) {
     var cursor: i64 = 0;
     while cursor < ctx.queue.len {
         let target = ctx.queue[cursor];
@@ -1496,16 +1551,16 @@ fn drainImplHashQueue(ctx: ImplHashCtx&, units: const Module[:]) {
             fnvByte(ctx.h, boolByte(body.is_function));
             fnvByte(ctx.h, boolByte(body.is_kernel));
             fnvUleb(ctx.h, body.parameters.len as u64);
-            hashNode(ctx, units, tm, body.root, 0);
+            hashNode(ctx, shared, units, tm, body.root, 0);
         } else if (target.binding as i64) < tm.bindings.len {
             let bi = tm.binding(target.binding);
             fnvByte(ctx.h, 2);
-            if bi.initializer != 0 { hashNode(ctx, units, tm, bi.initializer, 0); }
+            if bi.initializer != 0 { hashNode(ctx, shared, units, tm, bi.initializer, 0); }
         }
     }
 }
 
-fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&, dep_units: u32[>..]&) -> u64 {
+fn computeImplHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x03);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
@@ -1513,7 +1568,7 @@ fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::Ke
         enqueueBody(ctx, units, entry, decl.prepare_target);
     }
     enqueueBody(ctx, units, entry, decl.run_target);
-    drainImplHashQueue(ctx, units);
+    drainImplHashQueue(ctx, shared, units);
     for u in ctx.dep_units { noteDepUnit(dep_units, u); }
     for site in ctx.staging_sites {
         var seen = false;
@@ -1523,13 +1578,13 @@ fn computeImplHash(units: const Module[:], entry: u32, decl: blot_check_core::Ke
     return ctx.h.h;
 }
 
-fn computeProcessClosureHash(units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl, dep_units: u32[>..]&) -> u64 {
+fn computeProcessClosureHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x05);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
     enqueueBody(ctx, units, entry, decl.init_target);
     enqueueBody(ctx, units, entry, decl.step_target);
-    drainImplHashQueue(ctx, units);
+    drainImplHashQueue(ctx, shared, units);
     for u in ctx.dep_units { noteDepUnit(dep_units, u); }
     return ctx.h.h;
 }
@@ -1695,6 +1750,7 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
     if !info.has_persistent_state { return; }
     var cache = UnitIdCache {};
     initUnitIdCache(units, cache);
+    var shared_hash_index = SharedHashIndex {};
     let empty_subst: SubstEntry[0] = [];
     var all_kernel_staging_sites: u64[>..] = [];
 
@@ -1760,7 +1816,7 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         fnvByte(ioh, flags);
         kinfo.io_schema_hash = ioh.h;
         // impl_hash
-        kinfo.impl_hash = computeImplHash(units, entry, decl, all_kernel_staging_sites, info.dep_units);
+        kinfo.impl_hash = computeImplHash(shared_hash_index, units, entry, decl, all_kernel_staging_sites, info.dep_units);
         // binding_hash = fnv1a64(0x04 || ctx_schema_hash_le || in_schema_hash_le || out_schema_hash_le || [flags] || impl_hash_le)
         var bh = Hasher {};
         fnvByte(bh, 0x04);
@@ -1825,7 +1881,7 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         fnvU64Le(pbh, cmd_s.schema_hash);
         fnvU64Le(pbh, rep_s.schema_hash);
         pinfo.binding_hash = pbh.h;
-        fnvU64Le(pch, computeProcessClosureHash(units, entry, decl, info.dep_units));
+        fnvU64Le(pch, computeProcessClosureHash(shared_hash_index, units, entry, decl, info.dep_units));
         info.processes.push(pinfo);
     }
     info.process_closures_digest = pch.h;
