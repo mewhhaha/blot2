@@ -4,7 +4,7 @@
 
 Blot sits between garbage-collected scripting languages and LLVM-heavy systems languages: you get in-place native-class performance, memory safety without `'a` lifetime annotations, algebraic effects, compile-time reflection, and subsecond iteration — all inside a deterministic WebAssembly sandbox.
 
-[Features & Examples](#features--examples) · [Performance](#performance) · [Getting Started](#getting-started) · [Documentation](#documentation)
+[Features & Examples](#features--examples) · [Performance](#performance) · [Benchmarks](BENCHMARK.md) · [Getting Started](#getting-started) · [Documentation](#documentation)
 
 ---
 
@@ -190,7 +190,7 @@ Curried functions (`->`), exhaustive `case ... of` matching, `let $Some x = ... 
 
 ## Performance
 
-Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goose`) on **`wtime-aot 0.1.7`** (`--backend x64`, `x64-v4`, explicit software bounds checks) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.7`) and native `x86_64` (`-O3`, thin LTO). All runs report medians with **bit-exact checksum parity** ([source & runner](benchmarks/comparison/README.md), [raw JSON](benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json)).
+Measured on **AMD Ryzen 7 7800X3D (8C / 16T, Linux)** comparing Blot (`blotc-goose`) on **`wtime-aot 0.1.7`** (`--backend x64`, `x64-v4`, explicit software bounds checks) against **`rustc 1.96.0-nightly -O3`** compiled both to `wasm32 +simd128` (same `wtime-aot 0.1.7`) and native `x86_64` (`-O3`, thin LTO). All runs verify **bit-exact checksum parity** — see **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results and charts ([comparison runner](benchmarks/comparison/README.md), [raw JSON](benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json)).
 
 ![Compile speed and WebAssembly output size: Blot vs Rust](benchmarks/evidence/measurements/2026-11-26-compile-and-size.svg)
 
@@ -237,4 +237,4 @@ deno task test:guest
 
 - **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Effects & I/O](docs/language/effects-and-io.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [`io` entries](examples/io_entries.blot) · [Runtime coordination](examples/runtime_coordination.blot)
 - **Compiler & Host:** [Goose compiler](compiler-goose/README.md) · [Deno host & CLI](host/README.md) · [Guest ABI](docs/host/guest-abi.md) · [Packages](docs/host/packages.md)
-- **Benchmarks & State:** [Comparison suite](benchmarks/comparison/README.md) · [16-benchmark Goose suite](benchmarks/goose-suite/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)
+- **Benchmarks & State:** [All benchmarks (BENCHMARK.md)](BENCHMARK.md) · [Comparison suite](benchmarks/comparison/README.md) · [16-benchmark Goose suite](benchmarks/goose-suite/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)
