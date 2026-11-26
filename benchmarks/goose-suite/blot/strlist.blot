@@ -1,5 +1,4 @@
-// Packed 4-bytes/U32 text buffer split into a flat list of word spans,
-// then scanned 4 times summing (len + first_byte + last_byte).
+// Generate a byte buffer, split it into word spans, then scan the spans 4 times.
 import * as rng from "./rng"
 
 const BENCH_N: U32 = 400000 // BENCH_N
@@ -7,72 +6,38 @@ const PASSES: U32 = 4
 
 type Span is data = $Span { start: U32, len: U32 }
 
-func get_byte (buf: #[U32]) -> (idx: U32): U32 =>
-  return (buf[idx >> 2] >> ((idx & 3) << 3)) & 255
-
 io bench (): #[U32] =>
-  let text_words: #[U32] = #[]
-  let text_len: U32 = 0
-  let cur_word: U32 = 0
-  let r = rng.u64_from_u32 12345
-
+  let text: #[U8] = #[]
+  let r: U64 = 12345
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    let wl = 3 + rng.xs_mod_small r 18
+    let wl = 3 + rng.xs_mod r 18
     for _ in 0 .. wl:
       r := rng.xs_next self
-      let ch = 97 + rng.xs_mod_small r 26
-      let sh = (text_len & 3) << 3
-      if sh == 0:
-        cur_word := ch
-      else:
-        cur_word := self | (ch << sh)
-      text_len := self + 1
-      if (text_len & 3) == 0:
-        text_words := self.push cur_word
-    let sp_sh = (text_len & 3) << 3
-    if sp_sh == 0:
-      cur_word := 32
-    else:
-      cur_word := self | (32 << sp_sh)
-    text_len := self + 1
-    if (text_len & 3) == 0:
-      text_words := self.push cur_word
-
-  if (text_len & 3) != 0:
-    text_words := self.push cur_word
+      text := self.push (97 + rng.xs_mod r 26).to_u8
+    text := self.push 32
 
   // Split text on ASCII 32 into word spans.
   let words = @array.fill BENCH_N ($Span { start: 0, len: 0 })
   let wcount: U32 = 0
   let wstart: U32 = 0
-  for i in 0 .. text_len:
-    if get_byte text_words i == 32:
+  for i in 0 .. text.length:
+    if text[i] == 32:
       if i > wstart:
         words[wcount] := $Span { start: wstart, len: i - wstart }
         wcount := self + 1
       wstart := i + 1
-  if text_len > wstart:
-    words[wcount] := $Span { start: wstart, len: text_len - wstart }
+  if text.length > wstart:
+    words[wcount] := $Span { start: wstart, len: text.length - wstart }
     wcount := self + 1
 
-  // Scan PASSES times.
-  let total = rng.u64_zero ()
+  let total: I64 = 0
   for _ in 0 .. PASSES:
-    let chunk: U32 = 0
-    let count: U32 = 0
     for wi in 0 .. wcount:
       let $Span { start, len } = words[wi]
-      let first = get_byte text_words start
-      let last = get_byte text_words (start + len - 1)
-      chunk := self + len + first + last
-      count := self + 1
-      if count == 4194304:
-        total := rng.u64_add_u32 self chunk
-        chunk := 0
-        count := 0
-    if count > 0:
-      total := rng.u64_add_u32 self chunk
+      let first = text[start].to_i64
+      let last = text[start + len - 1].to_i64
+      total := self + len.to_i64 + first + last
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self wcount

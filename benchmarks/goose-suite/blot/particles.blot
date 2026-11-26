@@ -1,45 +1,70 @@
-// Integrate N particles for 200 steps of exact binary32 vector math (AoS).
-// All arithmetic is exact in IEEE 754 binary32 so checksums match bit-for-bit.
+// Integrate N independent particles for 200 steps of binary32 arithmetic.
 import * as rng from "./rng"
+import * as simd from "std/simd"
 
 const BENCH_N: U32 = 100000 // BENCH_N
 const STEPS: U32 = 200
 
-type Particle is data = $P { px: F32, py: F32, pz: F32, vx: F32, vy: F32, vz: F32 }
-
 io bench (): #[U32] =>
-  let ps = @array.fill BENCH_N ($P { px: 0.0, py: 0.0, pz: 0.0, vx: 0.0, vy: 0.0, vz: 0.0 })
-  let r = rng.u64_from_u32 12345
+  let px = @array.fill BENCH_N 0.0
+  let py = @array.fill BENCH_N 0.0
+  let pz = @array.fill BENCH_N 0.0
+  let vx = @array.fill BENCH_N 0.0
+  let vy = @array.fill BENCH_N 0.0
+  let vz = @array.fill BENCH_N 0.0
+  let r: U64 = 12345
   for i in 0 .. BENCH_N:
     r := rng.xs_next self
-    let $rng.U64 { lo, hi } = r
-    ps[i] := $P {
-      px: U32.to_f32 (lo & 1023),
-      py: U32.to_f32 ((lo >> 12) & 1023),
-      pz: U32.to_f32 (((lo >> 24) | (hi << 8)) & 1023),
-      vx: (U32.to_f32 ((hi >> 4) & 255) - 128.0) * 0.0625,
-      vy: (U32.to_f32 ((hi >> 12) & 255) - 128.0) * 0.0625,
-      vz: (U32.to_f32 ((hi >> 20) & 255) - 128.0) * 0.0625,
-    }
+    px[i] := (r & 1023).to_f32
+    py[i] := ((r >> 12) & 1023).to_f32
+    pz[i] := ((r >> 24) & 1023).to_f32
+    vx[i] := (((r >> 36) & 255).to_f32 - 128.0) * 0.0625
+    vy[i] := (((r >> 44) & 255).to_f32 - 128.0) * 0.0625
+    vz[i] := (((r >> 52) & 255).to_f32 - 128.0) * 0.0625
 
+  let groups = BENCH_N / 4
+  // Load each constant vector once before entering the integration loops.
+  let constants: #[F32] = #[
+    0.0, 0.0, 0.0, 0.0,
+    0.0625, 0.0625, 0.0625, 0.0625,
+    0.5, 0.5, 0.5, 0.5,
+  ]
+  let zero = simd.load 0 constants
+  let gravity = simd.load 4 constants
+  let half = simd.load 8 constants
   for _ in 0 .. STEPS:
-    for i in 0 .. BENCH_N:
-      let $P { px, py, pz, vx, vy, vz } = ps[i]
-      let nvy = vy - 0.0625
-      let npx = px + vx
-      let npy = py + nvy
-      let npz = pz + vz
-      if npy < 0.0:
-        ps[i] := $P { px: npx, py: 0.0 - npy, pz: npz, vx, vy: 0.0 - nvy * 0.5, vz }
+    for group in 0 .. groups:
+      let i = group * 4
+      let dx = simd.load i vx
+      let dy = simd.f32_sub (simd.load i vy) gravity
+      let dz = simd.load i vz
+      let x = simd.f32_add (simd.load i px) dx
+      let y = simd.f32_add (simd.load i py) dy
+      let z = simd.f32_add (simd.load i pz) dz
+      let bounce = simd.f32_lt y zero
+      let next_y = simd.f32_select bounce (simd.f32_sub zero y) y
+      let next_vy = simd.f32_select bounce (simd.f32_sub zero (simd.f32_mul dy half)) dy
+      px := simd.store i x self
+      py := simd.store i next_y self
+      pz := simd.store i z self
+      vy := simd.store i next_vy self
+    for i in (groups * 4) .. BENCH_N:
+      let dy = vy[i] - 0.0625
+      let y = py[i] + dy
+      px[i] := self + vx[i]
+      pz[i] := self + vz[i]
+      if y < 0.0:
+        py[i] := 0.0 - y
+        vy[i] := 0.0 - dy * 0.5
       else:
-        ps[i] := $P { px: npx, py: npy, pz: npz, vx, vy: nvy, vz }
+        py[i] := y
+        vy[i] := dy
 
-  let total = rng.u64_zero ()
+  let total: I64 = 0
   for i in 0 .. BENCH_N:
-    let $P { px, py, pz, vx: _, vy: _, vz: _ } = ps[i]
-    total := rng.i64_add_f32 self (px * 16.0)
-    total := rng.i64_add_f32 self (py * 16.0)
-    total := rng.i64_add_f32 self (pz * 16.0)
+    total := self + (px[i] * 16.0).to_i64
+    total := self + (py[i] * 16.0).to_i64
+    total := self + (pz[i] * 16.0).to_i64
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self BENCH_N

@@ -1,4 +1,4 @@
-// PLB helloworld: prints "Hello world <arg>!\n"
+// PLB helloworld: prints "Hello world <arg>!"
 import * as buf from "./buf"
 
 io bench (inp: #[U32]): #[U32] =>
@@ -14,5 +14,5 @@ io bench (inp: #[U32]): #[U32] =>
     w := w2
     l := l2
     c := c2
-  let (w3, l3, c3) = buf.push_text w l c "!\n"
+  let (w3, l3, c3) = buf.push_text w l c "!"
   return buf.finish_buf w3 l3 c3

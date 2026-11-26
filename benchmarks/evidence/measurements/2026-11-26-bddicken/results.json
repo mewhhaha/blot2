@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-11-26T20:58:10.049083+00:00",
+    "generated_at": "2026-11-26T23:18:24.613090+00:00",
     "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
     "os": "Linux 7.3.5-2-cachyos (x86_64)",
     "clang": "clang version 23.1.5",
@@ -13,164 +13,164 @@
   "benchmarks": {
     "fibonacci": {
       "blot": {
-        "best_mean_ms": 211.4339,
-        "best_min_ms": 190.2821,
-        "runs_per_rep": 10,
-        "compile_ms": 35.46,
+        "best_mean_ms": 47.0812,
+        "best_min_ms": 45.1005,
+        "runs_per_rep": 43,
+        "compile_ms": 16.4,
         "reps": [
           {
-            "mean_ms": 316.9477,
-            "std_dev_ms": 56.4196,
-            "min_ms": 253.8693,
-            "max_ms": 403.4727,
-            "runs": 7,
+            "mean_ms": 48.4105,
+            "std_dev_ms": 6.3634,
+            "min_ms": 45.2442,
+            "max_ms": 86.3341,
+            "runs": 42,
             "result": "24157817"
           },
           {
-            "mean_ms": 338.3291,
-            "std_dev_ms": 39.8601,
-            "min_ms": 297.0882,
-            "max_ms": 415.3648,
-            "runs": 6,
+            "mean_ms": 47.0812,
+            "std_dev_ms": 0.8924,
+            "min_ms": 45.1005,
+            "max_ms": 49.0253,
+            "runs": 43,
             "result": "24157817"
           },
           {
-            "mean_ms": 211.4339,
-            "std_dev_ms": 11.4493,
-            "min_ms": 190.2821,
-            "max_ms": 232.1444,
-            "runs": 10,
+            "mean_ms": 48.2479,
+            "std_dev_ms": 5.2022,
+            "min_ms": 45.3288,
+            "max_ms": 80.3305,
+            "runs": 42,
             "result": "24157817"
           }
         ],
-        "blotc_ms": 23.64,
-        "aot_ms": 11.82,
-        "wasm_bytes": 4061
+        "blotc_ms": 13.5,
+        "aot_ms": 2.9,
+        "wasm_bytes": 4038
       },
       "goose": {
-        "best_mean_ms": 85.4759,
-        "best_min_ms": 52.1881,
-        "runs_per_rep": 24,
-        "compile_ms": 557.76,
+        "best_mean_ms": 42.5644,
+        "best_min_ms": 41.6577,
+        "runs_per_rep": 47,
+        "compile_ms": 311.54,
         "reps": [
           {
-            "mean_ms": 99.1198,
-            "std_dev_ms": 28.1568,
-            "min_ms": 62.0478,
-            "max_ms": 150.6478,
-            "runs": 21,
+            "mean_ms": 42.5644,
+            "std_dev_ms": 0.8487,
+            "min_ms": 41.6636,
+            "max_ms": 45.3525,
+            "runs": 47,
             "result": "24157817"
           },
           {
-            "mean_ms": 85.4759,
-            "std_dev_ms": 21.3049,
-            "min_ms": 59.5379,
-            "max_ms": 144.1873,
-            "runs": 24,
+            "mean_ms": 42.8292,
+            "std_dev_ms": 1.2981,
+            "min_ms": 41.6577,
+            "max_ms": 48.9898,
+            "runs": 47,
             "result": "24157817"
           },
           {
-            "mean_ms": 109.8181,
-            "std_dev_ms": 33.1342,
-            "min_ms": 52.1881,
-            "max_ms": 178.4544,
-            "runs": 19,
+            "mean_ms": 43.4387,
+            "std_dev_ms": 1.7491,
+            "min_ms": 41.7262,
+            "max_ms": 53.4482,
+            "runs": 47,
             "result": "24157817"
           }
         ]
       },
       "c": {
-        "best_mean_ms": 112.334,
-        "best_min_ms": 73.7794,
-        "runs_per_rep": 19,
-        "compile_ms": 233.52,
+        "best_mean_ms": 49.3894,
+        "best_min_ms": 48.1351,
+        "runs_per_rep": 41,
+        "compile_ms": 77.23,
         "reps": [
           {
-            "mean_ms": 113.0974,
-            "std_dev_ms": 20.9356,
-            "min_ms": 78.9444,
-            "max_ms": 163.2587,
-            "runs": 19,
+            "mean_ms": 51.6453,
+            "std_dev_ms": 5.4143,
+            "min_ms": 48.3388,
+            "max_ms": 78.1112,
+            "runs": 39,
             "result": "24157817"
           },
           {
-            "mean_ms": 112.334,
-            "std_dev_ms": 33.071,
-            "min_ms": 75.4079,
-            "max_ms": 183.9151,
-            "runs": 19,
+            "mean_ms": 49.3894,
+            "std_dev_ms": 0.926,
+            "min_ms": 48.4097,
+            "max_ms": 51.7283,
+            "runs": 41,
             "result": "24157817"
           },
           {
-            "mean_ms": 112.6816,
-            "std_dev_ms": 24.2281,
-            "min_ms": 73.7794,
-            "max_ms": 158.9518,
-            "runs": 18,
+            "mean_ms": 49.6463,
+            "std_dev_ms": 1.8354,
+            "min_ms": 48.1351,
+            "max_ms": 59.4238,
+            "runs": 41,
             "result": "24157817"
           }
         ]
       },
       "cpp": {
-        "best_mean_ms": 110.4478,
-        "best_min_ms": 70.7715,
-        "runs_per_rep": 19,
-        "compile_ms": 5016.76,
+        "best_mean_ms": 52.1201,
+        "best_min_ms": 51.1055,
+        "runs_per_rep": 39,
+        "compile_ms": 1471.44,
         "reps": [
           {
-            "mean_ms": 132.3962,
-            "std_dev_ms": 37.7522,
-            "min_ms": 77.9834,
-            "max_ms": 238.3322,
-            "runs": 16,
+            "mean_ms": 53.0453,
+            "std_dev_ms": 2.0421,
+            "min_ms": 51.1962,
+            "max_ms": 63.4981,
+            "runs": 38,
             "result": "24157817"
           },
           {
-            "mean_ms": 122.3414,
-            "std_dev_ms": 26.5816,
-            "min_ms": 83.8708,
-            "max_ms": 180.0879,
-            "runs": 17,
+            "mean_ms": 52.1201,
+            "std_dev_ms": 0.9592,
+            "min_ms": 51.1246,
+            "max_ms": 55.1666,
+            "runs": 39,
             "result": "24157817"
           },
           {
-            "mean_ms": 110.4478,
-            "std_dev_ms": 27.1851,
-            "min_ms": 70.7715,
-            "max_ms": 172.7551,
-            "runs": 19,
+            "mean_ms": 52.755,
+            "std_dev_ms": 1.2455,
+            "min_ms": 51.1055,
+            "max_ms": 56.5371,
+            "runs": 38,
             "result": "24157817"
           }
         ]
       },
       "rust": {
-        "best_mean_ms": 99.2654,
-        "best_min_ms": 61.8782,
-        "runs_per_rep": 21,
-        "compile_ms": 91.81,
+        "best_mean_ms": 41.6716,
+        "best_min_ms": 40.8569,
+        "runs_per_rep": 48,
+        "compile_ms": 50.09,
         "reps": [
           {
-            "mean_ms": 114.5711,
-            "std_dev_ms": 25.9027,
-            "min_ms": 75.5674,
-            "max_ms": 156.5857,
-            "runs": 18,
+            "mean_ms": 41.8407,
+            "std_dev_ms": 0.8783,
+            "min_ms": 40.9615,
+            "max_ms": 44.2267,
+            "runs": 48,
             "result": "24157817"
           },
           {
-            "mean_ms": 99.2654,
-            "std_dev_ms": 26.82,
-            "min_ms": 61.8782,
-            "max_ms": 169.1617,
-            "runs": 21,
+            "mean_ms": 41.6716,
+            "std_dev_ms": 0.7284,
+            "min_ms": 40.8779,
+            "max_ms": 43.5494,
+            "runs": 48,
             "result": "24157817"
           },
           {
-            "mean_ms": 115.4694,
-            "std_dev_ms": 34.1824,
-            "min_ms": 64.1125,
-            "max_ms": 180.8338,
-            "runs": 18,
+            "mean_ms": 42.2677,
+            "std_dev_ms": 1.5803,
+            "min_ms": 40.8569,
+            "max_ms": 48.9752,
+            "runs": 48,
             "result": "24157817"
           }
         ]
@@ -178,329 +178,329 @@
     },
     "loops": {
       "blot": {
-        "best_mean_ms": 206.2466,
-        "best_min_ms": 128.9959,
-        "runs_per_rep": 10,
-        "compile_ms": 58.22,
+        "best_mean_ms": 67.6491,
+        "best_min_ms": 65.5699,
+        "runs_per_rep": 30,
+        "compile_ms": 17.46,
         "reps": [
           {
-            "mean_ms": 225.6052,
-            "std_dev_ms": 37.3389,
-            "min_ms": 180.3261,
-            "max_ms": 315.536,
-            "runs": 9,
-            "result": "198984"
+            "mean_ms": 67.9991,
+            "std_dev_ms": 2.7637,
+            "min_ms": 65.5699,
+            "max_ms": 80.5645,
+            "runs": 30,
+            "result": "201104"
           },
           {
-            "mean_ms": 206.2466,
-            "std_dev_ms": 49.9718,
-            "min_ms": 139.0742,
-            "max_ms": 283.9878,
-            "runs": 10,
-            "result": "195770"
+            "mean_ms": 67.818,
+            "std_dev_ms": 2.5787,
+            "min_ms": 65.5887,
+            "max_ms": 77.3162,
+            "runs": 30,
+            "result": "200321"
           },
           {
-            "mean_ms": 251.5137,
-            "std_dev_ms": 90.3548,
-            "min_ms": 128.9959,
-            "max_ms": 444.8551,
-            "runs": 8,
-            "result": "199915"
+            "mean_ms": 67.6491,
+            "std_dev_ms": 1.2489,
+            "min_ms": 65.7608,
+            "max_ms": 70.3353,
+            "runs": 30,
+            "result": "199563"
           }
         ],
-        "blotc_ms": 44.47,
-        "aot_ms": 13.75,
-        "wasm_bytes": 4409
+        "blotc_ms": 14.25,
+        "aot_ms": 3.21,
+        "wasm_bytes": 4438
       },
       "goose": {
-        "best_mean_ms": 80.2401,
-        "best_min_ms": 51.719,
-        "runs_per_rep": 25,
-        "compile_ms": 936.47,
+        "best_mean_ms": 34.674,
+        "best_min_ms": 33.4338,
+        "runs_per_rep": 58,
+        "compile_ms": 323.38,
         "reps": [
           {
-            "mean_ms": 81.8652,
-            "std_dev_ms": 15.0148,
-            "min_ms": 55.3127,
-            "max_ms": 110.2277,
-            "runs": 25,
-            "result": "195226"
+            "mean_ms": 35.0155,
+            "std_dev_ms": 1.2194,
+            "min_ms": 33.5309,
+            "max_ms": 39.512,
+            "runs": 58,
+            "result": "199589"
           },
           {
-            "mean_ms": 80.2401,
-            "std_dev_ms": 17.8736,
-            "min_ms": 51.719,
-            "max_ms": 116.4433,
-            "runs": 25,
-            "result": "196201"
+            "mean_ms": 34.674,
+            "std_dev_ms": 1.1987,
+            "min_ms": 33.5182,
+            "max_ms": 38.763,
+            "runs": 58,
+            "result": "202005"
           },
           {
-            "mean_ms": 111.1325,
-            "std_dev_ms": 29.0767,
-            "min_ms": 65.7365,
-            "max_ms": 173.6634,
-            "runs": 18,
-            "result": "204265"
+            "mean_ms": 34.946,
+            "std_dev_ms": 1.8198,
+            "min_ms": 33.4338,
+            "max_ms": 42.0044,
+            "runs": 58,
+            "result": "202577"
           }
         ]
       },
       "c": {
-        "best_mean_ms": 191.3735,
-        "best_min_ms": 127.935,
-        "runs_per_rep": 11,
-        "compile_ms": 239.0,
+        "best_mean_ms": 122.5682,
+        "best_min_ms": 119.2632,
+        "runs_per_rep": 17,
+        "compile_ms": 69.12,
         "reps": [
           {
-            "mean_ms": 204.4908,
-            "std_dev_ms": 81.2976,
-            "min_ms": 127.935,
-            "max_ms": 382.1112,
-            "runs": 10,
-            "result": "204367"
+            "mean_ms": 122.7841,
+            "std_dev_ms": 2.9152,
+            "min_ms": 119.5493,
+            "max_ms": 130.6912,
+            "runs": 17,
+            "result": "202146"
           },
           {
-            "mean_ms": 191.3735,
-            "std_dev_ms": 21.3388,
-            "min_ms": 156.4285,
-            "max_ms": 242.3122,
-            "runs": 11,
-            "result": "196311"
+            "mean_ms": 122.5682,
+            "std_dev_ms": 1.8535,
+            "min_ms": 120.4173,
+            "max_ms": 127.1095,
+            "runs": 17,
+            "result": "196938"
           },
           {
-            "mean_ms": 356.7222,
-            "std_dev_ms": 77.8131,
-            "min_ms": 262.602,
-            "max_ms": 477.487,
-            "runs": 6,
-            "result": "198436"
+            "mean_ms": 123.2007,
+            "std_dev_ms": 2.7262,
+            "min_ms": 119.2632,
+            "max_ms": 130.3809,
+            "runs": 17,
+            "result": "204439"
           }
         ]
       },
       "cpp": {
-        "best_mean_ms": 189.6745,
-        "best_min_ms": 146.3908,
-        "runs_per_rep": 11,
-        "compile_ms": 5725.83,
+        "best_mean_ms": 122.2966,
+        "best_min_ms": 119.5206,
+        "runs_per_rep": 17,
+        "compile_ms": 1540.63,
         "reps": [
           {
-            "mean_ms": 213.1837,
-            "std_dev_ms": 35.9247,
-            "min_ms": 169.7467,
-            "max_ms": 312.517,
-            "runs": 10,
-            "result": "196593"
+            "mean_ms": 122.4069,
+            "std_dev_ms": 1.757,
+            "min_ms": 119.5206,
+            "max_ms": 126.1317,
+            "runs": 17,
+            "result": "197324"
           },
           {
-            "mean_ms": 189.6745,
-            "std_dev_ms": 31.3194,
-            "min_ms": 146.3908,
-            "max_ms": 250.2114,
-            "runs": 11,
-            "result": "200528"
+            "mean_ms": 122.2966,
+            "std_dev_ms": 2.2399,
+            "min_ms": 119.7232,
+            "max_ms": 127.6809,
+            "runs": 17,
+            "result": "197419"
           },
           {
-            "mean_ms": 287.5146,
-            "std_dev_ms": 38.8716,
-            "min_ms": 243.4841,
-            "max_ms": 362.8554,
-            "runs": 7,
-            "result": "197177"
+            "mean_ms": 123.7002,
+            "std_dev_ms": 2.2531,
+            "min_ms": 119.5563,
+            "max_ms": 128.6713,
+            "runs": 17,
+            "result": "202184"
           }
         ]
       },
       "rust": {
-        "best_mean_ms": 196.4683,
-        "best_min_ms": 148.9283,
-        "runs_per_rep": 11,
-        "compile_ms": 73.75,
+        "best_mean_ms": 121.5414,
+        "best_min_ms": 119.544,
+        "runs_per_rep": 17,
+        "compile_ms": 41.8,
         "reps": [
           {
-            "mean_ms": 222.1963,
-            "std_dev_ms": 21.873,
-            "min_ms": 184.2666,
-            "max_ms": 249.4657,
-            "runs": 10,
-            "result": "196608"
+            "mean_ms": 121.9969,
+            "std_dev_ms": 2.1134,
+            "min_ms": 119.8873,
+            "max_ms": 127.3199,
+            "runs": 17,
+            "result": "203376"
           },
           {
-            "mean_ms": 196.4683,
-            "std_dev_ms": 23.7915,
-            "min_ms": 148.9283,
-            "max_ms": 224.6063,
-            "runs": 11,
-            "result": "196641"
+            "mean_ms": 121.5414,
+            "std_dev_ms": 1.4657,
+            "min_ms": 119.544,
+            "max_ms": 124.4585,
+            "runs": 17,
+            "result": "195261"
           },
           {
-            "mean_ms": 286.1693,
-            "std_dev_ms": 76.7688,
-            "min_ms": 176.5734,
-            "max_ms": 383.579,
-            "runs": 8,
-            "result": "199942"
+            "mean_ms": 123.1016,
+            "std_dev_ms": 1.9616,
+            "min_ms": 119.654,
+            "max_ms": 128.5297,
+            "runs": 17,
+            "result": "204831"
           }
         ]
       }
     },
     "levenshtein": {
       "blot": {
-        "best_mean_ms": 174.4342,
-        "best_min_ms": 125.3966,
-        "runs_per_rep": 12,
-        "compile_ms": 53.69,
+        "best_mean_ms": 51.2957,
+        "best_min_ms": 50.0316,
+        "runs_per_rep": 40,
+        "compile_ms": 18.07,
         "reps": [
           {
-            "mean_ms": 177.0668,
-            "std_dev_ms": 39.3006,
-            "min_ms": 128.5004,
-            "max_ms": 250.2494,
-            "runs": 12,
+            "mean_ms": 51.2957,
+            "std_dev_ms": 1.6601,
+            "min_ms": 50.0316,
+            "max_ms": 58.5546,
+            "runs": 40,
             "result": "554324"
           },
           {
-            "mean_ms": 174.4342,
-            "std_dev_ms": 26.197,
-            "min_ms": 125.3966,
-            "max_ms": 217.8951,
-            "runs": 12,
+            "mean_ms": 51.403,
+            "std_dev_ms": 1.803,
+            "min_ms": 50.0732,
+            "max_ms": 60.3422,
+            "runs": 39,
             "result": "554324"
           },
           {
-            "mean_ms": 238.6543,
-            "std_dev_ms": 35.5859,
-            "min_ms": 182.5935,
-            "max_ms": 302.5152,
-            "runs": 9,
+            "mean_ms": 51.64,
+            "std_dev_ms": 1.6161,
+            "min_ms": 50.0354,
+            "max_ms": 57.254,
+            "runs": 39,
             "result": "554324"
           }
         ],
-        "blotc_ms": 37.83,
-        "aot_ms": 15.86,
-        "wasm_bytes": 6687
+        "blotc_ms": 14.48,
+        "aot_ms": 3.59,
+        "wasm_bytes": 6575
       },
       "goose": {
-        "best_mean_ms": 71.7534,
-        "best_min_ms": 50.5603,
-        "runs_per_rep": 29,
-        "compile_ms": 667.14,
+        "best_mean_ms": 46.2574,
+        "best_min_ms": 45.0862,
+        "runs_per_rep": 44,
+        "compile_ms": 310.36,
         "reps": [
           {
-            "mean_ms": 99.2471,
-            "std_dev_ms": 26.4169,
-            "min_ms": 50.5603,
-            "max_ms": 144.1336,
-            "runs": 21,
+            "mean_ms": 46.4191,
+            "std_dev_ms": 0.9336,
+            "min_ms": 45.2145,
+            "max_ms": 48.8183,
+            "runs": 44,
             "result": "554324"
           },
           {
-            "mean_ms": 71.7534,
-            "std_dev_ms": 15.4372,
-            "min_ms": 57.0453,
-            "max_ms": 110.9981,
-            "runs": 29,
+            "mean_ms": 46.4019,
+            "std_dev_ms": 0.9957,
+            "min_ms": 45.1523,
+            "max_ms": 48.4933,
+            "runs": 44,
             "result": "554324"
           },
           {
-            "mean_ms": 87.8765,
-            "std_dev_ms": 23.9121,
-            "min_ms": 56.8058,
-            "max_ms": 151.2348,
-            "runs": 23,
+            "mean_ms": 46.2574,
+            "std_dev_ms": 1.0092,
+            "min_ms": 45.0862,
+            "max_ms": 48.6897,
+            "runs": 44,
             "result": "554324"
           }
         ]
       },
       "c": {
-        "best_mean_ms": 108.5154,
-        "best_min_ms": 78.5731,
-        "runs_per_rep": 19,
-        "compile_ms": 248.13,
+        "best_mean_ms": 55.4298,
+        "best_min_ms": 53.0676,
+        "runs_per_rep": 37,
+        "compile_ms": 95.59,
         "reps": [
           {
-            "mean_ms": 127.7503,
-            "std_dev_ms": 19.5473,
-            "min_ms": 86.0921,
-            "max_ms": 157.7293,
-            "runs": 16,
+            "mean_ms": 55.5243,
+            "std_dev_ms": 1.8429,
+            "min_ms": 53.2191,
+            "max_ms": 61.1569,
+            "runs": 37,
             "result": "554324"
           },
           {
-            "mean_ms": 108.5154,
-            "std_dev_ms": 22.5932,
-            "min_ms": 78.5731,
-            "max_ms": 173.0979,
-            "runs": 19,
+            "mean_ms": 56.5398,
+            "std_dev_ms": 1.0958,
+            "min_ms": 55.1181,
+            "max_ms": 60.6221,
+            "runs": 36,
             "result": "554324"
           },
           {
-            "mean_ms": 153.2559,
-            "std_dev_ms": 32.8302,
-            "min_ms": 102.6755,
-            "max_ms": 208.0778,
-            "runs": 14,
+            "mean_ms": 55.4298,
+            "std_dev_ms": 4.8085,
+            "min_ms": 53.0676,
+            "max_ms": 82.823,
+            "runs": 37,
             "result": "554324"
           }
         ]
       },
       "cpp": {
-        "best_mean_ms": 97.4303,
-        "best_min_ms": 71.4118,
-        "runs_per_rep": 21,
-        "compile_ms": 4024.18,
+        "best_mean_ms": 51.9478,
+        "best_min_ms": 50.3388,
+        "runs_per_rep": 39,
+        "compile_ms": 1616.97,
         "reps": [
           {
-            "mean_ms": 118.62,
-            "std_dev_ms": 27.2028,
-            "min_ms": 72.1751,
-            "max_ms": 175.437,
-            "runs": 17,
+            "mean_ms": 52.0823,
+            "std_dev_ms": 1.078,
+            "min_ms": 50.5412,
+            "max_ms": 54.7099,
+            "runs": 39,
             "result": "554324"
           },
           {
-            "mean_ms": 97.4303,
-            "std_dev_ms": 22.0299,
-            "min_ms": 71.4118,
-            "max_ms": 178.583,
-            "runs": 21,
+            "mean_ms": 51.9861,
+            "std_dev_ms": 1.8926,
+            "min_ms": 50.4616,
+            "max_ms": 61.6595,
+            "runs": 39,
             "result": "554324"
           },
           {
-            "mean_ms": 155.0993,
-            "std_dev_ms": 38.5393,
-            "min_ms": 115.7764,
-            "max_ms": 241.8036,
-            "runs": 14,
+            "mean_ms": 51.9478,
+            "std_dev_ms": 1.5858,
+            "min_ms": 50.3388,
+            "max_ms": 58.6256,
+            "runs": 39,
             "result": "554324"
           }
         ]
       },
       "rust": {
-        "best_mean_ms": 87.5851,
-        "best_min_ms": 66.8537,
-        "runs_per_rep": 23,
-        "compile_ms": 61.41,
+        "best_mean_ms": 40.2629,
+        "best_min_ms": 38.9505,
+        "runs_per_rep": 50,
+        "compile_ms": 14.88,
         "reps": [
           {
-            "mean_ms": 102.9995,
-            "std_dev_ms": 16.0017,
-            "min_ms": 79.9842,
-            "max_ms": 127.986,
-            "runs": 20,
+            "mean_ms": 40.2629,
+            "std_dev_ms": 0.7249,
+            "min_ms": 39.1011,
+            "max_ms": 42.5379,
+            "runs": 50,
             "result": "554324"
           },
           {
-            "mean_ms": 87.5851,
-            "std_dev_ms": 17.8285,
-            "min_ms": 66.8537,
-            "max_ms": 137.5088,
-            "runs": 23,
+            "mean_ms": 40.3222,
+            "std_dev_ms": 1.0729,
+            "min_ms": 38.9505,
+            "max_ms": 43.8066,
+            "runs": 50,
             "result": "554324"
           },
           {
-            "mean_ms": 114.4357,
-            "std_dev_ms": 25.7225,
-            "min_ms": 77.484,
-            "max_ms": 151.5156,
-            "runs": 18,
+            "mean_ms": 40.3778,
+            "std_dev_ms": 0.9339,
+            "min_ms": 39.1959,
+            "max_ms": 43.255,
+            "runs": 50,
             "result": "554324"
           }
         ]
@@ -508,119 +508,119 @@
     },
     "hello-world": {
       "blot": {
-        "best_mean_ms": 2.1468,
-        "best_min_ms": 0.5407,
+        "best_mean_ms": 0.4286,
+        "best_min_ms": 0.3256,
         "runs_per_rep": 100,
-        "compile_ms": 72.53,
+        "compile_ms": 15.99,
         "reps": [
           {
-            "mean_ms": 2.1679,
-            "min_ms": 0.6371,
+            "mean_ms": 0.4449,
+            "min_ms": 0.3275,
             "runs": 100
           },
           {
-            "mean_ms": 2.2027,
-            "min_ms": 0.5407,
+            "mean_ms": 0.4286,
+            "min_ms": 0.3256,
             "runs": 100
           },
           {
-            "mean_ms": 2.1468,
-            "min_ms": 0.6509,
+            "mean_ms": 0.4495,
+            "min_ms": 0.3498,
             "runs": 100
           }
         ],
-        "blotc_ms": 47.09,
-        "aot_ms": 25.45,
+        "blotc_ms": 12.76,
+        "aot_ms": 3.23,
         "wasm_bytes": 4381
       },
       "goose": {
-        "best_mean_ms": 1.9346,
-        "best_min_ms": 0.4867,
+        "best_mean_ms": 0.4083,
+        "best_min_ms": 0.3244,
         "runs_per_rep": 100,
-        "compile_ms": 306.67,
+        "compile_ms": 97.64,
         "reps": [
           {
-            "mean_ms": 2.0165,
-            "min_ms": 0.582,
+            "mean_ms": 0.4083,
+            "min_ms": 0.3244,
             "runs": 100
           },
           {
-            "mean_ms": 1.9346,
-            "min_ms": 0.5941,
+            "mean_ms": 0.4175,
+            "min_ms": 0.3259,
             "runs": 100
           },
           {
-            "mean_ms": 2.1195,
-            "min_ms": 0.4867,
+            "mean_ms": 0.4203,
+            "min_ms": 0.3299,
             "runs": 100
           }
         ]
       },
       "c": {
-        "best_mean_ms": 1.7191,
-        "best_min_ms": 0.4267,
+        "best_mean_ms": 0.3209,
+        "best_min_ms": 0.2548,
         "runs_per_rep": 100,
-        "compile_ms": 142.92,
+        "compile_ms": 35.49,
         "reps": [
           {
-            "mean_ms": 2.0313,
-            "min_ms": 0.4929,
+            "mean_ms": 0.3209,
+            "min_ms": 0.2548,
             "runs": 100
           },
           {
-            "mean_ms": 1.9369,
-            "min_ms": 0.5967,
+            "mean_ms": 0.3287,
+            "min_ms": 0.2627,
             "runs": 100
           },
           {
-            "mean_ms": 1.7191,
-            "min_ms": 0.4267,
+            "mean_ms": 0.3441,
+            "min_ms": 0.2578,
             "runs": 100
           }
         ]
       },
       "cpp": {
-        "best_mean_ms": 2.6227,
-        "best_min_ms": 0.9715,
+        "best_mean_ms": 0.7544,
+        "best_min_ms": 0.5981,
         "runs_per_rep": 100,
-        "compile_ms": 3302.65,
+        "compile_ms": 1022.46,
         "reps": [
           {
-            "mean_ms": 3.0765,
-            "min_ms": 1.0448,
+            "mean_ms": 0.7611,
+            "min_ms": 0.5992,
             "runs": 100
           },
           {
-            "mean_ms": 2.6227,
-            "min_ms": 0.9715,
+            "mean_ms": 0.7544,
+            "min_ms": 0.5981,
             "runs": 100
           },
           {
-            "mean_ms": 4.2191,
-            "min_ms": 1.0676,
+            "mean_ms": 0.7683,
+            "min_ms": 0.6,
             "runs": 100
           }
         ]
       },
       "rust": {
-        "best_mean_ms": 1.7039,
-        "best_min_ms": 0.5113,
+        "best_mean_ms": 0.4098,
+        "best_min_ms": 0.3197,
         "runs_per_rep": 100,
-        "compile_ms": 38.62,
+        "compile_ms": 11.39,
         "reps": [
           {
-            "mean_ms": 1.7955,
-            "min_ms": 0.5539,
+            "mean_ms": 0.4098,
+            "min_ms": 0.3216,
             "runs": 100
           },
           {
-            "mean_ms": 1.7039,
-            "min_ms": 0.5293,
+            "mean_ms": 0.4166,
+            "min_ms": 0.3197,
             "runs": 100
           },
           {
-            "mean_ms": 2.2649,
-            "min_ms": 0.5113,
+            "mean_ms": 0.4135,
+            "min_ms": 0.3236,
             "runs": 100
           }
         ]

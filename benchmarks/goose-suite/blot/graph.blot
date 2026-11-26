@@ -11,11 +11,11 @@ func build_csr (): (#[U32], #[U32]) =>
   let esrc = @array.fill ne 0
   let edst = @array.fill ne 0
   let start = @array.fill (BENCH_N + 1) 0
-  let r = rng.u64_from_u32 12345
+  let r: U64 = 12345
   for e in 0 .. ne:
     r := rng.xs_next self
     let u = rng.xs_mod r BENCH_N
-    let v = rng.xs_mod (rng.xs_shr r 24) BENCH_N
+    let v = rng.xs_mod (r >> 24) BENCH_N
     esrc[e] := u
     edst[e] := v
     start[u + 1] := self + 1
@@ -37,8 +37,8 @@ io bench (): #[U32] =>
   let (start, edges) = build_csr ()
   let dist = @array.fill BENCH_N UNVISITED
   let q = @array.fill BENCH_N 0
-  let total = rng.u64_zero ()
-  let seed = rng.u64_from_u32 999
+  let total: I64 = 0
+  let seed: U64 = 999
   for _ in 0 .. SOURCES:
     seed := rng.xs_next self
     let src = rng.xs_mod seed BENCH_N
@@ -48,14 +48,14 @@ io bench (): #[U32] =>
     q[0] := src
     let qlen: U32 = 1
     let qh: U32 = 0
-    let pass_sum: U32 = 0
+    let pass_sum: I64 = 0
     for ever:
       if qh >= qlen:
         break
       let u = q[qh]
       qh := self + 1
       let d = dist[u]
-      pass_sum := self + d
+      pass_sum := self + d.to_i64
       let lo = start[u]
       let hi = start[u + 1]
       for k in lo .. hi:
@@ -64,7 +64,7 @@ io bench (): #[U32] =>
           dist[w] := d + 1
           q[qlen] := w
           qlen := self + 1
-    total := rng.u64_add_u32 self pass_sum
+    total := self + pass_sum
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self (BENCH_N + BENCH_N * DEG)

@@ -65,6 +65,7 @@ SHORT_LABELS = {
     "blot CSR two-pass": "Blot",
     "blot packed bytes + open addressing": "Blot",
     "blot AoS, per component": "Blot",
+    "blot SoA, 4-wide SIMD": "Blot (SIMD)",
     "blot 8B arena + packed text": "Blot",
     "blot open addressing + arena": "Blot",
     "blot arena + inline transforms": "Blot",
@@ -72,6 +73,7 @@ SHORT_LABELS = {
     "blot arena per tree": "Blot",
     "blot streaming": "Blot",
     "blot sliding 3-col": "Blot",
+    "blot sliding 3-col, #[U8]": "Blot",
     # Goose
     "goose grow-only array": "Goose",
     "goose array, typed references": "Goose",

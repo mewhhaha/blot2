@@ -6,9 +6,9 @@ const MIN_DEPTH: U32 = 4
 const NONE: U32 = 0xFFFFFFFF
 
 // Parallel arrays + freelist stack (every node individually allocated & freed).
-// Flags word packs: bit 0 = has_hash, bit 1 = has_value.
+// Flags byte packs: bit 0 = has_hash, bit 1 = has_value.
 
-func alloc_node (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U32]) -> (freelist: own #[U32]) -> (flen: U32) -> (val: U32) -> (l: U32) -> (r: U32) -> (flags: U32): (U32, #[U32], #[U32], #[U32], #[U32], #[U32], #[U32], U32) =>
+func alloc_node (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U8]) -> (freelist: own #[U32]) -> (flen: U32) -> (val: U32) -> (l: U32) -> (r: U32) -> (flags: U8): (U32, #[U32], #[U32], #[U32], #[U32], #[U8], #[U32], U32) =>
   if flen > 0:
     let nflen = flen - 1
     let idx = freelist[nflen]
@@ -26,7 +26,7 @@ func alloc_node (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) ->
   nflags := self.push flags
   return (idx, nhash, nval, nl, nr, nflags, freelist, flen)
 
-func make_tree (depth: U32) -> (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U32]) -> (freelist: own #[U32]) -> (flen: U32) -> (st_d: own #[U32]) -> (st_s: own #[U32]) -> (st_l: own #[U32]): (U32, #[U32], #[U32], #[U32], #[U32], #[U32], #[U32], U32, #[U32], #[U32], #[U32]) =>
+func make_tree (depth: U32) -> (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl: own #[U32]) -> (nr: own #[U32]) -> (nflags: own #[U8]) -> (freelist: own #[U32]) -> (flen: U32) -> (st_d: own #[U32]) -> (st_s: own #[U32]) -> (st_l: own #[U32]): (U32, #[U32], #[U32], #[U32], #[U32], #[U8], #[U32], U32, #[U32], #[U32], #[U32]) =>
   st_d[0] := depth
   st_s[0] := 0
   let sp: U32 = 1
@@ -74,7 +74,7 @@ func make_tree (depth: U32) -> (nhash: own #[U32]) -> (nval: own #[U32]) -> (nl:
           sp := self - 1
   return (last, nhash, nval, nl, nr, nflags, freelist, flen, st_d, st_s, st_l)
 
-func cal_hash (root: U32) -> (nhash: own #[U32]) -> (nval: #[U32]) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: own #[U32]) -> (st_i: own #[U32]) -> (st_s: own #[U32]): (#[U32], #[U32], #[U32], #[U32]) =>
+func cal_hash (root: U32) -> (nhash: own #[U32]) -> (nval: #[U32]) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: own #[U8]) -> (st_i: own #[U32]) -> (st_s: own #[U32]): (#[U32], #[U8], #[U32], #[U32]) =>
   st_i[0] := root
   st_s[0] := 0
   let sp: U32 = 1
@@ -115,7 +115,7 @@ func cal_hash (root: U32) -> (nhash: own #[U32]) -> (nval: #[U32]) -> (nl: #[U32
             sp := self - 1
   return (nhash, nflags, st_i, st_s)
 
-func check_tree (root: U32) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: #[U32]) -> (st: own #[U32]): (Bool, #[U32]) =>
+func check_tree (root: U32) -> (nl: #[U32]) -> (nr: #[U32]) -> (nflags: #[U8]) -> (st: own #[U32]): (Bool, #[U32]) =>
   st[0] := root
   let sp: U32 = 1
   let ok = true
@@ -170,7 +170,7 @@ io bench (inp: #[U32]): #[U32] =>
   let nval: #[U32] = #[]
   let nl: #[U32] = #[]
   let nr: #[U32] = #[]
-  let nflags: #[U32] = #[]
+  let nflags: #[U8] = #[]
   let freelist: #[U32] = #[]
   let flen: U32 = 0
   let st_d = @array.fill 24 0

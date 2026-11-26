@@ -1,17 +1,17 @@
-// PLB nsieve: bit-packed prime sieve in U32 words.
+// PLB nsieve: one byte per sieve flag, matching the Go, C, and Rust implementations.
 import * as buf from "./buf"
 
 func nsieve (m: U32) -> (w: own #[U32]) -> (l: U32) -> (c: U32): (#[U32], U32, U32) =>
-  let flags = @array.fill ((m + 31) >> 5) 0
+  let flags = @array.fill m (U32.to_u8 0)
   let count: U32 = 0
   for i in 2 .. m:
-    if ((flags[i >> 5] >> (i & 31)) & 1) == 0:
+    if flags[i] == 0:
       count := self + 1
       let j = i << 1
       for ever:
         if j >= m:
           break
-        flags[j >> 5] := self | (1 << (j & 31))
+        flags[j] := 1
         j := self + i
   let (w1, l1, c1) = buf.push_text w l c "Primes up to "
   let (w2, l2, c2) = buf.push_u32_pad w1 l1 c1 m 8

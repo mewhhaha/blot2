@@ -8,80 +8,80 @@
   <text x="42.0" y="116.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="400" fill="#64748b" text-anchor="start">Relative to C++ expert (1.00×)</text>
   <text x="42.0" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Goose</text>
   <rect x="142.0" y="130.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="130.0" width="35.1" height="17" rx="3.5" fill="#2563eb"/>
-  <text x="183.1" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.89×</text>
+  <rect x="142.0" y="130.0" width="49.5" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="197.5" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.90×</text>
   <text x="42.0" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">C++ expert</text>
   <rect x="142.0" y="157.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="157.0" width="39.3" height="17" rx="3.5" fill="#334155"/>
-  <text x="187.3" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.00×</text>
+  <rect x="142.0" y="157.0" width="55.0" height="17" rx="3.5" fill="#334155"/>
+  <text x="203.0" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.00×</text>
   <text x="42.0" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust expert</text>
   <rect x="142.0" y="184.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="184.0" width="42.0" height="17" rx="3.5" fill="#c2592b"/>
-  <text x="190.0" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.07×</text>
+  <rect x="142.0" y="184.0" width="56.7" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="204.7" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.03×</text>
   <text x="42.0" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust idiomatic</text>
   <rect x="142.0" y="211.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="211.0" width="74.2" height="17" rx="3.5" fill="#e69f73"/>
-  <text x="222.2" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.89×</text>
+  <rect x="142.0" y="211.0" width="94.6" height="17" rx="3.5" fill="#e69f73"/>
+  <text x="242.6" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.72×</text>
   <text x="42.0" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">C++ idiomatic</text>
   <rect x="142.0" y="238.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="142.0" y="238.0" width="85.3" height="17" rx="3.5" fill="#94a3b8"/>
-  <text x="233.3" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">2.17×</text>
+  <rect x="142.0" y="238.0" width="105.6" height="17" rx="3.5" fill="#94a3b8"/>
+  <text x="253.6" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.92×</text>
   <text x="42.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">Blot (wtime-aot)</text>
   <rect x="142.0" y="265.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
   <rect x="142.0" y="265.0" width="114.0" height="17" rx="3.5" fill="#0f766e"/>
-  <text x="262.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">2.90×</text>
+  <text x="262.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">2.07×</text>
   <rect x="335" y="76" width="290" height="232" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="349.0" y="100.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.0" font-weight="700" fill="#0f172a" text-anchor="start">Geomean peak memory</text>
   <text x="349.0" y="116.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="400" fill="#64748b" text-anchor="start">Per-process RSS vs C++ expert (1.00×)</text>
   <text x="349.0" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Goose</text>
   <rect x="449.0" y="130.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="449.0" y="130.0" width="63.1" height="17" rx="3.5" fill="#2563eb"/>
-  <text x="518.1" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.72×</text>
+  <rect x="449.0" y="130.0" width="63.6" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="518.6" y="143.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.73×</text>
   <text x="349.0" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust expert</text>
   <rect x="449.0" y="157.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="449.0" y="157.0" width="74.9" height="17" rx="3.5" fill="#c2592b"/>
-  <text x="529.9" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.86×</text>
+  <rect x="449.0" y="157.0" width="75.9" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="530.9" y="170.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">0.87×</text>
   <text x="349.0" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">C++ expert</text>
   <rect x="449.0" y="184.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="449.0" y="184.0" width="87.4" height="17" rx="3.5" fill="#334155"/>
-  <text x="542.4" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.00×</text>
+  <rect x="449.0" y="184.0" width="87.0" height="17" rx="3.5" fill="#334155"/>
+  <text x="542.0" y="197.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.00×</text>
   <text x="349.0" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">Blot (wtime-aot)</text>
   <rect x="449.0" y="211.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="449.0" y="211.0" width="96.5" height="17" rx="3.5" fill="#0f766e"/>
-  <text x="551.5" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">1.10×</text>
+  <rect x="449.0" y="211.0" width="89.9" height="17" rx="3.5" fill="#0f766e"/>
+  <text x="544.9" y="224.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">1.03×</text>
   <text x="349.0" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">Rust idiomatic</text>
   <rect x="449.0" y="238.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
-  <rect x="449.0" y="238.0" width="97.5" height="17" rx="3.5" fill="#e69f73"/>
-  <text x="552.5" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.12×</text>
+  <rect x="449.0" y="238.0" width="97.7" height="17" rx="3.5" fill="#e69f73"/>
+  <text x="552.7" y="251.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.12×</text>
   <text x="349.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#0f172a" text-anchor="start">C++ idiomatic</text>
   <rect x="449.0" y="265.0" width="114.0" height="17" rx="3.5" fill="#f1f5f9"/>
   <rect x="449.0" y="265.0" width="114.0" height="17" rx="3.5" fill="#94a3b8"/>
-  <text x="569.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.30×</text>
+  <text x="569.0" y="278.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">1.31×</text>
   <rect x="642" y="76" width="290" height="232" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="656.0" y="100.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.0" font-weight="700" fill="#0f172a" text-anchor="start">Geomean cold compile</text>
-  <rect x="829.6" y="85.0" width="90.4" height="20.0" rx="10" fill="#dcfce7"/>
-  <text x="874.8" y="99.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">10.2× vs C++</text>
+  <rect x="835.8" y="85.0" width="84.2" height="20.0" rx="10" fill="#dcfce7"/>
+  <text x="877.9" y="99.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">9.3× vs C++</text>
   <text x="656.0" y="116.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="400" fill="#64748b" text-anchor="start">Full build to executable / native .so</text>
   <text x="656.0" y="152.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="700" fill="#0f766e" text-anchor="start">Blot (+AOT)</text>
   <rect x="740.0" y="138.0" width="122.0" height="20" rx="3.5" fill="#f1f5f9"/>
-  <rect x="740.0" y="138.0" width="11.9" height="20" rx="3.5" fill="#0f766e"/>
-  <text x="757.9" y="152.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">30 ms</text>
+  <rect x="740.0" y="138.0" width="13.2" height="20" rx="3.5" fill="#0f766e"/>
+  <text x="759.2" y="152.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="start">24 ms</text>
   <text x="656.0" y="190.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#0f172a" text-anchor="start">Rust (-O)</text>
   <rect x="740.0" y="176.0" width="122.0" height="20" rx="3.5" fill="#f1f5f9"/>
-  <rect x="740.0" y="176.0" width="41.6" height="20" rx="3.5" fill="#c2592b"/>
-  <text x="787.6" y="190.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">105 ms</text>
+  <rect x="740.0" y="176.0" width="46.9" height="20" rx="3.5" fill="#c2592b"/>
+  <text x="792.9" y="190.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">85 ms</text>
   <text x="656.0" y="228.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#0f172a" text-anchor="start">Goose (-O2)</text>
   <rect x="740.0" y="214.0" width="122.0" height="20" rx="3.5" fill="#f1f5f9"/>
-  <rect x="740.0" y="214.0" width="63.9" height="20" rx="3.5" fill="#2563eb"/>
-  <text x="809.9" y="228.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">162 ms</text>
+  <rect x="740.0" y="214.0" width="66.6" height="20" rx="3.5" fill="#2563eb"/>
+  <text x="812.6" y="228.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">121 ms</text>
   <text x="656.0" y="266.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.8" font-weight="500" fill="#0f172a" text-anchor="start">C++ (-O2)</text>
   <rect x="740.0" y="252.0" width="122.0" height="20" rx="3.5" fill="#f1f5f9"/>
   <rect x="740.0" y="252.0" width="122.0" height="20" rx="3.5" fill="#334155"/>
-  <text x="868.0" y="266.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">309 ms</text>
+  <text x="868.0" y="266.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a" text-anchor="start">222 ms</text>
   <rect x="28" y="326" width="904" height="408" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
   <text x="44.0" y="350.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.0" font-weight="700" fill="#0f172a" text-anchor="start">Blot vs Idiomatic C++ across all 16 benchmarks (log scale, &lt; 1.0× = Blot wins)</text>
   <rect x="660.2" y="335.0" width="257.8" height="20.0" rx="10" fill="#f1f5f9"/>
-  <text x="789.1" y="349.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#334155" text-anchor="middle">Memory: 12/16 wins · Runtime: 4/16 wins</text>
+  <text x="789.1" y="349.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#334155" text-anchor="middle">Memory: 13/16 wins · Runtime: 9/16 wins</text>
   <text x="44.0" y="374.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="600" fill="#475569" text-anchor="start">Peak RSS ratio (Blot / Idiomatic C++)</text>
   <line x1="170.7" y1="382" x2="170.7" y2="708" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2"/>
   <text x="170.7" y="722.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#64748b" text-anchor="middle">0.25×</text>
@@ -97,50 +97,50 @@
   <rect x="272.0" y="389.5" width="47.0" height="12.5" rx="2.5" fill="#94a3b8"/>
   <text x="323.0" y="399.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.90×</text>
   <text x="44.0" y="419.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">push</text>
-  <rect x="268.0" y="409.5" width="4.0" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="264.0" y="419.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.95×</text>
+  <rect x="268.3" y="409.5" width="3.7" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="264.3" y="419.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.95×</text>
   <text x="44.0" y="439.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">strlist</text>
-  <rect x="247.4" y="429.5" width="24.6" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="243.4" y="439.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.71×</text>
+  <rect x="247.5" y="429.5" width="24.5" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="243.5" y="439.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.72×</text>
   <text x="44.0" y="459.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">records</text>
-  <rect x="215.9" y="449.5" width="56.1" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="211.9" y="459.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.46×</text>
+  <rect x="215.8" y="449.5" width="56.2" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="211.8" y="459.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.46×</text>
   <text x="44.0" y="479.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">tree</text>
-  <rect x="264.3" y="469.5" width="7.7" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="260.3" y="479.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.90×</text>
+  <rect x="264.2" y="469.5" width="7.8" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="260.2" y="479.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.90×</text>
   <text x="44.0" y="499.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">interp</text>
-  <rect x="261.3" y="489.5" width="10.7" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="257.3" y="499.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.86×</text>
+  <rect x="261.4" y="489.5" width="10.6" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="257.4" y="499.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.87×</text>
   <text x="44.0" y="519.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">graph</text>
-  <rect x="272.0" y="509.5" width="9.3" height="12.5" rx="2.5" fill="#94a3b8"/>
-  <text x="285.3" y="519.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.14×</text>
+  <rect x="272.0" y="509.5" width="9.1" height="12.5" rx="2.5" fill="#94a3b8"/>
+  <text x="285.1" y="519.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.13×</text>
   <text x="44.0" y="539.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">words</text>
-  <rect x="236.3" y="529.5" width="35.7" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="232.3" y="539.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.61×</text>
+  <rect x="235.4" y="529.5" width="36.6" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="231.4" y="539.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.61×</text>
   <text x="44.0" y="559.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">particles</text>
-  <rect x="272.0" y="549.5" width="2.5" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="268.0" y="559.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">1.00×</text>
+  <rect x="271.8" y="549.5" width="2.5" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="267.8" y="559.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">1.00×</text>
   <text x="44.0" y="579.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">sexp</text>
-  <rect x="145.0" y="569.5" width="127.0" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="141.0" y="579.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.18×</text>
+  <rect x="144.9" y="569.5" width="127.1" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="140.9" y="579.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.18×</text>
   <text x="44.0" y="599.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">lru</text>
-  <rect x="223.7" y="589.5" width="48.3" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="219.7" y="599.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.52×</text>
+  <rect x="223.3" y="589.5" width="48.7" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="219.3" y="599.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.51×</text>
   <text x="44.0" y="619.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">scene</text>
-  <rect x="272.0" y="609.5" width="30.8" height="12.5" rx="2.5" fill="#94a3b8"/>
-  <text x="306.8" y="619.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.52×</text>
+  <rect x="272.0" y="609.5" width="30.7" height="12.5" rx="2.5" fill="#94a3b8"/>
+  <text x="306.7" y="619.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.52×</text>
   <text x="44.0" y="639.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">calc</text>
-  <rect x="264.9" y="629.5" width="7.1" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="260.9" y="639.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.91×</text>
+  <rect x="264.7" y="629.5" width="7.3" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="260.7" y="639.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.91×</text>
   <text x="44.0" y="659.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">bintrees</text>
-  <rect x="233.5" y="649.5" width="38.5" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="229.5" y="659.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.59×</text>
+  <rect x="233.1" y="649.5" width="38.9" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="229.1" y="659.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.59×</text>
   <text x="44.0" y="679.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">respond</text>
   <rect x="268.7" y="669.5" width="3.3" height="12.5" rx="2.5" fill="#0f766e"/>
   <text x="264.7" y="679.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.96×</text>
   <text x="44.0" y="699.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">blur</text>
-  <rect x="272.0" y="689.5" width="80.4" height="12.5" rx="2.5" fill="#94a3b8"/>
-  <text x="356.4" y="699.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">3.00×</text>
+  <rect x="271.6" y="689.5" width="2.5" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="267.6" y="699.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.99×</text>
   <text x="494.0" y="374.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="600" fill="#475569" text-anchor="start">CPU runtime ratio (Blot / Idiomatic C++)</text>
   <line x1="620.7" y1="382" x2="620.7" y2="708" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2"/>
   <text x="620.7" y="722.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#64748b" text-anchor="middle">0.25×</text>
@@ -153,52 +153,52 @@
   <line x1="823.3" y1="382" x2="823.3" y2="708" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,2"/>
   <text x="823.3" y="722.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#64748b" text-anchor="middle">4×</text>
   <text x="494.0" y="399.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">sum</text>
-  <rect x="722.0" y="389.5" width="72.8" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="798.8" y="399.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.71×</text>
+  <rect x="722.0" y="389.5" width="35.1" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="761.1" y="399.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.62×</text>
   <text x="494.0" y="419.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">push</text>
-  <rect x="722.0" y="409.5" width="65.4" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="791.4" y="419.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.45×</text>
+  <rect x="722.0" y="409.5" width="16.1" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="742.1" y="419.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.25×</text>
   <text x="494.0" y="439.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">strlist</text>
-  <rect x="722.0" y="429.5" width="18.7" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="744.7" y="439.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.29×</text>
+  <rect x="712.7" y="429.5" width="9.3" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="708.7" y="439.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.88×</text>
   <text x="494.0" y="459.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">records</text>
-  <rect x="722.0" y="449.5" width="15.0" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="741.0" y="459.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.23×</text>
+  <rect x="707.0" y="449.5" width="15.0" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="703.0" y="459.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.81×</text>
   <text x="494.0" y="479.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">tree</text>
-  <rect x="722.0" y="469.5" width="6.8" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="732.8" y="479.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.10×</text>
+  <rect x="714.3" y="469.5" width="7.7" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="710.3" y="479.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.90×</text>
   <text x="494.0" y="499.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">interp</text>
-  <rect x="722.0" y="489.5" width="52.3" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="778.3" y="499.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.05×</text>
+  <rect x="722.0" y="489.5" width="19.1" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="745.1" y="499.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.30×</text>
   <text x="494.0" y="519.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">graph</text>
-  <rect x="658.7" y="509.5" width="63.3" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="654.7" y="519.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.42×</text>
+  <rect x="681.2" y="509.5" width="40.8" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="677.2" y="519.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.57×</text>
   <text x="494.0" y="539.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">words</text>
-  <rect x="722.0" y="529.5" width="17.1" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="743.1" y="539.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.26×</text>
+  <rect x="722.0" y="529.5" width="14.4" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="740.4" y="539.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.22×</text>
   <text x="494.0" y="559.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">particles</text>
-  <rect x="722.0" y="549.5" width="66.4" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="792.4" y="559.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.48×</text>
+  <rect x="708.4" y="549.5" width="13.6" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="704.4" y="559.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.83×</text>
   <text x="494.0" y="579.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">sexp</text>
-  <rect x="667.0" y="569.5" width="55.0" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="663.0" y="579.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.47×</text>
+  <rect x="675.4" y="569.5" width="46.6" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="671.4" y="579.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.53×</text>
   <text x="494.0" y="599.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">lru</text>
-  <rect x="674.9" y="589.5" width="47.1" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="670.9" y="599.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.52×</text>
+  <rect x="679.1" y="589.5" width="42.9" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="675.1" y="599.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.56×</text>
   <text x="494.0" y="619.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">scene</text>
-  <rect x="722.0" y="609.5" width="15.1" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="741.1" y="619.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.23×</text>
+  <rect x="722.0" y="609.5" width="61.7" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="787.7" y="619.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.33×</text>
   <text x="494.0" y="639.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">calc</text>
-  <rect x="722.0" y="629.5" width="16.5" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="742.5" y="639.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.25×</text>
+  <rect x="716.0" y="629.5" width="6.0" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="712.0" y="639.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.92×</text>
   <text x="494.0" y="659.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">bintrees</text>
-  <rect x="687.2" y="649.5" width="34.8" height="12.5" rx="2.5" fill="#0f766e"/>
-  <text x="683.2" y="659.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.62×</text>
+  <rect x="688.3" y="649.5" width="33.7" height="12.5" rx="2.5" fill="#0f766e"/>
+  <text x="684.3" y="659.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="600" fill="#0f766e" text-anchor="end">0.63×</text>
   <text x="494.0" y="679.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">respond</text>
-  <rect x="722.0" y="669.5" width="59.9" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="785.9" y="679.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">2.27×</text>
+  <rect x="722.0" y="669.5" width="27.6" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="753.6" y="679.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">1.46×</text>
   <text x="494.0" y="699.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.3" font-weight="500" fill="#0f172a" text-anchor="start">blur</text>
-  <rect x="722.0" y="689.5" width="133.9" height="12.5" rx="2.5" fill="#d97706"/>
-  <text x="859.9" y="699.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">6.24×</text>
+  <rect x="722.0" y="689.5" width="131.6" height="12.5" rx="2.5" fill="#d97706"/>
+  <text x="857.6" y="699.2" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#475569" text-anchor="start">6.05×</text>
   <text x="28.0" y="756.0" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="400" fill="#64748b" text-anchor="start">Best single-process CPU time (user+sys) of 3 runs after 2 warmups &amp; exact per-process peak RSS via posix_spawn + wait4. All 16 outputs bit-identical.</text>
 </svg>

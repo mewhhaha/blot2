@@ -3,9 +3,9 @@
 // Input packet layout:
 //   [0] = word_count (W)
 //   [1 .. 1 + 2*W) = pairs (offset, len) into the same array
-//   [1 + 2*W ..) = ASCII character codes (1 byte per U32 word)
+//   [1 + 2*W ..) = ASCII character codes (one per U32 word at the ABI boundary)
 
-func lev_dist (buf: #[U32]) -> (o1: U32) -> (l1: U32) -> (o2: U32) -> (l2: U32): U32 =>
+func lev_dist (buf: #[U8]) -> (o1: U32) -> (l1: U32) -> (o2: U32) -> (l2: U32): U32 =>
   let s_off = if l1 <= l2 then o1 else o2
   let l_off = if l1 <= l2 then o2 else o1
   let m = if l1 <= l2 then l1 else l2
@@ -50,15 +50,20 @@ func lev_dist (buf: #[U32]) -> (o1: U32) -> (l1: U32) -> (o2: U32) -> (l2: U32):
 
 io distances (packed: #[U32]): #[U32] =>
   let wcount = packed[0]
+  let text_start = 1 + 2 * wcount
+  let text: #[U8] = @array.fill (packed.length - text_start) (U32.to_u8 0)
+  for i in 0 .. text.length:
+    text[i] := packed[text_start + i].to_u8
+
   let total_pairs = (wcount * (wcount - 1)) / 2
   let out = @array.fill total_pairs 0
   let idx: U32 = 0
   for i in 0 .. wcount:
-    let o1 = packed[1 + i * 2]
+    let o1 = packed[1 + i * 2] - text_start
     let l1 = packed[2 + i * 2]
     for j in (i + 1) .. wcount:
-      let o2 = packed[1 + j * 2]
+      let o2 = packed[1 + j * 2] - text_start
       let l2 = packed[2 + j * 2]
-      out[idx] := lev_dist packed o1 l1 o2 l2
+      out[idx] := lev_dist text o1 l1 o2 l2
       idx := self + 1
   return out

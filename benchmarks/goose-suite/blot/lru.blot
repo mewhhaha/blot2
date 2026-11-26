@@ -65,7 +65,7 @@ io bench (): #[U32] =>
   let hits: U32 = 0
   let misses: U32 = 0
   let removes: U32 = 0
-  let r = rng.u64_from_u32 12345
+  let r: U64 = 12345
 
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
@@ -73,7 +73,7 @@ io bench (): #[U32] =>
     let key = rng.sq_div_u32 a keys
     let at = find_slot slots mask key
     let f = slots[at].node
-    let $rng.U64 { lo: _, hi } = r
+    let hi = (r >> 32).to_u32
     if ((hi >> 8) & 15) == 0:
       if f != NONE:
         let p = nprev[f]
@@ -131,14 +131,14 @@ io bench (): #[U32] =>
         nnext[0] := ni
         count := self + 1
 
-  let walk = rng.u64_zero ()
-  let vals = rng.u64_zero ()
+  let walk: U64 = 0
+  let vals: I64 = 0
   let cur = nnext[0]
   for ever:
     if cur == NONE or cur == 1:
       break
-    walk := rng.u64_add_u32 (rng.u64_mul_31 self) nkey[cur]
-    vals := rng.u64_add_u32 self nval[cur]
+    walk := self * 31 + nkey[cur].to_u64
+    vals := self + nval[cur].to_i64
     cur := nnext[cur]
 
   let out: #[U32] = #[]

@@ -8,19 +8,16 @@ const NONE: U32 = 0xFFFFFFFF
 
 type TNode is data = $TNode { v: U32, l: U32, r: U32 }
 
-func build_tree (max_depth: U32) -> (init_seed: rng.U64): #[TNode] =>
+func build_tree (max_depth: U32) -> (init_seed: U64): #[TNode] =>
   let pool: #[TNode] = #[]
   let cap: U32 = 32
   let st_depth = @array.fill cap 0
-  let st_lo = @array.fill cap 0
-  let st_hi = @array.fill cap 0
+  let st_seed = @array.fill cap (U32.to_u64 0)
   let st_stage = @array.fill cap 0
   let st_left = @array.fill cap 0
 
-  let $rng.U64 { lo: slo, hi: shi } = init_seed
   st_depth[0] := max_depth
-  st_lo[0] := slo
-  st_hi[0] := shi
+  st_seed[0] := init_seed
   st_stage[0] := 0
   let sp: U32 = 1
   let last_idx: U32 = 0
@@ -30,73 +27,64 @@ func build_tree (max_depth: U32) -> (init_seed: rng.U64): #[TNode] =>
       break
     let top = sp - 1
     let d = st_depth[top]
-    let seed = rng.u64_make st_lo[top] st_hi[top]
+    let seed = st_seed[top]
     let stage = st_stage[top]
     if d == 0:
-      pool := self.push ($TNode { v: rng.xs_mod_small seed 1000, l: NONE, r: NONE })
+      let v1000 = (((seed >> 32).to_u32 % 1000) * 296 + (seed.to_u32 % 1000)) % 1000
+      pool := self.push ($TNode { v: v1000, l: NONE, r: NONE })
       last_idx := pool.length - 1
       sp := self - 1
     else:
       if stage == 0:
         st_stage[top] := 1
-        let $rng.U64 { lo: nlo, hi: nhi } = rng.xs_next seed
+        let child_seed = rng.xs_next seed
         st_depth[sp] := d - 1
-        st_lo[sp] := nlo
-        st_hi[sp] := nhi
+        st_seed[sp] := child_seed
         st_stage[sp] := 0
         sp := self + 1
       else:
         if stage == 1:
           st_left[top] := last_idx
           st_stage[top] := 2
-          let $rng.U64 { lo: nlo, hi: nhi } = rng.xs_next (rng.u64_add_u32 seed 1)
+          let child_seed = rng.xs_next (seed + 1)
           st_depth[sp] := d - 1
-          st_lo[sp] := nlo
-          st_hi[sp] := nhi
+          st_seed[sp] := child_seed
           st_stage[sp] := 0
           sp := self + 1
         else:
           let l = st_left[top]
           let r = last_idx
-          pool := self.push ($TNode { v: rng.xs_mod_small seed 1000, l, r })
+          let v1000 = (((seed >> 32).to_u32 % 1000) * 296 + (seed.to_u32 % 1000)) % 1000
+          pool := self.push ($TNode { v: v1000, l, r })
           last_idx := pool.length - 1
           sp := self - 1
   return pool
 
-func sum_pass (pool: #[TNode]) -> (root: U32) -> (p: U32): rng.U64 =>
+func sum_pass (pool: #[TNode]) -> (root: U32) -> (p: U32): I64 =>
   let stack = @array.fill 32 0
   stack[0] := root
   let sp: U32 = 1
-  let total = rng.u64_zero ()
-  let chunk: U32 = 0
-  let count: U32 = 0
+  let total: I64 = 0
   for ever:
     if sp == 0:
       break
     sp := self - 1
     let nd = pool[stack[sp]]
-    chunk := self + (nd.v ^ p)
-    count := self + 1
-    if count == 2097152:
-      total := rng.u64_add_u32 self chunk
-      chunk := 0
-      count := 0
+    total := self + (nd.v ^ p).to_i64
     if nd.r != NONE:
       stack[sp] := nd.r
       sp := self + 1
     if nd.l != NONE:
       stack[sp] := nd.l
       sp := self + 1
-  if count > 0:
-    total := rng.u64_add_u32 self chunk
   return total
 
 io bench (): #[U32] =>
-  let pool = build_tree BENCH_N (rng.u64_from_u32 12345)
+  let pool = build_tree BENCH_N 12345
   let root = pool.length - 1
-  let total = rng.u64_zero ()
+  let total: I64 = 0
   for p in 0 .. PASSES:
-    total := rng.u64_add self (sum_pass pool root p)
+    total := self + sum_pass pool root p
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self pool.length

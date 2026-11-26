@@ -12,7 +12,7 @@ Blot sits between garbage-collected scripting languages and LLVM-heavy systems l
 
 - **No GC pauses, no `'a` lifetimes.** Values are immutable by default; uniquely owned dynamic arrays (`#[T]`) mutate in place with `:=`, while the compiler infers local borrows (`&T`, `&[T]`) and ownership transfers (`own`) statically.
 - **Native-class speed, direct to Wasm.** No LLVM in the loop — a 6-kernel benchmark compiles in **13.6 ms** (**22.5 KiB** `.wasm`) and beats native `rustc -O3` across all 6 kernels on `wtime-aot`.
-- **Deterministic & sandboxed by construction.** Pure by default, explicit algebraic effects for I/O and state, canonical IEEE 754 quiet NaN (`0x7fc00000`) across scalar, SIMD, and `#run`.
+- **Deterministic & sandboxed by construction.** Pure by default, explicit algebraic effects for I/O and state, granular scalar types (`U8`, `U32`, `I32`, `U64`, `I64`, `F32`, `F64`) with 1-byte `#[U8]` arrays and canonical IEEE 754 quiet NaN (`0x7fc00000` / `0x7ff8000000000000`) across scalar, SIMD, and `#run`.
 - **Low-friction metaprogramming & parallelism.** Field defaults, `@[...]` data tags, compile-time `#for #fields` / `#variants`, speculative `fork` rollback, auto-SIMD `spark #[...]`, and first-class `#kernel` / `#process` concurrency.
 
 ---
@@ -198,7 +198,7 @@ Measured on **AMD Ryzen 7 7800X3D (Linux)** with `blotc-goose` + **`wtime-aot 0.
 
 - **Real-world builds:** Anonymous internal 3D game (~69k LOC, 325 modules, 6.71 MB `.wasm`) compiles in **~0.43–0.55 s** cold, **~41–44 ms** incremental (`fresh=1`), and **~20 ms** on literal edits (**~2.0M LOC/s** synthetic).
 - **AoS SIMD & concurrency:** `#[Vec4]` loops beat native Rust **1.83×**; 8-thread isolated guests scale **4.64×** (**3.67×** faster than native Rust); `#process` commits in **~53 ns/step**.
-- **Cross-language suites (Goose 16, `bddicken/languages`, PLB 9):** **10.2× faster** cold builds than `clang++ -O2` (**30.2 ms** geomean), **12/16** memory wins over idiomatic C++ (#1 lowest RSS on `words` and `sexp`), and PLB wins over official Go on **6/9** workloads (including **2.12×** on `binarytrees`, **2.59×** on `lru`, and **3–5×** lower RSS on `nsieve`).
+- **Cross-language suites (Goose 16, `bddicken/languages`, PLB 9):** **9.3× faster** cold builds than `clang++ -O2` (**24.0 ms** geomean, `5.3–26.8 KiB` `.wasm`); beats idiomatic C++ on **9/16** runtimes and **13/16** peak RSS (`1.03×` geomean RSS vs C++ expert, **#1 overall** on `particles` with unboxed `v128` SIMD, **#1 lowest RSS** on `words` and `sexp`); beats C (`clang -O3`) on **3/4** `bddicken` compute workloads (`1.81×` on `loops`, `1.08×` on `levenshtein`, `1.05×` on `fibonacci`); and beats official Go on **5/9** PLB workloads (`1.82×` on `binarytrees`, `2.77×` on `lru`, `1.51×` on `fasta`) with **2–4×** lower peak RSS on memory-heavy problems.
 - **Optional Wasm 3.0 (`--wasm3`):** Tail calls (`return_call`) and relaxed SIMD (FMA) on V8/Deno and `wtime-aot 0.1.7`.
 
 See **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results, SVG bar charts, Ink vs Bevy ECS numbers, `bddicken` & PLB suites, and raw JSON evidence.

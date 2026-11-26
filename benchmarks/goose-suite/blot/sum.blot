@@ -7,24 +7,15 @@ const PASSES: U32 = 8
 
 io bench (): #[U32] =>
   let arr: #[U32] = #[]
-  let r = rng.u64_from_u32 12345
+  let r: U64 = 12345
   for _ in 0 .. BENCH_N:
     r := rng.xs_next self
-    arr := self.push (rng.xs_mod_small r 1000)
+    arr := self.push (rng.xs_mod r 1000)
 
-  let total = rng.u64_zero ()
+  let total: I64 = 0
   for p in 0 .. PASSES:
-    let chunk: U32 = 0
-    let count: U32 = 0
     for i in 0 .. arr.length:
-      chunk := self + (arr[i] ^ p)
-      count := self + 1
-      if count == 2097152:
-        total := rng.u64_add_u32 self chunk
-        chunk := 0
-        count := 0
-    if count > 0:
-      total := rng.u64_add_u32 self chunk
+      total := self + (arr[i] ^ p).to_i64
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self arr.length

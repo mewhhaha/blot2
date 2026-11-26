@@ -10,11 +10,11 @@ Every implementation across all 16 benchmarks (88 rows total) runs the exact sam
 
 ![16-Benchmark Suite Summary: Blot vs Goose, Rust & C++](../evidence/measurements/2026-11-26-goose-suite/summary_overview.svg)
 
-Across all 16 benchmarks at **medium** size on **AMD Ryzen 7 7800X3D (Linux)**:
+Across all 16 benchmarks at **medium** size on **AMD Ryzen 7 7800X3D (Linux)** (`blotc-goose` `bac9eb2e`):
 
-- **Cold compile time (geomean):** **Blot builds in 30.2 ms** (`19.3 ms` `blotc-goose` + `10.6 ms` `wtime-aot`, `22.6–40.0 ms` range) — **10.2× faster than C++** (`308.9 ms`), **5.4× faster than Goose** (`161.9 ms`), and **3.5× faster than Rust** (`105.4 ms`), producing self-contained **6.0–33.5 KiB** `.wasm` modules.
-- **Peak memory (geomean exact per-process RSS vs C++ expert):** **Blot averages 1.10×**, edging out **idiomatic Rust (1.12×)** and **idiomatic C++ (1.30×)** (with Goose at `0.72×`, Rust expert `0.86×`, C++ expert `1.00×`). Blot uses less memory than idiomatic C++ on **12/16** benchmarks, less than idiomatic Rust on **8/16**, and achieves the **lowest peak memory of every language in the suite** on `words` (**91.2 MiB** vs Goose `138.1`, Rust `142.2`, C++ `148.7`) and `sexp` (**111.0 MiB** vs Goose `127.9`, Rust `224.8–481.5`, C++ `290.0–630.7`).
-- **Runtime (geomean CPU time vs C++ expert):** Inside a deterministic, bounds-checked Wasm32 sandbox with no LLVM optimizer in the compiler, **Blot averages 2.90× C++ expert** (`1.34×` idiomatic C++ at `2.17×`; Goose `0.89×`, Rust expert `1.07×`, Rust idiomatic `1.89×`). Blot beats **idiomatic C++** on **4/16** benchmarks (`graph` **2.38×**, `sexp` **2.12×**, `lru` **1.91×**, `bintrees` **1.61×**) and beats **idiomatic Rust** on **5/16** (`strlist`, `interp`, `graph`, `sexp`, `bintrees`).
+- **Cold compile time (geomean):** **Blot builds in 24.0 ms** (`14.7 ms` `blotc-goose` + `9.2 ms` `wtime-aot`, `20.7–32.2 ms` range) — **9.3× faster than C++** (`222.1 ms`), **5.1× faster than Goose** (`121.2 ms`), and **3.6× faster than Rust** (`85.3 ms`), producing self-contained **5.3–26.8 KiB** `.wasm` modules.
+- **Peak memory (geomean exact per-process RSS vs C++ expert):** **Blot averages 1.03×** (down from `1.10×`), edging out **idiomatic Rust (1.12×)** and **idiomatic C++ (1.31×)** (with Goose at `0.73×`, Rust expert `0.87×`, C++ expert `1.00×`). Blot uses less memory than idiomatic C++ on **13/16** benchmarks, less than idiomatic Rust on **8/16**, achieves the **lowest peak memory of every language in the suite** on `words` (**91.2 MiB** vs Goose `138.1`, Rust `142.4`, C++ `150.3`) and `sexp` (**110.8 MiB** vs Goose `128.0`, Rust `225.9–481.7`, C++ `290.1–631.0`), and matches C++ on `blur` (**11.9 MiB** via 1-byte `#[U8]` buffers).
+- **Runtime (geomean CPU time vs C++ expert):** Inside a deterministic, bounds-checked Wasm32 sandbox with no LLVM optimizer in the compiler, **Blot averages 2.07× C++ expert** (`1.08×` idiomatic C++ at `1.92×`, down from `2.90×`; Goose `0.90×`, Rust expert `1.03×`, Rust idiomatic `1.72×`). Blot beats **idiomatic C++** on **9/16** benchmarks (`strlist` **1.14×**, `records` **1.23×**, `tree` **1.11×**, `graph` **1.75×**, `particles` **1.20×**, `sexp` **1.89×**, `lru` **1.80×**, `calc` **1.09×**, `bintrees` **1.59×**), beats **idiomatic Rust** on **7/16** (`strlist`, `records`, `graph`, `particles`, `sexp`, `bintrees`, `respond`), and finishes **#1 fastest overall** on `particles` (**179.8 ms** with unboxed 4-wide `v128` SIMD vs C++ expert `185.4 ms`, Rust `186.8 ms`, Goose `190.5 ms`).
 
 ---
 
@@ -58,26 +58,25 @@ Blot's stacked bars show both `blotc-goose` compilation (dark teal) and `wtime-a
 
 ### Where Blot shines
 
-- **Allocator-heavy & graph/tree workloads (`sexp`, `bintrees`, `graph`, `lru`):** Blot's contiguous owned `#[T]` pools and explicit handles avoid per-node `malloc`/`free`, pointer chasing, and recursive destructor cascades. On Goose's flagship `sexp` benchmark, Blot runs **2.12× faster** and uses **5.68× less memory** than idiomatic C++ (`111.0 MiB` vs `630.7 MiB`), while beating even Goose (`127.9 MiB`) on peak memory.
-- **Data density (`words`, `sexp`, `records`, `strlist`):** Packing text 4 bytes per `U32` and keeping flat index arenas lets Blot beat idiomatic C++ memory on **12/16** benchmarks and post the #1 lowest peak RSS overall on `words` and `sexp`.
-- **Iteration speed:** Without LLVM in the loop, Blot compiles + AOTs all 16 benchmarks in **~30 ms geomean** (~10× faster than `clang++ -O2`).
+- **Unboxed `v128` SIMD (`particles`):** With Wave 2's tagged-word unboxed `v128` lowering for `std/simd`, Blot's SoA `particles` kernel (`179.8 ms`, bit-exact IEEE-754 binary32) finishes **#1 fastest of every language in the suite**, edging out C++ expert (`185.4 ms`), Rust (`186.8 ms`), and Goose (`190.5 ms`).
+- **Allocator-heavy & graph/tree workloads (`sexp`, `bintrees`, `graph`, `lru`, `records`, `calc`):** Blot's contiguous owned `#[T]` pools and explicit handles avoid per-node `malloc`/`free`, pointer chasing, and recursive destructor cascades. On Goose's flagship `sexp` benchmark, Blot runs **1.89× faster** and uses **5.69× less memory** than idiomatic C++ (`110.8 MiB` vs `631.0 MiB`), while beating even Goose (`128.0 MiB`) on peak memory.
+- **Data density (`words`, `sexp`, `records`, `strlist`, `blur`):** Native 1-byte `#[U8]` arrays and flat index arenas let Blot beat idiomatic C++ memory on **13/16** benchmarks, match C++ on `blur` (`11.9 MiB`), and post the #1 lowest peak RSS overall on `words` and `sexp`.
+- **Iteration speed:** Without LLVM in the loop, Blot compiles + AOTs all 16 benchmarks in **~24 ms geomean** (**9.3× faster** than `clang++ -O2`).
 
-### Why Blot trails native LLVM (`clang -O2` / `rustc -O`) on tight loops
+### Why Blot still trails expert LLVM (`clang -O2` / `rustc -O`) on tight scalar loops
 
-1. **No native `U64` or `U8` surface scalar types yet:** Every benchmark in Goose's suite uses 64-bit `xorshift64` RNG and 64-bit integer sums/hashes/divisions, and 7 benchmarks process byte streams. In Blot today, `U64` is emulated in pure Blot over `(lo, hi)` `U32` pairs ([`blot/rng.blot`](blot/rng.blot)), adding multi-instruction emulation on every RNG step, FNV-1a byte hash (`respond`), 64-bit multiply/divide (`calc`, `words`, `lru`), and byte extract/pack (`strlist`, `words`, `sexp`). On `blur`, storing 8-bit pixels in `U32` also multiplies pixel memory bandwidth 3× (`35.9 MiB` vs `11–12 MiB`).
-2. **No scalar loop auto-vectorizer in `wtime-aot`:** On `blur` (`132 ms` vs `19–25 ms`) and `particles` (`596 ms` vs `217–241 ms`), `clang -O2` and `rustc -O` auto-vectorize scalar loops into 128/256-bit SSE/AVX2 instructions, whereas `wtime-aot` lowers scalar Wasm loops directly to scalar x64 instructions. (In contrast, Blot's own data-parallel `spark #[...]` loops — benchmarked separately in [benchmarks/comparison](../comparison/README.md) — emit 4-wide Wasm `v128` SIMD directly.)
-3. **Explicit software bounds checks & sandbox guarantees:** Every array load/store in `wtime-aot` executes an explicit bounds check, and every `F32` op enforces canonical quiet NaN (`0x7fc00000`). Native C++, Rust (after LLVM range-check elimination), and Goose (`checkfree`) elide most inner-loop checks.
+1. **No scalar loop auto-vectorizer in `wtime-aot`:** On `blur` (`119.3 ms` vs `18.3–23.1 ms`), `clang -O2` and `rustc -O` auto-vectorize scalar byte stencils into 128/256-bit SSE/AVX2 instructions, whereas `wtime-aot` lowers scalar Wasm loops directly to scalar x64 instructions.
+2. **Explicit software bounds checks & sandbox guarantees:** Every array load/store in `wtime-aot` executes an explicit bounds check unless proven invariant/in-bounds by `blotc-goose`, and every `F32`/`F64` op enforces canonical quiet NaN (`0x7fc00000` / `0x7ff8000000000000`). Native C++, Rust (after LLVM range-check elimination), and Goose (`checkfree`) elide most inner-loop checks.
+3. **64-bit constant-divisor strength reduction & register allocation:** `blotc-goose` lowers `U32` constant divisions/remainders via 64-bit Granlund-Montgomery reciprocals and `U64` powers of two via shifts/masks, while general `U64` non-power-of-two remainders still execute hardware `i64.rem_u` and `wtime-aot` uses a fast single-pass register allocator rather than LLVM's multi-pass scheduler.
 4. **Iterative explicit stacks for tree/parser recursion:** Blot's current owned-storage backend restricts general recursion over dynamically resized owned arrays, so `tree`, `interp`, `bintrees`, `sexp`, `scene`, and `calc` use explicit fixed-size traversal stacks while keeping the exact same arenas, node layouts, per-tree/per-input allocations, and traversal semantics.
-
-Adding native `U64` and `U8` array storage plus loop bounds-check hoisting in `blotc-goose`/`wtime-aot` would directly address the largest remaining gaps shown in these charts.
 
 ---
 
 ## Methodology, Hardware & Reproduction
 
-- **Machine:** AMD Ryzen 7 7800X3D (8C / 16T), Linux `6.19.12-arch1-1` (`x86_64`).
+- **Machine:** AMD Ryzen 7 7800X3D (8C / 16T), Linux `x86_64`.
 - **Toolchains:**
-  - **Blot:** `blotc-goose` (`b0596602`, optimized build) + `wtime-aot 0.1.7` (`4aee74d`, `--backend x64 --target-cpu native --blot-cdylib`, executed via standalone native [`blot_runner.c`](blot_runner.c) reading ABI 8 `#[U32]` checksum packets).
+  - **Blot:** `blotc-goose` (`bac9eb2e`, optimized build) + `wtime-aot 0.1.7` (`4aee74d`, `--backend x64 --target-cpu native --blot-cdylib`, executed via standalone native [`blot_runner.c`](blot_runner.c) reading ABI 8 `#[U32]` checksum packets).
   - **Goose:** `goose` (`d5ae5bb`, `build-precision`, `-O2 --standalone`) + `clang 23.1.5 -O2`.
   - **C++:** `clang++ 23.1.5 -O2 -std=c++20` (both idiomatic and expert variants from Goose's suite).
   - **Rust:** `rustc 1.96.0-nightly (1d419d203 2026-04-06) -O -C codegen-units=1` (idiomatic and arena/expert variants from Goose's suite).

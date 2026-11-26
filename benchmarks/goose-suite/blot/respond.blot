@@ -3,9 +3,9 @@ import * as rng from "./rng"
 
 const BENCH_N: U32 = 400000 // BENCH_N
 
-type HandleRes is data = $HandleRes { hash: rng.U64, len: U32 }
+type HandleRes is data = $HandleRes { hash: U64, len: U32 }
 
-func emit_uint (buf: own #[U32]) -> (v: U32): #[U32] =>
+func emit_uint (buf: own #[U8]) -> (v: U32): #[U8] =>
   if v == 0:
     buf := self.push 48
     return buf
@@ -52,47 +52,47 @@ func emit_uint (buf: own #[U32]) -> (v: U32): #[U32] =>
       break
     n := self - 1
     let ch = if n == 0 then d0 else if n == 1 then d1 else if n == 2 then d2 else if n == 3 then d3 else if n == 4 then d4 else if n == 5 then d5 else if n == 6 then d6 else d7
-    buf := self.push ch
+    buf := self.push ch.to_u8
   return buf
 
-func emit_name (buf: own #[U32]) -> (seed: rng.U64): #[U32] =>
+func emit_name (buf: own #[U8]) -> (seed: U64): #[U8] =>
   let r = rng.xs_next seed
-  let n = 3 + rng.xs_mod_small r 8
-  let odd = rng.xs_mod_small (rng.xs_shr r 8) 8 == 0
+  let n = 3 + rng.xs_mod r 8
+  let odd = rng.xs_mod (r >> 8) 8 == 0
   buf := self.push 34
   for i in 0 .. n:
     r := rng.xs_next self
     if odd and i == 1:
       buf := self.push 92
-      let q: U32 = if rng.xs_mod_small r 2 == 0 then 34 else 92
+      let q: U8 = if rng.xs_mod r 2 == 0 then 34 else 92
       buf := self.push q
     else:
-      buf := self.push (97 + rng.xs_mod_small r 26)
+      buf := self.push (97 + rng.xs_mod r 26).to_u8
   buf := self.push 34
   return buf
 
-func emit_sku (buf: own #[U32]) -> (seed: rng.U64): #[U32] =>
+func emit_sku (buf: own #[U8]) -> (seed: U64): #[U8] =>
   let r = rng.xs_next seed
   buf := self.push 34
-  buf := self.push (65 + rng.xs_mod_small r 26)
-  buf := self.push (65 + rng.xs_mod_small (rng.xs_shr r 8) 26)
+  buf := self.push (65 + rng.xs_mod r 26).to_u8
+  buf := self.push (65 + rng.xs_mod (r >> 8) 26).to_u8
   for _ in 0 .. 4:
     r := rng.xs_next self
-    buf := self.push (48 + rng.xs_mod_small r 10)
+    buf := self.push (48 + rng.xs_mod r 10).to_u8
   buf := self.push 34
   return buf
 
-func fnv_buf (buf: #[U32]): rng.U64 =>
+func fnv_buf (buf: #[U8]): U64 =>
   // 14695981039346656037 = 0xCBF29CE484222325
-  let h = rng.u64_make 0x84222325 0xCBF29CE4
+  let h: U64 = rng.FNV_OFFSET
   for i in 0 .. buf.length:
     h := rng.fnv_step self buf[i]
   return h
 
-func handle (seed: rng.U64): HandleRes =>
+func handle (seed: U64): HandleRes =>
   let r0 = rng.xs_next seed
-  let n = 1 + rng.xs_mod_small r0 8
-  let buf: #[U32] = #[]
+  let n = 1 + rng.xs_mod r0 8
+  let buf: #[U8] = #[]
   // {"id":
   buf := self.push 123
   buf := self.push 34
@@ -100,7 +100,7 @@ func handle (seed: rng.U64): HandleRes =>
   buf := self.push 100
   buf := self.push 34
   buf := self.push 58
-  buf := emit_uint self (rng.xs_mod (rng.xs_shr r0 4) 1000000)
+  buf := emit_uint self (rng.xs_mod (r0 >> 4) 1000000)
   // ,"user":
   buf := self.push 44
   buf := self.push 34
@@ -110,7 +110,7 @@ func handle (seed: rng.U64): HandleRes =>
   buf := self.push 114
   buf := self.push 34
   buf := self.push 58
-  buf := emit_name self (rng.xs_shr r0 8)
+  buf := emit_name self (r0 >> 8)
   // ,"items":[
   buf := self.push 44
   buf := self.push 34
@@ -124,13 +124,13 @@ func handle (seed: rng.U64): HandleRes =>
   buf := self.push 91
 
   let total: U32 = 0
-  let r = rng.xs_shr r0 16
+  let r = r0 >> 16
   for i in 0 .. n:
     r := rng.xs_next self
     if i > 0:
       buf := self.push 44
-    let qty = 1 + rng.xs_mod_small (rng.xs_shr r 8) 5
-    let price = 100 + rng.xs_mod (rng.xs_shr r 16) 99900
+    let qty = 1 + rng.xs_mod (r >> 8) 5
+    let price = 100 + rng.xs_mod (r >> 16) 99900
     // {"sku":
     buf := self.push 123
     buf := self.push 34
@@ -181,15 +181,15 @@ func handle (seed: rng.U64): HandleRes =>
   return $HandleRes { hash: fnv_buf buf, len: buf.length }
 
 io bench (): #[U32] =>
-  let seed = rng.u64_from_u32 12345
-  let h = rng.u64_zero ()
-  let bytes = rng.u64_zero ()
+  let seed: U64 = 12345
+  let h: U64 = 0
+  let bytes: I64 = 0
   for i in 0 .. BENCH_N:
     seed := rng.xs_next self
     let $HandleRes { hash: hh, len: l } = handle seed
-    let term = rng.u64_add_u32 (rng.u64_mul_31 hh) i
-    h := rng.u64_xor self term
-    bytes := rng.u64_add_u32 self l
+    let term = hh * 31 + i.to_u64
+    h := self ^ term
+    bytes := self + l.to_i64
 
   let out: #[U32] = #[]
   out := rng.emit_u32 self BENCH_N

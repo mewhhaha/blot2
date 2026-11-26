@@ -35,23 +35,23 @@
 <text class="ctitle" x="48" y="148">helloworld</text>
 <text class="csub" x="48" y="166">arg = QwQ (process launch)</text>
 <rect class="badge-bg" x="366" y="133" width="92" height="22"/>
-<text class="badge-txt" x="412.0" y="148" text-anchor="middle">1.08× Go</text>
+<text class="badge-txt" x="412.0" y="148" text-anchor="middle">1.09× Go</text>
 <text class="lbl" x="48" y="198">C (-O3)</text>
 <rect class="track" x="124" y="184" width="242" height="20"/>
-<rect x="124" y="184" width="119.7" height="20" rx="4" fill="#64748b"/>
-<text class="val" x="251.7" y="198">2.0 MiB</text>
+<rect x="124" y="184" width="120.9" height="20" rx="4" fill="#64748b"/>
+<text class="val" x="252.9" y="198">2.1 MiB</text>
 <text class="lbl" x="48" y="228">Rust</text>
 <rect class="track" x="124" y="214" width="242" height="20"/>
-<rect x="124" y="214" width="133.3" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="265.3" y="228">2.3 MiB</text>
+<rect x="124" y="214" width="133.1" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="265.1" y="228">2.3 MiB</text>
 <text class="lbl" x="48" y="258">Go</text>
 <rect class="track" x="124" y="244" width="242" height="20"/>
-<rect x="124" y="244" width="205.1" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="337.1" y="258">3.5 MiB</text>
+<rect x="124" y="244" width="204.9" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="336.9" y="258">3.5 MiB</text>
 <text class="lbl-blot" x="48" y="288">Blot</text>
 <rect class="track" x="124" y="274" width="242" height="20"/>
-<rect x="124" y="274" width="222.0" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="354.0" y="288">3.8 MiB</text>
+<rect x="124" y="274" width="222.9" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="354.9" y="288">3.8 MiB</text>
 <text class="lbl" x="48" y="318">C++ (-O3)</text>
 <rect class="track" x="124" y="304" width="242" height="20"/>
 <rect x="124" y="304" width="242.0" height="20" rx="4" fill="#334155"/>
@@ -60,61 +60,61 @@
 <text class="ctitle" x="508" y="148">nsieve</text>
 <text class="csub" x="508" y="166">n = 12 (up to 40,960,000)</text>
 <rect class="badge-win" x="781" y="133" width="137" height="22"/>
-<text class="badge-win-txt" x="849.5" y="148" text-anchor="middle">5.2× less RAM vs Go</text>
+<text class="badge-win-txt" x="849.5" y="148" text-anchor="middle">1.0× less RAM vs Go</text>
 <text class="lbl" x="508" y="198">C++ (-O3)</text>
 <rect class="track" x="584" y="184" width="242" height="20"/>
-<rect x="584" y="184" width="29.8" height="20" rx="4" fill="#334155"/>
-<text class="val" x="621.8" y="198">8.8 MiB</text>
-<text class="lbl-blot" x="508" y="228">Blot</text>
+<rect x="584" y="184" width="28.4" height="20" rx="4" fill="#334155"/>
+<text class="val" x="620.4" y="198">8.7 MiB</text>
+<text class="lbl" x="508" y="228">C (-O3)</text>
 <rect class="track" x="584" y="214" width="242" height="20"/>
-<rect x="584" y="214" width="46.2" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="638.2" y="228">13.7 MiB</text>
-<text class="lbl" x="508" y="258">C (-O3)</text>
+<rect x="584" y="214" width="134.7" height="20" rx="4" fill="#64748b"/>
+<text class="val" x="726.7" y="228">41.0 MiB</text>
+<text class="lbl" x="508" y="258">Rust</text>
 <rect class="track" x="584" y="244" width="242" height="20"/>
-<rect x="584" y="244" width="138.6" height="20" rx="4" fill="#64748b"/>
-<text class="val" x="730.6" y="258">41.1 MiB</text>
-<text class="lbl" x="508" y="288">Rust</text>
+<rect x="584" y="244" width="135.6" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="727.6" y="258">41.3 MiB</text>
+<text class="lbl-blot" x="508" y="288">Blot</text>
 <rect class="track" x="584" y="274" width="242" height="20"/>
-<rect x="584" y="274" width="139.6" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="731.6" y="288">41.4 MiB</text>
+<rect x="584" y="274" width="240.2" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="832.2" y="288">73.2 MiB</text>
 <text class="lbl" x="508" y="318">Go</text>
 <rect class="track" x="584" y="304" width="242" height="20"/>
 <rect x="584" y="304" width="242.0" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="834.0" y="318">71.8 MiB</text>
+<text class="val" x="834.0" y="318">73.7 MiB</text>
 <rect class="card" x="952" y="122" width="440" height="224"/>
 <text class="ctitle" x="968" y="148">binarytrees</text>
 <text class="csub" x="968" y="166">depth = 18</text>
 <rect class="badge-win" x="1241" y="133" width="137" height="22"/>
-<text class="badge-win-txt" x="1309.5" y="148" text-anchor="middle">1.9× less RAM vs Go</text>
+<text class="badge-win-txt" x="1309.5" y="148" text-anchor="middle">2.4× less RAM vs Go</text>
 <text class="lbl-blot" x="968" y="198">Blot</text>
 <rect class="track" x="1044" y="184" width="242" height="20"/>
-<rect x="1044" y="184" width="114.0" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="1166.0" y="198">23.7 MiB</text>
-<text class="lbl" x="968" y="228">Go</text>
+<rect x="1044" y="184" width="102.0" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1154.0" y="198">23.8 MiB</text>
+<text class="lbl" x="968" y="228">Rust</text>
 <rect class="track" x="1044" y="214" width="242" height="20"/>
-<rect x="1044" y="214" width="218.4" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="1270.4" y="228">45.3 MiB</text>
-<text class="lbl" x="968" y="258">Rust</text>
+<rect x="1044" y="214" width="214.9" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="1266.9" y="228">50.1 MiB</text>
+<text class="lbl" x="968" y="258">Go</text>
 <rect class="track" x="1044" y="244" width="242" height="20"/>
-<rect x="1044" y="244" width="242.0" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="1294.0" y="258">50.2 MiB</text>
+<rect x="1044" y="244" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="1294.0" y="258">56.4 MiB</text>
 <rect class="card" x="32" y="366" width="440" height="224"/>
 <text class="ctitle" x="48" y="392">merkletrees</text>
 <text class="csub" x="48" y="410">depth = 17</text>
 <rect class="badge-win" x="321" y="377" width="137" height="22"/>
-<text class="badge-win-txt" x="389.5" y="392" text-anchor="middle">1.5× less RAM vs Go</text>
+<text class="badge-win-txt" x="389.5" y="392" text-anchor="middle">2.2× less RAM vs Go</text>
 <text class="lbl-blot" x="48" y="442">Blot</text>
 <rect class="track" x="124" y="428" width="242" height="20"/>
-<rect x="124" y="428" width="160.4" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="292.4" y="442">26.0 MiB</text>
+<rect x="124" y="428" width="111.3" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="243.3" y="442">21.8 MiB</text>
 <text class="lbl" x="48" y="472">Rust</text>
 <rect class="track" x="124" y="458" width="242" height="20"/>
-<rect x="124" y="458" width="210.8" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="342.8" y="472">34.1 MiB</text>
+<rect x="124" y="458" width="172.7" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="304.7" y="472">33.9 MiB</text>
 <text class="lbl" x="48" y="502">Go</text>
 <rect class="track" x="124" y="488" width="242" height="20"/>
 <rect x="124" y="488" width="242.0" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="374.0" y="502">39.2 MiB</text>
+<text class="val" x="374.0" y="502">47.5 MiB</text>
 <rect class="card" x="492" y="366" width="440" height="224"/>
 <text class="ctitle" x="508" y="392">fannkuch-redux</text>
 <text class="csub" x="508" y="410">n = 11 (39,916,800 perms)</text>
@@ -122,16 +122,16 @@
 <text class="badge-win-txt" x="849.5" y="392" text-anchor="middle">1.4× less RAM vs Go</text>
 <text class="lbl" x="508" y="442">Rust</text>
 <rect class="track" x="584" y="428" width="242" height="20"/>
-<rect x="584" y="428" width="97.0" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="689.0" y="442">2.2 MiB</text>
+<rect x="584" y="428" width="92.3" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="684.3" y="442">2.1 MiB</text>
 <text class="lbl-blot" x="508" y="472">Blot</text>
 <rect class="track" x="584" y="458" width="242" height="20"/>
-<rect x="584" y="458" width="170.3" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="762.3" y="472">3.9 MiB</text>
+<rect x="584" y="458" width="168.6" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="760.6" y="472">3.9 MiB</text>
 <text class="lbl" x="508" y="502">C++ (-O3)</text>
 <rect class="track" x="584" y="488" width="242" height="20"/>
-<rect x="584" y="488" width="173.1" height="20" rx="4" fill="#334155"/>
-<text class="val" x="765.1" y="502">4.0 MiB</text>
+<rect x="584" y="488" width="171.6" height="20" rx="4" fill="#334155"/>
+<text class="val" x="763.6" y="502">4.0 MiB</text>
 <text class="lbl" x="508" y="532">Go</text>
 <rect class="track" x="584" y="518" width="242" height="20"/>
 <rect x="584" y="518" width="242.0" height="20" rx="4" fill="#2563eb"/>
@@ -140,32 +140,32 @@
 <text class="ctitle" x="968" y="392">fasta</text>
 <text class="csub" x="968" y="410">n = 2,500,000 (25.4 MB DNA)</text>
 <rect class="badge-win" x="1241" y="377" width="137" height="22"/>
-<text class="badge-win-txt" x="1309.5" y="392" text-anchor="middle">2.7× less RAM vs Go</text>
+<text class="badge-win-txt" x="1309.5" y="392" text-anchor="middle">3.2× less RAM vs Go</text>
 <text class="lbl" x="968" y="442">Rust</text>
 <rect class="track" x="1044" y="428" width="242" height="20"/>
-<rect x="1044" y="428" width="37.6" height="20" rx="4" fill="#c2592c"/>
-<text class="val" x="1089.6" y="442">2.1 MiB</text>
+<rect x="1044" y="428" width="34.3" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="1086.3" y="442">2.3 MiB</text>
 <text class="lbl-blot" x="968" y="472">Blot</text>
 <rect class="track" x="1044" y="458" width="242" height="20"/>
-<rect x="1044" y="458" width="91.3" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="1143.3" y="472">5.2 MiB</text>
+<rect x="1044" y="458" width="76.8" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1128.8" y="472">5.1 MiB</text>
 <text class="lbl" x="968" y="502">Go</text>
 <rect class="track" x="1044" y="488" width="242" height="20"/>
 <rect x="1044" y="488" width="242.0" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="1294.0" y="502">13.8 MiB</text>
+<text class="val" x="1294.0" y="502">16.0 MiB</text>
 <rect class="card" x="32" y="610" width="440" height="224"/>
 <text class="ctitle" x="48" y="636">pidigits</text>
 <text class="csub" x="48" y="654">8,000 digits of pi</text>
 <rect class="badge-win" x="321" y="621" width="137" height="22"/>
-<text class="badge-win-txt" x="389.5" y="636" text-anchor="middle">2.3× less RAM vs Go</text>
+<text class="badge-win-txt" x="389.5" y="636" text-anchor="middle">2.1× less RAM vs Go</text>
 <text class="lbl-blot" x="48" y="686">Blot</text>
 <rect class="track" x="124" y="672" width="242" height="20"/>
-<rect x="124" y="672" width="105.6" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="237.6" y="686">4.5 MiB</text>
+<rect x="124" y="672" width="112.9" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="244.9" y="686">4.8 MiB</text>
 <text class="lbl" x="48" y="716">Go</text>
 <rect class="track" x="124" y="702" width="242" height="20"/>
 <rect x="124" y="702" width="242.0" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="374.0" y="716">10.2 MiB</text>
+<text class="val" x="374.0" y="716">10.3 MiB</text>
 <rect class="card" x="492" y="610" width="440" height="224"/>
 <text class="ctitle" x="508" y="636">lru</text>
 <text class="csub" x="508" y="654">size = 1,000 · 3,000,000 ops</text>
@@ -183,14 +183,14 @@
 <text class="ctitle" x="968" y="636">coro-prime-sieve</text>
 <text class="csub" x="968" y="654">first 4,000 primes</text>
 <rect class="badge-win" x="1241" y="621" width="137" height="22"/>
-<text class="badge-win-txt" x="1309.5" y="636" text-anchor="middle">3.9× less RAM vs Go</text>
+<text class="badge-win-txt" x="1309.5" y="636" text-anchor="middle">4.2× less RAM vs Go</text>
 <text class="lbl-blot" x="968" y="686">Blot</text>
 <rect class="track" x="1044" y="672" width="242" height="20"/>
-<rect x="1044" y="672" width="62.1" height="20" rx="4" fill="#0d7c66"/>
-<text class="val-blot" x="1114.1" y="686">3.9 MiB</text>
+<rect x="1044" y="672" width="58.0" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1110.0" y="686">3.7 MiB</text>
 <text class="lbl" x="968" y="716">Go</text>
 <rect class="track" x="1044" y="702" width="242" height="20"/>
 <rect x="1044" y="702" width="242.0" height="20" rx="4" fill="#2563eb"/>
-<text class="val" x="1294.0" y="716">15.4 MiB</text>
+<text class="val" x="1294.0" y="716">15.6 MiB</text>
 <text class="foot" x="32" y="864">Sorted lowest → highest peak RSS per problem. Measured via wait4(ru_maxrss) in a fresh child process.</text>
 </svg>

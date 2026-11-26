@@ -172,7 +172,7 @@ BENCHMARKS = [
         what="Integrate N particles for 200 steps of exact binary32 vector math.",
         param="N",
         sizes=[100_000, 1_000_000, 4_000_000],
-        blot=[dict(label="blot AoS, per component", file="particles.blot")],
+        blot=[dict(label="blot SoA, 4-wide SIMD", file="particles.blot")],
         goose=[dict(label="goose AoS, per component", file="particles_scalar.goose")],
         cpp=[
             dict(label="cpp AoS, elementwise", file="particles.cpp", variant=2, tier="idiomatic"),
@@ -284,7 +284,7 @@ BENCHMARKS = [
         what="16 passes of a 3x3 blur over a WxW 8-bit image.",
         param="W",
         sizes=[1024, 2048, 8192],
-        blot=[dict(label="blot sliding 3-col", file="blur.blot")],
+        blot=[dict(label="blot sliding 3-col, #[U8]", file="blur.blot")],
         goose=[dict(label="goose flat indexing", file="blur.goose")],
         cpp=[
             dict(label="cpp flat indexing", file="blur.cpp", variant=0, tier="idiomatic"),

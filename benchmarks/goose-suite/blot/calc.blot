@@ -22,17 +22,17 @@ const M_TERM: U32 = 1
 const M_FACTOR: U32 = 2
 const M_RETURN: U32 = 3
 
-type Expr is data = $Num { v: U32 } | $Neg { inner: U32 } | $Paren { inner: U32 } | $Bin { op: U32, l: U32, r: U32 }
-type RunRes is data = $RunRes { val: rng.U64, err: U32, nodes: U32 }
+type Expr is data = $Num { v: U32 } | $Neg { inner: U32 } | $Paren { inner: U32 } | $Bin { op: U8, l: U32, r: U32 }
+type RunRes is data = $RunRes { val: U64, err: U32, nodes: U32 }
 
-func push_ch (text: own #[U32]) -> (tlen: U32) -> (ch: U32): (#[U32], U32) =>
+func push_ch (text: own #[U8]) -> (tlen: U32) -> (ch: U8): (#[U8], U32) =>
   if tlen < text.length:
     text[tlen] := ch
     return (text, tlen + 1)
   text := self.push ch
   return (text, tlen + 1)
 
-func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own #[U32]) -> (init_depth: U32) -> (init_seed: rng.U64): (#[U32], #[U32], #[U32], U32) =>
+func gen_and_corrupt (text: own #[U8]) -> (st_d: own #[U32]) -> (st_stage: own #[U32]) -> (init_depth: U32) -> (init_seed: U64): (#[U8], #[U32], #[U32], U32) =>
   let tlen: U32 = 0
   let seed = init_seed
   st_d[0] := init_depth
@@ -47,14 +47,14 @@ func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own 
     let d = st_d[top]
     if stage == 0:
       seed := rng.xs_next self
-      let k = rng.xs_mod_small seed 8
+      let k = rng.xs_mod seed 8
       if d == 0 or k == 0:
-        let v = 1 + rng.xs_mod_small (rng.xs_shr seed 8) 99
+        let v = 1 + rng.xs_mod (seed >> 8) 99
         if v >= 10:
-          let (t1, l1) = push_ch text tlen (48 + v / 10)
+          let (t1, l1) = push_ch text tlen (48 + v / 10).to_u8
           text := t1
           tlen := l1
-        let (t2, l2) = push_ch text tlen (48 + v % 10)
+        let (t2, l2) = push_ch text tlen (48 + v % 10).to_u8
         text := t2
         tlen := l2
         sp := self - 1
@@ -85,8 +85,8 @@ func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own 
         tlen := l1
         sp := self - 1
       else:
-        let op = rng.xs_mod_small (rng.xs_shr seed 16) 4
-        let op_ch: U32 = if op == 0 then 43 else if op == 1 then 45 else if op == 2 then 42 else 47
+        let op = rng.xs_mod (seed >> 16) 4
+        let op_ch: U8 = if op == 0 then 43 else if op == 1 then 45 else if op == 2 then 42 else 47
         let (t1, l1) = push_ch text tlen 32
         let (t2, l2) = push_ch t1 l1 op_ch
         let (t3, l3) = push_ch t2 l2 32
@@ -96,7 +96,7 @@ func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own 
         st_d[top] := d - 1
         st_stage[top] := 0
 
-  let kind = rng.xs_mod_small seed 16
+  let kind = rng.xs_mod seed 16
   if kind == 0:
     let i = tlen
     let patched = false
@@ -112,7 +112,7 @@ func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own 
       text[0] := 35
   else:
     if kind == 1:
-      let idx = rng.xs_mod (rng.xs_shr seed 8) tlen
+      let idx = rng.xs_mod (seed >> 8) tlen
       text[idx] := 35
     else:
       if kind == 2:
@@ -127,7 +127,7 @@ func gen_and_corrupt (text: own #[U32]) -> (st_d: own #[U32]) -> (st_stage: own 
           tlen := l4
   return (text, st_d, st_stage, tlen)
 
-func skip (text: #[U32]) -> (tlen: U32) -> (pos: U32): U32 =>
+func skip (text: #[U8]) -> (tlen: U32) -> (pos: U32): U32 =>
   let p = pos
   for ever:
     if p >= tlen:
@@ -137,7 +137,7 @@ func skip (text: #[U32]) -> (tlen: U32) -> (pos: U32): U32 =>
     p := self + 1
   return p
 
-func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U32]) -> (fop: own #[U32]) -> (e_idx: own #[U32]) -> (e_stage: own #[U32]) -> (e_lo: own #[U32]) -> (e_hi: own #[U32]): (RunRes, #[U32], #[U32], #[U32], #[U32], #[U32], #[U32], #[U32]) =>
+func run_one (text: #[U8]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U32]) -> (fop: own #[U8]) -> (e_idx: own #[U32]) -> (e_stage: own #[U32]) -> (e_left: own #[U64]): (RunRes, #[U32], #[U32], #[U8], #[U32], #[U32], #[U64]) =>
   let pool: #[Expr] = #[]
   let sp: U32 = 0
   let pos: U32 = 0
@@ -172,7 +172,7 @@ func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U
                   break
                 let ch = text[pos]
                 if ch >= 48 and ch <= 57:
-                  v := self * 10 + (ch - 48)
+                  v := self * 10 + (ch - 48).to_u32
                   pos := self + 1
                 else:
                   break
@@ -264,15 +264,15 @@ func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U
                       mode := M_TERM
 
   if err != 0:
-    return ($RunRes { val: rng.u64_zero (), err, nodes }, fk, flhs, fop, e_idx, e_stage, e_lo, e_hi)
+    return ($RunRes { val: 0, err, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
   let end_pos = skip text tlen pos
   if end_pos != tlen:
-    return ($RunRes { val: rng.u64_zero (), err: E_TOKEN, nodes }, fk, flhs, fop, e_idx, e_stage, e_lo, e_hi)
+    return ($RunRes { val: 0, err: E_TOKEN, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
 
   e_idx[0] := ret
   e_stage[0] := 0
   let esp: U32 = 1
-  let res = rng.u64_zero ()
+  let res: U64 = 0
   let eerr: U32 = 0
   for ever:
     if esp == 0 or eerr != 0:
@@ -282,7 +282,7 @@ func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U
     let stage = e_stage[top]
     case pool[idx] of
       $Num { v } => do:
-        res := rng.u64_from_u32 v
+        res := v.to_u64
         esp := self - 1
       $Neg { inner } => do:
         if stage == 0:
@@ -291,7 +291,7 @@ func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U
           e_stage[esp] := 0
           esp := self + 1
         else:
-          res := rng.u64_neg self
+          res := 0 - self
           esp := self - 1
       $Paren { inner } => do:
         if stage == 0:
@@ -309,78 +309,73 @@ func run_one (text: #[U32]) -> (tlen: U32) -> (fk: own #[U32]) -> (flhs: own #[U
           esp := self + 1
         else:
           if stage == 1:
-            let $rng.U64 { lo, hi } = res
-            e_lo[top] := lo
-            e_hi[top] := hi
+            e_left[top] := res
             e_stage[top] := 2
             e_idx[esp] := r
             e_stage[esp] := 0
             esp := self + 1
           else:
-            let a = rng.u64_make e_lo[top] e_hi[top]
+            let a = e_left[top]
             let b = res
             if op == 43:
-              res := rng.u64_add a b
+              res := a + b
             else:
               if op == 45:
-                res := rng.u64_sub a b
+                res := a - b
               else:
                 if op == 42:
-                  res := rng.u64_mul a b
+                  res := a * b
                 else:
-                  let $rng.U64 { lo: blo, hi: bhi } = b
-                  if blo == 0 and bhi == 0:
+                  if b == 0:
                     eerr := E_DIV0
                   else:
-                    res := rng.u64_div a b
+                    res := a / b
             esp := self - 1
 
   if eerr != 0:
-    return ($RunRes { val: rng.u64_zero (), err: eerr, nodes }, fk, flhs, fop, e_idx, e_stage, e_lo, e_hi)
-  return ($RunRes { val: res, err: 0, nodes }, fk, flhs, fop, e_idx, e_stage, e_lo, e_hi)
+    return ($RunRes { val: 0, err: eerr, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
+  return ($RunRes { val: res, err: 0, nodes }, fk, flhs, fop, e_idx, e_stage, e_left)
 
 io bench (): #[U32] =>
-  let seed = rng.u64_from_u32 12345
-  let text: #[U32] = #[]
+  let seed: U64 = 12345
+  let text: #[U8] = #[]
   let gd = @array.fill 16 0
   let gs = @array.fill 16 0
   let fk = @array.fill 64 0
   let flhs = @array.fill 64 0
-  let fop = @array.fill 64 0
+  let fop = @array.fill 64 (U32.to_u8 0)
   let e_idx = @array.fill 64 0
   let e_stage = @array.fill 64 0
-  let e_lo = @array.fill 64 0
-  let e_hi = @array.fill 64 0
+  let e_left = @array.fill 64 (U32.to_u64 0)
 
   let ok: U32 = 0
   let e_eof: U32 = 0
   let e_paren: U32 = 0
   let e_token: U32 = 0
   let e_div0: U32 = 0
-  let sum = rng.u64_zero ()
-  let chars = rng.u64_zero ()
-  let nodes = rng.u64_zero ()
+  let sum: U64 = 0
+  let chars: I64 = 0
+  let nodes: I64 = 0
 
   for _ in 0 .. BENCH_N:
     seed := rng.xs_next self
-    let depth = 3 + rng.xs_mod_small seed 4
-    let (t1, gd1, gs1, tlen) = gen_and_corrupt text gd gs depth (rng.xs_shr seed 8)
+    let depth = 3 + rng.xs_mod seed 4
+    let (t1, gd1, gs1, tlen) = gen_and_corrupt text gd gs depth (seed >> 8)
     text := t1
     gd := gd1
     gs := gs1
-    chars := rng.u64_add_u32 self tlen
-    let ($RunRes { val, err, nodes: nn }, fk1, fl1, fo1, ei1, es1, elo1, ehi1) = run_one text tlen fk flhs fop e_idx e_stage e_lo e_hi
+    chars := self + tlen.to_i64
+    let ($RunRes { val, err, nodes: nn }, fk1, fl1, fo1, ei1, es1, el1) = run_one text tlen fk flhs fop e_idx e_stage e_left
     fk := fk1
     flhs := fl1
     fop := fo1
     e_idx := ei1
     e_stage := es1
-    e_lo := elo1
-    e_hi := ehi1
-    nodes := rng.u64_add_u32 self nn
+    e_left := el1
+    nodes := self + nn.to_i64
     if err == 0:
       ok := self + 1
-      sum := rng.u64_add (rng.u64_mul_31 self) val
+      sum := self * 31 + val
     else:
       if err == E_EOF:
         e_eof := self + 1

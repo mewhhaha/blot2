@@ -14,12 +14,13 @@ Every program passes all official PLB `*_out` unittests and produces a **100% id
 - **Single-threaded normalization**: All reference programs run with `GOMAXPROCS=1` and `OMP_NUM_THREADS=1`. Note that official PLB Go `fannkuch-redux/1.go` explicitly overrides `runtime.GOMAXPROCS(runtime.NumCPU())` inside `main`; reporting total CPU time (`cpu_ms`) keeps total compute work directly comparable.
 - **Algorithmic transparency**:
   - `coro-prime-sieve`: Blot has no language-level coroutines/channels, so `coro_prime_sieve.blot` runs the iterative prime-filter chain (`primes[0..k-1]`), whereas official Go `1.go` spawns 4,000 goroutines and channels.
-  - `pidigits`: Blot currently exposes only 32-bit `U32` integers, so `pidigits.blot` implements big integers in base-`2^15` `U32` limbs, whereas Go `8.go` uses Go's assembly-accelerated 64-bit `math/big`.
+  - `pidigits`: `pidigits.blot` implements big integers in pure Blot using base-`2^30` `U64` limbs (`#[U64]`), whereas Go `8.go` uses Go's assembly-accelerated 64-bit `math/big`.
+  - `nsieve`: `nsieve.blot` uses 1-byte `#[U8]` sieve flags, matching Go, Rust, and C.
   - `rust` / `c` / `cpp` coverage: Only unmodified official PLB reference files that compile without third-party Cargo crates or external libraries (`apr_pools`, GMP, etc.) are included alongside Go (which covers all 9 with pure stdlib).
-- **Remaining 9 of 18 PLB problems not yet included**:
-  - `nbody`, `spectral-norm`, `mandelbrot`, `json-serde`: require IEEE-754 `F64` (double precision).
+- **Remaining 9 of 18 PLB problems not yet ported**:
+  - `nbody`, `spectral-norm`, `mandelbrot`, `json-serde`: now unblocked by Wave 3 `F64` (not yet ported into this suite).
   - `regex-redux`, `http-server`: require regex engines / TCP HTTP networking.
-  - `knucleotide`, `edigits`, `secp256k1`: require streaming >2 MiB raw stdin or wide 64-bit/256-bit arithmetic.
+  - `knucleotide`, `edigits`, `secp256k1`: require streaming >2 MiB raw stdin or 256-bit arithmetic.
 
 ## Reproduce
 

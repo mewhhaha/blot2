@@ -7,20 +7,17 @@ const MOD: U32 = 1000003
 
 type Expr is data = $Num { v: U32 } | $Add { l: U32, r: U32 } | $Mul { l: U32, r: U32 } | $Neg { inner: U32 }
 
-func build_expr (max_depth: U32) -> (init_seed: rng.U64): #[Expr] =>
+func build_expr (max_depth: U32) -> (init_seed: U64): #[Expr] =>
   let pool: #[Expr] = #[]
   let cap: U32 = 32
   let st_depth = @array.fill cap 0
-  let st_lo = @array.fill cap 0
-  let st_hi = @array.fill cap 0
+  let st_seed = @array.fill cap (U32.to_u64 0)
   let st_k = @array.fill cap 0
   let st_stage = @array.fill cap 0
   let st_left = @array.fill cap 0
 
-  let $rng.U64 { lo: slo, hi: shi } = init_seed
   st_depth[0] := max_depth
-  st_lo[0] := slo
-  st_hi[0] := shi
+  st_seed[0] := init_seed
   st_stage[0] := 0
   let sp: U32 = 1
   let last_idx: U32 = 0
@@ -32,21 +29,19 @@ func build_expr (max_depth: U32) -> (init_seed: rng.U64): #[Expr] =>
     let d = st_depth[top]
     let stage = st_stage[top]
     if stage == 0:
-      let s = rng.xs_next (rng.u64_make st_lo[top] st_hi[top])
+      let s = rng.xs_next st_seed[top]
       if d == 0:
-        pool := self.push ($Num { v: rng.xs_mod_small s 1000 })
+        let v1000 = (((s >> 32).to_u32 % 1000) * 296 + (s.to_u32 % 1000)) % 1000
+        pool := self.push ($Num { v: v1000 })
         last_idx := pool.length - 1
         sp := self - 1
       else:
-        let k = rng.xs_mod_small s 8
-        let $rng.U64 { lo: nlo, hi: nhi } = s
-        st_lo[top] := nlo
-        st_hi[top] := nhi
+        let k = (s & 7).to_u32
+        st_seed[top] := s
         st_k[top] := k
         st_stage[top] := 1
         st_depth[sp] := d - 1
-        st_lo[sp] := nlo
-        st_hi[sp] := nhi
+        st_seed[sp] := s
         st_stage[sp] := 0
         sp := self + 1
     else:
@@ -59,11 +54,9 @@ func build_expr (max_depth: U32) -> (init_seed: rng.U64): #[Expr] =>
         else:
           st_left[top] := last_idx
           st_stage[top] := 2
-          let s2 = rng.xs_next (rng.u64_make st_lo[top] st_hi[top])
-          let $rng.U64 { lo: nlo, hi: nhi } = s2
+          let s2 = rng.xs_next st_seed[top]
           st_depth[sp] := d - 1
-          st_lo[sp] := nlo
-          st_hi[sp] := nhi
+          st_seed[sp] := s2
           st_stage[sp] := 0
           sp := self + 1
       else:
@@ -136,12 +129,13 @@ func eval_pass (pool: #[Expr]) -> (root: U32) -> (p: U32): U32 =>
             st_stage[sp] := 0
             sp := self + 1
           else:
-            res := rng.xs_mod (rng.u32_mul_wide st_val[top] res) MOD
+            let prod = st_val[top].to_u64 * res.to_u64
+            res := ((prod >> 32).to_u32 * 954414 + (prod.to_u32 % MOD)) % MOD
             sp := self - 1
   return res
 
 io bench (): #[U32] =>
-  let pool = build_expr BENCH_N (rng.u64_from_u32 12345)
+  let pool = build_expr BENCH_N 12345
   let root = pool.length - 1
   let total: U32 = 0
   for p in 0 .. PASSES:
