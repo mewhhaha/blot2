@@ -1560,6 +1560,7 @@ recursive fn ensureDeepCopyNomHelper(g: Generator&, unit: u32, ty: Ty) -> u32, E
     if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
     g.s.deep_copy_helpers.put(key, fn_id);
+    blot_direct_emit::recordParentAux(2, ty, fn_id);
     let s .= g.s;
     let code_mark = s.code.len;
     let sites_mark = blot_direct_relocations::mark();

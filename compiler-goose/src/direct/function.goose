@@ -268,6 +268,10 @@ fn recordFiniteF32(f: Fn&, binding: u32) {
 fn op(g: Generator&, value: u8) { g.s.code.push(value); }
 fn opIndex(g: Generator&, value: u8, index: u32) {
     g.s.code.push(value);
+    if g.s.parallel_readonly {
+        if (value == OP_call || value == OP_return_call) && blot_direct_emit::tryPatchCall(g, index) { return; }
+        if (value == OP_call_indirect || value == OP_return_call_indirect) && blot_direct_emit::tryPatchSig(g, index) { return; }
+    }
     blot_direct_writer::uleb(g.s.code, index);
 }
 fn uleb(g: Generator&, value: u32) { blot_direct_writer::uleb(g.s.code, value); }
@@ -1057,8 +1061,8 @@ fn isOpaqueOutsideUnit(g: const Generator&, m: const Module&, ty: Ty) -> bool {
     return false;
 }
 fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     if !g.module.has_memory {
+        if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
         g.module.has_memory = true;
         g.module.memory_pages = 1;
         g.module.memory_max_pages = 1;
@@ -1069,6 +1073,17 @@ fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
         let sp = blot_direct_emit::spanOf(g.units[f.unit - 1], id);
         sp_start = sp.start;
         sp_end = sp.end;
+    }
+    if g.s.parallel_readonly {
+        let ev_idx = blot_direct_emit::recordParallelTrap(kind, g.units[f.unit - 1].unit, sp_start, sp_end, message);
+        i32Const(g, blot_direct_runtime::trap_site_offset);
+        op(g, OP_i32_const);
+        blot_direct_emit::recordParallelTrapPatch(g.s.code.len as u32, ev_idx);
+        op(g, 0);
+        op(g, OP_i32_store);
+        uleb(g, 2);
+        uleb(g, 0);
+        return;
     }
     let msg_start = g.s.trap_text.len as u32;
     g.s.trap_text.append(message);
@@ -1082,8 +1097,8 @@ fn emitTrapSite(g: Generator&, f: Fn&, kind: u8, id: u32, message: Chars) {
     uleb(g, 0);
 }
 fn emitPanicTrap(g: Generator&, f: Fn&, id: u32) {
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
     if !g.module.has_memory {
+        if g.s.parallel_readonly { g.s.parallel_aborted = true; return; }
         g.module.has_memory = true;
         g.module.memory_pages = 1;
         g.module.memory_max_pages = 1;
@@ -1094,6 +1109,17 @@ fn emitPanicTrap(g: Generator&, f: Fn&, id: u32) {
         let sp = blot_direct_emit::spanOf(g.units[f.unit - 1], id);
         sp_start = sp.start;
         sp_end = sp.end;
+    }
+    if g.s.parallel_readonly {
+        let ev_idx = blot_direct_emit::recordParallelTrap(1, g.units[f.unit - 1].unit, sp_start, sp_end, g.units[f.unit - 1].panicMessage(id));
+        i32Const(g, blot_direct_runtime::trap_site_offset);
+        op(g, OP_i32_const);
+        blot_direct_emit::recordParallelTrapPatch(g.s.code.len as u32, ev_idx);
+        op(g, 0);
+        op(g, OP_i32_store);
+        uleb(g, 2);
+        uleb(g, 0);
+        return;
     }
     let msg_start = g.s.trap_text.len as u32;
     g.s.trap_text.append(g.units[f.unit - 1].panicMessage(id));
@@ -2013,7 +2039,10 @@ fn makeClosure(g: Generator&, f: Fn&, instance: u32, ty: Ty, captures: Vals, id:
     for at in 0..(captures.len as i64) { words += g.s.vals[captures.start + at].len; }
     let result, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
-    i32Const(g, slot);
+    if g.s.parallel_readonly && blot_direct_emit::tryPatchSlot(g, slot) {
+    } else {
+        i32Const(g, slot);
+    }
     opIndex(g, OP_local_set, w(g, result, 0));
     if words == 0 {
         i32Const(g, 0);
@@ -2087,6 +2116,9 @@ fn adapter(g: Generator&, f: const Fn&, kind: InstanceKind, target: BindingRef, 
     let arrow = g.types.node(rest);
     if arrow.tag != blot_direct_types::Tag.function { return 0, g.fail(m, id, "function value of a non-function type"); }
     let parameters = g.saveTys([arrow.a]);
+    if g.s.parallel_readonly {
+        return g.addParallelPartial(key, parameters, arrow.b, captures, m.unit), blot_direct_types::Error.none;
+    }
     return g.addInstanceWith(key, Env {}, parameters, arrow.b, true, captures, m, id);
 }
 
@@ -2161,15 +2193,20 @@ recursive fn closureNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if bound_here { continue; }
             let init_node, is_poly = g.s.polymorphic.get(polyKey(f, binding));
             if is_poly && m.node(init_node).tag == blot_check_core::Tag.closure {
+                if g.s.parallel_readonly { g.s.parallel_aborted = true; return neverVal(), blot_direct_types::Error.unsupported; }
                 recordPolyCapture(g, f, next_instance, binding, init_node, 0);
             }
         }
         let capture_types = Tys { g.s.tys.len as u32, captures.len };
         for at in 0..(captures.len as i64) { g.s.tys.push(g.s.vals[captures.start + at].ty); }
         let parameters = g.saveTys([arrow.a]);
-        let made, error = g.addInstanceWith(key, f.env, parameters, arrow.b, true, capture_types, m, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        instance = made;
+        if g.s.parallel_readonly {
+            instance = g.addParallelLambda(key, f.env, g.s.instances[f.instance_id].env.head, parameters, arrow.b, capture_types, m.unit);
+        } else {
+            let made, error = g.addInstanceWith(key, f.env, parameters, arrow.b, true, capture_types, m, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            instance = made;
+        }
     }
     return makeClosure(g, f, instance, ty, captures, id);
 }

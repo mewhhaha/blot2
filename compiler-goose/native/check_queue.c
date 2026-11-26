@@ -340,6 +340,175 @@ void blot_persist_close(uint64_t h) {
     struct persist_queue *queue = persist_queue(h);
     if (queue) munmap(queue, queue->map_length);
 }
+
+/* Persistent lock-free shared-memory wave pool for parallel Wasm emission.
+ * Forked once per emitAll; waves wake workers with a single futex wake and
+ * claim job chunks with a single atomic fetch_add (no mutexes, no per-job
+ * syscalls, no per-wave forks). */
+enum {
+    EMIT_POOL_MAX_WORKERS = 16,
+    EMIT_POOL_SYNC_CAP = 64 * 1024 * 1024,
+    EMIT_POOL_LANE_CAP = 64 * 1024 * 1024,
+};
+struct emit_pool {
+    _Atomic uint32_t wave_gen;
+    _Atomic uint32_t next_job;
+    _Atomic uint32_t done_workers;
+    _Atomic uint32_t failed;
+    pid_t parent_pid;
+    uint32_t worker_count;
+    uint32_t job_count;
+    uint32_t chunk_size;
+    uint64_t sync_len;
+    uint64_t lane_used[EMIT_POOL_MAX_WORKERS];
+    size_t map_length;
+};
+static struct emit_pool *emit_pool_ptr(uint64_t h) {
+    return (struct emit_pool *)(uintptr_t)h;
+}
+static size_t emit_pool_header_size(void) {
+    size_t s = sizeof(struct emit_pool);
+    return (s + 4095) & ~(size_t)4095;
+}
+static uint8_t *emit_pool_sync_buf(struct emit_pool *p) {
+    return (uint8_t *)p + emit_pool_header_size();
+}
+static uint8_t *emit_pool_lane_buf(struct emit_pool *p, uint32_t lane) {
+    return emit_pool_sync_buf(p) + (size_t)EMIT_POOL_SYNC_CAP +
+           (size_t)lane * (size_t)EMIT_POOL_LANE_CAP;
+}
+uint64_t blot_emit_pool_open(uint32_t workers) {
+    if (workers == 0 || workers > EMIT_POOL_MAX_WORKERS) return 0;
+    size_t map_len = emit_pool_header_size() + (size_t)EMIT_POOL_SYNC_CAP +
+                     (size_t)workers * (size_t)EMIT_POOL_LANE_CAP;
+    struct emit_pool *p = mmap(NULL, map_len, PROT_READ | PROT_WRITE,
+                               MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (p == MAP_FAILED) return 0;
+    atomic_init(&p->wave_gen, 0);
+    atomic_init(&p->next_job, 0);
+    atomic_init(&p->done_workers, 0);
+    atomic_init(&p->failed, 0);
+    p->parent_pid = getpid();
+    p->worker_count = workers;
+    p->map_length = map_len;
+    return (uint64_t)(uintptr_t)p;
+}
+void blot_emit_pool_close(uint64_t h) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (p) munmap(p, p->map_length);
+}
+void blot_emit_pool_stop(uint64_t h) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p) return;
+    atomic_store_explicit(&p->wave_gen, UINT32_MAX, memory_order_release);
+    (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+}
+bool blot_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
+                               const uint8_t *sync_bytes, uint64_t sync_len) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p || sync_len > EMIT_POOL_SYNC_CAP || chunk_size == 0) return false;
+    if (sync_len != 0) memcpy(emit_pool_sync_buf(p), sync_bytes, (size_t)sync_len);
+    p->job_count = job_count;
+    p->chunk_size = chunk_size;
+    p->sync_len = sync_len;
+    for (uint32_t i = 0; i < p->worker_count; ++i) p->lane_used[i] = 0;
+    atomic_store_explicit(&p->next_job, 0, memory_order_relaxed);
+    atomic_store_explicit(&p->done_workers, 0, memory_order_relaxed);
+    atomic_fetch_add_explicit(&p->wave_gen, 1, memory_order_release);
+    (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+    return true;
+}
+bool blot_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p) return false;
+    pid_t caller = getpid();
+    uint64_t deadline = blot_clock_ns() + persist_timeout;
+    for (;;) {
+        uint32_t done = atomic_load_explicit(&p->done_workers, memory_order_acquire);
+        if (atomic_load_explicit(&p->failed, memory_order_acquire) != 0) return false;
+        if (done >= p->worker_count) return true;
+        uint64_t now = blot_clock_ns();
+        if (now >= deadline) {
+            atomic_store_explicit(&p->failed, 1, memory_order_release);
+            return false;
+        }
+        for (uint32_t i = 0; i < pid_count; ++i) {
+            if (pids[i] != 0 && persist_worker_exited((pid_t)pids[i], caller)) {
+                atomic_store_explicit(&p->failed, 1, memory_order_release);
+                return false;
+            }
+        }
+        uint64_t remaining = deadline - now;
+        if (remaining > PERSIST_WAIT_NS) remaining = PERSIST_WAIT_NS;
+        struct timespec wait = { .tv_nsec = (long)remaining };
+        (void)syscall(SYS_futex, &p->done_workers, FUTEX_WAIT, done, &wait, NULL, 0);
+    }
+}
+int64_t blot_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p) return 0;
+    for (;;) {
+        uint32_t gen = atomic_load_explicit(&p->wave_gen, memory_order_acquire);
+        if (gen == UINT32_MAX || atomic_load_explicit(&p->failed, memory_order_acquire) != 0)
+            return 0;
+        if (gen != last_gen) return (int64_t)gen;
+        if (getppid() != p->parent_pid) return 0;
+        struct timespec wait = { .tv_nsec = PERSIST_WAIT_NS };
+        (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAIT, last_gen, &wait, NULL, 0);
+    }
+}
+uint64_t blot_emit_pool_sync_len(uint64_t h) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    return p ? p->sync_len : 0;
+}
+bool blot_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p || len > p->sync_len) return false;
+    if (len != 0) memcpy(out, emit_pool_sync_buf(p), (size_t)len);
+    return true;
+}
+uint64_t blot_emit_pool_claim_chunk(uint64_t h) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p) return 0;
+    uint32_t start = atomic_fetch_add_explicit(&p->next_job, p->chunk_size, memory_order_relaxed);
+    if (start >= p->job_count) return 0;
+    uint32_t end = start + p->chunk_size;
+    if (end > p->job_count) end = p->job_count;
+    return ((uint64_t)start << 32) | (uint64_t)end;
+}
+bool blot_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
+                                const uint8_t *pkt, uint64_t len) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p || lane >= p->worker_count) return false;
+    uint64_t used = p->lane_used[lane];
+    if (len > EMIT_POOL_LANE_CAP || used + 8 + len > EMIT_POOL_LANE_CAP) return false;
+    uint8_t *dst = emit_pool_lane_buf(p, lane) + used;
+    uint32_t hdr[2] = { job_idx, (uint32_t)len };
+    memcpy(dst, hdr, 8);
+    if (len != 0) memcpy(dst + 8, pkt, (size_t)len);
+    p->lane_used[lane] = used + 8 + len;
+    return true;
+}
+void blot_emit_pool_worker_done(uint64_t h, bool ok) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p) return;
+    if (!ok) atomic_store_explicit(&p->failed, 1, memory_order_release);
+    uint32_t prev = atomic_fetch_add_explicit(&p->done_workers, 1, memory_order_acq_rel);
+    if (prev + 1 >= p->worker_count || !ok) {
+        (void)syscall(SYS_futex, &p->done_workers, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+    }
+}
+uint64_t blot_emit_pool_lane_size(uint64_t h, uint32_t lane) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p || lane >= p->worker_count) return 0;
+    return p->lane_used[lane];
+}
+bool blot_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
+    struct emit_pool *p = emit_pool_ptr(h);
+    if (!p || lane >= p->worker_count || len > p->lane_used[lane]) return false;
+    if (len != 0) memcpy(out, emit_pool_lane_buf(p, lane), (size_t)len);
+    return true;
+}
 #else
 uint8_t blot_available_workers(void) { return 1; }
 void blot_persist_kill_child(uint32_t pid) { (void)pid; }
@@ -364,4 +533,27 @@ bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind,
 }
 void blot_persist_fail(uint64_t h) { (void)h; }
 void blot_persist_close(uint64_t h) { (void)h; }
+uint64_t blot_emit_pool_open(uint32_t workers) { (void)workers; return 0; }
+void blot_emit_pool_close(uint64_t h) { (void)h; }
+void blot_emit_pool_stop(uint64_t h) { (void)h; }
+bool blot_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
+                               const uint8_t *sync_bytes, uint64_t sync_len) {
+    (void)h; (void)job_count; (void)chunk_size; (void)sync_bytes; (void)sync_len; return false;
+}
+bool blot_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
+    (void)h; (void)pids; (void)pid_count; return false;
+}
+int64_t blot_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) { (void)h; (void)last_gen; return 0; }
+uint64_t blot_emit_pool_sync_len(uint64_t h) { (void)h; return 0; }
+bool blot_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) { (void)h; (void)out; (void)len; return false; }
+uint64_t blot_emit_pool_claim_chunk(uint64_t h) { (void)h; return 0; }
+bool blot_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
+                                const uint8_t *pkt, uint64_t len) {
+    (void)h; (void)lane; (void)job_idx; (void)pkt; (void)len; return false;
+}
+void blot_emit_pool_worker_done(uint64_t h, bool ok) { (void)h; (void)ok; }
+uint64_t blot_emit_pool_lane_size(uint64_t h, uint32_t lane) { (void)h; (void)lane; return 0; }
+bool blot_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
+    (void)h; (void)lane; (void)out; (void)len; return false;
+}
 #endif

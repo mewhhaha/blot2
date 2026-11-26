@@ -273,18 +273,22 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
     let key = InstanceKey { blot_direct_emit::InstanceKind.pool, target.unit, target.binding, ty, 0, 0 };
     var instance, present = g.find(key);
     if !present {
-        let created, error = g.addInstanceWith(key, Env {}, Tys {}, ty, false, Tys {}, g.units[f.unit - 1], id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        let at = g.s.pool_words.len as u32;
-        let first = g.module.addGlobal(VT_i32, true, 0);
-        let second = g.module.addGlobal(VT_i32, true, 0);
-        let third = g.module.addGlobal(VT_i32, true, 0);
-        g.s.pool_words.push(first);
-        g.s.pool_words.push(second);
-        g.s.pool_words.push(third);
-        g.s.instances[created].pool_offset = at;
-        g.s.pool_order.push(created);
-        instance = created;
+        if g.s.parallel_readonly {
+            instance = g.addParallelPool(key, ty, g.units[f.unit - 1].unit);
+        } else {
+            let created, error = g.addInstanceWith(key, Env {}, Tys {}, ty, false, Tys {}, g.units[f.unit - 1], id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let at = g.s.pool_words.len as u32;
+            let first = g.module.addGlobal(VT_i32, true, 0);
+            let second = g.module.addGlobal(VT_i32, true, 0);
+            let third = g.module.addGlobal(VT_i32, true, 0);
+            g.s.pool_words.push(first);
+            g.s.pool_words.push(second);
+            g.s.pool_words.push(third);
+            g.s.instances[created].pool_offset = at;
+            g.s.pool_order.push(created);
+            instance = created;
+        }
     }
     callf(g, g.s.instances[instance].function);
     return pop(g, f, ty, id);
@@ -299,6 +303,7 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
     if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
     g.s.persist_rec_helpers.put(key, fn_id);
+    blot_direct_emit::recordParentAux(3, ty, fn_id);
     let s .= g.s;
     let code_mark = s.code.len;
     let sites_mark = blot_direct_relocations::mark();
@@ -1044,6 +1049,7 @@ recursive fn recordPolyCapture(g: Generator&, f: const Fn&, target_instance: u32
     if depth >= 32 { return; }
     let m .= g.units[f.unit - 1];
     g.s.polymorphic.put(polyCaptureKey(target_instance, binding), init_node);
+    blot_direct_emit::recordParentPoly(target_instance, binding, init_node);
     if m.node(init_node).tag != blot_check_core::Tag.closure { return; }
     for c in m.closureCaptures(init_node) {
         let _, bound_here = bindGet(g, f, c);

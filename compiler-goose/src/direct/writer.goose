@@ -230,13 +230,27 @@ fn bucket(params: const ValType[:], results: const ValType[:]) -> i64 {
     for value in results { hash = (hash ^ value) * 1099511628211; }
     return (hash % signature_buckets) as! i64;
 }
+fn findSignature(module: const Module&, params: const ValType[:], results: const ValType[:]) -> u32, bool {
+    let home = bucket(params, results);
+    var at = module.signature_heads[home];
+    while at != 0 {
+        let known = module.signatures[at - 1];
+        if same(types(module, known.params), params) && same(types(module, known.results), results) {
+            return at - 1, true;
+        }
+        at = known.next;
+    }
+    return 0, false;
+}
 // The index of the signature with these types, added when it is new.
 fn signature(module: Module&, params: const ValType[:], results: const ValType[:]) -> u32 {
     let home = bucket(params, results);
     var at = module.signature_heads[home];
     while at != 0 {
-        let known = module.signatures[(at - 1) as i64];
-        if same(types(module, known.params), params) && same(types(module, known.results), results) { return at - 1; }
+        let known = module.signatures[at - 1];
+        if same(types(module, known.params), params) && same(types(module, known.results), results) {
+            return at - 1;
+        }
         at = known.next;
     }
     if module.readonly { module.readonly_hit = true; return 0; }

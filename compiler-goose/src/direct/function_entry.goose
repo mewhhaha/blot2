@@ -576,6 +576,13 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
         finish_body_scratch.push(OP_global_set);
         blot_direct_writer::uleb(finish_body_scratch, esc_global);
     }
+    if g.s.parallel_readonly {
+        let header_len = finish_body_scratch.len - mark;
+        blot_direct_emit::setParallelBody(finish_body_scratch[mark..], g.s.code[f.code_base..g.s.code.len], f.code_base);
+        blot_direct_relocations::finishBody(f.sites_base, header_len - f.code_base, 0, 0);
+        finish_body_scratch.resize(mark);
+        return;
+    }
     let body_start = g.module.text.len;
     g.module.text.append(finish_body_scratch[mark..]);
     let header_len = g.module.text.len - body_start;

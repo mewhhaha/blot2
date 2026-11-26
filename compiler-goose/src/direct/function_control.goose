@@ -8600,6 +8600,7 @@ recursive fn emitLoopCore(
         prefix.push(OP_global_set);
         blot_direct_writer::uleb(prefix, esc_global);
         blot_direct_relocations::insert(f.sites_base,mark_at,prefix.len);
+        if g.s.parallel_readonly { blot_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
         let old_len = s.code.len;
         for byte in prefix { s.code.push(byte); }
         var at = old_len;
@@ -10031,6 +10032,7 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             prefix.push(OP_global_set);
             blot_direct_writer::uleb(prefix, esc_global);
             blot_direct_relocations::insert(f.sites_base, mark_at, prefix.len);
+            if g.s.parallel_readonly { blot_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
             let old_len = g.s.code.len;
             for byte in prefix { g.s.code.push(byte); }
             var at = old_len;

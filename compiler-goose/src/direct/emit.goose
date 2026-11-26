@@ -649,11 +649,13 @@ fn closureSignature(g: Generator&, parameter: Ty, result: Ty) -> u32, Error {
         var small: ValType[32] = [0; 32];
         small[0] = blot_direct_writer::VT_i32;
         for w, i in parameter_words { small[i + 1] = w; }
+        if g.s.parallel_readonly { return recordParallelSig(g, small[..parameter_words.len + 1], result_words), blot_direct_types::Error.none; }
         return g.module.signature(small[..parameter_words.len + 1], result_words), blot_direct_types::Error.none;
     }
     var words: ValType[>..<] = [];
     words.push(blot_direct_writer::VT_i32);
     words.append(parameter_words);
+    if g.s.parallel_readonly { return recordParallelSig(g, words[..], result_words), blot_direct_types::Error.none; }
     return g.module.signature(words[..], result_words), blot_direct_types::Error.none;
 }
 fn find(g: Generator&, key: InstanceKey) -> u32, bool {
@@ -662,6 +664,13 @@ fn find(g: Generator&, key: InstanceKey) -> u32, bool {
     while at != 0 {
         let entry = g.s.index_nodes[at - 1];
         if sameKey(entry.key, key) {
+            if g.s.parallel_readonly && (entry.value as i64) >= par_base_insts {
+                let ep = par_inst_epoch[(entry.value as i64) - par_base_insts];
+                if ep != 0xffffffff && ep != par_job_epoch {
+                    at = entry.next;
+                    continue;
+                }
+            }
             recordDep(g, entry.value);
             return entry.value, true;
         }
@@ -841,6 +850,7 @@ fn operationId(g: Generator&, operation: Ty) -> u32 {
     if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0; }
     let id = g.s.operation_ids.count + 1;
     g.s.operation_ids.put(operation, id);
+    recordParentAux(1, operation, id);
     return id;
 }
 recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: const blot_check_types::List[:], mark: i64, depth: i64) {
@@ -1053,6 +1063,9 @@ recursive fn namedWith(g: Generator&, target: BindingRef, ty: Ty, unused_holes: 
         result = peeled;
     }
     if result == blot_direct_types::never && has_peeled { result = peeled; }
+    if g.s.parallel_readonly {
+        return addParallelNamed(g, key, env, lowered, result, unused_holes, site.unit), blot_direct_types::Error.none;
+    }
     let id, error = addInstance(g, key, env, lowered, result, site, site_id);
     if error != blot_direct_types::Error.none { return 0, error; }
     g.s.instances[id].unused_holes = unused_holes;
@@ -1454,18 +1467,555 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
     return blot_direct_types::Error.none;
 }
 
+let PAR_EV_TRAP: u8 = 1;
+let PAR_EV_NAMED: u8 = 2;
+let PAR_EV_SIG: u8 = 3;
+let PAR_EV_PARTIAL: u8 = 4;
+let PAR_EV_POOL: u8 = 5;
+let PAR_EV_LAMBDA: u8 = 6;
+
+let PAR_PATCH_CALL: u8 = 1;
+let PAR_PATCH_SIG: u8 = 2;
+let PAR_PATCH_TRAP: u8 = 3;
+let PAR_PATCH_SLOT: u8 = 4;
+
+let PAR_PROV_BIT: u32 = 0x40000000;
+let PAR_PROV_MASK: u32 = 0x3fffffff;
+
+struct ParPatch { kind: u8 = 0, code_off: u32 = 0, ev_idx: u32 = 0 }
+struct ParProvSig { pstart: u32 = 0, plen: u32 = 0, rstart: u32 = 0, rlen: u32 = 0 }
+struct ParAuxEntry { kind: u8 = 0, ty: Ty = 0, val: u32 = 0 }
+struct ParPolyEntry { target_inst: u32 = 0, binding: u32 = 0, init_node: u32 = 0 }
+
+var par_base_types: i64 = 0;
+var par_base_spellings: i64 = 0;
+var par_base_insts: i64 = 0;
+var par_job_epoch: u32 = 0;
+var par_job_ev_count: u32 = 0;
+var par_job_patch_base: i64 = 0;
+var par_job_fn_base: i64 = 0;
+var par_job_slot_base: i64 = 0;
+var par_job_sig_base: i64 = 0;
+var par_body_start: i64 = 0;
+var par_body_len: i64 = 0;
+var par_last_header_len: i64 = 0;
+var par_body_buf: u8[>..] = [];
+var par_ev_bytes: u8[>..] = [];
+var par_patches: ParPatch[>..] = [];
+var par_inst_epoch: u32[>..] = [];
+var par_inst_ev: u32[>..] = [];
+var par_w2p: u32[>..] = [];
+var par_p2w: u32[>..] = [];
+var par_fn_ev: u32[>..] = [];
+var par_slot_ev: u32[>..] = [];
+var par_prov_sigs: ParProvSig[>..] = [];
+var par_prov_sig_bytes: u8[>..] = [];
+var par_prov_sig_ev: u32[>..] = [];
+var par_track_aux: bool = false;
+var par_parent_aux: ParAuxEntry[>..] = [];
+var par_parent_poly: ParPolyEntry[>..] = [];
+
+fn recordParentAux(kind: u8, ty: Ty, val: u32) {
+    if par_track_aux { par_parent_aux.push(ParAuxEntry { kind: kind, ty: ty, val: val }); }
+}
+fn recordParentPoly(target_inst: u32, binding: u32, init_node: u32) {
+    if par_track_aux { par_parent_poly.push(ParPolyEntry { target_inst: target_inst, binding: binding, init_node: init_node }); }
+}
+
+fn workerToParentInst(w_id: u32) -> u32 {
+    if (w_id as i64) < par_base_insts { return w_id; }
+    return par_w2p[(w_id as i64) - par_base_insts];
+}
+fn parentToWorkerInst(p_id: u32) -> u32 {
+    if (p_id as i64) < par_base_insts { return p_id; }
+    return par_p2w[(p_id as i64) - par_base_insts];
+}
+
+fn setParallelBody(header: const u8[:], code: const u8[:], code_base: i64) {
+    par_body_start = par_body_buf.len;
+    par_body_buf.append(header);
+    par_body_buf.append(code);
+    par_body_len = par_body_buf.len - par_body_start;
+    par_last_header_len = header.len - code_base;
+}
+fn shiftParallelPatches(mark_at: i64, delta: i64) {
+    var i = par_patches.len;
+    while i > par_job_patch_base {
+        i -= 1;
+        if (par_patches[i].code_off as i64) < mark_at { break; }
+        par_patches[i].code_off += delta as u32;
+    }
+}
+
+fn packU32(out: u8[>..<]&, v: u32) {
+    out.push(v as! u8);
+    out.push((v >> 8) as! u8);
+    out.push((v >> 16) as! u8);
+    out.push((v >> 24) as! u8);
+}
+
+fn packU32Grow(out: u8[>..]&, v: u32) {
+    out.push(v as! u8);
+    out.push((v >> 8) as! u8);
+    out.push((v >> 16) as! u8);
+    out.push((v >> 24) as! u8);
+}
+
+fn packU64(out: u8[>..<]&, v: u64) {
+    packU32(out, v as! u32);
+    packU32(out, (v >> 32) as! u32);
+}
+
+recursive fn packTyGrow(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..]&) {
+    if (ty as i64) < par_base_types {
+        out.push(0);
+        packU32Grow(out, ty);
+        return;
+    }
+    let n = types.node(ty);
+    out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
+    match n.tag {
+        unit, boolean, u32_, f32_, never => {},
+        array, ref, view, link, provider, cell => {
+            packTyGrow(types, n.a, out);
+        },
+        function => {
+            packTyGrow(types, n.a, out);
+            packTyGrow(types, n.b, out);
+        },
+        tuple => {
+            packU32Grow(out, n.b);
+            for i in 0..(n.b as i64) { packTyGrow(types, types.words[n.a + i], out); }
+        },
+        state_provider => {
+            packTyGrow(types, types.words[n.a], out);
+            packTyGrow(types, types.words[n.a + 1], out);
+            packTyGrow(types, types.words[n.a + 2], out);
+        },
+        nominal => {
+            packU32Grow(out, types.words[n.a]);
+            packU32Grow(out, types.words[n.a + 1]);
+            packU32Grow(out, n.b);
+            for i in 0..(n.b as i64) { packTyGrow(types, types.words[n.a + 2 + i], out); }
+        },
+        record => {
+            packU32Grow(out, n.b);
+            for i in 0..(n.b as i64) {
+                let fld = types.recordField(ty, i);
+                if (fld.name as i64) < par_base_spellings {
+                    out.push(0);
+                    packU32Grow(out, fld.name);
+                } else {
+                    let sp = types.spelling(fld.name);
+                    out.push(1);
+                    packU32Grow(out, sp.len as u32);
+                    out.append(sp);
+                }
+                packTyGrow(types, fld.ty, out);
+            }
+        },
+    }
+}
+
+recursive fn packTy(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..<]&) {
+    if (ty as i64) < par_base_types {
+        out.push(0);
+        packU32(out, ty);
+        return;
+    }
+    let n = types.node(ty);
+    out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
+    match n.tag {
+        unit, boolean, u32_, f32_, never => {},
+        array, ref, view, link, provider, cell => {
+            packTy(types, n.a, out);
+        },
+        function => {
+            packTy(types, n.a, out);
+            packTy(types, n.b, out);
+        },
+        tuple => {
+            packU32(out, n.b);
+            for i in 0..(n.b as i64) { packTy(types, types.words[n.a + i], out); }
+        },
+        state_provider => {
+            packTy(types, types.words[n.a], out);
+            packTy(types, types.words[n.a + 1], out);
+            packTy(types, types.words[n.a + 2], out);
+        },
+        nominal => {
+            packU32(out, types.words[n.a]);
+            packU32(out, types.words[n.a + 1]);
+            packU32(out, n.b);
+            for i in 0..(n.b as i64) { packTy(types, types.words[n.a + 2 + i], out); }
+        },
+        record => {
+            packU32(out, n.b);
+            for i in 0..(n.b as i64) {
+                let fld = types.recordField(ty, i);
+                if (fld.name as i64) < par_base_spellings {
+                    out.push(0);
+                    packU32(out, fld.name);
+                } else {
+                    let sp = types.spelling(fld.name);
+                    out.push(1);
+                    packU32(out, sp.len as u32);
+                    out.append(sp);
+                }
+                packTy(types, fld.ty, out);
+            }
+        },
+    }
+}
+
+fn pushUnpackU32(buf: u32[>..]&, len: i64&, value: u32) {
+    if len < buf.len { buf[len] = value; } else { buf.push(value); }
+    len += 1;
+}
+fn pushUnpackField(buf: blot_direct_types::Field[>..]&, len: i64&, value: blot_direct_types::Field) {
+    if len < buf.len { buf[len] = value; } else { buf.push(value); }
+    len += 1;
+}
+
+recursive fn unpackTy(
+    types: blot_direct_types::Types&,
+    pkt: const u8[:],
+    pos: i64&,
+    ok: bool&,
+    u32_buf: u32[>..]&,
+    u32_len: i64&,
+    fld_buf: blot_direct_types::Field[>..]&,
+    fld_len: i64&,
+) -> Ty {
+    if !ok || pos >= pkt.len { ok = false; return 0; }
+    let tag_b = pkt[pos];
+    pos += 1;
+    if tag_b == 0 {
+        if pos + 4 > pkt.len { ok = false; return 0; }
+        let id = binary::u32le(pkt, pos);
+        pos += 4;
+        return id;
+    }
+    let code = (tag_b - 1) as u32;
+    if code == 8 {
+        let a = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        let b = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok { return 0; }
+        let res, err = types.function(a, b);
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    if code == 9 || code == 12 || code == 13 || code == 14 || code == 15 || code == 17 {
+        let a = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok { return 0; }
+        var tag = blot_direct_types::Tag.array;
+        if code == 12 { tag = blot_direct_types::Tag.ref; }
+        else if code == 13 { tag = blot_direct_types::Tag.view; }
+        else if code == 14 { tag = blot_direct_types::Tag.link; }
+        else if code == 15 { tag = blot_direct_types::Tag.provider; }
+        else if code == 17 { tag = blot_direct_types::Tag.cell; }
+        let res, err = types.intern(tag, [a]);
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    if code == 5 {
+        if pos + 4 > pkt.len { ok = false; return 0; }
+        let count = binary::u32le(pkt, pos) as i64;
+        pos += 4;
+        let mark = u32_len;
+        for i in 0..count { pushUnpackU32(u32_buf, u32_len, 0); }
+        for i in 0..count {
+            let item = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { u32_len = mark; return 0; }
+            u32_buf[mark + i] = item;
+        }
+        let res, err = types.tuple(u32_buf[mark..mark + count]);
+        u32_len = mark;
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    if code == 16 {
+        let a = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        let b = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        let c = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok { return 0; }
+        let res, err = types.intern(blot_direct_types::Tag.state_provider, [a, b, c]);
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    if code == 7 {
+        if pos + 12 > pkt.len { ok = false; return 0; }
+        let u = binary::u32le(pkt, pos);
+        let d = binary::u32le(pkt, pos + 4);
+        let count = binary::u32le(pkt, pos + 8) as i64;
+        pos += 12;
+        let mark = u32_len;
+        pushUnpackU32(u32_buf, u32_len, u);
+        pushUnpackU32(u32_buf, u32_len, d);
+        for i in 0..count { pushUnpackU32(u32_buf, u32_len, 0); }
+        for i in 0..count {
+            let item = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { u32_len = mark; return 0; }
+            u32_buf[mark + 2 + i] = item;
+        }
+        let res, err = types.intern(blot_direct_types::Tag.nominal, u32_buf[mark..mark + 2 + count]);
+        u32_len = mark;
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    if code == 6 {
+        if pos + 4 > pkt.len { ok = false; return 0; }
+        let count = binary::u32le(pkt, pos) as i64;
+        pos += 4;
+        let mark = fld_len;
+        for i in 0..count { pushUnpackField(fld_buf, fld_len, blot_direct_types::Field { 0, 0 }); }
+        for i in 0..count {
+            if pos >= pkt.len { fld_len = mark; ok = false; return 0; }
+            let nmode = pkt[pos];
+            pos += 1;
+            var name_id: u32 = 0;
+            if nmode == 0 {
+                if pos + 4 > pkt.len { fld_len = mark; ok = false; return 0; }
+                name_id = binary::u32le(pkt, pos);
+                pos += 4;
+            } else {
+                if pos + 4 > pkt.len { fld_len = mark; ok = false; return 0; }
+                let slen = binary::u32le(pkt, pos) as i64;
+                pos += 4;
+                if pos + slen > pkt.len { fld_len = mark; ok = false; return 0; }
+                name_id = types.fieldName(pkt[pos..pos + slen]);
+                pos += slen;
+            }
+            let fty = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { fld_len = mark; return 0; }
+            fld_buf[mark + i] = blot_direct_types::Field { name_id, fty };
+        }
+        let res, err = types.record(fld_buf[mark..mark + count]);
+        fld_len = mark;
+        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        return res;
+    }
+    ok = false;
+    return 0;
+}
+
+fn sameBytes(a: const u8[:], b: const u8[:]) -> bool {
+    if a.len != b.len { return false; }
+    for v, i in a { if v != b[i] { return false; } }
+    return true;
+}
+
+fn recordParallelSig(g: Generator&, params: const ValType[:], results: const ValType[:]) -> u32 {
+    let existing, found = g.module.findSignature(params, results);
+    if found { return existing; }
+    for i in par_job_sig_base..par_prov_sigs.len {
+        let s = par_prov_sigs[i];
+        let ps = par_prov_sig_bytes[(s.pstart as i64)..(s.pstart as i64) + (s.plen as i64)];
+        let rs = par_prov_sig_bytes[(s.rstart as i64)..(s.rstart as i64) + (s.rlen as i64)];
+        if sameBytes(ps, params) && sameBytes(rs, results) {
+            return PAR_PROV_BIT | ((i - par_job_sig_base) as u32);
+        }
+    }
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_SIG);
+    packU32Grow(par_ev_bytes, params.len as u32);
+    par_ev_bytes.append(params);
+    packU32Grow(par_ev_bytes, results.len as u32);
+    par_ev_bytes.append(results);
+    let rel = (par_prov_sigs.len - par_job_sig_base) as u32;
+    let pstart = par_prov_sig_bytes.len as u32;
+    par_prov_sig_bytes.append(params);
+    let rstart = par_prov_sig_bytes.len as u32;
+    par_prov_sig_bytes.append(results);
+    par_prov_sigs.push(ParProvSig { pstart: pstart, plen: params.len as u32, rstart: rstart, rlen: results.len as u32 });
+    par_prov_sig_ev.push(ev_idx);
+    return PAR_PROV_BIT | rel;
+}
+
+fn recordParallelTrap(kind: u8, unit: u32, sp_start: u32, sp_end: u32, message: Chars) -> u32 {
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_TRAP);
+    par_ev_bytes.push(kind);
+    packU32Grow(par_ev_bytes, unit);
+    packU32Grow(par_ev_bytes, sp_start);
+    packU32Grow(par_ev_bytes, sp_end);
+    packU32Grow(par_ev_bytes, message.len as u32);
+    par_ev_bytes.append(message);
+    return ev_idx;
+}
+
+fn recordParallelTrapPatch(code_off: u32, ev_idx: u32) {
+    par_patches.push(ParPatch { kind: PAR_PATCH_TRAP, code_off: code_off, ev_idx: ev_idx });
+}
+
+fn tryPatchCall(g: Generator&, fn_id: u32) -> bool {
+    if (fn_id & PAR_PROV_BIT) == 0 { return false; }
+    let idx = par_job_fn_base + ((fn_id & PAR_PROV_MASK) as i64);
+    if idx >= par_fn_ev.len { g.s.parallel_aborted = true; return false; }
+    par_patches.push(ParPatch { kind: PAR_PATCH_CALL, code_off: g.s.code.len as u32, ev_idx: par_fn_ev[idx] });
+    g.s.code.push(0);
+    return true;
+}
+
+fn tryPatchSig(g: Generator&, sig_id: u32) -> bool {
+    if (sig_id & PAR_PROV_BIT) == 0 { return false; }
+    let idx = par_job_sig_base + ((sig_id & PAR_PROV_MASK) as i64);
+    if idx >= par_prov_sig_ev.len { g.s.parallel_aborted = true; return false; }
+    par_patches.push(ParPatch { kind: PAR_PATCH_SIG, code_off: g.s.code.len as u32, ev_idx: par_prov_sig_ev[idx] });
+    g.s.code.push(0);
+    return true;
+}
+
+fn tryPatchSlot(g: Generator&, slot: u32) -> bool {
+    if (slot & PAR_PROV_BIT) == 0 { return false; }
+    let idx = par_job_slot_base + ((slot & PAR_PROV_MASK) as i64);
+    if idx >= par_slot_ev.len { g.s.parallel_aborted = true; return false; }
+    g.s.code.push(blot_direct_writer::OP_i32_const);
+    par_patches.push(ParPatch { kind: PAR_PATCH_SLOT, code_off: g.s.code.len as u32, ev_idx: par_slot_ev[idx] });
+    g.s.code.push(0);
+    return true;
+}
+
+fn pushProvisionalInstance(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, result: Ty, closure: bool, captures: Tys, unused_holes: bool, site_unit: u32, ev_idx: u32) -> u32 {
+    let fn_id = PAR_PROV_BIT | ((par_fn_ev.len - par_job_fn_base) as u32);
+    par_fn_ev.push(ev_idx);
+    var slot: u32 = 0;
+    if closure {
+        slot = PAR_PROV_BIT | ((par_slot_ev.len - par_job_slot_base) as u32);
+        par_slot_ev.push(ev_idx);
+    }
+    let id = g.s.instances.len as u32;
+    g.s.instances.push(Instance { key: key, env: env, function: fn_id, parameters: parameters, result: result, closure: closure, captures: captures, slot: slot, unused_holes: unused_holes, site: site_unit });
+    par_inst_epoch.push(par_job_epoch);
+    par_inst_ev.push(ev_idx);
+    par_w2p.push(0xffffffff);
+    indexPut(g, key, id);
+    recordDep(g, id);
+    return id;
+}
+
+fn packEnv(types: const blot_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..<]&, full_out: u8&) {
+    var nodes: u32[>..<] = [];
+    var at = head;
+    while at != stop_head && at != 0 {
+        nodes.push(at);
+        at = types.env_nodes[at].next;
+    }
+    full_out = if at != stop_head { 1 } else { 0 };
+    packU32(out, nodes.len as u32);
+    for idx in nodes {
+        let en = types.env_nodes[idx];
+        packU32(out, en.unit);
+        packU32(out, en.ty);
+        packTy(types, en.value, out);
+    }
+}
+
+fn packEnvGrow(types: const blot_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..]&, full_out: u8&) {
+    var nodes: u32[>..<] = [];
+    var at = head;
+    while at != stop_head && at != 0 {
+        nodes.push(at);
+        at = types.env_nodes[at].next;
+    }
+    full_out = if at != stop_head { 1 } else { 0 };
+    packU32Grow(out, nodes.len as u32);
+    for idx in nodes {
+        let en = types.env_nodes[idx];
+        packU32Grow(out, en.unit);
+        packU32Grow(out, en.ty);
+        packTyGrow(types, en.value, out);
+    }
+}
+
+fn addParallelNamed(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, result: Ty, unused_holes: bool, site_unit: u32) -> u32 {
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_NAMED);
+    packU32Grow(par_ev_bytes, key.unit);
+    packU32Grow(par_ev_bytes, key.id);
+    packTyGrow(g.types, key.ty, par_ev_bytes);
+    par_ev_bytes.push(if unused_holes { 1 } else { 0 });
+    packU32Grow(par_ev_bytes, site_unit);
+    packU32Grow(par_ev_bytes, key.evidence_context);
+    var dummy_full: u8 = 0;
+    packEnvGrow(g.types, env.head, 0, par_ev_bytes, dummy_full);
+    packU32Grow(par_ev_bytes, parameters.len);
+    for pi in 0..(parameters.len as i64) {
+        packTyGrow(g.types, g.s.tys[parameters.start + pi], par_ev_bytes);
+    }
+    packTyGrow(g.types, result, par_ev_bytes);
+    return pushProvisionalInstance(g, key, env, parameters, result, false, Tys {}, unused_holes, site_unit, ev_idx);
+}
+
+fn addParallelPartial(g: Generator&, key: InstanceKey, parameters: Tys, result: Ty, captures: Tys, site_unit: u32) -> u32 {
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_PARTIAL);
+    par_ev_bytes.push(kindCode(key.kind) as! u8);
+    packU32Grow(par_ev_bytes, key.unit);
+    packU32Grow(par_ev_bytes, key.id);
+    packTyGrow(g.types, key.ty, par_ev_bytes);
+    packU32Grow(par_ev_bytes, key.parent);
+    packU32Grow(par_ev_bytes, key.evidence_context);
+    packU32Grow(par_ev_bytes, site_unit);
+    return pushProvisionalInstance(g, key, Env {}, parameters, result, true, captures, false, site_unit, ev_idx);
+}
+
+fn addParallelPool(g: Generator&, key: InstanceKey, ty: Ty, site_unit: u32) -> u32 {
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_POOL);
+    packU32Grow(par_ev_bytes, key.unit);
+    packU32Grow(par_ev_bytes, key.id);
+    packTyGrow(g.types, ty, par_ev_bytes);
+    packU32Grow(par_ev_bytes, site_unit);
+    return pushProvisionalInstance(g, key, Env {}, Tys {}, ty, false, Tys {}, false, site_unit, ev_idx);
+}
+
+fn addParallelLambda(g: Generator&, key: InstanceKey, env: Env, orig_head: u32, parameters: Tys, result: Ty, captures: Tys, site_unit: u32) -> u32 {
+    let ev_idx = par_job_ev_count;
+    par_job_ev_count += 1;
+    par_ev_bytes.push(PAR_EV_LAMBDA);
+    packU32Grow(par_ev_bytes, key.unit);
+    packU32Grow(par_ev_bytes, key.id);
+    packTyGrow(g.types, key.ty, par_ev_bytes);
+    packU32Grow(par_ev_bytes, workerToParentInst(key.parent));
+    packU32Grow(par_ev_bytes, key.evidence_context);
+    packU32Grow(par_ev_bytes, site_unit);
+    var full_env: u8 = 0;
+    var env_nodes: u32[>..<] = [];
+    var at = env.head;
+    while at != orig_head && at != 0 {
+        env_nodes.push(at);
+        at = g.types.env_nodes[at].next;
+    }
+    if at != orig_head { full_env = 1; }
+    par_ev_bytes.push(full_env);
+    packU32Grow(par_ev_bytes, env_nodes.len as u32);
+    for idx in env_nodes {
+        let en = g.types.env_nodes[idx];
+        packU32Grow(par_ev_bytes, en.unit);
+        packU32Grow(par_ev_bytes, en.ty);
+        packTyGrow(g.types, en.value, par_ev_bytes);
+    }
+    packU32Grow(par_ev_bytes, captures.len);
+    for ci in 0..(captures.len as i64) {
+        packTyGrow(g.types, g.s.tys[captures.start + ci], par_ev_bytes);
+    }
+    return pushProvisionalInstance(g, key, env, parameters, result, true, captures, false, site_unit, ev_idx);
+}
+
 struct SharedSnapshot {
-    signatures_len: i64 = 0,
     imports_len: i64 = 0,
-    functions_len: i64 = 0,
     globals_len: i64 = 0,
     exports_len: i64 = 0,
-    table_len: i64 = 0,
     host_slots: u32 = 0,
     has_memory: bool = false,
     data_len: i64 = 0,
     customs_len: i64 = 0,
-    instances_len: i64 = 0,
     queue_len: i64 = 0,
     traps_len: i64 = 0,
     operation_ids_count: u32 = 0,
@@ -1484,17 +2034,13 @@ struct SharedSnapshot {
 
 fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
     return SharedSnapshot {
-        signatures_len: g.module.signatures.len,
         imports_len: g.module.imports.len,
-        functions_len: g.module.functions.len,
         globals_len: g.module.globals.len,
         exports_len: g.module.exports.len,
-        table_len: g.module.table.len,
         host_slots: g.module.host_slots,
         has_memory: g.module.has_memory,
         data_len: g.module.data.len,
         customs_len: g.module.customs.len,
-        instances_len: g.s.instances.len,
         queue_len: g.s.queue.len,
         traps_len: g.s.traps.len,
         operation_ids_count: g.s.operation_ids.count,
@@ -1513,17 +2059,13 @@ fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
 }
 
 fn sameSnapshot(a: SharedSnapshot, b: SharedSnapshot) -> bool {
-    return a.signatures_len == b.signatures_len &&
-        a.imports_len == b.imports_len &&
-        a.functions_len == b.functions_len &&
+    return a.imports_len == b.imports_len &&
         a.globals_len == b.globals_len &&
         a.exports_len == b.exports_len &&
-        a.table_len == b.table_len &&
         a.host_slots == b.host_slots &&
         a.has_memory == b.has_memory &&
         a.data_len == b.data_len &&
         a.customs_len == b.customs_len &&
-        a.instances_len == b.instances_len &&
         a.queue_len == b.queue_len &&
         a.traps_len == b.traps_len &&
         a.operation_ids_count == b.operation_ids_count &&
@@ -1540,16 +2082,26 @@ fn sameSnapshot(a: SharedSnapshot, b: SharedSnapshot) -> bool {
         a.reloc_staged == b.reloc_staged;
 }
 
-fn packU32(out: u8[>..<]&, v: u32) {
-    out.push(v as! u8);
-    out.push((v >> 8) as! u8);
-    out.push((v >> 16) as! u8);
-    out.push((v >> 24) as! u8);
+fn allKindFromCode(code: u8) -> InstanceKind, bool {
+    if code == 0 { return InstanceKind.named, true; }
+    if code == 1 { return InstanceKind.lambda, true; }
+    if code == 2 { return InstanceKind.partial, true; }
+    if code == 3 { return InstanceKind.primitive, true; }
+    if code == 4 { return InstanceKind.constructor, true; }
+    if code == 5 { return InstanceKind.host, true; }
+    if code == 6 { return InstanceKind.pool, true; }
+    if code == 7 { return InstanceKind.trap, true; }
+    if code == 8 { return InstanceKind.operation, true; }
+    if code == 9 { return InstanceKind.state_get, true; }
+    if code == 10 { return InstanceKind.state_set, true; }
+    return InstanceKind.named, false;
 }
 
-fn packU64(out: u8[>..<]&, v: u64) {
-    packU32(out, v as! u32);
-    packU32(out, (v >> 32) as! u32);
+fn kindFromCode(code: u8) -> InstanceKind, bool {
+    if code == 2 { return InstanceKind.partial, true; }
+    if code == 3 { return InstanceKind.primitive, true; }
+    if code == 4 { return InstanceKind.constructor, true; }
+    return InstanceKind.named, false;
 }
 
 fn emitWaveSerial(g: Generator&, wave_start: i64, wave_end: i64) -> Error {
@@ -1563,174 +2115,940 @@ fn emitWaveSerial(g: Generator&, wave_start: i64, wave_end: i64) -> Error {
     return blot_direct_types::Error.none;
 }
 
-fn runEmitLane(g: Generator&, shared: u64, wave_start: i64) -> bool {
-    g.s.parallel_readonly = true;
-    g.module.readonly = true;
-    let base_snap = takeSnapshot(g);
-    let recording = blot_direct_relocations::isRecording();
-    let marker: u8 = 0;
-    var pkt: u8[>..<] = [];
-    loop {
-        let job = blot_native::persist_claim(shared);
-        if job == 0 { return true; }
-        if job < 0 { return false; }
-        let id = g.s.queue[wave_start + job - 1];
-        if g.s.instances[id].emitted {
-            pkt.clear();
-            pkt.push(0);
-            let job_id = job as u32;
-            if !blot_native::persist_publish(shared, job_id, 1, marker, 1) ||
-               !blot_native::persist_publish(shared, job_id, 2, pkt[0], 1) { return false; }
-            continue;
-        }
-        g.s.parallel_aborted = false;
-        g.module.readonly_hit = false;
-        g.s.has_failure = false;
-        g.s.composing = false;
-        let before_vec = g.s.sparks_vectorized;
-        let before_fb = g.s.sparks_scalar_fallback;
-        let before_deps = g.s.dep_list.len;
-        let before_inl = parallel_inlined.len;
-        let before_bodies = blot_direct_relocations::bodyCount();
-        g.s.instances[id].emitted = true;
-        let err = blot_direct_function::emitInstance(g, id);
-        let unchanged = sameSnapshot(base_snap, takeSnapshot(g));
-        let clean = err == blot_direct_types::Error.none && !g.s.parallel_aborted && !g.module.readonly_hit && !g.s.has_failure && unchanged;
-        pkt.clear();
-        if clean {
-            let fn_idx = g.s.instances[id].function - (g.module.imports.len as u32);
-            let fn_body = g.module.functions[fn_idx].body;
-            let sv = (g.s.sparks_vectorized - before_vec) as! u64;
-            let sf = (g.s.sparks_scalar_fallback - before_fb) as! u64;
-            let body_len = fn_body.len as u32;
-            let deps_len = if g.s.track_deps { (g.s.dep_list.len - before_deps) as u32 } else { 0 };
-            let inl_len = if g.s.track_deps { (parallel_inlined.len - before_inl) as u32 } else { 0 };
-            let sites_len = if recording { (blot_direct_relocations::bodyCount() - before_bodies) as u32 } else { 0 };
-            pkt.push(1);
-            packU64(pkt, sv);
-            packU64(pkt, sf);
-            packU32(pkt, body_len);
-            packU32(pkt, deps_len);
-            packU32(pkt, inl_len);
-            packU32(pkt, sites_len);
-            if fn_body.len != 0 { pkt.append(g.module.text[fn_body.start..fn_body.start + fn_body.len]); }
-            if deps_len != 0 {
-                for di in 0..(deps_len as i64) { packU32(pkt, g.s.dep_list[before_deps + di]); }
+struct EmitPool {
+    handle: u64 = 0,
+    width: i64 = 0,
+    pids: u32[16] = [0; 16],
+    base_types: i64 = 0,
+    base_spellings: i64 = 0,
+    base_insts: i64 = 0,
+    synced_sigs: i64 = 0,
+    synced_pool_words: i64 = 0,
+    synced_insts: i64 = 0,
+    synced_index_nodes: i64 = 0,
+    synced_aux: i64 = 0,
+    synced_poly: i64 = 0,
+    has_rt: bool = false,
+    has_memory: bool = false,
+    host_slots: u32 = 0,
+    exported_storage: bool = false,
+}
+
+fn closeEmitPool(pool: EmitPool&) {
+    if pool.handle == 0 { return; }
+    blot_native::emit_pool_stop(pool.handle);
+    for i in 0..pool.width {
+        let pid = pool.pids[i];
+        if pid != 0 {
+            if !blot_native::wait_success(pid) {
+                blot_native::persist_kill_child(pid);
+                blot_native::wait_success(pid);
             }
-            if inl_len != 0 {
-                for ii in 0..(inl_len as i64) { packU64(pkt, parallel_inlined[before_inl + ii]); }
-            }
-            if sites_len != 0 {
-                for si in 0..(sites_len as i64) {
-                    let rec = blot_direct_relocations::bodyAt(before_bodies + si);
-                    packU32(pkt, rec.site.unit);
-                    packU32(pkt, rec.site.node);
-                    packU64(pkt, rec.site.offset as! u64);
-                }
-            }
-        } else {
-            pkt.push(0);
+            pool.pids[i] = 0;
         }
-        g.s.sparks_vectorized = before_vec;
-        g.s.sparks_scalar_fallback = before_fb;
-        let job_id = job as u32;
-        if !blot_native::persist_publish(shared, job_id, 1, marker, 1) ||
-           !blot_native::persist_publish(shared, job_id, 2, pkt[0], pkt.len as u64) {
-            return false;
+    }
+    blot_native::emit_pool_close(pool.handle);
+    pool.handle = 0;
+    pool.width = 0;
+    par_track_aux = false;
+}
+
+fn packSyncDelta(g: const Generator&, pool: EmitPool&, wave_start: i64, wave_end: i64, out: u8[>..<]&) {
+    out.clear();
+    par_base_types = pool.base_types;
+    par_base_spellings = pool.base_spellings;
+    // 1. New signatures.
+    let sig_count = g.module.signatures.len - pool.synced_sigs;
+    packU32(out, sig_count as u32);
+    for si in pool.synced_sigs..g.module.signatures.len {
+        let s = g.module.signatures[si];
+        let ps = blot_direct_writer::types(g.module, s.params);
+        let rs = blot_direct_writer::types(g.module, s.results);
+        packU32(out, ps.len as u32);
+        out.append(ps);
+        packU32(out, rs.len as u32);
+        out.append(rs);
+    }
+    pool.synced_sigs = g.module.signatures.len;
+    // 2. New pool_words.
+    let pw_count = g.s.pool_words.len - pool.synced_pool_words;
+    packU32(out, pw_count as u32);
+    for pi in pool.synced_pool_words..g.s.pool_words.len {
+        packU32(out, g.s.pool_words[pi]);
+    }
+    pool.synced_pool_words = g.s.pool_words.len;
+    // 3. New instances.
+    let old_insts = pool.synced_insts;
+    let inst_count = g.s.instances.len - old_insts;
+    packU32(out, inst_count as u32);
+    for p_id in old_insts..g.s.instances.len {
+        let inst = g.s.instances[p_id];
+        out.push(kindCode(inst.key.kind) as! u8);
+        packU32(out, inst.key.unit);
+        packU32(out, inst.key.id);
+        packTy(g.types, inst.key.ty, out);
+        packU32(out, inst.key.parent);
+        packU32(out, inst.key.evidence_context);
+        packU32(out, inst.function);
+        packU32(out, inst.slot);
+        packU32(out, inst.site);
+        packU32(out, inst.pool_offset);
+        var flags: u8 = 0;
+        if inst.closure { flags |= 1; }
+        if inst.unused_holes { flags |= 2; }
+        if inst.emitted { flags |= 4; }
+        out.push(flags);
+        packTy(g.types, inst.result, out);
+        packU32(out, inst.parameters.len);
+        for ti in 0..(inst.parameters.len as i64) {
+            packTy(g.types, g.s.tys[inst.parameters.start + ti], out);
         }
-        if !unchanged { return true; }
+        packU32(out, inst.captures.len);
+        for ci in 0..(inst.captures.len as i64) {
+            packTy(g.types, g.s.tys[inst.captures.start + ci], out);
+        }
+        var dummy_full: u8 = 0;
+        packEnv(g.types, inst.env.head, 0, out, dummy_full);
+    }
+    pool.synced_insts = g.s.instances.len;
+    // 4. Extra alias index_nodes (e.g. from inferResult).
+    let alias_count_pos = out.len;
+    packU32(out, 0);
+    var alias_count: u32 = 0;
+    for ii in pool.synced_index_nodes..g.s.index_nodes.len {
+        let node = g.s.index_nodes[ii];
+        if (node.value as i64) < old_insts || !sameKey(node.key, g.s.instances[node.value].key) {
+            out.push(kindCode(node.key.kind) as! u8);
+            packU32(out, node.key.unit);
+            packU32(out, node.key.id);
+            packTy(g.types, node.key.ty, out);
+            packU32(out, node.key.parent);
+            packU32(out, node.key.evidence_context);
+            packU32(out, node.value);
+            alias_count += 1;
+        }
+    }
+    out[alias_count_pos] = alias_count as! u8;
+    out[alias_count_pos + 1] = (alias_count >> 8) as! u8;
+    out[alias_count_pos + 2] = (alias_count >> 16) as! u8;
+    out[alias_count_pos + 3] = (alias_count >> 24) as! u8;
+    pool.synced_index_nodes = g.s.index_nodes.len;
+    // 5. Aux maps (operation_ids, deep_copy_helpers, persist_rec_helpers).
+    let aux_count = par_parent_aux.len - pool.synced_aux;
+    packU32(out, aux_count as u32);
+    for ai in pool.synced_aux..par_parent_aux.len {
+        let a = par_parent_aux[ai];
+        out.push(a.kind);
+        packTy(g.types, a.ty, out);
+        packU32(out, a.val);
+    }
+    pool.synced_aux = par_parent_aux.len;
+    // 6. Poly captures.
+    let poly_count = par_parent_poly.len - pool.synced_poly;
+    packU32(out, poly_count as u32);
+    for pi in pool.synced_poly..par_parent_poly.len {
+        let p = par_parent_poly[pi];
+        packU32(out, p.target_inst);
+        packU32(out, p.binding);
+        packU32(out, p.init_node);
+    }
+    pool.synced_poly = par_parent_poly.len;
+    // 7. Wave job parent instance IDs.
+    let wcount = wave_end - wave_start;
+    packU32(out, wcount as u32);
+    for wi in wave_start..wave_end {
+        packU32(out, g.s.queue[wi]);
     }
 }
 
-fn emitWaveParallel(g: Generator&, wave_start: i64, wave_end: i64, workers: u8) -> Error, i64 {
-    let count = wave_end - wave_start;
-    let width = min(16, min(workers as i64, max(1, count / 8)));
-    if width <= 1 { return emitWaveSerial(g, wave_start, wave_end), 0; }
-    let shared = blot_native::persist_open(count as u32);
-    if shared == 0 { return emitWaveSerial(g, wave_start, wave_end), 0; }
-    for idx in 0..count {
-        if !blot_native::persist_node(shared, (idx + 1) as u32, (count - idx) as u32) {
-            blot_native::persist_close(shared);
-            return emitWaveSerial(g, wave_start, wave_end), 0;
-        }
+fn applySyncDelta(
+    g: Generator&,
+    sync: const u8[:],
+    wave_ids: u32[>..<]&,
+    u32_buf: u32[>..]&,
+    fld_buf: blot_direct_types::Field[>..]&,
+    eu: u32[>..<]&,
+    et: u32[>..<]&,
+    ev: Ty[>..<]&,
+) -> bool {
+    var pos: i64 = 0;
+    var ok = true;
+    var u32_len: i64 = 0;
+    var fld_len: i64 = 0;
+    // 1. New signatures.
+    if pos + 4 > sync.len { return false; }
+    let sig_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    for si in 0..sig_count {
+        if pos + 4 > sync.len { return false; }
+        let plen = binary::u32le(sync, pos) as i64;
+        pos += 4;
+        if pos + plen + 4 > sync.len { return false; }
+        let pstart = pos;
+        pos += plen;
+        let rlen = binary::u32le(sync, pos) as i64;
+        pos += 4;
+        if pos + rlen > sync.len { return false; }
+        let rstart = pos;
+        pos += rlen;
+        g.module.signature(sync[pstart..pstart + plen], sync[rstart..rstart + rlen]);
     }
-    var pids: i64[16] = [0; 16];
-    var children: i64 = 0;
+    // 2. New pool_words.
+    if pos + 4 > sync.len { return false; }
+    let pw_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    if pos + pw_count * 4 > sync.len { return false; }
+    for pi in 0..pw_count {
+        g.s.pool_words.push(binary::u32le(sync, pos));
+        pos += 4;
+    }
+    // 3. New instances.
+    if pos + 4 > sync.len { return false; }
+    let inst_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    for ii in 0..inst_count {
+        if pos + 9 > sync.len { return false; }
+        let kcode = sync[pos];
+        let unit = binary::u32le(sync, pos + 1);
+        let item_id = binary::u32le(sync, pos + 5);
+        pos += 9;
+        let kind, kok = allKindFromCode(kcode);
+        if !kok { return false; }
+        let kty = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok || pos + 25 > sync.len { return false; }
+        var parent = binary::u32le(sync, pos);
+        if kind == InstanceKind.lambda { parent = parentToWorkerInst(parent); }
+        let ev_ctx = binary::u32le(sync, pos + 4);
+        let fn_id = binary::u32le(sync, pos + 8);
+        let slot = binary::u32le(sync, pos + 12);
+        let site = binary::u32le(sync, pos + 16);
+        let pool_off = binary::u32le(sync, pos + 20);
+        let flags = sync[pos + 24];
+        pos += 25;
+        let res_ty = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok || pos + 4 > sync.len { return false; }
+        let plen = binary::u32le(sync, pos) as i64;
+        pos += 4;
+        let pstart = g.s.tys.len as u32;
+        for ti in 0..plen {
+            let pt = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { return false; }
+            g.s.tys.push(pt);
+        }
+        if pos + 4 > sync.len { return false; }
+        let clen = binary::u32le(sync, pos) as i64;
+        pos += 4;
+        let cstart = g.s.tys.len as u32;
+        for ci in 0..clen {
+            let ct = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { return false; }
+            g.s.tys.push(ct);
+        }
+        if pos + 4 > sync.len { return false; }
+        let elen = binary::u32le(sync, pos) as i64;
+        pos += 4;
+        eu.clear();
+        et.clear();
+        ev.clear();
+        for ei in 0..elen {
+            if pos + 8 > sync.len { return false; }
+            eu.push(binary::u32le(sync, pos));
+            et.push(binary::u32le(sync, pos + 4));
+            pos += 8;
+            let v = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { return false; }
+            ev.push(v);
+        }
+        var env = Env {};
+        var ri = elen;
+        while ri > 0 {
+            ri -= 1;
+            g.types.envPut(env, eu[ri], et[ri], ev[ri]);
+        }
+        let key = InstanceKey { kind, unit, item_id, kty, parent, ev_ctx };
+        let p_id = (par_base_insts + par_p2w.len) as u32;
+        let w_id = g.s.instances.len as u32;
+        g.s.instances.push(Instance {
+            key: key,
+            env: env,
+            function: fn_id,
+            parameters: Tys { pstart, plen as u32 },
+            result: res_ty,
+            closure: (flags & 1) != 0,
+            captures: Tys { cstart, clen as u32 },
+            slot: slot,
+            emitted: (flags & 4) != 0,
+            unused_holes: (flags & 2) != 0,
+            site: site,
+            pool_offset: pool_off,
+        });
+        par_inst_epoch.push(0xffffffff);
+        par_inst_ev.push(0);
+        par_w2p.push(p_id);
+        par_p2w.push(w_id);
+        indexPut(g, key, w_id);
+    }
+    // 4. Extra alias index_nodes.
+    if pos + 4 > sync.len { return false; }
+    let alias_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    for ai in 0..alias_count {
+        if pos + 9 > sync.len { return false; }
+        let kcode = sync[pos];
+        let unit = binary::u32le(sync, pos + 1);
+        let item_id = binary::u32le(sync, pos + 5);
+        pos += 9;
+        let kind, kok = allKindFromCode(kcode);
+        if !kok { return false; }
+        let kty = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok || pos + 12 > sync.len { return false; }
+        var parent = binary::u32le(sync, pos);
+        if kind == InstanceKind.lambda { parent = parentToWorkerInst(parent); }
+        let ev_ctx = binary::u32le(sync, pos + 4);
+        let val = parentToWorkerInst(binary::u32le(sync, pos + 8));
+        pos += 12;
+        indexPut(g, InstanceKey { kind, unit, item_id, kty, parent, ev_ctx }, val);
+    }
+    // 5. Aux maps.
+    if pos + 4 > sync.len { return false; }
+    let aux_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    for ai in 0..aux_count {
+        if pos >= sync.len { return false; }
+        let akind = sync[pos];
+        pos += 1;
+        let aty = unpackTy(g.types, sync, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+        if !ok || pos + 4 > sync.len { return false; }
+        let aval = binary::u32le(sync, pos);
+        pos += 4;
+        if akind == 1 { g.s.operation_ids.put(aty, aval); }
+        else if akind == 2 { g.s.deep_copy_helpers.put(key64(aty, 1), aval); }
+        else if akind == 3 { g.s.persist_rec_helpers.put(key64(aty, 1), aval); }
+    }
+    // 6. Poly captures.
+    if pos + 4 > sync.len { return false; }
+    let poly_count = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    if pos + poly_count * 12 > sync.len { return false; }
+    for pi in 0..poly_count {
+        let target_inst = parentToWorkerInst(binary::u32le(sync, pos));
+        let binding = binary::u32le(sync, pos + 4);
+        let init_node = binary::u32le(sync, pos + 8);
+        pos += 12;
+        g.s.polymorphic.put(key64(0x80000000 | target_inst, binding), init_node);
+    }
+    // 7. Wave job parent instance IDs.
+    if pos + 4 > sync.len { return false; }
+    let wcount = binary::u32le(sync, pos) as i64;
+    pos += 4;
+    if pos + wcount * 4 != sync.len { return false; }
+    wave_ids.clear();
+    for wi in 0..wcount {
+        wave_ids.push(binary::u32le(sync, pos));
+        pos += 4;
+    }
+    return true;
+}
+
+fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
+    par_base_types = g.types.nodes.len;
+    par_base_spellings = g.types.spellings.len;
+    par_base_insts = g.s.instances.len;
+    par_job_epoch = 0;
+    let recording = blot_direct_relocations::isRecording();
+    var sync_buf: u8[>..<] = [];
+    var wave_ids: u32[>..<] = [];
+    var pkt: u8[>..<] = [];
+    var u32_buf: u32[>..] = [];
+    var fld_buf: blot_direct_types::Field[>..] = [];
+    var eu: u32[>..<] = [];
+    var et: u32[>..<] = [];
+    var ev: Ty[>..<] = [];
+    var last_gen: u32 = 0;
+    loop {
+        let next_gen = blot_native::emit_pool_worker_wait(handle, last_gen);
+        if next_gen <= 0 { return; }
+        last_gen = next_gen as u32;
+        let slen = blot_native::emit_pool_sync_len(handle) as i64;
+        if slen > sync_buf.len { sync_buf.resize(max(slen, sync_buf.len * 2), 0); }
+        if slen == 0 || !blot_native::emit_pool_sync_read(handle, sync_buf[0], slen as u64) {
+            blot_native::emit_pool_worker_done(handle, false);
+            return;
+        }
+        g.s.parallel_readonly = false;
+        g.module.readonly = false;
+        if !applySyncDelta(g, sync_buf[..slen], wave_ids, u32_buf, fld_buf, eu, et, ev) {
+            blot_native::emit_pool_worker_done(handle, false);
+            return;
+        }
+        g.s.parallel_readonly = true;
+        g.module.readonly = true;
+        let base_snap = takeSnapshot(g);
+        var poisoned = false;
+        loop {
+            let span = blot_native::emit_pool_claim_chunk(handle);
+            let start = (span >> 32) as i64;
+            let end = (span & 0xffffffff) as i64;
+            if start >= end { break; }
+            for idx in start..end {
+                let p_id = wave_ids[idx];
+                let w_id = parentToWorkerInst(p_id);
+                if g.s.instances[w_id].emitted || poisoned {
+                    continue;
+                }
+                par_job_epoch += 1;
+                par_job_ev_count = 0;
+                par_body_start = par_body_buf.len;
+                par_body_len = 0;
+                par_last_header_len = 0;
+                let before_ev_bytes = par_ev_bytes.len;
+                par_job_patch_base = par_patches.len;
+                par_job_fn_base = par_fn_ev.len;
+                par_job_slot_base = par_slot_ev.len;
+                par_job_sig_base = par_prov_sigs.len;
+                let before_inl = parallel_inlined.len;
+                g.s.parallel_aborted = false;
+                g.module.readonly_hit = false;
+                g.s.has_failure = false;
+                g.s.composing = false;
+                let before_vec = g.s.sparks_vectorized;
+                let before_fb = g.s.sparks_scalar_fallback;
+                let before_deps = g.s.dep_list.len;
+                let save_code = g.s.code.len;
+                let save_locals = g.s.locals.len;
+                let save_labels = g.s.labels.len;
+                let save_handles = g.s.handles.len;
+                let save_hcells = g.s.handle_cells_len;
+                let save_scratch = g.s.scratch.len;
+                let save_sbytes = g.s.scratch_bytes.len;
+                let save_stypes = g.s.scratch_types.len;
+                let save_depscratch = g.s.dep_scratch.len;
+                let save_reloc_mark = blot_direct_relocations::mark();
+                let before_bodies = blot_direct_relocations::bodyCount();
+                g.s.instances[w_id].emitted = true;
+                let err = blot_direct_function::emitInstance(g, w_id);
+                let unchanged = sameSnapshot(base_snap, takeSnapshot(g));
+                let clean = err == blot_direct_types::Error.none && !g.s.parallel_aborted && !g.module.readonly_hit && !g.s.has_failure && unchanged;
+                if clean {
+                    pkt.clear();
+                    let sv = (g.s.sparks_vectorized - before_vec) as! u64;
+                    let sf = (g.s.sparks_scalar_fallback - before_fb) as! u64;
+                    let body_len = par_body_len as u32;
+                    let deps_len = if g.s.track_deps { (g.s.dep_list.len - before_deps) as u32 } else { 0 };
+                    let inl_len = if g.s.track_deps { (parallel_inlined.len - before_inl) as u32 } else { 0 };
+                    let sites_len = if recording { (blot_direct_relocations::bodyCount() - before_bodies) as u32 } else { 0 };
+                    let ev_count = par_job_ev_count;
+                    let ev_bytes_len = (par_ev_bytes.len - before_ev_bytes) as u32;
+                    let patches_len = (par_patches.len - par_job_patch_base) as u32;
+                    pkt.push(1);
+                    packU64(pkt, sv);
+                    packU64(pkt, sf);
+                    packU32(pkt, body_len);
+                    packU32(pkt, deps_len);
+                    packU32(pkt, inl_len);
+                    packU32(pkt, sites_len);
+                    packU32(pkt, ev_count);
+                    packU32(pkt, ev_bytes_len);
+                    packU32(pkt, patches_len);
+                    if par_body_len != 0 { pkt.append(par_body_buf[par_body_start..par_body_start + par_body_len]); }
+                    if deps_len != 0 {
+                        for di in 0..(deps_len as i64) {
+                            var dep_id = g.s.dep_list[before_deps + di];
+                            if (dep_id as i64) >= par_base_insts {
+                                let rel = (dep_id as i64) - par_base_insts;
+                                if par_inst_epoch[rel] == 0xffffffff {
+                                    dep_id = par_w2p[rel];
+                                } else {
+                                    dep_id = 0x80000000 | par_inst_ev[rel];
+                                }
+                            }
+                            packU32(pkt, dep_id);
+                        }
+                    }
+                    if inl_len != 0 {
+                        for ii in 0..(inl_len as i64) { packU64(pkt, parallel_inlined[before_inl + ii]); }
+                    }
+                    if sites_len != 0 {
+                        for si in 0..(sites_len as i64) {
+                            let rec = blot_direct_relocations::bodyAt(before_bodies + si);
+                            packU32(pkt, rec.site.unit);
+                            packU32(pkt, rec.site.node);
+                            packU64(pkt, rec.site.offset as! u64);
+                        }
+                    }
+                    if ev_bytes_len != 0 {
+                        pkt.append(par_ev_bytes[before_ev_bytes..par_ev_bytes.len]);
+                    }
+                    if patches_len != 0 {
+                        let hdr = par_last_header_len as u32;
+                        for pi in 0..(patches_len as i64) {
+                            let p = par_patches[par_job_patch_base + pi];
+                            pkt.push(p.kind);
+                            packU32(pkt, hdr + p.code_off);
+                            packU32(pkt, p.ev_idx);
+                        }
+                    }
+                    blot_native::emit_pool_lane_append(handle, lane, idx as u32, pkt[0], pkt.len as u64);
+                }
+                g.s.sparks_vectorized = before_vec;
+                g.s.sparks_scalar_fallback = before_fb;
+                g.s.code.resize(save_code);
+                g.s.locals.resize(save_locals);
+                g.s.labels.resize(save_labels);
+                g.s.handles.resize(save_handles);
+                g.s.handle_cells_len = save_hcells;
+                g.s.scratch.resize(save_scratch);
+                g.s.scratch_bytes.resize(save_sbytes);
+                g.s.scratch_types.resize(save_stypes);
+                g.s.dep_scratch.resize(save_depscratch);
+                blot_direct_relocations::rewind(save_reloc_mark);
+                blot_direct_relocations::rewindBodies(before_bodies);
+                if !unchanged { poisoned = true; }
+            }
+        }
+        blot_native::emit_pool_worker_done(handle, !poisoned);
+        if poisoned { return; }
+    }
+}
+
+fn openEmitPool(g: Generator&, pool: EmitPool&, width: i64) -> bool {
+    let handle = blot_native::emit_pool_open(width as u32);
+    if handle == 0 { return false; }
+    pool.handle = handle;
+    pool.width = width;
+    pool.base_types = g.types.nodes.len;
+    pool.base_spellings = g.types.spellings.len;
+    pool.base_insts = g.s.instances.len;
+    pool.synced_sigs = g.module.signatures.len;
+    pool.synced_pool_words = g.s.pool_words.len;
+    pool.synced_insts = g.s.instances.len;
+    pool.synced_index_nodes = g.s.index_nodes.len;
+    pool.synced_aux = par_parent_aux.len;
+    pool.synced_poly = par_parent_poly.len;
+    pool.has_rt = g.s.has_rt;
+    pool.has_memory = g.module.has_memory;
+    pool.host_slots = g.module.host_slots;
+    pool.exported_storage = g.s.exported_storage;
+    var spawned: i64 = 0;
     for lane in 0..width {
         let pid = blot_native::fork_process();
         if pid == 0 {
-            if !runEmitLane(g, shared, wave_start) {
-                blot_native::persist_fail(shared);
-                blot_native::job_exit(1);
-            }
+            runEmitPoolWorker(g, handle, lane as u32);
             blot_native::job_exit(0);
         }
-        if pid > 0 { pids[lane] = pid; children += 1; }
+        if pid > 0 {
+            pool.pids[lane] = pid as u32;
+            spawned += 1;
+        } else {
+            break;
+        }
     }
-    if children == 0 {
-        blot_native::persist_close(shared);
+    if spawned != width {
+        pool.width = spawned;
+        closeEmitPool(pool);
+        return false;
+    }
+    par_track_aux = true;
+    return true;
+}
+
+fn replayParallelEvents(
+    g: Generator&,
+    ev_slice: const u8[:],
+    ev_count: i64,
+    ev_vals: u32[>..<]&,
+    ev_insts: u32[>..<]&,
+    u32_buf: u32[>..]&,
+    fld_buf: blot_direct_types::Field[>..]&,
+    eu: u32[>..<]&,
+    et: u32[>..<]&,
+    ev: Ty[>..<]&,
+    ptmp: Ty[>..<]&,
+) -> bool, Error {
+    ev_vals.clear();
+    ev_insts.clear();
+    var u32_len: i64 = 0;
+    var fld_len: i64 = 0;
+    var pos: i64 = 0;
+    for ei in 0..ev_count {
+        if pos >= ev_slice.len { return false, blot_direct_types::Error.none; }
+        let tag = ev_slice[pos];
+        pos += 1;
+        if tag == PAR_EV_TRAP {
+            if pos + 17 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let kind = ev_slice[pos];
+            let unit = binary::u32le(ev_slice, pos + 1);
+            let sp_start = binary::u32le(ev_slice, pos + 5);
+            let sp_end = binary::u32le(ev_slice, pos + 9);
+            let mlen = binary::u32le(ev_slice, pos + 13) as i64;
+            pos += 17;
+            if pos + mlen > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let msg_start = g.s.trap_text.len as u32;
+            if mlen != 0 { g.s.trap_text.append(ev_slice[pos..pos + mlen]); }
+            pos += mlen;
+            g.s.traps.push(TrapEntry { kind: kind, unit: unit, start: sp_start, end: sp_end, message_start: msg_start, message_len: mlen as u32 });
+            ev_vals.push(g.s.traps.len as u32);
+            ev_insts.push(0);
+        } else if tag == PAR_EV_NAMED {
+            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let unit = binary::u32le(ev_slice, pos);
+            let binding = binary::u32le(ev_slice, pos + 4);
+            pos += 8;
+            var ok = true;
+            let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok || pos + 13 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let unused_holes = ev_slice[pos] != 0;
+            let site_unit = binary::u32le(ev_slice, pos + 1);
+            let ev_ctx = binary::u32le(ev_slice, pos + 5);
+            let env_len = binary::u32le(ev_slice, pos + 9) as i64;
+            pos += 13;
+            eu.clear();
+            et.clear();
+            ev.clear();
+            for i in 0..env_len {
+                if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+                eu.push(binary::u32le(ev_slice, pos));
+                et.push(binary::u32le(ev_slice, pos + 4));
+                pos += 8;
+                let v = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+                if !ok { return false, blot_direct_types::Error.none; }
+                ev.push(v);
+            }
+            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let param_len = binary::u32le(ev_slice, pos) as i64;
+            pos += 4;
+            ptmp.clear();
+            for i in 0..param_len {
+                let pt = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+                if !ok { return false, blot_direct_types::Error.none; }
+                ptmp.push(pt);
+            }
+            let result_ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok { return false, blot_direct_types::Error.none; }
+            let key = InstanceKey { InstanceKind.named, unit, binding, ty, 0, ev_ctx };
+            var real_id, present = find(g, key);
+            if !present {
+                var env = Env {};
+                var ri = env_len;
+                while ri > 0 {
+                    ri -= 1;
+                    g.types.envPut(env, eu[ri], et[ri], ev[ri]);
+                }
+                let pstart = g.s.tys.len as u32;
+                for pt in ptmp { g.s.tys.push(pt); }
+                let made, err = addInstance(g, key, env, Tys { pstart, param_len as u32 }, result_ty, g.units[site_unit - 1], 0);
+                if err != blot_direct_types::Error.none { return false, err; }
+                g.s.instances[made].unused_holes = unused_holes;
+                real_id = made;
+            }
+            ev_vals.push(g.s.instances[real_id].function);
+            ev_insts.push(real_id);
+        } else if tag == PAR_EV_SIG {
+            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let plen = binary::u32le(ev_slice, pos) as i64;
+            pos += 4;
+            if pos + plen + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let pstart = pos;
+            pos += plen;
+            let rlen = binary::u32le(ev_slice, pos) as i64;
+            pos += 4;
+            if pos + rlen > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let rstart = pos;
+            pos += rlen;
+            let real_sig = g.module.signature(ev_slice[pstart..pstart + plen], ev_slice[rstart..rstart + rlen]);
+            ev_vals.push(real_sig);
+            ev_insts.push(0);
+        } else if tag == PAR_EV_PARTIAL {
+            if pos + 9 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let kcode = ev_slice[pos];
+            let unit = binary::u32le(ev_slice, pos + 1);
+            let item_id = binary::u32le(ev_slice, pos + 5);
+            pos += 9;
+            let kind, kok = kindFromCode(kcode);
+            if !kok { return false, blot_direct_types::Error.none; }
+            var ok = true;
+            let full_ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok || pos + 12 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let count = binary::u32le(ev_slice, pos);
+            let ev_ctx = binary::u32le(ev_slice, pos + 4);
+            let site_unit = binary::u32le(ev_slice, pos + 8);
+            pos += 12;
+            let key = InstanceKey { kind, unit, item_id, full_ty, count, ev_ctx };
+            var real_id, present = find(g, key);
+            if !present {
+                let captures = Tys { g.s.tys.len as u32, count };
+                var rest = full_ty;
+                for step in 0..(count as i64) {
+                    let arrow = g.types.node(rest);
+                    g.s.tys.push(arrow.a);
+                    rest = arrow.b;
+                }
+                let arrow = g.types.node(rest);
+                let parameters = saveTys(g, [arrow.a]);
+                let made, err = addInstanceWith(g, key, Env {}, parameters, arrow.b, true, captures, g.units[site_unit - 1], 0);
+                if err != blot_direct_types::Error.none { return false, err; }
+                real_id = made;
+            }
+            ev_vals.push(g.s.instances[real_id].slot);
+            ev_insts.push(real_id);
+        } else if tag == PAR_EV_POOL {
+            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let unit = binary::u32le(ev_slice, pos);
+            let binding = binary::u32le(ev_slice, pos + 4);
+            pos += 8;
+            var ok = true;
+            let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok || pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let site_unit = binary::u32le(ev_slice, pos);
+            pos += 4;
+            let key = InstanceKey { InstanceKind.pool, unit, binding, ty, 0, 0 };
+            var real_id, present = find(g, key);
+            if !present {
+                let created, err = addInstanceWith(g, key, Env {}, Tys {}, ty, false, Tys {}, g.units[site_unit - 1], 0);
+                if err != blot_direct_types::Error.none { return false, err; }
+                let at = g.s.pool_words.len as u32;
+                let first = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
+                let second = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
+                let third = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
+                g.s.pool_words.push(first);
+                g.s.pool_words.push(second);
+                g.s.pool_words.push(third);
+                g.s.instances[created].pool_offset = at;
+                g.s.pool_order.push(created);
+                real_id = created;
+            }
+            ev_vals.push(g.s.instances[real_id].function);
+            ev_insts.push(real_id);
+        } else if tag == PAR_EV_LAMBDA {
+            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let unit = binary::u32le(ev_slice, pos);
+            let node_id = binary::u32le(ev_slice, pos + 4);
+            pos += 8;
+            var ok = true;
+            let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+            if !ok || pos + 17 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let parent_id = binary::u32le(ev_slice, pos);
+            let ev_ctx = binary::u32le(ev_slice, pos + 4);
+            let site_unit = binary::u32le(ev_slice, pos + 8);
+            let full_env = ev_slice[pos + 12];
+            let env_len = binary::u32le(ev_slice, pos + 13) as i64;
+            pos += 17;
+            eu.clear();
+            et.clear();
+            ev.clear();
+            for i in 0..env_len {
+                if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+                eu.push(binary::u32le(ev_slice, pos));
+                et.push(binary::u32le(ev_slice, pos + 4));
+                pos += 8;
+                let v = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+                if !ok { return false, blot_direct_types::Error.none; }
+                ev.push(v);
+            }
+            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            let cap_len = binary::u32le(ev_slice, pos) as i64;
+            pos += 4;
+            ptmp.clear();
+            for i in 0..cap_len {
+                let ct = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
+                if !ok { return false, blot_direct_types::Error.none; }
+                ptmp.push(ct);
+            }
+            let key = InstanceKey { InstanceKind.lambda, unit, node_id, ty, parent_id, ev_ctx };
+            var real_id, present = find(g, key);
+            if !present {
+                var env = Env {};
+                if full_env == 0 { env = g.s.instances[parent_id].env; }
+                var ei2 = env_len;
+                while ei2 > 0 {
+                    ei2 -= 1;
+                    g.types.envPut(env, eu[ei2], et[ei2], ev[ei2]);
+                }
+                let cap_start = g.s.tys.len as u32;
+                for ct in ptmp { g.s.tys.push(ct); }
+                let arrow = g.types.node(ty);
+                let parameters = saveTys(g, [arrow.a]);
+                let made, err = addInstanceWith(g, key, env, parameters, arrow.b, true, Tys { cap_start, cap_len as u32 }, g.units[site_unit - 1], 0);
+                if err != blot_direct_types::Error.none { return false, err; }
+                real_id = made;
+            }
+            ev_vals.push(g.s.instances[real_id].slot);
+            ev_insts.push(real_id);
+        } else {
+            return false, blot_direct_types::Error.none;
+        }
+    }
+    return pos == ev_slice.len, blot_direct_types::Error.none;
+}
+
+fn emitWavePool(
+    g: Generator&,
+    pool: EmitPool&,
+    wave_start: i64,
+    wave_end: i64,
+    sync_buf: u8[>..<]&,
+    all_lanes: u8[>..<]&,
+    job_off: i64[>..<]&,
+    job_len: i64[>..<]&,
+    ev_vals: u32[>..<]&,
+    ev_insts: u32[>..<]&,
+    u32_buf: u32[>..]&,
+    fld_buf: blot_direct_types::Field[>..]&,
+    eu: u32[>..<]&,
+    et: u32[>..<]&,
+    ev: Ty[>..<]&,
+    ptmp: Ty[>..<]&,
+    patch_offs: i64[>..<]&,
+    patch_deltas: i64[>..<]&,
+    enc: u8[>..<]&,
+) -> Error, i64 {
+    let count = wave_end - wave_start;
+    packSyncDelta(g, pool, wave_start, wave_end, sync_buf);
+    let chunk_size = max(1, min(8, count / (pool.width * 4))) as u32;
+    if !blot_native::emit_pool_begin_wave(pool.handle, count as u32, chunk_size, sync_buf[0], sync_buf.len as u64) ||
+       !blot_native::emit_pool_wait_wave(pool.handle, pool.pids[0], pool.width as u32) {
+        closeEmitPool(pool);
         return emitWaveSerial(g, wave_start, wave_end), 0;
     }
-    var ok = true;
-    for pid in pids {
-        if pid > 0 && !blot_native::wait_success(pid as u32) { ok = false; }
+    var total_bytes: i64 = 0;
+    for lane in 0..pool.width {
+        total_bytes += blot_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
     }
-    if !ok {
-        blot_native::persist_close(shared);
-        return emitWaveSerial(g, wave_start, wave_end), 0;
+    all_lanes.clear();
+    if total_bytes > 0 {
+        all_lanes.resize(total_bytes, 0);
+        var dst_pos: i64 = 0;
+        for lane in 0..pool.width {
+            let lsz = blot_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
+            if lsz > 0 {
+                blot_native::emit_pool_lane_read(pool.handle, lane as u32, all_lanes[dst_pos], lsz as u64);
+                dst_pos += lsz;
+            }
+        }
+    }
+    job_off.clear();
+    job_len.clear();
+    job_off.resize(count, -1);
+    job_len.resize(count, 0);
+    var scan: i64 = 0;
+    while scan + 8 <= total_bytes {
+        let jidx = binary::u32le(all_lanes[..total_bytes], scan) as i64;
+        let plen = binary::u32le(all_lanes[..total_bytes], scan + 4) as i64;
+        scan += 8;
+        if scan + plen > total_bytes { break; }
+        if jidx >= 0 && jidx < count {
+            job_off[jidx] = scan;
+            job_len[jidx] = plen;
+        }
+        scan += plen;
     }
     let recording = blot_direct_relocations::isRecording();
-    var pkt: u8[>..<] = [];
     var wave_err = blot_direct_types::Error.none;
     var applied_count: i64 = 0;
     for idx in 0..count {
         let id = g.s.queue[wave_start + idx];
         if g.s.instances[id].emitted { continue; }
-        let job_id = (idx + 1) as u32;
-        let size = blot_native::persist_size(shared, job_id, 2);
+        let off = job_off[idx];
+        let size = job_len[idx];
         var applied = false;
-        if size >= 33 {
-            if size > pkt.len { pkt.resize(max(size, pkt.len * 2), 0); }
-            if blot_native::persist_read(shared, job_id, 2, pkt[0], size as u64) && pkt[0] == 1 {
-                let sv = binary::u64le(pkt[..size], 1) as! i64;
-                let sf = binary::u64le(pkt[..size], 9) as! i64;
-                let body_len = binary::u32le(pkt[..size], 17) as i64;
-                let deps_len = binary::u32le(pkt[..size], 21) as i64;
-                let inl_len = binary::u32le(pkt[..size], 25) as i64;
-                let sites_len = binary::u32le(pkt[..size], 29) as i64;
-                let expected = 33 + body_len + deps_len * 4 + inl_len * 8 + sites_len * 16;
-                if expected == size {
+        if off >= 0 && size >= 45 && all_lanes[off] == 1 {
+            let pkt = all_lanes[off..off + size];
+            let sv = binary::u64le(pkt, 1) as! i64;
+            let sf = binary::u64le(pkt, 9) as! i64;
+            let body_len = binary::u32le(pkt, 17) as i64;
+            let deps_len = binary::u32le(pkt, 21) as i64;
+            let inl_len = binary::u32le(pkt, 25) as i64;
+            let sites_len = binary::u32le(pkt, 29) as i64;
+            let ev_count = binary::u32le(pkt, 33) as i64;
+            let ev_bytes_len = binary::u32le(pkt, 37) as i64;
+            let patches_len = binary::u32le(pkt, 41) as i64;
+            let expected = 45 + body_len + deps_len * 4 + inl_len * 8 + sites_len * 16 + ev_bytes_len + patches_len * 9;
+            if expected == size {
+                let body_pos: i64 = 45;
+                let deps_pos = body_pos + body_len;
+                let inl_pos = deps_pos + deps_len * 4;
+                let sites_pos = inl_pos + inl_len * 8;
+                let ev_pos = sites_pos + sites_len * 16;
+                let patches_pos = ev_pos + ev_bytes_len;
+                var ev_ok = true;
+                if ev_count != 0 {
+                    let rok, rerr = replayParallelEvents(g, pkt[ev_pos..ev_pos + ev_bytes_len], ev_count, ev_vals, ev_insts, u32_buf, fld_buf, eu, et, ev, ptmp);
+                    if rerr != blot_direct_types::Error.none { wave_err = rerr; break; }
+                    ev_ok = rok;
+                } else {
+                    ev_vals.clear();
+                    ev_insts.clear();
+                }
+                if ev_ok {
                     g.s.sparks_vectorized += sv;
                     g.s.sparks_scalar_fallback += sf;
                     let body_start = g.module.text.len;
-                    var pos: i64 = 33;
-                    if body_len != 0 {
-                        g.module.text.append(pkt[pos..pos + body_len]);
-                        pos += body_len;
+                    patch_offs.clear();
+                    patch_deltas.clear();
+                    if patches_len == 0 {
+                        if body_len != 0 { g.module.text.append(pkt[body_pos..body_pos + body_len]); }
+                    } else {
+                        var cursor: i64 = 0;
+                        for pi in 0..patches_len {
+                            let pbase = patches_pos + pi * 9;
+                            let pkind = pkt[pbase];
+                            let poff = binary::u32le(pkt, pbase + 1) as i64;
+                            let pev = binary::u32le(pkt, pbase + 5) as i64;
+                            if poff > cursor { g.module.text.append(pkt[body_pos + cursor..body_pos + poff]); }
+                            let pval = ev_vals[pev];
+                            enc.clear();
+                            if pkind == PAR_PATCH_CALL || pkind == PAR_PATCH_SIG {
+                                blot_direct_writer::uleb(enc, pval as u64);
+                            } else {
+                                blot_direct_writer::sleb(enc, pval as! i32);
+                            }
+                            g.module.text.append(enc[..]);
+                            let d = enc.len - 1;
+                            if d != 0 {
+                                patch_offs.push(poff);
+                                patch_deltas.push(d);
+                            }
+                            cursor = poff + 1;
+                        }
+                        if cursor < body_len { g.module.text.append(pkt[body_pos + cursor..body_pos + body_len]); }
                     }
+                    let final_body_len = g.module.text.len - body_start;
                     let fn_idx = g.s.instances[id].function - (g.module.imports.len as u32);
-                    g.module.functions[fn_idx].body = blot_direct_writer::Range { start: body_start, len: body_len };
+                    g.module.functions[fn_idx].body = blot_direct_writer::Range { start: body_start, len: final_body_len };
                     if g.s.track_deps {
                         let dep_start = g.s.dep_list.len as u32;
+                        var dpos = deps_pos;
                         for di in 0..deps_len {
-                            g.s.dep_list.push(binary::u32le(pkt[..size], pos));
-                            pos += 4;
+                            var dep_id = binary::u32le(pkt, dpos);
+                            dpos += 4;
+                            if (dep_id & 0x80000000) != 0 {
+                                dep_id = ev_insts[(dep_id & 0x7fffffff) as i64];
+                            }
+                            g.s.dep_list.push(dep_id);
                         }
                         g.s.instances[id].deps_start = dep_start;
                         g.s.instances[id].deps_len = deps_len as u32;
+                        var ipos = inl_pos;
                         for ii in 0..inl_len {
-                            g.s.inlined_callees.put(binary::u64le(pkt[..size], pos), 1);
-                            pos += 8;
+                            g.s.inlined_callees.put(binary::u64le(pkt, ipos), 1);
+                            ipos += 8;
                         }
-                    } else {
-                        pos += deps_len * 4 + inl_len * 8;
                     }
                     if recording {
+                        var spos = sites_pos;
                         for si in 0..sites_len {
-                            let sunit = binary::u32le(pkt[..size], pos);
-                            let snode = binary::u32le(pkt[..size], pos + 4);
-                            let soff = binary::u64le(pkt[..size], pos + 8) as! i64;
-                            pos += 16;
+                            let sunit = binary::u32le(pkt, spos);
+                            let snode = binary::u32le(pkt, spos + 4);
+                            var soff = binary::u64le(pkt, spos + 8) as! i64;
+                            spos += 16;
+                            if soff >= 0 && patch_offs.len != 0 {
+                                var adj: i64 = 0;
+                                for pdi in 0..patch_offs.len {
+                                    if patch_offs[pdi] < soff { adj += patch_deltas[pdi]; }
+                                    else { break; }
+                                }
+                                soff += adj;
+                            }
                             blot_direct_relocations::pushBodySite(blot_direct_relocations::Site { sunit, snode, soff }, fn_idx, body_start);
                         }
                     }
@@ -1746,7 +3064,6 @@ fn emitWaveParallel(g: Generator&, wave_start: i64, wave_end: i64, workers: u8) 
             if error != blot_direct_types::Error.none { wave_err = error; break; }
         }
     }
-    blot_native::persist_close(shared);
     return wave_err, applied_count;
 }
 
@@ -1754,27 +3071,74 @@ fn emitAll(g: Generator&) -> Error {
     var next: i64 = 0;
     let workers = blot_direct_writer::emitWorkers();
     var allow_parallel = workers > 1 && blot_native::platform_is_linux() != 0 && !g.s.replaying;
+    var pool_width: i64 = 0;
     if allow_parallel {
         var total_core_nodes: i64 = 0;
         for u in g.units { total_core_nodes += u.nodes.len; }
-        if total_core_nodes < 250000 { allow_parallel = false; }
+        if total_core_nodes < 250000 {
+            allow_parallel = false;
+        } else {
+            pool_width = min(workers as i64, min(12, max(6, total_core_nodes / 80000)));
+            if pool_width <= 1 { allow_parallel = false; }
+        }
     }
-    var min_wave: i64 = 64;
+    var pool = EmitPool {};
+    var sync_buf: u8[>..<] = [];
+    var all_lanes: u8[>..<] = [];
+    var job_off: i64[>..<] = [];
+    var job_len: i64[>..<] = [];
+    var ev_vals: u32[>..<] = [];
+    var ev_insts: u32[>..<] = [];
+    var u32_buf: u32[>..] = [];
+    var fld_buf: blot_direct_types::Field[>..] = [];
+    var eu: u32[>..<] = [];
+    var et: u32[>..<] = [];
+    var ev: Ty[>..<] = [];
+    var ptmp: Ty[>..<] = [];
+    var patch_offs: i64[>..<] = [];
+    var patch_deltas: i64[>..<] = [];
+    var enc: u8[>..<] = [];
+    var failed_waves: i64 = 0;
+    var result_err = blot_direct_types::Error.none;
     while next < g.s.queue.len {
         if allow_parallel {
             let pending = g.s.queue.len - next;
-            if pending >= min_wave {
-                let take = min(pending, 16384);
-                let wave_start = next;
-                next += take;
-                let werr, applied = emitWaveParallel(g, wave_start, next, workers);
-                if werr != blot_direct_types::Error.none { return werr; }
-                if applied == 0 {
-                    min_wave = 0x7fffffff;
-                } else if applied * 2 < take {
-                    if min_wave < 4096 { min_wave = min_wave * 4; }
+            let need = if pool.handle != 0 { max(12, pool_width * 2) } else { 64 };
+            if pending >= need {
+                if pool.handle != 0 && (
+                    pool.has_rt != g.s.has_rt ||
+                    pool.has_memory != g.module.has_memory ||
+                    pool.host_slots != g.module.host_slots ||
+                    pool.exported_storage != g.s.exported_storage
+                ) {
+                    closeEmitPool(pool);
                 }
-                continue;
+                if pool.handle == 0 {
+                    if !openEmitPool(g, pool, pool_width) {
+                        allow_parallel = false;
+                    }
+                }
+                if pool.handle != 0 {
+                    let take = min(pending, 16384);
+                    let wave_start = next;
+                    next += take;
+                    let werr, applied = emitWavePool(
+                        g, pool, wave_start, next, sync_buf, all_lanes, job_off, job_len,
+                        ev_vals, ev_insts, u32_buf, fld_buf, eu, et, ev, ptmp,
+                        patch_offs, patch_deltas, enc
+                    );
+                    if werr != blot_direct_types::Error.none { result_err = werr; break; }
+                    if applied == 0 {
+                        failed_waves += 1;
+                        if failed_waves >= 2 {
+                            closeEmitPool(pool);
+                            allow_parallel = false;
+                        }
+                    } else {
+                        failed_waves = 0;
+                    }
+                    continue;
+                }
             }
         }
         let id = g.s.queue[next];
@@ -1782,7 +3146,8 @@ fn emitAll(g: Generator&) -> Error {
         if g.s.instances[id].emitted { continue; }
         g.s.instances[id].emitted = true;
         let error = blot_direct_function::emitInstance(g, id);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != blot_direct_types::Error.none { result_err = error; break; }
     }
-    return blot_direct_types::Error.none;
+    closeEmitPool(pool);
+    return result_err;
 }
