@@ -1,0 +1,30 @@
+// PLB nsieve: bit-packed prime sieve in U32 words.
+import * as buf from "./buf"
+
+func nsieve (m: U32) -> (w: own #[U32]) -> (l: U32) -> (c: U32): (#[U32], U32, U32) =>
+  let flags = @array.fill ((m + 31) >> 5) 0
+  let count: U32 = 0
+  for i in 2 .. m:
+    if ((flags[i >> 5] >> (i & 31)) & 1) == 0:
+      count := self + 1
+      let j = i << 1
+      for ever:
+        if j >= m:
+          break
+        flags[j >> 5] := self | (1 << (j & 31))
+        j := self + i
+  let (w1, l1, c1) = buf.push_text w l c "Primes up to "
+  let (w2, l2, c2) = buf.push_u32_pad w1 l1 c1 m 8
+  let (w3, l3, c3) = buf.push_b w2 l2 c2 32
+  let (w4, l4, c4) = buf.push_u32_pad w3 l3 c3 count 8
+  return buf.push_b w4 l4 c4 10
+
+io bench (inp: #[U32]): #[U32] =>
+  let n = inp[0]
+  let (w, l, c) = buf.new_buf ()
+  for i in 0 .. 3:
+    let (w1, l1, c1) = nsieve (10000 << (n - i)) w l c
+    w := w1
+    l := l1
+    c := c1
+  return buf.finish_buf w l c

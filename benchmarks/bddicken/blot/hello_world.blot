@@ -1,0 +1,2 @@
+// Hello World benchmark matching bddicken/languages.
+io hello (): #[U32] => "Hello, World!"

@@ -1,0 +1,147 @@
+// PLB fasta: chunked zero-copy 4-bytes/U32 DNA sequence generator.
+// Input:  #[section, seed, offset, count, emit_header]
+// Output: words[0] = byte_len, words[1] = next_seed, words[2..] = packed ASCII bytes.
+
+const ALU: Text = "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+
+func pick_iub (r: U32): U32 =>
+  if r <= 37791:
+    return 97
+  if r <= 54587:
+    return 99
+  if r <= 71383:
+    return 103
+  if r <= 109175:
+    return 116
+  if r <= 111974:
+    return 66
+  if r <= 114773:
+    return 68
+  if r <= 117573:
+    return 72
+  if r <= 120372:
+    return 75
+  if r <= 123171:
+    return 77
+  if r <= 125971:
+    return 78
+  if r <= 128770:
+    return 82
+  if r <= 131569:
+    return 83
+  if r <= 134369:
+    return 86
+  if r <= 137168:
+    return 87
+  return 89
+
+func pick_hs (r: U32): U32 =>
+  if r <= 42403:
+    return 97
+  if r <= 70116:
+    return 99
+  if r <= 97766:
+    return 103
+  return 116
+
+io bench (inp: #[U32]): #[U32] =>
+  let section = inp[0]
+  let seed = inp[1]
+  let offset = inp[2]
+  let count = inp[3]
+  let emit_header = inp[4]
+
+  // Preallocate exact worst-case packed words: header (<= 32) + count + ceil(count/60) newlines.
+  let max_bytes = 40 + count + ((count + 59) / 60)
+  let words = @array.fill (2 + ((max_bytes + 3) >> 2)) 0
+  let blen: U32 = 0
+  let cur: U32 = 0
+  let widx: U32 = 2
+
+  if emit_header != 0:
+    let hdr = if section == 0 then ">ONE Homo sapiens alu\n" else if section == 1 then ">TWO IUB ambiguity codes\n" else ">THREE Homo sapiens frequency\n"
+    for i in 0 .. hdr.length:
+      let b = hdr[i] & 255
+      let sh = (blen & 3) << 3
+      cur := if sh == 0 then b else self | (b << sh)
+      blen := self + 1
+      if (blen & 3) == 0:
+        words[widx] := cur
+        widx := self + 1
+
+  let rem = count
+  if section == 0:
+    let alen = ALU.length
+    let pos = offset % alen
+    for ever:
+      if rem == 0:
+        break
+      let nb = if rem < 60 then rem else 60
+      for _ in 0 .. nb:
+        let b = ALU[pos] & 255
+        pos := self + 1
+        if pos == alen:
+          pos := 0
+        let sh = (blen & 3) << 3
+        cur := if sh == 0 then b else self | (b << sh)
+        blen := self + 1
+        if (blen & 3) == 0:
+          words[widx] := cur
+          widx := self + 1
+      // newline
+      let shn = (blen & 3) << 3
+      cur := if shn == 0 then 10 else self | (10 << shn)
+      blen := self + 1
+      if (blen & 3) == 0:
+        words[widx] := cur
+        widx := self + 1
+      rem := self - nb
+  else:
+    if section == 1:
+      for ever:
+        if rem == 0:
+          break
+        let nb = if rem < 60 then rem else 60
+        for _ in 0 .. nb:
+          seed := (self * 3877 + 29573) % 139968
+          let b = pick_iub seed
+          let sh = (blen & 3) << 3
+          cur := if sh == 0 then b else self | (b << sh)
+          blen := self + 1
+          if (blen & 3) == 0:
+            words[widx] := cur
+            widx := self + 1
+        let shn = (blen & 3) << 3
+        cur := if shn == 0 then 10 else self | (10 << shn)
+        blen := self + 1
+        if (blen & 3) == 0:
+          words[widx] := cur
+          widx := self + 1
+        rem := self - nb
+    else:
+      for ever:
+        if rem == 0:
+          break
+        let nb = if rem < 60 then rem else 60
+        for _ in 0 .. nb:
+          seed := (self * 3877 + 29573) % 139968
+          let b = pick_hs seed
+          let sh = (blen & 3) << 3
+          cur := if sh == 0 then b else self | (b << sh)
+          blen := self + 1
+          if (blen & 3) == 0:
+            words[widx] := cur
+            widx := self + 1
+        let shn = (blen & 3) << 3
+        cur := if shn == 0 then 10 else self | (10 << shn)
+        blen := self + 1
+        if (blen & 3) == 0:
+          words[widx] := cur
+          widx := self + 1
+        rem := self - nb
+
+  if (blen & 3) != 0:
+    words[widx] := cur
+  words[0] := blen
+  words[1] := seed
+  return words

@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1424 880" width="1424" height="880">
+<style>
+  .bg { fill: #fafafa; }
+  .card { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1; rx: 10; }
+  .title { font: 700 22px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0f172a; }
+  .sub { font: 400 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #475569; }
+  .ctitle { font: 700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0f172a; }
+  .csub { font: 400 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #64748b; }
+  .lbl { font: 500 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #1e293b; }
+  .lbl-blot { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }
+  .val { font: 600 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0f172a; }
+  .val-blot { font: 700 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }
+  .badge-bg { fill: #f1f5f9; rx: 6; }
+  .badge-win { fill: #dcfce7; rx: 6; }
+  .badge-txt { font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #334155; }
+  .badge-win-txt { font: 700 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #166534; }
+  .track { fill: #f1f5f9; rx: 4; }
+  .leg { font: 500 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #334155; }
+  .foot { font: 400 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #64748b; }
+</style>
+<rect class="bg" width="1424" height="880"/>
+<text class="title" x="32" y="40">Programming-Language-Benchmarks (PLB): Runtime (Blot vs Official Go, Rust, C &amp; C++)</text>
+<text class="sub" x="32" y="64">Single-process CPU time (helloworld: median wall ms) · 100% verified official PLB outputs · AMD Ryzen 7 7800X3D 8-Core Processor · lower is better</text>
+<rect x="32" y="82" width="13" height="13" rx="3" fill="#0d7c66"/>
+<text class="leg" x="51" y="93">Blot</text>
+<rect x="105.0" y="82" width="13" height="13" rx="3" fill="#64748b"/>
+<text class="leg" x="124.0" y="93">C (-O3)</text>
+<rect x="200.5" y="82" width="13" height="13" rx="3" fill="#334155"/>
+<text class="leg" x="219.5" y="93">C++ (-O3)</text>
+<rect x="311.0" y="82" width="13" height="13" rx="3" fill="#c2592c"/>
+<text class="leg" x="330.0" y="93">Rust</text>
+<rect x="384.0" y="82" width="13" height="13" rx="3" fill="#2563eb"/>
+<text class="leg" x="403.0" y="93">Go</text>
+<rect class="card" x="32" y="122" width="440" height="224"/>
+<text class="ctitle" x="48" y="148">helloworld</text>
+<text class="csub" x="48" y="166">arg = QwQ (process launch)</text>
+<rect class="badge-win" x="314" y="133" width="144" height="22"/>
+<text class="badge-win-txt" x="386.0" y="148" text-anchor="middle">2.28× faster than Go</text>
+<text class="lbl-blot" x="48" y="198">Blot</text>
+<rect class="track" x="124" y="184" width="242" height="20"/>
+<rect x="124" y="184" width="106.2" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="238.2" y="198">2.04 ms</text>
+<text class="lbl" x="48" y="228">Rust</text>
+<rect class="track" x="124" y="214" width="242" height="20"/>
+<rect x="124" y="214" width="108.2" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="240.2" y="228">2.07 ms</text>
+<text class="lbl" x="48" y="258">C (-O3)</text>
+<rect class="track" x="124" y="244" width="242" height="20"/>
+<rect x="124" y="244" width="116.4" height="20" rx="4" fill="#64748b"/>
+<text class="val" x="248.4" y="258">2.23 ms</text>
+<text class="lbl" x="48" y="288">C++ (-O3)</text>
+<rect class="track" x="124" y="274" width="242" height="20"/>
+<rect x="124" y="274" width="175.9" height="20" rx="4" fill="#334155"/>
+<text class="val" x="307.9" y="288">3.37 ms</text>
+<text class="lbl" x="48" y="318">Go</text>
+<rect class="track" x="124" y="304" width="242" height="20"/>
+<rect x="124" y="304" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="374.0" y="318">4.64 ms</text>
+<rect class="card" x="492" y="122" width="440" height="224"/>
+<text class="ctitle" x="508" y="148">nsieve</text>
+<text class="csub" x="508" y="166">n = 12 (up to 40,960,000)</text>
+<rect class="badge-bg" x="826" y="133" width="92" height="22"/>
+<text class="badge-txt" x="872.0" y="148" text-anchor="middle">1.15× Go</text>
+<text class="lbl" x="508" y="198">C++ (-O3)</text>
+<rect class="track" x="584" y="184" width="242" height="20"/>
+<rect x="584" y="184" width="132.1" height="20" rx="4" fill="#334155"/>
+<text class="val" x="724.1" y="198">214.2 ms</text>
+<text class="lbl" x="508" y="228">Go</text>
+<rect class="track" x="584" y="214" width="242" height="20"/>
+<rect x="584" y="214" width="203.3" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="795.3" y="228">329.5 ms</text>
+<text class="lbl" x="508" y="258">Rust</text>
+<rect class="track" x="584" y="244" width="242" height="20"/>
+<rect x="584" y="244" width="230.3" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="822.3" y="258">373.3 ms</text>
+<text class="lbl-blot" x="508" y="288">Blot</text>
+<rect class="track" x="584" y="274" width="242" height="20"/>
+<rect x="584" y="274" width="233.1" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="825.1" y="288">377.8 ms</text>
+<text class="lbl" x="508" y="318">C (-O3)</text>
+<rect class="track" x="584" y="304" width="242" height="20"/>
+<rect x="584" y="304" width="242.0" height="20" rx="4" fill="#64748b"/>
+<text class="val" x="834.0" y="318">392.2 ms</text>
+<rect class="card" x="952" y="122" width="440" height="224"/>
+<text class="ctitle" x="968" y="148">binarytrees</text>
+<text class="csub" x="968" y="166">depth = 18</text>
+<rect class="badge-win" x="1234" y="133" width="144" height="22"/>
+<text class="badge-win-txt" x="1306.0" y="148" text-anchor="middle">2.13× faster than Go</text>
+<text class="lbl-blot" x="968" y="198">Blot</text>
+<rect class="track" x="1044" y="184" width="242" height="20"/>
+<rect x="1044" y="184" width="93.7" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1145.7" y="198">1.13 s</text>
+<text class="lbl" x="968" y="228">Go</text>
+<rect class="track" x="1044" y="214" width="242" height="20"/>
+<rect x="1044" y="214" width="199.1" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="1251.1" y="228">2.40 s</text>
+<text class="lbl" x="968" y="258">Rust</text>
+<rect class="track" x="1044" y="244" width="242" height="20"/>
+<rect x="1044" y="244" width="242.0" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="1294.0" y="258">2.92 s</text>
+<rect class="card" x="32" y="366" width="440" height="224"/>
+<text class="ctitle" x="48" y="392">merkletrees</text>
+<text class="csub" x="48" y="410">depth = 17</text>
+<rect class="badge-win" x="314" y="377" width="144" height="22"/>
+<text class="badge-win-txt" x="386.0" y="392" text-anchor="middle">1.00× faster than Go</text>
+<text class="lbl" x="48" y="442">Rust</text>
+<rect class="track" x="124" y="428" width="242" height="20"/>
+<rect x="124" y="428" width="186.0" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="318.0" y="442">1.25 s</text>
+<text class="lbl-blot" x="48" y="472">Blot</text>
+<rect class="track" x="124" y="458" width="242" height="20"/>
+<rect x="124" y="458" width="241.3" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="373.3" y="472">1.62 s</text>
+<text class="lbl" x="48" y="502">Go</text>
+<rect class="track" x="124" y="488" width="242" height="20"/>
+<rect x="124" y="488" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="374.0" y="502">1.62 s</text>
+<rect class="card" x="492" y="366" width="440" height="224"/>
+<text class="ctitle" x="508" y="392">fannkuch-redux</text>
+<text class="csub" x="508" y="410">n = 11 (39,916,800 perms)</text>
+<rect class="badge-bg" x="826" y="377" width="92" height="22"/>
+<text class="badge-txt" x="872.0" y="392" text-anchor="middle">1.80× Go</text>
+<text class="lbl" x="508" y="442">C++ (-O3)</text>
+<rect class="track" x="584" y="428" width="242" height="20"/>
+<rect x="584" y="428" width="85.3" height="20" rx="4" fill="#334155"/>
+<text class="val" x="677.3" y="442">1.03 s</text>
+<text class="lbl" x="508" y="472">Go</text>
+<rect class="track" x="584" y="458" width="242" height="20"/>
+<rect x="584" y="458" width="134.4" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="726.4" y="472">1.62 s</text>
+<text class="lbl" x="508" y="502">Rust</text>
+<rect class="track" x="584" y="488" width="242" height="20"/>
+<rect x="584" y="488" width="171.2" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="763.2" y="502">2.07 s</text>
+<text class="lbl-blot" x="508" y="532">Blot</text>
+<rect class="track" x="584" y="518" width="242" height="20"/>
+<rect x="584" y="518" width="242.0" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="834.0" y="532">2.92 s</text>
+<rect class="card" x="952" y="366" width="440" height="224"/>
+<text class="ctitle" x="968" y="392">fasta</text>
+<text class="csub" x="968" y="410">n = 2,500,000 (25.4 MB DNA)</text>
+<rect class="badge-win" x="1234" y="377" width="144" height="22"/>
+<text class="badge-win-txt" x="1306.0" y="392" text-anchor="middle">1.27× faster than Go</text>
+<text class="lbl" x="968" y="442">Rust</text>
+<rect class="track" x="1044" y="428" width="242" height="20"/>
+<rect x="1044" y="428" width="161.1" height="20" rx="4" fill="#c2592c"/>
+<text class="val" x="1213.1" y="442">160.8 ms</text>
+<text class="lbl-blot" x="968" y="472">Blot</text>
+<rect class="track" x="1044" y="458" width="242" height="20"/>
+<rect x="1044" y="458" width="191.3" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1243.3" y="472">191.0 ms</text>
+<text class="lbl" x="968" y="502">Go</text>
+<rect class="track" x="1044" y="488" width="242" height="20"/>
+<rect x="1044" y="488" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="1294.0" y="502">241.6 ms</text>
+<rect class="card" x="32" y="610" width="440" height="224"/>
+<text class="ctitle" x="48" y="636">pidigits</text>
+<text class="csub" x="48" y="654">8,000 digits of pi</text>
+<rect class="badge-bg" x="366" y="621" width="92" height="22"/>
+<text class="badge-txt" x="412.0" y="636" text-anchor="middle">14.19× Go</text>
+<text class="lbl" x="48" y="686">Go</text>
+<rect class="track" x="124" y="672" width="242" height="20"/>
+<rect x="124" y="672" width="17.1" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="149.1" y="686">714.0 ms</text>
+<text class="lbl-blot" x="48" y="716">Blot</text>
+<rect class="track" x="124" y="702" width="242" height="20"/>
+<rect x="124" y="702" width="242.0" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="374.0" y="716">10.13 s</text>
+<rect class="card" x="492" y="610" width="440" height="224"/>
+<text class="ctitle" x="508" y="636">lru</text>
+<text class="csub" x="508" y="654">size = 1,000 · 3,000,000 ops</text>
+<rect class="badge-win" x="774" y="621" width="144" height="22"/>
+<text class="badge-win-txt" x="846.0" y="636" text-anchor="middle">2.59× faster than Go</text>
+<text class="lbl-blot" x="508" y="686">Blot</text>
+<rect class="track" x="584" y="672" width="242" height="20"/>
+<rect x="584" y="672" width="93.6" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="685.6" y="686">93.2 ms</text>
+<text class="lbl" x="508" y="716">Go</text>
+<rect class="track" x="584" y="702" width="242" height="20"/>
+<rect x="584" y="702" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="834.0" y="716">241.0 ms</text>
+<rect class="card" x="952" y="610" width="440" height="224"/>
+<text class="ctitle" x="968" y="636">coro-prime-sieve</text>
+<text class="csub" x="968" y="654">first 4,000 primes</text>
+<rect class="badge-win" x="1228" y="621" width="150" height="22"/>
+<text class="badge-win-txt" x="1303.0" y="636" text-anchor="middle">76.52× faster than Go</text>
+<text class="lbl-blot" x="968" y="686">Blot</text>
+<rect class="track" x="1044" y="672" width="242" height="20"/>
+<rect x="1044" y="672" width="4.0" height="20" rx="4" fill="#0d7c66"/>
+<text class="val-blot" x="1056.0" y="686">10.8 ms</text>
+<text class="lbl" x="968" y="716">Go</text>
+<rect class="track" x="1044" y="702" width="242" height="20"/>
+<rect x="1044" y="702" width="242.0" height="20" rx="4" fill="#2563eb"/>
+<text class="val" x="1294.0" y="716">825.5 ms</text>
+<text class="foot" x="32" y="864">Sorted fastest → slowest per problem. Official unmodified PLB Go, Rust, C, and C++ sources run single-threaded (GOMAXPROCS=1, OMP_NUM_THREADS=1).</text>
+</svg>

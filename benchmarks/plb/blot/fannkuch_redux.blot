@@ -1,0 +1,78 @@
+// PLB fannkuch-redux: iterative permutation generator and prefix-reversal counter.
+import * as buf from "./buf"
+
+io bench (inp: #[U32]): #[U32] =>
+  let n = inp[0]
+  let perm = @array.fill n 0
+  let perm1 = @array.fill n 0
+  let count = @array.fill n 0
+  for i in 0 .. n:
+    perm1[i] := i
+
+  let max_flips: U32 = 0
+  let checksum: U32 = 0
+  let perm_count: U32 = 0
+  let r = n
+
+  for ever:
+    for ever:
+      if r == 1:
+        break
+      count[r - 1] := r
+      r := self - 1
+
+    if perm1[0] != 0:
+      for i in 0 .. n:
+        perm[i] := perm1[i]
+      let flips: U32 = 0
+      for ever:
+        let k = perm[0]
+        if k == 0:
+          break
+        let lo: U32 = 0
+        let hi = k
+        for ever:
+          if lo >= hi:
+            break
+          let tmp = perm[lo]
+          perm[lo] := perm[hi]
+          perm[hi] := tmp
+          lo := self + 1
+          hi := self - 1
+        flips := self + 1
+      if flips > max_flips:
+        max_flips := flips
+      if (perm_count & 1) == 0:
+        checksum := self + flips
+      else:
+        checksum := self - flips
+
+    perm_count := self + 1
+    let done = false
+    for ever:
+      if r == n:
+        done := true
+        break
+      let perm0 = perm1[0]
+      let i: U32 = 0
+      for ever:
+        if i >= r:
+          break
+        perm1[i] := perm1[i + 1]
+        i := self + 1
+      perm1[r] := perm0
+      count[r] := self - 1
+      if count[r] > 0:
+        break
+      r := self + 1
+    if done:
+      break
+
+  let (w, l, c) = buf.new_buf ()
+  let (w1, l1, c1) = buf.push_i32 w l c checksum
+  let (w2, l2, c2) = buf.push_text w1 l1 c1 "\nPfannkuchen("
+  let (w3, l3, c3) = buf.push_u32 w2 l2 c2 n
+  let (w4, l4, c4) = buf.push_text w3 l3 c3 ") = "
+  let (w5, l5, c5) = buf.push_u32 w4 l4 c4 max_flips
+  let (w6, l6, c6) = buf.push_b w5 l5 c5 10
+  return buf.finish_buf w6 l6 c6

@@ -7,6 +7,8 @@ Unified index of all recorded Blot benchmark suites, charts, and exact measureme
 - [Suite 3: AoS Record SIMD, Multi-Core Isolated Guests & Persistent `#process`](#suite-3-aos-record-simd-multi-core-isolated-guests--persistent-process)
 - [Suite 4: Ink ECS (Blot `#process`) vs Bevy ECS 0.20.1 (Native Rust)](#suite-4-ink-ecs-blot-process-vs-bevy-ecs-0201-native-rust)
 - [Suite 5: Compiler Cold Build, Incremental Edit & Scaling](#suite-5-compiler-cold-build-incremental-edit--scaling)
+- [Suite 6: `bddicken/languages` Suite (Blot vs Goose, C, C++ & Rust)](#suite-6-bddickenlanguages-suite-blot-vs-goose-c-c--rust)
+- [Suite 7: Programming-Language-Benchmarks (PLB) Suite (Blot vs Go, Rust, C & C++)](#suite-7-programming-language-benchmarks-plb-suite-blot-vs-go-rust-c--c)
 - [Regression & Boundary Suites](#regression--boundary-suites)
 
 ---
@@ -130,6 +132,43 @@ Real 10,000-entity ECS worlds comparing **Ink ECS** (`ink/ecs` + `ink/ecs/query`
 - **16-benchmark Goose suite:** `30.2 ms` geomean cold build (`19.3 ms` `blotc-goose` + `10.6 ms` `wtime-aot`, `6.0–33.5 KiB` `.wasm`) vs `105.4 ms` `rustc -O` (`3.5×`), `161.9 ms` `goose + clang -O2` (`5.4×`), and `308.9 ms` `clang++ -O2` (`10.2×`).
 - **Anonymous internal 3D game project:** ~**69k LOC** of Blot across **263** source modules + **62** shader/data asset modules (**325 modules / 4,572 functions / 6.71 MB `.wasm`**) — **~0.43–0.55 s** full cold build, **~41–44 ms** `fresh=1` single-file incremental edit, **~20 ms** literal/comment edit.
 - **Synthetic 1M LOC scaling:** **~0.50 s** (**~2.0M LOC/s**).
+
+---
+
+## Suite 6: `bddicken/languages` Suite (Blot vs Goose, C, C++ & Rust)
+
+All four workloads from [`bddicken/languages`](https://github.com/bddicken/languages) comparing **Blot** (`blotc-goose` + `wtime-aot 0.1.7`, x64 native) against unmodified official C (`clang -O3`), C++ (`clang++ -O3 -march=native`), Rust (`cargo build --release`), and Goose (`clang -O3`). In-process benchmark loops (`500 ms` warmup, `2,000 ms` run window, best mean across 3 interleaved reps; `hello-world`: median wall ms over 100 launches); **100% verified outputs**.
+
+- **Details & runner:** [benchmarks/bddicken/README.md](benchmarks/bddicken/README.md) · **Raw JSON:** [`results.json`](benchmarks/evidence/measurements/2026-11-26-bddicken/results.json)
+
+![bddicken/languages Results](benchmarks/evidence/measurements/2026-11-26-bddicken/bddicken_chart.svg)
+
+- **`fibonacci(37)`** (`24,157,817`): Goose `85.5 ms`, Rust `99.3 ms`, C++ `110.4 ms`, C `112.3 ms`, Blot `211.4 ms` (`1.88×` C; compile `35.5 ms`, `4.0 KiB` `.wasm`).
+- **`loops(40)`** (`10,000 × 10,000` modulo sum): Goose `80.2 ms`, C++ `189.7 ms`, C `191.4 ms`, Rust `196.5 ms`, Blot `206.2 ms` (`1.08×` C; best min `129.0 ms` vs C `127.9 ms`).
+- **`levenshtein`** (72 words, `2,556` pairs, sum `554,324`): Goose `71.8 ms`, Rust `87.6 ms`, C++ `97.4 ms`, C `108.5 ms`, Blot `174.4 ms` (`1.61×` C).
+- **`hello-world`** (100 launches, `Hello, World!`): Rust `1.70 ms`, C `1.72 ms`, Goose `1.93 ms`, **Blot `2.15 ms`** (beats C++ `2.62 ms`).
+
+---
+
+## Suite 7: Programming-Language-Benchmarks (PLB) Suite (Blot vs Go, Rust, C & C++)
+
+Nine workloads from [`hanabi1224/Programming-Language-Benchmarks`](https://github.com/hanabi1224/Programming-Language-Benchmarks) comparing **Blot** (`blotc-goose` + `wtime-aot 0.1.7`, x64 native) against unmodified official PLB **Go (`1.27.4`)**, **Rust (`rustc -O -C lto=fat`)**, **C (`clang -O3`)**, and **C++ (`clang++ -O3`)** reference sources (`GOMAXPROCS=1`, `OMP_NUM_THREADS=1`). Best single-process CPU time (`helloworld`: median wall ms over 15 launches) and median peak RSS via [`measure_proc.c`](benchmarks/goose-suite/measure_proc.c); **100% official unittest pass + identical full-input stdout SHA-256 across all languages**.
+
+- **Details, fairness notes & runner:** [benchmarks/plb/README.md](benchmarks/plb/README.md) · **Raw JSON:** [`results.json`](benchmarks/evidence/measurements/2026-11-26-plb/results.json)
+
+![PLB Runtime](benchmarks/evidence/measurements/2026-11-26-plb/plb_runtime.svg)
+
+![PLB Peak Memory](benchmarks/evidence/measurements/2026-11-26-plb/plb_memory.svg)
+
+- **`helloworld`** (`QwQ`): **Blot `2.04 ms` wall** (`0.55 ms` CPU, `3.8 MiB`) vs Rust `2.07 ms`, C `2.23 ms`, C++ `3.37 ms`, Go `4.64 ms`.
+- **`nsieve`** (`12`, up to `40,960,000`): C++ `214.2 ms` (`8.8 MiB`), Go `329.5 ms` (`71.8 MiB`), Rust `373.3 ms` (`41.4 MiB`), **Blot `377.8 ms` (`13.7 MiB`)** (beats C `392.2 ms`, `3×` less RAM than C/Rust, `5.2×` less than Go).
+- **`binarytrees`** (`18`): **Blot `1.13 s` (`23.7 MiB`)** — **`2.12×` faster than Go** (`2.40 s`, `45.3 MiB`) and **`2.58×` faster than Rust `3.rs`** (`2.92 s`, `50.2 MiB`).
+- **`merkletrees`** (`17`): Rust `1.25 s` (`34.1 MiB`), **Blot `1.62 s` (`26.0 MiB`, lowest RSS)**, Go `1.62 s` (`39.2 MiB`).
+- **`fannkuch-redux`** (`11`): C++ `1.03 s` (`4.0 MiB`), Go `1.62 s` (`5.6 MiB`), Rust `2.07 s` (`2.2 MiB`), Blot `2.92 s` (`3.9 MiB`, `1.41×` Rust).
+- **`fasta`** (`2,500,000`, `25.4 MB`): Rust `160.8 ms` (`2.1 MiB`), **Blot `191.0 ms` (`5.2 MiB`)** (**`1.27×` faster than Go** `241.6 ms`, `13.8 MiB`).
+- **`pidigits`** (`8,000` digits): Go `math/big` `714.0 ms` (`10.2 MiB`) vs Blot pure-`U32` base-`2^15` spigot `10.13 s` (`4.5 MiB`).
+- **`lru`** (`1,000`, `3,000,000` ops): **Blot `93.2 ms` (`3.9 MiB`)** — **`2.59×` faster than Go** (`241.0 ms`, `3.5 MiB`).
+- **`coro-prime-sieve`** (`4,000`): **Blot `10.8 ms` (`3.9 MiB`)** (iterative filter chain) vs Go `1.go` `825.5 ms` (`15.4 MiB`, 4,000 goroutines).
 
 ---
 

@@ -198,10 +198,10 @@ Measured on **AMD Ryzen 7 7800X3D (Linux)** with `blotc-goose` + **`wtime-aot 0.
 
 - **Real-world builds:** Anonymous internal 3D game (~69k LOC, 325 modules, 6.71 MB `.wasm`) compiles in **~0.43–0.55 s** cold, **~41–44 ms** incremental (`fresh=1`), and **~20 ms** on literal edits (**~2.0M LOC/s** synthetic).
 - **AoS SIMD & concurrency:** `#[Vec4]` loops beat native Rust **1.83×**; 8-thread isolated guests scale **4.64×** (**3.67×** faster than native Rust); `#process` commits in **~53 ns/step**.
-- **16-benchmark suite (vs Goose, Rust & C++):** **10.2× faster** cold builds than `clang++ -O2` (**30.2 ms** geomean), **12/16** memory wins over idiomatic C++ (#1 lowest RSS on `words` and `sexp`), and **4/16** runtime wins over idiomatic C++ (**5/16** over idiomatic Rust).
+- **Cross-language suites (Goose 16, `bddicken/languages`, PLB 9):** **10.2× faster** cold builds than `clang++ -O2` (**30.2 ms** geomean), **12/16** memory wins over idiomatic C++ (#1 lowest RSS on `words` and `sexp`), and PLB wins over official Go on **6/9** workloads (including **2.12×** on `binarytrees`, **2.59×** on `lru`, and **3–5×** lower RSS on `nsieve`).
 - **Optional Wasm 3.0 (`--wasm3`):** Tail calls (`return_call`) and relaxed SIMD (FMA) on V8/Deno and `wtime-aot 0.1.7`.
 
-See **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results, SVG bar charts, Ink vs Bevy ECS numbers, and raw JSON evidence.
+See **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results, SVG bar charts, Ink vs Bevy ECS numbers, `bddicken` & PLB suites, and raw JSON evidence.
 
 ---
 
@@ -238,4 +238,4 @@ deno task test:guest
 
 - **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Effects & I/O](docs/language/effects-and-io.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [`io` entries](examples/io_entries.blot) · [Runtime coordination](examples/runtime_coordination.blot)
 - **Compiler & Host:** [Goose compiler](compiler-goose/README.md) · [Deno host & CLI](host/README.md) · [Guest ABI](docs/host/guest-abi.md) · [Packages](docs/host/packages.md)
-- **Benchmarks & State:** [All benchmarks (BENCHMARK.md)](BENCHMARK.md) · [Comparison suite](benchmarks/comparison/README.md) · [16-benchmark Goose suite](benchmarks/goose-suite/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)
+- **Benchmarks & State:** [All benchmarks (BENCHMARK.md)](BENCHMARK.md) · [Comparison suite](benchmarks/comparison/README.md) · [16-benchmark Goose suite](benchmarks/goose-suite/README.md) · [`bddicken` suite](benchmarks/bddicken/README.md) · [PLB suite](benchmarks/plb/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)

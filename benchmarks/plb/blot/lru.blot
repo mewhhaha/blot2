@@ -1,0 +1,130 @@
+// PLB lru: open-addressed hash table + parallel doubly-linked circular list.
+import * as buf from "./buf"
+
+const NONE: U32 = 0xFFFFFFFF
+
+type Slot is data = $Slot { key: U32, node: U32 }
+
+func find_slot (slots: #[Slot]) -> (mask: U32) -> (shift: U32) -> (key: U32): U32 =>
+  let i = (key * 2654435769) >> shift
+  for ever:
+    let idx = i & mask
+    let $Slot { key: sk, node: sn } = slots[idx]
+    if sn == NONE or sk == key:
+      return idx
+    i := self + 1
+  return 0
+
+func remove_at (slots: own #[Slot]) -> (mask: U32) -> (shift: U32) -> (at: U32): #[Slot] =>
+  let i = at
+  let j = at
+  for ever:
+    j := self + 1
+    let sj = slots[j & mask]
+    if sj.node == NONE:
+      break
+    let h = (sj.key * 2654435769) >> shift
+    if ((j - h) & mask) >= (j - i):
+      slots[i & mask] := sj
+      i := j
+  slots[i & mask] := $Slot { key: 0, node: NONE }
+  return slots
+
+io bench (inp: #[U32]): #[U32] =>
+  let size = inp[0]
+  let n = inp[1]
+  let modular = size * 10
+
+  let bits: U32 = 3
+  for ever:
+    if (1 << bits) >= 4 * size:
+      break
+    bits := self + 1
+  let nslots: U32 = 1 << bits
+  let mask = nslots - 1
+  let shift = 32 - bits
+  let slots = @array.fill nslots ($Slot { key: 0, node: NONE })
+
+  // Sentinel head = 0; pool capacity = size + 1.
+  let nkey = @array.fill (size + 1) 0
+  let nval = @array.fill (size + 1) 0
+  let nprev = @array.fill (size + 1) 0
+  let nnext = @array.fill (size + 1) 0
+  let pool_used: U32 = 1
+  let count: U32 = 0
+
+  let s0: U32 = 0
+  let s1: U32 = 1
+  let hit: U32 = 0
+  let missed: U32 = 0
+
+  for _ in 0 .. n:
+    s0 := (1103515245 * self + 12345) & 0x7FFFFFFF
+    let k0 = s0 % modular
+    // cache_put(k0, k0)
+    let at = find_slot slots mask shift k0
+    let f = slots[at].node
+    if f != NONE:
+      nval[f] := k0
+      let p = nprev[f]
+      let q = nnext[f]
+      nnext[p] := q
+      nprev[q] := p
+      let hp = nprev[0]
+      nprev[f] := hp
+      nnext[f] := 0
+      nnext[hp] := f
+      nprev[0] := f
+    else:
+      if count == size:
+        let lru = nnext[0]
+        let old = find_slot slots mask shift nkey[lru]
+        nkey[lru] := k0
+        nval[lru] := k0
+        let lp = nprev[lru]
+        let lq = nnext[lru]
+        nnext[lp] := lq
+        nprev[lq] := lp
+        let hp = nprev[0]
+        nprev[lru] := hp
+        nnext[lru] := 0
+        nnext[hp] := lru
+        nprev[0] := lru
+        slots[at] := $Slot { key: k0, node: lru }
+        slots := remove_at self mask shift old
+      else:
+        let e = pool_used
+        pool_used := self + 1
+        nkey[e] := k0
+        nval[e] := k0
+        let hp = nprev[0]
+        nprev[e] := hp
+        nnext[e] := 0
+        nnext[hp] := e
+        nprev[0] := e
+        slots[at] := $Slot { key: k0, node: e }
+        count := self + 1
+
+    s1 := (1103515245 * self + 12345) & 0x7FFFFFFF
+    let k1 = s1 % modular
+    let g = slots[find_slot slots mask shift k1].node
+    if g != NONE:
+      let p = nprev[g]
+      let q = nnext[g]
+      nnext[p] := q
+      nprev[q] := p
+      let hp = nprev[0]
+      nprev[g] := hp
+      nnext[g] := 0
+      nnext[hp] := g
+      nprev[0] := g
+      hit := self + 1
+    else:
+      missed := self + 1
+
+  let (w, l, c) = buf.new_buf ()
+  let (w1, l1, c1) = buf.push_u32 w l c hit
+  let (w2, l2, c2) = buf.push_b w1 l1 c1 10
+  let (w3, l3, c3) = buf.push_u32 w2 l2 c2 missed
+  let (w4, l4, c4) = buf.push_b w3 l3 c3 10
+  return buf.finish_buf w4 l4 c4

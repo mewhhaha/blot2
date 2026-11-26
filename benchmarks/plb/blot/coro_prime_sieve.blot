@@ -1,0 +1,33 @@
+// PLB coro-prime-sieve: lazy filter chain matching the PLB generator programs
+// (tests each candidate against primes[0..k-1] in exact chain order).
+import * as buf from "./buf"
+
+io bench (inp: #[U32]): #[U32] =>
+  let n = inp[0]
+  let primes = @array.fill n 0
+  let plen: U32 = 0
+  let gen: U32 = 2
+  let (w, l, c) = buf.new_buf ()
+
+  for _ in 0 .. n:
+    let found: U32 = 0
+    for ever:
+      let v = gen
+      gen := self + 1
+      let ok = true
+      for j in 0 .. plen:
+        if v % primes[j] == 0:
+          ok := false
+          break
+      if ok:
+        found := v
+        break
+    primes[plen] := found
+    plen := self + 1
+    let (w1, l1, c1) = buf.push_u32 w l c found
+    let (w2, l2, c2) = buf.push_b w1 l1 c1 10
+    w := w2
+    l := l2
+    c := c2
+
+  return buf.finish_buf w l c

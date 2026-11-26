@@ -1,0 +1,110 @@
+// Compact packed byte-buffer writer (4 little-endian ASCII bytes per U32 word).
+// Word 0 reserves the total byte length; words 1.. hold contiguous bytes so the
+// native C runner can emit stdout with a single zero-copy fwrite().
+
+func new_buf (): (#[U32], U32, U32) =>
+  return (#[0], 0, 0)
+
+func push_b (words: own #[U32]) -> (len: U32) -> (cur: U32) -> (b: U32): (#[U32], U32, U32) =>
+  let sh = (len & 3) << 3
+  let nc = if sh == 0 then b else cur | (b << sh)
+  let nl = len + 1
+  if (nl & 3) == 0:
+    words := self.push nc
+  return (words, nl, nc)
+
+func push_text (words: own #[U32]) -> (len: U32) -> (cur: U32) -> (s: Text): (#[U32], U32, U32) =>
+  for i in 0 .. s.length:
+    let (w1, l1, c1) = push_b words len cur (s[i] & 255)
+    words := w1
+    len := l1
+    cur := c1
+  return (words, len, cur)
+
+func push_u32 (words: own #[U32]) -> (len: U32) -> (cur: U32) -> (v: U32): (#[U32], U32, U32) =>
+  if v == 0:
+    return push_b words len cur 48
+  let d0: U32 = 0
+  let d1: U32 = 0
+  let d2: U32 = 0
+  let d3: U32 = 0
+  let d4: U32 = 0
+  let d5: U32 = 0
+  let d6: U32 = 0
+  let d7: U32 = 0
+  let d8: U32 = 0
+  let d9: U32 = 0
+  let n: U32 = 0
+  let x = v
+  for ever:
+    if x == 0:
+      break
+    let dig = 48 + (x % 10)
+    if n == 0:
+      d0 := dig
+    else:
+      if n == 1:
+        d1 := dig
+      else:
+        if n == 2:
+          d2 := dig
+        else:
+          if n == 3:
+            d3 := dig
+          else:
+            if n == 4:
+              d4 := dig
+            else:
+              if n == 5:
+                d5 := dig
+              else:
+                if n == 6:
+                  d6 := dig
+                else:
+                  if n == 7:
+                    d7 := dig
+                  else:
+                    if n == 8:
+                      d8 := dig
+                    else:
+                      d9 := dig
+    n := self + 1
+    x := self / 10
+  for ever:
+    if n == 0:
+      break
+    n := self - 1
+    let ch = if n == 0 then d0 else if n == 1 then d1 else if n == 2 then d2 else if n == 3 then d3 else if n == 4 then d4 else if n == 5 then d5 else if n == 6 then d6 else if n == 7 then d7 else if n == 8 then d8 else d9
+    let (w1, l1, c1) = push_b words len cur ch
+    words := w1
+    len := l1
+    cur := c1
+  return (words, len, cur)
+
+func push_i32 (words: own #[U32]) -> (len: U32) -> (cur: U32) -> (v: U32): (#[U32], U32, U32) =>
+  if v >= 0x80000000:
+    let (w1, l1, c1) = push_b words len cur 45
+    return push_u32 w1 l1 c1 (0 - v)
+  return push_u32 words len cur v
+
+func push_u32_pad (words: own #[U32]) -> (len: U32) -> (cur: U32) -> (v: U32) -> (width: U32): (#[U32], U32, U32) =>
+  let digits: U32 = 1
+  let t = v
+  for ever:
+    if t < 10:
+      break
+    t := self / 10
+    digits := self + 1
+  if digits < width:
+    for _ in 0 .. (width - digits):
+      let (w1, l1, c1) = push_b words len cur 32
+      words := w1
+      len := l1
+      cur := c1
+  return push_u32 words len cur v
+
+func finish_buf (words: own #[U32]) -> (len: U32) -> (cur: U32): #[U32] =>
+  if (len & 3) != 0:
+    words := self.push cur
+  words[0] := len
+  return words

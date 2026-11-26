@@ -1,0 +1,18 @@
+// PLB helloworld: prints "Hello world <arg>!\n"
+import * as buf from "./buf"
+
+io bench (inp: #[U32]): #[U32] =>
+  let (w, l, c) = buf.new_buf ()
+  let (w1, l1, c1) = buf.push_text w l c "Hello world "
+  w := w1
+  l := l1
+  c := c1
+  let alen = inp[0]
+  for i in 0 .. alen:
+    let b = (inp[1 + (i >> 2)] >> ((i & 3) << 3)) & 255
+    let (w2, l2, c2) = buf.push_b w l c b
+    w := w2
+    l := l2
+    c := c2
+  let (w3, l3, c3) = buf.push_text w l c "!\n"
+  return buf.finish_buf w3 l3 c3

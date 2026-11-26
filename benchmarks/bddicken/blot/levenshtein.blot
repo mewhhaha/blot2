@@ -1,0 +1,64 @@
+// Wagner-Fischer O(min(m, n)) two-row Levenshtein distance over all unique
+// pairs of words, matching bddicken/languages.
+// Input packet layout:
+//   [0] = word_count (W)
+//   [1 .. 1 + 2*W) = pairs (offset, len) into the same array
+//   [1 + 2*W ..) = ASCII character codes (1 byte per U32 word)
+
+func lev_dist (buf: #[U32]) -> (o1: U32) -> (l1: U32) -> (o2: U32) -> (l2: U32): U32 =>
+  let s_off = if l1 <= l2 then o1 else o2
+  let l_off = if l1 <= l2 then o2 else o1
+  let m = if l1 <= l2 then l1 else l2
+  let n = if l1 <= l2 then l2 else l1
+  let row_len = m + 1
+  let r0 = @array.fill row_len 0
+  let r1 = @array.fill row_len 0
+  for i in 0 .. row_len:
+    r0[i] := i
+
+  for j in 0 .. n:
+    let ch2 = buf[l_off + j]
+    let row_num = j + 1
+    if (j & 1) == 0:
+      r1[0] := row_num
+      let diag = r0[0]
+      let left = row_num
+      for i in 0 .. m:
+        let up = r0[i + 1]
+        let cost: U32 = if buf[s_off + i] != ch2 then 1 else 0
+        let sub = diag + cost
+        let del_ins = (if up < left then up else left) + 1
+        let best = if del_ins < sub then del_ins else sub
+        r1[i + 1] := best
+        diag := up
+        left := best
+    else:
+      r0[0] := row_num
+      let diag = r1[0]
+      let left = row_num
+      for i in 0 .. m:
+        let up = r1[i + 1]
+        let cost: U32 = if buf[s_off + i] != ch2 then 1 else 0
+        let sub = diag + cost
+        let del_ins = (if up < left then up else left) + 1
+        let best = if del_ins < sub then del_ins else sub
+        r0[i + 1] := best
+        diag := up
+        left := best
+
+  return if (n & 1) == 0 then r0[m] else r1[m]
+
+io distances (packed: #[U32]): #[U32] =>
+  let wcount = packed[0]
+  let total_pairs = (wcount * (wcount - 1)) / 2
+  let out = @array.fill total_pairs 0
+  let idx: U32 = 0
+  for i in 0 .. wcount:
+    let o1 = packed[1 + i * 2]
+    let l1 = packed[2 + i * 2]
+    for j in (i + 1) .. wcount:
+      let o2 = packed[1 + j * 2]
+      let l2 = packed[2 + j * 2]
+      out[idx] := lev_dist packed o1 l1 o2 l2
+      idx := self + 1
+  return out

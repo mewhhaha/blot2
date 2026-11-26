@@ -1,0 +1,195 @@
+// PLB pidigits: strictly non-negative Gibbons/Lambert spigot in base-2^15 U32 limbs.
+// Tracks (num, s, den) where s = 3*num + acc = n2 and s + num = n1, so every limb
+// operation is non-negative and digit extraction never underflows.
+import * as buf from "./buf"
+
+const MASK: U32 = 32767
+
+func bi_mul (a: own #[U32]) -> (alen: U32) -> (m: U32): (#[U32], U32) =>
+  if alen == 0 or m == 0:
+    return (a, 0)
+  let carry: U32 = 0
+  for i in 0 .. alen:
+    let prod = a[i] * m + carry
+    a[i] := prod & MASK
+    carry := prod >> 15
+  for ever:
+    if carry == 0:
+      break
+    if alen < a.length:
+      a[alen] := carry & MASK
+    else:
+      a := self.push (carry & MASK)
+    alen := self + 1
+    carry := self >> 15
+  return (a, alen)
+
+func bi_add_scaled (dst: own #[U32]) -> (dlen: U32) -> (src: #[U32]) -> (slen: U32) -> (m: U32): (#[U32], U32) =>
+  if slen == 0 or m == 0:
+    return (dst, dlen)
+  let maxl = if dlen > slen then dlen else slen
+  let carry: U32 = 0
+  let i: U32 = 0
+  for ever:
+    if i >= maxl and carry == 0:
+      break
+    let dv = if i < dlen then dst[i] else 0
+    let sv = if i < slen then src[i] * m else 0
+    let sum = dv + sv + carry
+    if i < dst.length:
+      dst[i] := sum & MASK
+    else:
+      dst := self.push (sum & MASK)
+    carry := sum >> 15
+    i := self + 1
+  return (dst, i)
+
+func bi_sub_scaled (dst: own #[U32]) -> (dlen: U32) -> (src: #[U32]) -> (slen: U32) -> (m: U32): (#[U32], U32) =>
+  if m == 0 or slen == 0:
+    return (dst, dlen)
+  let borrow: U32 = 0
+  for i in 0 .. dlen:
+    let dv = dst[i]
+    let sv = (if i < slen then src[i] * m else 0) + borrow
+    if dv >= sv:
+      dst[i] := dv - sv
+      borrow := 0
+    else:
+      let diff = sv - dv
+      let b = (diff + MASK) >> 15
+      dst[i] := (b << 15) - diff
+      borrow := b
+  let nl = dlen
+  for ever:
+    if nl == 0:
+      break
+    if dst[nl - 1] != 0:
+      break
+    nl := self - 1
+  return (dst, nl)
+
+func bi_cmp (a: #[U32]) -> (alen: U32) -> (b: #[U32]) -> (blen: U32): U32 =>
+  if alen != blen:
+    return if alen < blen then 0 else 2
+  let i = alen
+  for ever:
+    if i == 0:
+      break
+    i := self - 1
+    let av = a[i]
+    let bv = b[i]
+    if av != bv:
+      return if av < bv then 0 else 2
+  return 1
+
+io bench (inp: #[U32]): #[U32] =>
+  let target = inp[0]
+  let cap: U32 = (target >> 2) + 64
+  let num = @array.fill cap 0
+  let s = @array.fill cap 0
+  let den = @array.fill cap 0
+  let rem = @array.fill cap 0
+  let chk = @array.fill cap 0
+  num[0] := 1
+  s[0] := 3
+  den[0] := 1
+  let nlen: U32 = 1
+  let slen: U32 = 1
+  let dlen: U32 = 1
+  let k: U32 = 0
+  let printed: U32 = 0
+  let (w, l, c) = buf.new_buf ()
+
+  for ever:
+    if printed >= target:
+      break
+    // Try extracting digits while floor(s / den) == floor((s + num) / den).
+    let d3: U32 = 0
+    let rlen: U32 = slen
+    for i in 0 .. slen:
+      if i < rem.length:
+        rem[i] := s[i]
+      else:
+        rem := self.push s[i]
+    if rlen >= dlen:
+      let top_d = den[dlen - 1]
+      let top_r = (if rlen > dlen then (rem[dlen] << 15) else 0) + rem[dlen - 1]
+      d3 := top_r / (top_d + 1)
+      if d3 > 0:
+        let (rem1, rlen1) = bi_sub_scaled rem rlen den dlen d3
+        rem := rem1
+        rlen := rlen1
+      for ever:
+        if bi_cmp rem rlen den dlen == 0:
+          break
+        let (rem2, rlen2) = bi_sub_scaled rem rlen den dlen 1
+        rem := rem2
+        rlen := rlen2
+        d3 := self + 1
+    // chk = rem + num; safe iff chk < den.
+    let clen: U32 = rlen
+    for i in 0 .. rlen:
+      if i < chk.length:
+        chk[i] := rem[i]
+      else:
+        chk := self.push rem[i]
+    let (chk1, clen1) = bi_add_scaled chk clen num nlen 1
+    chk := chk1
+    clen := clen1
+
+    if bi_cmp chk clen den dlen == 0:
+      let (w1, l1, c1) = buf.push_b w l c (48 + d3)
+      w := w1
+      l := l1
+      c := c1
+      printed := self + 1
+      let rem10 = printed % 10
+      if rem10 == 0:
+        let (wa, la, ca) = buf.push_text w l c "\t:"
+        let (wb, lb, cb) = buf.push_u32 wa la ca printed
+        let (wc, lc, cc) = buf.push_b wb lb cb 10
+        w := wc
+        l := lc
+        c := cc
+      if printed >= target:
+        if rem10 != 0:
+          for _ in 0 .. (10 - rem10):
+            let (ws, ls, cs) = buf.push_b w l c 32
+            w := ws
+            l := ls
+            c := cs
+          let (wa, la, ca) = buf.push_text w l c "\t:"
+          let (wb, lb, cb) = buf.push_u32 wa la ca printed
+          let (wc, lc, cc) = buf.push_b wb lb cb 10
+          w := wc
+          l := lc
+          c := cc
+        break
+      // s = rem * 10, num = num * 10
+      for i in 0 .. rlen:
+        if i < s.length:
+          s[i] := rem[i]
+        else:
+          s := self.push rem[i]
+      let (s1, slen1) = bi_mul s rlen 10
+      s := s1
+      slen := slen1
+      let (num1, nlen1) = bi_mul num nlen 10
+      num := num1
+      nlen := nlen1
+    else:
+      k := self + 1
+      let k2 = (k << 1) + 1
+      // s' = s * (2*k + 1) + num * (k - 1)
+      let (s1, slen1) = bi_mul s slen k2
+      let (s2, slen2) = bi_add_scaled s1 slen1 num nlen (k - 1)
+      s := s2
+      slen := slen2
+      let (den1, dlen1) = bi_mul den dlen k2
+      den := den1
+      dlen := dlen1
+      let (num1, nlen1) = bi_mul num nlen k
+      num := num1
+      nlen := nlen1
+
+  return buf.finish_buf w l c
