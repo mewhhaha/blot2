@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    working-directory: squid-lang
 concurrency:
   group: compiler-${{ github.ref }}
   cancel-in-progress: true
@@ -13,6 +16,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: squid-lang
+      # The browser kernel qualification tests import Pen's host implementation.
+      - uses: actions/checkout@v4
+        with:
+          repository: mewhhhaha/pen
+          ref: b301f55cc94620a409444ffd001b490844c7886e
+          path: pen
+          persist-credentials: false
+      # The render-copy qualification tests compile against Ink's source library.
+      - uses: actions/checkout@v4
+        with:
+          repository: mewhhhaha/ink
+          ref: 29b672fb7323bafc8c612885c3e9ba228bf60994
+          path: ink
+          persist-credentials: false
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -25,14 +44,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/deno
-          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+          key: deno-${{ runner.os }}-${{ hashFiles('squid-lang/deno.lock') }}
           restore-keys: deno-${{ runner.os }}-
       # The compiler is written in Goose; its build first builds upstream Goose
       # with the patch series in compiler-goose/tools/upstream-32a4f44.
       - name: Cache the patched Goose compiler
         uses: actions/cache@v4
         with:
-          path: build/goose-port
-          key: goose-${{ runner.os }}-${{ hashFiles('compiler-goose/tools/upstream-32a4f44/**') }}
+          path: squid-lang/build/goose-port
+          key: goose-${{ runner.os }}-${{ hashFiles('squid-lang/compiler-goose/tools/upstream-32a4f44/**') }}
       - run: deno task check
       - run: deno publish --dry-run --allow-dirty
