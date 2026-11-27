@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json"
+DATA_PATH = ROOT / "benchmarks/evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json"
 OUT_DIR = ROOT / "benchmarks/evidence/measurements"
 
 FONT = "'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
@@ -133,11 +133,12 @@ def build_compile_and_size(data: dict) -> str:
 
     # Footer
     aot_k = c.get("wtime_aot_squid_kernels_ms", 0.0)
+    wtime_label = data.get("toolchains", {}).get("wtime_aot", "0.1.11").split(" ")[0]
     els.append(
         text(
             28,
             304,
-            f"wtime-aot 0.1.7 x64 AOT-compiles Squid Wasm in {aot_k:.1f} ms. On a 319-module / 6.19 MB 3D game: ~0.63 s cold, 61–90 ms structural edits, ~20 ms literal edits.",
+            f"wtime-aot {wtime_label} x64 (--guard-pages) AOT-compiles Squid Wasm in {aot_k:.1f} ms. On a 325-module / 6.71 MB 3D game: ~0.43–0.55 s cold, ~41–44 ms edit.",
             size=10.8,
             fill=TEXT_MUTED,
         )
@@ -219,11 +220,12 @@ def build_kernels_chart(data: dict) -> str:
         rweight = "600" if ratio_w < 1.0 else "500"
         els.append(text(cx + 14, cy + card_h - 12, ratio_txt, size=10.2, weight=rweight, fill=rfill))
 
+    wtime_label = data.get("toolchains", {}).get("wtime_aot", "0.1.11").split(" ")[0]
     els.append(
         text(
             28,
             h - 16,
-            "Linear 0..max scale per card. Executed via wtime-aot 0.1.7 (--backend x64, x64-v4, explicit software bounds). Squid enforces canonical 0x7fc00000 NaN.",
+            f"Linear 0..max scale per card. Executed via wtime-aot {wtime_label} (--backend x64 --target-cpu native --guard-pages). Bit-exact checksums.",
             size=10.5,
             fill=TEXT_MUTED,
         )
@@ -262,8 +264,12 @@ def build_ecs_chart(data: dict) -> str:
     els.append(f'  <rect x="{tx}" y="{ty}" width="{tw}" height="{th}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(tx + 16, ty + 25, "Dense iteration: Pos += Vel (10,000 entities × 100 ticks)", size=13.5, weight="700"))
     ratio_spark = dense["bevy_native_ms"] / dense["ink_soa_spark_simd_ms"]
-    ratio_aos = dense["bevy_native_ms"] / dense["ink_cached_query_ms"]
-    els.append(pill(tx + tw - 14, ty + 24, f"Ink AoS {ratio_aos:.1f}× · SoA {ratio_spark:.1f}× faster vs Bevy", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    ratio_pool = dense["bevy_native_ms"] / dense["ink_pool_direct_ms"]
+    if ratio_pool >= 1.0:
+        dense_badge = f"Ink Pool {ratio_pool:.1f}× · SoA {ratio_spark:.1f}× faster vs Bevy"
+    else:
+        dense_badge = f"Squid SoA + spark {ratio_spark:.1f}× faster vs Bevy"
+    els.append(pill(tx + tw - 14, ty + 24, dense_badge, PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
     dense_rows = sorted(
         [
@@ -371,12 +377,20 @@ def build_ecs_chart(data: dict) -> str:
             els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bw:.1f}" height="18" rx="4" fill="{bcol}"/>')
             els.append(text(bx + bw + 8, by + 13.5, bfmt, size=11.2, weight="600", fill=TEXT_MAIN))
 
+    wtime_label = data.get("toolchains", {}).get("wtime_aot", "0.1.11").split(" ")[0]
+    wins = sum([
+        dense["ink_soa_spark_simd_ms"] <= dense["bevy_native_ms"],
+        churn["ink_ms"] <= churn["bevy_native_ms"],
+        snap["ink_ms"] <= snap["bevy_native_world_rebuild_ms"],
+        sparse["ink_cached_query_ms"] <= sparse["bevy_native_ms"],
+        spawn["ink_ms"] <= spawn["bevy_native_ms"],
+    ])
     els.append(
         text(
             28,
             h - 18,
-            "Ink 4× coalesced v128 AoS queries & transposed reductions beat native Bevy across all 5/5 ECS workloads.",
-            size=10.9,
+            f"Squid/Ink wins {wins}/5 ECS workloads on wtime-aot {wtime_label} (--guard-pages); dense SoA spark leads {ratio_spark:.1f}×, snapshot {snap['bevy_native_world_rebuild_ms'] / snap['ink_ms']:.1f}×, spawn {spawn['bevy_native_ms'] / spawn['ink_ms']:.1f}×.",
+            size=10.7,
             fill=TEXT_MUTED,
         )
     )
@@ -387,8 +401,9 @@ def build_ecs_chart(data: dict) -> str:
 def main() -> None:
     data = json.loads(DATA_PATH.read_text())
     outputs = {
-        "2026-11-26-compile-and-size.svg": build_compile_and_size(data),
-        "2026-11-26-squid-vs-rust-kernels.svg": build_kernels_chart(data),
+        "2026-11-27-compile-and-size.svg": build_compile_and_size(data),
+        "2026-11-27-squid-vs-rust-kernels.svg": build_kernels_chart(data),
+        "2026-11-27-ink-vs-bevy-ecs.svg": build_ecs_chart(data),
     }
     for fname, content in outputs.items():
         path = OUT_DIR / fname

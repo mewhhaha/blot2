@@ -31,10 +31,10 @@ static uint64_t upload_u32_array(
 ) {
     uint8_t trap = 0;
     uint64_t dummy = 0;
-    call(h, (const uint8_t *)"squid:reset", 10, 0, &dummy, &trap);
+    call(h, (const uint8_t *)"squid:reset", 11, 0, &dummy, &trap);
     uint64_t ptr = 0;
     uint64_t bytes = 4ull + (uint64_t)count * 4ull;
-    int32_t rc = call(h, (const uint8_t *)"squid:allocate", 13, bytes, &ptr, &trap);
+    int32_t rc = call(h, (const uint8_t *)"squid:allocate", 14, bytes, &ptr, &trap);
     if (rc != 0) {
         fprintf(stderr, "squid:allocate(%llu) failed rc=%d\n", (unsigned long long)bytes, rc);
         print_trap(trap_msg, trap);
@@ -54,10 +54,10 @@ static uint64_t upload_u8_array(
 ) {
     uint8_t trap = 0;
     uint64_t dummy = 0;
-    call(h, (const uint8_t *)"squid:reset", 10, 0, &dummy, &trap);
+    call(h, (const uint8_t *)"squid:reset", 11, 0, &dummy, &trap);
     uint64_t ptr = 0;
     uint64_t alloc_bytes = ((4ull + (uint64_t)count) + 3ull) & ~3ull;
-    int32_t rc = call(h, (const uint8_t *)"squid:allocate", 13, alloc_bytes, &ptr, &trap);
+    int32_t rc = call(h, (const uint8_t *)"squid:allocate", 14, alloc_bytes, &ptr, &trap);
     if (rc != 0) {
         fprintf(stderr, "squid:allocate(%llu) failed rc=%d\n", (unsigned long long)alloc_bytes, rc);
         print_trap(trap_msg, trap);

@@ -109,6 +109,7 @@ impl WtimeAotModule {
                 "x64",
                 "--target-cpu",
                 "native",
+                "--guard-pages",
                 "--blot-cdylib",
                 wasm_path.to_str().unwrap(),
                 "-o",

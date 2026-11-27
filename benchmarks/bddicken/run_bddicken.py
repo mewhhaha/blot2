@@ -6,7 +6,7 @@ Reads official C, C++, Rust sources and levenshtein-words.txt from
 `build/goose-port/upstream-d5ae5bb/source/bench/bddicken`, and Squid sources
 from `benchmarks/bddicken/squid/`.
 
-Outputs `benchmarks/evidence/measurements/2026-11-26-bddicken/results.json`
+Outputs `benchmarks/evidence/measurements/2026-11-27-bddicken/results.json`
 and generates `bddicken_chart.svg`.
 """
 
@@ -30,11 +30,12 @@ HERE = Path(__file__).resolve().parent
 SQUID_DIR = HERE / "squid"
 GOOSE_BDD = ROOT / "build/goose-port/upstream-d5ae5bb/source/bench/bddicken"
 GOOSE_EXE = ROOT / "build/goose-port/upstream-d5ae5bb/build-precision/goose"
+GOOSE_STDLIB = ROOT / "build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
 SQUIDC = ROOT / "compiler-goose/build/squidc-goose"
 STD_ROOT = ROOT / "std"
 PRELUDE = STD_ROOT / "prelude.sq"
 WORK_DIR = ROOT / "build/bddicken-work"
-OUT_DIR = ROOT / "benchmarks/evidence/measurements/2026-11-26-bddicken"
+OUT_DIR = ROOT / "benchmarks/evidence/measurements/2026-11-27-bddicken"
 
 BENCHES = ["fibonacci", "loops", "levenshtein", "hello-world"]
 LANGS = ["squid", "goose", "c", "cpp", "rust"]
@@ -119,7 +120,7 @@ def build_all(bdd: Path, wtime: Path) -> dict[str, dict[str, dict]]:
         run_cmd([str(SQUIDC), "build", str(SQUID_DIR / squid_map[bench]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT)])
         squidc_ms = (time.perf_counter() - t0) * 1000.0
         t1 = time.perf_counter()
-        run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--blot-cdylib", str(wasm), "-o", str(so)])
+        run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--guard-pages", "--blot-cdylib", str(wasm), "-o", str(so)])
         aot_ms = (time.perf_counter() - t1) * 1000.0
         bins[bench]["squid"] = {
             "argv": [str(runner), bench, str(so)],
@@ -135,7 +136,7 @@ def build_all(bdd: Path, wtime: Path) -> dict[str, dict[str, dict]]:
         cfile = gdir / f"{bench}.c"
         gexe = gdir / bench
         t0 = time.perf_counter()
-        run_cmd([str(GOOSE_EXE), "-O2", "--standalone", "-o", str(cfile), str(GOOSE_BDD / bench / "goose/run.goose")])
+        run_cmd([str(GOOSE_EXE), "-O2", "--stdlib", str(GOOSE_STDLIB), "--standalone", "-o", str(cfile), str(GOOSE_BDD / bench / "goose/run.goose")])
         run_cmd(["clang", "-O3", "-w", str(cfile), "-o", str(gexe), "-lm", "-pthread", "-ldl"])
         bins[bench]["goose"] = {"argv": [str(gexe)], "compile_ms": round((time.perf_counter() - t0) * 1000.0, 2)}
 
@@ -339,6 +340,7 @@ def main() -> None:
 
     clang_ver = subprocess.run(["clang", "--version"], capture_output=True, text=True).stdout.splitlines()[0]
     rust_ver = subprocess.run(["rustc", "--version"], capture_output=True, text=True).stdout.strip()
+    squid_commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip() or "unknown"
     summary: dict[str, dict[str, dict]] = {}
     for bench in BENCHES:
         summary[bench] = {}
@@ -366,6 +368,8 @@ def main() -> None:
             "os": f"{platform.system()} {platform.release()} ({platform.machine()})",
             "clang": clang_ver,
             "rust": rust_ver,
+            "squid_commit": squid_commit,
+            "wtime_aot": f"{wtime} (--guard-pages)",
             "run_ms": args.run_ms,
             "warmup_ms": args.warmup_ms,
             "reps": args.reps,

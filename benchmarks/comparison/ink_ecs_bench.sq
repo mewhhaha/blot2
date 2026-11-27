@@ -77,10 +77,56 @@ func build_world (count: U32): EcsWorld =>
 
 func checksum_pos (pos: ecs.Pool Pos): U32 =>
   let sum: U32 = 0
+  if pos.flags == 0:
+    let vals = pos.values
+    let n = vals.length
+    for i in 0 .. n:
+      let $Pos { x, y, z } = vals[i]
+      sum := self + F32.to_u32 ((x + y + z) * 16.0)
+    return sum
   for i in 0 .. pos.length:
-    if let $Some ($Pos { x, y, z }) = pos[i]:
+    if let $Some ($Pos { x, y, z }) = ecs.read pos i:
       sum := self + F32.to_u32 ((x + y + z) * 16.0)
   return sum
+
+func step_dense (pos: own ecs.Pool Pos) -> (vel: ecs.Pool Vel): ecs.Pool Pos =>
+  if pos.flags == 0 and vel.flags == 0:
+    let $ecs.Pool { extent, flags, meta, values } = pos
+    let vv = vel.values
+    let n = min values.length vv.length
+    for _ in 0 .. 100:
+      for i in 0 .. n:
+        let $Pos { x, y, z } = values[i]
+        let $Vel { vx, vy, vz } = vv[i]
+        values[i] := $Pos { x: x + vx, y: y + vy, z: z + vz }
+    return $ecs.Pool { extent, flags, meta, values }
+  let n = pos.length
+  for _ in 0 .. 100:
+    for i in 0 .. n:
+      if let $Some ($Pos { x, y, z }) = ecs.read pos i:
+        if let $Some ($Vel { vx, vy, vz }) = ecs.read vel i:
+          pos := ecs.write_row self i ($Pos { x: x + vx, y: y + vy, z: z + vz })
+  return pos
+
+func step_selected (pos: own ecs.Pool Pos) -> (vel: ecs.Pool Vel) -> (ids: #[U32]): ecs.Pool Pos =>
+  let m = ids.length
+  if pos.flags == 0 and vel.flags == 0:
+    let $ecs.Pool { extent, flags, meta, values } = pos
+    let vv = vel.values
+    for _ in 0 .. 100:
+      for k in 0 .. m:
+        let id = ids[k]
+        let $Pos { x, y, z } = values[id]
+        let $Vel { vx, vy, vz } = vv[id]
+        values[id] := $Pos { x: x + vx, y: y + vy, z: z + vz }
+    return $ecs.Pool { extent, flags, meta, values }
+  for _ in 0 .. 100:
+    for k in 0 .. m:
+      let id = ids[k]
+      if let $Some ($Pos { x, y, z }) = ecs.read pos id:
+        if let $Some ($Vel { vx, vy, vz }) = ecs.read vel id:
+          pos := ecs.write_row self id ($Pos { x: x + vx, y: y + vy, z: z + vz })
+  return pos
 
 // Commands for persistent process:
 // cmd == 1: Dense iter via direct ecs.Pool scan (100 ticks)
@@ -100,12 +146,7 @@ func world_step (st: own EcsWorld) -> (cmd: U32): (EcsWorld, U32) =>
   } = st
   let out: U32 = 0
   if cmd == 1:
-    let n = pos.length
-    for _ in 0 .. 100:
-      for i in 0 .. n:
-        if let $Some ($Pos { x, y, z }) = pos[i]:
-          if let $Some ($Vel { vx, vy, vz }) = vel[i]:
-            pos[i] := $Some ($Pos { x: x + vx, y: y + vy, z: z + vz })
+    pos := step_dense self vel
     pos_meta := ecs.bump_payload self
     out := checksum_pos pos
   if cmd == 2:
@@ -118,13 +159,7 @@ func world_step (st: own EcsWorld) -> (cmd: U32): (EcsWorld, U32) =>
       dense_key := dk
       dense_ids := di
       dense_meta := dm
-    let m = dense_ids.length
-    for _ in 0 .. 100:
-      for k in 0 .. m:
-        let id = dense_ids[k]
-        if let $Some ($Pos { x, y, z }) = pos[id]:
-          if let $Some ($Vel { vx, vy, vz }) = vel[id]:
-            pos[id] := $Some ($Pos { x: x + vx, y: y + vy, z: z + vz })
+    pos := step_selected self vel dense_ids
     pos_meta := ecs.bump_payload self
     out := checksum_pos pos
   if cmd == 3:
@@ -139,13 +174,7 @@ func world_step (st: own EcsWorld) -> (cmd: U32): (EcsWorld, U32) =>
       sparse_key := sk
       sparse_ids := si
       sparse_meta := sm
-    let m = sparse_ids.length
-    for _ in 0 .. 100:
-      for k in 0 .. m:
-        let id = sparse_ids[k]
-        if let $Some ($Pos { x, y, z }) = pos[id]:
-          if let $Some ($Vel { vx, vy, vz }) = vel[id]:
-            pos[id] := $Some ($Pos { x: x + vx, y: y + vy, z: z + vz })
+    pos := step_selected self vel sparse_ids
     pos_meta := ecs.bump_payload self
     out := checksum_pos pos
   if cmd == 4:
@@ -171,11 +200,11 @@ func world_step (st: own EcsWorld) -> (cmd: U32): (EcsWorld, U32) =>
       active_meta := next_am
     out := ecs.membership_revision active_meta
   if cmd == 5:
-    let snap_alive = @storage.copy alive
-    let snap_pos = @storage.copy pos
-    let snap_vel = @storage.copy vel
-    let snap_act = @storage.copy active
-    let snap_frz = @storage.copy frozen
+    let snap_alive = $ecs.Entities { count: alive.count, words: @storage.copy alive.words }
+    let snap_pos: ecs.Pool Pos = ecs.copy_into identity (ecs.pool ()) pos
+    let snap_vel: ecs.Pool Vel = ecs.copy_into identity (ecs.pool ()) vel
+    let snap_act: ecs.Pool Bool = ecs.copy_into identity (ecs.pool ()) active
+    let snap_frz: ecs.Pool Bool = ecs.copy_into identity (ecs.pool ()) frozen
     out := snap_alive.length + snap_pos.length + snap_vel.length + snap_act.length + snap_frz.length
   return ($EcsWorld {
     alive, entity_meta,

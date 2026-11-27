@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-label="bddicken/languages benchmarks: Squid vs Goose, C, C++, and Rust">
+  <title>bddicken/languages benchmarks: Squid vs Goose, C, C++, and Rust</title>
+  <rect x="0.5" y="0.5" width="959" height="519" rx="12" fill="#fafaf8" stroke="#e2e8f0"/>
+  <text x="28" y="36" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">bddicken/languages Suite: Squid vs Goose, C, C++ &amp; Rust</text>
+  <text x="28" y="57" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.8" fill="#475569">Exact official C/C++/Rust sources &amp; inputs · verified outputs · AMD Ryzen 7 7800X3D 8-Core Processor · lower is better</text>
+  <rect x="28.0" y="74.5" width="12" height="12" rx="3" fill="#0f766e"/>
+  <text x="45.0" y="84.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#475569">Squid (wtime-aot)</text>
+  <rect x="170.1" y="74.5" width="12" height="12" rx="3" fill="#2563eb"/>
+  <text x="187.1" y="84.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#475569">Goose (clang -O3)</text>
+  <rect x="312.2" y="74.5" width="12" height="12" rx="3" fill="#64748b"/>
+  <text x="329.2" y="84.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#475569">C (clang -O3)</text>
+  <rect x="429.1" y="74.5" width="12" height="12" rx="3" fill="#334155"/>
+  <text x="446.1" y="84.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#475569">C++ (-O3 native)</text>
+  <rect x="564.9" y="74.5" width="12" height="12" rx="3" fill="#c2592b"/>
+  <text x="581.9" y="84.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#475569">Rust (release)</text>
+  <rect x="28" y="104" width="442" height="184" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="42" y="127" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a">fibonacci</text>
+  <text x="42" y="143" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.0" fill="#64748b">Naive recursion fib(37) = 24,157,817 · in-process mean ms</text>
+  <rect x="344.8" y="112.0" width="115.2" height="20" rx="10" fill="#dcfce7"/>
+  <text x="402.4" y="125.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">Squid 1.07× vs C</text>
+  <text x="42" y="169.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Rust</text>
+  <rect x="146.0" y="156.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="156.0" width="193.6" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="346.6" y="169.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">44.0 ms</text>
+  <text x="42" y="194.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Goose</text>
+  <rect x="146.0" y="181.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="181.0" width="195.8" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="348.8" y="194.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">44.5 ms</text>
+  <text x="42" y="219.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="700" fill="#0f766e">Squid</text>
+  <rect x="146.0" y="206.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="206.0" width="211.9" height="17" rx="3.5" fill="#0f766e"/>
+  <text x="364.9" y="219.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e">48.1 ms</text>
+  <text x="42" y="244.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C (-O3)</text>
+  <rect x="146.0" y="231.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="231.0" width="227.0" height="17" rx="3.5" fill="#64748b"/>
+  <text x="380.0" y="244.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">51.5 ms</text>
+  <text x="42" y="269.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C++ (-O3)</text>
+  <rect x="146.0" y="256.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="256.0" width="240.0" height="17" rx="3.5" fill="#334155"/>
+  <text x="393.0" y="269.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">54.5 ms</text>
+  <rect x="490" y="104" width="442" height="184" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="504" y="127" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a">loops</text>
+  <text x="504" y="143" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.0" fill="#64748b">10,000 × 10,000 modulo sum (u = 40) · in-process mean ms</text>
+  <rect x="806.8" y="112.0" width="115.2" height="20" rx="10" fill="#dcfce7"/>
+  <text x="864.4" y="125.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">Squid 2.14× vs C</text>
+  <text x="504" y="169.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Goose</text>
+  <rect x="608.0" y="156.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="156.0" width="66.4" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="681.4" y="169.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">35.0 ms</text>
+  <text x="504" y="194.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="700" fill="#0f766e">Squid</text>
+  <rect x="608.0" y="181.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="181.0" width="111.6" height="17" rx="3.5" fill="#0f766e"/>
+  <text x="726.6" y="194.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e">58.8 ms</text>
+  <text x="504" y="219.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C (-O3)</text>
+  <rect x="608.0" y="206.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="206.0" width="238.9" height="17" rx="3.5" fill="#64748b"/>
+  <text x="853.9" y="219.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">126.0 ms</text>
+  <text x="504" y="244.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C++ (-O3)</text>
+  <rect x="608.0" y="231.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="231.0" width="239.9" height="17" rx="3.5" fill="#334155"/>
+  <text x="854.9" y="244.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">126.5 ms</text>
+  <text x="504" y="269.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Rust</text>
+  <rect x="608.0" y="256.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="256.0" width="240.0" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="855.0" y="269.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">126.5 ms</text>
+  <rect x="28" y="306" width="442" height="184" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="42" y="329" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a">levenshtein</text>
+  <text x="42" y="345" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.0" fill="#64748b">Wagner-Fischer 2-row DP on 2,556 word pairs (sum = 554,324) · mean ms</text>
+  <rect x="344.8" y="314.0" width="115.2" height="20" rx="10" fill="#dcfce7"/>
+  <text x="402.4" y="327.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#166534" text-anchor="middle">Squid 1.19× vs C</text>
+  <text x="42" y="371.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Rust</text>
+  <rect x="146.0" y="358.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="358.0" width="174.9" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="327.9" y="371.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">41.0 ms</text>
+  <text x="42" y="396.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="700" fill="#0f766e">Squid</text>
+  <rect x="146.0" y="383.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="383.0" width="202.4" height="17" rx="3.5" fill="#0f766e"/>
+  <text x="355.4" y="396.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e">47.5 ms</text>
+  <text x="42" y="421.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Goose</text>
+  <rect x="146.0" y="408.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="408.0" width="207.9" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="360.9" y="421.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">48.8 ms</text>
+  <text x="42" y="446.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C++ (-O3)</text>
+  <rect x="146.0" y="433.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="433.0" width="226.0" height="17" rx="3.5" fill="#334155"/>
+  <text x="379.0" y="446.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">53.0 ms</text>
+  <text x="42" y="471.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C (-O3)</text>
+  <rect x="146.0" y="458.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="146.0" y="458.0" width="240.0" height="17" rx="3.5" fill="#64748b"/>
+  <text x="393.0" y="471.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">56.3 ms</text>
+  <rect x="490" y="306" width="442" height="184" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="504" y="329" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0f172a">hello-world</text>
+  <text x="504" y="345" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.0" fill="#64748b">Whole-process launch + stdout print · median wall ms (100 runs)</text>
+  <rect x="825.4" y="314.0" width="96.6" height="20" rx="10" fill="#f1f5f9"/>
+  <text x="873.7" y="327.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" font-weight="600" fill="#334155" text-anchor="middle">Squid 1.31× C</text>
+  <text x="504" y="371.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Rust</text>
+  <rect x="608.0" y="358.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="358.0" width="111.3" height="17" rx="3.5" fill="#c2592b"/>
+  <text x="726.3" y="371.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">0.36 ms</text>
+  <text x="504" y="396.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C (-O3)</text>
+  <rect x="608.0" y="383.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="383.0" width="111.5" height="17" rx="3.5" fill="#64748b"/>
+  <text x="726.5" y="396.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">0.36 ms</text>
+  <text x="504" y="421.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">Goose</text>
+  <rect x="608.0" y="408.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="408.0" width="131.3" height="17" rx="3.5" fill="#2563eb"/>
+  <text x="746.3" y="421.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">0.43 ms</text>
+  <text x="504" y="446.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="700" fill="#0f766e">Squid</text>
+  <rect x="608.0" y="433.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="433.0" width="146.2" height="17" rx="3.5" fill="#0f766e"/>
+  <text x="761.2" y="446.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#0f766e">0.48 ms</text>
+  <text x="504" y="471.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.6" font-weight="500" fill="#0f172a">C++ (-O3)</text>
+  <rect x="608.0" y="458.0" width="240.0" height="17" rx="3.5" fill="#f1f5f9"/>
+  <rect x="608.0" y="458.0" width="240.0" height="17" rx="3.5" fill="#334155"/>
+  <text x="855.0" y="471.5" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#0f172a">0.78 ms</text>
+  <text x="28" y="506" font-family="'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.2" fill="#64748b">Sorted fastest → slowest per benchmark. Best mean across 3 interleaved 2s runs (hello-world: median of 100 process launches).</text>
+</svg>

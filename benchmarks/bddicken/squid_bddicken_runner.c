@@ -113,10 +113,10 @@ typedef struct {
 static uint64_t upload_u32_array(ctx_t *c, const uint32_t *data, uint32_t count) {
     uint8_t trap = 0;
     uint64_t dummy = 0;
-    c->call(c->h, (const uint8_t *)"squid:reset", 10, 0, &dummy, &trap);
+    c->call(c->h, (const uint8_t *)"squid:reset", 11, 0, &dummy, &trap);
     uint64_t ptr = 0;
     uint64_t bytes = 4ull + (uint64_t)count * 4ull;
-    int32_t rc = c->call(c->h, (const uint8_t *)"squid:allocate", 13, bytes, &ptr, &trap);
+    int32_t rc = c->call(c->h, (const uint8_t *)"squid:allocate", 14, bytes, &ptr, &trap);
     if (rc != 0) {
         fprintf(stderr, "squid:allocate failed rc=%d\n", rc);
         print_trap(c->trap_msg, trap);

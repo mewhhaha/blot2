@@ -34,6 +34,7 @@ SUITE_DIR = Path(__file__).resolve().parent
 SQUID_SRC_DIR = SUITE_DIR / "squid"
 GOOSE_BENCH_DIR = ROOT / "build/goose-port/upstream-d5ae5bb/source/bench"
 GOOSE_EXE_DEFAULT = ROOT / "build/goose-port/upstream-d5ae5bb/build-precision/goose"
+GOOSE_STDLIB_DEFAULT = ROOT / "build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
 SQUIDC_DEFAULT = ROOT / "compiler-goose/build/squidc-goose"
 STD_ROOT = ROOT / "std"
 PRELUDE_PATH = STD_ROOT / "prelude.sq"
@@ -497,7 +498,7 @@ def build_goose(goose_exe: Path, work_dir: Path, file: str, n: int, tag: str) ->
     exe = gdir / tag
     write_sized(GOOSE_BENCH_DIR / "goose" / file, src, n, GOOSE_N_RE)
 
-    r = run_measured([str(goose_exe), "-O2", "--standalone", "-o", str(cfile), str(src)])
+    r = run_measured([str(goose_exe), "-O2", "--stdlib", str(GOOSE_STDLIB_DEFAULT), "--standalone", "-o", str(cfile), str(src)])
     if r["code"] != 0:
         return {"ok": False, "error": f"goose failed:\n{r['out']}\n{r['err']}"}
     r2 = run_measured(

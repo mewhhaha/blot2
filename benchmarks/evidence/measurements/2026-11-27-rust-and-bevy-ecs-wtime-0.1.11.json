@@ -1,0 +1,243 @@
+{
+  "aos_record_simd": [
+    {
+      "checksum_rust_native": 16529059,
+      "checksum_squid": 16529059,
+      "checksum_wasm3": 16529059,
+      "name": "aos_vec4_euler_65k_x32",
+      "rust_native_ms": 3.007702,
+      "squid_vs_rust_native": 0.5317880561305608,
+      "squid_wasm3_wtime_ms": 1.515941,
+      "squid_wtime_ms": 1.59946,
+      "wasm3_vs_rust_native": 0.5040196801411841
+    },
+    {
+      "checksum_rust_native": 19009988,
+      "checksum_squid": 19009988,
+      "checksum_wasm3": 19009988,
+      "name": "aos_vec2_euler_65k_x32",
+      "rust_native_ms": 0.482487,
+      "squid_vs_rust_native": 1.5171310315096571,
+      "squid_wasm3_wtime_ms": 0.723936,
+      "squid_wtime_ms": 0.731996,
+      "wasm3_vs_rust_native": 1.500425918211268
+    }
+  ],
+  "compile_speed_ms": {
+    "ink_ecs_wasm_bytes": 158909,
+    "rust_native_opt3_ms": 92.852866,
+    "rust_wasm32_opt3_ms": 102.286699,
+    "rust_wasm_bytes": 1503585,
+    "squid_6_kernels_ms": 19.834809,
+    "squid_ink_ecs_app_ms": 42.667951,
+    "squid_wasm3_bytes": 21135,
+    "squid_wasm_bytes": 21375,
+    "wtime_aot_ink_ecs_ms": 19.80903,
+    "wtime_aot_rust_kernels_ms": 6.0233229999999995,
+    "wtime_aot_squid_kernels_ms": 7.339645,
+    "wtime_aot_squid_kernels_wasm3_ms": 6.50886
+  },
+  "ecs": [
+    {
+      "bevy_native_ms": 1.907128,
+      "checksum_bevy": 88466466,
+      "checksum_ink": 88466466,
+      "ink_cached_query_ms": 3.090181,
+      "ink_pool_direct_ms": 2.9440030000000004,
+      "ink_soa_spark_simd_ms": 0.260349,
+      "name": "dense_iter_10k_x100"
+    },
+    {
+      "bevy_native_ms": 0.11438999999999999,
+      "checksum_bevy": 71214832,
+      "checksum_ink": 71214832,
+      "ink_cached_query_ms": 0.362087,
+      "name": "sparse_filtered_iter_500_of_10k_x100"
+    },
+    {
+      "bevy_native_ms": 0.550227,
+      "checksum_bevy": 70292880,
+      "checksum_ink": 70292880,
+      "ink_ms": 0.253039,
+      "name": "batch_spawn_10k"
+    },
+    {
+      "bevy_native_ms": 0.10849900000000001,
+      "checksum_bevy": 36000,
+      "checksum_ink": 37000,
+      "ink_ms": 0.15437900000000002,
+      "name": "structural_churn_2000_tag_ops"
+    },
+    {
+      "bevy_native_world_rebuild_ms": 0.552486,
+      "checksum_bevy": 16384,
+      "checksum_ink": 49972,
+      "ink_ms": 0.037239,
+      "name": "world_snapshot_copy_10k"
+    }
+  ],
+  "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
+  "kernels": [
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 54448,
+      "checksum_squid": 54448,
+      "name": "lcg_recurrence",
+      "rust_native_ms": 0.342478,
+      "rust_wtime_ms": 0.34006800000000004,
+      "squid_vs_rust_native": 0.20544385332780496,
+      "squid_vs_rust_wasm": 0.20689979651128593,
+      "squid_wtime_ms": 0.07035999999999999
+    },
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 1881015445,
+      "checksum_squid": 1881015445,
+      "name": "prime_sieve",
+      "rust_native_ms": 0.07374,
+      "rust_wtime_ms": 0.062099,
+      "squid_vs_rust_native": 0.786276105234608,
+      "squid_vs_rust_wasm": 0.9336704294755148,
+      "squid_wtime_ms": 0.05798
+    },
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 6538500,
+      "checksum_squid": 6538500,
+      "name": "matmul_64",
+      "rust_native_ms": 0.02062,
+      "rust_wtime_ms": 0.019979999999999998,
+      "squid_vs_rust_native": 0.7594568380213386,
+      "squid_vs_rust_wasm": 0.7837837837837839,
+      "squid_wtime_ms": 0.01566
+    },
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 1686408,
+      "checksum_squid": 1686408,
+      "name": "mandelbrot_f32",
+      "rust_native_ms": 3.689258,
+      "rust_wtime_ms": 0.343958,
+      "squid_vs_rust_native": 0.15063652365868693,
+      "squid_vs_rust_wasm": 1.6157118020223402,
+      "squid_wtime_ms": 0.555737
+    },
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 13338354,
+      "checksum_squid": 13338354,
+      "name": "particle_spark_simd",
+      "rust_native_ms": 0.6852860000000001,
+      "rust_wtime_ms": 0.606826,
+      "squid_vs_rust_native": 0.5492276217520861,
+      "squid_vs_rust_wasm": 0.6202403984008596,
+      "squid_wtime_ms": 0.37637800000000005
+    },
+    {
+      "checksum_exact": true,
+      "checksum_rust_native": 2814210976,
+      "checksum_squid": 2814210976,
+      "name": "merge_sort",
+      "rust_native_ms": 5.443687,
+      "rust_wtime_ms": 3.39356,
+      "squid_vs_rust_native": 0.7053155333875736,
+      "squid_vs_rust_wasm": 1.131412734709273,
+      "squid_wtime_ms": 3.8395170000000003
+    }
+  ],
+  "multicore_wtime_mandelbrot_8_tiles": [
+    {
+      "checksum": 13500030,
+      "rust_native_ms": 28.981784,
+      "squid_scaling": 1.0,
+      "squid_vs_rust_native": 0.17515584961919528,
+      "squid_wtime_ms": 5.076329,
+      "threads": 1
+    },
+    {
+      "checksum": 13500030,
+      "rust_native_ms": 16.187162,
+      "squid_scaling": 1.7024657659207627,
+      "squid_vs_rust_native": 0.18420468022745431,
+      "squid_wtime_ms": 2.981751,
+      "threads": 2
+    },
+    {
+      "checksum": 13500030,
+      "rust_native_ms": 8.661197000000001,
+      "squid_scaling": 3.2437415373290457,
+      "squid_vs_rust_native": 0.18068645707977773,
+      "squid_wtime_ms": 1.5649609999999998,
+      "threads": 4
+    },
+    {
+      "checksum": 13500030,
+      "rust_native_ms": 4.627712,
+      "squid_scaling": 4.774243515782387,
+      "squid_vs_rust_native": 0.2297623534048791,
+      "squid_wtime_ms": 1.0632739999999998,
+      "threads": 8
+    }
+  ],
+  "persistent_process_wtime_particle_sim_4096": {
+    "aos_vec4_physics_us_per_step": 2.17889,
+    "noop_commit_us_per_step": 0.048386700000000005,
+    "noop_steps_per_sec": 20666836.13472297
+  },
+  "toolchains": {
+    "bevy_ecs": "0.20.1",
+    "rustc": "1.96.0-nightly",
+    "squid_commit": "abb9acaf",
+    "wtime_aot": "0.1.11 (x64-v4, 91d6cfe)"
+  },
+  "wasm3_kernels": [
+    {
+      "checksum_default": 54448,
+      "checksum_wasm3": 54448,
+      "default_wtime_ms": 0.07035999999999999,
+      "name": "lcg_recurrence",
+      "speedup_vs_default": 0.7854519474430389,
+      "wasm3_wtime_ms": 0.089579
+    },
+    {
+      "checksum_default": 1881015445,
+      "checksum_wasm3": 1881015445,
+      "default_wtime_ms": 0.05798,
+      "name": "prime_sieve",
+      "speedup_vs_default": 0.8480451666691043,
+      "wasm3_wtime_ms": 0.068369
+    },
+    {
+      "checksum_default": 6538500,
+      "checksum_wasm3": 6538500,
+      "default_wtime_ms": 0.01566,
+      "name": "matmul_64",
+      "speedup_vs_default": 1.3039134054954205,
+      "wasm3_wtime_ms": 0.01201
+    },
+    {
+      "checksum_default": 1686408,
+      "checksum_wasm3": 1686413,
+      "default_wtime_ms": 0.555737,
+      "name": "mandelbrot_f32",
+      "speedup_vs_default": 0.958603571280721,
+      "wasm3_wtime_ms": 0.5797359999999999
+    },
+    {
+      "checksum_default": 13338354,
+      "checksum_wasm3": 13338354,
+      "default_wtime_ms": 0.37637800000000005,
+      "name": "particle_spark_simd",
+      "speedup_vs_default": 1.1905120386654353,
+      "wasm3_wtime_ms": 0.316148
+    },
+    {
+      "checksum_default": 2814210976,
+      "checksum_wasm3": 2814210976,
+      "default_wtime_ms": 3.8395170000000003,
+      "name": "merge_sort",
+      "speedup_vs_default": 1.098360862081444,
+      "wasm3_wtime_ms": 3.495679
+    }
+  ]
+}

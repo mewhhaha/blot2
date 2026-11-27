@@ -1,0 +1,643 @@
+{
+  "meta": {
+    "generated_at": "2026-11-27T20:57:09.557640+00:00",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "os": "Linux 7.3.5-2-cachyos (x86_64)",
+    "squid_commit": "6a455eae",
+    "wtime_aot": "0.1.11 (91d6cfe)",
+    "clang": "clang version 23.1.5",
+    "rust": "rustc 1.96.0-nightly (3645249d7 2026-03-16)",
+    "imbl": "6",
+    "samples": 11,
+    "warmup": 3
+  },
+  "benchmarks": [
+    {
+      "id": "flat_scan",
+      "title": "Flat U32 build + 10\u00d7 sum",
+      "subtitle": "N = 100,000 sequential push + 10\u00d7 full scan",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 0.09326,
+          "mem_bytes": 589824,
+          "rss_bytes": 4440064,
+          "checksum": 3970611936,
+          "wasm_bytes": 5011,
+          "squidc_ms": 18.16,
+          "aot_ms": 4.07
+        },
+        "packed": {
+          "ms": 0.13053,
+          "mem_bytes": 589824,
+          "rss_bytes": 4284416,
+          "checksum": 3970611936,
+          "wasm_bytes": 5072,
+          "squidc_ms": 17.75,
+          "aot_ms": 3.29
+        },
+        "seq": {
+          "ms": 0.30154,
+          "mem_bytes": 524288,
+          "rss_bytes": 4489216,
+          "checksum": 3970611936,
+          "wasm_bytes": 11348,
+          "squidc_ms": 16.88,
+          "aot_ms": 4.66
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 0.05797,
+          "rss_bytes": 4595712,
+          "checksum": 3970611936
+        },
+        "deque": {
+          "ms": 0.59496,
+          "rss_bytes": 4702208,
+          "checksum": 3970611936
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 0.09717,
+          "rss_bytes": 3158016,
+          "checksum": 3970611936
+        },
+        "deque": {
+          "ms": 0.48545,
+          "rss_bytes": 3092480,
+          "checksum": 3970611936
+        },
+        "imbl": {
+          "ms": 3.14815,
+          "rss_bytes": 3293184,
+          "checksum": 3970611936
+        }
+      }
+    },
+    {
+      "id": "random_index",
+      "title": "200k random lookups",
+      "subtitle": "N = 100,000 scattered LCG indexing",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 0.3367,
+          "mem_bytes": 589824,
+          "rss_bytes": 4489216,
+          "checksum": 1505971104,
+          "wasm_bytes": 5097,
+          "squidc_ms": 17.31,
+          "aot_ms": 3.1
+        },
+        "seq": {
+          "ms": 1.887,
+          "mem_bytes": 524288,
+          "rss_bytes": 4493312,
+          "checksum": 1505971104,
+          "wasm_bytes": 11056,
+          "squidc_ms": 16.45,
+          "aot_ms": 3.86
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 0.27568,
+          "rss_bytes": 4390912,
+          "checksum": 1505971104
+        },
+        "deque": {
+          "ms": 0.52346,
+          "rss_bytes": 4726784,
+          "checksum": 1505971104
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 0.33305,
+          "rss_bytes": 3088384,
+          "checksum": 1505971104
+        },
+        "deque": {
+          "ms": 0.32707,
+          "rss_bytes": 3092480,
+          "checksum": 1505971104
+        },
+        "imbl": {
+          "ms": 2.93464,
+          "rss_bytes": 3289088,
+          "checksum": 1505971104
+        }
+      }
+    },
+    {
+      "id": "skewed_sum",
+      "title": "Skewed 64B sum (20\u00d7 scan)",
+      "subtitle": "N = 100,000 \u00b7 99% $Tick / 1% 64B $Big",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 1.42694,
+          "mem_bytes": 8454144,
+          "rss_bytes": 10665984,
+          "checksum": 2000120000,
+          "wasm_bytes": 5471,
+          "squidc_ms": 17.58,
+          "aot_ms": 2.99
+        },
+        "packed": {
+          "ms": 1.00231,
+          "mem_bytes": 327680,
+          "rss_bytes": 3985408,
+          "checksum": 2000120000,
+          "wasm_bytes": 6125,
+          "squidc_ms": 18.34,
+          "aot_ms": 3.17
+        },
+        "seq": {
+          "ms": 1.74512,
+          "mem_bytes": 458752,
+          "rss_bytes": 4362240,
+          "checksum": 2000120000,
+          "wasm_bytes": 12929,
+          "squidc_ms": 16.57,
+          "aot_ms": 4.16
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 2.84458,
+          "rss_bytes": 11395072,
+          "checksum": 2000120000
+        },
+        "manual_split": {
+          "ms": 0.49814,
+          "rss_bytes": 4575232,
+          "checksum": 2000120000
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 1.23212,
+          "rss_bytes": 9904128,
+          "checksum": 2000120000
+        },
+        "manual_split": {
+          "ms": 0.58461,
+          "rss_bytes": 2838528,
+          "checksum": 2000120000
+        },
+        "imbl": {
+          "ms": 4.08352,
+          "rss_bytes": 9908224,
+          "checksum": 2000120000
+        }
+      }
+    },
+    {
+      "id": "wide_soa",
+      "title": "Wide 72B Record (80\u00d7 2-col scan)",
+      "subtitle": "N = 100,000 \u00b7 10 fields, reads only id & hp",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 5.65476,
+          "mem_bytes": 8454144,
+          "rss_bytes": 10788864,
+          "checksum": 1700124416,
+          "wasm_bytes": 5240,
+          "squidc_ms": 16.17,
+          "aot_ms": 3.47
+        },
+        "packed": {
+          "ms": 4.45587,
+          "mem_bytes": 8978432,
+          "rss_bytes": 12759040,
+          "checksum": 1700124416,
+          "wasm_bytes": 7972,
+          "squidc_ms": 17.66,
+          "aot_ms": 4.89
+        },
+        "seq": {
+          "ms": 7.70169,
+          "mem_bytes": 8650752,
+          "rss_bytes": 11440128,
+          "checksum": 1700124416,
+          "wasm_bytes": 12395,
+          "squidc_ms": 18.72,
+          "aot_ms": 4.76
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 7.20344,
+          "rss_bytes": 11186176,
+          "checksum": 1700124416
+        },
+        "manual_soa": {
+          "ms": 3.43537,
+          "rss_bytes": 10657792,
+          "checksum": 1700124416
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 4.58354,
+          "rss_bytes": 9973760,
+          "checksum": 1700124416
+        },
+        "manual_soa": {
+          "ms": 2.69965,
+          "rss_bytes": 9060352,
+          "checksum": 1700124416
+        },
+        "imbl": {
+          "ms": 12.00053,
+          "rss_bytes": 9867264,
+          "checksum": 1700124416
+        }
+      }
+    },
+    {
+      "id": "reverse_ops",
+      "title": "100\u00d7 reverse + reverse_range",
+      "subtitle": "N = 100,000 \u00b7 O(1) lazy rev bit vs O(n)",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 4.62577,
+          "mem_bytes": 589824,
+          "rss_bytes": 4493312,
+          "checksum": 14999900,
+          "wasm_bytes": 5639,
+          "squidc_ms": 17.28,
+          "aot_ms": 3.22
+        },
+        "seq": {
+          "ms": 0.15036,
+          "mem_bytes": 393216,
+          "rss_bytes": 4358144,
+          "checksum": 14999900,
+          "wasm_bytes": 9660,
+          "squidc_ms": 16.82,
+          "aot_ms": 4.04
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 4.08,
+          "rss_bytes": 4587520,
+          "checksum": 14999900
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 1.15582,
+          "rss_bytes": 3158016,
+          "checksum": 14999900
+        },
+        "imbl": {
+          "ms": 180.30424,
+          "rss_bytes": 3682304,
+          "checksum": 14999900
+        }
+      }
+    },
+    {
+      "id": "generative_1m",
+      "title": "1M ramp + edit + 1k reads + slice",
+      "subtitle": "N = 1,000,000 \u00b7 O(1) generative leaf vs materialized",
+      "n": 1000000,
+      "squid": {
+        "array": {
+          "ms": 0.69468,
+          "mem_bytes": 4259840,
+          "rss_bytes": 8028160,
+          "checksum": 1631421043,
+          "wasm_bytes": 5437,
+          "squidc_ms": 20.21,
+          "aot_ms": 3.3
+        },
+        "seq": {
+          "ms": 0.00793,
+          "mem_bytes": 131072,
+          "rss_bytes": 4096000,
+          "checksum": 1631421043,
+          "wasm_bytes": 12237,
+          "squidc_ms": 17.02,
+          "aot_ms": 4.55
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 0.26559,
+          "rss_bytes": 8192000,
+          "checksum": 1631421043
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 0.43893,
+          "rss_bytes": 6635520,
+          "checksum": 1631421043
+        },
+        "imbl": {
+          "ms": 7.20043,
+          "rss_bytes": 7741440,
+          "checksum": 1631421043
+        }
+      }
+    },
+    {
+      "id": "snapshot_cow",
+      "title": "2,000\u00d7 CoW snapshot + 1 edit",
+      "subtitle": "N = 50,000 U32 base \u00b7 persistent branching",
+      "n": 50000,
+      "squid": {
+        "array": {
+          "ms": 5.78215,
+          "mem_bytes": 589824,
+          "rss_bytes": 4493312,
+          "checksum": 52604000,
+          "wasm_bytes": 5276,
+          "squidc_ms": 17.4,
+          "aot_ms": 3.32
+        },
+        "seq": {
+          "ms": 0.95534,
+          "mem_bytes": 3080192,
+          "rss_bytes": 6729728,
+          "checksum": 52604000,
+          "wasm_bytes": 11816,
+          "squidc_ms": 17.32,
+          "aot_ms": 4.33
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 5.85171,
+          "rss_bytes": 4542464,
+          "checksum": 52604000
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 5.96064,
+          "rss_bytes": 3162112,
+          "checksum": 52604000
+        },
+        "imbl": {
+          "ms": 1.41734,
+          "rss_bytes": 3026944,
+          "checksum": 52604000
+        }
+      }
+    },
+    {
+      "id": "cursor_insert",
+      "title": "2,000 cursor-local middle inserts",
+      "subtitle": "N = 20,000 \u00b7 FocusGap O(1) vs array shift",
+      "n": 20000,
+      "squid": {
+        "array": {
+          "ms": 7.58129,
+          "mem_bytes": 196608,
+          "rss_bytes": 4091904,
+          "checksum": 233999,
+          "wasm_bytes": 5320,
+          "squidc_ms": 19.72,
+          "aot_ms": 3.56
+        },
+        "seq": {
+          "ms": 0.0712,
+          "mem_bytes": 196608,
+          "rss_bytes": 4096000,
+          "checksum": 233999,
+          "wasm_bytes": 11150,
+          "squidc_ms": 19.67,
+          "aot_ms": 4.46
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 0.73137,
+          "rss_bytes": 4628480,
+          "checksum": 233999
+        },
+        "deque": {
+          "ms": 1.33977,
+          "rss_bytes": 4415488,
+          "checksum": 233999
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 0.81175,
+          "rss_bytes": 2568192,
+          "checksum": 233999
+        },
+        "deque": {
+          "ms": 0.76785,
+          "rss_bytes": 2764800,
+          "checksum": 233999
+        },
+        "imbl": {
+          "ms": 45.25924,
+          "rss_bytes": 3289088,
+          "checksum": 233999
+        }
+      }
+    },
+    {
+      "id": "front_deque",
+      "title": "Front deque (5k push + 2.5k pop)",
+      "subtitle": "push_front + pop_front on U32",
+      "n": 5000,
+      "squid": {
+        "array": {
+          "ms": 8.51484,
+          "mem_bytes": 131072,
+          "rss_bytes": 4096000,
+          "checksum": 9376250,
+          "wasm_bytes": 5411,
+          "squidc_ms": 20.55,
+          "aot_ms": 4.06
+        },
+        "seq": {
+          "ms": 0.06709,
+          "mem_bytes": 131072,
+          "rss_bytes": 4096000,
+          "checksum": 9376250,
+          "wasm_bytes": 11650,
+          "squidc_ms": 17.22,
+          "aot_ms": 4.29
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 0.65197,
+          "rss_bytes": 4509696,
+          "checksum": 9376250
+        },
+        "deque": {
+          "ms": 0.01151,
+          "rss_bytes": 4403200,
+          "checksum": 9376250
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 0.67047,
+          "rss_bytes": 2834432,
+          "checksum": 9376250
+        },
+        "deque": {
+          "ms": 0.00758,
+          "rss_bytes": 2633728,
+          "checksum": 9376250
+        },
+        "imbl": {
+          "ms": 0.05331,
+          "rss_bytes": 2764800,
+          "checksum": 9376250
+        }
+      }
+    },
+    {
+      "id": "split_concat",
+      "title": "500\u00d7 split+concat rotations",
+      "subtitle": "N = 50,000 \u00b7 O(log_16 n) RRB split/concat",
+      "n": 50000,
+      "squid": {
+        "array": {
+          "ms": 32.68164,
+          "mem_bytes": 131399680,
+          "rss_bytes": 106463232,
+          "checksum": 106417,
+          "wasm_bytes": 5677,
+          "squidc_ms": 16.45,
+          "aot_ms": 3.17
+        },
+        "seq": {
+          "ms": 1.04533,
+          "mem_bytes": 2949120,
+          "rss_bytes": 6852608,
+          "checksum": 106417,
+          "wasm_bytes": 11633,
+          "squidc_ms": 19.3,
+          "aot_ms": 4.27
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 1.44668,
+          "rss_bytes": 4628480,
+          "checksum": 106417
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 1.46626,
+          "rss_bytes": 3092480,
+          "checksum": 106417
+        },
+        "imbl": {
+          "ms": 4.55546,
+          "rss_bytes": 3022848,
+          "checksum": 106417
+        }
+      }
+    },
+    {
+      "id": "frozen_span",
+      "title": "500\u00d7 frozen-array slice+reverse",
+      "subtitle": "N = 100,000 \u00b7 zero-copy Seq.from_frozen_array",
+      "n": 100000,
+      "squid": {
+        "array": {
+          "ms": 9.31296,
+          "mem_bytes": 720896,
+          "rss_bytes": 4489216,
+          "checksum": 2346780112,
+          "wasm_bytes": 5657,
+          "squidc_ms": 18.54,
+          "aot_ms": 3.33
+        },
+        "seq": {
+          "ms": 0.25346,
+          "mem_bytes": 786432,
+          "rss_bytes": 4489216,
+          "checksum": 2346780112,
+          "wasm_bytes": 11329,
+          "squidc_ms": 17.59,
+          "aot_ms": 4.61
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 1.12217,
+          "rss_bytes": 4530176,
+          "checksum": 2346780112
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 1.2881,
+          "rss_bytes": 3162112,
+          "checksum": 2346780112
+        },
+        "imbl": {
+          "ms": 14.32721,
+          "rss_bytes": 3268608,
+          "checksum": 2346780112
+        }
+      }
+    },
+    {
+      "id": "packed_sum_cow",
+      "title": "1,000\u00d7 CoW edit on 50k 64B sum",
+      "subtitle": "N = 50,000 skewed sum \u00b7 persistent packed leaves",
+      "n": 50000,
+      "squid": {
+        "array": {
+          "ms": 60.52618,
+          "mem_bytes": 8454144,
+          "rss_bytes": 10907648,
+          "checksum": 1504060,
+          "wasm_bytes": 6058,
+          "squidc_ms": 20.22,
+          "aot_ms": 3.38
+        },
+        "seq": {
+          "ms": 0.56332,
+          "mem_bytes": 983040,
+          "rss_bytes": 4751360,
+          "checksum": 1504060,
+          "wasm_bytes": 14332,
+          "squidc_ms": 17.03,
+          "aot_ms": 4.48
+        }
+      },
+      "cpp": {
+        "vector": {
+          "ms": 69.23556,
+          "rss_bytes": 10964992,
+          "checksum": 1504060
+        }
+      },
+      "rust": {
+        "vec": {
+          "ms": 67.25302,
+          "rss_bytes": 9957376,
+          "checksum": 1504060
+        },
+        "imbl": {
+          "ms": 1.14437,
+          "rss_bytes": 6176768,
+          "checksum": 1504060
+        }
+      }
+    }
+  ]
+}
