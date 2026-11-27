@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "22a548a80f6c4c6d75465f2ef9cf7b15a66ab0a060096867577293b5ce10b775",
+  "digest": "38c2bd05762a26d7c39b7256cd742d8392c003ad00509abd13363e25f41b688e",
   "goose": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -402,9 +402,9 @@
       "sha256": "3069443ec37d7e8ae4575a13ea59e0f85003ea2e42ea0c6af54a6add8120b29a"
     },
     {
-      "bytes": 77951,
+      "bytes": 78331,
       "path": "src/check/wire_schema.goose",
-      "sha256": "ae8fd4d541cfe4fa93f5f13021f13f4082e98f020830d5524594d43c5054f06c"
+      "sha256": "452a28f1af3fcd96a87c5e99cda392895b7a64cdb40cba79242abb432b1ce564"
     },
     {
       "bytes": 2874,

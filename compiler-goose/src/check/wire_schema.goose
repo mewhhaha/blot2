@@ -545,6 +545,11 @@ recursive fn encodeTypeId(
         boolean => { cache.out_buf.push(0x02); return true; },
         floating32 => { cache.out_buf.push(0x03); return true; },
         never => { cache.out_buf.push(0x06); return true; },
+        unsigned8 => { cache.out_buf.push(0x07); return true; },
+        signed32 => { cache.out_buf.push(0x08); return true; },
+        unsigned64 => { cache.out_buf.push(0x09); return true; },
+        signed64 => { cache.out_buf.push(0x0a); return true; },
+        floating64 => { cache.out_buf.push(0x0b); return true; },
         variable => {
             let mapped, ok = lookupSubstRange(cache.subst_pool[..], subst_start, subst_len, unit, tid);
             if ok {
@@ -1023,7 +1028,7 @@ recursive fn checkPersistentSafe(
     if (tid as i64) >= m.types.nodes.len { return false; }
     let node = m.types.node(tid);
     match node.tag {
-        unit, boolean, unsigned32, floating32, never => { return true; },
+        unit, boolean, unsigned32, floating32, never, unsigned8, signed32, unsigned64, signed64, floating64 => { return true; },
         variable => {
             let mapped, ok = lookupSubstRange(cache.subst_pool[..], subst_start, subst_len, unit, tid);
             if !ok { return false; }

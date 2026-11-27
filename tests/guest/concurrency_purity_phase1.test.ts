@@ -903,3 +903,44 @@ io smoke (): U32 => return 1
     { stdRoot },
   );
 });
+
+Deno.test("PersistentSafe allows U8, I32, U64, I64, and F64 inside #process state", async () => {
+  await compileAndRun(
+    `type WideState is data = $WideState {
+  bits: #[U64],
+  bytes: #[U8],
+  signed32: I32,
+  signed64: I64,
+  wide_f: F64,
+}
+func init_wide (n: U32): WideState =>
+  let bits: #[U64] = #[U32.to_u64 n]
+  let bytes: #[U8] = #[U32.to_u8 (n & 255)]
+  return $WideState {
+    bits,
+    bytes,
+    signed32: U32.to_i32 n,
+    signed64: U32.to_i64 n,
+    wide_f: U32.to_f64 n,
+  }
+func step_wide (st: own WideState) -> (delta: U32): (WideState, U32) =>
+  let $WideState { bits, bytes, signed32, signed64, wide_f } = st
+  bits[0] := U64.add self (U32.to_u64 delta)
+  bytes[0] := U32.to_u8 ((U8.to_u32 self + delta) & 255)
+  let next_s32 = I32.add signed32 (U32.to_i32 delta)
+  let next_s64 = I64.add signed64 (U32.to_i64 delta)
+  let next_f = F64.add wide_f (U32.to_f64 delta)
+  let out = U64.to_u32 bits[0] + U8.to_u32 bytes[0] + I32.to_u32 next_s32 + I64.to_u32 next_s64 + F64.to_u32 next_f
+  return ($WideState { bits, bytes, signed32: next_s32, signed64: next_s64, wide_f: next_f }, out)
+#process const wide_proc: Process [U32, U32, U32] = { init: init_wide, step: step_wide }
+io ok (): U32 => return 1
+`,
+    (guest) => {
+      equal(guest.call("ok", null), 1);
+      guest.call("squid:proc_init:wide_proc", 5);
+      equal(guest.call("squid:proc_step:wide_proc", 3), 40);
+      equal(guest.call("squid:proc_step:wide_proc", 2), 50);
+    },
+    { stdRoot },
+  );
+});

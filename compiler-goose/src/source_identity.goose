@@ -1,6 +1,6 @@
 // Generated from actual Goose/host/build inputs by build.py.
 // Regenerated before every build; no Zig oracle digest is reused.
 namespace squid_source_identity;
-let digest:u8[32]=[34,165,72,168,15,108,76,109,117,70,95,46,249,207,123,21,166,106,176,160,96,9,104,103,87,114,147,181,206,16,183,117];
+let digest:u8[32]=[56,194,189,5,118,42,38,215,195,155,114,86,205,116,45,131,146,192,3,173,0,80,154,189,19,54,62,37,244,27,104,142];
 let inference_budget:u64=1000000;
 let artifact_replay:bool=false;
