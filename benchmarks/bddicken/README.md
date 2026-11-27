@@ -1,8 +1,8 @@
 # `bddicken/languages` Suite: Squid vs Goose, C, C++ & Rust
 
-Side-by-side results on all four workloads from [`bddicken/languages`](https://github.com/bddicken/languages), running Squid (`squidc-goose` + `wtime-aot 0.1.7`, x64-v4) against the unmodified official upstream C (`clang -O3`), C++ (`clang++ -O3 -march=native`), Rust (`cargo build --release`), and Goose (`clang -O3`) implementations on the same AMD Ryzen 7 7800X3D host.
+Side-by-side results on all four workloads from [`bddicken/languages`](https://github.com/bddicken/languages), running Squid (`squidc-goose` `abb9acaf` + `wtime-aot 0.1.11 --guard-pages`, x64 native) against the unmodified official upstream C (`clang -O3`), C++ (`clang++ -O3 -march=native`), Rust (`cargo build --release`), and Goose (`clang -O3`) implementations on the same AMD Ryzen 7 7800X3D host.
 
-![bddicken/languages benchmark results](../evidence/measurements/2026-11-26-bddicken/bddicken_chart.svg)
+![bddicken/languages benchmark results](../evidence/measurements/2026-11-27-bddicken/bddicken_chart.svg)
 
 ## Protocol & Verification
 
@@ -18,4 +18,4 @@ Side-by-side results on all four workloads from [`bddicken/languages`](https://g
 python3 benchmarks/bddicken/run_bddicken.py --run-ms 2000 --warmup-ms 500 --reps 3 --hello-runs 100
 ```
 
-- **Raw evidence**: [`results.json`](../evidence/measurements/2026-11-26-bddicken/results.json)
+- **Raw evidence**: [`results.json`](../evidence/measurements/2026-11-27-bddicken/results.json) (previous Nov 26 baseline preserved in [`../evidence/measurements/2026-11-26-bddicken/`](../evidence/measurements/2026-11-26-bddicken/results.json))

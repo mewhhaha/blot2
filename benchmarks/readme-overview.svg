@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="342" viewBox="0 0 920 342" role="img" aria-labelledby="title desc">
   <title id="title">Squid benchmark results</title>
-  <desc id="desc">Each bar shows Squid's time or memory as a percentage of the named baseline. On the 16-benchmark Goose suite, Squid takes 1.07 times the runtime and uses 0.86 times the peak memory of expert C++. On 12 PLB problems, Squid is 2.14 times faster than Go. A cold native build takes 27 milliseconds, 8.7 times faster than clang++. All comparisons use geometric means.</desc>
+  <desc id="desc">Each bar shows Squid's time or memory as a percentage of the named baseline. On the 16-benchmark Goose suite, Squid takes 1.10 times the runtime and uses 0.86 times the peak memory of expert C++. On 12 PLB problems, Squid is 2.18 times faster than Go. A cold native build takes 30 milliseconds, 8.5 times faster than clang++. All comparisons use geometric means.</desc>
   <style>
     text { font-family: system-ui, sans-serif; fill: #192924; }
     .heading { font-size: 25px; font-weight: 700; }
@@ -26,15 +26,15 @@
   <g transform="translate(0 131)">
     <text x="24" class="label">Runtime</text>
     <text x="24" y="20" class="detail">Goose suite · 16 benchmarks</text>
-    <rect x="264" y="-7" width="428" height="16" rx="3" class="bar"/>
-    <text x="732" class="value">1.07×</text>
+    <rect x="264" y="-7" width="440" height="16" rx="3" class="bar"/>
+    <text x="732" class="value">1.10×</text>
     <text x="732" y="20" class="detail">expert C++ time</text>
   </g>
   <g transform="translate(0 187)">
     <text x="24" class="label">Runtime</text>
     <text x="24" y="20" class="detail">PLB · 12 problems</text>
-    <rect x="264" y="-7" width="186.92" height="16" rx="3" class="bar"/>
-    <text x="732" class="value">2.14× faster</text>
+    <rect x="264" y="-7" width="183.49" height="16" rx="3" class="bar"/>
+    <text x="732" class="value">2.18× faster</text>
     <text x="732" y="20" class="detail">than Go</text>
   </g>
   <g transform="translate(0 243)">
@@ -47,8 +47,8 @@
   <g transform="translate(0 299)">
     <text x="24" class="label">Cold build to native</text>
     <text x="24" y="20" class="detail">Goose suite · 16 benchmarks</text>
-    <rect x="264" y="-7" width="45.88" height="16" rx="3" class="bar"/>
-    <text x="732" class="value">27 ms</text>
-    <text x="732" y="20" class="detail">8.7× faster than clang++</text>
+    <rect x="264" y="-7" width="47.21" height="16" rx="3" class="bar"/>
+    <text x="732" class="value">30 ms</text>
+    <text x="732" y="20" class="detail">8.5× faster than clang++</text>
   </g>
 </svg>

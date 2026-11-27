@@ -17,7 +17,7 @@
   <a href="DESIGN.md">Design</a>
 </p>
 
-![Squid benchmark results. Across 16 benchmarks, Squid takes 1.07× the runtime and uses 0.86× the peak memory of expert C++. On 12 PLB problems it is 2.14× faster than Go. A cold native build takes 27 ms, 8.7× faster than clang++.](benchmarks/readme-overview.svg)
+![Squid benchmark results. Across 16 benchmarks, Squid takes 1.10× the runtime and uses 0.86× the peak memory of expert C++. On 12 PLB problems it is 2.18× faster than Go. A cold native build takes 30 ms, 8.5× faster than clang++.](benchmarks/readme-overview.svg)
 
 <sub>AMD Ryzen 7 7800X3D · <code>squidc-goose</code> → <code>wtime-aot 0.1.11</code> AOT-compiled Wasm · 100% bit-exact output parity · <a href="BENCHMARK.md">Methodology →</a></sub>
 
@@ -164,7 +164,7 @@ io main (): #[U32] => encode_fields ($Player { id: 7 }) // #[10, 7, 20, 100]
 
 ### SIMD by default with `spark`
 
-Mark an elementwise comprehension with `spark` to auto-vectorize straight to Wasm `v128` SIMD—the mechanism behind Squid's **2.24×** lead over C++ on `particles`.
+Mark an elementwise comprehension with `spark` to auto-vectorize straight to Wasm `v128` SIMD—the mechanism behind Squid's **2.19×** lead over C++ on `particles`.
 
 ```squid
 func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32] =>
@@ -231,19 +231,20 @@ Run `deno task squid explain <CODE>` for the full cause, minimal repro, and fix 
 
 | Workload | Squid | Comparison | Result |
 |---|---:|---:|---|
-| `particles` (16-suite) | 83.0 ms | C++ expert 185.6 ms | **#1 overall · 2.24× faster** |
-| `sum` (16-suite) | 39.6 ms | Goose 47.8 ms | **#1 overall · 1.21× faster** |
-| `bintrees` (16-suite) | 66.5 ms | C++ expert 86.5 ms | **1.30× vs C++ exp · 1.09× vs Rust exp** |
-| PLB `binarytrees` | 146.3 ms | Go 1.22 s · Rust 1.44 s | **8.31× vs Go · 9.85× vs Rust** |
-| PLB `spectral-norm` | 483.6 ms | Rust 490.1 ms | **#1 overall · 1.28× vs Go** |
-| PLB `merkletrees` | 372.4 ms · 17.8 MiB | Rust 678.6 ms · 34.1 MiB | **#1 speed & lowest RSS** |
-| `sexp` / `words` RSS | 109.2 / 79.6 MiB | Goose 128.0 / 138.3 MiB | **#1 lowest RSS in suite** |
+| `particles` (16-suite) | 86.9 ms | C++ expert 190.7 ms | **#1 overall · 2.19× faster** |
+| `sum` (16-suite) | 44.5 ms | Rust 51.8 ms · Goose 52.8 ms | **#1 overall · 1.19× vs C++ exp** |
+| `bintrees` (16-suite) | 67.2 ms | C++ expert 85.5 ms | **1.27× vs C++ exp · 1.05× vs Rust exp** |
+| PLB `binarytrees` | 154.8 ms | Go 1.34 s · Rust 1.59 s | **8.68× vs Go · 10.29× vs Rust** |
+| PLB `spectral-norm` | 486.1 ms | Rust 482.6 ms · Go 648.4 ms | **1.33× vs Go · 1.53× vs C** |
+| PLB `merkletrees` | 393.1 ms · 17.8 MiB | Rust 726.1 ms · 33.9 MiB | **#1 speed & lowest RSS** |
+| `sexp` / `words` RSS | 109.1 / 79.6 MiB | Goose 128.0 / 138.2 MiB | **#1 lowest RSS in suite** |
+| `~[T]` / `%[T]` collections | 563 µs CoW · 1.00 ms sum | C++ `vector` 69.2 ms · `2.84 ms` | **123× CoW · beats `imbl` 11/12** |
 
-Where Squid trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap), and on PLB Squid trails C++/Rust on SIMD-heavy `fannkuch-redux` (`1.74 s` vs C++ `960.9 ms`) and Go's assembly `math/big` on `pidigits` (`1.14 s` vs `648.6 ms`).
+Where Squid trails: Goose leads the 16-suite geomean at `0.89×`, and on PLB Squid trails C++/Rust on SIMD-heavy `fannkuch-redux` (`1.83 s` vs C++ `989.5 ms`) and Go's assembly `math/big` on `pidigits` (`1.20 s` vs `678.0 ms`).
 
 | Iteration speed | Time |
 |---|---:|
-| 16-suite cold build to native (geomean) | **26.9 ms** (8.7× faster than `clang++ -O2`) |
+| 16-suite cold build to native (geomean) | **29.9 ms** (8.5× faster than `clang++ -O2`) |
 | 69k-LOC 3D game, cold build (325 modules) | **0.43–0.55 s** |
 | Single-file incremental edit | **41–44 ms** |
 | Literal / comment edit | **~20 ms** |
@@ -255,7 +256,13 @@ Where Squid trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap),
 <img src="benchmarks/evidence/measurements/2026-11-27-plb/plb_runtime.svg" width="100%" alt="Programming-Language-Benchmarks runtime comparison across 13 problems for Squid, Go, Rust, C, and C++">
 </details>
 
-→ **[BENCHMARK.md](BENCHMARK.md)** — full per-benchmark tables, Ink vs Bevy ECS, `bddicken/languages`, and raw JSON.
+<details>
+<summary>Collection families chart (Squid <code>#[T]</code> / <code>%[T]</code> / <code>~[T]</code> vs C++20, Rust &amp; <code>imbl::Vector</code>)</summary>
+
+<img src="benchmarks/evidence/measurements/2026-11-27-collections/collections_cross_lang.svg" width="100%" alt="Cross-language collections benchmark comparing Squid #[T], %[T], and ~[T] against C++20 std::vector/deque and Rust Vec/VecDeque/imbl::Vector">
+</details>
+
+→ **[BENCHMARK.md](BENCHMARK.md)** — full per-benchmark tables, collection families, Ink vs Bevy ECS, `bddicken/languages`, and raw JSON.
 
 ## Getting started
 

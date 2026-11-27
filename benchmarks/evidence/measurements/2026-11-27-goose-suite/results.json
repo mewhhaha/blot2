@@ -7,54 +7,54 @@
         "medium": {
           "n": 16000000,
           "rows": {
-            "blot grow array": {
-              "kind": "blot",
+            "squid grow array": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 39.562,
-              "wall_ms": 40.172,
-              "median_ms": 40.963,
+              "ms": 44.526,
+              "wall_ms": 46.523,
+              "median_ms": 45.302,
               "all_ms": [
-                39.562,
-                40.963,
-                43.22
+                44.526,
+                45.302,
+                45.952
               ],
               "all_wall_ms": [
-                40.172,
-                41.395,
-                43.674
+                46.523,
+                47.558,
+                48.525
               ],
-              "peak_bytes": 68059136,
-              "peak_mb": 64.91,
-              "compile_ms": 28.73,
+              "peak_bytes": 67960832,
+              "peak_mb": 64.81,
+              "compile_ms": 26.59,
               "stdout": [
                 "16000000",
                 "63945983872"
               ],
-              "blotc_ms": 21.36,
-              "aot_ms": 7.37,
-              "wasm_bytes": 5707
+              "squidc_ms": 19.11,
+              "aot_ms": 7.48,
+              "wasm_bytes": 5713
             },
             "goose grow-only array": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 47.76,
-              "wall_ms": 48.039,
-              "median_ms": 47.987,
+              "ms": 52.806,
+              "wall_ms": 54.057,
+              "median_ms": 53.015,
               "all_ms": [
-                47.76,
-                47.987,
-                49.261
+                52.806,
+                53.015,
+                54.198
               ],
               "all_wall_ms": [
-                48.039,
-                48.392,
-                49.605
+                54.057,
+                54.392,
+                55.967
               ],
-              "peak_bytes": 68403200,
-              "peak_mb": 65.23,
-              "compile_ms": 112.84,
+              "peak_bytes": 68587520,
+              "peak_mb": 65.41,
+              "compile_ms": 118.59,
               "stdout": [
                 "16000000",
                 "63945983872"
@@ -64,22 +64,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 52.476,
-              "wall_ms": 52.963,
-              "median_ms": 53.222,
+              "ms": 57.522,
+              "wall_ms": 58.26,
+              "median_ms": 60.182,
               "all_ms": [
-                52.476,
-                53.222,
-                53.68
+                57.522,
+                60.182,
+                63.529
               ],
               "all_wall_ms": [
-                52.963,
-                53.792,
-                54.228
+                58.26,
+                61.162,
+                65.532
               ],
-              "peak_bytes": 71180288,
-              "peak_mb": 67.88,
-              "compile_ms": 153.82,
+              "peak_bytes": 72007680,
+              "peak_mb": 68.67,
+              "compile_ms": 163.23,
               "stdout": [
                 "16000000",
                 "63945983872"
@@ -89,22 +89,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 50.764,
-              "wall_ms": 51.12,
-              "median_ms": 50.776,
+              "ms": 53.009,
+              "wall_ms": 54.464,
+              "median_ms": 53.407,
               "all_ms": [
-                50.764,
-                50.776,
-                52.806
+                53.009,
+                53.407,
+                53.449
               ],
               "all_wall_ms": [
-                51.12,
-                51.24,
-                53.582
+                54.464,
+                54.494,
+                55.779
               ],
-              "peak_bytes": 67952640,
-              "peak_mb": 64.8,
-              "compile_ms": 161.43,
+              "peak_bytes": 68136960,
+              "peak_mb": 64.98,
+              "compile_ms": 171.0,
               "stdout": [
                 "16000000",
                 "63945983872"
@@ -114,22 +114,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 49.699,
-              "wall_ms": 50.394,
-              "median_ms": 50.558,
+              "ms": 51.835,
+              "wall_ms": 52.807,
+              "median_ms": 53.923,
               "all_ms": [
-                49.699,
-                50.558,
-                51.259
+                51.835,
+                53.923,
+                54.755
               ],
               "all_wall_ms": [
-                50.394,
-                50.924,
-                52.336
+                52.807,
+                56.143,
+                57.004
               ],
-              "peak_bytes": 66621440,
-              "peak_mb": 63.54,
-              "compile_ms": 76.76,
+              "peak_bytes": 66564096,
+              "peak_mb": 63.48,
+              "compile_ms": 88.2,
               "stdout": [
                 "16000000",
                 "63945983872"
@@ -146,56 +146,56 @@
         "medium": {
           "n": 16000000,
           "rows": {
-            "blot array+reserve, indices": {
-              "kind": "blot",
+            "squid array+reserve, indices": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 44.375,
-              "wall_ms": 45.267,
-              "median_ms": 44.427,
+              "ms": 44.504,
+              "wall_ms": 46.591,
+              "median_ms": 46.359,
               "all_ms": [
-                44.375,
-                44.427,
-                44.435
+                44.504,
+                46.359,
+                47.133
               ],
               "all_wall_ms": [
-                45.267,
-                45.359,
-                46.423
+                46.591,
+                47.128,
+                49.567
               ],
-              "peak_bytes": 133079040,
-              "peak_mb": 126.91,
-              "compile_ms": 26.42,
+              "peak_bytes": 133025792,
+              "peak_mb": 126.86,
+              "compile_ms": 27.74,
               "stdout": [
                 "16000000",
                 "250000",
                 "7999220817282",
                 "12000142"
               ],
-              "blotc_ms": 18.43,
-              "aot_ms": 7.99,
-              "wasm_bytes": 7020
+              "squidc_ms": 19.66,
+              "aot_ms": 8.08,
+              "wasm_bytes": 7026
             },
             "goose array, typed references": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 36.296,
-              "wall_ms": 36.553,
-              "median_ms": 37.349,
+              "ms": 40.054,
+              "wall_ms": 42.279,
+              "median_ms": 40.632,
               "all_ms": [
-                36.296,
-                37.349,
-                37.459
+                40.054,
+                40.632,
+                40.846
               ],
               "all_wall_ms": [
-                36.553,
-                37.591,
-                37.837
+                42.279,
+                43.054,
+                43.105
               ],
-              "peak_bytes": 133394432,
-              "peak_mb": 127.21,
-              "compile_ms": 103.98,
+              "peak_bytes": 133218304,
+              "peak_mb": 127.05,
+              "compile_ms": 115.88,
               "stdout": [
                 "16000000",
                 "250000",
@@ -207,22 +207,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 52.264,
-              "wall_ms": 52.633,
-              "median_ms": 52.285,
+              "ms": 54.71,
+              "wall_ms": 55.437,
+              "median_ms": 55.334,
               "all_ms": [
-                52.264,
-                52.285,
-                52.925
+                54.71,
+                55.334,
+                56.119
               ],
               "all_wall_ms": [
-                52.633,
-                52.934,
-                53.267
+                55.437,
+                56.832,
+                57.27
               ],
-              "peak_bytes": 141328384,
-              "peak_mb": 134.78,
-              "compile_ms": 171.5,
+              "peak_bytes": 140140544,
+              "peak_mb": 133.65,
+              "compile_ms": 179.66,
               "stdout": [
                 "16000000",
                 "250000",
@@ -234,22 +234,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 43.4,
-              "wall_ms": 43.701,
-              "median_ms": 43.845,
+              "ms": 44.925,
+              "wall_ms": 45.949,
+              "median_ms": 45.519,
               "all_ms": [
-                43.4,
-                43.845,
-                44.761
+                44.925,
+                45.519,
+                47.606
               ],
               "all_wall_ms": [
-                43.701,
-                44.183,
-                45.245
+                45.949,
+                47.101,
+                49.36
               ],
-              "peak_bytes": 134197248,
-              "peak_mb": 127.98,
-              "compile_ms": 169.69,
+              "peak_bytes": 134152192,
+              "peak_mb": 127.94,
+              "compile_ms": 186.74,
               "stdout": [
                 "16000000",
                 "250000",
@@ -261,22 +261,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 39.707,
-              "wall_ms": 40.3,
-              "median_ms": 39.938,
+              "ms": 41.698,
+              "wall_ms": 42.397,
+              "median_ms": 42.245,
               "all_ms": [
-                39.707,
-                39.938,
-                40.57
+                41.698,
+                42.245,
+                42.685
               ],
               "all_wall_ms": [
-                40.3,
-                40.345,
-                40.778
+                42.397,
+                42.688,
+                44.05
               ],
-              "peak_bytes": 132661248,
-              "peak_mb": 126.52,
-              "compile_ms": 71.91,
+              "peak_bytes": 132571136,
+              "peak_mb": 126.43,
+              "compile_ms": 77.61,
               "stdout": [
                 "16000000",
                 "250000",
@@ -295,54 +295,54 @@
         "medium": {
           "n": 2000000,
           "rows": {
-            "blot packed bytes + offsets": {
-              "kind": "blot",
+            "squid packed bytes + offsets": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 70.892,
-              "wall_ms": 71.171,
-              "median_ms": 73.688,
+              "ms": 81.438,
+              "wall_ms": 85.075,
+              "median_ms": 84.775,
               "all_ms": [
-                70.892,
-                73.688,
-                73.821
+                81.438,
+                84.775,
+                92.179
               ],
               "all_wall_ms": [
-                71.171,
-                74.254,
-                74.265
+                85.075,
+                87.198,
+                95.366
               ],
               "peak_bytes": 45469696,
               "peak_mb": 43.36,
-              "compile_ms": 26.07,
+              "compile_ms": 26.58,
               "stdout": [
                 "2000000",
                 "1843958476"
               ],
-              "blotc_ms": 18.32,
-              "aot_ms": 7.75,
-              "wasm_bytes": 6772
+              "squidc_ms": 18.77,
+              "aot_ms": 7.81,
+              "wasm_bytes": 6778
             },
             "goose inline strings, owned": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 73.295,
-              "wall_ms": 73.715,
-              "median_ms": 73.539,
+              "ms": 76.072,
+              "wall_ms": 77.726,
+              "median_ms": 76.317,
               "all_ms": [
-                73.295,
-                73.539,
-                74.147
+                76.072,
+                76.317,
+                78.939
               ],
               "all_wall_ms": [
-                73.715,
-                74.054,
-                74.521
+                77.726,
+                78.344,
+                81.601
               ],
-              "peak_bytes": 59928576,
-              "peak_mb": 57.15,
-              "compile_ms": 121.78,
+              "peak_bytes": 59760640,
+              "peak_mb": 56.99,
+              "compile_ms": 130.21,
               "stdout": [
                 "2000000",
                 "1843958476"
@@ -352,22 +352,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 107.486,
-              "wall_ms": 108.94,
-              "median_ms": 112.046,
+              "ms": 118.165,
+              "wall_ms": 121.201,
+              "median_ms": 121.725,
               "all_ms": [
-                107.486,
-                112.046,
-                113.314
+                118.165,
+                121.725,
+                123.131
               ],
               "all_wall_ms": [
-                108.94,
-                112.894,
-                114.508
+                121.201,
+                125.479,
+                128.201
               ],
-              "peak_bytes": 115236864,
-              "peak_mb": 109.9,
-              "compile_ms": 233.28,
+              "peak_bytes": 113287168,
+              "peak_mb": 108.04,
+              "compile_ms": 274.74,
               "stdout": [
                 "2000000",
                 "1843958476"
@@ -377,22 +377,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 74.322,
-              "wall_ms": 74.93,
-              "median_ms": 76.533,
+              "ms": 79.547,
+              "wall_ms": 81.019,
+              "median_ms": 82.024,
               "all_ms": [
-                74.322,
-                76.533,
-                80.73
+                79.547,
+                82.024,
+                82.358
               ],
               "all_wall_ms": [
-                74.93,
-                77.121,
-                81.795
+                81.019,
+                83.987,
+                85.571
               ],
-              "peak_bytes": 63000576,
-              "peak_mb": 60.08,
-              "compile_ms": 227.32,
+              "peak_bytes": 62902272,
+              "peak_mb": 59.99,
+              "compile_ms": 249.97,
               "stdout": [
                 "2000000",
                 "1843958476"
@@ -402,22 +402,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 138.33,
-              "wall_ms": 139.221,
-              "median_ms": 140.409,
+              "ms": 151.659,
+              "wall_ms": 155.537,
+              "median_ms": 152.039,
               "all_ms": [
-                138.33,
-                140.409,
-                145.212
+                151.659,
+                152.039,
+                153.424
               ],
               "all_wall_ms": [
-                139.221,
-                141.881,
-                146.056
+                155.537,
+                155.75,
+                157.0
               ],
-              "peak_bytes": 142782464,
-              "peak_mb": 136.17,
-              "compile_ms": 98.52,
+              "peak_bytes": 142311424,
+              "peak_mb": 135.72,
+              "compile_ms": 108.74,
               "stdout": [
                 "2000000",
                 "1843958476"
@@ -427,22 +427,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 86.87,
-              "wall_ms": 87.326,
-              "median_ms": 87.074,
+              "ms": 98.335,
+              "wall_ms": 105.362,
+              "median_ms": 104.156,
               "all_ms": [
-                86.87,
-                87.074,
-                89.265
+                98.335,
+                104.156,
+                107.053
               ],
               "all_wall_ms": [
-                87.326,
-                87.764,
-                90.722
+                105.362,
+                114.987,
+                119.997
               ],
-              "peak_bytes": 62517248,
-              "peak_mb": 59.62,
-              "compile_ms": 92.47,
+              "peak_bytes": 62205952,
+              "peak_mb": 59.32,
+              "compile_ms": 104.23,
               "stdout": [
                 "2000000",
                 "1843958476"
@@ -459,54 +459,54 @@
         "medium": {
           "n": 4000000,
           "rows": {
-            "blot packed records + text pool": {
-              "kind": "blot",
+            "squid packed records + text pool": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 115.072,
-              "wall_ms": 117.619,
-              "median_ms": 115.614,
+              "ms": 112.001,
+              "wall_ms": 115.554,
+              "median_ms": 115.644,
               "all_ms": [
-                115.072,
-                115.614,
-                116.637
+                112.001,
+                115.644,
+                116.175
               ],
               "all_wall_ms": [
-                117.619,
-                117.964,
-                119.396
+                115.554,
+                118.271,
+                118.966
               ],
-              "peak_bytes": 77463552,
-              "peak_mb": 73.88,
-              "compile_ms": 24.13,
+              "peak_bytes": 77619200,
+              "peak_mb": 74.02,
+              "compile_ms": 27.88,
               "stdout": [
                 "4000000",
                 "701055136604"
               ],
-              "blotc_ms": 16.09,
-              "aot_ms": 8.04,
-              "wasm_bytes": 7356
+              "squidc_ms": 20.06,
+              "aot_ms": 7.82,
+              "wasm_bytes": 7362
             },
             "goose variable enum": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 107.292,
-              "wall_ms": 108.206,
-              "median_ms": 108.349,
+              "ms": 108.766,
+              "wall_ms": 110.158,
+              "median_ms": 109.048,
               "all_ms": [
-                107.292,
-                108.349,
-                109.146
+                108.766,
+                109.048,
+                111.678
               ],
               "all_wall_ms": [
-                108.206,
-                109.901,
-                110.307
+                110.158,
+                111.003,
+                116.455
               ],
-              "peak_bytes": 41078784,
-              "peak_mb": 39.18,
-              "compile_ms": 115.37,
+              "peak_bytes": 41140224,
+              "peak_mb": 39.23,
+              "compile_ms": 128.41,
               "stdout": [
                 "4000000",
                 "701055136604"
@@ -516,22 +516,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 161.845,
-              "wall_ms": 162.854,
-              "median_ms": 162.297,
+              "ms": 171.186,
+              "wall_ms": 173.917,
+              "median_ms": 171.789,
               "all_ms": [
-                161.845,
-                162.297,
-                163.777
+                171.186,
+                171.789,
+                173.715
               ],
               "all_wall_ms": [
-                162.854,
-                163.913,
-                165.806
+                173.917,
+                178.123,
+                182.984
               ],
-              "peak_bytes": 205971456,
-              "peak_mb": 196.43,
-              "compile_ms": 335.5,
+              "peak_bytes": 206311424,
+              "peak_mb": 196.75,
+              "compile_ms": 385.25,
               "stdout": [
                 "4000000",
                 "701055136604"
@@ -541,22 +541,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 121.079,
-              "wall_ms": 122.449,
-              "median_ms": 123.325,
+              "ms": 124.712,
+              "wall_ms": 130.401,
+              "median_ms": 129.264,
               "all_ms": [
-                121.079,
-                123.325,
-                125.932
+                124.712,
+                129.264,
+                132.496
               ],
               "all_wall_ms": [
-                122.449,
-                124.934,
-                127.27
+                130.401,
+                133.77,
+                142.642
               ],
-              "peak_bytes": 105263104,
-              "peak_mb": 100.39,
-              "compile_ms": 323.39,
+              "peak_bytes": 105881600,
+              "peak_mb": 100.98,
+              "compile_ms": 369.92,
               "stdout": [
                 "4000000",
                 "701055136604"
@@ -566,22 +566,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 159.791,
-              "wall_ms": 160.683,
-              "median_ms": 161.959,
+              "ms": 167.124,
+              "wall_ms": 173.627,
+              "median_ms": 168.466,
               "all_ms": [
-                159.791,
-                161.959,
-                163.938
+                167.124,
+                168.466,
+                171.452
               ],
               "all_wall_ms": [
-                160.683,
-                163.024,
-                165.358
+                173.627,
+                175.344,
+                178.739
               ],
-              "peak_bytes": 164159488,
-              "peak_mb": 156.55,
-              "compile_ms": 81.51,
+              "peak_bytes": 163540992,
+              "peak_mb": 155.96,
+              "compile_ms": 90.41,
               "stdout": [
                 "4000000",
                 "701055136604"
@@ -598,54 +598,54 @@
         "medium": {
           "n": 20,
           "rows": {
-            "blot arena + indices": {
-              "kind": "blot",
+            "squid arena + indices": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 31.664,
-              "wall_ms": 31.844,
-              "median_ms": 31.732,
+              "ms": 36.08,
+              "wall_ms": 36.733,
+              "median_ms": 38.1,
               "all_ms": [
-                31.664,
-                31.732,
-                32.008
+                36.08,
+                38.1,
+                40.767
               ],
               "all_wall_ms": [
-                31.844,
-                32.023,
-                32.255
+                36.733,
+                39.842,
+                42.535
               ],
-              "peak_bytes": 29298688,
-              "peak_mb": 27.94,
-              "compile_ms": 25.8,
+              "peak_bytes": 29270016,
+              "peak_mb": 27.91,
+              "compile_ms": 27.34,
               "stdout": [
                 "2097151",
                 "8377899684"
               ],
-              "blotc_ms": 17.68,
-              "aot_ms": 8.12,
-              "wasm_bytes": 6996
+              "squidc_ms": 19.87,
+              "aot_ms": 7.47,
+              "wasm_bytes": 7002
             },
             "goose pool + typed relative refs": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 24.734,
-              "wall_ms": 24.945,
-              "median_ms": 24.91,
+              "ms": 26.152,
+              "wall_ms": 26.447,
+              "median_ms": 28.819,
               "all_ms": [
-                24.734,
-                24.91,
-                25.606
+                26.152,
+                28.819,
+                29.704
               ],
               "all_wall_ms": [
-                24.945,
-                25.453,
-                25.924
+                26.447,
+                30.078,
+                30.29
               ],
-              "peak_bytes": 27615232,
-              "peak_mb": 26.34,
-              "compile_ms": 104.1,
+              "peak_bytes": 27512832,
+              "peak_mb": 26.24,
+              "compile_ms": 109.69,
               "stdout": [
                 "2097151",
                 "8377899684"
@@ -655,22 +655,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 84.796,
-              "wall_ms": 85.352,
-              "median_ms": 94.046,
+              "ms": 105.563,
+              "wall_ms": 109.162,
+              "median_ms": 113.527,
               "all_ms": [
-                84.796,
-                94.046,
-                105.95
+                105.563,
+                113.527,
+                116.689
               ],
               "all_wall_ms": [
-                85.352,
-                96.802,
-                107.31
+                109.162,
+                119.598,
+                120.674
               ],
-              "peak_bytes": 71311360,
-              "peak_mb": 68.01,
-              "compile_ms": 278.81,
+              "peak_bytes": 71208960,
+              "peak_mb": 67.91,
+              "compile_ms": 308.37,
               "stdout": [
                 "2097151",
                 "8377899684"
@@ -680,22 +680,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 25.251,
-              "wall_ms": 25.392,
-              "median_ms": 25.833,
+              "ms": 26.839,
+              "wall_ms": 27.83,
+              "median_ms": 28.558,
               "all_ms": [
-                25.251,
-                25.833,
-                26.268
+                26.839,
+                28.558,
+                29.735
               ],
               "all_wall_ms": [
-                25.392,
-                26.188,
-                26.48
+                27.83,
+                31.863,
+                32.452
               ],
-              "peak_bytes": 29282304,
-              "peak_mb": 27.93,
-              "compile_ms": 273.42,
+              "peak_bytes": 29310976,
+              "peak_mb": 27.95,
+              "compile_ms": 333.32,
               "stdout": [
                 "2097151",
                 "8377899684"
@@ -705,22 +705,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 76.317,
-              "wall_ms": 77.019,
-              "median_ms": 77.474,
+              "ms": 79.562,
+              "wall_ms": 83.515,
+              "median_ms": 79.564,
               "all_ms": [
-                76.317,
-                77.474,
-                78.537
+                79.562,
+                79.564,
+                84.679
               ],
               "all_wall_ms": [
-                77.019,
-                78.586,
-                78.816
+                83.515,
+                84.269,
+                87.664
               ],
-              "peak_bytes": 69525504,
-              "peak_mb": 66.3,
-              "compile_ms": 65.23,
+              "peak_bytes": 69357568,
+              "peak_mb": 66.14,
+              "compile_ms": 76.66,
               "stdout": [
                 "2097151",
                 "8377899684"
@@ -730,22 +730,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 25.442,
-              "wall_ms": 25.599,
-              "median_ms": 25.959,
+              "ms": 27.738,
+              "wall_ms": 28.68,
+              "median_ms": 29.617,
               "all_ms": [
-                25.442,
-                25.959,
-                27.16
+                27.738,
+                29.617,
+                41.251
               ],
               "all_wall_ms": [
-                25.599,
-                26.102,
-                27.505
+                28.68,
+                30.019,
+                44.018
               ],
-              "peak_bytes": 27787264,
-              "peak_mb": 26.5,
-              "compile_ms": 69.71,
+              "peak_bytes": 27803648,
+              "peak_mb": 26.52,
+              "compile_ms": 79.15,
               "stdout": [
                 "2097151",
                 "8377899684"
@@ -762,54 +762,54 @@
         "medium": {
           "n": 20,
           "rows": {
-            "blot arena + tag dispatch": {
-              "kind": "blot",
+            "squid arena + tag dispatch": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 9.68,
-              "wall_ms": 9.796,
-              "median_ms": 9.894,
+              "ms": 10.455,
+              "wall_ms": 10.9,
+              "median_ms": 10.55,
               "all_ms": [
-                9.68,
-                9.894,
-                10.127
+                10.455,
+                10.55,
+                10.975
               ],
               "all_wall_ms": [
-                9.796,
-                9.997,
-                10.216
+                10.9,
+                11.034,
+                11.927
               ],
-              "peak_bytes": 8458240,
-              "peak_mb": 8.07,
-              "compile_ms": 25.3,
+              "peak_bytes": 8425472,
+              "peak_mb": 8.04,
+              "compile_ms": 27.65,
               "stdout": [
                 "294997",
                 "950682"
               ],
-              "blotc_ms": 17.56,
-              "aot_ms": 7.74,
-              "wasm_bytes": 6910
+              "squidc_ms": 19.4,
+              "aot_ms": 8.25,
+              "wasm_bytes": 6916
             },
             "goose case functions + relative refs": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 7.89,
-              "wall_ms": 7.998,
-              "median_ms": 8.048,
+              "ms": 8.273,
+              "wall_ms": 8.489,
+              "median_ms": 8.279,
               "all_ms": [
-                7.89,
-                8.048,
-                8.465
+                8.273,
+                8.279,
+                8.717
               ],
               "all_wall_ms": [
-                7.998,
-                8.145,
-                8.525
+                8.489,
+                8.92,
+                9.062
               ],
-              "peak_bytes": 4419584,
-              "peak_mb": 4.21,
-              "compile_ms": 109.28,
+              "peak_bytes": 4210688,
+              "peak_mb": 4.02,
+              "compile_ms": 126.66,
               "stdout": [
                 "294997",
                 "950682"
@@ -819,22 +819,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 13.409,
-              "wall_ms": 13.612,
-              "median_ms": 13.532,
+              "ms": 14.719,
+              "wall_ms": 15.212,
+              "median_ms": 15.53,
               "all_ms": [
-                13.409,
-                13.532,
-                14.578
+                14.719,
+                15.53,
+                16.86
               ],
               "all_wall_ms": [
-                13.612,
-                13.647,
-                15.143
+                15.212,
+                16.108,
+                18.096
               ],
-              "peak_bytes": 13848576,
-              "peak_mb": 13.21,
-              "compile_ms": 314.13,
+              "peak_bytes": 13713408,
+              "peak_mb": 13.08,
+              "compile_ms": 365.55,
               "stdout": [
                 "294997",
                 "950682"
@@ -844,22 +844,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 7.323,
-              "wall_ms": 7.397,
-              "median_ms": 7.785,
+              "ms": 7.249,
+              "wall_ms": 7.383,
+              "median_ms": 7.282,
               "all_ms": [
-                7.323,
-                7.785,
-                7.883
+                7.249,
+                7.282,
+                7.937
               ],
               "all_wall_ms": [
-                7.397,
-                7.899,
-                7.96
+                7.383,
+                7.408,
+                8.439
               ],
-              "peak_bytes": 11988992,
-              "peak_mb": 11.43,
-              "compile_ms": 280.89,
+              "peak_bytes": 11993088,
+              "peak_mb": 11.44,
+              "compile_ms": 325.07,
               "stdout": [
                 "294997",
                 "950682"
@@ -869,22 +869,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 15.192,
-              "wall_ms": 15.284,
-              "median_ms": 16.214,
+              "ms": 16.009,
+              "wall_ms": 16.479,
+              "median_ms": 17.519,
               "all_ms": [
-                15.192,
-                16.214,
-                16.393
+                16.009,
+                17.519,
+                18.193
               ],
               "all_wall_ms": [
-                15.284,
-                16.43,
-                16.683
+                16.479,
+                18.683,
+                18.768
               ],
-              "peak_bytes": 12038144,
-              "peak_mb": 11.48,
-              "compile_ms": 65.21,
+              "peak_bytes": 11939840,
+              "peak_mb": 11.39,
+              "compile_ms": 73.24,
               "stdout": [
                 "294997",
                 "950682"
@@ -894,22 +894,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 9.519,
-              "wall_ms": 9.585,
-              "median_ms": 9.923,
+              "ms": 10.888,
+              "wall_ms": 11.504,
+              "median_ms": 11.298,
               "all_ms": [
-                9.519,
-                9.923,
-                11.057
+                10.888,
+                11.298,
+                11.661
               ],
               "all_wall_ms": [
-                9.585,
-                10.013,
-                11.463
+                11.504,
+                11.531,
+                12.506
               ],
-              "peak_bytes": 8044544,
-              "peak_mb": 7.67,
-              "compile_ms": 69.34,
+              "peak_bytes": 8171520,
+              "peak_mb": 7.79,
+              "compile_ms": 78.38,
               "stdout": [
                 "294997",
                 "950682"
@@ -926,54 +926,54 @@
         "medium": {
           "n": 500000,
           "rows": {
-            "blot CSR two-pass": {
-              "kind": "blot",
+            "squid CSR two-pass": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 83.185,
-              "wall_ms": 83.632,
-              "median_ms": 83.246,
+              "ms": 123.269,
+              "wall_ms": 126.003,
+              "median_ms": 140.538,
               "all_ms": [
-                83.185,
-                83.246,
-                92.365
+                123.269,
+                140.538,
+                146.856
               ],
               "all_wall_ms": [
-                83.632,
-                83.658,
-                93.472
+                126.003,
+                147.903,
+                150.725
               ],
-              "peak_bytes": 60063744,
-              "peak_mb": 57.28,
-              "compile_ms": 25.48,
+              "peak_bytes": 60002304,
+              "peak_mb": 57.22,
+              "compile_ms": 29.19,
               "stdout": [
                 "4500000",
                 "12991077"
               ],
-              "blotc_ms": 16.76,
-              "aot_ms": 8.73,
-              "wasm_bytes": 8424
+              "squidc_ms": 19.99,
+              "aot_ms": 9.21,
+              "wasm_bytes": 8430
             },
             "goose CSR two-pass": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 70.669,
-              "wall_ms": 70.983,
-              "median_ms": 71.454,
+              "ms": 80.822,
+              "wall_ms": 86.5,
+              "median_ms": 99.27,
               "all_ms": [
-                70.669,
-                71.454,
-                71.505
+                80.822,
+                99.27,
+                102.359
               ],
               "all_wall_ms": [
-                70.983,
-                71.995,
-                72.057
+                86.5,
+                101.761,
+                109.425
               ],
-              "peak_bytes": 61845504,
-              "peak_mb": 58.98,
-              "compile_ms": 119.98,
+              "peak_bytes": 61616128,
+              "peak_mb": 58.76,
+              "compile_ms": 137.92,
               "stdout": [
                 "4500000",
                 "12991077"
@@ -983,22 +983,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 201.711,
-              "wall_ms": 203.521,
-              "median_ms": 247.751,
+              "ms": 364.042,
+              "wall_ms": 381.36,
+              "median_ms": 385.357,
               "all_ms": [
-                201.711,
-                247.751,
-                274.312
+                364.042,
+                385.357,
+                386.702
               ],
               "all_wall_ms": [
-                203.521,
-                250.309,
-                276.931
+                381.36,
+                402.274,
+                422.093
               ],
-              "peak_bytes": 54370304,
-              "peak_mb": 51.85,
-              "compile_ms": 630.47,
+              "peak_bytes": 54009856,
+              "peak_mb": 51.51,
+              "compile_ms": 691.64,
               "stdout": [
                 "4500000",
                 "12991077"
@@ -1008,22 +1008,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 85.06,
-              "wall_ms": 85.936,
-              "median_ms": 90.035,
+              "ms": 112.852,
+              "wall_ms": 119.977,
+              "median_ms": 136.029,
               "all_ms": [
-                85.06,
-                90.035,
-                96.927
+                112.852,
+                136.029,
+                141.383
               ],
               "all_wall_ms": [
-                85.936,
-                90.718,
-                97.5
+                119.977,
+                143.884,
+                150.092
               ],
-              "peak_bytes": 59916288,
-              "peak_mb": 57.14,
-              "compile_ms": 171.49,
+              "peak_bytes": 59772928,
+              "peak_mb": 57.0,
+              "compile_ms": 189.3,
               "stdout": [
                 "4500000",
                 "12991077"
@@ -1033,22 +1033,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 140.578,
-              "wall_ms": 141.875,
-              "median_ms": 260.82,
+              "ms": 385.178,
+              "wall_ms": 397.289,
+              "median_ms": 386.494,
               "all_ms": [
-                140.578,
-                260.82,
-                264.772
+                385.178,
+                386.494,
+                388.203
               ],
               "all_wall_ms": [
-                141.875,
-                263.929,
-                269.791
+                397.289,
+                406.725,
+                410.517
               ],
-              "peak_bytes": 53399552,
+              "peak_bytes": 53403648,
               "peak_mb": 50.93,
-              "compile_ms": 93.25,
+              "compile_ms": 102.8,
               "stdout": [
                 "4500000",
                 "12991077"
@@ -1058,22 +1058,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 84.691,
-              "wall_ms": 86.507,
-              "median_ms": 148.252,
+              "ms": 146.37,
+              "wall_ms": 151.057,
+              "median_ms": 152.044,
               "all_ms": [
-                84.691,
-                148.252,
-                254.627
+                146.37,
+                152.044,
+                156.627
               ],
               "all_wall_ms": [
-                86.507,
-                158.567,
-                292.968
+                151.057,
+                156.186,
+                162.009
               ],
-              "peak_bytes": 58605568,
-              "peak_mb": 55.89,
-              "compile_ms": 85.76,
+              "peak_bytes": 58249216,
+              "peak_mb": 55.55,
+              "compile_ms": 100.88,
               "stdout": [
                 "4500000",
                 "12991077"
@@ -1090,55 +1090,55 @@
         "medium": {
           "n": 4000000,
           "rows": {
-            "blot packed bytes + open addressing": {
-              "kind": "blot",
+            "squid packed bytes + open addressing": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 198.791,
-              "wall_ms": 200.714,
-              "median_ms": 200.272,
+              "ms": 296.812,
+              "wall_ms": 305.871,
+              "median_ms": 329.252,
               "all_ms": [
-                198.791,
-                200.272,
-                203.262
+                296.812,
+                329.252,
+                329.448
               ],
               "all_wall_ms": [
-                200.714,
-                203.599,
-                205.193
+                305.871,
+                342.481,
+                344.031
               ],
-              "peak_bytes": 83431424,
-              "peak_mb": 79.57,
-              "compile_ms": 26.75,
+              "peak_bytes": 83460096,
+              "peak_mb": 79.59,
+              "compile_ms": 31.87,
               "stdout": [
                 "4000000",
                 "287555",
                 "472050912"
               ],
-              "blotc_ms": 17.08,
-              "aot_ms": 9.67,
-              "wasm_bytes": 9152
+              "squidc_ms": 21.75,
+              "aot_ms": 10.12,
+              "wasm_bytes": 9158
             },
             "goose slices + open addressing": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 124.356,
-              "wall_ms": 125.882,
-              "median_ms": 126.194,
+              "ms": 178.297,
+              "wall_ms": 187.195,
+              "median_ms": 191.299,
               "all_ms": [
-                124.356,
-                126.194,
-                133.925
+                178.297,
+                191.299,
+                192.818
               ],
               "all_wall_ms": [
-                125.882,
-                127.005,
-                135.044
+                187.195,
+                197.302,
+                199.246
               ],
-              "peak_bytes": 144973824,
-              "peak_mb": 138.26,
-              "compile_ms": 139.94,
+              "peak_bytes": 144912384,
+              "peak_mb": 138.2,
+              "compile_ms": 157.63,
               "stdout": [
                 "4000000",
                 "287555",
@@ -1149,22 +1149,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 282.708,
-              "wall_ms": 284.935,
-              "median_ms": 286.716,
+              "ms": 368.337,
+              "wall_ms": 382.157,
+              "median_ms": 490.176,
               "all_ms": [
-                282.708,
-                286.716,
-                288.891
+                368.337,
+                490.176,
+                491.754
               ],
               "all_wall_ms": [
-                284.935,
-                288.823,
-                291.058
+                382.157,
+                510.793,
+                513.124
               ],
-              "peak_bytes": 155942912,
-              "peak_mb": 148.72,
-              "compile_ms": 294.81,
+              "peak_bytes": 155963392,
+              "peak_mb": 148.74,
+              "compile_ms": 339.91,
               "stdout": [
                 "4000000",
                 "287555",
@@ -1175,22 +1175,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 159.896,
-              "wall_ms": 160.755,
-              "median_ms": 160.234,
+              "ms": 236.131,
+              "wall_ms": 248.299,
+              "median_ms": 262.646,
               "all_ms": [
-                159.896,
-                160.234,
-                163.4
+                236.131,
+                262.646,
+                311.839
               ],
               "all_wall_ms": [
-                160.755,
-                161.238,
-                164.257
+                248.299,
+                273.07,
+                328.154
               ],
-              "peak_bytes": 204300288,
-              "peak_mb": 194.84,
-              "compile_ms": 270.26,
+              "peak_bytes": 204267520,
+              "peak_mb": 194.8,
+              "compile_ms": 317.33,
               "stdout": [
                 "4000000",
                 "287555",
@@ -1201,22 +1201,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 261.548,
-              "wall_ms": 263.494,
-              "median_ms": 263.472,
+              "ms": 359.942,
+              "wall_ms": 372.54,
+              "median_ms": 362.703,
               "all_ms": [
-                261.548,
-                263.472,
-                264.398
+                359.942,
+                362.703,
+                375.205
               ],
               "all_wall_ms": [
-                263.494,
-                265.174,
-                266.595
+                372.54,
+                373.012,
+                386.763
               ],
-              "peak_bytes": 149299200,
-              "peak_mb": 142.38,
-              "compile_ms": 144.38,
+              "peak_bytes": 149037056,
+              "peak_mb": 142.13,
+              "compile_ms": 166.15,
               "stdout": [
                 "4000000",
                 "287555",
@@ -1227,22 +1227,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 181.217,
-              "wall_ms": 182.455,
-              "median_ms": 182.993,
+              "ms": 261.925,
+              "wall_ms": 267.437,
+              "median_ms": 308.107,
               "all_ms": [
-                181.217,
-                182.993,
-                184.022
+                261.925,
+                308.107,
+                339.968
               ],
               "all_wall_ms": [
-                182.455,
-                184.127,
-                185.018
+                267.437,
+                319.541,
+                357.291
               ],
-              "peak_bytes": 179494912,
-              "peak_mb": 171.18,
-              "compile_ms": 111.03,
+              "peak_bytes": 179949568,
+              "peak_mb": 171.61,
+              "compile_ms": 121.66,
               "stdout": [
                 "4000000",
                 "287555",
@@ -1260,54 +1260,54 @@
         "medium": {
           "n": 1000000,
           "rows": {
-            "blot SoA, 4-wide SIMD": {
-              "kind": "blot",
+            "squid SoA, 4-wide SIMD": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 82.982,
-              "wall_ms": 83.377,
-              "median_ms": 83.908,
+              "ms": 86.937,
+              "wall_ms": 89.314,
+              "median_ms": 88.859,
               "all_ms": [
-                82.982,
-                83.908,
-                86.312
+                86.937,
+                88.859,
+                89.722
               ],
               "all_wall_ms": [
-                83.377,
-                85.012,
-                87.75
+                89.314,
+                92.121,
+                92.564
               ],
-              "peak_bytes": 27955200,
-              "peak_mb": 26.66,
-              "compile_ms": 28.09,
+              "peak_bytes": 28057600,
+              "peak_mb": 26.76,
+              "compile_ms": 32.53,
               "stdout": [
                 "1000000",
                 "19381529234"
               ],
-              "blotc_ms": 19.17,
-              "aot_ms": 8.92,
-              "wasm_bytes": 9667
+              "squidc_ms": 24.1,
+              "aot_ms": 8.43,
+              "wasm_bytes": 9673
             },
             "goose AoS, per component": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 192.545,
-              "wall_ms": 193.915,
-              "median_ms": 192.933,
+              "ms": 201.185,
+              "wall_ms": 210.92,
+              "median_ms": 202.734,
               "all_ms": [
-                192.545,
-                192.933,
-                194.781
+                201.185,
+                202.734,
+                203.337
               ],
               "all_wall_ms": [
-                193.915,
-                193.918,
-                196.16
+                210.92,
+                211.029,
+                213.293
               ],
-              "peak_bytes": 26370048,
-              "peak_mb": 25.15,
-              "compile_ms": 108.61,
+              "peak_bytes": 26501120,
+              "peak_mb": 25.27,
+              "compile_ms": 129.51,
               "stdout": [
                 "1000000",
                 "19381529234"
@@ -1317,22 +1317,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 218.746,
-              "wall_ms": 220.245,
-              "median_ms": 219.057,
+              "ms": 223.68,
+              "wall_ms": 233.688,
+              "median_ms": 226.659,
               "all_ms": [
-                218.746,
-                219.057,
-                219.488
+                223.68,
+                226.659,
+                227.664
               ],
               "all_wall_ms": [
-                220.245,
-                220.546,
-                220.863
+                233.688,
+                234.846,
+                235.87
               ],
-              "peak_bytes": 28119040,
-              "peak_mb": 26.82,
-              "compile_ms": 151.39,
+              "peak_bytes": 28086272,
+              "peak_mb": 26.79,
+              "compile_ms": 177.21,
               "stdout": [
                 "1000000",
                 "19381529234"
@@ -1342,22 +1342,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 185.574,
-              "wall_ms": 186.58,
-              "median_ms": 186.624,
+              "ms": 190.665,
+              "wall_ms": 194.28,
+              "median_ms": 192.593,
               "all_ms": [
-                185.574,
-                186.624,
-                188.159
+                190.665,
+                192.593,
+                195.014
               ],
               "all_wall_ms": [
-                186.58,
-                187.522,
-                189.596
+                194.28,
+                196.855,
+                203.826
               ],
-              "peak_bytes": 28143616,
-              "peak_mb": 26.84,
-              "compile_ms": 159.48,
+              "peak_bytes": 28033024,
+              "peak_mb": 26.73,
+              "compile_ms": 180.26,
               "stdout": [
                 "1000000",
                 "19381529234"
@@ -1367,22 +1367,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 186.285,
-              "wall_ms": 187.442,
-              "median_ms": 187.471,
+              "ms": 193.063,
+              "wall_ms": 197.8,
+              "median_ms": 194.749,
               "all_ms": [
-                186.285,
-                187.471,
-                187.743
+                193.063,
+                194.749,
+                195.896
               ],
               "all_wall_ms": [
-                187.442,
-                188.741,
-                188.898
+                197.8,
+                199.817,
+                205.222
               ],
-              "peak_bytes": 26599424,
-              "peak_mb": 25.37,
-              "compile_ms": 71.3,
+              "peak_bytes": 26619904,
+              "peak_mb": 25.39,
+              "compile_ms": 81.94,
               "stdout": [
                 "1000000",
                 "19381529234"
@@ -1399,26 +1399,26 @@
         "medium": {
           "n": 100000,
           "rows": {
-            "blot 8B arena + packed text": {
-              "kind": "blot",
+            "squid 8B arena + packed text": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 561.438,
-              "wall_ms": 566.378,
-              "median_ms": 571.41,
+              "ms": 609.679,
+              "wall_ms": 631.835,
+              "median_ms": 637.201,
               "all_ms": [
-                561.438,
-                571.41,
-                576.917
+                609.679,
+                637.201,
+                662.261
               ],
               "all_wall_ms": [
-                566.378,
-                577.285,
-                584.525
+                631.835,
+                656.214,
+                702.149
               ],
-              "peak_bytes": 114487296,
-              "peak_mb": 109.18,
-              "compile_ms": 28.46,
+              "peak_bytes": 114429952,
+              "peak_mb": 109.13,
+              "compile_ms": 32.75,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1426,30 +1426,30 @@
                 "0",
                 "547350405826"
               ],
-              "blotc_ms": 18.6,
-              "aot_ms": 9.87,
-              "wasm_bytes": 12097
+              "squidc_ms": 20.97,
+              "aot_ms": 11.78,
+              "wasm_bytes": 12103
             },
             "goose pool + refs, inline text": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 406.67,
-              "wall_ms": 408.693,
-              "median_ms": 407.7,
+              "ms": 477.993,
+              "wall_ms": 493.266,
+              "median_ms": 503.274,
               "all_ms": [
-                406.67,
-                407.7,
-                433.167
+                477.993,
+                503.274,
+                523.641
               ],
               "all_wall_ms": [
-                408.693,
-                410.963,
-                436.185
+                493.266,
+                545.06,
+                583.551
               ],
-              "peak_bytes": 134209536,
-              "peak_mb": 127.99,
-              "compile_ms": 138.63,
+              "peak_bytes": 134176768,
+              "peak_mb": 127.96,
+              "compile_ms": 159.16,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1462,22 +1462,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 1156.91,
-              "wall_ms": 1164.279,
-              "median_ms": 1172.51,
+              "ms": 1321.504,
+              "wall_ms": 1368.049,
+              "median_ms": 1418.44,
               "all_ms": [
-                1156.91,
-                1172.51,
-                1180.364
+                1321.504,
+                1418.44,
+                1505.661
               ],
               "all_wall_ms": [
-                1164.279,
-                1180.428,
-                1189.266
+                1368.049,
+                1522.35,
+                1553.754
               ],
-              "peak_bytes": 662216704,
-              "peak_mb": 631.54,
-              "compile_ms": 300.85,
+              "peak_bytes": 661045248,
+              "peak_mb": 630.42,
+              "compile_ms": 362.33,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1490,22 +1490,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 439.463,
-              "wall_ms": 443.165,
-              "median_ms": 455.7,
+              "ms": 516.359,
+              "wall_ms": 532.73,
+              "median_ms": 533.977,
               "all_ms": [
-                439.463,
-                455.7,
-                466.452
+                516.359,
+                533.977,
+                535.259
               ],
               "all_wall_ms": [
-                443.165,
-                460.654,
-                469.876
+                532.73,
+                556.586,
+                561.023
               ],
-              "peak_bytes": 306139136,
-              "peak_mb": 291.96,
-              "compile_ms": 293.36,
+              "peak_bytes": 304181248,
+              "peak_mb": 290.09,
+              "compile_ms": 378.28,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1518,22 +1518,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 851.358,
-              "wall_ms": 856.06,
-              "median_ms": 868.094,
+              "ms": 930.638,
+              "wall_ms": 945.58,
+              "median_ms": 936.203,
               "all_ms": [
-                851.358,
-                868.094,
-                874.649
+                930.638,
+                936.203,
+                952.187
               ],
               "all_wall_ms": [
-                856.06,
-                874.377,
-                880.144
+                945.58,
+                973.742,
+                978.034
               ],
-              "peak_bytes": 504807424,
-              "peak_mb": 481.42,
-              "compile_ms": 101.33,
+              "peak_bytes": 505016320,
+              "peak_mb": 481.62,
+              "compile_ms": 113.28,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1546,22 +1546,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 433.315,
-              "wall_ms": 438.276,
-              "median_ms": 446.696,
+              "ms": 486.897,
+              "wall_ms": 503.009,
+              "median_ms": 505.368,
               "all_ms": [
-                433.315,
-                446.696,
-                448.813
+                486.897,
+                505.368,
+                506.477
               ],
               "all_wall_ms": [
-                438.276,
-                449.378,
-                451.72
+                503.009,
+                542.782,
+                544.421
               ],
-              "peak_bytes": 236879872,
-              "peak_mb": 225.91,
-              "compile_ms": 93.5,
+              "peak_bytes": 236949504,
+              "peak_mb": 225.97,
+              "compile_ms": 104.89,
               "stdout": [
                 "47939902",
                 "7609503",
@@ -1581,26 +1581,26 @@
         "medium": {
           "n": 8000000,
           "rows": {
-            "blot open addressing + arena": {
-              "kind": "blot",
+            "squid open addressing + arena": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 183.644,
-              "wall_ms": 184.783,
-              "median_ms": 184.629,
+              "ms": 414.13,
+              "wall_ms": 426.079,
+              "median_ms": 484.473,
               "all_ms": [
-                183.644,
-                184.629,
-                214.237
+                414.13,
+                484.473,
+                527.2
               ],
               "all_wall_ms": [
-                184.783,
-                185.639,
-                216.511
+                426.079,
+                498.007,
+                548.945
               ],
               "peak_bytes": 40812544,
               "peak_mb": 38.92,
-              "compile_ms": 27.61,
+              "compile_ms": 31.26,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1609,30 +1609,30 @@
                 "1009107182135619685",
                 "501925078"
               ],
-              "blotc_ms": 18.03,
-              "aot_ms": 9.59,
-              "wasm_bytes": 11169
+              "squidc_ms": 21.24,
+              "aot_ms": 10.02,
+              "wasm_bytes": 11175
             },
             "goose reusable pool + pool-relative refs": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 120.323,
-              "wall_ms": 121.419,
-              "median_ms": 121.332,
+              "ms": 218.21,
+              "wall_ms": 224.914,
+              "median_ms": 232.061,
               "all_ms": [
-                120.323,
-                121.332,
-                123.84
+                218.21,
+                232.061,
+                258.355
               ],
               "all_wall_ms": [
-                121.419,
-                122.036,
-                127.5
+                224.914,
+                238.361,
+                268.249
               ],
-              "peak_bytes": 35979264,
-              "peak_mb": 34.31,
-              "compile_ms": 133.15,
+              "peak_bytes": 35938304,
+              "peak_mb": 34.27,
+              "compile_ms": 148.68,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1646,22 +1646,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 505.609,
-              "wall_ms": 508.925,
-              "median_ms": 516.496,
+              "ms": 1603.31,
+              "wall_ms": 1644.99,
+              "median_ms": 1670.069,
               "all_ms": [
-                505.609,
-                516.496,
-                711.685
+                1603.31,
+                1670.069,
+                1761.064
               ],
               "all_wall_ms": [
-                508.925,
-                521.67,
-                718.335
+                1644.99,
+                1724.101,
+                1825.535
               ],
-              "peak_bytes": 79163392,
-              "peak_mb": 75.5,
-              "compile_ms": 200.25,
+              "peak_bytes": 78852096,
+              "peak_mb": 75.2,
+              "compile_ms": 244.73,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1675,22 +1675,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 129.593,
-              "wall_ms": 130.527,
-              "median_ms": 135.056,
+              "ms": 244.216,
+              "wall_ms": 250.359,
+              "median_ms": 253.997,
               "all_ms": [
-                129.593,
-                135.056,
-                135.087
+                244.216,
+                253.997,
+                294.289
               ],
               "all_wall_ms": [
-                130.527,
-                136.153,
-                137.071
+                250.359,
+                265.05,
+                306.081
               ],
-              "peak_bytes": 37634048,
-              "peak_mb": 35.89,
-              "compile_ms": 190.22,
+              "peak_bytes": 37621760,
+              "peak_mb": 35.88,
+              "compile_ms": 203.94,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1704,22 +1704,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 278.662,
-              "wall_ms": 280.509,
-              "median_ms": 279.455,
+              "ms": 593.822,
+              "wall_ms": 612.606,
+              "median_ms": 602.165,
               "all_ms": [
-                278.662,
-                279.455,
-                312.015
+                593.822,
+                602.165,
+                604.537
               ],
               "all_wall_ms": [
-                280.509,
-                281.344,
-                314.596
+                612.606,
+                617.998,
+                620.978
               ],
-              "peak_bytes": 47321088,
-              "peak_mb": 45.13,
-              "compile_ms": 143.82,
+              "peak_bytes": 46837760,
+              "peak_mb": 44.67,
+              "compile_ms": 158.72,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1733,22 +1733,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 135.501,
-              "wall_ms": 136.292,
-              "median_ms": 135.639,
+              "ms": 274.706,
+              "wall_ms": 282.702,
+              "median_ms": 351.962,
               "all_ms": [
-                135.501,
-                135.639,
-                137.329
+                274.706,
+                351.962,
+                355.257
               ],
               "all_wall_ms": [
-                136.292,
-                136.342,
-                138.429
+                282.702,
+                368.313,
+                369.465
               ],
-              "peak_bytes": 36065280,
-              "peak_mb": 34.39,
-              "compile_ms": 100.03,
+              "peak_bytes": 35631104,
+              "peak_mb": 33.98,
+              "compile_ms": 105.1,
               "stdout": [
                 "4937489",
                 "2561689",
@@ -1769,54 +1769,54 @@
         "medium": {
           "n": 14,
           "rows": {
-            "blot arena + inline transforms": {
-              "kind": "blot",
+            "squid arena + inline transforms": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 59.331,
-              "wall_ms": 59.757,
-              "median_ms": 60.588,
+              "ms": 66.935,
+              "wall_ms": 69.556,
+              "median_ms": 69.386,
               "all_ms": [
-                59.331,
-                60.588,
-                61.49
+                66.935,
+                69.386,
+                69.462
               ],
               "all_wall_ms": [
-                59.757,
-                60.993,
-                61.916
+                69.556,
+                71.447,
+                71.978
               ],
-              "peak_bytes": 60305408,
-              "peak_mb": 57.51,
-              "compile_ms": 25.79,
+              "peak_bytes": 60174336,
+              "peak_mb": 57.39,
+              "compile_ms": 30.41,
               "stdout": [
                 "254401",
                 "16563864"
               ],
-              "blotc_ms": 16.47,
-              "aot_ms": 9.32,
-              "wasm_bytes": 9757
+              "squidc_ms": 20.94,
+              "aot_ms": 9.47,
+              "wasm_bytes": 9763
             },
             "goose pool + inline child refs": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 43.776,
-              "wall_ms": 44.178,
-              "median_ms": 43.841,
+              "ms": 47.056,
+              "wall_ms": 47.784,
+              "median_ms": 47.167,
               "all_ms": [
-                43.776,
-                43.841,
-                44.121
+                47.056,
+                47.167,
+                55.86
               ],
               "all_wall_ms": [
-                44.178,
-                44.245,
-                44.556
+                47.784,
+                49.737,
+                60.907
               ],
-              "peak_bytes": 33796096,
-              "peak_mb": 32.23,
-              "compile_ms": 119.35,
+              "peak_bytes": 33710080,
+              "peak_mb": 32.15,
+              "compile_ms": 138.48,
               "stdout": [
                 "254401",
                 "16563864"
@@ -1826,22 +1826,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 91.677,
-              "wall_ms": 92.734,
-              "median_ms": 91.945,
+              "ms": 115.423,
+              "wall_ms": 118.339,
+              "median_ms": 121.591,
               "all_ms": [
-                91.677,
-                91.945,
-                95.713
+                115.423,
+                121.591,
+                130.032
               ],
               "all_wall_ms": [
-                92.734,
-                92.849,
-                96.479
+                118.339,
+                125.203,
+                135.72
               ],
-              "peak_bytes": 44793856,
-              "peak_mb": 42.72,
-              "compile_ms": 290.75,
+              "peak_bytes": 44957696,
+              "peak_mb": 42.88,
+              "compile_ms": 339.82,
               "stdout": [
                 "254401",
                 "16563864"
@@ -1851,22 +1851,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 46.594,
-              "wall_ms": 46.857,
-              "median_ms": 48.057,
+              "ms": 52.505,
+              "wall_ms": 53.934,
+              "median_ms": 54.068,
               "all_ms": [
-                46.594,
-                48.057,
-                48.655
+                52.505,
+                54.068,
+                58.705
               ],
               "all_wall_ms": [
-                46.857,
-                48.484,
-                50.007
+                53.934,
+                55.191,
+                62.039
               ],
-              "peak_bytes": 36753408,
+              "peak_bytes": 36749312,
               "peak_mb": 35.05,
-              "compile_ms": 288.98,
+              "compile_ms": 329.59,
               "stdout": [
                 "254401",
                 "16563864"
@@ -1876,22 +1876,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 79.871,
-              "wall_ms": 80.445,
-              "median_ms": 88.004,
+              "ms": 94.797,
+              "wall_ms": 97.411,
+              "median_ms": 95.029,
               "all_ms": [
-                79.871,
-                88.004,
-                89.094
+                94.797,
+                95.029,
+                100.489
               ],
               "all_wall_ms": [
-                80.445,
-                88.858,
-                89.813
+                97.411,
+                99.541,
+                105.447
               ],
-              "peak_bytes": 43978752,
-              "peak_mb": 41.94,
-              "compile_ms": 85.69,
+              "peak_bytes": 43618304,
+              "peak_mb": 41.6,
+              "compile_ms": 95.9,
               "stdout": [
                 "254401",
                 "16563864"
@@ -1901,22 +1901,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 43.505,
-              "wall_ms": 43.894,
-              "median_ms": 46.182,
+              "ms": 46.906,
+              "wall_ms": 48.158,
+              "median_ms": 48.606,
               "all_ms": [
-                43.505,
-                46.182,
-                49.15
+                46.906,
+                48.606,
+                49.156
               ],
               "all_wall_ms": [
-                43.894,
-                47.17,
-                49.82
+                48.158,
+                50.27,
+                50.715
               ],
-              "peak_bytes": 33918976,
-              "peak_mb": 32.35,
-              "compile_ms": 90.68,
+              "peak_bytes": 33103872,
+              "peak_mb": 31.57,
+              "compile_ms": 96.77,
               "stdout": [
                 "254401",
                 "16563864"
@@ -1933,26 +1933,26 @@
         "medium": {
           "n": 400000,
           "rows": {
-            "blot arena + error codes": {
-              "kind": "blot",
+            "squid arena + error codes": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 187.293,
-              "wall_ms": 190.322,
-              "median_ms": 190.462,
+              "ms": 181.467,
+              "wall_ms": 183.517,
+              "median_ms": 190.879,
               "all_ms": [
-                187.293,
-                190.462,
-                205.707
+                181.467,
+                190.879,
+                192.773
               ],
               "all_wall_ms": [
-                190.322,
-                192.551,
-                208.64
+                183.517,
+                196.74,
+                198.669
               ],
-              "peak_bytes": 4100096,
+              "peak_bytes": 4096000,
               "peak_mb": 3.91,
-              "compile_ms": 31.8,
+              "compile_ms": 33.22,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -1963,30 +1963,30 @@
                 "16093",
                 "17094074625383217522"
               ],
-              "blotc_ms": 18.75,
-              "aot_ms": 13.05,
-              "wasm_bytes": 17781
+              "squidc_ms": 20.15,
+              "aot_ms": 13.07,
+              "wasm_bytes": 17787
             },
             "goose local pool + return from": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 121.598,
-              "wall_ms": 122.403,
-              "median_ms": 125.305,
+              "ms": 126.574,
+              "wall_ms": 128.466,
+              "median_ms": 127.413,
               "all_ms": [
-                121.598,
-                125.305,
-                127.338
+                126.574,
+                127.413,
+                129.773
               ],
               "all_wall_ms": [
-                122.403,
-                127.042,
-                128.589
+                128.466,
+                129.835,
+                133.29
               ],
-              "peak_bytes": 2416640,
-              "peak_mb": 2.3,
-              "compile_ms": 135.84,
+              "peak_bytes": 2142208,
+              "peak_mb": 2.04,
+              "compile_ms": 152.03,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -2002,22 +2002,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 399.537,
-              "wall_ms": 403.457,
-              "median_ms": 400.212,
+              "ms": 408.782,
+              "wall_ms": 415.916,
+              "median_ms": 417.385,
               "all_ms": [
-                399.537,
-                400.212,
-                404.014
+                408.782,
+                417.385,
+                419.799
               ],
               "all_wall_ms": [
-                403.457,
-                403.515,
-                408.205
+                415.916,
+                427.634,
+                432.481
               ],
-              "peak_bytes": 4505600,
-              "peak_mb": 4.3,
-              "compile_ms": 303.01,
+              "peak_bytes": 4526080,
+              "peak_mb": 4.32,
+              "compile_ms": 337.17,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -2033,22 +2033,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 119.887,
-              "wall_ms": 120.696,
-              "median_ms": 120.75,
+              "ms": 128.108,
+              "wall_ms": 131.116,
+              "median_ms": 128.14,
               "all_ms": [
-                119.887,
-                120.75,
-                120.962
+                128.108,
+                128.14,
+                131.102
               ],
               "all_wall_ms": [
-                120.696,
-                121.43,
-                122.089
+                131.116,
+                133.796,
+                134.48
               ],
-              "peak_bytes": 4345856,
-              "peak_mb": 4.14,
-              "compile_ms": 298.1,
+              "peak_bytes": 4308992,
+              "peak_mb": 4.11,
+              "compile_ms": 349.05,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -2064,22 +2064,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 215.934,
-              "wall_ms": 218.396,
-              "median_ms": 242.322,
+              "ms": 223.777,
+              "wall_ms": 229.998,
+              "median_ms": 227.203,
               "all_ms": [
-                215.934,
-                242.322,
-                301.188
+                223.777,
+                227.203,
+                230.295
               ],
               "all_wall_ms": [
-                218.396,
-                246.855,
-                410.452
+                229.998,
+                234.489,
+                241.474
               ],
-              "peak_bytes": 2625536,
-              "peak_mb": 2.5,
-              "compile_ms": 102.77,
+              "peak_bytes": 2506752,
+              "peak_mb": 2.39,
+              "compile_ms": 124.4,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -2095,22 +2095,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 150.69,
-              "wall_ms": 157.141,
-              "median_ms": 151.823,
+              "ms": 118.167,
+              "wall_ms": 120.387,
+              "median_ms": 118.889,
               "all_ms": [
-                150.69,
-                151.823,
-                154.183
+                118.167,
+                118.889,
+                118.89
               ],
               "all_wall_ms": [
-                157.141,
-                178.544,
-                233.922
+                120.387,
+                121.285,
+                121.39
               ],
-              "peak_bytes": 2584576,
-              "peak_mb": 2.46,
-              "compile_ms": 124.0,
+              "peak_bytes": 2506752,
+              "peak_mb": 2.39,
+              "compile_ms": 107.2,
               "stdout": [
                 "16589727",
                 "6746064",
@@ -2133,26 +2133,26 @@
         "medium": {
           "n": 17,
           "rows": {
-            "blot arena per tree": {
-              "kind": "blot",
+            "squid arena per tree": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 66.543,
-              "wall_ms": 66.89,
-              "median_ms": 67.115,
+              "ms": 67.177,
+              "wall_ms": 68.024,
+              "median_ms": 67.371,
               "all_ms": [
-                66.543,
-                67.115,
-                67.377
+                67.177,
+                67.371,
+                68.447
               ],
               "all_wall_ms": [
-                66.89,
-                67.692,
-                68.864
+                68.024,
+                69.246,
+                69.648
               ],
               "peak_bytes": 11702272,
               "peak_mb": 11.16,
-              "compile_ms": 26.34,
+              "compile_ms": 29.28,
               "stdout": [
                 "524287",
                 "131072",
@@ -2178,30 +2178,30 @@
                 "4194272",
                 "262143"
               ],
-              "blotc_ms": 17.44,
-              "aot_ms": 8.89,
-              "wasm_bytes": 8142
+              "squidc_ms": 20.66,
+              "aot_ms": 8.61,
+              "wasm_bytes": 8148
             },
             "goose local pool per tree": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 50.909,
-              "wall_ms": 51.56,
-              "median_ms": 54.273,
+              "ms": 52.575,
+              "wall_ms": 53.423,
+              "median_ms": 53.297,
               "all_ms": [
-                50.909,
-                54.273,
-                87.034
+                52.575,
+                53.297,
+                54.241
               ],
               "all_wall_ms": [
-                51.56,
-                55.06,
-                88.236
+                53.423,
+                56.035,
+                56.096
               ],
-              "peak_bytes": 8548352,
-              "peak_mb": 8.15,
-              "compile_ms": 142.99,
+              "peak_bytes": 8683520,
+              "peak_mb": 8.28,
+              "compile_ms": 119.88,
               "stdout": [
                 "524287",
                 "131072",
@@ -2232,22 +2232,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 669.218,
-              "wall_ms": 697.505,
-              "median_ms": 672.105,
+              "ms": 492.087,
+              "wall_ms": 498.962,
+              "median_ms": 492.326,
               "all_ms": [
-                669.218,
-                672.105,
-                781.99
+                492.087,
+                492.326,
+                499.369
               ],
               "all_wall_ms": [
-                697.505,
-                699.17,
-                856.347
+                498.962,
+                505.337,
+                513.521
               ],
-              "peak_bytes": 21102592,
-              "peak_mb": 20.12,
-              "compile_ms": 178.9,
+              "peak_bytes": 21082112,
+              "peak_mb": 20.11,
+              "compile_ms": 168.34,
               "stdout": [
                 "524287",
                 "131072",
@@ -2278,22 +2278,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 86.459,
-              "wall_ms": 87.038,
-              "median_ms": 91.79,
+              "ms": 85.514,
+              "wall_ms": 86.95,
+              "median_ms": 86.817,
               "all_ms": [
-                86.459,
-                91.79,
-                92.051
+                85.514,
+                86.817,
+                89.539
               ],
               "all_wall_ms": [
-                87.038,
-                92.763,
-                92.825
+                86.95,
+                88.831,
+                92.286
               ],
-              "peak_bytes": 12521472,
-              "peak_mb": 11.94,
-              "compile_ms": 206.97,
+              "peak_bytes": 12451840,
+              "peak_mb": 11.88,
+              "compile_ms": 176.7,
               "stdout": [
                 "524287",
                 "131072",
@@ -2324,22 +2324,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 559.638,
-              "wall_ms": 564.082,
-              "median_ms": 564.32,
+              "ms": 593.363,
+              "wall_ms": 607.963,
+              "median_ms": 593.893,
               "all_ms": [
-                559.638,
-                564.32,
-                730.168
+                593.363,
+                593.893,
+                608.316
               ],
               "all_wall_ms": [
-                564.082,
-                572.299,
-                830.764
+                607.963,
+                613.046,
+                630.26
               ],
-              "peak_bytes": 19271680,
-              "peak_mb": 18.38,
-              "compile_ms": 85.76,
+              "peak_bytes": 19255296,
+              "peak_mb": 18.36,
+              "compile_ms": 85.4,
               "stdout": [
                 "524287",
                 "131072",
@@ -2370,22 +2370,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 72.254,
-              "wall_ms": 72.548,
-              "median_ms": 76.883,
+              "ms": 70.538,
+              "wall_ms": 70.997,
+              "median_ms": 76.335,
               "all_ms": [
-                72.254,
-                76.883,
-                79.861
+                70.538,
+                76.335,
+                77.989
               ],
               "all_wall_ms": [
-                72.548,
-                77.298,
-                84.791
+                70.997,
+                78.61,
+                80.481
               ],
-              "peak_bytes": 8982528,
-              "peak_mb": 8.57,
-              "compile_ms": 69.0,
+              "peak_bytes": 9048064,
+              "peak_mb": 8.63,
+              "compile_ms": 77.44,
               "stdout": [
                 "524287",
                 "131072",
@@ -2423,55 +2423,55 @@
         "medium": {
           "n": 400000,
           "rows": {
-            "blot streaming": {
-              "kind": "blot",
+            "squid streaming": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 183.343,
-              "wall_ms": 185.659,
-              "median_ms": 185.847,
+              "ms": 194.271,
+              "wall_ms": 200.315,
+              "median_ms": 196.137,
               "all_ms": [
-                183.343,
-                185.847,
-                185.913
+                194.271,
+                196.137,
+                200.391
               ],
               "all_wall_ms": [
-                185.659,
-                187.115,
-                187.828
+                200.315,
+                203.078,
+                207.847
               ],
               "peak_bytes": 4096000,
               "peak_mb": 3.91,
-              "compile_ms": 28.21,
+              "compile_ms": 32.76,
               "stdout": [
                 "400000",
                 "91800236",
                 "8685297199210497210"
               ],
-              "blotc_ms": 17.62,
-              "aot_ms": 10.58,
-              "wasm_bytes": 11087
+              "squidc_ms": 20.32,
+              "aot_ms": 12.45,
+              "wasm_bytes": 11093
             },
             "goose inline DTO": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 188.755,
-              "wall_ms": 227.739,
-              "median_ms": 191.336,
+              "ms": 148.931,
+              "wall_ms": 153.445,
+              "median_ms": 149.706,
               "all_ms": [
-                188.755,
-                191.336,
-                191.491
+                148.931,
+                149.706,
+                151.796
               ],
               "all_wall_ms": [
-                227.739,
-                230.707,
-                233.982
+                153.445,
+                155.207,
+                155.37
               ],
-              "peak_bytes": 2236416,
-              "peak_mb": 2.13,
-              "compile_ms": 263.47,
+              "peak_bytes": 2220032,
+              "peak_mb": 2.12,
+              "compile_ms": 185.89,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2482,22 +2482,22 @@
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 136.464,
-              "wall_ms": 150.496,
-              "median_ms": 136.712,
+              "ms": 112.952,
+              "wall_ms": 115.17,
+              "median_ms": 115.389,
               "all_ms": [
-                136.464,
-                136.712,
-                139.861
+                112.952,
+                115.389,
+                121.736
               ],
               "all_wall_ms": [
-                150.496,
-                163.113,
-                180.903
+                115.17,
+                120.322,
+                125.508
               ],
-              "peak_bytes": 2277376,
-              "peak_mb": 2.17,
-              "compile_ms": 221.55,
+              "peak_bytes": 2252800,
+              "peak_mb": 2.15,
+              "compile_ms": 159.63,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2508,22 +2508,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 242.489,
-              "wall_ms": 276.887,
-              "median_ms": 264.349,
+              "ms": 182.396,
+              "wall_ms": 185.155,
+              "median_ms": 182.552,
               "all_ms": [
-                242.489,
-                264.349,
-                269.152
+                182.396,
+                182.552,
+                187.329
               ],
               "all_wall_ms": [
-                276.887,
-                325.555,
-                339.21
+                185.155,
+                186.01,
+                193.904
               ],
-              "peak_bytes": 4325376,
-              "peak_mb": 4.12,
-              "compile_ms": 488.95,
+              "peak_bytes": 4440064,
+              "peak_mb": 4.23,
+              "compile_ms": 346.29,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2534,22 +2534,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 133.383,
-              "wall_ms": 136.123,
-              "median_ms": 142.127,
+              "ms": 133.491,
+              "wall_ms": 135.987,
+              "median_ms": 134.976,
               "all_ms": [
-                133.383,
-                142.127,
-                159.644
+                133.491,
+                134.976,
+                137.111
               ],
               "all_wall_ms": [
-                136.123,
-                144.444,
-                194.803
+                135.987,
+                137.667,
+                139.883
               ],
-              "peak_bytes": 4325376,
-              "peak_mb": 4.12,
-              "compile_ms": 446.01,
+              "peak_bytes": 4337664,
+              "peak_mb": 4.14,
+              "compile_ms": 298.53,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2560,22 +2560,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 250.959,
-              "wall_ms": 252.457,
-              "median_ms": 256.634,
+              "ms": 266.879,
+              "wall_ms": 269.85,
+              "median_ms": 270.751,
               "all_ms": [
-                250.959,
-                256.634,
-                282.982
+                266.879,
+                270.751,
+                271.114
               ],
               "all_wall_ms": [
-                252.457,
-                257.925,
-                285.233
+                269.85,
+                280.479,
+                281.836
               ],
               "peak_bytes": 2629632,
               "peak_mb": 2.51,
-              "compile_ms": 113.97,
+              "compile_ms": 123.56,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2586,22 +2586,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 169.377,
-              "wall_ms": 170.99,
-              "median_ms": 177.809,
+              "ms": 165.448,
+              "wall_ms": 169.67,
+              "median_ms": 166.811,
               "all_ms": [
-                169.377,
-                177.809,
-                208.701
+                165.448,
+                166.811,
+                167.757
               ],
               "all_wall_ms": [
-                170.99,
-                179.531,
-                210.225
+                169.67,
+                172.006,
+                172.8
               ],
-              "peak_bytes": 2461696,
-              "peak_mb": 2.35,
-              "compile_ms": 101.58,
+              "peak_bytes": 2478080,
+              "peak_mb": 2.36,
+              "compile_ms": 108.29,
               "stdout": [
                 "400000",
                 "91800236",
@@ -2619,54 +2619,54 @@
         "medium": {
           "n": 2048,
           "rows": {
-            "blot 16-wide U8x16 SIMD": {
-              "kind": "blot",
+            "squid 16-wide U8x16 SIMD": {
+              "kind": "squid",
               "tier": null,
               "ok": true,
-              "ms": 28.312,
-              "wall_ms": 28.494,
-              "median_ms": 29.186,
+              "ms": 28.516,
+              "wall_ms": 28.692,
+              "median_ms": 28.881,
               "all_ms": [
-                28.312,
-                29.186,
-                29.823
+                28.516,
+                28.881,
+                30.669
               ],
               "all_wall_ms": [
-                28.494,
-                29.323,
-                30.04
+                28.692,
+                29.303,
+                31.293
               ],
-              "peak_bytes": 12484608,
-              "peak_mb": 11.91,
-              "compile_ms": 27.02,
+              "peak_bytes": 12517376,
+              "peak_mb": 11.94,
+              "compile_ms": 32.32,
               "stdout": [
                 "2048",
                 "502239988"
               ],
-              "blotc_ms": 18.13,
-              "aot_ms": 8.89,
-              "wasm_bytes": 8338
+              "squidc_ms": 23.48,
+              "aot_ms": 8.84,
+              "wasm_bytes": 8344
             },
             "goose flat indexing": {
               "kind": "goose",
               "tier": null,
               "ok": true,
-              "ms": 29.762,
-              "wall_ms": 30.106,
-              "median_ms": 29.926,
+              "ms": 19.447,
+              "wall_ms": 19.78,
+              "median_ms": 20.144,
               "all_ms": [
-                29.762,
-                29.926,
-                30.513
+                19.447,
+                20.144,
+                22.635
               ],
               "all_wall_ms": [
-                30.106,
-                31.04,
-                31.326
+                19.78,
+                21.467,
+                25.548
               ],
-              "peak_bytes": 11898880,
-              "peak_mb": 11.35,
-              "compile_ms": 164.53,
+              "peak_bytes": 11747328,
+              "peak_mb": 11.2,
+              "compile_ms": 132.45,
               "stdout": [
                 "2048",
                 "502239988"
@@ -2676,22 +2676,22 @@
               "kind": "cpp",
               "tier": "idiomatic",
               "ok": true,
-              "ms": 21.689,
-              "wall_ms": 21.82,
-              "median_ms": 22.239,
+              "ms": 22.266,
+              "wall_ms": 24.176,
+              "median_ms": 23.622,
               "all_ms": [
-                21.689,
-                22.239,
-                22.326
+                22.266,
+                23.622,
+                23.643
               ],
               "all_wall_ms": [
-                21.82,
-                22.528,
-                22.576
+                24.176,
+                24.274,
+                24.431
               ],
-              "peak_bytes": 12615680,
-              "peak_mb": 12.03,
-              "compile_ms": 196.59,
+              "peak_bytes": 12365824,
+              "peak_mb": 11.79,
+              "compile_ms": 182.43,
               "stdout": [
                 "2048",
                 "502239988"
@@ -2701,22 +2701,22 @@
               "kind": "cpp",
               "tier": "expert",
               "ok": true,
-              "ms": 24.393,
-              "wall_ms": 24.693,
-              "median_ms": 24.585,
+              "ms": 24.714,
+              "wall_ms": 25.344,
+              "median_ms": 25.109,
               "all_ms": [
-                24.393,
-                24.585,
-                26.175
+                24.714,
+                25.109,
+                25.676
               ],
               "all_wall_ms": [
-                24.693,
-                25.061,
-                26.56
+                25.344,
+                25.525,
+                26.316
               ],
-              "peak_bytes": 12546048,
-              "peak_mb": 11.96,
-              "compile_ms": 164.81,
+              "peak_bytes": 12406784,
+              "peak_mb": 11.83,
+              "compile_ms": 174.77,
               "stdout": [
                 "2048",
                 "502239988"
@@ -2726,22 +2726,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 20.753,
-              "wall_ms": 21.042,
-              "median_ms": 21.415,
+              "ms": 22.729,
+              "wall_ms": 23.86,
+              "median_ms": 23.371,
               "all_ms": [
-                20.753,
-                21.415,
-                21.432
+                22.729,
+                23.371,
+                23.383
               ],
               "all_wall_ms": [
-                21.042,
-                21.622,
-                22.029
+                23.86,
+                23.913,
+                23.999
               ],
-              "peak_bytes": 11128832,
-              "peak_mb": 10.61,
-              "compile_ms": 83.65,
+              "peak_bytes": 11014144,
+              "peak_mb": 10.5,
+              "compile_ms": 91.92,
               "stdout": [
                 "2048",
                 "502239988"
@@ -2751,22 +2751,22 @@
               "kind": "rust",
               "tier": null,
               "ok": true,
-              "ms": 19.911,
-              "wall_ms": 20.075,
-              "median_ms": 19.914,
+              "ms": 20.358,
+              "wall_ms": 22.04,
+              "median_ms": 21.683,
               "all_ms": [
-                19.911,
-                19.914,
-                20.029
+                20.358,
+                21.683,
+                21.811
               ],
               "all_wall_ms": [
-                20.075,
-                20.162,
-                20.486
+                22.04,
+                22.801,
+                23.674
               ],
-              "peak_bytes": 11145216,
-              "peak_mb": 10.63,
-              "compile_ms": 80.06,
+              "peak_bytes": 10924032,
+              "peak_mb": 10.42,
+              "compile_ms": 85.59,
               "stdout": [
                 "2048",
                 "502239988"
@@ -2778,14 +2778,14 @@
     }
   },
   "meta": {
-    "generated_at": "2026-11-27T17:43:40.107930+00:00",
+    "generated_at": "2026-11-27T21:17:39.535304+00:00",
     "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
     "os": "Linux 7.3.5-2-cachyos (x86_64)",
     "clang": "clang version 23.1.5",
     "rust": "rustc 1.96.0-nightly (3645249d7 2026-03-16)",
     "wtime_aot": "/home/mewhhaha/src/wtime/tools/wtime-aot/target/release/wtime-aot",
-    "blotc": "/home/mewhhaha/src/blot2/compiler-goose/build/blotc-goose",
-    "goose": "/home/mewhhaha/src/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
+    "squidc": "/home/mewhhaha/src/squid-lang/compiler-goose/build/squidc-goose",
+    "goose": "/home/mewhhaha/src/squid-lang/build/goose-port/upstream-d5ae5bb/build-precision/goose",
     "reps": 3,
     "warmups": 2,
     "sizes": [

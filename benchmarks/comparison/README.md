@@ -24,13 +24,13 @@ Reproducible cross-language benchmark suite backing the numbers in the root
   (default and `--wasm3`).
 - [rust_bench_main.rs](rust_bench_main.rs) + [Cargo.toml](Cargo.toml): Unified
   benchmark runner executing Squid Wasm (default and `--wasm3`) and Rust Wasm on
-  the same `wtime-aot 0.1.7` (`--backend x64 --target-cpu native --blot-cdylib`,
-  `x64-v4` with AVX-512/AVX2/BMI2, zero external deps, explicit software bounds checks),
-  native Rust `-O3` kernels, `bevy_ecs 0.20.1` native worlds, AoS `Vec2`/`Vec4`
-  record SIMD, 1–8 thread isolated-guest scaling, and persistent `#process`
-  throughput with bit-exact checksum verification on every matching workload.
+  the same `wtime-aot 0.1.11` (`--backend x64 --target-cpu native --guard-pages
+  --blot-cdylib`, `x64-v4` with AVX-512/AVX2/BMI2), native Rust `-O3` kernels,
+  `bevy_ecs 0.20.1` native worlds, AoS `Vec2`/`Vec4` record SIMD, 1–8 thread
+  isolated-guest scaling, and persistent `#process` throughput with bit-exact
+  checksum verification on every matching workload.
 - [plot_benchmarks.py](plot_benchmarks.py): Generates the SVG graphs embedded in
-  [README.md](../../README.md) directly from the recorded JSON evidence.
+  [BENCHMARK.md](../../BENCHMARK.md) directly from the recorded JSON evidence.
 
 ## Running
 
@@ -50,6 +50,11 @@ deno run --allow-read --allow-write --allow-run --allow-env=SQUID_CLIENT_TEST_AM
 
 ## Recorded Evidence
 
+- [2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json](../evidence/measurements/2026-11-27-rust-and-bevy-ecs-wtime-0.1.11.json):
+  Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
+  AMD Ryzen 7 7800X3D with `squidc-goose` (`abb9acaf`), `wtime-aot 0.1.11`
+  (`--backend x64 --target-cpu native --guard-pages`, `x64-v4`, `91d6cfe`),
+  `rustc 1.96.0-nightly`, and `bevy_ecs 0.20.1`.
 - [2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json](../evidence/measurements/2026-11-26-rust-and-bevy-ecs-wtime-0.1.7.json):
   Raw medians (15 timed samples after warmup; 9 samples for compile speed) on
   AMD Ryzen 7 7800X3D with `squidc-goose` (`c79a8354`), `wtime-aot 0.1.7`
