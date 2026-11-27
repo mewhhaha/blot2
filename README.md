@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="favicon.svg" width="96" alt="Squid logo">
+  <img src="./favicon.svg" width="112" height="112" alt="Lime-green Squid mascot on a purple ink splat">
 </p>
 
 <h1 align="center">Squid</h1>
