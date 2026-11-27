@@ -17,9 +17,7 @@
   <a href="DESIGN.md">Design</a>
 </p>
 
-| **1.07×** | **2.14×** | **0.86×** | **27 ms** |
-|:---:|:---:|:---:|:---:|
-| runtime vs expert C++<br><sub>16-suite geomean · lower is better</sub> | faster than Go<br><sub>PLB · 12 problems</sub> | peak memory vs expert C++<br><sub>16-suite geomean · lower is better</sub> | cold build → native<br><sub>8.7× faster than clang++</sub> |
+![Squid benchmark results. Across 16 benchmarks, Squid takes 1.07× the runtime and uses 0.86× the peak memory of expert C++. On 12 PLB problems it is 2.14× faster than Go. A cold native build takes 27 ms, 8.7× faster than clang++.](benchmarks/readme-overview.svg)
 
 <sub>AMD Ryzen 7 7800X3D · <code>squidc-goose</code> → <code>wtime-aot 0.1.11</code> AOT-compiled Wasm · 100% bit-exact output parity · <a href="BENCHMARK.md">Methodology →</a></sub>
 
