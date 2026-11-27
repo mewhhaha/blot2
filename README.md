@@ -1,90 +1,120 @@
-# Blot
+<p align="center">
+  <img src="favicon.svg" width="96" alt="Blot logo">
+</p>
 
-**A zero-GC, pure-ownership language that compiles directly to fast, deterministic WebAssembly in milliseconds.**
+<h1 align="center">Blot</h1>
 
-Blot sits between garbage-collected scripting languages and LLVM-heavy systems languages: you get in-place native-class performance, memory safety without `'a` lifetime annotations, algebraic effects, compile-time reflection, and subsecond iteration — all inside a deterministic WebAssembly sandbox.
+<p align="center">
+  <b>A zero-GC, ownership-checked language compiling straight to WebAssembly in milliseconds.</b><br>
+  The safety and ergonomics of functional scripting with native-class speed, without a garbage collector or LLVM.
+</p>
 
-[Features & Examples](#features--examples) · [Performance](#performance) · [Benchmarks](BENCHMARK.md) · [Getting Started](#getting-started) · [Documentation](#documentation)
+<p align="center">
+  <a href="#tour">Tour</a> ·
+  <a href="#performance">Performance</a> ·
+  <a href="#getting-started">Get started</a> ·
+  <a href="CHEATSHEET.md">Cheatsheet</a> ·
+  <a href="DESIGN.md">Design</a>
+</p>
 
----
+| **1.07×** | **2.14×** | **0.86×** | **27 ms** |
+|:---:|:---:|:---:|:---:|
+| runtime vs expert C++<br><sub>16-suite geomean · lower is better</sub> | faster than Go<br><sub>PLB · 12 problems</sub> | peak memory vs expert C++<br><sub>16-suite geomean · lower is better</sub> | cold build → native<br><sub>8.7× faster than clang++</sub> |
 
-## Why Blot?
-
-- **No GC pauses, no `'a` lifetimes.** Values are immutable by default; uniquely owned dynamic arrays (`#[T]`) mutate in place with `:=`, while the compiler infers local borrows (`&T`, `&[T]`) and ownership transfers (`own`) statically.
-- **Native-class speed, direct to Wasm.** No LLVM in the loop — a 6-kernel benchmark compiles in **13.6 ms** (**22.5 KiB** `.wasm`) and beats native `rustc -O3` across all 6 kernels on `wtime-aot`.
-- **Deterministic & sandboxed by construction.** Pure by default, explicit algebraic effects for I/O and state, granular scalar types (`U8`, `U32`, `I32`, `U64`, `I64`, `F32`, `F64`) with 1-byte `#[U8]` arrays and canonical IEEE 754 quiet NaN (`0x7fc00000` / `0x7ff8000000000000`) across scalar, SIMD, and `#run`.
-- **Low-friction metaprogramming & parallelism.** Field defaults, `@[...]` data tags, compile-time `#for #fields` / `#variants`, speculative `fork` rollback, auto-SIMD `spark #[...]`, and first-class `#kernel` / `#process` concurrency.
-
----
-
-## Features & Examples
-
-### 1. In-Place Ownership Without Lifetimes
-
-Mutate uniquely owned arrays in place with `:=` and `.push`, take an explicit snapshot with `copy`, and hand ownership across functions with `own` — zero lifetime parameters, zero hidden aliasing, and `self` shorthand for clean updates:
-
-```blot
-func scale_and_append (items: own #[F32]) -> (factor: F32): #[F32] =>
-  for i in 0 .. items.length:
-    items[i] := self * factor
-  items := self.push factor
-  return items
-
-io main (): F32 =>
-  let base = #[1.0, 2.0, 3.0]
-  let snapshot = copy base             // explicit deep snapshot
-  let updated = scale_and_append base 2.0
-  return snapshot[0] + updated[3]      // 1.0 + 2.0 = 3.0
-```
-
-### 2. Zero-Boilerplate Comptime Reflection, Defaults & Tags
-
-Annotate fields with ordinary data tags (`@[...]`), give fields defaults, and iterate any record or sum type at compile time with `#for #fields` / `#variants`. Heterogeneous trait dispatch (`Codec.encode val.(field)`) unrolls statically with zero macros and zero runtime reflection cost:
+<sub>AMD Ryzen 7 7800X3D · <code>blotc-goose</code> → <code>wtime-aot 0.1.11</code> AOT-compiled Wasm · 100% bit-exact output parity · <a href="BENCHMARK.md">Methodology →</a></sub>
 
 ```blot
-type Skip is data = $Skip
-type FieldId is data = $FieldId U32
+type Clock is effect = { tick: Unit -> U32 }
+type Action is data = $Add U32 | $Clear
 
-type Codec a is trait = { encode: a -> #[U32] }
-const U32.Codec: Codec U32 = { encode: func x => #[x] }
-const Bool.Codec: Codec Bool = { encode: func b => #[if b then 1 else 0] }
-
-type Player is data = $Player {
-  @[$FieldId 10]
-  id: U32,
-  @[$FieldId 20]
-  hp: U32 = 100,
-  @[$FieldId 30]
-  alive: Bool = true,
-  @[$Skip]
-  cached_score: U32 = 0,
-}
-
-func encode_record (val: t): #[U32] =>
-  let out: #[U32] = #[]
-  #for field in #fields t:
-    #if not (field.has_tag $Skip):
-      out := self.push (field.tag $FieldId)
-      for word in Codec.encode val.(field):
-        out := self.push word
-  return out
+func apply (log: own #[U32]) -> (act: Action): #[U32] !{ Clock } =>
+  use t <- Clock.tick ()
+  case act of
+    $Add n =>
+      log := self.push (t + n)
+    $Clear =>
+      log := self.truncate 0
+  return log
 
 io main (): #[U32] =>
-  // Defaults fill in `hp`, `alive`, and `cached_score` automatically.
-  let p = $Player { id: 7 }
-  return encode_record p               // #[10, 7, 20, 100, 30, 1]
+  handler clock: Clock =>
+    tick () => 10
+  return (apply #[1, 2]).handle clock
+    .run ($Add 5) // #[1, 2, 15]
 ```
 
-### 3. Composable Scoped Effect Handlers (`handler`, `.handle`, `layer`)
+## Why Blot
 
-No ambient globals, hidden I/O, or DI boilerplate. Declare capabilities as effects, define scoped `handler` bindings, and chain or bundle them with `.handle`, `layer`, and `.run` — deterministic tests, replay, and mocking compose like ordinary functions:
+- **No GC, no lifetimes.** Values have a single owner, update in place with `:=`, and free deterministically when their scope ends.
+- **Native-class, no LLVM.** Direct compilation to compact WebAssembly (`wtime-aot` to native x64/ARM64) delivers millisecond cold builds and competitive runtime.
+- **Deterministic by construction.** Every guest runs in a memory-isolated sandbox where all host I/O enters through typed, swappable algebraic effects.
+- **Comptime without macros.** `#for`, `#if`, and `#fields` inspect types and generate specialized code at compile time using ordinary Blot syntax.
+
+## Tour
+
+### Owned, in place
+
+Pass `own` to mutate arrays and recursive data in place without garbage collection, borrow-checker lifetimes, or accidental aliasing.
+
+```blot
+type Tree is data = $Leaf U32 | $Branch (Tree, Tree)
+
+func map_tree (t: own Tree) -> (k: U32): Tree => case t of
+  $Leaf n => $Leaf (n * k)
+  $Branch (l, r) => $Branch (map_tree l k, map_tree r k)
+
+func scale (items: own #[F32]) -> (k: F32): #[F32] =>
+  for i in 0 .. items.length:
+    items[i] := self * k
+  items := self.push k
+  return items
+```
+
+| When timelines diverge | Cost | Gives you |
+|---|---|---|
+| `x.copy` | O(n) | An independent, mutable clone |
+| `freeze x` | O(1) | A read-only `*T` shared freely across scopes |
+| `fork x:` | O(edits) | Speculative mutations that roll back automatically on exit |
+
+→ [Owned updates and copies](docs/language/guide.md#owned-updates-and-copies)
+
+### Data layout is a symbol
+
+Blot puts memory layout directly in the type so you choose dense storage without changing how code reads.
+
+| Write | Means |
+|---|---|
+| `#[T]` | Dynamic contiguous array, mutated in place |
+| `#[n; T]` | Fixed-length array with compile-time bounds-check elimination |
+| `%[T]` | Packed sequential storage: SoA record columns and split-stream sums |
+| `*T` | Frozen value, shared by handle with zero copying |
+
+```blot
+type Event is data = $Hit U32 | $Miss
+
+func damage (raw: #[U32]): U32 =>
+  let events: %[Event] = %[if x > 0 then $Hit x else $Miss | x <- raw]
+  let total: U32 = 0
+  for ev in events:
+    case ev of
+      $Hit d =>
+        total := self + d
+      $Miss => ()
+  return total
+```
+
+→ [Arrays and packed storage](docs/language/guide.md#arrays-and-libraries)
+
+### Effects that compose
+
+All I/O, randomness, and host state enter through typed effects—stack `handler` values with `layer` (or `@handle`) to test and replay deterministically.
 
 ```blot
 type Rng is effect = { next: Unit -> U32 }
 type Log is effect = { write: U32 -> Unit }
 
-func roll_loot (count: U32): Unit !{ Rng, Log } =>
-  for _ in 0 .. count:
+func roll_loot (n: U32): Unit !{ Rng, Log } =>
+  for _ in 0 .. n:
     use r <- Rng.next ()
     use Log.write (r % 100)
   return ()
@@ -98,37 +128,44 @@ io main (): U32 =>
       return seed >> 16
   handler log: Log =>
     write loot => total := self + loot
-  roll_loot.handle rng
-    .handle log
+  let env = layer rng log
+  roll_loot.handle env
     .run 5
   return total
 ```
 
-### 4. Speculative Rollback with `fork`
+→ [Effects & I/O](docs/language/effects-and-io.md)
 
-Need lookahead search, move evaluation, or transactional validation? `fork` lets you mutate an owned array directly in place while journaling touched bytes — exiting the scope automatically restores the original array without pre-cloning it:
+### Reflection at compile time
+
+Attach typed `@[...]` tags to record fields and walk `#fields t` at compile time—no proc macros, no runtime reflection.
 
 ```blot
-func score_move (board: own #[U32]) -> (slot: U32) -> (piece: U32): (U32, #[U32]) =>
-  let score = fork board:
-    board[slot] := piece
-    board := self.push piece
-    let acc: U32 = 0
-    for cell in board:
-      acc := self + cell
-    return acc
-  // `board` is back to its exact pre-fork contents and length.
-  return (score, board)
+type Skip is data = $Skip
+type FieldId is data = $FieldId U32
 
-io main (): #[U32] =>
-  let board: #[U32] = #[1, 2, 3]
-  let (preview, restored) = score_move board 1 99
-  return #[preview, restored[1], restored.length]   // #[202, 2, 3]
+type Player is data = $Player {
+  @[$FieldId 10] id: U32,
+  @[$FieldId 20] hp: U32 = 100,
+  @[$Skip] cached_score: U32 = 0,
+}
+
+func encode_fields (val: t): #[U32] =>
+  let out: #[U32] = #[]
+  #for field in #fields t:
+    #if not (field.has_tag $Skip):
+      out := self.push (field.tag $FieldId)
+      out := self.push val.(field)
+  return out
+
+io main (): #[U32] => encode_fields ($Player { id: 7 }) // #[10, 7, 20, 100]
 ```
 
-### 5. Auto-Vectorized `spark` SIMD & AoS Loops
+→ [Expression tags & comptime](docs/language/guide.md#expression-tags)
 
-Write straightforward math with `spark #[...]` (or flat `#[Vec4]` loops) and the compiler proves data independence and emits 4-wide WebAssembly `v128` SIMD automatically:
+### SIMD by default with `spark`
+
+Mark an elementwise comprehension with `spark` to auto-vectorize straight to Wasm `v128` SIMD—the mechanism behind Blot's **2.24×** lead over C++ on `particles`.
 
 ```blot
 func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32] =>
@@ -136,110 +173,126 @@ func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32]
   return spark #[px[i] + vx[i] * dt + ax[i] * half_dt2 | i <- 0 .. px.length]
 ```
 
-### 6. First-Class Multi-Core Kernels, Persistent Processes & In-Language Coordination
+→ [Sparks, kernels & processes](docs/language/guide.md#sparks-kernels-and-isolated-processes)
 
-Two built-in Wasm ABI 8 entry points cover parallel fan-out and long-lived stateful systems without threads or shared mutable memory — and programs can orchestrate both directly inside Blot via `std/runtime`, `std/kernel`, and `std/process`:
+<details>
+<summary><b>Kernels &amp; persistent processes</b> — isolated compute kernels and long-lived stateful actors</summary>
 
 ```blot
-import * as runtime from "std/runtime"
-import * as kernel from "std/kernel"
-import * as process from "std/process"
-
-// Pure data-parallel worker dispatched across host worker pools:
 #kernel func shade_row (row: U32): U32 =>
   let acc: U32 = 0
   for x in 0 .. 256:
     acc := self + ((row * 31 + x) & 255)
   return acc
 
-// Isolated persistent state machine with zero-alloc commits and rollback on trap:
-type Counter is data = $Counter { tick: U32, history: #[U32] }
-
-func init_counter (start: U32): Counter =>
-  return $Counter { tick: start, history: #[] }
-
-func step_counter (st: own Counter) -> (delta: U32): (Counter, U32) =>
-  let $Counter { tick, history } = st
-  let next = tick + delta
-  history := self.push next
-  return ($Counter { tick: next, history }, next)
+func init_counter (start: U32): U32 => start
+func step_counter (st: own U32) -> (delta: U32): (U32, U32) => (st + delta, st + delta)
 
 #process const counter: Process [U32, U32, U32] = {
   init: init_counter,
   step: step_counter,
 }
-
-// Orchestrate both directly in Blot over a single mockable `Runtime` effect:
-io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.provider host):
-  use rows_res <- kernel.run shade_row #[0, 1, 2, 3]
-  let $Ok rows = rows_res else:
-    break 0
-  use pid_res <- process.spawn counter 10
-  let $Ok pid = pid_res else:
-    break 0
-  use reply_res <- process.call pid rows[0]
-  let $Ok total = reply_res else:
-    break 0
-  use _ <- process.close pid
-  break total
 ```
 
-See [examples/runtime_coordination.blot](examples/runtime_coordination.blot) for the full runnable pipeline (including prepared kernels, concurrent `submit`/`await_job`, async `send`/`advance`/`poll`, and pure-Blot mocking) and [examples/io_entries.blot](examples/io_entries.blot) for `io` entry declarations.
+→ [Full coordination pipeline](examples/runtime_coordination.blot)
+</details>
 
-### 7. Ergonomics That Stay Out of Your Way
+<details>
+<summary><b>Custom operators &amp; diagnostics</b> — user-defined operators, guarded destructuring, and blame-tracked errors</summary>
 
-Curried functions (`->`), exhaustive `case ... of` matching, `let $Some x = ... else:` early exits, `self` update shorthand, and structured Solid-2–inspired diagnostics (`blot explain <code>`) with ownership blame spans keep everyday code concise and readable.
+```blot
+func (+*) (a: U32) -> (b: U32): U32 => a * b + 1
 
----
+func first_or_zero (xs: #[U32]): U32 =>
+  let $Some x = xs.get 0 else:
+    return 0
+  return x +* 3
+```
+
+```text
+[SPENT_VALUE] `items` was already moved at line 5 and can no longer be used here.
+in spent_demo.blot › io main
+at spent_demo.blot:6:14
+ 5 |   let n = consume items
+   |           ------------- `items` moved here
+ 6 |   return n + items[0]
+   |              ^^^^^ `items` used after move
+fix: Pass `items.copy` at line 5 to keep `items` live, or use the owned value returned by that call.
+doc: blot explain SPENT_VALUE (skills/blot-diagnostics/SKILL.md#SPENT_VALUE)
+```
+
+Run `deno task blot explain <CODE>` for the full cause, minimal repro, and fix guide for any diagnostic code.
+</details>
 
 ## Performance
 
-Measured on **AMD Ryzen 7 7800X3D (Linux)** with `blotc-goose` + **`wtime-aot 0.1.7`** (`x64-v4`, explicit software bounds checks, canonical NaN) vs `rustc 1.96.0-nightly -O3`. Every run verifies bit-exact checksum parity.
+<sub>Measured on AMD Ryzen 7 7800X3D (Linux <code>x86_64</code>) · <code>blotc-goose</code> → <code>wtime-aot 0.1.11 --guard-pages</code> · single-process CPU time &amp; exact peak RSS · 100% bit-exact output parity.</sub>
 
-![Compile speed and WebAssembly output size: Blot vs Rust](benchmarks/evidence/measurements/2026-11-26-compile-and-size.svg)
+<img src="benchmarks/evidence/measurements/2026-11-27-goose-suite/summary_overview.svg" width="100%" alt="16-benchmark suite runtime, peak memory, and compile speed overview comparing Blot, Goose, Rust, and C++">
 
-![Blot vs Rust -O3 compute, memory, and auto-SIMD benchmarks](benchmarks/evidence/measurements/2026-11-26-blot-vs-rust-kernels.svg)
+| Workload | Blot | Comparison | Result |
+|---|---:|---:|---|
+| `particles` (16-suite) | 83.0 ms | C++ expert 185.6 ms | **#1 overall · 2.24× faster** |
+| `sum` (16-suite) | 39.6 ms | Goose 47.8 ms | **#1 overall · 1.21× faster** |
+| `bintrees` (16-suite) | 66.5 ms | C++ expert 86.5 ms | **1.30× vs C++ exp · 1.09× vs Rust exp** |
+| PLB `binarytrees` | 146.3 ms | Go 1.22 s · Rust 1.44 s | **8.31× vs Go · 9.85× vs Rust** |
+| PLB `spectral-norm` | 483.6 ms | Rust 490.1 ms | **#1 overall · 1.28× vs Go** |
+| PLB `merkletrees` | 372.4 ms · 17.8 MiB | Rust 678.6 ms · 34.1 MiB | **#1 speed & lowest RSS** |
+| `sexp` / `words` RSS | 109.2 / 79.6 MiB | Goose 128.0 / 138.3 MiB | **#1 lowest RSS in suite** |
 
-- **Real-world builds:** Anonymous internal 3D game (~69k LOC, 325 modules, 6.71 MB `.wasm`) compiles in **~0.43–0.55 s** cold, **~41–44 ms** incremental (`fresh=1`), and **~20 ms** on literal edits (**~2.0M LOC/s** synthetic).
-- **AoS SIMD & concurrency:** `#[Vec4]` loops beat native Rust **1.83×**; 8-thread isolated guests scale **4.64×** (**3.67×** faster than native Rust); `#process` commits in **~53 ns/step**.
-- **Cross-language suites (Goose 16, `bddicken/languages`, PLB 9):** **9.3× faster** cold builds than `clang++ -O2` (**24.0 ms** geomean, `5.3–26.8 KiB` `.wasm`); beats idiomatic C++ on **9/16** runtimes and **13/16** peak RSS (`1.03×` geomean RSS vs C++ expert, **#1 overall** on `particles` with unboxed `v128` SIMD, **#1 lowest RSS** on `words` and `sexp`); beats C (`clang -O3`) on **3/4** `bddicken` compute workloads (`1.81×` on `loops`, `1.08×` on `levenshtein`, `1.05×` on `fibonacci`); and beats official Go on **5/9** PLB workloads (`1.82×` on `binarytrees`, `2.77×` on `lru`, `1.51×` on `fasta`) with **2–4×** lower peak RSS on memory-heavy problems.
-- **Optional Wasm 3.0 (`--wasm3`):** Tail calls (`return_call`) and relaxed SIMD (FMA) on V8/Deno and `wtime-aot 0.1.7`.
+Where Blot trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap), and on PLB Blot trails C++/Rust on SIMD-heavy `fannkuch-redux` (`1.74 s` vs C++ `960.9 ms`) and Go's assembly `math/big` on `pidigits` (`1.14 s` vs `648.6 ms`).
 
-See **[BENCHMARK.md](BENCHMARK.md)** for full per-suite results, SVG bar charts, Ink vs Bevy ECS numbers, `bddicken` & PLB suites, and raw JSON evidence.
+| Iteration speed | Time |
+|---|---:|
+| 16-suite cold build to native (geomean) | **26.9 ms** (8.7× faster than `clang++ -O2`) |
+| 69k-LOC 3D game, cold build (325 modules) | **0.43–0.55 s** |
+| Single-file incremental edit | **41–44 ms** |
+| Literal / comment edit | **~20 ms** |
+| 1M-LOC synthetic scaling | **~0.50 s** (~2.0M LOC/s) |
 
----
+<details>
+<summary>PLB runtime chart (13 problems vs Go, Rust, C &amp; C++)</summary>
 
-## Getting Started
+<img src="benchmarks/evidence/measurements/2026-11-27-plb/plb_runtime.svg" width="100%" alt="Programming-Language-Benchmarks runtime comparison across 13 problems for Blot, Go, Rust, C, and C++">
+</details>
 
-### Prerequisites
+→ **[BENCHMARK.md](BENCHMARK.md)** — full per-benchmark tables, Ink vs Bevy ECS, `bddicken/languages`, and raw JSON.
 
-- **Deno 2** (CLI, formatter, and Wasm guest host)
-- **clang, cmake, ninja, and Python 3** (to build `blotc-goose` from source)
+## Getting started
 
-### Build, Run & Test
+Requires **Deno 2** (plus `clang`, `cmake`, `ninja`, and `Python 3` to build from source). Prebuilt Linux `x86_64` binaries are available on [Releases](https://github.com/mewhhaha/blot2/releases).
 
 ```sh
-# Build the optimized compiler (or build:compiler:dev for fast debug builds)
+# Build the compiler (first run bootstraps Goose in ~2 min; ~7 min optimized, or :dev in ~1.5 min)
 deno task build:compiler
 
-# Type-check, compile to Wasm (ABI 8), or format
-deno task blot check examples/syntax.blot
-deno task blot build examples/syntax.blot --out build/syntax.wasm
-deno task blot build examples/syntax.blot --out build/syntax.wasm --wasm3
-deno task blot fmt examples/syntax.blot
+# Type-check, compile to Wasm, and format
+deno task blot check path/to/app.blot
+deno task blot build path/to/app.blot -o app.wasm
+deno task blot fmt path/to/app.blot
 
-# Inspect any diagnostic code or print the quick cheatsheet
+# Inspect diagnostics and browse the built-in cheatsheet
 deno task blot explain SPENT_VALUE
 deno task blot guide --cheatsheet
 
-# Run tests (or deno task test:compiler for the full release qualification gate)
+# Run the guest and host test suite
 deno task test:guest
 ```
 
----
-
 ## Documentation
 
-- **Language & Examples:** [Cheatsheet](CHEATSHEET.md) · [Language guide](docs/language/guide.md) · [Effects & I/O](docs/language/effects-and-io.md) · [Diagnostic handbook](skills/blot-diagnostics/SKILL.md) · [Standard library](std/README.md) · [Syntax showcase](examples/syntax.blot) · [`io` entries](examples/io_entries.blot) · [Runtime coordination](examples/runtime_coordination.blot)
-- **Compiler & Host:** [Goose compiler](compiler-goose/README.md) · [Deno host & CLI](host/README.md) · [Guest ABI](docs/host/guest-abi.md) · [Packages](docs/host/packages.md)
-- **Benchmarks & State:** [All benchmarks (BENCHMARK.md)](BENCHMARK.md) · [Comparison suite](benchmarks/comparison/README.md) · [16-benchmark Goose suite](benchmarks/goose-suite/README.md) · [`bddicken` suite](benchmarks/bddicken/README.md) · [PLB suite](benchmarks/plb/README.md) · [Repository map](docs/README.md) · [Current frontier](CONTINUE.md) · [Contributor rules](AGENTS.md)
+| I want to… | Read |
+|---|---|
+| Learn the syntax fast | [Cheatsheet](CHEATSHEET.md) |
+| Understand the design philosophy | [Design](DESIGN.md) |
+| Read the language guide & formal spec | [Guide](docs/language/guide.md) · [Spec](docs/language/spec.md) |
+| Work with effects, handlers & host I/O | [Effects & I/O](docs/language/effects-and-io.md) |
+| Look up a compiler diagnostic | [Diagnostics Guide](skills/blot-diagnostics/SKILL.md) |
+| Explore the standard library | [Standard Library](std/README.md) |
+| Inspect all benchmark suites & raw data | [Benchmarks](BENCHMARK.md) |
+| Dive into compiler internals | [Compiler README](compiler-goose/README.md) |
+| Embed Blot or inspect the Wasm ABI | [Host Runtime](host/README.md) · [Guest ABI](docs/host/guest-abi.md) |
+| Contribute or check active priorities | [AGENTS.md](AGENTS.md) · [CONTINUE.md](CONTINUE.md) · [Docs Index](docs/README.md) |
+
+> [!NOTE]
+> Blot is a greenfield project under active development—expect breaking changes. Prebuilt releases currently target Linux `x86_64`, and the compiler targets WebAssembly guest ABI 8.
