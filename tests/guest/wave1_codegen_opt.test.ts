@@ -360,6 +360,7 @@ Deno.test("Wave 1 freshly allocated arrays are writable but static pool handles 
   await compileAndRun(
     `
 const POOL: #[U32] = #[10, 20, 30, 40]
+io get_pool (): #[U32] => return POOL
 io read_pool (index: U32): U32 => return POOL[index]
 io mutate (items: own #[U32]): U32 =>
   items[0] := 77

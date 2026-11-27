@@ -263,6 +263,24 @@ fn buildWithAnalysis(g: Generator&, entry: u32, pinfo: const blot_check_wire_sch
         g.s.staged_dep_units[sj] = key;
     }
     g.s.staged_dep_units_valid = true;
+    if g.module.data.len != 0 {
+        g.module.data_offset = blot_direct_runtime::arena_start;
+        if !g.module.has_memory {
+            g.module.has_memory = true;
+            g.module.memory_pages = 1;
+            g.module.memory_max_pages = 1;
+        }
+        let rodata_end = (blot_direct_runtime::arena_start + (g.module.data.len as u32) + 15) & 0xfffffff0;
+        let min_pages = (rodata_end + 0xffff) / 0x10000;
+        if g.module.memory_pages < min_pages { g.module.memory_pages = min_pages; }
+        if g.module.memory_max_pages < min_pages { g.module.memory_max_pages = min_pages; }
+        if g.s.has_rt {
+            g.module.globals[g.s.rt.arena_top].init = rodata_end;
+            if min_pages > 1 {
+                g.module.globals[g.s.rt.page_top].init = min_pages * 65536;
+            }
+        }
+    }
     let r_asm = blot_phase_profile::region("direct.assemble", entry, 0, 0);
     blot_direct_writer::assemble(g.module, bytes);
     r_asm.exitWithItems(g.module.functions.len, bytes.len);

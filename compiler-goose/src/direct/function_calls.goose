@@ -188,6 +188,14 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32, is_t
     opIndex(g, OP_call_indirect, signature);
     uleb(g, 0);
     f.checked_elems_len = 0;
+    let arg_holds, arg_herr = g.holdsMemory(arrow.a);
+    if arg_herr == blot_direct_types::Error.none && arg_holds {
+        if tagOf(g, argument.ty) == blot_direct_types::Tag.array {
+            invalidateCheckedOwner(g, f, argument);
+        } else {
+            invalidateCheckedContainers(f);
+        }
+    }
     return received(g, f, arrow.b, id);
 }
 recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -228,16 +236,12 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.tail_call_node = 0;
             return res_v, res_err;
         }
-        var current = field_val;
-        for step in 0..chain_len {
-            let arg_node = chain_args[chain_len - 1 - step];
-            let arg_val, error = expr(g, f, arg_node);
-            if error != blot_direct_types::Error.none { return arg_val, error; }
-            let applied, error = applyClosure(g, f, current, arg_val, id, is_tail && step + 1 == chain_len);
-            if error != blot_direct_types::Error.none { return applied, error; }
-            current = applied;
-        }
-        return current, blot_direct_types::Error.none;
+        return applyChain(g, f, field_val, chain_args, chain_len, id, is_tail);
+    }
+    if chain_len > 0 && m.node(cursor).tag != blot_check_core::Tag.operation_value {
+        let head_val, herr = expr(g, f, cursor);
+        if herr != blot_direct_types::Error.none { return head_val, herr; }
+        return applyChain(g, f, head_val, chain_args, chain_len, id, is_tail);
     }
     let n = m.node(id);
     let callee, error = expr(g, f, n.a);
@@ -253,6 +257,521 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if noted != blot_direct_types::Error.none { return neverVal(), noted; }
     }
     return applyClosure(g, f, callee, argument, id, is_tail);
+}
+
+// Applies an evaluated function value `head_val` to an unwound chain of
+// arguments (stored in reverse in `chain_args[0..chain_len]`), specializing
+// and inlining statically known closures and partials without `call_indirect`.
+recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const u32[8]&, chain_len: i64, id: u32, is_tail: bool) -> Val, Error {
+    let kc_idx = if head_val.len == 2 && tagOf(g, head_val.ty) == blot_direct_types::Tag.function {
+        findKnownClosure(f, w(g, head_val, 0), w(g, head_val, 1))
+    } else { -1 };
+    if kc_idx >= 0 {
+        let kc = f.known_closures[kc_idx];
+        let eval_args = g.reserveVals(chain_len);
+        for step in 0..chain_len {
+            let arg_node = chain_args[chain_len - 1 - step];
+            let arg_val, aerr = expr(g, f, arg_node);
+            if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+            g.s.vals[eval_args.start + step] = arg_val;
+        }
+        if kc.kind == 1 {
+            let cap_n = kc.cap_count as i64;
+            let all_args = g.reserveVals(cap_n + chain_len);
+            for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
+            for si in 0..chain_len { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
+            let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
+            if rerr == blot_direct_types::Error.none {
+                if is_tail { f.tail_call_node = id; }
+                let res_v, res_err = callTarget(g, f, BindingRef { kc.unit, kc.id }, all_args, kc.full_ty, rest, id);
+                f.tail_call_node = 0;
+                return res_v, res_err;
+            }
+            g.dropFailure();
+        } else if kc.kind == 3 {
+            let cap_n = kc.cap_count as i64;
+            let all_args = g.reserveVals(cap_n + chain_len);
+            for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
+            for si in 0..chain_len { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
+            let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
+            if rerr == blot_direct_types::Error.none {
+                let tm .= g.units[kc.unit - 1];
+                var primitive = blot_check_core::Primitive { kind: blot_check_core::PrimitiveKind.scalar, arity: 0 };
+                var has_prim = false;
+                if (kc.id & primitive_node_bit) != 0 {
+                    primitive = tm.primitive(kc.id & 0x7fffffff);
+                    has_prim = true;
+                } else {
+                    let alias, has_alias = primitiveAlias(tm, kc.id);
+                    if has_alias { primitive = tm.primitive(alias); has_prim = true; }
+                }
+                if has_prim && primitive.kind == blot_check_core::PrimitiveKind.scalar && (all_args.len as u32) <= primitive.arity {
+                    return applyPrimitive(g, f, primitive, all_args, kc.full_ty, rest, BindingRef { kc.unit, kc.id }, id);
+                }
+            } else {
+                g.dropFailure();
+            }
+        } else if kc.kind == 2 {
+            let inlined, did_inline, ierr = tryInlineKnownLambda(g, f, kc, eval_args, id, is_tail);
+            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            if did_inline { return inlined, blot_direct_types::Error.none; }
+        }
+        // Fallback: arguments are already evaluated; apply them via closure dispatch.
+        var cur = head_val;
+        for step in 0..chain_len {
+            let applied, aerr = applyClosure(g, f, cur, g.s.vals[eval_args.start + step], id, is_tail && step + 1 == chain_len);
+            if aerr != blot_direct_types::Error.none { return applied, aerr; }
+            cur = applied;
+        }
+        return cur, blot_direct_types::Error.none;
+    }
+    var current = head_val;
+    for step in 0..chain_len {
+        let arg_node = chain_args[chain_len - 1 - step];
+        let arg_val, error = expr(g, f, arg_node);
+        if error != blot_direct_types::Error.none { return arg_val, error; }
+        let applied, error = applyClosure(g, f, current, arg_val, id, is_tail && step + 1 == chain_len);
+        if error != blot_direct_types::Error.none { return applied, error; }
+        current = applied;
+    }
+    return current, blot_direct_types::Error.none;
+}
+
+recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_args: Vals, id: u32, is_tail: bool) -> Val, bool, Error {
+    if f.inline_depth >= 4 || f.evidence_context != 0 {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    if !g.types.concrete(kc.full_ty, 0) {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    var peeled: i64 = 0;
+    var param_bs: u32[8] = [0; 8];
+    var param_tys: TId[8] = [0; 8];
+    var final_closure: u32 = 0;
+    var final_body: u32 = 0;
+    var after_ty: Ty = kc.full_ty;
+    var is_partial_closure = false;
+    {
+        let lm .= g.units[kc.unit - 1];
+        var cur = kc.id;
+        while peeled < (eval_args.len as i64) && peeled < 8 {
+            if lm.node(cur).tag != blot_check_core::Tag.closure { break; }
+            let cinfo = lm.closure(cur);
+            if cinfo.parameter.binding == 0 { break; }
+            if tagOf(g, after_ty) != blot_direct_types::Tag.function { break; }
+            param_bs[peeled] = cinfo.parameter.binding;
+            param_tys[peeled] = cinfo.parameter.ty;
+            final_closure = cur;
+            final_body = cinfo.body;
+            after_ty = g.types.node(after_ty).b;
+            peeled += 1;
+            let next = forwardingRoot(lm, final_body);
+            if peeled < (eval_args.len as i64) && lm.node(next).tag == blot_check_core::Tag.closure {
+                cur = next;
+            } else {
+                break;
+            }
+        }
+        if peeled == 0 || final_body == 0 || tagOf(g, after_ty) == blot_direct_types::Tag.never || !g.types.concrete(after_ty, 0) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        let unwrapped = forwardingRoot(lm, final_body);
+        if lm.node(unwrapped).tag == blot_check_core::Tag.closure {
+            if peeled != (eval_args.len as i64) || f.inline_depth >= 3 {
+                return neverVal(), false, blot_direct_types::Error.none;
+            }
+            is_partial_closure = true;
+        } else {
+            var budget: i64 = 128;
+            if !canInlineBody(g, lm, final_body, BindingRef { 0, 0 }, budget) {
+                return neverVal(), false, blot_direct_types::Error.none;
+            }
+        }
+    }
+    let boxed_ret, berr = g.types.boxed(after_ty);
+    if berr != blot_direct_types::Error.none || boxed_ret {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    var env = kc.lambda_env;
+    {
+        let lm .= g.units[kc.unit - 1];
+        for pi in 0..peeled {
+            let aval = g.s.vals[eval_args.start + pi];
+            g.types.match_(lm, param_tys[pi], aval.ty, env);
+            let pty, perr = g.types.lower(lm, param_tys[pi], env);
+            if perr != blot_direct_types::Error.none {
+                g.dropFailure();
+                return neverVal(), false, blot_direct_types::Error.none;
+            }
+            let pwords, werr = g.types.layout(pty);
+            if werr != blot_direct_types::Error.none || (pwords.len as u32) != aval.len {
+                return neverVal(), false, blot_direct_types::Error.none;
+            }
+        }
+    }
+
+    let saved_unit = f.unit;
+    let saved_env = f.env;
+    let saved_bindings = f.bindings;
+    let saved_with_cells = f.with_cells;
+    let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_owned = f.unique_owned;
+    let saved_loop_depth = f.loop_depth;
+    let saved_indirect_b = f.indirect_bound_binding;
+    let saved_indirect_l = f.indirect_bound_len;
+    let saved_indirect_d = f.indirect_bound_distinct_local;
+    let saved_fn_ret_block = f.fn_return_block;
+    let saved_self_tco_loop = f.self_tco_loop;
+    let saved_tail_call = f.tail_call_node;
+    let saved_tco_inhibit = f.tco_inhibit;
+    let saved_owned_computed = f.owned_uses_computed;
+    let saved_owned_uses = f.owned_uses;
+    let saved_owned_flows = f.owned_flows;
+    let saved_nan_computed = f.nan_elide_computed;
+    let saved_nan_observed = f.nan_observed;
+    let saved_finite_f32 = f.finite_f32;
+    let saved_finite_f32_len = f.finite_f32_len;
+    let saved_inlined_body = f.inlined_body_binding;
+    let saved_inlined_root = f.inlined_body_root;
+    let saved_labels_base = f.labels_base;
+    let saved_scratch_body = f.scratch_body;
+    let saved_scratch_cut = f.scratch_cut;
+    let saved_serial = f.serial;
+    let saved_checked_range = f.checked_range;
+    let saved_current_call = f.current_call;
+    let saved_field_value = f.field_value;
+    let saved_evidence_context = f.evidence_context;
+    let saved_direct_returns = f.direct_returns;
+    let saved_worker_spec = f.worker_spec;
+    let saved_worker_scc_idx = f.worker_scc_idx;
+    let saved_peel_active = f.peel_active;
+    let saved_peel_force_leaf = f.peel_force_leaf;
+
+    let slot = g.newSlot();
+    let made, merr = fresh(g, f, after_ty, id);
+    if merr != blot_direct_types::Error.none { return neverVal(), false, merr; }
+    g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
+
+    let exit = open(g, f, OP_block);
+    let s .= g.s;
+    let labels_mark = s.labels.len;
+    s.labels.push(blot_direct_emit::Label { target: final_closure, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+
+    s.serial += 1;
+    f.serial = s.serial;
+    f.unit = kc.unit;
+    f.env = env;
+    f.bindings = blot_support_zigmap::Map {};
+    f.with_cells = blot_support_zigmap::Map {};
+    f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_owned = blot_support_zigmap::Map {};
+    f.loop_depth = 0;
+    f.indirect_bound_binding = 0;
+    f.indirect_bound_len = 0;
+    f.indirect_bound_distinct_local = 0xffffffff;
+    f.fn_return_block = 0;
+    f.self_tco_loop = 0xffffffff;
+    f.tail_call_node = 0;
+    f.tco_inhibit = saved_tco_inhibit + 1;
+    f.owned_uses_computed = false;
+    f.owned_uses = blot_support_zigmap::Map {};
+    f.owned_flows = blot_support_zigmap::Map {};
+    f.nan_elide_computed = false;
+    f.nan_observed = blot_support_zigmap::Map {};
+    f.finite_f32_len = 0;
+    f.inlined_body_binding = 0;
+    f.inlined_body_root = final_body;
+    f.labels_base = labels_mark;
+    f.scratch_body = 0;
+    f.scratch_cut = ScratchCut {};
+    f.checked_range = CheckedRange {};
+    f.current_call = 0;
+    f.field_value = false;
+    f.evidence_context = 0;
+    f.direct_returns = false;
+    f.worker_spec = -1;
+    f.worker_scc_idx = -1;
+    f.peel_active = false;
+    f.peel_force_leaf = false;
+    f.inline_depth += 1;
+
+    for ci in 0..(kc.cap_count as i64) {
+        bindPut(g, f, kc.cap_bindings[ci], kc.caps[ci]);
+    }
+    for pi in 0..peeled {
+        bindPut(g, f, param_bs[pi], g.s.vals[eval_args.start + pi]);
+    }
+    let body_val, b_err = stmt(g, f, final_body);
+    var final_err = b_err;
+    if final_err == blot_direct_types::Error.none {
+        let derr = deliver(g, f, body_val, slot, final_body);
+        if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[kc.unit - 1], final_body); }
+        else if derr != blot_direct_types::Error.none { final_err = derr; }
+    }
+    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+        propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
+    }
+    close(g, f);
+
+    s.labels.resize(labels_mark);
+    f.inline_depth -= 1;
+    f.unit = saved_unit;
+    f.env = saved_env;
+    f.bindings = saved_bindings;
+    f.with_cells = saved_with_cells;
+    f.unique_boxed = saved_unique_boxed;
+    f.unique_owned = saved_unique_owned;
+    f.loop_depth = saved_loop_depth;
+    f.indirect_bound_binding = saved_indirect_b;
+    f.indirect_bound_len = saved_indirect_l;
+    f.indirect_bound_distinct_local = saved_indirect_d;
+    f.fn_return_block = saved_fn_ret_block;
+    f.self_tco_loop = saved_self_tco_loop;
+    f.tail_call_node = saved_tail_call;
+    f.tco_inhibit = saved_tco_inhibit;
+    f.owned_uses_computed = saved_owned_computed;
+    f.owned_uses = saved_owned_uses;
+    f.owned_flows = saved_owned_flows;
+    f.nan_elide_computed = saved_nan_computed;
+    f.nan_observed = saved_nan_observed;
+    f.finite_f32 = saved_finite_f32;
+    f.finite_f32_len = saved_finite_f32_len;
+    f.inlined_body_binding = saved_inlined_body;
+    f.inlined_body_root = saved_inlined_root;
+    f.labels_base = saved_labels_base;
+    f.scratch_body = saved_scratch_body;
+    f.scratch_cut = saved_scratch_cut;
+    f.serial = saved_serial;
+    f.checked_range = saved_checked_range;
+    f.current_call = saved_current_call;
+    f.field_value = saved_field_value;
+    f.evidence_context = saved_evidence_context;
+    f.direct_returns = saved_direct_returns;
+    f.worker_spec = saved_worker_spec;
+    f.worker_scc_idx = saved_worker_scc_idx;
+    f.peel_active = saved_peel_active;
+    f.peel_force_leaf = saved_peel_force_leaf;
+
+    if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
+    var ret_val = g.s.slots[slot].value;
+    for at in peeled..(eval_args.len as i64) {
+        let applied, aerr = applyClosure(g, f, ret_val, g.s.vals[eval_args.start + at], id, is_tail && at + 1 == (eval_args.len as i64));
+        if aerr != blot_direct_types::Error.none { return applied, true, aerr; }
+        ret_val = applied;
+    }
+    return ret_val, true, blot_direct_types::Error.none;
+}
+
+recursive fn canInlineConstBody(g: Generator&, tm: const Module&, id: u32, target: BindingRef, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = tm.node(id);
+    match n.tag {
+        constant => { return true; },
+        reference => {
+            let resolved = g.resolve(tm, tm.reference(id));
+            return !(resolved == target);
+        },
+        closure => {
+            return tm.closureCaptures(id).len == 0;
+        },
+        construct => { return canInlineConstBody(g, tm, n.b, target, budget); },
+        return_, project => { return canInlineConstBody(g, tm, n.a, target, budget); },
+        record, product, block_, suite => {
+            let ch = tm.children(id);
+            if ch.len > 16 { return false; }
+            for child in ch {
+                if !canInlineConstBody(g, tm, child, target, budget) { return false; }
+            }
+            return true;
+        },
+        call => {
+            let info = tm.call(id);
+            let callee_ref = g.resolve(tm, info.target);
+            if callee_ref == target || !g.hasUnit(callee_ref.unit) { return false; }
+            let ctm .= g.units[callee_ref.unit - 1];
+            let _, is_prim = primitiveAlias(ctm, callee_ref.binding);
+            if !is_prim {
+                let cbody .= ctm.body(callee_ref.binding);
+                if !cbody || !cbody.is_function || cbody.exported { return false; }
+                var cb: i64 = 32;
+                var lb: i64 = 32;
+                if bodyContainsCall(ctm, cbody.root, cb) || bodyContainsLoop(ctm, cbody.root, lb) { return false; }
+                if !canInlineTarget(g, callee_ref, 0) { return false; }
+            }
+            for arg in info.arguments {
+                if !canInlineConstBody(g, tm, arg, target, budget) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+
+recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, bool, Error {
+    if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != blot_direct_types::Error.none || boxed {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    var body_root: u32 = 0;
+    var env = Env {};
+    var obligations = blot_check_types::List {};
+    {
+        let tm .= g.units[target.unit - 1];
+        let body .= tm.body(target.binding);
+        if !body || body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
+        body_root = body.root;
+        var budget: i64 = 24;
+        if !canInlineConstBody(g, tm, body_root, target, budget) {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+        g.types.match_(tm, tm.binding(body.binding).ty, ty, env);
+        obligations = body.scheme.obligations;
+    }
+    if obligations.len != 0 {
+        let solved = g.solveObligationsPublic(g.units[target.unit - 1], obligations, env);
+        if solved != blot_direct_types::Error.none {
+            g.dropFailure();
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
+    }
+    {
+        let tm .= g.units[target.unit - 1];
+        let body .= tm.body(target.binding);
+        if !body { return neverVal(), false, blot_direct_types::Error.none; }
+        for v in tm.types.list(body.scheme.variables) {
+            let _, verr = g.types.lower(tm, v, env);
+            if verr != blot_direct_types::Error.none {
+                g.dropFailure();
+                return neverVal(), false, blot_direct_types::Error.none;
+            }
+        }
+    }
+
+    let saved_unit = f.unit;
+    let saved_env = f.env;
+    let saved_bindings = f.bindings;
+    let saved_with_cells = f.with_cells;
+    let saved_unique_boxed = f.unique_boxed;
+    let saved_unique_owned = f.unique_owned;
+    let saved_loop_depth = f.loop_depth;
+    let saved_fn_ret_block = f.fn_return_block;
+    let saved_self_tco_loop = f.self_tco_loop;
+    let saved_tail_call = f.tail_call_node;
+    let saved_tco_inhibit = f.tco_inhibit;
+    let saved_owned_computed = f.owned_uses_computed;
+    let saved_owned_uses = f.owned_uses;
+    let saved_owned_flows = f.owned_flows;
+    let saved_nan_computed = f.nan_elide_computed;
+    let saved_nan_observed = f.nan_observed;
+    let saved_finite_f32 = f.finite_f32;
+    let saved_finite_f32_len = f.finite_f32_len;
+    let saved_inlined_body = f.inlined_body_binding;
+    let saved_inlined_root = f.inlined_body_root;
+    let saved_labels_base = f.labels_base;
+    let saved_scratch_body = f.scratch_body;
+    let saved_scratch_cut = f.scratch_cut;
+    let saved_serial = f.serial;
+    let saved_checked_range = f.checked_range;
+    let saved_current_call = f.current_call;
+    let saved_field_value = f.field_value;
+    let saved_evidence_context = f.evidence_context;
+    let saved_direct_returns = f.direct_returns;
+
+    let slot = g.newSlot();
+    let made, merr = fresh(g, f, ty, id);
+    if merr != blot_direct_types::Error.none { return neverVal(), false, merr; }
+    g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
+
+    let exit = open(g, f, OP_block);
+    let s .= g.s;
+    let labels_mark = s.labels.len;
+    s.labels.push(blot_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+
+    s.serial += 1;
+    f.serial = s.serial;
+    f.unit = target.unit;
+    f.env = env;
+    f.bindings = blot_support_zigmap::Map {};
+    f.with_cells = blot_support_zigmap::Map {};
+    f.unique_boxed = blot_support_zigmap::Map {};
+    f.unique_owned = blot_support_zigmap::Map {};
+    f.loop_depth = 0;
+    f.fn_return_block = 0;
+    f.self_tco_loop = 0xffffffff;
+    f.tail_call_node = 0;
+    f.tco_inhibit = saved_tco_inhibit + 1;
+    f.owned_uses_computed = false;
+    f.owned_uses = blot_support_zigmap::Map {};
+    f.owned_flows = blot_support_zigmap::Map {};
+    f.nan_elide_computed = false;
+    f.nan_observed = blot_support_zigmap::Map {};
+    f.finite_f32_len = 0;
+    f.inlined_body_binding = target.binding;
+    f.inlined_body_root = body_root;
+    f.labels_base = labels_mark;
+    f.scratch_body = 0;
+    f.scratch_cut = ScratchCut {};
+    f.checked_range = CheckedRange {};
+    f.current_call = 0;
+    f.field_value = false;
+    f.evidence_context = 0;
+    f.direct_returns = false;
+    f.inline_depth += 1;
+
+    let body_val, b_err = stmt(g, f, body_root);
+    var final_err = b_err;
+    if final_err == blot_direct_types::Error.none {
+        let derr = deliver(g, f, body_val, slot, body_root);
+        if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
+        else if derr != blot_direct_types::Error.none { final_err = derr; }
+    }
+    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+        propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
+    }
+    close(g, f);
+
+    s.labels.resize(labels_mark);
+    f.inline_depth -= 1;
+    f.unit = saved_unit;
+    f.env = saved_env;
+    f.bindings = saved_bindings;
+    f.with_cells = saved_with_cells;
+    f.unique_boxed = saved_unique_boxed;
+    f.unique_owned = saved_unique_owned;
+    f.loop_depth = saved_loop_depth;
+    f.fn_return_block = saved_fn_ret_block;
+    f.self_tco_loop = saved_self_tco_loop;
+    f.tail_call_node = saved_tail_call;
+    f.tco_inhibit = saved_tco_inhibit;
+    f.owned_uses_computed = saved_owned_computed;
+    f.owned_uses = saved_owned_uses;
+    f.owned_flows = saved_owned_flows;
+    f.nan_elide_computed = saved_nan_computed;
+    f.nan_observed = saved_nan_observed;
+    f.finite_f32 = saved_finite_f32;
+    f.finite_f32_len = saved_finite_f32_len;
+    f.inlined_body_binding = saved_inlined_body;
+    f.inlined_body_root = saved_inlined_root;
+    f.labels_base = saved_labels_base;
+    f.scratch_body = saved_scratch_body;
+    f.scratch_cut = saved_scratch_cut;
+    f.serial = saved_serial;
+    f.checked_range = saved_checked_range;
+    f.current_call = saved_current_call;
+    f.field_value = saved_field_value;
+    f.evidence_context = saved_evidence_context;
+    f.direct_returns = saved_direct_returns;
+
+    if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
+    return g.s.slots[slot].value, true, blot_direct_types::Error.none;
 }
 fn constructorFunction(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = g.units[f.unit - 1].node(id);
@@ -718,6 +1237,48 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
         if serr != blot_direct_types::Error.none { return src_val, serr; }
         g.recordInlined(gen_resolved.unit, gen_resolved.binding);
         return emitFillOrGenerate(g, f, false, count_loc, src_val, gen_out_ty, id);
+    }
+    // Fast path: intercept 2-arg `@storage.extend` forwarders (e.g. `Array.extend`)
+    // when arg 1 is a .rodata constant array so we never materialize `pool.*`.
+    if arguments.len == 2 && m.node(arguments[1]).tag == blot_check_core::Tag.reference && g.hasUnit(target.unit) {
+        let resolved_ext = followAliasTarget(g, target);
+        if g.hasUnit(resolved_ext.unit) {
+            let tm .= g.units[resolved_ext.unit - 1];
+            let tbody .= tm.body(resolved_ext.binding);
+            if tbody && tbody.is_function {
+                let tparams = tm.bodyParameters(tbody);
+                if tparams.len == 2 {
+                    let inner = scratchReturned(tm, unwrapSingleBody(tm, tbody.root));
+                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.storage {
+                        let sop, sok = blot_check_storage_ops::opFromCode(tm.node(inner).c);
+                        if sok == blot_error::Error.none && sop == blot_check_storage_ops::Op.extend {
+                            let ch = tm.children(inner);
+                            if ch.len == 2 && localRef(tm, ch[0]) == tparams[0].binding && localRef(tm, ch[1]) == tparams[1].binding {
+                                let rd, is_rd = tryResolveRodata(g, f, arguments[1]);
+                                if is_rd {
+                                    let is_direct = localRef(m, arguments[0]) != 0;
+                                    let dst, derr = expr(g, f, arguments[0]);
+                                    if derr != blot_direct_types::Error.none { return dst, derr; }
+                                    if tagOf(g, dst.ty) == blot_direct_types::Tag.array && g.types.node(dst.ty).a == rd.elem_ty {
+                                        g.recordInlined(resolved_ext.unit, resolved_ext.binding);
+                                        return emitExtendFromRodata(g, f, dst, is_direct, rd, id);
+                                    }
+                                    // Type mismatch fallback (unreachable for well-typed programs).
+                                    let src_val, serr = expr(g, f, arguments[1]);
+                                    if serr != blot_direct_types::Error.none { return src_val, serr; }
+                                    let vals2 = g.saveVals([dst, src_val]);
+                                    let cty, cerr = calleeOf(g, f, target, vals2, id);
+                                    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+                                    let rty, rerr = restType(g, f, cty, 2, id);
+                                    if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                                    return callTarget(g, f, target, vals2, cty, rty, id, elide_nan);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     var elide_args = false;
     var elide_vector_args = false;
@@ -1565,6 +2126,55 @@ recursive fn bodyContainsCall(m: const Module&, id: u32, left: i64&) -> bool {
     }
 }
 
+recursive fn bodyContainsLoop(m: const Module&, id: u32, left: i64&) -> bool {
+    if id == 0 || left <= 0 { return true; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        loop_, spark => { return true; },
+        suite, block_, product, record, array, array_op, storage => {
+            for child in m.children(id) {
+                if bodyContainsLoop(m, child, left) { return true; }
+            }
+            return false;
+        },
+        if_stmt, if_value => {
+            return bodyContainsLoop(m, n.a, left) || bodyContainsLoop(m, n.b, left) || bodyContainsLoop(m, n.c, left);
+        },
+        bind, construct => { return bodyContainsLoop(m, n.b, left); },
+        pattern_bind => { return bodyContainsLoop(m, n.b, left) || bodyContainsLoop(m, n.c, left); },
+        return_, project => { return bodyContainsLoop(m, n.a, left); },
+        scalar, logical, associated, apply => { return bodyContainsLoop(m, n.a, left) || bodyContainsLoop(m, n.b, left); },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if bodyContainsLoop(m, inp, left) { return true; }
+            }
+            for arm in m.matchArms(id) {
+                if bodyContainsLoop(m, arm.guard_, left) || bodyContainsLoop(m, arm.body, left) { return true; }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+
+// Invalidate cached array base/length facts for any `own` argument passed to a
+// non-inlined callee, since the callee may push, truncate or reallocate it.
+fn invalidateOwnCallArgs(g: const Generator&, f: Fn&, own_mask: u32, direct: Vals) {
+    if own_mask == 0 { return; }
+    for at in 0..(direct.len as i64) {
+        if at >= 32 || ((own_mask >> (at as u32)) & 1) != 0 {
+            let arg_v = g.s.vals[direct.start + at];
+            if tagOf(g, arg_v.ty) == blot_direct_types::Tag.array {
+                invalidateCheckedOwner(g, f, arg_v);
+            } else {
+                invalidateCheckedContainers(f);
+                return;
+            }
+        }
+    }
+}
+
 // Applies a resolved module-level binding to evaluated arguments. `callee` is
 // its concrete (curried) function type at this site.
 recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool = false) -> Val, Error {
@@ -1591,12 +2201,14 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         let evidence_context = evidenceContext(g, f, target, id);
         let self_tco_target = is_tail && f.self_tco_loop != 0xffffffff &&
             target.unit == f.unit && target.binding == g.s.instances[f.instance_id].key.id;
-        var skip_inline_for_tco = self_tco_target;
+        let is_scc_peer = f.worker_spec >= 0 &&
+            sccMemberIndex(g.s.worker_specs[f.worker_spec], target) >= 0;
+        var skip_inline_for_tco = self_tco_target || is_scc_peer;
         if !skip_inline_for_tco && is_tail && blot_direct_writer::tailCallsEnabled() {
             var cbud: i64 = 64;
             if bodyContainsCall(tm, body.root, cbud) { skip_inline_for_tco = true; }
         }
-        if !self_tco_target && f.forward_depth < 8 && evidence_context == 0 {
+        if !self_tco_target && !is_scc_peer && f.forward_depth < 8 && evidence_context == 0 {
             f.forward_depth += 1;
             let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id, elide_nan);
             f.forward_depth -= 1;
@@ -1638,31 +2250,121 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 }
             }
             if is_tail && f.self_tco_loop != 0xffffffff && instance == f.instance_id && direct.len == f.self_tco_inputs.len {
-                // Default MVP self-tail-call-to-loop: push all argument words onto the
+                // Default MVP self-tail-call-to-loop: push changing argument words onto the
                 // Wasm stack, pop in reverse into parameter locals (parallel-swap safe!),
-                // clear caches, and jump back to the function's TCO loop header.
-                for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
+                // clear non-invariant caches, and jump back to the function's TCO loop header.
+                var changed_mask: u32 = 0;
+                for at in 0..(direct.len as i64) {
+                    let arg_v = g.s.vals[direct.start + at];
+                    let param_v = g.s.vals[f.self_tco_inputs.start + at];
+                    if !sameWords(g, arg_v, param_v) {
+                        if at < 32 { changed_mask |= ((1 as u32) << (at as u32)); }
+                        push(g, arg_v);
+                    }
+                }
                 var at = direct.len as i64;
                 while at > 0 {
                     at -= 1;
                     let param_v = g.s.vals[f.self_tco_inputs.start + at];
+                    if at < 32 && ((changed_mask >> (at as u32)) & 1) == 0 { continue; }
                     var wi = param_v.len as i64;
                     while wi > 0 {
                         wi -= 1;
                         lset(g, w(g, param_v, wi));
                     }
                 }
-                f.checked_arrays_len = 0;
-                f.checked_grows_len = 0;
+                var keep_ca: i64 = 0;
+                for ci in 0..f.checked_arrays_len {
+                    let ca = f.checked_arrays[ci];
+                    var clob = false;
+                    for pi in 0..(direct.len as i64) {
+                        if pi < 32 && ((changed_mask >> (pi as u32)) & 1) == 0 { continue; }
+                        let pv = g.s.vals[f.self_tco_inputs.start + pi];
+                        if hasWord(g, pv, ca.slot) || hasWord(g, pv, ca.generation) { clob = true; break; }
+                    }
+                    if !clob && ca.depth <= f.self_tco_loop {
+                        f.checked_arrays[keep_ca] = ca;
+                        keep_ca += 1;
+                    }
+                }
+                f.checked_arrays_len = keep_ca;
+                var keep_cg: i64 = 0;
+                for ci in 0..f.checked_grows_len {
+                    let cg = f.checked_grows[ci];
+                    var clob = false;
+                    for pi in 0..(direct.len as i64) {
+                        if pi < 32 && ((changed_mask >> (pi as u32)) & 1) == 0 { continue; }
+                        let pv = g.s.vals[f.self_tco_inputs.start + pi];
+                        if hasWord(g, pv, cg.slot) || hasWord(g, pv, cg.generation) { clob = true; break; }
+                    }
+                    if !clob && cg.depth <= f.self_tco_loop {
+                        f.checked_grows[keep_cg] = cg;
+                        keep_cg += 1;
+                    }
+                }
+                f.checked_grows_len = keep_cg;
                 f.checked_views_len = 0;
                 f.checked_elems_len = 0;
                 f.checked_bounds_len = 0;
                 f.checked_le_len = 0;
                 f.const_tags_len = 0;
+                f.known_closures_len = 0;
                 br(g, f, OP_br, f.self_tco_loop);
                 return neverVal(), blot_direct_types::Error.none;
             }
-            if is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+            if f.worker_spec >= 0 {
+                let spec = g.s.worker_specs[f.worker_spec];
+                var peer_idx: i64 = -1;
+                for si in 0..(spec.scc_len as i64) {
+                    if spec.scc_insts[si] == instance { peer_idx = si; break; }
+                }
+                if peer_idx >= 0 {
+                    if f.peel_force_leaf && peer_idx == f.worker_scc_idx && spec.scc_len == 1 {
+                        let peeled, perr = emitPeelLeafCall(g, f, direct, id);
+                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                        value = peeled;
+                    } else {
+                        for at in 0..(direct.len as i64) {
+                            let arg_v = g.s.vals[direct.start + at];
+                            let pmode = if at < 8 { spec.param_modes[at] } else { 0 };
+                            if pmode == 3 {
+                                let entry_loc = ensureCheckedGrow(g, f, arg_v);
+                                lget(g, entry_loc);
+                            } else if pmode == 1 || pmode == 2 {
+                                let base_loc, len_loc = ensureCheckedArray(g, f, arg_v);
+                                lget(g, base_loc);
+                                lget(g, len_loc);
+                            } else {
+                                push(g, arg_v);
+                            }
+                        }
+                        callf(g, spec.scc_fns[peer_idx]);
+                        f.checked_elems_len = 0;
+                        invalidateOwnCallArgs(g, f, tm.binding(body.binding).capability_parameters.own, direct);
+                        let res_ty = g.s.instances[instance].result;
+                        if !spec.no_scope_alloc {
+                            let holds, herr = g.holdsMemory(res_ty);
+                            if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+                            if holds { noteAllocation(f); }
+                        }
+                        if spec.drop_param != 0xff {
+                            let drop_arg = g.s.vals[direct.start + (spec.drop_param as i64)];
+                            let popped, perr = popWorkerResult(g, f, res_ty, spec.drop_word_start, drop_arg, id);
+                            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                            if spec.param_modes[spec.drop_param] == 3 {
+                                invalidateCheckedOwner(g, f, drop_arg);
+                            }
+                            value = popped;
+                        } else {
+                            let popped, perr = pop(g, f, res_ty, id);
+                            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                            value = popped;
+                        }
+                    }
+                    has_value = true;
+                }
+            }
+            if !has_value && is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
                 g.s.instances[instance].result == g.s.instances[f.instance_id].result &&
                 g.s.instances[f.instance_id].result != blot_direct_types::never {
                 // Opt-in Wasm 3.0 `return_call` (0x12) for non-self / mutual tail calls.
@@ -1672,12 +2374,23 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 f.checked_elems_len = 0;
                 return neverVal(), blot_direct_types::Error.none;
             }
-            for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
-            callf(g, g.s.instances[instance].function);
-            f.checked_elems_len = 0;
-            let returned, error = received(g, f, g.s.instances[instance].result, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            value = returned;
+            if !has_value {
+                for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
+                callf(g, g.s.instances[instance].function);
+                f.checked_elems_len = 0;
+                invalidateOwnCallArgs(g, f, tm.binding(body.binding).capability_parameters.own, direct);
+                let w_idx, has_w = g.s.worker_map.get(instance as u64);
+                let skip_alloc_note = has_w && w_idx != 0 && ((w_idx - 1) as i64) < g.s.worker_specs.len && g.s.worker_specs[(w_idx - 1) as i64].no_scope_alloc;
+                if skip_alloc_note {
+                    let returned, error = pop(g, f, g.s.instances[instance].result, id);
+                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    value = returned;
+                } else {
+                    let returned, error = received(g, f, g.s.instances[instance].result, id);
+                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    value = returned;
+                }
+            }
         }
         for at in param_count..(arguments.len as i64) {
             let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id, tail_here && at + 1 == (arguments.len as i64));
@@ -1821,7 +2534,7 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
             if ok != blot_error::Error.none { return false; }
-            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate && op_kind != blot_check_storage_ops::Op.with_capacity && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend { return false; }
+            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate && op_kind != blot_check_storage_ops::Op.with_capacity && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend && op_kind != blot_check_storage_ops::Op.view { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -1924,7 +2637,34 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         return neverVal(), false, blot_direct_types::Error.none;
     }
     if !canInlineTarget(g, target, f.inline_depth) {
-        return neverVal(), false, blot_direct_types::Error.none;
+        // Pillar 3: Aggregate call-traffic inlining cost model. A non-recursive,
+        // call-free, loop-free leaf function passing wide flat aggregates (e.g.
+        // 12-field F32 transforms) pays heavy call-boundary spilling/moves, so
+        // grant extra AST budget proportional to flat ABI word count.
+        var wide_ok = false;
+        if f.inline_depth == 0 {
+            var total_words: i64 = 0;
+            for at in 0..(direct.len as i64) { total_words += g.s.vals[direct.start + at].len as i64; }
+            let ret_layout, rlerr = g.types.layout(after);
+            if rlerr == blot_direct_types::Error.none { total_words += ret_layout.len; }
+            if total_words >= 8 {
+                let tm .= g.units[target.unit - 1];
+                let body .= tm.body(target.binding);
+                if body && body.is_function && !body.exported {
+                    var cb: i64 = 384;
+                    var lb: i64 = 384;
+                    if !bodyContainsCall(tm, body.root, cb) && !bodyContainsLoop(tm, body.root, lb) {
+                        var budget = 168 + 8 * total_words;
+                        if budget > 384 { budget = 384; }
+                        var margin = budget;
+                        wide_ok = canInlineBodyMargin(g, tm, body.root, target, budget, margin);
+                    }
+                }
+            }
+        }
+        if !wide_ok {
+            return neverVal(), false, blot_direct_types::Error.none;
+        }
     }
     let boxed_ret, berr = g.types.boxed(after);
     if berr != blot_direct_types::Error.none || boxed_ret {
@@ -2031,6 +2771,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_finite_f32 = f.finite_f32;
     let saved_finite_f32_len = f.finite_f32_len;
     let saved_inlined_body = f.inlined_body_binding;
+    let saved_inlined_root = f.inlined_body_root;
     let saved_labels_base = f.labels_base;
     let saved_scratch_body = f.scratch_body;
     let saved_scratch_cut = f.scratch_cut;
@@ -2039,6 +2780,11 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     let saved_current_call = f.current_call;
     let saved_field_value = f.field_value;
     let saved_evidence_context = f.evidence_context;
+    let saved_direct_returns = f.direct_returns;
+    let saved_worker_spec = f.worker_spec;
+    let saved_worker_scc_idx = f.worker_scc_idx;
+    let saved_peel_active = f.peel_active;
+    let saved_peel_force_leaf = f.peel_force_leaf;
 
     let slot = g.newSlot();
     let made, merr = fresh(g, f, after, id);
@@ -2073,6 +2819,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.nan_observed = blot_support_zigmap::Map {};
     f.finite_f32_len = 0;
     f.inlined_body_binding = target.binding;
+    f.inlined_body_root = body_root;
     f.labels_base = labels_mark;
     f.scratch_body = 0;
     f.scratch_cut = ScratchCut {};
@@ -2080,6 +2827,11 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.current_call = 0;
     f.field_value = false;
     f.evidence_context = 0;
+    f.direct_returns = false;
+    f.worker_spec = -1;
+    f.worker_scc_idx = -1;
+    f.peel_active = false;
+    f.peel_force_leaf = false;
     f.inline_depth += 1;
 
     var own_param_mask: u32 = 0;
@@ -2115,6 +2867,9 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
         else if derr != blot_direct_types::Error.none { final_err = derr; }
     }
+    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+        propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
+    }
     close(g, f);
 
     s.labels.resize(labels_mark);
@@ -2141,6 +2896,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.finite_f32 = saved_finite_f32;
     f.finite_f32_len = saved_finite_f32_len;
     f.inlined_body_binding = saved_inlined_body;
+    f.inlined_body_root = saved_inlined_root;
     f.labels_base = saved_labels_base;
     f.scratch_body = saved_scratch_body;
     f.scratch_cut = saved_scratch_cut;
@@ -2149,25 +2905,89 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.current_call = saved_current_call;
     f.field_value = saved_field_value;
     f.evidence_context = saved_evidence_context;
+    f.direct_returns = saved_direct_returns;
+    f.worker_spec = saved_worker_spec;
+    f.worker_scc_idx = saved_worker_scc_idx;
+    f.peel_active = saved_peel_active;
+    f.peel_force_leaf = saved_peel_force_leaf;
 
     if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
     let ret_val = g.s.slots[slot].value;
     if tagOf(g, ret_val.ty) == blot_direct_types::Tag.array {
         let tm .= g.units[target.unit - 1];
+        var matched_param = false;
         for at in 0..param_count {
             let aval = g.s.vals[direct.start + at];
             if tagOf(g, aval.ty) != blot_direct_types::Tag.array { continue; }
             if calleeReturnsParamHandle(g, tm, body_root, param_bindings[at], 0) {
-                if knownMutable(g, f, aval) { recordMutable(g, f, ret_val); }
-                let ca = findCheckedArray(f, w(g, aval, 0), w(g, aval, 1));
-                if ca >= 0 {
-                    recordCheckedArray(f, w(g, ret_val, 0), w(g, ret_val, 1), f.checked_arrays[ca].base, f.checked_arrays[ca].length);
+                propagateArrayFacts(g, f, aval, ret_val);
+                if aval.ty == ret_val.ty {
+                    return aval, true, blot_direct_types::Error.none;
                 }
+                matched_param = true;
                 break;
             }
         }
+        if !matched_param {
+            let rf = returnedFreshArrayExpr(tm, body_root);
+            if rf != 0 {
+                var is_fresh_mut = isFreshOwnedArrayNode(g, tm, rf, 0);
+                if !is_fresh_mut && tm.node(rf).tag == blot_check_core::Tag.storage {
+                    let op_k, ok = blot_check_storage_ops::opFromCode(tm.node(rf).c);
+                    if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.with_capacity {
+                        is_fresh_mut = true;
+                    }
+                }
+                if is_fresh_mut { recordMutable(g, f, ret_val); }
+            }
+        }
+    } else if tagOf(g, ret_val.ty) == blot_direct_types::Tag.tuple {
+        let tn = g.types.node(ret_val.ty);
+        let tm .= g.units[target.unit - 1];
+        var woff: u32 = 0;
+        for ei in 0..(tn.b as i64) {
+            let ety = g.types.words[tn.a + ei];
+            let elen, lerr = layoutLen(g, f, ety, id);
+            if lerr != blot_direct_types::Error.none { break; }
+            if tagOf(g, ety) == blot_direct_types::Tag.array && elen == 2 {
+                let elem_val = Val { ety, ret_val.start + woff, 2 };
+                for at in 0..param_count {
+                    let aval = g.s.vals[direct.start + at];
+                    if tagOf(g, aval.ty) != blot_direct_types::Tag.array { continue; }
+                    if calleeReturnsParamAt(g, tm, body_root, param_bindings[at], ei, 0) {
+                        propagateArrayFacts(g, f, aval, elem_val);
+                        break;
+                    }
+                }
+            }
+            woff += elen;
+        }
     }
     return ret_val, true, blot_direct_types::Error.none;
+}
+
+fn propagateArrayFacts(g: const Generator&, f: Fn&, src: Val, dst: Val) {
+    if knownMutable(g, f, src) { recordMutable(g, f, dst); }
+    let s0 = w(g, src, 0);
+    let s1 = w(g, src, 1);
+    let d0 = w(g, dst, 0);
+    let d1 = w(g, dst, 1);
+    let ca = findCheckedArray(f, s0, s1);
+    if ca >= 0 {
+        recordCheckedArray(f, d0, d1, f.checked_arrays[ca].base, f.checked_arrays[ca].length);
+    }
+    let cg = findCheckedGrow(f, s0, s1);
+    if cg >= 0 {
+        recordCheckedGrow(f, d0, d1, f.checked_grows[cg].entry);
+    }
+    let wr = findWorkerR(f, s0, s1);
+    if wr >= 0 {
+        recordWorkerR(f, d0, d1, f.worker_r[wr].base, f.worker_r[wr].length);
+    }
+    let wm = findWorkerM(f, s0, s1);
+    if wm >= 0 {
+        recordWorkerM(f, d0, d1, f.worker_m[wm].entry);
+    }
 }
 
 fn forwardingRoot(tm: const Module&, body_root: u32) -> u32 {

@@ -31,6 +31,7 @@ let OP_i32_load8_u: u8 = blot_direct_writer::OP_i32_load8_u;
 let OP_i32_store: u8 = blot_direct_writer::OP_i32_store;
 let OP_f32_store: u8 = blot_direct_writer::OP_f32_store;
 let OP_i32_store8: u8 = blot_direct_writer::OP_i32_store8;
+let OP_i32_store16: u8 = blot_direct_writer::OP_i32_store16;
 let OP_memory_size: u8 = blot_direct_writer::OP_memory_size;
 let OP_i32_const: u8 = blot_direct_writer::OP_i32_const;
 let OP_i64_const: u8 = blot_direct_writer::OP_i64_const;

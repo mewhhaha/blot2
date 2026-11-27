@@ -39,17 +39,30 @@ recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if perr != blot_direct_types::Error.none { return pos_val, perr; }
             let idx_loc, ierr = scalarLocal(g, f, pos_val, id);
             if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-            let addr = directArrayAddress(g, f, da, idx_loc, id);
-            if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
-                let old, lerr = loadElement(g, f, addr, 0, da.elem_ty, id);
-                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
-                bindPut(g, f, info.self_binding, old);
+            if da.scalar_packed {
+                if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
+                    let old, lerr = emitDirectArrayRead(g, f, da, idx_loc, id);
+                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    bindPut(g, f, info.self_binding, old);
+                }
+                let replacement, rerr = stmt(g, f, info.value);
+                if rerr != blot_direct_types::Error.none { return replacement, rerr; }
+                if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
+                let werr = emitDirectArrayWrite(g, f, da, idx_loc, replacement, id);
+                if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            } else {
+                let addr = directArrayAddress(g, f, da, idx_loc, id);
+                if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
+                    let old, lerr = loadElement(g, f, addr, 0, da.elem_ty, id);
+                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    bindPut(g, f, info.self_binding, old);
+                }
+                let replacement, rerr = stmt(g, f, info.value);
+                if rerr != blot_direct_types::Error.none { return replacement, rerr; }
+                if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
+                let werr = writeElement(g, f, addr, 0, replacement, id);
+                if werr != blot_direct_types::Error.none { return neverVal(), werr; }
             }
-            let replacement, rerr = stmt(g, f, info.value);
-            if rerr != blot_direct_types::Error.none { return replacement, rerr; }
-            if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
-            let werr = writeElement(g, f, addr, 0, replacement, id);
-            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
             let bound, _ = bindGet(g, f, da.binding);
             return bound, blot_direct_types::Error.none;
         }
@@ -1167,6 +1180,17 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if did_direct { return direct_val, blot_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
+    if m.node(n.a).tag == blot_check_core::Tag.reference {
+        let sp = m.fieldSpelling(m.projection(n.b).field);
+        if sp.present && sp.value == "length" {
+            let rd, is_rd = tryResolveRodata(g, f, n.a);
+            if is_rd {
+                let klen = constLocal(g, f, rd.count);
+                recordConstU32(f, klen, rd.count);
+                return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
+            }
+        }
+    }
     let value, error = expr(g, f, n.a);
     if error != blot_direct_types::Error.none { return value, error; }
     let field_val, target, is_method, error = projectFieldOrMethod(g, f, id, value);

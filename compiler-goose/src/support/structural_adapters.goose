@@ -975,6 +975,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::ParProvSig)
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::ParProvSig,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Recorded)->bool {return equalFields(left,right);}
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::Recorded,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::RodataEntry)->bool {return equalFields(left,right);}
+fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::RodataEntry,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::SharedSnapshot)->bool {return equalFields(left,right);}
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::SharedSnapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Slot)->bool {return equalFields(left,right);}
@@ -993,6 +995,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Vals)->bool
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::Vals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::Words)->bool {return equalFields(left,right);}
 fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::Words,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_emit::WorkerSpec)->bool {return equalFields(left,right);}
+fn blot_direct_emit::blotStructuralHash<StructuralSink>(value:blot_direct_emit::WorkerSpec,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedAdd)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::CheckedAdd,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::CheckedAffineBound)->bool {return equalFields(left,right);}
@@ -1031,6 +1035,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::ExtU32U
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::ExtU32U64,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Fn)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::Fn,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::KnownClosure)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::KnownClosure,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::LoopReciprocal)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::LoopReciprocal,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::LoopReciprocalU64)->bool {return equalFields(left,right);}
@@ -1067,6 +1073,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageVa
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageValue,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::Vec3MaybeMatch)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::Vec3MaybeMatch,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::WorkerM)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::WorkerM,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::WorkerR)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::WorkerR,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_map::U64Map)->bool {return equalFields(left,right);}
 fn blot_direct_map::blotStructuralHash<StructuralSink>(value:blot_direct_map::U64Map,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::BodySite)->bool {return equalFields(left,right);}

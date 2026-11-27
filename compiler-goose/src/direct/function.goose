@@ -188,6 +188,38 @@ struct DirectArray {
     elem_ty: Ty = 0,
     step: u32 = 0,
     depth: u32 = 0,
+    // Scalar-packed register mode for tiny <= 16-byte U8/Bool non-escaping buffers.
+    scalar_packed: bool = false,
+    pack_lo: u32 = 0xffffffff,
+    pack_hi: u32 = 0xffffffff,
+}
+struct WorkerR {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    base: u32 = 0,
+    length: u32 = 0,
+}
+struct WorkerM {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    entry: u32 = 0,
+}
+// Statically known closure value within the current Wasm function (surviving
+// inlineSmall boundaries via word-level propagation).
+// kind: 1 = partial of named function, 2 = closure literal, 3 = partial of primitive.
+struct KnownClosure {
+    fn_local: u32 = 0,
+    env_local: u32 = 0,
+    kind: u8 = 0,
+    unit: u32 = 0,
+    id: u32 = 0,
+    instance_id: u32 = 0,
+    full_ty: Ty = 0,
+    cap_count: u8 = 0,
+    caps: Val[4] = [Val {}; 4],
+    cap_bindings: u32[4] = [0; 4],
+    lambda_env: Env = Env {},
+    depth: u32 = 0,
 }
 struct Fn {
     // Only stable value locals have facts. Loop-carried copies and mutable
@@ -299,6 +331,10 @@ struct Fn {
     defer_f32_nan: bool = false,
     // Non-zero while emitting an inlined function body via `inlineSmall`.
     inlined_body_binding: u32 = 0,
+    // Non-zero while emitting an inlined lambda/const body root in `f.unit`.
+    inlined_body_root: u32 = 0,
+    known_closures: KnownClosure[16] = [KnownClosure {}; 16],
+    known_closures_len: i64 = 0,
     // Prevents recursive loop-specialization cloning.
     in_specialized_loop: bool = false,
     // 6A: Local holding 1 iff the pre-scanned indirect index array is strictly increasing.
@@ -317,6 +353,7 @@ struct Fn {
     direct_returns: bool = false,
     assoc_tco_local: u32 = 0xffffffff,
     assoc_tco_opcode: u8 = 0,
+    assoc_tco_ty: Ty = 0,
     tco_inhibit: u32 = 0,
     emitted_return_call: bool = false,
     // 7B: `@array.fill` node IDs proved completely overwritten by an immediately following 0..n loop.
@@ -325,6 +362,19 @@ struct Fn {
     // Backend-only stack-inlined small fixed local arrays (skip owner table open/check/release).
     direct_arrays: DirectArray[16] = [DirectArray {}; 16],
     direct_arrays_len: i64 = 0,
+    // Active specialized recursive worker state (never cleared by invalidateCheckedContainers).
+    worker_spec: i64 = -1,
+    worker_scc_idx: i64 = -1,
+    worker_r: WorkerR[16] = [WorkerR {}; 16],
+    worker_r_len: i64 = 0,
+    worker_m: WorkerM[16] = [WorkerM {}; 16],
+    worker_m_len: i64 = 0,
+    // 1-level small-leaf peeling state inside a self-recursive worker.
+    peel_active: bool = false,
+    peel_d_idx: i64 = -1,
+    peel_prefix_parent: u32 = 0,
+    peel_if_pos: i64 = -1,
+    peel_force_leaf: bool = false,
 }
 
 fn recordSkipFillNode(f: Fn&, id: u32) {
@@ -352,10 +402,36 @@ fn findDirectArrayBySlot(f: const Fn&, slot_local: u32) -> i64 {
     }
     return -1;
 }
-fn recordDirectArray(f: Fn&, binding: u32, slot_local: u32, base: u32, len_local: u32, length: u32, elem_ty: Ty, step: u32) {
+fn recordDirectArray(f: Fn&, binding: u32, slot_local: u32, base: u32, len_local: u32, length: u32, elem_ty: Ty, step: u32, scalar_packed: bool = false, pack_lo: u32 = 0xffffffff, pack_hi: u32 = 0xffffffff) {
     if binding == 0 || f.direct_arrays_len >= 16 { return; }
-    f.direct_arrays[f.direct_arrays_len] = DirectArray { binding, slot_local, base, len_local, length, elem_ty, step, f.depth };
+    f.direct_arrays[f.direct_arrays_len] = DirectArray { binding, slot_local, base, len_local, length, elem_ty, step, f.depth, scalar_packed, pack_lo, pack_hi };
     f.direct_arrays_len += 1;
+}
+fn findWorkerR(f: const Fn&, slot: u32, generation: u32) -> i64 {
+    var i = f.worker_r_len;
+    while i > 0 {
+        i -= 1;
+        if f.worker_r[i].slot == slot && f.worker_r[i].generation == generation { return i; }
+    }
+    return -1;
+}
+fn recordWorkerR(f: Fn&, slot: u32, generation: u32, base: u32, length: u32) {
+    if findWorkerR(f, slot, generation) >= 0 || f.worker_r_len >= 16 { return; }
+    f.worker_r[f.worker_r_len] = WorkerR { slot, generation, base, length };
+    f.worker_r_len += 1;
+}
+fn findWorkerM(f: const Fn&, slot: u32, generation: u32) -> i64 {
+    var i = f.worker_m_len;
+    while i > 0 {
+        i -= 1;
+        if f.worker_m[i].slot == slot && f.worker_m[i].generation == generation { return i; }
+    }
+    return -1;
+}
+fn recordWorkerM(f: Fn&, slot: u32, generation: u32, entry: u32) {
+    if findWorkerM(f, slot, generation) >= 0 || f.worker_m_len >= 16 { return; }
+    f.worker_m[f.worker_m_len] = WorkerM { slot, generation, entry };
+    f.worker_m_len += 1;
 }
 fn consumeSkipFillNode(f: Fn&, id: u32) -> bool {
     if id == 0 || f.skip_fill_len == 0 { return false; }
@@ -623,6 +699,9 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth > max_depth {
         f.direct_arrays_len -= 1;
     }
+    while f.known_closures_len > 0 && f.known_closures[f.known_closures_len - 1].depth > max_depth {
+        f.known_closures_len -= 1;
+    }
 }
 fn popCheckedArraysAt(f: Fn&, depth: u32) {
     while f.checked_arrays_len > 0 && f.checked_arrays[f.checked_arrays_len - 1].depth >= depth {
@@ -657,6 +736,55 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth >= depth {
         f.direct_arrays_len -= 1;
+    }
+    while f.known_closures_len > 0 && f.known_closures[f.known_closures_len - 1].depth >= depth {
+        f.known_closures_len -= 1;
+    }
+}
+fn findKnownClosure(f: const Fn&, fn_local: u32, env_local: u32) -> i64 {
+    var i = f.known_closures_len;
+    while i > 0 {
+        i -= 1;
+        if f.known_closures[i].fn_local == fn_local && f.known_closures[i].env_local == env_local {
+            return i;
+        }
+    }
+    return -1;
+}
+fn recordKnownClosure(f: Fn&, kc: KnownClosure) {
+    if f.known_closures_len >= 16 { return; }
+    f.known_closures[f.known_closures_len] = kc;
+    f.known_closures_len += 1;
+}
+fn propagateKnownClosures(g: const Generator&, f: Fn&, src: Val, dst: Val, out_depth: u32) {
+    if src.len != dst.len || src.len < 2 || f.known_closures_len == 0 { return; }
+    var moved: KnownClosure[8] = [KnownClosure {}; 8];
+    var moved_len: i64 = 0;
+    var off: i64 = 0;
+    while off + 1 < (src.len as i64) {
+        let s0 = w(g, src, off);
+        let s1 = w(g, src, off + 1);
+        let idx = findKnownClosure(f, s0, s1);
+        if idx >= 0 {
+            if moved_len < 8 {
+                var copied = f.known_closures[idx];
+                copied.fn_local = w(g, dst, off);
+                copied.env_local = w(g, dst, off + 1);
+                copied.depth = out_depth;
+                moved[moved_len] = copied;
+                moved_len += 1;
+            }
+            off += 2;
+        } else {
+            off += 1;
+        }
+    }
+    if moved_len == 0 { return; }
+    while f.known_closures_len > 0 && f.known_closures[f.known_closures_len - 1].depth > out_depth {
+        f.known_closures_len -= 1;
+    }
+    for mi in 0..moved_len {
+        recordKnownClosure(f, moved[mi]);
     }
 }
 fn findConstTag(f: const Fn&, local_id: u32) -> u32, bool {
@@ -1165,6 +1293,27 @@ fn enclosingBody(g: const Generator&, f: const Fn&) -> const blot_check_core::Bo
     }
     return null;
 }
+// The active AST body root for this instance (inlined named body, named body,
+// or the lambda's own closure body — never walking up to an outer named body).
+fn currentBodyRoot(g: const Generator&, f: const Fn&) -> u32 {
+    if f.inlined_body_root != 0 { return f.inlined_body_root; }
+    if f.inlined_body_binding != 0 {
+        let body .= g.units[f.unit - 1].body(f.inlined_body_binding);
+        if body { return body.root; }
+        return 0;
+    }
+    let key = g.s.instances[f.instance_id].key;
+    if key.unit != f.unit { return 0; }
+    if key.kind == blot_direct_emit::InstanceKind.named {
+        let body .= g.units[f.unit - 1].body(key.id);
+        if body { return body.root; }
+        return 0;
+    }
+    if key.kind == blot_direct_emit::InstanceKind.lambda {
+        return g.units[f.unit - 1].closure(key.id).body;
+    }
+    return 0;
+}
 fn typeOf(g: Generator&, f: Fn&, id: u32) -> Ty, Error { return lower(g, f, g.units[f.unit - 1].typeOf(id), id); }
 fn push(g: Generator&, value: Val) {
     for at in 0..(value.len as i64) { opIndex(g, OP_local_get, g.s.words[value.start + at]); }
@@ -1450,7 +1599,7 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         if src_da >= 0 {
             let da = f.direct_arrays[src_da];
-            recordDirectArray(f, n.a, da.slot_local, da.base, da.len_local, da.length, da.elem_ty, da.step);
+            recordDirectArray(f, n.a, da.slot_local, da.base, da.len_local, da.length, da.elem_ty, da.step, da.scalar_packed, da.pack_lo, da.pack_hi);
         }
     }
     if f.indirect_bound_binding != 0 && n.a == f.indirect_bound_binding && tagOf(g, value.ty) == blot_direct_types::Tag.u32_ {
@@ -1717,14 +1866,14 @@ fn ensureOwnedUses(g: Generator&, f: Fn&) -> bool {
     if !f.owned_uses_computed {
         f.owned_uses_computed = true;
         let m .= g.units[f.unit - 1];
-        let body .= enclosingBody(g, f);
-        if !body {
+        let root = currentBodyRoot(g, f);
+        if root == 0 {
             blot_support_zigmap::put(g.s.map_pool, f.owned_flows, 0xffffffff, 1);
             return false;
         }
         var overflow = false;
         var budget: i64 = 2048;
-        scanOwnedUses(g, f, m, body.root, false, overflow, budget);
+        scanOwnedUses(g, f, m, root, false, overflow, budget);
         if overflow {
             blot_support_zigmap::put(g.s.map_pool, f.owned_flows, 0xffffffff, 1);
             return false;
@@ -2077,8 +2226,8 @@ fn bindingIgnoresNanPayload(g: Generator&, f: Fn&, binding: u32) -> bool {
     if !f.nan_elide_computed {
         f.nan_elide_computed = true;
         let m .= g.units[f.unit - 1];
-        let body .= enclosingBody(g, f);
-        if !body {
+        let root = currentBodyRoot(g, f);
+        if root == 0 {
             // Sentinel 0xffffffff marks analysis unavailable (conservative).
             markNanObserved(g, f, 0xffffffff);
             return false;
@@ -2088,7 +2237,7 @@ fn bindingIgnoresNanPayload(g: Generator&, f: Fn&, binding: u32) -> bool {
         var edge_len: i64 = 0;
         var overflow = false;
         var budget: i64 = 4096;
-        scanNanUses(g, f, m, body.root, false, edge_src, edge_dst, edge_len, overflow, budget);
+        scanNanUses(g, f, m, root, false, edge_src, edge_dst, edge_len, overflow, budget);
         if overflow {
             markNanObserved(g, f, 0xffffffff);
             return false;
@@ -2422,6 +2571,13 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
                     recordConstTag(f, loc, ctor_tag);
                     return valOf1(g, ty, loc), blot_direct_types::Error.none;
                 }
+            } else if f.inline_depth < 3 {
+                let inlined, was_inlined, ierr = inlineSmallConst(g, f, target, ty, id);
+                if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+                if was_inlined {
+                    g.recordInlined(target.unit, target.binding);
+                    return inlined, blot_direct_types::Error.none;
+                }
             }
         }
         // A constant: its instance computes the value.
@@ -2677,7 +2833,30 @@ fn partial(g: Generator&, f: Fn&, kind: InstanceKind, target: BindingRef, ty: Ty
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let instance, error = adapter(g, f, kind, target, full, arguments.len, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    return makeClosure(g, f, instance, ty, arguments, id);
+    let res, merr = makeClosure(g, f, instance, ty, arguments, id);
+    if merr != blot_direct_types::Error.none { return res, merr; }
+    if (kind == blot_direct_emit::InstanceKind.partial || kind == blot_direct_emit::InstanceKind.primitive) &&
+        arguments.len <= 4 && f.evidence_context == 0 {
+        var ok = true;
+        var kc = KnownClosure {
+            fn_local: w(g, res, 0),
+            env_local: w(g, res, 1),
+            kind: if kind == blot_direct_emit::InstanceKind.partial { 1 } else { 3 },
+            unit: target.unit,
+            id: target.binding,
+            instance_id: instance,
+            full_ty: full,
+            cap_count: arguments.len as u8,
+            depth: f.depth,
+        };
+        for at in 0..(arguments.len as i64) {
+            let av = g.s.vals[arguments.start + at];
+            if tagOf(g, av.ty) == blot_direct_types::Tag.cell { ok = false; break; }
+            kc.caps[at] = av;
+        }
+        if ok { recordKnownClosure(f, kc); }
+    }
+    return res, blot_direct_types::Error.none;
 }
 // The closure taking argument `count` of `target` at function type `full`.
 fn adapter(g: Generator&, f: const Fn&, kind: InstanceKind, target: BindingRef, full: Ty, count: i64, id: u32) -> u32, Error {
@@ -2783,6 +2962,10 @@ recursive fn closureNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         for at in 0..(captures.len as i64) { g.s.tys.push(g.s.vals[captures.start + at].ty); }
         let parameters = g.saveTys([arrow.a]);
         if g.s.parallel_readonly {
+            if m.unit != g.s.instances[f.instance_id].key.unit {
+                g.s.parallel_aborted = true;
+                return neverVal(), blot_direct_types::Error.unsupported;
+            }
             instance = g.addParallelLambda(key, f.env, g.s.instances[f.instance_id].env.head, parameters, arrow.b, capture_types, m.unit);
         } else {
             let made, error = g.addInstanceWith(key, f.env, parameters, arrow.b, true, capture_types, m, id);
@@ -2790,7 +2973,32 @@ recursive fn closureNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             instance = made;
         }
     }
-    return makeClosure(g, f, instance, ty, captures, id);
+    let res, merr = makeClosure(g, f, instance, ty, captures, id);
+    if merr != blot_direct_types::Error.none { return res, merr; }
+    if capture_ids.len <= 4 && f.evidence_context == 0 {
+        var ok = true;
+        var kc = KnownClosure {
+            fn_local: w(g, res, 0),
+            env_local: w(g, res, 1),
+            kind: 2,
+            unit: m.unit,
+            id: id,
+            instance_id: instance,
+            full_ty: ty,
+            cap_count: capture_ids.len as u8,
+            lambda_env: f.env,
+            depth: f.depth,
+        };
+        for binding, at in capture_ids {
+            let _, bound_here = bindGet(g, f, binding);
+            let cv = g.s.vals[captures.start + at];
+            if !bound_here || tagOf(g, cv.ty) == blot_direct_types::Tag.cell { ok = false; break; }
+            kc.caps[at] = cv;
+            kc.cap_bindings[at] = binding;
+        }
+        if ok { recordKnownClosure(f, kc); }
+    }
+    return res, blot_direct_types::Error.none;
 }
 
 // A lambda whose parameter type is known but whose result only its body

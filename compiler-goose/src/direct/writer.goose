@@ -80,6 +80,7 @@ let OP_i32_load8_u: Op = 0x2d;
 let OP_i32_store: Op = 0x36;
 let OP_f32_store: Op = 0x38;
 let OP_i32_store8: Op = 0x3a;
+let OP_i32_store16: Op = 0x3b;
 let OP_memory_size: Op = 0x3f;
 let OP_memory_grow: Op = 0x40;
 let OP_i32_const: Op = 0x41;

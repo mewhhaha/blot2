@@ -56,7 +56,7 @@ struct Tys { start: u32 = 0, len: u32 = 0 }
 struct Words { start: u32 = 0, len: u32 = 0 }
 // Zig's `?Val` behind a pointer: a label's result, allocated by the first
 // value that reaches it.
-struct Slot { present: bool = false, value: Val = Val {} }
+struct Slot { present: bool = false, value: Val = Val {}, deliver_count: u32 = 0, last_src: Val = Val {} }
 
 // named: a function or constant binding; lambda: a closure node of the
 // `parent` instance; partial: a named function applied to its first
@@ -168,6 +168,29 @@ struct Handle { saved: u32, depth: u32, cells_start: u32 = 0, cells_len: u32 = 0
 
 struct DepEntry { id: u32 }
 struct TrapEntry { kind: u8 = 0, unit: u32 = 0, start: u32 = 0, end: u32 = 0, message_start: u32 = 0, message_len: u32 = 0 }
+struct RodataEntry {
+    addr: u32 = 0,
+    count: u32 = 0,
+    byte_len: u32 = 0,
+    elem_ty: Ty = 0,
+    step: u32 = 0,
+}
+// Specialized recursive worker descriptor for a 1..4 function SCC.
+// param_modes[i]: 0 = normal, 1 = Mode R read-only (base, len),
+// 2 = Mode R mutable own non-resizing (base, len), 3 = Mode M own resizing (entry).
+struct WorkerSpec {
+    unit: u32 = 0,
+    scc_len: u32 = 0,
+    scc_bindings: u32[4] = [0; 4],
+    scc_insts: u32[4] = [0; 4],
+    scc_fns: u32[4] = [0; 4],
+    param_count: u32 = 0,
+    param_modes: u8[8] = [0; 8],
+    drop_param: u8 = 0xff,
+    drop_ret_pos: i8 = -2,
+    drop_word_start: u32 = 0,
+    no_scope_alloc: bool = false,
+}
 // Four consecutive scalar locals start at w0. A tagged word indexes this
 // entry and encodes its lane in the low two bits.
 struct V128Shadow {
@@ -286,6 +309,14 @@ root struct State {
     // Recorded runtime trap sites for the optional `blot:traps` v1 custom section.
     traps: TrapEntry[>..] = [],
     trap_text: u8[>..] = [],
+    // Direct .rodata constant scalar array tables: (unit, binding) -> 1-based index into rodata_entries.
+    rodata_map: U64Map = U64Map {},
+    rodata_entries: RodataEntry[>..] = [],
+    // Lazy push_entry(entry, stride) -> addr helper (0 when unemitted).
+    push_entry_helper: u32 = 0,
+    // Specialized recursive worker specs: instance_id -> 1-based index into worker_specs.
+    worker_map: U64Map = U64Map {},
+    worker_specs: WorkerSpec[>..] = [],
     // Speculative parallel wave emission flags (never serialized).
     parallel_readonly: bool = false,
     parallel_aborted: bool = false,
@@ -2053,6 +2084,8 @@ struct SharedSnapshot {
     exported_storage: bool = false,
     trap_closures: u32 = 0,
     reloc_staged: bool = false,
+    push_entry_helper: u32 = 0,
+    worker_specs_len: i64 = 0,
 }
 
 fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
@@ -2078,6 +2111,8 @@ fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
         exported_storage: g.s.exported_storage,
         trap_closures: g.s.trap_closures,
         reloc_staged: blot_direct_relocations::hasStagedFlag(),
+        push_entry_helper: g.s.push_entry_helper,
+        worker_specs_len: g.s.worker_specs.len,
     };
 }
 
@@ -2102,7 +2137,9 @@ fn sameSnapshot(a: SharedSnapshot, b: SharedSnapshot) -> bool {
         a.has_rt == b.has_rt &&
         a.exported_storage == b.exported_storage &&
         a.trap_closures == b.trap_closures &&
-        a.reloc_staged == b.reloc_staged;
+        a.reloc_staged == b.reloc_staged &&
+        a.push_entry_helper == b.push_entry_helper &&
+        a.worker_specs_len == b.worker_specs_len;
 }
 
 fn allKindFromCode(code: u8) -> InstanceKind, bool {

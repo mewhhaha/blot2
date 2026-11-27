@@ -2994,6 +2994,8 @@ fn tryEmitVectorReductionLoop(
     }
 
     let av, _ = bindGet(g, f, arr_b);
+    let ada = findDirectArrayBySlot(f, w(g, av, 0));
+    if ada >= 0 && f.direct_arrays[ada].scalar_packed { return blot_direct_types::Error.none; }
     let arr_base, arr_len = ensureCheckedArray(g, f, av);
 
     var rhs_vlocs: u32[2] = [0; 2];
@@ -3500,6 +3502,8 @@ fn tryEmitVec3MaybeReductionLoop(
 
     if arr_inlined.binding != 0 { g.recordInlined(arr_inlined.unit, arr_inlined.binding); }
     let av, _ = bindGet(g, f, arr_b);
+    let ada = findDirectArrayBySlot(f, w(g, av, 0));
+    if ada >= 0 && f.direct_arrays[ada].scalar_packed { return blot_direct_types::Error.none; }
     let arr_base, arr_len = ensureCheckedArray(g, f, av);
 
     let simd_n = local32(g, f);

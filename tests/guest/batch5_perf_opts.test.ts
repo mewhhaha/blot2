@@ -105,7 +105,6 @@ io run_grow (n: U32): #[U32] =>
     opts,
   );
 });
-
 Deno.test("Batch 5 Opt 2: F64 and F64x2 NaN-canonicalization elision preserves canonical NaN at all boundaries", async () => {
   await compileAndRun(
     `
@@ -180,7 +179,6 @@ io test_nan_boundaries (n: U32): #[U32] =>
     opts,
   );
 });
-
 Deno.test("Batch 5 Opt 4: recursive own storage (direct, growing, mutual, non-first param)", async () => {
   await compileAndRun(
     `
@@ -248,7 +246,6 @@ io test_rec_own (depth: U32): #[U32] =>
     opts,
   );
 });
-
 Deno.test("Batch 5 Opt 4 negative: aliased recursive own call is rejected by uniqueness", async () => {
   await compileExpectedFailure(
     `
@@ -313,6 +310,202 @@ io run_rewind (iters: U32): U32 =>
         }
       }
       assert.equal(guest.call("run_rewind", 20000), expected);
+    },
+    opts,
+  );
+});
+Deno.test("Regression: small array literals declared inside lambdas respect real-handle escape/growth/carry", async () => {
+  await compileAndRun(
+    `
+func read_sum (xs: #[U32]): U32 =>
+  let s: U32 = 0
+  for i in 0 .. xs.length:
+    s := self + xs[i]
+  return s
+
+func bump_first (m: own #[U32]): #[U32] =>
+  m[0] := m[0] + 1
+  return m
+
+func with_val (n: U32) -> (f: U32 -> #[U32]): #[U32] => f n
+
+io test_lambda_small_arrays (n: U32): #[U32] =>
+  // Case 1: small literal inside lambda passed to callee (mirrors six-more-ecs_membership_edits)
+  let r1 = with_val n (func (x: U32): #[U32] =>
+    let ids = #[0, x / 2, x - 1]
+    return #[read_sum ids])
+  // Case 2: 1-element literal inside lambda mutated and loop-carried across calls (mirrors incremental-query_cached/uncached)
+  let r2 = with_val n (func (x: U32): #[U32] =>
+    let meta: #[U32] = #[0]
+    let acc: U32 = 0
+    for i in 0 .. 4:
+      if i == 2:
+        meta[0] := 0
+      meta := bump_first self
+      acc := self + meta[0]
+    return #[acc, meta[0]])
+  // Case 3: small literal inside lambda grown via bulk push loop (mirrors followup-six-publish_*)
+  let r3 = with_val n (func (x: U32): #[U32] =>
+    let out: #[U32] = #[1, 2, 3, x]
+    for i in 0 .. 3:
+      for w in #[i, i + 1, i + 2]:
+        @storage.push out w
+    return out)
+  // Case 4: genuinely non-escaping small literal inside lambda (positive DirectArray path)
+  let r4 = with_val n (func (x: U32): #[U32] =>
+    let local_arr = #[x, x + 1, x + 2]
+    local_arr[1] := local_arr[0] + local_arr[2]
+    return #[local_arr[0] + local_arr[1] + local_arr[2]])
+  return #[r1[0], r2[0], r2[1], r3.length, r3[r3.length - 1], r4[0]]
+`,
+    (guest) => {
+      // n = 10:
+      // r1 = [0 + 5 + 9] = [14]
+      // r2: i=0 -> meta=[1], acc=1; i=1 -> meta=[2], acc=3; i=2 -> reset 0 -> meta=[1], acc=4; i=3 -> meta=[2], acc=6
+      // r3: 4 + 3*3 = 13 elements, last element = 2 + 2 = 4
+      // r4: local_arr = [10, 22, 12], sum = 44
+      assert.deepEqual(
+        Array.from(guest.call("test_lambda_small_arrays", 10) as Uint32Array),
+        [14, 6, 2, 13, 4, 44],
+      );
+    },
+    opts,
+  );
+});
+
+Deno.test("Regression: non-inlined own-array call invalidates cached checked_arrays before inline tuple propagation", async () => {
+  await compileAndRun(
+    `
+type Span is data = $Span { start: U32, count: U32 }
+
+// Deliberately large enough to stay non-inlined while taking \`labels: own #[U32]\`
+// and growing it via bulk push loop, mirroring ink/ui/tree.store_node + declare_owned.
+func push_pair (a: &[U32]) -> (b: &[U32]) -> (c: &[U32]) -> (labels: own #[U32]): (Span, #[U32]) =>
+  let s = labels.length
+  for x in a:
+    @storage.push labels x
+  let d = labels.length
+  for x in b:
+    @storage.push labels x
+  let e = labels.length
+  for x in c:
+    @storage.push labels x
+  let total = a.length + b.length + c.length + (d - s) * 0 + (e - d) * 0
+  return ($Span { start: s, count: total }, labels)
+
+// Small wrapper that gets inlined and returns (labels, spans).
+func declare_pair (a: &[U32]) -> (b: &[U32]) -> (c: &[U32]) -> (labels: own #[U32]) -> (spans: own #[Span]): (#[U32], #[Span]) =>
+  let (sp, labels) = push_pair a b c labels
+  @storage.push spans sp
+  return (labels, spans)
+
+func check_spans (labels: &[U32]) -> (spans: &[Span]): U32 =>
+  let sum: U32 = 0
+  for sp in spans:
+    if sp.start > labels.length or sp.count > labels.length - sp.start:
+      return panic "span outside labels"
+    for i in sp.start .. sp.start + sp.count:
+      sum := self + labels[i]
+  return sum
+
+io test_own_call_invalidation (n: U32): #[U32] =>
+  let src = #[10, 20, 30]
+  let empty: #[U32] = #[]
+  let a = &src[0..1]
+  let b = &src[1..2]
+  let c = &empty[0..0]
+  let labels: #[U32] = #[]
+  let spans: #[Span] = #[]
+  let (labels, spans) = declare_pair a b c labels spans
+  let (labels, spans) = declare_pair a b c labels spans
+  let (labels, spans) = declare_pair a b c labels spans
+  // First check caches \`labels\` (base, length=6) in checked_arrays.
+  let first = check_spans (&labels[0..labels.length]) (&spans[0..spans.length])
+  // Subsequent declare_pair calls grow \`labels\` past initial capacity (6 -> 8 -> 10).
+  let (labels, spans) = declare_pair a b c labels spans
+  let (labels, spans) = declare_pair a b c labels spans
+  // Must NOT reuse stale length=6 or stale pre-realloc base!
+  let second = check_spans (&labels[0..labels.length]) (&spans[0..spans.length])
+  return #[first, second, labels.length, spans.length + n * 0]
+`,
+    (guest) => {
+      assert.deepEqual(
+        Array.from(guest.call("test_own_call_invalidation", 0) as Uint32Array),
+        [90, 150, 10, 5],
+      );
+    },
+    opts,
+  );
+});
+
+Deno.test("KnownClosure devirtualization: const policy records, multi-arg lambdas, and control-flow soundness", async () => {
+  await compileAndRun(
+    `
+type Ops = { hash: U32 -> U32, equal: U32 -> U32 -> Bool }
+
+func hash_u32 (x: U32): U32 => (x * 2654435761) ^ (x >> 16)
+func eq_u32 (a: U32) -> (b: U32): Bool => a == b
+const u32_ops: Ops = { hash: hash_u32, equal: eq_u32 }
+
+func eq_target (target: U32) -> (value: U32): Bool => value == target
+
+func fold_matching (ops: Ops) -> (pred: U32 -> Bool) -> (step: U32 -> U32 -> U32) -> (xs: #[U32]) -> (init: U32): U32 =>
+  let acc = init
+  for i in 0 .. xs.length:
+    let v = xs[i]
+    if pred v and ops.equal v v:
+      acc := step self (ops.hash v & 0xFF)
+  return acc
+
+// Conditional branch returning two distinct closures (deliver_count == 2):
+// must NOT mis-propagate either branch as statically known.
+func pick_op (flag: Bool) -> (k: U32): (U32 -> U32) =>
+  if flag:
+    return func (x: U32): U32 => x + k
+  return func (x: U32): U32 => x * k
+
+// Helper creating an internal temporary closure before returning another closure,
+// exercising known_closures stack compaction across > 16 sequential calls.
+func wrap_adder (base: U32): (U32 -> U32) =>
+  let tmp = func (z: U32): U32 => z + 999
+  let bonus = tmp 0 - 999
+  return func (x: U32): U32 => x + base + bonus
+
+io test_known_closures (n: U32): #[U32] =>
+  let xs: #[U32] = #[3, 7, 3, 11, 3, 7]
+  let bias: U32 = n
+  // 1. Const policy record + partial predicate + 2-arg capturing lambda
+  let r1 = fold_matching u32_ops (eq_target 3) (func (a: U32) => func (b: U32): U32 => a + b + bias) xs 0
+  // 2. Conditional closure return (both arms exercised)
+  let f_add = pick_op true 5
+  let f_mul = pick_op false 5
+  let r2 = f_add 10
+  let r3 = f_mul 10
+  // 3. Loop-carried closure reassignment must not stick to initial closure
+  let cur: U32 -> U32 = func (x: U32): U32 => x + 1
+  let r4: U32 = 0
+  for i in 0 .. 4:
+    r4 := self + cur i
+    if i == 1:
+      cur := func (x: U32): U32 => x * 10
+  // 4. >16 sequential inlined closure-returning calls (must not leak known_closures slots)
+  let r5: U32 = 0
+  for i in 0 .. 20:
+    let g = wrap_adder i
+    r5 := self + g 1
+  return #[r1, r2, r3, r4, r5]
+`,
+    (guest) => {
+      const h3 = (((Math.imul(3, 2654435761) >>> 0) ^ (3 >>> 16)) & 0xff) >>> 0;
+      // r1: 3 matches of value 3, each adds h3 + bias(2)
+      const expectedR1 = 3 * (h3 + 2);
+      // r2 = 10 + 5 = 15, r3 = 10 * 5 = 50
+      // r4: i=0 -> 0+1=1; i=1 -> 1+1=2 (then cur becomes *10); i=2 -> 20; i=3 -> 30 => 53
+      // r5: sum_{i=0..19} (1 + i) = 20 + 190 = 210
+      assert.deepEqual(
+        Array.from(guest.call("test_known_closures", 2) as Uint32Array),
+        [expectedR1, 15, 50, 53, 210],
+      );
     },
     opts,
   );

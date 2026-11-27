@@ -279,18 +279,26 @@ fn emitScaledBytes(g: Generator&, f: const Fn&, count: u32, step: u32) -> u32 {
 fn ensureCheckedArray(g: Generator&, f: Fn&, container: Val) -> u32, u32 {
     let slot = w(g, container, 0);
     let da_idx = findDirectArrayBySlot(f, slot);
-    if da_idx >= 0 {
+    if da_idx >= 0 && !f.direct_arrays[da_idx].scalar_packed {
         return f.direct_arrays[da_idx].base, f.direct_arrays[da_idx].len_local;
     }
     let generation = w(g, container, 1);
+    let wr = findWorkerR(f, slot, generation);
+    if wr >= 0 {
+        return f.worker_r[wr].base, f.worker_r[wr].length;
+    }
     let cached = findCheckedArray(f, slot, generation);
     if cached >= 0 {
         let entry = f.checked_arrays[cached];
         return entry.base, entry.length;
     }
-    let cg = findCheckedGrow(f, slot, generation);
+    let wm = findWorkerM(f, slot, generation);
+    let cg = if wm >= 0 { -1 } else { findCheckedGrow(f, slot, generation) };
     var entry: u32 = 0;
-    if cg >= 0 {
+    if wm >= 0 {
+        entry = f.worker_m[wm].entry;
+        lget(g, entry);
+    } else if cg >= 0 {
         entry = f.checked_grows[cg].entry;
         lget(g, entry);
     } else {
@@ -354,6 +362,8 @@ fn createUninit(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, u32
 fn ensureCheckedGrow(g: Generator&, f: Fn&, container: Val) -> u32 {
     let slot = w(g, container, 0);
     let generation = w(g, container, 1);
+    let wm = findWorkerM(f, slot, generation);
+    if wm >= 0 { return f.worker_m[wm].entry; }
     let cached = findCheckedGrow(f, slot, generation);
     if cached >= 0 { return f.checked_grows[cached].entry; }
     let entry = local32(g, f);
@@ -383,7 +393,8 @@ fn create(g: Generator&, f: Fn&, ty: Ty, length: u32, id: u32) -> Val, Error {
 }
 // The address of element 0 of an owner handle.
 fn baseOf(g: Generator&, f: Fn&, handle: Val) -> u32 {
-    if tagOf(g, handle.ty) == blot_direct_types::Tag.array {
+    let htag = tagOf(g, handle.ty);
+    if htag == blot_direct_types::Tag.array || htag == blot_direct_types::Tag.view {
         let base, _ = ensureCheckedArray(g, f, handle);
         return base;
     }
@@ -666,7 +677,7 @@ fn constLocal(g: Generator&, f: const Fn&, value: u32) -> u32 {
     return made;
 }
 
-fn directArrayAddress(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u32) -> u32 {
+fn emitDirectArrayBoundsCheck(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u32) {
     var skip_bounds = false;
     let cf, known = constU32(f, index);
     if known && cf.value < da.length {
@@ -692,7 +703,460 @@ fn directArrayAddress(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u3
         op(g, OP_i32_ge_u);
         trapBounds(g, f, id);
     }
+}
+
+fn directArrayAddress(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u32) -> u32 {
+    emitDirectArrayBoundsCheck(g, f, da, index, id);
     return emitOffsetAddress(g, f, da.base, index, da.step);
+}
+
+fn emitDirectArrayRead(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u32) -> Val, Error {
+    if !da.scalar_packed {
+        let addr = directArrayAddress(g, f, da, index, id);
+        return loadElement(g, f, addr, 0, da.elem_ty, id);
+    }
+    emitDirectArrayBoundsCheck(g, f, da, index, id);
+    let out_loc = local32(g, f);
+    let cf, known = constU32(f, index);
+    if known && cf.value < da.length {
+        useConstU32(cf);
+        let src_word = if cf.value < 8 { da.pack_lo } else { da.pack_hi };
+        let sh = ((cf.value & 7) * 8) as i64;
+        lget(g, src_word);
+        if sh != 0 {
+            i64Const(g, sh);
+            op(g, OP_i64_shr_u);
+        }
+        op(g, OP_i32_wrap_i64);
+        i32Const(g, 0xff);
+        op(g, OP_i32_and);
+        lset(g, out_loc);
+        return valOf1(g, da.elem_ty, out_loc), blot_direct_types::Error.none;
+    }
+    if da.pack_hi == 0xffffffff {
+        lget(g, da.pack_lo);
+        lget(g, index);
+        i32Const(g, 3);
+        op(g, OP_i32_shl);
+        op(g, OP_i64_extend_i32_u);
+    } else {
+        lget(g, da.pack_hi);
+        lget(g, da.pack_lo);
+        lget(g, index);
+        i32Const(g, 8);
+        op(g, OP_i32_ge_u);
+        op(g, OP_select);
+        lget(g, index);
+        i32Const(g, 7);
+        op(g, OP_i32_and);
+        i32Const(g, 3);
+        op(g, OP_i32_shl);
+        op(g, OP_i64_extend_i32_u);
+    }
+    op(g, OP_i64_shr_u);
+    op(g, OP_i32_wrap_i64);
+    i32Const(g, 0xff);
+    op(g, OP_i32_and);
+    lset(g, out_loc);
+    return valOf1(g, da.elem_ty, out_loc), blot_direct_types::Error.none;
+}
+
+fn emitDirectArrayWrite(g: Generator&, f: Fn&, da: DirectArray, index: u32, replacement: Val, id: u32) -> Error {
+    if !da.scalar_packed {
+        let addr = directArrayAddress(g, f, da, index, id);
+        return writeElement(g, f, addr, 0, replacement, id);
+    }
+    emitDirectArrayBoundsCheck(g, f, da, index, id);
+    let cf, known = constU32(f, index);
+    if known && cf.value < da.length {
+        useConstU32(cf);
+        let target_word = if cf.value < 8 { da.pack_lo } else { da.pack_hi };
+        let sh = ((cf.value & 7) * 8) as u64;
+        let clear_mask: u64 = ((0xff as u64) << sh) ^ 0xffffffffffffffff;
+        lget(g, target_word);
+        i64Const(g, clear_mask as! i64);
+        op(g, OP_i64_and);
+        lget(g, w(g, replacement, 0));
+        i32Const(g, 0xff);
+        op(g, OP_i32_and);
+        op(g, OP_i64_extend_i32_u);
+        if sh != 0 {
+            i64Const(g, sh as i64);
+            op(g, OP_i64_shl);
+        }
+        op(g, OP_i64_or);
+        lset(g, target_word);
+        return blot_direct_types::Error.none;
+    }
+    let sh64 = local(g, f, VT_i64);
+    lget(g, index);
+    if da.pack_hi != 0xffffffff {
+        i32Const(g, 7);
+        op(g, OP_i32_and);
+    }
+    i32Const(g, 3);
+    op(g, OP_i32_shl);
+    op(g, OP_i64_extend_i32_u);
+    lset(g, sh64);
+    let keep_mask = local(g, f, VT_i64);
+    i64Const(g, 0xff);
+    lget(g, sh64);
+    op(g, OP_i64_shl);
+    i64Const(g, -1);
+    op(g, OP_i64_xor);
+    lset(g, keep_mask);
+    let ins_bits = local(g, f, VT_i64);
+    lget(g, w(g, replacement, 0));
+    i32Const(g, 0xff);
+    op(g, OP_i32_and);
+    op(g, OP_i64_extend_i32_u);
+    lget(g, sh64);
+    op(g, OP_i64_shl);
+    lset(g, ins_bits);
+    if da.pack_hi == 0xffffffff {
+        lget(g, da.pack_lo);
+        lget(g, keep_mask);
+        op(g, OP_i64_and);
+        lget(g, ins_bits);
+        op(g, OP_i64_or);
+        lset(g, da.pack_lo);
+    } else {
+        lget(g, index);
+        i32Const(g, 8);
+        op(g, OP_i32_lt_u);
+        let _ = open(g, f, OP_if_);
+        lget(g, da.pack_lo);
+        lget(g, keep_mask);
+        op(g, OP_i64_and);
+        lget(g, ins_bits);
+        op(g, OP_i64_or);
+        lset(g, da.pack_lo);
+        op(g, OP_else_);
+        lget(g, da.pack_hi);
+        lget(g, keep_mask);
+        op(g, OP_i64_and);
+        lget(g, ins_bits);
+        op(g, OP_i64_or);
+        lset(g, da.pack_hi);
+        close(g, f);
+    }
+    return blot_direct_types::Error.none;
+}
+
+fn extractConstScalar(tm: const Module&, id: u32, elem_tag: blot_direct_types::Tag) -> u32, u32, bool {
+    if id == 0 { return 0, 0, false; }
+    let n = tm.node(id);
+    if n.tag == blot_check_core::Tag.constant {
+        match elem_tag {
+            boolean => {
+                if n.a > 1 { return 0, 0, false; }
+                return n.a, 0, true;
+            },
+            u8_ => {
+                if n.a > 255 { return 0, 0, false; }
+                return n.a, 0, true;
+            },
+            u32_, i32_, f32_ => { return n.a, 0, true; },
+            u64_, i64_, f64_ => { return n.a, n.b, true; },
+            _ => { return 0, 0, false; },
+        }
+    }
+    if n.tag == blot_check_core::Tag.scalar && n.op == blot_check_core::Op.neg && n.b == 0 {
+        let cn = tm.node(n.a);
+        if cn.tag != blot_check_core::Tag.constant { return 0, 0, false; }
+        match elem_tag {
+            i32_ => { return (0 as u32) - cn.a, 0, true; },
+            i64_ => {
+                let v: u64 = (0 as u64) - ((cn.a as u64) | ((cn.b as u64) << 32));
+                return v as! u32, (v >> 32) as! u32, true;
+            },
+            f32_ => {
+                if (cn.a & 0x7fffffff) <= 0x7f800000 { return cn.a ^ 0x80000000, 0, true; }
+                return 0, 0, false;
+            },
+            f64_ => {
+                let hi = cn.b & 0x7fffffff;
+                if hi < 0x7ff00000 || (hi == 0x7ff00000 && cn.a == 0) {
+                    return cn.a, cn.b ^ 0x80000000, true;
+                }
+                return 0, 0, false;
+            },
+            _ => { return 0, 0, false; },
+        }
+    }
+    return 0, 0, false;
+}
+
+fn tryResolveRodata(g: Generator&, f: const Fn&, ref_node: u32) -> blot_direct_emit::RodataEntry, bool {
+    if ref_node == 0 { return blot_direct_emit::RodataEntry {}, false; }
+    let m .= g.units[f.unit - 1];
+    if m.node(ref_node).tag != blot_check_core::Tag.reference { return blot_direct_emit::RodataEntry {}, false; }
+    let ref = m.reference(ref_node);
+    if ref.unit == 0 || ref.unit == m.unit {
+        let _, bound_here = bindGet(g, f, ref.binding);
+        if bound_here { return blot_direct_emit::RodataEntry {}, false; }
+        let _, is_poly = g.s.polymorphic.get(polyKey(f, ref.binding));
+        if is_poly { return blot_direct_emit::RodataEntry {}, false; }
+    }
+    let target = g.resolve(m, ref);
+    if !g.hasUnit(target.unit) { return blot_direct_emit::RodataEntry {}, false; }
+    let tm .= g.units[target.unit - 1];
+    let body .= tm.body(target.binding);
+    if !body || body.is_function || body.scheme.variables.len != 0 { return blot_direct_emit::RodataEntry {}, false; }
+    let root = unwrapSingleBody(tm, body.root);
+    if root == 0 || tm.node(root).tag != blot_check_core::Tag.array { return blot_direct_emit::RodataEntry {}, false; }
+    let key = blot_direct_emit::key64(target.unit, target.binding);
+    let cached, found = g.s.rodata_map.get(key);
+    if found && cached != 0 && ((cached - 1) as i64) < g.s.rodata_entries.len {
+        g.recordInlined(target.unit, target.binding);
+        blot_direct_relocations::unpatchableOperand(target.unit, root);
+        return g.s.rodata_entries[(cached - 1) as i64], true;
+    }
+    let children = tm.children(root);
+    if children.len > 65536 { return blot_direct_emit::RodataEntry {}, false; }
+    let arr_ty, aerr = g.types.lower(tm, tm.binding(target.binding).ty, Env {});
+    if aerr != blot_direct_types::Error.none {
+        g.dropFailure();
+        return blot_direct_emit::RodataEntry {}, false;
+    }
+    if tagOf(g, arr_ty) != blot_direct_types::Tag.array { return blot_direct_emit::RodataEntry {}, false; }
+    let elem_ty = g.types.node(arr_ty).a;
+    let elem_tag = tagOf(g, elem_ty);
+    var step: u32 = 0;
+    match elem_tag {
+        boolean, u8_ => { step = 1; },
+        u32_, i32_, f32_ => { step = 4; },
+        u64_, i64_, f64_ => { step = 8; },
+        _ => { return blot_direct_emit::RodataEntry {}, false; },
+    }
+    let byte_len = (children.len as u32) * step;
+    if (g.module.data.len as u32) + byte_len + 16 > 262144 { return blot_direct_emit::RodataEntry {}, false; }
+    for child in children {
+        let _, _, ok = extractConstScalar(tm, child, elem_tag);
+        if !ok { return blot_direct_emit::RodataEntry {}, false; }
+    }
+    if g.s.parallel_readonly {
+        g.s.parallel_aborted = true;
+        return blot_direct_emit::RodataEntry {}, false;
+    }
+    if !g.module.has_memory {
+        g.module.has_memory = true;
+        g.module.memory_pages = 1;
+        g.module.memory_max_pages = 1;
+    }
+    let align: i64 = if step > 8 { step as i64 } else { 8 };
+    while (g.module.data.len % align) != 0 { g.module.data.push(0); }
+    let addr = blot_direct_runtime::arena_start + (g.module.data.len as u32);
+    for child in children {
+        let low, high, _ = extractConstScalar(tm, child, elem_tag);
+        if step == 1 {
+            g.module.data.push((low & 0xff) as! u8);
+        } else if step == 4 {
+            g.module.data.push((low & 0xff) as! u8);
+            g.module.data.push(((low >> 8) & 0xff) as! u8);
+            g.module.data.push(((low >> 16) & 0xff) as! u8);
+            g.module.data.push(((low >> 24) & 0xff) as! u8);
+        } else {
+            g.module.data.push((low & 0xff) as! u8);
+            g.module.data.push(((low >> 8) & 0xff) as! u8);
+            g.module.data.push(((low >> 16) & 0xff) as! u8);
+            g.module.data.push(((low >> 24) & 0xff) as! u8);
+            g.module.data.push((high & 0xff) as! u8);
+            g.module.data.push(((high >> 8) & 0xff) as! u8);
+            g.module.data.push(((high >> 16) & 0xff) as! u8);
+            g.module.data.push(((high >> 24) & 0xff) as! u8);
+        }
+    }
+    let entry = blot_direct_emit::RodataEntry {
+        addr: addr,
+        count: children.len as u32,
+        byte_len: byte_len,
+        elem_ty: elem_ty,
+        step: step,
+    };
+    g.s.rodata_entries.push(entry);
+    g.s.rodata_map.put(key, g.s.rodata_entries.len as u32);
+    g.recordInlined(target.unit, target.binding);
+    blot_direct_relocations::unpatchableOperand(target.unit, root);
+    return entry, true;
+}
+
+fn emitRodataRead(g: Generator&, f: Fn&, rd: blot_direct_emit::RodataEntry, idx_node: u32, id: u32) -> Val, Error {
+    let position, perr = expr(g, f, idx_node);
+    if perr != blot_direct_types::Error.none { return position, perr; }
+    let index, ierr = scalarLocal(g, f, position, id);
+    if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+    let cf, known = constU32(f, index);
+    if known && cf.value < rd.count {
+        useConstU32(cf);
+        let zero = constLocal(g, f, 0);
+        return loadElement(g, f, zero, rd.addr + cf.value * rd.step, rd.elem_ty, id);
+    }
+    var skip_bounds = false;
+    let cm = findCheckedMask(f, index);
+    if cm >= 0 && f.checked_masks[cm].has_const && f.checked_masks[cm].max_const < rd.count {
+        skip_bounds = true;
+    }
+    if !skip_bounds && !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff && index == f.checked_range.index {
+        let ce, ek = constU32(f, f.checked_range.end_local);
+        if ek && ce.value <= rd.count {
+            useConstU32(ce);
+            skip_bounds = true;
+        }
+    }
+    if !skip_bounds {
+        lget(g, index);
+        i32Const(g, rd.count);
+        op(g, OP_i32_ge_u);
+        trapBounds(g, f, id);
+    }
+    let scaled = if rd.step == 1 { index } else { emitScaledBytes(g, f, index, rd.step) };
+    return loadElement(g, f, scaled, rd.addr, rd.elem_ty, id);
+}
+
+fn emitExtendFromRodata(g: Generator&, f: Fn&, dst: Val, is_direct: bool, rd: blot_direct_emit::RodataEntry, id: u32) -> Val, Error {
+    let element, eerr = elementOf(g, f, dst.ty, id);
+    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    let step, sterr = stride(g, f, element, id);
+    if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+    let rt = g.runtime_();
+    let fast_eligible = !rt.has_fork && step > 0 && step <= 65536 && tagOf(g, dst.ty) == blot_direct_types::Tag.array;
+    var dst_entry: u32 = 0;
+    var dst_len: u32 = 0;
+    if fast_eligible {
+        dst_entry = ensureCheckedGrow(g, f, dst);
+        dst_len = local32(g, f);
+        lget(g, dst_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+        lset(g, dst_len);
+    } else {
+        let dl, dlerr = lengthOf(g, f, dst, id);
+        if dlerr != blot_direct_types::Error.none { return neverVal(), dlerr; }
+        dst_len = dl;
+    }
+    var next_len = dst_len;
+    if rd.count > 0 {
+        next_len = local32(g, f);
+        lget(g, dst_len);
+        i32Const(g, rd.count);
+        op(g, OP_i32_add);
+        ltee(g, next_len);
+        lget(g, dst_len);
+        op(g, OP_i32_lt_u);
+        trap(g, f);
+    }
+    if fast_eligible {
+        let max_elems = if blot_direct_runtime::capacity_mask / step < 0x04000000 { blot_direct_runtime::capacity_mask / step } else { 0x04000000 };
+        let need_bytes = emitScaledBytes(g, f, next_len, step);
+        let cap = local32(g, f);
+        lget(g, dst_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+        ltee(g, cap);
+        i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
+        op(g, OP_i32_and);
+        i32Const(g, blot_direct_runtime::live_flag);
+        op(g, OP_i32_eq);
+        lget(g, next_len);
+        i32Const(g, max_elems);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
+        lget(g, need_bytes);
+        lget(g, cap);
+        i32Const(g, blot_direct_runtime::capacity_mask);
+        op(g, OP_i32_and);
+        op(g, OP_i32_le_u);
+        op(g, OP_i32_and);
+        op(g, OP_i32_eqz);
+        let need_grow = open(g, f, OP_if_);
+        lget(g, w(g, dst, 0));
+        lget(g, w(g, dst, 1));
+        lget(g, next_len);
+        i32Const(g, step);
+        callf(g, rt.reserve);
+        popCheckedArraysAt(f, need_grow);
+        close(g, f);
+    } else {
+        lget(g, w(g, dst, 0));
+        lget(g, w(g, dst, 1));
+        lget(g, next_len);
+        i32Const(g, step);
+        callf(g, rt.reserve);
+    }
+    if rd.count > 0 {
+        if !fast_eligible {
+            dst_entry = local32(g, f);
+            lget(g, w(g, dst, 0));
+            lget(g, w(g, dst, 1));
+            callf(g, rt.check);
+            lset(g, dst_entry);
+        }
+        let dst_base = local32(g, f);
+        lget(g, dst_entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        lset(g, dst_base);
+        let dst_ptr = emitOffsetAddress(g, f, dst_base, dst_len, step);
+        if rt.has_fork {
+            recordBeforeWrite(g, f, w(g, dst, 0), dst_entry, blot_direct_runtime::entry_length, 4);
+        }
+        let data_start = (rd.addr - blot_direct_runtime::arena_start) as i64;
+        if rd.byte_len <= 16 && data_start + (rd.byte_len as i64) <= g.module.data.len {
+            var off: u32 = 0;
+            while off < rd.byte_len {
+                let rem = rd.byte_len - off;
+                let di = data_start + (off as i64);
+                if rem >= 8 {
+                    let v64: u64 =
+                        (g.module.data[di] as u64) |
+                        ((g.module.data[di + 1] as u64) << 8) |
+                        ((g.module.data[di + 2] as u64) << 16) |
+                        ((g.module.data[di + 3] as u64) << 24) |
+                        ((g.module.data[di + 4] as u64) << 32) |
+                        ((g.module.data[di + 5] as u64) << 40) |
+                        ((g.module.data[di + 6] as u64) << 48) |
+                        ((g.module.data[di + 7] as u64) << 56);
+                    lget(g, dst_ptr);
+                    i64Const(g, v64 as! i64);
+                    op(g, OP_i64_store); uleb(g, 0); uleb(g, off);
+                    off += 8;
+                } else if rem >= 4 {
+                    let v32: u32 =
+                        (g.module.data[di] as u32) |
+                        ((g.module.data[di + 1] as u32) << 8) |
+                        ((g.module.data[di + 2] as u32) << 16) |
+                        ((g.module.data[di + 3] as u32) << 24);
+                    lget(g, dst_ptr);
+                    i32Const(g, v32);
+                    op(g, OP_i32_store); uleb(g, 0); uleb(g, off);
+                    off += 4;
+                } else if rem >= 2 {
+                    let v16: u32 = (g.module.data[di] as u32) | ((g.module.data[di + 1] as u32) << 8);
+                    lget(g, dst_ptr);
+                    i32Const(g, v16);
+                    op(g, OP_i32_store16); uleb(g, 0); uleb(g, off);
+                    off += 2;
+                } else {
+                    lget(g, dst_ptr);
+                    i32Const(g, g.module.data[di] as u32);
+                    op(g, OP_i32_store8); uleb(g, 0); uleb(g, off);
+                    off += 1;
+                }
+            }
+        } else {
+            lget(g, dst_ptr);
+            i32Const(g, rd.addr);
+            i32Const(g, rd.byte_len);
+            memoryCopyOp(g);
+        }
+        lget(g, dst_entry);
+        lget(g, next_len);
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    }
+    if is_direct && tagOf(g, dst.ty) == blot_direct_types::Tag.array {
+        invalidateCheckedOwner(g, f, dst);
+    } else {
+        invalidateCheckedContainers(f);
+    }
+    return dst, blot_direct_types::Error.none;
 }
 
 recursive fn tryEmitDirectLocalArray(g: Generator&, f: Fn&, binding: u32, init_id: u32, id: u32) -> Val, bool, Error {
@@ -728,8 +1192,9 @@ recursive fn tryEmitDirectLocalArray(g: Generator&, f: Fn&, binding: u32, init_i
     if eerr != blot_direct_types::Error.none || !isScalarTag(tagOf(g, elem_ty)) {
         return neverVal(), false, blot_direct_types::Error.none;
     }
-    let body .= enclosingBody(g, f);
-    if !body || !isDirectLocalArrayBinding(g, f, m, body.root, binding) {
+    let root = currentBodyRoot(g, f);
+    var needs_addr = false;
+    if root == 0 || !isDirectLocalArrayBinding(g, f, m, root, binding, needs_addr) {
         return neverVal(), false, blot_direct_types::Error.none;
     }
     let step, serr = stride(g, f, elem_ty, id);
@@ -738,6 +1203,58 @@ recursive fn tryEmitDirectLocalArray(g: Generator&, f: Fn&, binding: u32, init_i
     let slot_local = constLocal(g, f, 0);
     let len_local = constLocal(g, f, count_val);
     recordConstU32(f, len_local, count_val);
+    let pack_scalar = !needs_addr && step == 1 && count_val <= 16 &&
+        (tagOf(g, elem_ty) == blot_direct_types::Tag.u8_ || tagOf(g, elem_ty) == blot_direct_types::Tag.boolean);
+    if pack_scalar {
+        let pack_lo = local(g, f, VT_i64);
+        let pack_hi = if count_val > 8 { local(g, f, VT_i64) } else { 0xffffffff };
+        if is_lit {
+            let ch = m.children(init_id);
+            for child, at in ch {
+                let v, verr = expr(g, f, child);
+                if verr != blot_direct_types::Error.none { return v, false, verr; }
+                let target_w = if at < 8 { pack_lo } else { pack_hi };
+                let sh = ((at & 7) * 8) as i64;
+                if at != 0 && at != 8 { lget(g, target_w); }
+                lget(g, w(g, v, 0));
+                i32Const(g, 0xff);
+                op(g, OP_i32_and);
+                op(g, OP_i64_extend_i32_u);
+                if sh != 0 {
+                    i64Const(g, sh);
+                    op(g, OP_i64_shl);
+                }
+                if at != 0 && at != 8 { op(g, OP_i64_or); }
+                lset(g, target_w);
+            }
+        } else {
+            let val, verr = expr(g, f, fill_val_node);
+            if verr != blot_direct_types::Error.none { return val, false, verr; }
+            blot_direct_relocations::unpatchableOperand(m.unit, count_node);
+            let skip_fill = consumeSkipFillNode(f, init_id);
+            let vf, vknown = constU32(f, w(g, val, 0));
+            let is_zero_fill = vknown && (vf.value & 0xff) == 0;
+            if is_zero_fill { useConstU32(vf); }
+            if !skip_fill && !is_zero_fill {
+                lget(g, w(g, val, 0));
+                i32Const(g, 0xff);
+                op(g, OP_i32_and);
+                op(g, OP_i64_extend_i32_u);
+                i64Const(g, 0x0101010101010101);
+                op(g, OP_i64_mul);
+                if pack_hi != 0xffffffff {
+                    ltee(g, pack_lo);
+                    lset(g, pack_hi);
+                } else {
+                    lset(g, pack_lo);
+                }
+            }
+        }
+        recordDirectArray(f, binding, slot_local, 0, len_local, count_val, elem_ty, step, true, pack_lo, pack_hi);
+        let dummy = valOf2(g, arr_ty, slot_local, slot_local);
+        recordMutable(g, f, dummy);
+        return dummy, true, blot_direct_types::Error.none;
+    }
     if is_lit {
         let ch = m.children(init_id);
         let values = g.reserveVals(ch.len);
@@ -866,6 +1383,12 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 recordConstU32(f, klen, f.direct_arrays[da_idx].length);
                 return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
             }
+            let rd, is_rd = tryResolveRodata(g, f, children[0]);
+            if is_rd {
+                let klen = constLocal(g, f, rd.count);
+                recordConstU32(f, klen, rd.count);
+                return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let length, error = lengthOf(g, f, container, id);
@@ -880,8 +1403,11 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if perr != blot_direct_types::Error.none { return position, perr; }
                 let index, ierr = scalarLocal(g, f, position, id);
                 if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-                let addr = directArrayAddress(g, f, da, index, id);
-                return loadElement(g, f, addr, 0, da.elem_ty, id);
+                return emitDirectArrayRead(g, f, da, index, id);
+            }
+            let rd, is_rd = tryResolveRodata(g, f, children[0]);
+            if is_rd {
+                return emitRodataRead(g, f, rd, children[1], id);
             }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
@@ -1481,6 +2007,123 @@ recursive fn tryEmitGenerateInlineClosure(g: Generator&, f: Fn&, count: u32, clo
     close(g, f);
     return handle, true, blot_direct_types::Error.none;
 }
+// Lazily emit `runtime.push_entry(entry: i32, stride: i32) -> addr: i32` for
+// validated mutable owner entries (no `has_fork`, caller already validated
+// liveness and non-static mutability). Preserves exact `runtime.push` doubling
+// growth and heap freeing semantics for arbitrary initial capacities.
+fn ensurePushEntryHelper(g: Generator&) -> u32, Error {
+    if g.s.push_entry_helper != 0 { return g.s.push_entry_helper, blot_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    let rt = g.runtime_();
+    let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
+    blot_direct_writer::setName(g.module, fn_id, "runtime.push_entry");
+    g.s.push_entry_helper = fn_id;
+    let s .= g.s;
+    let code_mark = s.code.len;
+    let sites_mark = blot_direct_relocations::mark();
+    let locals_mark = s.locals.len;
+    let labels_mark = s.labels.len;
+    let handles_mark = s.handles.len;
+    let handle_cells_mark = s.handle_cells_len;
+    var nf = newFn(g, 1, 0);
+    let entry = local(g, nf, VT_i32);
+    let stride_loc = local(g, nf, VT_i32);
+    nf.parameter_words = 2;
+    let capacity = local32(g, nf);
+    let length = local32(g, nf);
+    let need = local32(g, nf);
+    let fresh_ptr = local32(g, nf);
+    let size = local32(g, nf);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    lset(g, capacity);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    ltee(g, length);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    lget(g, stride_loc);
+    op(g, OP_i32_mul);
+    ltee(g, need);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    op(g, OP_i32_gt_u);
+    let need_grow = open(g, nf, OP_if_);
+    lget(g, need);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    i32Const(g, 1);
+    op(g, OP_i32_shl);
+    lget(g, need);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    i32Const(g, 1);
+    op(g, OP_i32_shl);
+    op(g, OP_i32_gt_u);
+    op(g, OP_select);
+    callf(g, rt.heap_alloc);
+    lset(g, size);
+    lset(g, fresh_ptr);
+    lget(g, fresh_ptr);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lget(g, length);
+    lget(g, stride_loc);
+    op(g, OP_i32_mul);
+    memoryCopyOp(g);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::heap_flag);
+    op(g, OP_i32_and);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
+    op(g, OP_i32_and);
+    let free_old = open(g, nf, OP_if_);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lget(g, capacity);
+    i32Const(g, blot_direct_runtime::capacity_mask);
+    op(g, OP_i32_and);
+    callf(g, rt.heap_free);
+    close(g, nf);
+    lget(g, entry);
+    lget(g, fresh_ptr);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lget(g, entry);
+    lget(g, size);
+    i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
+    op(g, OP_i32_or);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    close(g, nf);
+    lget(g, entry);
+    lget(g, length);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lget(g, length);
+    lget(g, stride_loc);
+    op(g, OP_i32_mul);
+    op(g, OP_i32_add);
+    op(g, OP_end);
+    finishWith(g, fn_id, nf, false, 0, 0, 0);
+    blot_direct_relocations::rewind(sites_mark);
+    s.code.resize(code_mark);
+    s.locals.resize(locals_mark);
+    s.labels.resize(labels_mark);
+    s.handles.resize(handles_mark);
+    s.handle_cells_len = handle_cells_mark;
+    return fn_id, blot_direct_types::Error.none;
+}
+
 fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, selective: bool = false) -> Val, Error {
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -1489,6 +2132,7 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
     let address = local32(g, f);
     let ctag = tagOf(g, container.ty);
     if !g.runtime_().has_fork && step > 0 && step <= 65536 && ctag == blot_direct_types::Tag.array {
+        let wm = findWorkerM(f, w(g, container, 0), w(g, container, 1));
         let entry = ensureCheckedGrow(g, f, container);
         let len = local32(g, f);
         let next_len = local32(g, f);
@@ -1502,17 +2146,25 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
         let cap = local32(g, f);
         lget(g, entry);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-        ltee(g, cap);
-        i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
-        op(g, OP_i32_and);
-        i32Const(g, blot_direct_runtime::live_flag);
-        op(g, OP_i32_eq);
-        lget(g, need);
-        lget(g, cap);
-        i32Const(g, blot_direct_runtime::capacity_mask);
-        op(g, OP_i32_and);
-        op(g, OP_i32_le_u);
-        op(g, OP_i32_and);
+        let is_mut = wm >= 0 || knownMutable(g, f, container);
+        if is_mut {
+            i32Const(g, blot_direct_runtime::capacity_mask);
+            op(g, OP_i32_and);
+            lget(g, need);
+            op(g, OP_i32_ge_u);
+        } else {
+            ltee(g, cap);
+            i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
+            op(g, OP_i32_and);
+            i32Const(g, blot_direct_runtime::live_flag);
+            op(g, OP_i32_eq);
+            lget(g, need);
+            lget(g, cap);
+            i32Const(g, blot_direct_runtime::capacity_mask);
+            op(g, OP_i32_and);
+            op(g, OP_i32_le_u);
+            op(g, OP_i32_and);
+        }
         let fast = open(g, f, OP_if_);
         lget(g, entry);
         lget(g, next_len);
@@ -1526,10 +2178,18 @@ fn emitStoragePushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32
         lset(g, address);
         popCheckedArraysAt(f, fast);
         op(g, OP_else_);
-        lget(g, w(g, container, 0));
-        lget(g, w(g, container, 1));
-        i32Const(g, step);
-        callf(g, g.runtime_().push);
+        if wm >= 0 {
+            let pe_fn, pe_err = ensurePushEntryHelper(g);
+            if pe_err != blot_direct_types::Error.none { return neverVal(), pe_err; }
+            lget(g, entry);
+            i32Const(g, step);
+            callf(g, pe_fn);
+        } else {
+            lget(g, w(g, container, 0));
+            lget(g, w(g, container, 1));
+            i32Const(g, step);
+            callf(g, g.runtime_().push);
+        }
         lset(g, address);
         close(g, f);
     } else {
@@ -1701,6 +2361,12 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 recordConstU32(f, klen, f.direct_arrays[da_idx].length);
                 return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
             }
+            let rd, is_rd = tryResolveRodata(g, f, children[0]);
+            if is_rd {
+                let klen = constLocal(g, f, rd.count);
+                recordConstU32(f, klen, rd.count);
+                return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let length, error = lengthOf(g, f, container, id);
@@ -1715,8 +2381,11 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if perr != blot_direct_types::Error.none { return position, perr; }
                 let index, ierr = scalarLocal(g, f, position, id);
                 if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-                let addr = directArrayAddress(g, f, da, index, id);
-                return loadElement(g, f, addr, 0, da.elem_ty, id);
+                return emitDirectArrayRead(g, f, da, index, id);
+            }
+            let rd, is_rd = tryResolveRodata(g, f, children[0]);
+            if is_rd {
+                return emitRodataRead(g, f, rd, children[1], id);
             }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
@@ -1930,6 +2599,10 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let is_direct = localRef(m, children[0]) != 0;
             let dst, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return dst, error; }
+            let rd, is_rd = tryResolveRodata(g, f, children[1]);
+            if is_rd && tagOf(g, dst.ty) == blot_direct_types::Tag.array && g.types.node(dst.ty).a == rd.elem_ty {
+                return emitExtendFromRodata(g, f, dst, is_direct, rd, id);
+            }
             let src, serr = expr(g, f, children[1]);
             if serr != blot_direct_types::Error.none { return src, serr; }
             let element, eerr = elementOf(g, f, dst.ty, id);
@@ -1965,24 +2638,36 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 let max_elems = if blot_direct_runtime::capacity_mask / step < 0x04000000 { blot_direct_runtime::capacity_mask / step } else { 0x04000000 };
                 let need_bytes = emitScaledBytes(g, f, next_len, step);
                 let cap = local32(g, f);
+                let skip_flags = knownMutable(g, f, dst);
                 lget(g, dst_entry);
                 op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-                ltee(g, cap);
-                i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
-                op(g, OP_i32_and);
-                i32Const(g, blot_direct_runtime::live_flag);
-                op(g, OP_i32_eq);
-                lget(g, next_len);
-                i32Const(g, max_elems);
-                op(g, OP_i32_le_u);
-                op(g, OP_i32_and);
-                lget(g, need_bytes);
-                lget(g, cap);
-                i32Const(g, blot_direct_runtime::capacity_mask);
-                op(g, OP_i32_and);
-                op(g, OP_i32_le_u);
-                op(g, OP_i32_and);
-                op(g, OP_i32_eqz);
+                if skip_flags {
+                    i32Const(g, blot_direct_runtime::capacity_mask);
+                    op(g, OP_i32_and);
+                    lget(g, need_bytes);
+                    op(g, OP_i32_lt_u);
+                    lget(g, next_len);
+                    i32Const(g, max_elems);
+                    op(g, OP_i32_gt_u);
+                    op(g, OP_i32_or);
+                } else {
+                    ltee(g, cap);
+                    i32Const(g, blot_direct_runtime::flag_mask ^ blot_direct_runtime::heap_flag);
+                    op(g, OP_i32_and);
+                    i32Const(g, blot_direct_runtime::live_flag);
+                    op(g, OP_i32_eq);
+                    lget(g, next_len);
+                    i32Const(g, max_elems);
+                    op(g, OP_i32_le_u);
+                    op(g, OP_i32_and);
+                    lget(g, need_bytes);
+                    lget(g, cap);
+                    i32Const(g, blot_direct_runtime::capacity_mask);
+                    op(g, OP_i32_and);
+                    op(g, OP_i32_le_u);
+                    op(g, OP_i32_and);
+                    op(g, OP_i32_eqz);
+                }
                 let need_grow = open(g, f, OP_if_);
                 lget(g, w(g, dst, 0));
                 lget(g, w(g, dst, 1));
@@ -2015,9 +2700,16 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
                 lset(g, dst_base);
                 let dst_ptr = emitOffsetAddress(g, f, dst_base, dst_len, step);
-                var src_ptr = baseOf(g, f, src);
+                var src_ptr: u32 = 0;
                 if tagOf(g, src.ty) == blot_direct_types::Tag.view {
-                    src_ptr = emitOffsetAddress(g, f, src_ptr, w(g, src, 2), step);
+                    let cv = findCheckedView(f, w(g, src, 0), w(g, src, 1), w(g, src, 2), w(g, src, 3));
+                    if cv >= 0 {
+                        src_ptr = f.checked_views[cv].base;
+                    } else {
+                        src_ptr = emitOffsetAddress(g, f, baseOf(g, f, src), w(g, src, 2), step);
+                    }
+                } else {
+                    src_ptr = baseOf(g, f, src);
                 }
                 let copy_bytes = emitScaledBytes(g, f, src_len, step);
                 if rt.has_fork {
