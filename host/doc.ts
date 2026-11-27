@@ -32,7 +32,7 @@ import {
 } from "./test_runner.ts";
 import { decodeText } from "./text.ts";
 
-// ── Raw JSON shape emitted by `blotc doc-project` ───────────────────────────
+// ── Raw JSON shape emitted by `squidc doc-project` ───────────────────────────
 
 interface RawDocField {
   name: string;
@@ -452,8 +452,8 @@ export class TypeVarRenamer {
   }
 }
 
-/** Format a compiler-emitted checked type string into clean Blot syntax. */
-export function formatBlotType(
+/** Format a compiler-emitted checked type string into clean Squid syntax. */
+export function formatSquidType(
   rawType: string,
   ownMask = 0,
   ownCount = 0,
@@ -488,7 +488,7 @@ export function formatBlotType(
       const spacedEffects = effects.startsWith(" ") ? effects : ` ${effects}`;
       // Non-final effectful arrow stays grouped so effect scope stays accurate
       if (splitTopLevelArrow(rhs)) {
-        const inner = formatBlotType(
+        const inner = formatSquidType(
           rhs,
           ownMask >>> (step + 1),
           Math.max(0, ownCount - step - 1),
@@ -514,7 +514,7 @@ export function formatValueSignature(raw: RawDocValue): {
   where: string[];
 } {
   const renamer = new TypeVarRenamer();
-  const formattedType = formatBlotType(
+  const formattedType = formatSquidType(
     raw.type,
     raw.own_mask,
     raw.own_count,
@@ -689,7 +689,7 @@ export function extractCodeBlocks(
       i++;
     }
     if (i < lines.length) i++;
-    if (lang !== "blot") continue;
+    if (lang !== "squid") continue;
     const mods = new Set(tokens.slice(1));
     let mode: DocCodeBlock["mode"] = "run";
     if (mods.has("ignore")) mode = "ignore";
@@ -815,7 +815,7 @@ export function buildSymbolResolver(pkg: DocPackage): SymbolResolver {
   }
 
   const findModule = (ref: string): DocModule | undefined => {
-    const clean = ref.replace(/\.blot$/, "");
+    const clean = ref.replace(/\.sq$/, "");
     if (byImportPath.has(clean)) return byImportPath.get(clean);
     if (byModuleId.has(clean)) return byModuleId.get(clean);
     for (const mod of pkg.modules) {
@@ -895,9 +895,9 @@ export function extractIntraDocLinkTargets(markdown: string): string[] {
     for (const m of line.matchAll(/\[`([^`]+)`\](?!\()/g)) {
       targets.push(m[1].trim());
     }
-    // Match [label](`Target`) and [label](blot:Target)
+    // Match [label](`Target`) and [label](squid:Target)
     for (
-      const m of line.matchAll(/\[[^\]]+\]\((?:`([^`]+)`|blot:([^)]+))\)/g)
+      const m of line.matchAll(/\[[^\]]+\]\((?:`([^`]+)`|squid:([^)]+))\)/g)
     ) {
       const t = (m[1] ?? m[2] ?? "").trim();
       if (t) targets.push(t);
@@ -942,7 +942,7 @@ export function rewriteMarkdownLinks(
       },
     );
     rewritten = rewritten.replace(
-      /\[([^\]]+)\]\((?:`([^`]+)`|blot:([^)]+))\)/g,
+      /\[([^\]]+)\]\((?:`([^`]+)`|squid:([^)]+))\)/g,
       (full, label: string, backtickTarget?: string, schemeTarget?: string) => {
         const target = (backtickTarget ?? schemeTarget ?? "").trim();
         const hit = resolveLink(target, fromModuleId);
@@ -958,7 +958,7 @@ export function rewriteMarkdownLinks(
   return out.join("\n");
 }
 
-// ── Project & library discovery (`blot.json`, `pen.json`, `std`, paths) ─────
+// ── Project & library discovery (`squid.json`, `pen.json`, `std`, paths) ─────
 
 interface PenProjectConfig {
   root: string;
@@ -1013,7 +1013,7 @@ async function findPenProject(
   }
 }
 
-async function collectBlotFiles(
+async function collectSquidFiles(
   dir: string,
   skipTests = true,
 ): Promise<string[]> {
@@ -1038,7 +1038,7 @@ async function collectBlotFiles(
       if (entry.isDirectory) {
         if (skipNames.has(entry.name)) continue;
         await walk(full);
-      } else if (entry.isFile && entry.name.endsWith(".blot")) {
+      } else if (entry.isFile && entry.name.endsWith(".sq")) {
         results.push(full);
       }
     }
@@ -1060,8 +1060,8 @@ function toPosix(p: string): string {
   return p.replaceAll("\\", "/");
 }
 
-function stripBlotExt(p: string): string {
-  return p.endsWith(".blot") ? p.slice(0, -5) : p;
+function stripSquidExt(p: string): string {
+  return p.endsWith(".sq") ? p.slice(0, -3) : p;
 }
 
 export async function discoverDocContext(
@@ -1072,29 +1072,29 @@ export async function discoverDocContext(
   const target = options.target?.trim();
   const baseImports: Record<string, string> = Object.create(null);
 
-  // Merge blot.json or pen.json from cwd or target directory
+  // Merge squid.json or pen.json from cwd or target directory
   const probeDir = target && await pathExists(resolve(cwd, target))
     ? ((await pathExists(resolve(cwd, target)))!.isDirectory
       ? resolve(cwd, target)
       : dirname(resolve(cwd, target)))
     : cwd;
 
-  const blotPkg = await resolveProject(probeDir).catch(() => undefined);
-  const penPkg = !blotPkg ? await findPenProject(probeDir) : null;
+  const squidPkg = await resolveProject(probeDir).catch(() => undefined);
+  const penPkg = !squidPkg ? await findPenProject(probeDir) : null;
 
   let stdRoot = options.stdRoot
     ? resolve(cwd, options.stdRoot)
     : penPkg?.stdRoot ?? bundledStdRoot;
   let prelude: string | null = options.prelude !== undefined
     ? (options.prelude === null ? null : resolve(cwd, options.prelude))
-    : blotPkg
-    ? blotPkg.prelude
+    : squidPkg
+    ? squidPkg.prelude
     : penPkg?.prelude !== undefined
     ? penPkg.prelude
-    : join(stdRoot, "prelude.blot");
+    : join(stdRoot, "prelude.sq");
 
-  if (blotPkg) {
-    for (const [k, v] of Object.entries(blotPkg.imports)) {
+  if (squidPkg) {
+    for (const [k, v] of Object.entries(squidPkg.imports)) {
       if (k === "std/") stdRoot = v;
       else baseImports[k] = v;
     }
@@ -1113,12 +1113,12 @@ export async function discoverDocContext(
   if (target === "std" || target?.startsWith("std/")) {
     const stdDir = resolve(stdRoot);
     if (target === "std") {
-      const files = await collectBlotFiles(stdDir, false);
+      const files = await collectSquidFiles(stdDir, false);
       return {
         name: "std",
         root: stdDir,
         files: files.map((f) => {
-          const rel = stripBlotExt(toPosix(relative(stdDir, f)));
+          const rel = stripSquidExt(toPosix(relative(stdDir, f)));
           return { filename: f, id: `std/${rel}`, importPath: `std/${rel}` };
         }),
         stdRoot: stdDir,
@@ -1126,8 +1126,8 @@ export async function discoverDocContext(
         imports: baseImports,
       };
     }
-    const sub = target.slice(4).replace(/\.blot$/, "");
-    const candidate = join(stdDir, `${sub}.blot`);
+    const sub = target.slice(4).replace(/\.sq$/, "");
+    const candidate = join(stdDir, `${sub}.sq`);
     if (await pathExists(candidate)) {
       return {
         name: "std",
@@ -1145,7 +1145,7 @@ export async function discoverDocContext(
     throw new Error(`Standard library module not found: ${target}`);
   }
 
-  // Case 2: Alias target from blot.json / pen.json (e.g. `ink` or `ink/codec`)
+  // Case 2: Alias target from squid.json / pen.json (e.g. `ink` or `ink/codec`)
   if (target && !target.startsWith(".") && !isAbsolute(target)) {
     const firstSlash = target.indexOf("/");
     const aliasName = firstSlash === -1 ? target : target.slice(0, firstSlash);
@@ -1153,12 +1153,12 @@ export async function discoverDocContext(
     const aliasDir = baseImports[aliasPrefix];
     if (aliasDir && await pathExists(aliasDir)) {
       if (firstSlash === -1) {
-        const files = await collectBlotFiles(aliasDir, true);
+        const files = await collectSquidFiles(aliasDir, true);
         return {
           name: aliasName,
           root: aliasDir,
           files: files.map((f) => {
-            const rel = stripBlotExt(toPosix(relative(aliasDir, f)));
+            const rel = stripSquidExt(toPosix(relative(aliasDir, f)));
             return {
               filename: f,
               id: `${aliasName}/${rel}`,
@@ -1170,8 +1170,8 @@ export async function discoverDocContext(
           imports: baseImports,
         };
       }
-      const sub = target.slice(firstSlash + 1).replace(/\.blot$/, "");
-      const fileCandidate = join(aliasDir, `${sub}.blot`);
+      const sub = target.slice(firstSlash + 1).replace(/\.sq$/, "");
+      const fileCandidate = join(aliasDir, `${sub}.sq`);
       if (await pathExists(fileCandidate)) {
         return {
           name: aliasName,
@@ -1189,12 +1189,12 @@ export async function discoverDocContext(
       const dirCandidate = join(aliasDir, sub);
       const dirInfo = await pathExists(dirCandidate);
       if (dirInfo?.isDirectory) {
-        const files = await collectBlotFiles(dirCandidate, true);
+        const files = await collectSquidFiles(dirCandidate, true);
         return {
           name: aliasName,
           root: aliasDir,
           files: files.map((f) => {
-            const rel = stripBlotExt(toPosix(relative(aliasDir, f)));
+            const rel = stripSquidExt(toPosix(relative(aliasDir, f)));
             return {
               filename: f,
               id: `${aliasName}/${rel}`,
@@ -1218,19 +1218,19 @@ export async function discoverDocContext(
 
   if (info.isFile) {
     const dir = dirname(resolvedTarget);
-    const name = stripBlotExt(basename(resolvedTarget));
+    const name = stripSquidExt(basename(resolvedTarget));
     // Check if this file falls under an import alias (e.g. `ink/codec`)
     let importPath = name;
     for (const [prefix, aliasDir] of Object.entries(baseImports)) {
       const rel = relative(aliasDir, resolvedTarget);
       if (!rel.startsWith("..") && !isAbsolute(rel)) {
-        importPath = `${prefix}${stripBlotExt(toPosix(rel))}`;
+        importPath = `${prefix}${stripSquidExt(toPosix(rel))}`;
         break;
       }
     }
     const relStd = relative(stdRoot, resolvedTarget);
     if (!relStd.startsWith("..") && !isAbsolute(relStd)) {
-      importPath = `std/${stripBlotExt(toPosix(relStd))}`;
+      importPath = `std/${stripSquidExt(toPosix(relStd))}`;
     }
     return {
       name: basename(dir),
@@ -1256,12 +1256,12 @@ export async function discoverDocContext(
         : null);
     if (libDir) {
       const prefix = penPkg.imports[ownAlias] ? ownAlias : "";
-      const files = await collectBlotFiles(libDir, true);
+      const files = await collectSquidFiles(libDir, true);
       return {
         name: dirName,
         root: libDir,
         files: files.map((f) => {
-          const rel = stripBlotExt(toPosix(relative(libDir, f)));
+          const rel = stripSquidExt(toPosix(relative(libDir, f)));
           const id = prefix ? `${prefix}${rel}` : rel;
           return { filename: f, id, importPath: id };
         }),
@@ -1272,15 +1272,15 @@ export async function discoverDocContext(
     }
   }
 
-  const files = await collectBlotFiles(resolvedTarget, true);
+  const files = await collectSquidFiles(resolvedTarget, true);
   if (files.length === 0) {
-    throw new Error(`No .blot files found in ${resolvedTarget}`);
+    throw new Error(`No .sq files found in ${resolvedTarget}`);
   }
   return {
     name: dirName,
     root: resolvedTarget,
     files: files.map((f) => {
-      const rel = stripBlotExt(toPosix(relative(resolvedTarget, f)));
+      const rel = stripSquidExt(toPosix(relative(resolvedTarget, f)));
       return { filename: f, id: rel, importPath: rel };
     }),
     stdRoot,
@@ -1289,7 +1289,7 @@ export async function discoverDocContext(
   };
 }
 
-// ── Invoke `blotc doc-project` ──────────────────────────────────────────────
+// ── Invoke `squidc doc-project` ──────────────────────────────────────────────
 
 async function invokeDocProject(
   compiler: string | URL,
@@ -1342,10 +1342,10 @@ async function resolveCompilerExecutable(
   if (executable) return executable;
   const found = await findCheckoutCompiler();
   if (found) return found;
-  return new URL("../compiler-goose/build/blotc-goose", import.meta.url);
+  return new URL("../compiler-goose/build/squidc-goose", import.meta.url);
 }
 
-/** Generate the full checked documentation model for a Blot file, library, or package. */
+/** Generate the full checked documentation model for a Squid file, library, or package. */
 export async function generateDocs(
   options: GenerateDocOptions = {},
 ): Promise<{
@@ -1408,7 +1408,7 @@ export async function generateDocs(
       }
       await recordDiags(res.diagnostics);
     } else {
-      // Batch-check all non-prelude files in one fast `blotc doc-project` pass via a temp umbrella file.
+      // Batch-check all non-prelude files in one fast `squidc doc-project` pass via a temp umbrella file.
       const nonPrelude: typeof context.files = [];
       let preludeEntry: (typeof context.files)[number] | null = null;
       for (const f of context.files) {
@@ -1420,16 +1420,16 @@ export async function generateDocs(
       }
 
       if (nonPrelude.length > 0) {
-        const tmpDir = await Deno.makeTempDir({ prefix: "blot-doc-batch-" });
+        const tmpDir = await Deno.makeTempDir({ prefix: "squid-doc-batch-" });
         try {
-          const umbrella = join(tmpDir, "_umbrella.blot");
+          const umbrella = join(tmpDir, "_umbrella.sq");
           const lines: string[] = [];
           const batchImports: Record<string, string> = {
             ...context.imports,
             "__doc_root__/": context.root,
           };
           for (let i = 0; i < nonPrelude.length; i++) {
-            const rel = stripBlotExt(
+            const rel = stripSquidExt(
               toPosix(relative(context.root, nonPrelude[i].filename)),
             );
             lines.push(`import * as _m${i} from "__doc_root__/${rel}"`);
@@ -1582,7 +1582,7 @@ export async function generateDocs(
               : "";
             return {
               name: fld.name,
-              type: formatBlotType(fld.type, 0, 0, typeRenamer),
+              type: formatSquidType(fld.type, 0, 0, typeRenamer),
               hasDefault: fld.has_default,
               doc: fdoc,
               start: fld.start,
@@ -1593,7 +1593,7 @@ export async function generateDocs(
             name: c.name,
             declaredRecord: c.declared_record,
             payload: c.payload
-              ? formatBlotType(c.payload, 0, 0, typeRenamer)
+              ? formatSquidType(c.payload, 0, 0, typeRenamer)
               : null,
             fields,
             doc: cdoc,
@@ -1609,7 +1609,7 @@ export async function generateDocs(
           private: t.private,
           opaque: t.opaque,
           params: t.params,
-          alias: t.alias ? formatBlotType(t.alias, 0, 0, typeRenamer) : null,
+          alias: t.alias ? formatSquidType(t.alias, 0, 0, typeRenamer) : null,
           constructors,
           methods,
           doc,
@@ -1644,7 +1644,7 @@ export async function generateDocs(
           members: tr.members.map((m) => ({
             name: m.name,
             kind: m.kind,
-            type: m.type ? formatBlotType(m.type, 0, 0, traitRenamer) : null,
+            type: m.type ? formatSquidType(m.type, 0, 0, traitRenamer) : null,
           })),
           doc,
           codeBlocks: extractCodeBlocks(
@@ -1671,8 +1671,8 @@ export async function generateDocs(
           params: eff.params,
           operations: eff.operations.map((op) => ({
             name: op.name,
-            parameter: formatBlotType(op.parameter, 0, 0, effRenamer),
-            result: formatBlotType(op.result, 0, 0, effRenamer),
+            parameter: formatSquidType(op.parameter, 0, 0, effRenamer),
+            result: formatSquidType(op.result, 0, 0, effRenamer),
           })),
           doc,
           codeBlocks: extractCodeBlocks(
@@ -1701,7 +1701,7 @@ export async function generateDocs(
             name: imp.name,
             private: imp.private,
             contract: imp.contract,
-            head: imp.head.map((h) => formatBlotType(h, 0, 0, impRenamer)),
+            head: imp.head.map((h) => formatSquidType(h, 0, 0, impRenamer)),
             where: imp.where.map((w) => impRenamer.rename(w)),
             doc,
             start: imp.start,
@@ -2024,12 +2024,12 @@ async function compileDocCodeBlock(
   isTextHint: boolean;
   diagnostics: RawDiagnosticRecord[];
 }> {
-  const tmpDir = await Deno.makeTempDir({ prefix: "blot-doctest-" });
+  const tmpDir = await Deno.makeTempDir({ prefix: "squid-doctest-" });
   try {
-    const snippetPath = join(tmpDir, "example.blot");
+    const snippetPath = join(tmpDir, "example.sq");
     const wasmPath = join(tmpDir, "example.wasm");
     const modDir = dirname(mod.filename);
-    const modStem = stripBlotExt(basename(mod.filename));
+    const modStem = stripSquidExt(basename(mod.filename));
     const aliasImports: Record<string, string> = {
       ...context.imports,
       "__doc_mod__/": modDir,
@@ -2111,7 +2111,7 @@ async function compileDocCodeBlock(
   }
 }
 
-/** Compile and run all doc examples (`blot doc --test`). */
+/** Compile and run all doc examples (`squid doc --test`). */
 export async function runDocTests(
   pkg: DocPackage,
   context: DocProjectContext,
@@ -2127,7 +2127,7 @@ export async function runDocTests(
         stdRoot: library.path,
         prelude: context.prelude === null
           ? null
-          : join(library.path, "prelude.blot"),
+          : join(library.path, "prelude.sq"),
       };
     }
     const compiler = await resolveCompilerExecutable(executable);
@@ -2368,7 +2368,7 @@ export async function runDocTests(
   }
 }
 
-/** Precompile all runnable Blot doc examples to base64 ABI 8 Wasm for static HTML docs. */
+/** Precompile all runnable Squid doc examples to base64 ABI 8 Wasm for static HTML docs. */
 export async function precompileDocExamples(
   pkg: DocPackage,
   context: DocProjectContext,
@@ -2384,7 +2384,7 @@ export async function precompileDocExamples(
         stdRoot: library.path,
         prelude: context.prelude === null
           ? null
-          : join(library.path, "prelude.blot"),
+          : join(library.path, "prelude.sq"),
       };
     }
     const compiler = await resolveCompilerExecutable(executable);
@@ -2472,7 +2472,7 @@ function renderModuleMarkdown(
       else header += " is data";
       lines.push(`### \`${ty.name}\` <a id="${ty.anchor}"></a>`);
       lines.push("");
-      lines.push("```blot");
+      lines.push("```squid");
       lines.push(header);
       lines.push("```");
       lines.push("");
@@ -2514,7 +2514,7 @@ function renderModuleMarkdown(
       for (const m of ty.methods) {
         lines.push(`#### \`${m.name}\` <a id="${m.anchor}"></a>`);
         lines.push("");
-        lines.push("```blot");
+        lines.push("```squid");
         lines.push(m.signature);
         lines.push("```");
         lines.push("");
@@ -2536,7 +2536,7 @@ function renderModuleMarkdown(
       const wh = tr.where.length ? ` where { ${tr.where.join(", ")} }` : "";
       lines.push(`### \`${tr.name}\` <a id="${tr.anchor}"></a>`);
       lines.push("");
-      lines.push("```blot");
+      lines.push("```squid");
       lines.push(`type ${tr.name}${params} is trait${wh}`);
       lines.push("```");
       lines.push("");
@@ -2560,7 +2560,7 @@ function renderModuleMarkdown(
       const params = eff.params.length ? ` ${eff.params.join(" ")}` : "";
       lines.push(`### \`${eff.name}\` <a id="${eff.anchor}"></a>`);
       lines.push("");
-      lines.push("```blot");
+      lines.push("```squid");
       if (eff.callable && eff.operations.length === 1) {
         lines.push(
           `effect ${eff.name}${params}: ${eff.operations[0].parameter} -> ${
@@ -2593,7 +2593,7 @@ function renderModuleMarkdown(
     for (const val of mod.values) {
       lines.push(`### \`${val.name}\` <a id="${val.anchor}"></a>`);
       lines.push("");
-      lines.push("```blot");
+      lines.push("```squid");
       lines.push(val.signature);
       lines.push("```");
       lines.push("");
@@ -2777,14 +2777,14 @@ export function searchDocPackage(
   return hits.map(({ score: _s, ...rest }) => rest);
 }
 
-// ── CLI entry point (`blot doc`) ────────────────────────────────────────────
+// ── CLI entry point (`squid doc`) ────────────────────────────────────────────
 
-const docUsage = `Usage: blot doc [TARGET] [options]
-Targets: std | std/<module> | <alias>[/<module>] | <dir> | <file.blot>
+const docUsage = `Usage: squid doc [TARGET] [options]
+Targets: std | std/<module> | <alias>[/<module>] | <dir> | <file.sq>
 Options:
   --out DIR            Write static Markdown docs (INDEX.md, API.md, modules/*.md)
   --html               With --out DIR, write a static HTML site with live runnable Wasm examples
-  --test               Compile and run Blot code examples in doc comments
+  --test               Compile and run Squid code examples in doc comments
   --check-links        Fail if any intra-doc symbol link [\`Symbol\`] is unresolved
   --search QUERY       Search symbols, signatures, and doc comments
   --compact            Print compact one-line-per-symbol API summary

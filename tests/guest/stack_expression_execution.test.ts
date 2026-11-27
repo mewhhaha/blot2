@@ -22,9 +22,9 @@ io const floating = func (input: F32): F32 => return do:
 `;
 Deno.test(`stack expressions preserve repeated values reads writes branches and F32`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-stack-expressions-",
+    prefix: "squid-stack-expressions-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

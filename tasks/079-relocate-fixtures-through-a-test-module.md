@@ -8,7 +8,7 @@
 - **Originating requirements:** PLAN: Hills 15 and 20 / fixtures and test
   discovery. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -26,7 +26,7 @@ test suite. Many `@embedFile` paths still point inside production `src/`.
 
 - [x] Create a dedicated fixture module rooted at `compiler/fixtures/` and
       expose needed embedded data through it.
-- [x] Move top-level `.blot` and fixture directories out of production sources,
+- [x] Move top-level `.sq` and fixture directories out of production sources,
       updating test consumers and build wiring.
 - [x] Preserve complete comptime test import/discovery and correct module-root
       restrictions; do not make production depend on test data.
@@ -36,7 +36,7 @@ test suite. Many `@embedFile` paths still point inside production `src/`.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Run the full native suite and several known filtered tests, including a
@@ -78,7 +78,7 @@ The checkpoints below retain their original dates and measurements. Statements
 that qualification or a commit was pending refer to those earlier checkpoints.
 
 - Commit: pending; record the local milestone revision.
-- Implementation: the `fixtures` native test module owns 126 Blot inputs and two
+- Implementation: the `fixtures` native test module owns 126 Squid inputs and two
   frozen oracle files, all byte identical to their prior locations. Thirty Zig
   consumers and four guest helper/fixture readers use the new location;
   test-only module wiring gives production imports no fixture access.

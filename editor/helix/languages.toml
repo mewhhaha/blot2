@@ -1,12 +1,12 @@
 [[language]]
-name = "blot"
-language-id = "blot"
-scope = "source.blot"
-file-types = ["blot"]
+name = "squid"
+language-id = "squid"
+scope = "source.squid"
+file-types = ["sq"]
 roots = ["deno.json", ".git"]
 comment-token = "//"
-grammar = "blot"
-language-servers = ["blot"]
+grammar = "squid"
+language-servers = ["squid"]
 auto-format = false
 rainbow-brackets = true
 indent = { tab-width = 2, unit = "  " }

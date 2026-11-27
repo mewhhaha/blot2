@@ -103,21 +103,23 @@ export interface TestMetadata {
   line: number;
 }
 
-/** Return undefined when blot:tests is absent, and throw on a malformed section. */
+/** Return undefined when squid:tests is absent, and throw on a malformed section. */
 export function readTestMetadata(
   wasm: WebAssembly.Module | Uint8Array<ArrayBuffer>,
 ): TestMetadata[] | undefined {
   const module = wasm instanceof WebAssembly.Module
     ? wasm
     : new WebAssembly.Module(wasm);
-  const sections = WebAssembly.Module.customSections(module, "blot:tests");
+  const sections = WebAssembly.Module.customSections(module, "squid:tests");
   if (!sections.length) return undefined;
-  if (sections.length !== 1) throw new Error("Duplicate blot:tests section");
+  if (sections.length !== 1) throw new Error("Duplicate squid:tests section");
   const bytes = new Uint8Array(sections[0]);
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   let offset = 0;
   function byte(): number {
-    if (offset >= bytes.length) throw new Error("Truncated blot:tests section");
+    if (offset >= bytes.length) {
+      throw new Error("Truncated squid:tests section");
+    }
     return bytes[offset++];
   }
   function u32(): number {
@@ -128,34 +130,34 @@ export function readTestMetadata(
       value += (next & 0x7F) * 2 ** shift;
       if (next < 0x80) return value;
     }
-    throw new Error("Invalid u32 LEB128 in blot:tests section");
+    throw new Error("Invalid u32 LEB128 in squid:tests section");
   }
   function string(): string {
     const length = u32();
     if (length > bytes.length - offset) {
-      throw new Error("Truncated UTF-8 field in blot:tests section");
+      throw new Error("Truncated UTF-8 field in squid:tests section");
     }
     const start = offset;
     offset += length;
     try {
       return decoder.decode(bytes.subarray(start, offset));
     } catch (cause) {
-      throw new Error("Invalid UTF-8 in blot:tests section", { cause });
+      throw new Error("Invalid UTF-8 in squid:tests section", { cause });
     }
   }
   const version = byte();
   if (version !== 1) {
-    throw new Error(`Unsupported blot:tests version ${version}`);
+    throw new Error(`Unsupported squid:tests version ${version}`);
   }
   const count = u32();
   if (count > Math.floor((bytes.length - offset) / 5)) {
-    throw new Error("Truncated blot:tests entries");
+    throw new Error("Truncated squid:tests entries");
   }
   const tests: TestMetadata[] = [];
   for (let i = 0; i < count; i++) {
     const kind = byte();
     if (kind !== 0 && kind !== 1) {
-      throw new Error(`Invalid blot:tests kind ${kind}`);
+      throw new Error(`Invalid squid:tests kind ${kind}`);
     }
     tests.push({
       kind: kind === 0 ? "check" : "trap",
@@ -166,7 +168,7 @@ export function readTestMetadata(
     });
   }
   if (offset !== bytes.length) {
-    throw new Error("Trailing bytes in blot:tests section");
+    throw new Error("Trailing bytes in squid:tests section");
   }
   return tests;
 }
@@ -269,7 +271,7 @@ export async function discoverTestModules(
   const explicit = options.paths ?? [];
   const project = explicit.length
     ? undefined
-    : await resolveProject(join(cwd, "blot.json"));
+    : await resolveProject(join(cwd, "squid.json"));
   const root = project?.root ?? cwd;
   const candidates = new Map<string, boolean>();
   function add(path: string, explicitFile: boolean) {
@@ -295,7 +297,7 @@ export async function discoverTestModules(
   async function include(path: string) {
     const stat = await Deno.stat(path);
     if (stat.isDirectory) {
-      await walk(path, (file) => file.endsWith(".blot"), false);
+      await walk(path, (file) => file.endsWith(".sq"), false);
     } else if (stat.isFile) add(path, true);
     else throw new Error(`Expected a test file or directory: ${path}`);
   }
@@ -310,8 +312,8 @@ export async function discoverTestModules(
       join(testsRoot, "rejected"),
     ]);
     await walk(root, (path) =>
-      path.endsWith(".test.blot") ||
-      (path.endsWith(".blot") && testDirectories.has(dirname(path))), true);
+      path.endsWith(".test.sq") ||
+      (path.endsWith(".sq") && testDirectories.has(dirname(path))), true);
   }
   const modules: TestModule[] = [];
   for (const [path, explicitFile] of candidates) {
@@ -686,7 +688,7 @@ async function compileModule(
     }
   }
   const output = await Deno.makeTempFile({
-    prefix: "blot-test-",
+    prefix: "squid-test-",
     suffix: ".wasm",
   });
   try {
@@ -767,7 +769,7 @@ function supportsTestMode(executable: string | URL): Promise<boolean> {
   return compilerAdvertises(executable, /--test\b/);
 }
 
-export async function runBlotTests(
+export async function runSquidTests(
   options: TestRunOptions = {},
 ): Promise<TestRunReport> {
   const jobs = options.jobs ?? defaultJobs();
@@ -872,7 +874,7 @@ export async function runBlotTests(
             ? (await (library ??= extractStandardLibrary())).path
             : fileURLToPath(defaultStdRoot);
           if (prelude === undefined) {
-            prelude = join(standardRoot, "prelude.blot");
+            prelude = join(standardRoot, "prelude.sq");
           }
           if (stdRoot === undefined) {
             stdRoot = Object.hasOwn(imports, "std/") ? null : standardRoot;

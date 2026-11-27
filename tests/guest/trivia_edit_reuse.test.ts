@@ -2,9 +2,9 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const repo = new URL("../../", import.meta.url).pathname;
-const prelude = `${repo}std/prelude.blot`;
+const prelude = `${repo}std/prelude.sq`;
 const stdRoot = `${repo}std`;
 
 // Comment and spacing edits, real edits, errors and recovery in a retained
@@ -12,7 +12,7 @@ const stdRoot = `${repo}std`;
 // edited text.
 Deno.test("retained trivia and real edits match fresh builds", async () => {
   for (const name of ["ecs", "syntax", "prelude"]) {
-    const entry = `${repo}examples/${name}.blot`;
+    const entry = `${repo}examples/${name}.sq`;
     const original = await Deno.readTextFile(entry);
     const firstLine = original.indexOf("\n");
     const lines = original.split("\n");

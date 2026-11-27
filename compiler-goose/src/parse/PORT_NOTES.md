@@ -28,9 +28,9 @@ use `c_` and AST-local aliases use `a_`. No polymorphic untyped table is used.
 Array owners belong to the caller. The following contexts contain fixed typed
 `T[>..<]&` references. Initialization expects initially empty owners.
 
-- `blot_parse_symbols::init(bytes,entries,buckets) -> Pool`.
-- `blot_parse_lexer::init(tokens,comments,diagnostics) -> Result`.
-- `blot_parse_ast::init(nodes,spans,extra,roots,runtime_names,constant_names,
+- `squid_parse_symbols::init(bytes,entries,buckets) -> Pool`.
+- `squid_parse_lexer::init(tokens,comments,diagnostics) -> Result`.
+- `squid_parse_ast::init(nodes,spans,extra,roots,runtime_names,constant_names,
   declaration_traits,declaration_nodes,diagnostics,operator_origins,
   type_conversion_origins) -> Tree`. Adds the absent node/span at index zero.
 

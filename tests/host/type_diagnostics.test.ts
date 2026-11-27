@@ -147,12 +147,12 @@ Deno.test("implementation explanations validate owned origins steps and total by
       side: "implementation",
       operand: null,
       outcome: "head_mismatch",
-      origin: { name: "Scalar", path: "source.blot", span: null },
+      origin: { name: "Scalar", path: "source.sq", span: null },
     }],
     steps: [{ member: "Item", ty: "U32", outcome: "requires_evidence" }],
     contexts: [{
       kind: "left_operand",
-      path: "source.blot",
+      path: "source.sq",
       span: { start: 5, end: 10 },
     }],
     truncated: false,
@@ -172,7 +172,7 @@ Deno.test("implementation explanations validate owned origins steps and total by
         ...value,
         contexts: [{
           kind: "left_operand",
-          path: "source.blot",
+          path: "source.sq",
           span: { start: 10, end: 5 },
         }],
       }),
@@ -198,7 +198,7 @@ Deno.test("implementation explanations validate owned origins steps and total by
           ...value.candidates[0],
           origin: {
             name: "Scalar",
-            path: "source.blot",
+            path: "source.sq",
             span: { start: 20, end: 1 },
           },
         }],

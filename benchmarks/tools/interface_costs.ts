@@ -33,7 +33,7 @@ if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const root = resolve(repo, "../gdev");
 const executable = resolve(
-  values.compiler ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
+  values.compiler ?? `${repo}/compiler-goose/build/squidc-goose-dev`,
 );
 const directory = resolve(values.output);
 await Deno.mkdir(directory, { recursive: true });
@@ -46,7 +46,7 @@ const compilerSha256 = await hash(await Deno.readFile(executable));
 const penBytes = await Deno.readFile(`${root}/pen.json`);
 const settings =
   JSON.parse(new TextDecoder().decode(penBytes)).compiler.settings;
-const producerPath = `${root}/pen/protocol_render.blot`;
+const producerPath = `${root}/pen/protocol_render.sq`;
 const originalProducer = await Deno.readTextFile(producerPath);
 let annotatedProducer = originalProducer;
 const annotations = [];
@@ -101,8 +101,8 @@ type Probe = {
   inputs: number[];
   producerExecution: boolean;
 };
-const matrixEntry = `${evidence}/matrix6.blot`;
-const renderPath = `${root}/.pen/bounded-interface-cost-render.blot`;
+const matrixEntry = `${evidence}/matrix6.sq`;
+const renderPath = `${root}/.pen/bounded-interface-cost-render.sq`;
 const probes: Probe[] = [{
   name: "ink_matrix6",
   entry: matrixEntry,
@@ -129,8 +129,8 @@ for (const probe of probes) {
     const pins: Record<string, string> = {};
     for (const [path, source] of Object.entries(files)) {
       pins[path] = await hashText(source);
-      let filename = "entry.blot";
-      if (path === producerPath) filename = "protocol_render.blot";
+      let filename = "entry.sq";
+      if (path === producerPath) filename = "protocol_render.sq";
       await Deno.writeTextFile(
         `${evidence}/${probe.name}-${variant}-${filename}`,
         source,
@@ -141,14 +141,14 @@ for (const probe of probes) {
 }
 const sourceFiles = Object.fromEntries(
   await Promise.all([
-    `${repo}/std/prelude.blot`,
-    `${repo}/std/array.blot`,
-    `${repo}/../ink/lib/transform.blot`,
-    `${repo}/../ink/lib/math.blot`,
+    `${repo}/std/prelude.sq`,
+    `${repo}/std/array.sq`,
+    `${repo}/../ink/lib/transform.sq`,
+    `${repo}/../ink/lib/math.sq`,
     producerPath,
-    `${root}/pen/protocol.blot`,
-    `${root}/pen/lanes.blot`,
-    `${root}/pen/types.blot`,
+    `${root}/pen/protocol.sq`,
+    `${root}/pen/lanes.sq`,
+    `${root}/pen/types.sq`,
   ].map(async (
     path,
   ) => [resolve(path), await hash(await Deno.readFile(path))])),
@@ -238,7 +238,7 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           ...projectOptions,
           executable,
           entry: probe.entry,
-          prelude: `${repo}/std/prelude.blot`,
+          prelude: `${repo}/std/prelude.sq`,
           stdRoot: `${repo}/std`,
           startupTimeoutMs: 5000,
           profileBackend: true,

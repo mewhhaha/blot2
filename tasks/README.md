@@ -1,11 +1,11 @@
-# Blot task navigation
+# Squid task navigation
 
 Start with [the current handoff](../CONTINUE.md) and the
 [owned-storage rewrite](STORAGE_REWRITE.md). One real Gdev frame has passed in
 Pen; broader qualification and tasks 110–121 remain unfinished.
 
 The
-[earlier task program](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md)
+[earlier task program](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md)
 preserves the 001–109 index, coverage matrix, dependency rules, qualification
 records and benchmark methods. Those task files remain here so unresolved
 requirements and evidence are not lost. Earlier counted-memory and language-task

@@ -13,7 +13,7 @@ for path in sorted(R.rglob('*.goose')):
  if not m:continue
  ns=m[1];module_path=path.relative_to(R).with_suffix('').as_posix().replace('/','.')
  PATHS.setdefault(ns,module_path)
- if ns=='blot_'+module_path.replace('.','_'):PATHS[ns]=module_path
+ if ns=='squid_'+module_path.replace('.','_'):PATHS[ns]=module_path
  for m in re.finditer(r'\b(struct|enum|type)\s+(\w+)\s*(<[^>{}]+>)?\s*(\{|=)',s):
   kind,name,params,tok=m.groups();key=ns+'::'+name
   if tok=='=':
@@ -36,7 +36,7 @@ for path in sorted(R.rglob('*.goose')):
    D[key]=(kind,split((params or '<>')[1:-1]),data,ns)
 def q(t,ns,subs={}):
  return re.sub(r'(?<![\w:])\b\w+\b(?!::)',lambda m:subs.get(m[0],ns+'::'+m[0] if ns+'::'+m[0] in D else m[0]),t)
-def resolve(t,ns='blot_project_packet'):
+def resolve(t,ns='squid_project_packet'):
  t=q(t,ns).strip();t=re.sub(r'^const\s+','',t)
  # Normalize aliases while keeping numeric domains as actual storage types.
  m=re.fullmatch(r'(\w+::\w+)(?:<(.*)>)?',t,re.S)
@@ -45,38 +45,38 @@ def resolve(t,ns='blot_project_packet'):
   if k=='alias':return resolve(q(data,owner,dict(zip(ps,split(m[2] or '')))),owner)
  return t
 SPECIAL={
- 'blot_check_check::Checked':{'owner','types','parameter_patterns'},
- 'blot_check_types::Store':None,
- 'blot_check_parameter_patterns::Store':None,
- 'blot_parse_ast::Tree':None,
- 'blot_parse_symbols::Pool':None,
- 'blot_check_type_store_snapshot::Snapshot':{'lease_index','generation'},
- 'blot_check_type_store_snapshot::State':{'store_owner_id'},
+ 'squid_check_check::Checked':{'owner','types','parameter_patterns'},
+ 'squid_check_types::Store':None,
+ 'squid_check_parameter_patterns::Store':None,
+ 'squid_parse_ast::Tree':None,
+ 'squid_parse_symbols::Pool':None,
+ 'squid_check_type_store_snapshot::Snapshot':{'lease_index','generation'},
+ 'squid_check_type_store_snapshot::State':{'store_owner_id'},
 }
 ROOTS=[
- 'blot_check_check::Checked','blot_parse_ast::Tree','blot_parse_symbols::Pool',
- 'blot_check_check::ModuleOrigins','blot_reuse_project_check::Diagnostic','blot_reuse_project_check::Export',
- 'blot_reuse_project::Range','blot_reuse_project::Import','blot_reuse_project::Diagnostic','blot_reuse_project::Lowering','blot_reuse_project::InputMode',
- 'blot_reuse_frozen_dependency::Module',
- 'blot_check_type_store_snapshot::Snapshot','blot_check_parameter_patterns::Node',
- 'blot_work_counters::Frontend','blot_phase_profile::WorkerContext','blot_phase_profile::WorkerSnapshot',
+ 'squid_check_check::Checked','squid_parse_ast::Tree','squid_parse_symbols::Pool',
+ 'squid_check_check::ModuleOrigins','squid_reuse_project_check::Diagnostic','squid_reuse_project_check::Export',
+ 'squid_reuse_project::Range','squid_reuse_project::Import','squid_reuse_project::Diagnostic','squid_reuse_project::Lowering','squid_reuse_project::InputMode',
+ 'squid_reuse_frozen_dependency::Module',
+ 'squid_check_type_store_snapshot::Snapshot','squid_check_parameter_patterns::Node',
+ 'squid_work_counters::Frontend','squid_phase_profile::WorkerContext','squid_phase_profile::WorkerSnapshot',
 ]
 CUSTOM_CHILDREN={
- 'blot_parse_ast::Tree':[],
- 'blot_parse_symbols::Pool':['u8[:]','blot_parse_symbols::Entry[:]','u32[:]'],
- 'blot_check_types::Store':['blot_check_type_store_snapshot::Snapshot'],
- 'blot_check_parameter_patterns::Store':['blot_check_parameter_patterns::Node[:]','u32[:]'],
+ 'squid_parse_ast::Tree':[],
+ 'squid_parse_symbols::Pool':['u8[:]','squid_parse_symbols::Entry[:]','u32[:]'],
+ 'squid_check_types::Store':['squid_check_type_store_snapshot::Snapshot'],
+ 'squid_check_parameter_patterns::Store':['squid_check_parameter_patterns::Node[:]','u32[:]'],
 }
 # Every AST owner table is explicit, preserving actual tag/ID ordinals.
-for field,t in D['blot_parse_ast::Tree'][2]:
+for field,t in D['squid_parse_ast::Tree'][2]:
  if t.endswith('&'):
-  bt=resolve(t[:-1],'blot_parse_ast');info=D.get(bt)
+  bt=resolve(t[:-1],'squid_parse_ast');info=D.get(bt)
   if info:
    item=dict(info[2]).get('items')
-   if item:CUSTOM_CHILDREN['blot_parse_ast::Tree'].append(q(item,info[3]))
+   if item:CUSTOM_CHILDREN['squid_parse_ast::Tree'].append(q(item,info[3]))
 PRIM={'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
 SEEN={};SLICES={};ARRAYS=set();ENUMS={};STRUCTS={};IMPORTS=set()
-def visit(t,ns='blot_project_packet'):
+def visit(t,ns='squid_project_packet'):
  t=resolve(t,ns);t=re.sub(r'\s+',' ',t).strip()
  if t in SEEN:return
  SEEN[t]=True
@@ -93,7 +93,7 @@ def visit(t,ns='blot_project_packet'):
   inner=resolve(t[:-1],ns);SLICES[inner]=True;visit(inner,ns);return
  if t.startswith('dictionary_slot<'):
   args=split(t[t.index('<')+1:-1]);visit(args[0],ns);visit(args[1],ns);return
- if t.startswith('blot_support::Option<'):
+ if t.startswith('squid_support::Option<'):
   visit(t[t.index('<')+1:-1],ns);return
  if t in CUSTOM_CHILDREN:
   for child in CUSTOM_CHILDREN[t]:visit(child,ns)
@@ -115,13 +115,13 @@ def visit(t,ns='blot_project_packet'):
  else:raise ValueError((kind,t))
 for root in ROOTS:visit(root)
 # Header vectors and mutable body data also allocate exact typed slices.
-for t in ['u8','u32','blot_reuse_project_check::Export','blot_reuse_project_check::Diagnostic','blot_reuse_frozen_dependency::Module','blot_check_parameter_patterns::Node','blot_reuse_project::Import','blot_reuse_project::Diagnostic','bool']:
+for t in ['u8','u32','squid_reuse_project_check::Export','squid_reuse_project_check::Diagnostic','squid_reuse_frozen_dependency::Module','squid_check_parameter_patterns::Node','squid_reuse_project::Import','squid_reuse_project::Diagnostic','bool']:
  t=resolve(t);visit(t);SLICES[t]=True
 for t in list(SLICES):visit(t)
 # Concrete code below is emitted after the contexts file has defined all roots.
 def ident(t):return re.sub(r'[^A-Za-z0-9_]','_',t)
 imports='\n'.join('import '+x+';' for x in sorted(IMPORTS))
-code=['// Concrete data domains for the same-executable copied worker protocol.','namespace blot_project_packet;','import binary;',imports,'import .project_packet;']
+code=['// Concrete data domains for the same-executable copied worker protocol.','namespace squid_project_packet;','import binary;',imports,'import .project_packet;']
 for typ in ['u8','i8']:
  code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(1) {{return;}}self.output.push(value as! u8);}}')
  code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(1) {{return;}}value=self.bytes[self.at] as! {typ};self.at+=1;}}')
@@ -135,8 +135,8 @@ for typ in ['u64','i64']:
  code.append(f'fn put(self:Writer&,value:{typ}) {{if !self.room(8) {{return;}}let bits=value as! u64;var buf:u8[8]=[bits as! u8,(bits>>8) as! u8,(bits>>16) as! u8,(bits>>24) as! u8,(bits>>32) as! u8,(bits>>40) as! u8,(bits>>48) as! u8,(bits>>56) as! u8];self.output.append(buf);}}')
  code.append(f'fn get(self:Reader&,value:{typ}&) {{if !self.available(8) {{return;}}value=binary::u64le(self.bytes,self.at) as! {typ};self.at+=8;}}')
 for typ,bits in [('f32','u32'),('f64','u64')]:
- code.append(f'fn put(self:Writer&,value:{typ}) {{put(self,blot_native::{typ}_bits(value));}}')
- code.append(f'fn get(self:Reader&,value:{typ}&) {{var bits:{bits}=0;get(self,bits);value=blot_native::{typ}_from_bits(bits);}}')
+ code.append(f'fn put(self:Writer&,value:{typ}) {{put(self,squid_native::{typ}_bits(value));}}')
+ code.append(f'fn get(self:Reader&,value:{typ}&) {{var bits:{bits}=0;get(self,bits);value=squid_native::{typ}_from_bits(bits);}}')
 for t,values in ENUMS.items():
  body=[]
  for i,(name,fs) in enumerate(values):
@@ -159,22 +159,22 @@ for t,n in sorted(ARRAYS):
  code.append(f'fn put(self:Writer&,value:{t}[{n}]) {{for item in value {{put(self,item);}}}}')
  code.append(f'fn get(self:Reader&,value:{t}[{n}]&) {{for &item in value {{get(self,item);}}}}')
 # Core private IDs/derived child lane do not cross the process protocol.
-for t,skip in [('blot_check_core::Module',{'owner_id'}),('blot_check_core::Types',{'owner_id'}),('blot_check_frozen_types::Graph',{'owner_id'}),('blot_check_type_store_snapshot::Snapshot',{'lease_index','generation'}),('blot_check_type_store_snapshot::State',{'store_owner_id'})]:
+for t,skip in [('squid_check_core::Module',{'owner_id'}),('squid_check_core::Types',{'owner_id'}),('squid_check_frozen_types::Graph',{'owner_id'}),('squid_check_type_store_snapshot::Snapshot',{'lease_index','generation'}),('squid_check_type_store_snapshot::State',{'store_owner_id'})]:
  if t not in SEEN:continue
  data=D[t][2];owner=D[t][3]
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in data if f not in skip)+'self.depth--;}')
  trailer=''
- if t in ('blot_check_core::Module','blot_check_core::Types','blot_check_frozen_types::Graph') and any(f=='owner_id' for f,ty in data):trailer='value.owner_id=blot_native::fresh_owner_id();'
+ if t in ('squid_check_core::Module','squid_check_core::Types','squid_check_frozen_types::Graph') and any(f=='owner_id' for f,ty in data):trailer='value.owner_id=squid_native::fresh_owner_id();'
  code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}'+''.join('get(self,value.'+f+');' for f,ty in data if f not in skip)+trailer+'self.depth--;}')
 # Explicit nominal heads avoid ties between the generic record, slice and
 # optional helpers. Reader/writer inference keeps unused codecs uninstantiated.
-private={'blot_check_core::Module','blot_check_core::Types','blot_check_frozen_types::Graph'}
+private={'squid_check_core::Module','squid_check_core::Types','squid_check_frozen_types::Graph'}
 for t in sorted(STRUCTS):
  if t in private or t in SPECIAL:continue
  owner=D[t.split('<')[0]][3]
  fields=[(f,resolve(q(ty,owner),owner)) for f,ty in STRUCTS[t] if f not in SPECIAL.get(t,set())]
  # The hot two-word descriptor has a handwritten wire-compatible codec.
- if t == 'blot_check_types::List':
+ if t == 'squid_check_types::List':
   assert fields == [('start', 'u32'), ('len', 'u32')]
   continue
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in fields)+'self.depth--;}')
@@ -190,53 +190,53 @@ code=[line.replace('fn put(self:Writer&','fn put<PacketWriter>(self:PacketWriter
 # payload variants): payloadless variants leave inactive union bytes
 # uninitialized, making raw flat images non-deterministic across processes.
 FLAT_SLICES = (
-    'blot_check_core::Associated',
-    'blot_check_core::Binding',
-    'blot_check_core::Body',
-    'blot_check_core::ClosureInfo',
-    'blot_check_core::Constructor',
-    'blot_check_core::Contract',
-    'blot_check_core::DeclarationDependencies',
-    'blot_check_core::DependencyMember',
-    'blot_check_core::Diagnostic',
-    'blot_check_core::ErasedDeclarationReference',
-    'blot_check_core::LoopInfo',
-    'blot_check_core::MatchArm',
-    'blot_check_core::MatchInfo',
-    'blot_check_core::Node',
-    'blot_check_core::Nominal',
-    'blot_check_core::Obligation',
-    'blot_check_core::OperationName',
-    'blot_check_core::OperationValue',
-    'blot_check_core::Parameter',
-    'blot_check_core::Pattern',
-    'blot_check_core::Primitive',
-    'blot_check_core::Projection',
-    'blot_check_core::TypeTag',
-    'blot_check_core::UpdateInfo',
-    'blot_check_core::UpdateStep',
-    'blot_check_parameter_patterns::Node',
-    'blot_check_types::Node',
-    'blot_check_types::Obligation',
-    'blot_check_types::Operation',
-    'blot_reuse_frozen_dependency::Export',
-    'blot_reuse_principal_interface::Associated',
-    'blot_reuse_principal_interface::Binding',
-    'blot_reuse_principal_interface::Constructor',
-    'blot_reuse_principal_interface::Contract',
-    'blot_reuse_principal_interface::ContractMember',
-    'blot_reuse_principal_interface::EffectFamily',
-    'blot_reuse_principal_interface::EffectTemplate',
-    'blot_reuse_principal_interface::Implementation',
-    'blot_reuse_principal_interface::ImplementationMember',
-    'blot_reuse_principal_interface::MemberTemplate',
-    'blot_reuse_principal_interface::Nominal',
-    'blot_reuse_project_check::Export',
+    'squid_check_core::Associated',
+    'squid_check_core::Binding',
+    'squid_check_core::Body',
+    'squid_check_core::ClosureInfo',
+    'squid_check_core::Constructor',
+    'squid_check_core::Contract',
+    'squid_check_core::DeclarationDependencies',
+    'squid_check_core::DependencyMember',
+    'squid_check_core::Diagnostic',
+    'squid_check_core::ErasedDeclarationReference',
+    'squid_check_core::LoopInfo',
+    'squid_check_core::MatchArm',
+    'squid_check_core::MatchInfo',
+    'squid_check_core::Node',
+    'squid_check_core::Nominal',
+    'squid_check_core::Obligation',
+    'squid_check_core::OperationName',
+    'squid_check_core::OperationValue',
+    'squid_check_core::Parameter',
+    'squid_check_core::Pattern',
+    'squid_check_core::Primitive',
+    'squid_check_core::Projection',
+    'squid_check_core::TypeTag',
+    'squid_check_core::UpdateInfo',
+    'squid_check_core::UpdateStep',
+    'squid_check_parameter_patterns::Node',
+    'squid_check_types::Node',
+    'squid_check_types::Obligation',
+    'squid_check_types::Operation',
+    'squid_reuse_frozen_dependency::Export',
+    'squid_reuse_principal_interface::Associated',
+    'squid_reuse_principal_interface::Binding',
+    'squid_reuse_principal_interface::Constructor',
+    'squid_reuse_principal_interface::Contract',
+    'squid_reuse_principal_interface::ContractMember',
+    'squid_reuse_principal_interface::EffectFamily',
+    'squid_reuse_principal_interface::EffectTemplate',
+    'squid_reuse_principal_interface::Implementation',
+    'squid_reuse_principal_interface::ImplementationMember',
+    'squid_reuse_principal_interface::MemberTemplate',
+    'squid_reuse_principal_interface::Nominal',
+    'squid_reuse_project_check::Export',
 )
-def has_tagged_union(t, ns='blot_project_packet'):
+def has_tagged_union(t, ns='squid_project_packet'):
  t = resolve(t, ns)
- if t.startswith('blot_support::Option<'):
-  return has_tagged_union(t[len('blot_support::Option<'):-1], ns)
+ if t.startswith('squid_support::Option<'):
+  return has_tagged_union(t[len('squid_support::Option<'):-1], ns)
  m = re.fullmatch(r'(.+)\[\d+\]', t)
  if m:
   return has_tagged_union(m[1], ns)
@@ -248,7 +248,7 @@ def has_tagged_union(t, ns='blot_project_packet'):
  if kind == 'struct':
   return any(has_tagged_union(ty, owner) for _, ty in data)
  return False
-VERIFIED_FLAT_SLICES = {'blot_reuse_principal_interface::Binding'}
+VERIFIED_FLAT_SLICES = {'squid_reuse_principal_interface::Binding'}
 for t in FLAT_SLICES:
  assert t in SLICES, t
  assert not has_tagged_union(t), f'FLAT_SLICES type {t} contains a tagged union with uninitialized inactive bytes'
@@ -261,23 +261,23 @@ for t in FLAT_SLICES:
 syntax_types=PRIM|{name.split('::')[-1] for name in D}
 (R/'support/project_packet_codecs.goose').write_text(finish_syntax(normalize('\n'.join(code)+'\n',syntax_types)))
 # Every family is concrete; no generic cast, byte arena or ownership erasure.
-owner=['// Typed bounded decode journal. The owner is shared only within one process.','namespace blot_project_packet;',imports,'import .project_packet;','struct Owner {slot:u32=0,generation:u64=0}','enum Run {']
+owner=['// Typed bounded decode journal. The owner is shared only within one process.','namespace squid_project_packet;',imports,'import .project_packet;','struct Owner {slot:u32=0,generation:u64=0}','enum Run {']
 for t in sorted(SLICES):owner.append('run_'+ident(t)+' {values:'+t+'[:]},')
 owner+=['}','struct Link {value:Run,next:u32=0}','struct Lease {generation:u64=0,live:bool=false,references:u64=1,head:u32=0}','reusable var leases:Lease[>..]=[];','reusable var links:Link[>..]=[];']
 for t in sorted(SLICES):owner.append('reusable[] var pool_'+ident(t)+':'+t+'[>..]=[];')
-owner+=['fn valid(self:Owner)->bool {return self.slot!=0&&self.slot-1<leases.len&&leases[self.slot-1].live&&leases[self.slot-1].generation==self.generation;}','fn initOwner()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation},Error.none;}','fn retain(self:Owner)->Owner,Error {if !self.valid() {return Owner{..},Error.invalid_artifact;}let state:Lease&=leases[self.slot-1];if state.references==0xffffffffffffffff {return Owner{..},Error.dependency_limit;}state.references++;return self,Error.none;}']
+owner+=['fn valid(self:Owner)->bool {return self.slot!=0&&self.slot-1<leases.len&&leases[self.slot-1].live&&leases[self.slot-1].generation==self.generation;}','fn initOwner()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},Error.out_of_memory;}let generation=squid_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation},Error.none;}','fn retain(self:Owner)->Owner,Error {if !self.valid() {return Owner{..},Error.invalid_artifact;}let state:Lease&=leases[self.slot-1];if state.references==0xffffffffffffffff {return Owner{..},Error.dependency_limit;}state.references++;return self,Error.none;}']
 for t in sorted(SLICES):
  owner.append('fn allocate<PacketOwner>(self:PacketOwner&,length:i64,witness:'+t+')->'+t+'[:],Error {if !self.valid()||length<0||length>element_limit {return default<'+t+'[:]>(),Error.invalid_artifact;}if length==0 {return default<'+t+'[:]>(),Error.none;}if links.len>=0xfffffffe {return default<'+t+'[:]>(),Error.out_of_memory;}let run=pool_'+ident(t)+'.alloc_slice(length);let state:Lease& =leases[self.slot-1];let at=links.alloc_index(Link{Run.run_'+ident(t)+'{run},state.head});state.head=(at+1) as u32;return run,Error.none;}')
 # Only Checked's retained packet slices need public header observation.
 observe_types=set()
-for key in ['blot_check_check::Checked','blot_check_check::EditorCapture']:
+for key in ['squid_check_check::Checked','squid_check_check::EditorCapture']:
  for field,ty in D[key][2]:
   ty=resolve(ty,D[key][3])
   if ty.endswith('[:]'):observe_types.add(resolve(ty[:-3],D[key][3]))
 for t in sorted(observe_types):
  if t not in SLICES:raise ValueError('Unknown Checked packet run '+t)
  for method,qual in [('view',''),('readView','const ')]:
-  owner.append('fn '+method+'(self:Owner,values:'+qual+t+'[:])->'+qual+t+'[:] {assert(self.valid());if values.len==0 {return default<'+qual+t+'[:]>();}var next=leases[self.slot-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_'+ident(t)+' run=>{if blot_support::same_slice_identity(values,run.values) {let owned=pool_'+ident(t)+'.realloc_slice(run.values,run.values.len);let start=pool_'+ident(t)+'.index_of(owned[0]);return pool_'+ident(t)+'[start..start+owned.len];}},_=>{}}}abort("packet view must name this owner\'s exact live typed run");}')
+  owner.append('fn '+method+'(self:Owner,values:'+qual+t+'[:])->'+qual+t+'[:] {assert(self.valid());if values.len==0 {return default<'+qual+t+'[:]>();}var next=leases[self.slot-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_'+ident(t)+' run=>{if squid_support::same_slice_identity(values,run.values) {let owned=pool_'+ident(t)+'.realloc_slice(run.values,run.values.len);let start=pool_'+ident(t)+'.index_of(owned[0]);return pool_'+ident(t)+'[start..start+owned.len];}},_=>{}}}abort("packet view must name this owner\'s exact live typed run");}')
 owner.append('fn deinit(self:Owner&) {if self.slot==0 {return;}assert(self.valid());let state:Lease&=leases[self.slot-1];assert(state.references!=0);state.references--;if state.references==0 {var next=state.head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {')
 for t in sorted(SLICES):owner.append('Run.run_'+ident(t)+' value=>{pool_'+ident(t)+'.free_slice(value.values);},')
 owner.append('}links.free(at);}state.live=false;leases.free(self.slot-1);}self=Owner{..};}')

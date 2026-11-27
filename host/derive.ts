@@ -1,6 +1,6 @@
 import { createFrontend, type Cst } from "./syntax.ts";
 
-/** A checked data declaration's source shape, used to emit ordinary Blot code. */
+/** A checked data declaration's source shape, used to emit ordinary Squid code. */
 export interface DeriveShape {
   name: string;
   parameters: string[];

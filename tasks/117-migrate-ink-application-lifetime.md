@@ -20,7 +20,7 @@ is needed. Remove general `app.preview`; explicit copied sandboxes are separate.
 
 ## Exclusive ownership
 
-In sibling `/home/mewhhaha/src/ink/lib/`, own `.blot` files/directories `app`, `codec`, `editor`, `lanes`,
+In sibling `/home/mewhhaha/src/ink/lib/`, own `.sq` files/directories `app`, `codec`, `editor`, `lanes`,
 `persist`, `persist/`, `preferences`, `services`, `services/`, `tune`, `pen/`.
 Own matching tests and Pen session-protocol/version/acknowledgement changes,
 including these paths under sibling `/home/mewhhaha/src/pen/`:
@@ -34,7 +34,7 @@ including these paths under sibling `/home/mewhhaha/src/pen/`:
 - Matching session/recovery fixtures: explicit checkpoint recovery/replay.
 
 Preserve renderer transactions in `pen-runtime`.
-Do not edit `../pen/crates/blot-host/src/lib.rs` or `native.rs`: task 113 owns them.
+Do not edit `../pen/crates/squid-host/src/lib.rs` or `native.rs`: task 113 owns them.
 Shared fixtures/generators remain with root integrator; coordinate any necessary
 cross-owner host interface change before editing.
 
@@ -84,4 +84,4 @@ Do not report a partial run as a pass or infer frame performance from compile ti
 
 - [Rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md)
 - [Storage rewrite](STORAGE_REWRITE.md)
-- Ink `docs/architecture.md`, `docs/blot.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.
+- Ink `docs/architecture.md`, `docs/squid.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.

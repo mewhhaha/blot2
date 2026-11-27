@@ -33,14 +33,14 @@ Deno.test("primitive associated selection uses the actual prelude catalog", asyn
       } else {for (let i = 0; i < 100; i++) {
           equal(guest.call("answer", null), 42);
         }}
-    }, { prelude: "std/prelude.blot" });
+    }, { prelude: "std/prelude.sq" });
   }
   await compileAndRun(
     'io const answer=func(): Bool => return @type.call "eq" true true\n',
     (guest) => {
       equal(guest.call("answer", null), true);
     },
-    { prelude: "std/prelude.blot" },
+    { prelude: "std/prelude.sq" },
   );
 });
 

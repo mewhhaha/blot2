@@ -5,7 +5,7 @@
 // atomically in Phase 2 with explicit temp-slot detach ONLY for transferred
 // StealHeap/CopiedHeap/new_block_pins/ledger/reply backings (leaving Empty temp
 // slots intact so releaseEntry() frees any retained heap capacity).
-namespace blot_direct_function;
+namespace squid_direct_function;
 import .function;
 
 struct PersistRoot {
@@ -24,9 +24,9 @@ struct PersistRoot {
 
 fn createPersistRoot(g: Generator&, state_ty: Ty) -> PersistRoot, Error {
     let layout, lerr = g.types.layout(state_ty);
-    if lerr != blot_direct_types::Error.none { return PersistRoot {}, lerr; }
+    if lerr != squid_direct_types::Error.none { return PersistRoot {}, lerr; }
     let holds, herr = g.holdsMemory(state_ty);
-    if herr != blot_direct_types::Error.none { return PersistRoot {}, herr; }
+    if herr != squid_direct_types::Error.none { return PersistRoot {}, herr; }
     let start = g.s.words.len as u32;
     for wt in layout {
         let gid = g.module.addGlobal(wt, true, 0);
@@ -48,18 +48,18 @@ fn createPersistRoot(g: Generator&, state_ty: Ty) -> PersistRoot, Error {
         root.live_blocks_len = g.module.addGlobal(VT_i32, true, 0);
         root.live_blocks_cap = g.module.addGlobal(VT_i32, true, 0);
     }
-    return root, blot_direct_types::Error.none;
+    return root, squid_direct_types::Error.none;
 }
 
 fn loadPersistRootVal(g: Generator&, f: Fn&, root: PersistRoot) -> Val, Error {
     let val, ferr = fresh(g, f, root.state_ty, 0);
-    if ferr != blot_direct_types::Error.none { return neverVal(), ferr; }
+    if ferr != squid_direct_types::Error.none { return neverVal(), ferr; }
     for wi in 0..(root.state_globals_len as i64) {
         let gid = g.s.words[root.state_globals_start + wi];
         gget(g, gid);
         lset(g, w(g, val, wi));
     }
-    return val, blot_direct_types::Error.none;
+    return val, squid_direct_types::Error.none;
 }
 
 fn storePersistRootVal(g: Generator&, f: const Fn&, root: PersistRoot, val: Val) {
@@ -72,7 +72,7 @@ fn storePersistRootVal(g: Generator&, f: const Fn&, root: PersistRoot, val: Val)
 
 fn zeroPersistRootGlobals(g: Generator&, root: PersistRoot) -> Error {
     let layout, lerr = g.types.layout(root.state_ty);
-    if lerr != blot_direct_types::Error.none { return lerr; }
+    if lerr != squid_direct_types::Error.none { return lerr; }
     for wi in 0..(root.state_globals_len as i64) {
         let gid = g.s.words[root.state_globals_start + wi];
         let wt = layout[wi];
@@ -83,10 +83,10 @@ fn zeroPersistRootGlobals(g: Generator&, root: PersistRoot) -> Error {
         } else { pushZero(g, wt); }
         gset(g, gid);
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
-// Emits `blot:kernel_clear:<name>` body: idempotent on status == 0; else sets 2,
+// Emits `squid:kernel_clear:<name>` body: idempotent on status == 0; else sets 2,
 // frees all live_owners & live_blocks & ledgers, zeroes globals, sets 0, returns 0.
 fn emitClearRoot(g: Generator&, f: Fn&, root: PersistRoot) -> Error {
     let rt = g.runtime_();
@@ -189,10 +189,10 @@ fn emitClearRoot(g: Generator&, f: Fn&, root: PersistRoot) -> Error {
         i32Const(g, 0); gset(g, root.live_blocks_cap);
     }
     let zerr = zeroPersistRootGlobals(g, root);
-    if zerr != blot_direct_types::Error.none { return zerr; }
+    if zerr != squid_direct_types::Error.none { return zerr; }
     i32Const(g, 0);
     gset(g, root.status_global);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 // Collect all memory-holding `Ty`s reachable from `root_ty` for flat iterative dispatch.
@@ -202,13 +202,13 @@ fn findCollectedTy(tys: const Ty[:], ty: Ty) -> i64 {
 }
 
 recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64, force: bool) -> Error {
-    if depth > 64 { return blot_direct_types::Error.none; }
+    if depth > 64 { return squid_direct_types::Error.none; }
     let holds, herr = g.holdsMemory(ty);
-    if herr != blot_direct_types::Error.none { return herr; }
+    if herr != squid_direct_types::Error.none { return herr; }
     let cholds, cherr = g.contentsHoldMemory(ty);
-    if cherr != blot_direct_types::Error.none { return cherr; }
-    if !force && !holds && !cholds { return blot_direct_types::Error.none; }
-    if findCollectedTy(out[..], ty) >= 0 { return blot_direct_types::Error.none; }
+    if cherr != squid_direct_types::Error.none { return cherr; }
+    if !force && !holds && !cholds { return squid_direct_types::Error.none; }
+    if findCollectedTy(out[..], ty) >= 0 { return squid_direct_types::Error.none; }
     out.push(ty);
     let n = g.types.node(ty);
     match n.tag {
@@ -218,44 +218,44 @@ recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64,
         packed => {
             let dummy_f = newFn(g, 1, 0);
             let plan, perr = computePackedPlan(g, dummy_f, n.a, 0);
-            if perr != blot_direct_types::Error.none { return perr; }
+            if perr != squid_direct_types::Error.none { return perr; }
             if plan.mode == PACKED_FLAT {
                 return collectPersistTys(g, n.a, out, depth + 1, false);
             }
             for s in 0..plan.stream_count {
-                let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
-                if ierr != blot_direct_types::Error.none { return ierr; }
+                let sub_arr, ierr = g.types.intern(squid_direct_types::Tag.array, [plan.stream_ty[s]]);
+                if ierr != squid_direct_types::Error.none { return ierr; }
                 let err = collectPersistTys(g, sub_arr, out, depth + 1, true);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         tuple => {
             for at in 0..(n.b as i64) {
                 let err = collectPersistTys(g, g.types.words[n.a + at], out, depth + 1, false);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         record => {
             for idx in 0..(n.b as i64) {
                 let err = collectPersistTys(g, g.types.recordField(ty, idx).ty, out, depth + 1, false);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         nominal => {
             let cases, cerr = g.types.variants(ty);
-            if cerr != blot_direct_types::Error.none { return cerr; }
+            if cerr != squid_direct_types::Error.none { return cerr; }
             for ci in 0..(cases.len as i64) {
                 let is_out, oerr = g.types.variantOutlined(ty, ci);
-                if oerr != blot_direct_types::Error.none { return oerr; }
+                if oerr != squid_direct_types::Error.none { return oerr; }
                 let err = collectPersistTys(g, g.types.variant_payloads[cases.payloads + ci], out, depth + 1, is_out);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
-        _ => { return blot_direct_types::Error.none; },
+        _ => { return squid_direct_types::Error.none; },
     }
 }
 
@@ -314,9 +314,9 @@ fn emitPushFixup(g: Generator&, vec_slot: u32, addr_loc: u32, val_loc: u32, dst_
 // Emits a child field push from flat container at `base_addr + offset`.
 fn emitPushFlatChild(g: Generator&, f: Fn&, work_slot: u32, base_addr: u32, offset: u32, child_ty: Ty, tys: const Ty[:], tmp_a: u32, tmp_b: u32, dst_tmp: u32) -> Error {
     let cidx = findCollectedTy(tys, child_ty);
-    if cidx < 0 { return blot_direct_types::Error.none; }
+    if cidx < 0 { return squid_direct_types::Error.none; }
     let is_rec, rerr = g.types.isRecursive(child_ty);
-    if rerr != blot_direct_types::Error.none { return rerr; }
+    if rerr != squid_direct_types::Error.none { return rerr; }
     lget(g, base_addr);
     if offset != 0 {
         i32Const(g, offset);
@@ -333,7 +333,7 @@ fn emitPushFlatChild(g: Generator&, f: Fn&, work_slot: u32, base_addr: u32, offs
         lset(g, tmp_b);
         emitPushWork(g, work_slot, 0, tmp_a, tmp_b, cidx as u32, dst_tmp);
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 fn emitCommitReplyPin(
@@ -369,106 +369,106 @@ fn emitCommitReplyPin(
 // array, multi-variant sum, view/ref/link, closure, or >32 owners exist.
 recursive fn collectPersistFlatArrayOffsets(g: Generator&, ty: Ty, base_off: u32, out: u32[32]&, out_len: i64&) -> bool, Error {
     let holds, error = g.contentsHoldMemory(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if !holds { return true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
     let rec, rerr = g.types.isRecursive(ty);
-    if rerr != blot_direct_types::Error.none { return false, rerr; }
-    if rec { return false, blot_direct_types::Error.none; }
+    if rerr != squid_direct_types::Error.none { return false, rerr; }
+    if rec { return false, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
         array => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
-            if herr != blot_direct_types::Error.none { return false, herr; }
-            if elem_holds || out_len >= 32 { return false, blot_direct_types::Error.none; }
+            if herr != squid_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 32 { return false, squid_direct_types::Error.none; }
             out[out_len] = base_off;
             out_len += 1;
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         tuple => {
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
                 let ioff, ierr = g.types.tupleItemByteOffset(ty, index);
-                if ierr != blot_direct_types::Error.none { return false, ierr; }
+                if ierr != squid_direct_types::Error.none { return false, ierr; }
                 let ok, oerr = collectPersistFlatArrayOffsets(g, item, base_off + ioff, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         record => {
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
                 let foff, ferr = g.types.recordFieldByteOffset(ty, index);
-                if ferr != blot_direct_types::Error.none { return false, ferr; }
+                if ferr != squid_direct_types::Error.none { return false, ferr; }
                 let ok, oerr = collectPersistFlatArrayOffsets(g, field, base_off + foff, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         nominal => {
             let cases, verr = g.types.variants(ty);
-            if verr != blot_direct_types::Error.none { return false, verr; }
-            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
             let payload = g.types.variant_payloads[cases.payloads];
             return collectPersistFlatArrayOffsets(g, payload, base_off, out, out_len);
         },
-        _ => { return false, blot_direct_types::Error.none; },
+        _ => { return false, squid_direct_types::Error.none; },
     }
 }
 // Collect word indices of every plain-element `Tag.array` handle inside an
 // unboxed root (e.g. SoaWorld).
 recursive fn collectPersistRegArrayWords(g: Generator&, ty: Ty, base_word: u32, out: u32[32]&, out_len: i64&) -> bool, Error {
     let holds, error = g.contentsHoldMemory(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if !holds { return true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
     let boxed, berr = g.types.boxed(ty);
-    if berr != blot_direct_types::Error.none { return false, berr; }
-    if boxed { return false, blot_direct_types::Error.none; }
+    if berr != squid_direct_types::Error.none { return false, berr; }
+    if boxed { return false, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
         array => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
-            if herr != blot_direct_types::Error.none { return false, herr; }
-            if elem_holds || out_len >= 32 { return false, blot_direct_types::Error.none; }
+            if herr != squid_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 32 { return false, squid_direct_types::Error.none; }
             out[out_len] = base_word;
             out_len += 1;
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         tuple => {
             var cur = base_word;
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
                 let ok, oerr = collectPersistRegArrayWords(g, item, cur, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 let layout, lerr = g.types.layout(item);
-                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
                 cur += layout.len as u32;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         record => {
             var cur = base_word;
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
                 let ok, oerr = collectPersistRegArrayWords(g, field, cur, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 let layout, lerr = g.types.layout(field);
-                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
                 cur += layout.len as u32;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         nominal => {
             let cases, verr = g.types.variants(ty);
-            if verr != blot_direct_types::Error.none { return false, verr; }
-            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
             let payload = g.types.variant_payloads[cases.payloads];
             return collectPersistRegArrayWords(g, payload, base_word, out, out_len);
         },
-        _ => { return false, blot_direct_types::Error.none; },
+        _ => { return false, squid_direct_types::Error.none; },
     }
 }
 // Emits complete 100% iterative two-phase staging for `root` given `next_val`.
@@ -500,20 +500,20 @@ fn emitStageRoot(
         releaseEntry(g);
         i32Const(g, 1);
         gset(g, root.status_global);
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
 
-    // Zero-allocation fast-path commit for `blot:proc_step` when every plain-element
+    // Zero-allocation fast-path commit for `squid:proc_step` when every plain-element
     // array handle in `next_val` is bit-identical to the currently committed persistent root!
     var has_fast_branch = false;
     if is_step {
         let root_boxed, rberr = isBoxed(g, f, root.state_ty, 0);
-        if rberr != blot_direct_types::Error.none { return rberr; }
+        if rberr != squid_direct_types::Error.none { return rberr; }
         if !root_boxed {
             var owner_words: u32[32] = [0; 32];
             var owner_count: i64 = 0;
             let fok, ferr = collectPersistRegArrayWords(g, root.state_ty, 0, owner_words, owner_count);
-            if ferr != blot_direct_types::Error.none { return ferr; }
+            if ferr != squid_direct_types::Error.none { return ferr; }
             if fok && owner_count > 0 {
                 let fast_ok = local32(g, f);
                 gget(g, root.live_blocks_len);
@@ -547,10 +547,10 @@ fn emitStageRoot(
             var owner_offs: u32[32] = [0; 32];
             var owner_count: i64 = 0;
             let fok, ferr = collectPersistFlatArrayOffsets(g, root.state_ty, 0, owner_offs, owner_count);
-            if ferr != blot_direct_types::Error.none { return ferr; }
+            if ferr != squid_direct_types::Error.none { return ferr; }
             if fok && owner_count > 0 && root.state_globals_len == 1 {
                 let logical_bytes, berr = blockBytes(g, f, root.state_ty, 0);
-                if berr != blot_direct_types::Error.none { return berr; }
+                if berr != squid_direct_types::Error.none { return berr; }
                 let old_ptr = local32(g, f);
                 let new_ptr = w(g, next_val, 0);
                 gget(g, g.s.words[root.state_globals_start]);
@@ -605,21 +605,21 @@ fn emitStageRoot(
     // Collect every memory-holding Ty reachable from root.state_ty.
     var tys: Ty[>..] = [];
     let cerr = collectPersistTys(g, root.state_ty, tys, 0, false);
-    if cerr != blot_direct_types::Error.none { return cerr; }
+    if cerr != squid_direct_types::Error.none { return cerr; }
     assert(tys.len > 0 && tys[0] == root.state_ty);
     var needs_box_ptr: bool[>..] = [];
     for t in tys {
         let tb, tberr = isBoxed(g, f, t, 0);
-        if tberr != blot_direct_types::Error.none { return tberr; }
+        if tberr != squid_direct_types::Error.none { return tberr; }
         needs_box_ptr.push(tb);
     }
     for t in tys {
-        if g.types.node(t).tag == blot_direct_types::Tag.nominal {
+        if g.types.node(t).tag == squid_direct_types::Tag.nominal {
             let cases, vcerr = g.types.variants(t);
-            if vcerr != blot_direct_types::Error.none { return vcerr; }
+            if vcerr != squid_direct_types::Error.none { return vcerr; }
             for ci in 0..(cases.len as i64) {
                 let is_out, oerr = g.types.variantOutlined(t, ci);
-                if oerr != blot_direct_types::Error.none { return oerr; }
+                if oerr != squid_direct_types::Error.none { return oerr; }
                 if is_out {
                     let pidx = findCollectedTy(tys[..], g.types.variant_payloads[cases.payloads + ci]);
                     if pidx >= 0 { needs_box_ptr[pidx] = true; }
@@ -630,9 +630,9 @@ fn emitStageRoot(
 
     // Compute root shadow buffer byte size.
     let layout, lerr = g.types.layout(root.state_ty);
-    if lerr != blot_direct_types::Error.none { return lerr; }
+    if lerr != squid_direct_types::Error.none { return lerr; }
     var root_bytes: u32 = 0;
-    for wt in layout { root_bytes += blot_direct_writer::wordBytes(wt); }
+    for wt in layout { root_bytes += squid_direct_writer::wordBytes(wt); }
     var root_alloc_bytes = root_bytes;
     if root_alloc_bytes < 16 { root_alloc_bytes = 16; }
 
@@ -725,7 +725,7 @@ fn emitStageRoot(
     let tmp_b = local32(g, f);
     let dst_tmp = local32(g, f);
     let root_boxed, rberr = isBoxed(g, f, root.state_ty, 0);
-    if rberr != blot_direct_types::Error.none { return rberr; }
+    if rberr != squid_direct_types::Error.none { return rberr; }
     if root_boxed {
         lget(g, root_buf); lset(g, tmp_a);
         lget(g, root_buf); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, tmp_b);
@@ -767,14 +767,14 @@ fn emitStageRoot(
         let w_exit = open(g, f, OP_block);
         let w_loop = open(g, f, OP_loop);
         emitLoadTempEntry(g, work_slot, w_entry);
-        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
         ltee(g, w_len);
         op(g, OP_i32_eqz);
         br(g, f, OP_br_if, w_exit);
         // Pop last work item.
         lget(g, w_len); i32Const(g, 1); op(g, OP_i32_sub); lset(g, w_len);
-        lget(g, w_entry); lget(g, w_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
-        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        lget(g, w_entry); lget(g, w_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
+        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
         lget(g, w_len); i32Const(g, 4); op(g, OP_i32_shl); op(g, OP_i32_add);
         ltee(g, w_cell);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, w_kind);
@@ -796,15 +796,15 @@ fn emitStageRoot(
                 array => {
                     let elem_ty = tn.a;
                     let elem_step, serr = stride(g, f, elem_ty, 0);
-                    if serr != blot_direct_types::Error.none { return serr; }
+                    if serr != squid_direct_types::Error.none { return serr; }
                     let elem_cidx = findCollectedTy(tys[..], elem_ty);
                     // Read (slot, gen) at w_a and check handle.
                     lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, o_slot);
                     lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4); lset(g, o_gen);
                     lget(g, o_slot); lget(g, o_gen); callf(g, rt.check); ltee(g, o_entry);
-                    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, o_base);
-                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, o_len);
-                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity); lset(g, o_cap);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, o_base);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, o_len);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity); lset(g, o_cap);
 
                     // Branch: persistent (>= persistent_split) vs temporary (< persistent_split).
                     lget(g, o_slot);
@@ -813,7 +813,7 @@ fn emitStageRoot(
                     let p_if = open(g, f, OP_if_);
                     // Persistent owner: skip static_pool_flag, else verify in old_owners_map and retain.
                     lget(g, o_cap);
-                    i32Const(g, blot_direct_runtime::static_pool_flag);
+                    i32Const(g, squid_direct_runtime::static_pool_flag);
                     op(g, OP_i32_and);
                     op(g, OP_i32_eqz);
                     let non_static_if = open(g, f, OP_if_);
@@ -837,7 +837,7 @@ fn emitStageRoot(
                         lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb);
                         lget(g, o_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
                         let perr = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                         lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
                         br(g, f, OP_br, el);
                         close(g, f);
@@ -857,7 +857,7 @@ fn emitStageRoot(
                     op(g, OP_else_);
                     // New temp owner: allocate next steal_idx.
                     emitLoadTempEntry(g, steal_slot, dst_tmp);
-                    lget(g, dst_tmp); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, steal_idx);
+                    lget(g, dst_tmp); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, steal_idx);
                     lget(g, temp_owner_map); lget(g, o_slot); i32Const(g, 0); i32Const(g, 0);
                     lget(g, steal_idx); i32Const(g, 1); op(g, OP_i32_add);
                     callf(g, rt.hmap_put);
@@ -874,7 +874,7 @@ fn emitStageRoot(
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                     op(g, OP_else_);
-                    lget(g, o_cap); i32Const(g, blot_direct_runtime::heap_flag); op(g, OP_i32_and);
+                    lget(g, o_cap); i32Const(g, squid_direct_runtime::heap_flag); op(g, OP_i32_and);
                     let heap_o_if = open(g, f, OP_if_);
                     // StealHeap: steal_kind = 1, src_slot = o_slot, dst_base = o_base.
                     lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
@@ -882,7 +882,7 @@ fn emitStageRoot(
                     lget(g, dst_tmp); lget(g, o_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
                     lget(g, dst_tmp); lget(g, o_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
                     lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
-                    lget(g, dst_tmp); lget(g, o_cap); i32Const(g, blot_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                    lget(g, dst_tmp); lget(g, o_cap); i32Const(g, squid_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
                     lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                     lget(g, o_base); lset(g, dst_base);
                     op(g, OP_else_);
@@ -907,7 +907,7 @@ fn emitStageRoot(
                         lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb2);
                         lget(g, dst_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
                         let perr = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                         lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
                         br(g, f, OP_br, el2);
                         close(g, f);
@@ -923,7 +923,7 @@ fn emitStageRoot(
                     lget(g, o_slot); i32Const(g, rt.layout.persistent_split); op(g, OP_i32_lt_u);
                     let temp_seq = open(g, f, OP_if_);
                     let p_slot, p_gen, perr = emitSeqPersist(g, f, o_slot, o_gen, t, 0, 0);
-                    if perr != blot_direct_types::Error.none { return perr; }
+                    if perr != squid_direct_types::Error.none { return perr; }
                     lget(g, w_a); lget(g, p_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
                     lget(g, w_a); lget(g, p_gen); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
                     close(g, f);
@@ -931,11 +931,11 @@ fn emitStageRoot(
                 packed => {
                     let elem_ty = tn.a;
                     let plan, perr = computePackedPlan(g, f, elem_ty, 0);
-                    if perr != blot_direct_types::Error.none { return perr; }
+                    if perr != squid_direct_types::Error.none { return perr; }
                     let is_multi = plan.mode != PACKED_FLAT;
                     let elem_step = if is_multi { 0 as u32 } else {
                         let st, serr = stride(g, f, elem_ty, 0);
-                        if serr != blot_direct_types::Error.none { return serr; }
+                        if serr != squid_direct_types::Error.none { return serr; }
                         st
                     };
                     let header_bytes = (plan.stream_count as u32) * 8;
@@ -943,13 +943,13 @@ fn emitStageRoot(
                     lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, o_slot);
                     lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 4); lset(g, o_gen);
                     lget(g, o_slot); lget(g, o_gen); callf(g, rt.check); ltee(g, o_entry);
-                    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, o_base);
-                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, o_len);
-                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity); lset(g, o_cap);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, o_base);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, o_len);
+                    lget(g, o_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity); lset(g, o_cap);
 
                     lget(g, o_slot); i32Const(g, rt.layout.persistent_split); op(g, OP_i32_ge_u);
                     let p_if = open(g, f, OP_if_);
-                    lget(g, o_cap); i32Const(g, blot_direct_runtime::static_pool_flag); op(g, OP_i32_and); op(g, OP_i32_eqz);
+                    lget(g, o_cap); i32Const(g, squid_direct_runtime::static_pool_flag); op(g, OP_i32_and); op(g, OP_i32_eqz);
                     let non_static_if = open(g, f, OP_if_);
                     lget(g, old_owners_map); lget(g, o_slot); lget(g, o_gen); i32Const(g, 0); callf(g, rt.hmap_get);
                     lset(g, m_found); op(g, OP_drop);
@@ -962,12 +962,12 @@ fn emitStageRoot(
                     emitPushFixup(g, ret_owners_slot, o_slot, o_gen, dst_tmp);
                     if is_multi {
                         for s in 0..plan.stream_count {
-                            let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
-                            if ierr != blot_direct_types::Error.none { return ierr; }
+                            let sub_arr, ierr = g.types.intern(squid_direct_types::Tag.array, [plan.stream_ty[s]]);
+                            if ierr != squid_direct_types::Error.none { return ierr; }
                             let scidx = findCollectedTy(tys[..], sub_arr);
                             if scidx >= 0 {
                                 let perr2 = emitPushFlatChild(g, f, work_slot, o_base, (s as u32) * 8, sub_arr, tys[..], tmp_a, tmp_b, dst_tmp);
-                                if perr2 != blot_direct_types::Error.none { return perr2; }
+                                if perr2 != squid_direct_types::Error.none { return perr2; }
                             }
                         }
                     } else if elem_cidx >= 0 {
@@ -977,7 +977,7 @@ fn emitStageRoot(
                         lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb);
                         lget(g, o_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
                         let perr2 = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr2 != blot_direct_types::Error.none { return perr2; }
+                        if perr2 != squid_direct_types::Error.none { return perr2; }
                         lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
                         br(g, f, OP_br, el);
                         close(g, f); close(g, f);
@@ -992,7 +992,7 @@ fn emitStageRoot(
                     emitPushFixup(g, owner_fix_slot, w_a, steal_idx, dst_tmp);
                     op(g, OP_else_);
                     emitLoadTempEntry(g, steal_slot, dst_tmp);
-                    lget(g, dst_tmp); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, steal_idx);
+                    lget(g, dst_tmp); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, steal_idx);
                     lget(g, temp_owner_map); lget(g, o_slot); i32Const(g, 0); i32Const(g, 0);
                     lget(g, steal_idx); i32Const(g, 1); op(g, OP_i32_add); callf(g, rt.hmap_put);
                     emitPushFixup(g, owner_fix_slot, w_a, steal_idx, dst_tmp);
@@ -1009,12 +1009,12 @@ fn emitStageRoot(
                         lget(g, dst_tmp); lget(g, dst_cap); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
                         lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                         for s in 0..plan.stream_count {
-                            let sub_arr, ierr = g.types.intern(blot_direct_types::Tag.array, [plan.stream_ty[s]]);
-                            if ierr != blot_direct_types::Error.none { return ierr; }
+                            let sub_arr, ierr = g.types.intern(squid_direct_types::Tag.array, [plan.stream_ty[s]]);
+                            if ierr != squid_direct_types::Error.none { return ierr; }
                             let scidx = findCollectedTy(tys[..], sub_arr);
                             if scidx >= 0 {
                                 let perr2 = emitPushFlatChild(g, f, work_slot, dst_base, (s as u32) * 8, sub_arr, tys[..], tmp_a, tmp_b, dst_tmp);
-                                if perr2 != blot_direct_types::Error.none { return perr2; }
+                                if perr2 != squid_direct_types::Error.none { return perr2; }
                             }
                         }
                     } else {
@@ -1028,14 +1028,14 @@ fn emitStageRoot(
                         lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
                         lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                         op(g, OP_else_);
-                        lget(g, o_cap); i32Const(g, blot_direct_runtime::heap_flag); op(g, OP_i32_and);
+                        lget(g, o_cap); i32Const(g, squid_direct_runtime::heap_flag); op(g, OP_i32_and);
                         let heap_o_if = open(g, f, OP_if_);
                         lget(g, steal_slot); i32Const(g, 32); callf(g, rt.scratch_push); lset(g, dst_tmp);
                         lget(g, dst_tmp); i32Const(g, 1); op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
                         lget(g, dst_tmp); lget(g, o_slot); op(g, OP_i32_store); uleb(g, 2); uleb(g, 4);
                         lget(g, dst_tmp); lget(g, o_base); op(g, OP_i32_store); uleb(g, 2); uleb(g, 8);
                         lget(g, dst_tmp); lget(g, o_len); op(g, OP_i32_store); uleb(g, 2); uleb(g, 12);
-                        lget(g, dst_tmp); lget(g, o_cap); i32Const(g, blot_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
+                        lget(g, dst_tmp); lget(g, o_cap); i32Const(g, squid_direct_runtime::capacity_mask); op(g, OP_i32_and); op(g, OP_i32_store); uleb(g, 2); uleb(g, 16);
                         lget(g, dst_tmp); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, 20);
                         lget(g, o_base); lset(g, dst_base);
                         op(g, OP_else_);
@@ -1058,7 +1058,7 @@ fn emitStageRoot(
                             lget(g, elem_i); lget(g, o_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, eb2);
                             lget(g, dst_base); lget(g, elem_i); i32Const(g, elem_step); op(g, OP_i32_mul); op(g, OP_i32_add); lset(g, elem_addr);
                             let perr2 = emitPushFlatChild(g, f, work_slot, elem_addr, 0, elem_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                            if perr2 != blot_direct_types::Error.none { return perr2; }
+                            if perr2 != squid_direct_types::Error.none { return perr2; }
                             lget(g, elem_i); i32Const(g, 1); op(g, OP_i32_add); lset(g, elem_i);
                             br(g, f, OP_br, el2);
                             close(g, f); close(g, f);
@@ -1072,29 +1072,29 @@ fn emitStageRoot(
                     for at in 0..(tn.b as i64) {
                         let item_ty = g.types.words[tn.a + at];
                         let ioff, ierr = g.types.tupleItemByteOffset(t, at);
-                        if ierr != blot_direct_types::Error.none { return ierr; }
+                        if ierr != squid_direct_types::Error.none { return ierr; }
                         let perr = emitPushFlatChild(g, f, work_slot, w_a, ioff, item_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                     }
                 },
                 record => {
                     for idx in 0..(tn.b as i64) {
                         let field_ty = g.types.recordField(t, idx).ty;
                         let foff, ferr = g.types.recordFieldByteOffset(t, idx);
-                        if ferr != blot_direct_types::Error.none { return ferr; }
+                        if ferr != squid_direct_types::Error.none { return ferr; }
                         let perr = emitPushFlatChild(g, f, work_slot, w_a, foff, field_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                     }
                 },
                 nominal => {
                     let cases, cerr = g.types.variants(t);
-                    if cerr != blot_direct_types::Error.none { return cerr; }
+                    if cerr != squid_direct_types::Error.none { return cerr; }
                     if cases.len == 1 {
                         let perr = emitPushFlatChild(g, f, work_slot, w_a, 0, g.types.variant_payloads[cases.payloads], tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                     } else if cases.len > 1 {
                         let is_niche, _, _, some_pty, nerr = g.types.nullableNiche(t);
-                        if nerr != blot_direct_types::Error.none { return nerr; }
+                        if nerr != squid_direct_types::Error.none { return nerr; }
                         if is_niche {
                             let pidx = findCollectedTy(tys[..], some_pty);
                             if pidx >= 0 {
@@ -1107,17 +1107,17 @@ fn emitStageRoot(
                             }
                         } else {
                             let _, payload_off, serr = g.types.sumTagInfo(t);
-                            if serr != blot_direct_types::Error.none { return serr; }
+                            if serr != squid_direct_types::Error.none { return serr; }
                             lget(g, w_a);
                             let tlerr = emitTagLoad(g, t, 0);
-                            if tlerr != blot_direct_types::Error.none { return tlerr; }
+                            if tlerr != squid_direct_types::Error.none { return tlerr; }
                             lset(g, vtag_loc);
                             for ci in 0..(cases.len as i64) {
                                 let pty = g.types.variant_payloads[cases.payloads + ci];
                                 let pidx = findCollectedTy(tys[..], pty);
                                 if pidx < 0 { continue; }
                                 let is_out, oerr = g.types.variantOutlined(t, ci);
-                                if oerr != blot_direct_types::Error.none { return oerr; }
+                                if oerr != squid_direct_types::Error.none { return oerr; }
                                 lget(g, vtag_loc);
                                 i32Const(g, g.types.variant_tags[cases.tags + ci]);
                                 op(g, OP_i32_eq);
@@ -1134,7 +1134,7 @@ fn emitStageRoot(
                                     emitPushWork(g, work_slot, 1, tmp_a, tmp_b, pidx as u32, dst_tmp);
                                 } else {
                                     let perr = emitPushFlatChild(g, f, work_slot, w_a, payload_off, pty, tys[..], tmp_a, tmp_b, dst_tmp);
-                                    if perr != blot_direct_types::Error.none { return perr; }
+                                    if perr != squid_direct_types::Error.none { return perr; }
                                 }
                                 close(g, f);
                             }
@@ -1150,9 +1150,9 @@ fn emitStageRoot(
         for t, ti in tys {
             if !needs_box_ptr[ti] { continue; }
             let is_rec, rerr = g.types.isRecursive(t);
-            if rerr != blot_direct_types::Error.none { return rerr; }
+            if rerr != squid_direct_types::Error.none { return rerr; }
             let logical_bytes, berr = blockBytes(g, f, t, 0);
-            if berr != blot_direct_types::Error.none { return berr; }
+            if berr != squid_direct_types::Error.none { return berr; }
             lget(g, w_ty);
             i32Const(g, ti as u32);
             op(g, OP_i32_eq);
@@ -1320,9 +1320,9 @@ fn emitStageRoot(
     let next_b_cap = local32(g, f);
 
     emitLoadTempEntry(g, ret_owners_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, ret_o_len);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, ret_o_len);
     emitLoadTempEntry(g, steal_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, steal_len);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, steal_len);
     lget(g, ret_o_len); lget(g, steal_len); op(g, OP_i32_add); lset(g, total_o);
     i32Const(g, 0); lset(g, next_o_slot);
     i32Const(g, 0); lset(g, next_o_ptr);
@@ -1337,9 +1337,9 @@ fn emitStageRoot(
     }
 
     emitLoadTempEntry(g, ret_blocks_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, ret_b_len);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, ret_b_len);
     emitLoadTempEntry(g, new_blocks_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, new_b_len);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, new_b_len);
     lget(g, ret_b_len); lget(g, new_b_len); op(g, OP_i32_add); lset(g, total_b);
     i32Const(g, 0); lset(g, next_b_slot);
     i32Const(g, 0); lset(g, next_b_ptr);
@@ -1362,7 +1362,7 @@ fn emitStageRoot(
 
     // 1. Open persistent slots for every entry in steal_list; detach ONLY StealHeap (1) and CopiedHeap (2)!
     emitLoadTempEntry(g, steal_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, lptr);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, lptr);
     i32Const(g, 0); lset(g, li);
     {
         let sb = open(g, f, OP_block);
@@ -1376,7 +1376,7 @@ fn emitStageRoot(
         i32Const(g, 0);
         i32Const(g, 0);
         lget(g, lcell); op(g, OP_i32_load); uleb(g, 2); uleb(g, 20);
-        i32Const(g, blot_direct_runtime::live_flag);
+        i32Const(g, squid_direct_runtime::live_flag);
         op(g, OP_i32_or);
         callf(g, rt.open_persistent);
         lset(g, o_gen); lset(g, o_slot);
@@ -1387,7 +1387,7 @@ fn emitStageRoot(
         lget(g, lcell); op(g, OP_i32_load); uleb(g, 2); uleb(g, 16);
         lget(g, lcell); op(g, OP_i32_load); uleb(g, 2); uleb(g, 20);
         op(g, OP_i32_or);
-        i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
+        i32Const(g, squid_direct_runtime::heap_flag | squid_direct_runtime::live_flag);
         op(g, OP_i32_or);
         callf(g, rt.open_persistent);
         lset(g, o_gen); lset(g, o_slot);
@@ -1404,7 +1404,7 @@ fn emitStageRoot(
 
     // 2. Detach every new_block_pins pin slot.
     emitLoadTempEntry(g, new_blocks_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, lptr);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, lptr);
     i32Const(g, 0); lset(g, li);
     {
         let nb = open(g, f, OP_block);
@@ -1421,8 +1421,8 @@ fn emitStageRoot(
 
     // 3. Apply box_fixups.
     emitLoadTempEntry(g, box_fix_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, lptr);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, llen);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, lptr);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, llen);
     i32Const(g, 0); lset(g, li);
     {
         let fb = open(g, f, OP_block);
@@ -1440,10 +1440,10 @@ fn emitStageRoot(
 
     // 4. Apply owner_fixups.
     emitLoadTempEntry(g, steal_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, o_base);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, o_base);
     emitLoadTempEntry(g, owner_fix_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, lptr);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length); lset(g, llen);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, lptr);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length); lset(g, llen);
     i32Const(g, 0); lset(g, li);
     {
         let fb = open(g, f, OP_block);
@@ -1468,7 +1468,7 @@ fn emitStageRoot(
         let cp_ro = open(g, f, OP_if_);
         emitLoadTempEntry(g, ret_owners_slot, w_entry);
         lget(g, next_o_ptr);
-        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
         lget(g, ret_o_len); i32Const(g, 3); op(g, OP_i32_shl);
         memoryCopyOp(g);
         close(g, f);
@@ -1500,13 +1500,13 @@ fn emitStageRoot(
         let cp_rb = open(g, f, OP_if_);
         emitLoadTempEntry(g, ret_blocks_slot, w_entry);
         lget(g, next_b_ptr);
-        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
         lget(g, ret_b_len); i32Const(g, 4); op(g, OP_i32_shl);
         memoryCopyOp(g);
         close(g, f);
     }
     emitLoadTempEntry(g, new_blocks_slot, w_entry);
-    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, lptr);
+    lget(g, w_entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, lptr);
     i32Const(g, 0); lset(g, li);
     {
         let fb = open(g, f, OP_block);
@@ -1614,7 +1614,7 @@ fn emitStageRoot(
     lget(g, next_b_cap); gset(g, root.live_blocks_cap);
 
     let committed_val, lverr = loadAt(g, f, root_buf, 0, root.state_ty, 0);
-    if lverr != blot_direct_types::Error.none { return lverr; }
+    if lverr != squid_direct_types::Error.none { return lverr; }
     storePersistRootVal(g, f, root, committed_val);
 
     // 11. Release all temporary scratch slots & stack while status == 2, then publish status = 1!
@@ -1622,5 +1622,5 @@ fn emitStageRoot(
     i32Const(g, 1);
     gset(g, root.status_global);
     if has_fast_branch { close(g, f); }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }

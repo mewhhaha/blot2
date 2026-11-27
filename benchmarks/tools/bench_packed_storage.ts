@@ -5,7 +5,7 @@ const bytes = await Deno.readFile(Deno.args[0]);
 assert(WebAssembly.validate(bytes));
 async function runtime() {
   const { instance } = await WebAssembly.instantiate(bytes);
-  const memory = instance.exports["blot:memory"] as WebAssembly.Memory;
+  const memory = instance.exports["squid:memory"] as WebAssembly.Memory;
   const call = (name: string, ...args: number[]) =>
     Number((instance.exports[name] as CallableFunction)(...args)) >>> 0;
   const word = (address: number) =>
@@ -51,7 +51,7 @@ for (const count of [0, 1, 248, 10000, 100000]) {
   for (let i = -10; i < 25; i++) {
     for (const v of i % 2 ? [1, 0] : [0, 1]) {
       const r = guests[v], mode = modes[v];
-      r.call("blot:reset");
+      r.call("squid:reset");
       const before = Math.max(r.call("heap"), 65536);
       const start = performance.now();
       const pointer = r.call(mode, count, 0);

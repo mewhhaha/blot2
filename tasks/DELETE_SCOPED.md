@@ -18,7 +18,7 @@ serve it are deleted, and then tasks/LANGUAGE_COHERENCE.md follows.
 ```
 cd compiler && zig build install -Doptimize=fast -Dllvm=false --prefix zig-out-direct
 cd .. && deno test -A --parallel --junit-path=J.xml tests/guest tests/host -- \
-  compiler/zig-out-direct/bin/blotc
+  compiler/zig-out-direct/bin/squidc
 ```
 
 Baseline at 51536924: 771 of 1,990 guest cases passed on a direct-default
@@ -86,7 +86,7 @@ behaviour keeps the kept part.
   direct backend selects lanes at run time, so the rule only served the
   scoped backend's v128 shuffles. Open for the owner: keep the rule as a
   language restriction or drop it.
-- Tests that read the scoped runtime's counters (`blot:rc_*` exports), v128
+- Tests that read the scoped runtime's counters (`squid:rc_*` exports), v128
   locals, boxes or checkpoints are scoped internals.
 
 ## Code deletion (done, 14 November 2026)
@@ -115,8 +115,8 @@ went from 157 files (67,630 lines) to 74 (24,892). About 160,000 lines left
   validated (Gdev's Pen settings send it) but unused, and `dependencies`
   still opens a bundle whose unchanged modules a build takes as checked.
 - **Dependency artifacts** were already frontend artifacts (checked Core and
-  principal interfaces). `blotc dependencies`, `--dependencies` and
-  `.blotdep` stay; the consumer compiles with the direct backend. The
+  principal interfaces). `squidc dependencies`, `--dependencies` and
+  `.sqdep` stay; the consumer compiles with the direct backend. The
   retained-snapshot and completed-Core receipts around them are deleted.
 - **Checker modules**: the checker's `eval/` modules (type evidence,
   implementation admission, given equations and their helpers) moved to
@@ -214,7 +214,7 @@ Still ignored, by kind:
   beyond Wasm32 memory, and `entry_let_type` positions.
 - **Inference.** Unresolved type variables where no use fixes a hole, a
   closure parameter fixed only by a later call, a `from` result typed through
-  an operator, an empty array with no fixed element type, `examples/ecs.blot`,
+  an operator, an empty array with no fixed element type, `examples/ecs.sq`,
   type-changing rebinding of a generalized builder, and generalized locals
   used at several types (the value restriction question).
 - **Unsupported forms.** References to whole local values (`&local`, A4) and
@@ -265,7 +265,7 @@ Found while editing, without an ignored case:
 5. Release tier: the direct output, optionally run through `wasm-opt`. First
    measure Gdev's run-time frame cost against the scoped build.
 
-Each step runs Ink (`pen test-blot`, all 64 modules matching) and Gdev Main's
+Each step runs Ink (`pen test-squid`, all 64 modules matching) and Gdev Main's
 Pen frame (frame.png 19a03f0a…, frames.trace 86d50101…) before pushing.
 
 ## Inventory at the baseline

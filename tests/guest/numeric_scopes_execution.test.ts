@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 const integer = func (index: U32) => return do:
   let shifted = @u32.add index 17
@@ -35,9 +35,9 @@ io const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
 
 Deno.test(`numeric helpers with private scopes keep tails, aliased writes and scalar fallbacks`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-numeric-scopes-",
+    prefix: "squid-numeric-scopes-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -102,9 +102,9 @@ Deno.test(`numeric helpers with private scopes keep tails, aliased writes and sc
 
 Deno.test("numeric helper admission revalidates retained edits", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-numeric-revision-",
+    prefix: "squid-numeric-revision-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const changed = source.replace(
     "@u32.mul shifted 4294967295",
     "@u32.div 12 (@u32.sub 4 index)",

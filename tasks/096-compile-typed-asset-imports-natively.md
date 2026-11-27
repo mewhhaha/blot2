@@ -6,14 +6,14 @@
 - **Dependencies:** [095](095-specify-and-version-the-project-protocol.md)
 - **Originating requirements:** the owner's decision of 11 October 2026, relayed
   by the gdev session and recorded in gdev's `PEN_MIGRATION.md` ("Decisions",
-  phase 1): typed asset imports move into `blotc` so every host gets them alike;
+  phase 1): typed asset imports move into `squidc` so every host gets them alike;
   gdev's `asset_parsers.ts` is the specification.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
-`blotc` reads and types asset imports itself, so a host sends only sources and
+`squidc` reads and types asset imports itself, so a host sends only sources and
 options, never parsed assets.
 
 ## Starting point
@@ -28,7 +28,7 @@ constants, through `wgsl_reflect`).
 
 ## Implementation checklist
 
-- [x] Specify each asset kind's Blot interface and errors from
+- [x] Specify each asset kind's Squid interface and errors from
       `asset_parsers.ts`, including asset handles, content snapshots and
       dependency reporting.
 - [x] Implement the readers natively, with bounded, positioned diagnostics, and
@@ -48,7 +48,7 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [x] gdev's typed asset imports compile through `blotc` with no host parsers,
+- [x] gdev's typed asset imports compile through `squidc` with no host parsers,
       matching the TypeScript results.
 - [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.

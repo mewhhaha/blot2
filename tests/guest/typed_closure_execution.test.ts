@@ -94,9 +94,9 @@ function descriptorExpected(input: number): Uint32Array {
 
 Deno.test(`typed closures preserve runtime captures schemas and descriptor reads`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-typed-closures-",
+    prefix: "squid-typed-closures-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   let compiler:
     | Awaited<ReturnType<typeof createZigProjectCompiler>>
     | undefined;

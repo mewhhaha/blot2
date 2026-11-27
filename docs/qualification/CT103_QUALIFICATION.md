@@ -196,13 +196,13 @@ regions and repeated summary/body queries outside principal replay. Keep the
 body 20% target and four/two/one-second ordinary-edit targets open. Investigate
 first-edit frontend allocation separately from later revisions. Do not multiply
 historical ratios from different intervals into a cumulative speedup claim. See
-[the compile queue](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md), [build queue](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/BUILD_HILLS.md) and
-[performance review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/PERFORMANCE_REVIEW.md).
+[the compile queue](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md), [build queue](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/BUILD_HILLS.md) and
+[performance review](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/PERFORMANCE_REVIEW.md).
 
 ## Installation and evidence
 
-The combined release is installed as `~/.local/bin/blotc`; the standalone CLI at
-`~/.local/bin/blot` bundles that exact native binary, parser, updated guide and
+The combined release is installed as `~/.local/bin/squidc`; the standalone CLI at
+`~/.local/bin/squid` bundles that exact native binary, parser, updated guide and
 standard library. Both resolve through PATH. Outside the repository,
 format/check/build pass, native and CLI Wasm are byte-identical, and the
 executed list example returns 29. The bundled guide equals the combined source

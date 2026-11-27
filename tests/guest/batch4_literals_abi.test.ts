@@ -4,9 +4,9 @@ import { instantiateGuest, readMemoryShape } from "../../host/guest.ts";
 import { formatSource } from "../../host/format.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const preludePath =
-  new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdOpts = { stdRoot: new URL("../../std", import.meta.url).pathname };
 
 async function buildWasm(
@@ -17,7 +17,7 @@ async function buildWasm(
   await Deno.mkdir(parent, { recursive: true });
   const dir = await Deno.makeTempDir({ dir: parent, prefix: "batch4-budget-" });
   try {
-    const input = `${dir}/program.blot`;
+    const input = `${dir}/program.sq`;
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(compiler, {

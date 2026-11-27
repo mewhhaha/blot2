@@ -1,6 +1,6 @@
 // Deno host multi-core `#kernel` (KernelPool) & persistent `#process` (Processes) showcase.
 // Run with:
-//   deno run --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT \
+//   deno run --allow-read --allow-write --allow-run --allow-env=SQUID_CLIENT_TEST_AMBIENT \
 //     benchmarks/comparison/bench_multicore_kernel.ts [compiler_path] [--wasm3]
 
 import { fileURLToPath } from "node:url";
@@ -11,10 +11,10 @@ import { Processes } from "../../host/processes.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const posArgs = Deno.args.filter((a) => !a.startsWith("--"));
-const executable = posArgs[0] ?? `${root}/compiler-goose/build/blotc-goose`;
+const executable = posArgs[0] ?? `${root}/compiler-goose/build/squidc-goose`;
 const useWasm3 = Deno.args.includes("--wasm3");
-const entry = `${root}/benchmarks/comparison/multicore_aos_bench.blot`;
-const prelude = `${root}/std/prelude.blot`;
+const entry = `${root}/benchmarks/comparison/multicore_aos_bench.sq`;
+const prelude = `${root}/std/prelude.sq`;
 const stdRoot = `${root}/std`;
 
 function median(xs: number[]): number {

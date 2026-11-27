@@ -41,7 +41,7 @@ spellings over 256 UTF-8 bytes and malformed strings.
 - The evaluator's `select`, `resultSelection` and closure-region constraints
   record a plain `DispatchRecord` inside their diagnostic. On failure the
   backend spells it with the entry-interface type display, so nominal types are
-  module-qualified (`main::Box`, `library.blot::Meters`), and member names come
+  module-qualified (`main::Box`, `library.sq::Meters`), and member names come
   from the build's identity view.
 
 Explanations change no selection, no selection order and no reported diagnostic.

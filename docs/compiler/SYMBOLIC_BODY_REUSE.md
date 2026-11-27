@@ -32,7 +32,7 @@ eight bytes. Constant-folding passes treat tagged table indices as symbolic
 references rather than numeric allocation sizes or offsets. Artifact replay
 preserves the tag.
 
-Portable optimizer captures use schema `blot-optimizer-capture-v3`. They own
+Portable optimizer captures use schema `squid-optimizer-capture-v3`. They own
 import names and complete global facts, parameter roles and ownership
 annotations. Decode checks references, annotation counts and table-reference
 opcode/target validity before publication. Older schemas decline through the
@@ -83,7 +83,7 @@ coarse at these sizes, often 10 ms; no overall compiler speedup is claimed.
 
 Reproduction uses the ignored `build/bench/resolved-bodies/compare_release.py`
 and `deno task bench:compile --workload synthetic --runs 7`, with CPU 7 affinity
-and `BLOT_CACHE_DIR=""`. Distributions, logs and binary/harness pins live under
+and `SQUID_CACHE_DIR=""`. Distributions, logs and binary/harness pins live under
 `build/bench/symbolic-body-reuse/public/` and `synthetic/`.
 
 The intended improvement is optimizer reuse after incidental resource movement,

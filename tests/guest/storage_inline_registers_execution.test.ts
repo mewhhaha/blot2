@@ -57,16 +57,16 @@ const guarded = func (input: U32): Four => return do:
 
 Deno.test(`inline return registers retain nested results bits traps and source edits`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-inline-registers-",
+    prefix: "squid-inline-registers-",
   });
-  const entry = `${directory}/main.blot`;
-  const values = `${directory}/values.blot`;
+  const entry = `${directory}/main.sq`;
+  const values = `${directory}/values.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const options = {
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   };
   const compiler = await createZigProjectCompiler(options);
   try {
@@ -192,15 +192,15 @@ io const rollback = func (input: U32): Array U32 => return do:
 `;
 Deno.test(`inline return registers survive reusable helpers and enclosing loops`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-inline-registers-helpers-",
+    prefix: "squid-inline-registers-helpers-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({

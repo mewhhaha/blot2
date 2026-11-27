@@ -15,7 +15,7 @@ io const answer = func () => return do:
   break @u32.add integer (@f32.to_u32 (local 1.0))
 `,
     (guest) => equal(guest.call("answer", null), 42),
-    { prelude: "std/prelude.blot" },
+    { prelude: "std/prelude.sq" },
   );
   await compileExpectedFailure(
     `
@@ -28,7 +28,7 @@ io const answer = func () => return do:
 `,
     "type_mismatch",
     undefined,
-    { prelude: "std/prelude.blot" },
+    { prelude: "std/prelude.sq" },
   );
   await compileAndRun(
     `
@@ -40,7 +40,7 @@ io const answer = func () => return do:
   break selected 21
 `,
     (guest) => equal(guest.call("answer", null), 42),
-    { prelude: "std/prelude.blot" },
+    { prelude: "std/prelude.sq" },
   );
 });
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
@@ -84,7 +84,7 @@ Deno.test.ignore("qualified invocation rows retain multiset counts and reject in
   );
   const primitiveClause = 'type Tick is effect=Unit->Unit\nconst identity:a->a where {associated "add" U32 U32 U32 ! {Tick}}=func value=> return value\nio const answer=func()=> return identity 42\n';
   await compileExpectedFailure(primitiveClause, "missing_associated", undefined, { prelude: "none" });
-  await compileExpectedFailure(primitiveClause, "effect_mismatch", undefined, { prelude: "std/prelude.blot" });
+  await compileExpectedFailure(primitiveClause, "effect_mismatch", undefined, { prelude: "std/prelude.sq" });
   await compileAndRun(
     `
 type Tick is effect = Unit -> Unit

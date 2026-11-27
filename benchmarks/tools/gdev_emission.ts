@@ -8,7 +8,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     output: { type: "string", default: "build/bench/gdev-emission" },
     "timeout-ms": { type: "string", default: "30000" },
@@ -42,8 +42,8 @@ const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   ).join("");
 const options: ZigProjectCompilerOptions = {
   executable: resolve(values.compiler!),
-  entry: resolve(root, "src/main.blot"),
-  prelude: resolve(repo, "std/prelude.blot"),
+  entry: resolve(root, "src/main.sq"),
+  prelude: resolve(repo, "std/prelude.sq"),
   stdRoot: resolve(repo, "std"),
   imports: Object.fromEntries(
     Object.entries(settings.imports).map(([key, path]) => [

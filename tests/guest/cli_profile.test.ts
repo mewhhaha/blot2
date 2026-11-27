@@ -4,8 +4,8 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const source = `const twice = func x => return x + x
 const quad = func x => return twice (twice x)
 io const answer = func (x: U32) : U32 => return quad x + quad 1
@@ -55,7 +55,7 @@ async function build(command: string, label: string, ...extra: string[]) {
   const directory = `${root}/${label}`;
   await Deno.mkdir(directory);
   try {
-    const input = `${directory}/main.blot`;
+    const input = `${directory}/main.sq`;
     const output = `${directory}/main.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(executable, {
@@ -77,7 +77,7 @@ async function build(command: string, label: string, ...extra: string[]) {
   }
 }
 
-const root = await Deno.makeTempDir({ prefix: "blot-profile-" });
+const root = await Deno.makeTempDir({ prefix: "squid-profile-" });
 for (const command of ["build", "build-project"]) {
   Deno.test(`${command} omits detailed timing unless --profile is given`, async () => {
     const plain = await build(command, `${command}-a`);
@@ -94,9 +94,9 @@ for (const command of ["build", "build-project"]) {
 
 Deno.test("--profile is rejected where it has no effect", async () => {
   for (const command of ["check-project", "parse-project"]) {
-    const directory = await Deno.makeTempDir({ prefix: "blot-profile-" });
+    const directory = await Deno.makeTempDir({ prefix: "squid-profile-" });
     try {
-      const input = `${directory}/main.blot`;
+      const input = `${directory}/main.sq`;
       await Deno.writeTextFile(input, source);
       const result = await new Deno.Command(executable, {
         args: [command, input, "--prelude", prelude, "--profile"],
@@ -111,8 +111,8 @@ Deno.test("--profile is rejected where it has no effect", async () => {
 });
 
 Deno.test("project API reports clocks only when profiled", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-profile-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-profile-" });
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const options = { executable, entry, prelude };
   const plain = await createZigProjectCompiler(options);
@@ -136,7 +136,7 @@ Deno.test("project API reports clocks only when profiled", async () => {
 
 Deno.test("independent field requirements take linear candidate scans", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const count = 128;
   const lines = Array.from(
     { length: count },
@@ -176,7 +176,7 @@ Deno.test("independent field requirements take linear candidate scans", async ()
 
 Deno.test("ownership analysis handles shared tuple and record subtrees", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const lines = [];
   for (
     const [name, seed, layers] of [

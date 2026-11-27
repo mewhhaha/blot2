@@ -44,7 +44,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 pins[scriptPath] = await hash(scriptPath);
 for (const path of [baseline, candidate]) pins[path] = await hash(path);
 for await (const entry of Deno.readDir(std)) {
-  if (entry.isFile && entry.name.endsWith(".blot")) {
+  if (entry.isFile && entry.name.endsWith(".sq")) {
     const path = `${std}/${entry.name}`;
     pins[path] = await hash(path);
   }
@@ -82,7 +82,7 @@ for (const width of widths) {
     { length: width },
     (_, i) => shape === "tuple" ? `f${i}` : `row.f${i}`,
   ).join(" + ");
-  const path = `${output}/width-${width}.blot`;
+  const path = `${output}/width-${width}.sq`;
   await Deno.writeTextFile(
     path,
     `let rows = @list.generate ${count} (func i => return ${value})
@@ -119,11 +119,11 @@ io const memory_probe = func (seed: U32) => return #[seed]
           "--std-root",
           std,
           "--prelude",
-          `${std}/prelude.blot`,
+          `${std}/prelude.sq`,
         ],
         stdout: "piped",
         stderr: "piped",
-        env: { BLOT_CACHE_DIR: "" },
+        env: { SQUID_CACHE_DIR: "" },
       }).output();
       const wall_ms = performance.now() - started;
       const log = new TextDecoder().decode(compiled.stdout);

@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 io const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use initial <- host 0
@@ -35,14 +35,14 @@ io const floating = func (host: F32 -> Array F32 ! {Foreign}) => return do:
 `;
 
 Deno.test("private scalar captures preserve early exits loop reentry host suspension and failed producer edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-scalar-capture-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-scalar-capture-" });
+  const entry = `${directory}/main.sq`;
   try {
     {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       });
       try {
         const edited = source.replace(
@@ -63,7 +63,7 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
           const fresh = await createZigProjectCompiler({
             executable,
             entry,
-            prelude: new URL("../../std/prelude.blot", import.meta.url),
+            prelude: new URL("../../std/prelude.sq", import.meta.url),
           });
           try {
             const repeated = await fresh.build({ sources: { [entry]: text } });

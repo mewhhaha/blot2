@@ -4,7 +4,7 @@
 // that order (the checker's imported names and globals, the direct backend's
 // binding map), so the port keeps the same layout. Removal is not needed.
 // Values are u32 handles.
-namespace blot_support_zigmap;
+namespace squid_support_zigmap;
 import std;
 import support.wyhash;
 
@@ -14,7 +14,7 @@ struct Map { base: u32 = 0, capacity: u32 = 0, size: u32 = 0, available: u32 = 0
 
 // AutoContext hashes a u32 key as Wyhash.hash(0, its four bytes).
 fn hashKey(key: u32) -> u64 {
-    return blot_support_wyhash::hashU32(key);
+    return squid_support_wyhash::hashU32(key);
 }
 fn used<P>(pool: const P&, map: Map, slot: u32) -> bool { return pool[map.base + slot * 3] != 0; }
 fn keyAt<P>(pool: const P&, map: Map, slot: u32) -> u32 { return pool[map.base + slot * 3 + 1]; }

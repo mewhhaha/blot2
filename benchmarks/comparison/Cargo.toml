@@ -1,10 +1,10 @@
 [package]
-name = "blot_readme_bench"
+name = "squid_readme_bench"
 version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "blot_readme_bench"
+name = "squid_readme_bench"
 path = "rust_bench_main.rs"
 
 [dependencies]

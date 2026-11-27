@@ -1,61 +1,61 @@
-namespace blot_io;
+namespace squid_io;
 import support.native;
 import support.error;
 
-type Error = blot_error::Error;
+type Error = squid_error::Error;
 struct Reader { fd: i32 }
 struct Writer { fd: i32 }
 
 fn read_short(reader: Reader, out: u8[:]) -> i64, Error {
     var used: i64 = 0;
     while used < out.len {
-        let count = blot_native::read(reader.fd, out[used], (out.len - used) as u64);
-        if count < 0 { return used, blot_error::Error.io; }
-        if count == 0 { return used, blot_error::Error.none; }
+        let count = squid_native::read(reader.fd, out[used], (out.len - used) as u64);
+        if count < 0 { return used, squid_error::Error.io; }
+        if count == 0 { return used, squid_error::Error.none; }
         used += count;
     }
-    return used, blot_error::Error.none;
+    return used, squid_error::Error.none;
 }
 fn read_all(reader: Reader, out: u8[:]) -> Error {
     let count, error = read_short(reader, out);
-    if error != blot_error::Error.none { return error; }
-    if count != out.len { return blot_error::Error.end_of_stream; }
-    return blot_error::Error.none;
+    if error != squid_error::Error.none { return error; }
+    if count != out.len { return squid_error::Error.end_of_stream; }
+    return squid_error::Error.none;
 }
 fn write_all(writer: Writer, bytes: const u8[:]) -> Error {
     var used: i64 = 0;
     while used < bytes.len {
-        let count = blot_native::write(writer.fd, bytes[used], (bytes.len - used) as u64);
-        if count <= 0 { return blot_error::Error.io; }
+        let count = squid_native::write(writer.fd, bytes[used], (bytes.len - used) as u64);
+        if count <= 0 { return squid_error::Error.io; }
         used += count;
     }
-    return blot_error::Error.none;
+    return squid_error::Error.none;
 }
-fn flush(writer: Writer) -> Error { return blot_error::Error.none; }
+fn flush(writer: Writer) -> Error { return squid_error::Error.none; }
 fn writeAll(writer:Writer&,bytes:const u8[:])->Error {return write_all(writer,bytes);}
 
 fn read_file(path: const u8[:], out: u8[>..<]&, maximum: i64) -> Error {
     var terminated: u8[>..] = []; terminated.append(path); terminated.push(0);
-    let fd = blot_native::open_read(terminated[0]);
-    if fd < 0 { return blot_error::Error.io; }
-    let size = blot_native::file_size(fd);
-    if size < 0 || size > maximum { blot_native::close(fd); return blot_error::Error.overflow; }
+    let fd = squid_native::open_read(terminated[0]);
+    if fd < 0 { return squid_error::Error.io; }
+    let size = squid_native::file_size(fd);
+    if size < 0 || size > maximum { squid_native::close(fd); return squid_error::Error.overflow; }
     let start = out.len;
-    if size > 9223372036854775807 - start { blot_native::close(fd); return blot_error::Error.overflow; }
+    if size > 9223372036854775807 - start { squid_native::close(fd); return squid_error::Error.overflow; }
     out.resize(start + size, 0);
     let error = read_all(Reader { fd , ..}, out[start..]);
-    let closed = blot_native::close(fd);
-    if error != blot_error::Error.none { out.resize(start, 0); return error; }
-    if closed < 0 { out.resize(start, 0); return blot_error::Error.io; }
-    return blot_error::Error.none;
+    let closed = squid_native::close(fd);
+    if error != squid_error::Error.none { out.resize(start, 0); return error; }
+    if closed < 0 { out.resize(start, 0); return squid_error::Error.io; }
+    return squid_error::Error.none;
 }
 fn write_file(path: const u8[:], bytes: const u8[:]) -> Error {
     var terminated: u8[>..] = []; terminated.append(path); terminated.push(0);
-    let fd = blot_native::open_write(terminated[0], false);
-    if fd < 0 { return blot_error::Error.io; }
+    let fd = squid_native::open_write(terminated[0], false);
+    if fd < 0 { return squid_error::Error.io; }
     let error = write_all(Writer { fd , ..}, bytes);
-    let closed = blot_native::close(fd);
-    if error != blot_error::Error.none { return error; }
-    if closed < 0 { return blot_error::Error.io; }
-    return blot_error::Error.none;
+    let closed = squid_native::close(fd);
+    if error != squid_error::Error.none { return error; }
+    if closed < 0 { return squid_error::Error.io; }
+    return squid_error::Error.none;
 }

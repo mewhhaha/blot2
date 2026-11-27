@@ -49,7 +49,7 @@ export interface AssetReference {
   readonly [referenceBrand]: true;
 }
 export interface AssetModule {
-  /** Raw Blot declarations, optionally followed by structured exports. */
+  /** Raw Squid declarations, optionally followed by structured exports. */
   readonly source?: string;
   /** Transparent names for scalar, array, tuple, or other described types. */
   readonly aliases?: Readonly<Record<string, AssetType>>;
@@ -173,7 +173,7 @@ function identifier(name: string, upper: boolean): string {
     (upper && ["Unit", "Bool", "U32", "F32", "Array"].includes(name))
   ) {
     throw new TypeError(
-      `Invalid Blot ${upper ? "type" : "value/field"} name: ${name}`,
+      `Invalid Squid ${upper ? "type" : "value/field"} name: ${name}`,
     );
   }
   return name;
@@ -240,7 +240,7 @@ function prepareModule(
   if (raw !== undefined) {
     if (typeof raw !== "string" || !raw.isWellFormed() || raw.includes("\0")) {
       throw new TypeError(
-        "Generated asset source must be well-formed Blot text without NUL",
+        "Generated asset source must be well-formed Squid text without NUL",
       );
     }
     if (raw && !raw.endsWith("\n")) raw += "\n";
@@ -487,7 +487,7 @@ export async function withAssetImports(
       );
     }
     const path = localPath(
-      name.endsWith(".blot") ? name : `${name}.blot`,
+      name.endsWith(".sq") ? name : `${name}.sq`,
       base,
     );
     const module = await canonical(path);
@@ -1009,7 +1009,7 @@ export async function withAssetImports(
 }
 
 /** JSON objects become nominal records; homogeneous arrays remain arrays.
- * Strings use an explicit Utf8 record of bytes until Blot has runtime Text.
+ * Strings use an explicit Utf8 record of bytes until Squid has runtime Text.
  * Empty/heterogeneous arrays are exact tuples, avoiding guessed element types. */
 export const jsonAssetParser: AssetParser = (context) => {
   const source = new TextDecoder("utf-8", { fatal: true }).decode(

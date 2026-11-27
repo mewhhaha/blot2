@@ -12,8 +12,8 @@ import {
 } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -44,7 +44,7 @@ async function withModule(
   ) => void,
 ) {
   const dir = await Deno.makeTempDir({ prefix });
-  const entry = `${dir}/main.blot`;
+  const entry = `${dir}/main.sq`;
   try {
     await Deno.writeTextFile(entry, src);
     const compiler = await createZigProjectCompiler({
@@ -126,7 +126,7 @@ io run_arr_sum (n: U32): U32 =>
 io run_fork_check (n: U32): U32 =>
   return fork_in_body n
 `;
-  await withModule("blot-self-tco-", src, {}, (guest) => {
+  await withModule("squid-self-tco-", src, {}, (guest) => {
     // 200,000 deep recursion runs in O(1) stack via MVP loop/br (zero Wasm 3.0 opcodes)
     const n = 200_000;
     const expectedSum = ((BigInt(n) * BigInt(n + 1)) / 2n) & 0xffffffffn;
@@ -197,7 +197,7 @@ io mutual_run (n: U32): U32 =>
 `;
   let defaultId = "";
   let tailId = "";
-  await withModule("blot-tc-def-", src, {}, (guest, _bytes, id) => {
+  await withModule("squid-tc-def-", src, {}, (guest, _bytes, id) => {
     defaultId = id;
     // Small depth works without --tail-calls, while 200k mutual calls overflow stack (proving no return_call in default mode)
     strictEqual(guest.call("mutual_run", 30), 60);
@@ -213,7 +213,7 @@ io mutual_run (n: U32): U32 =>
     );
   });
   await withModule(
-    "blot-tc-on-",
+    "squid-tc-on-",
     src,
     { tailCalls: true },
     (guest, _bytes, id) => {
@@ -333,7 +333,7 @@ io escape_fma (size: U32): U32 =>
   let defaultSpark: number[] = [];
   let defaultMatmuls: number[][] = [];
 
-  await withModule("blot-rs-def-", src, {}, (guest, bytes, id) => {
+  await withModule("squid-rs-def-", src, {}, (guest, bytes, id) => {
     defaultId = id;
     ok(
       !hasByteSeq(bytes, RELAXED_MADD),
@@ -355,7 +355,7 @@ io escape_fma (size: U32): U32 =>
   });
 
   await withModule(
-    "blot-rs-on-",
+    "squid-rs-on-",
     src,
     { wasm3: true },
     (guest, bytes, id) => {
@@ -402,9 +402,9 @@ io escape_fma (size: U32): U32 =>
   );
 
   // Verify host CLI (`runCli`) passes --relaxed-simd / --wasm3 end-to-end
-  const dir = await Deno.makeTempDir({ prefix: "blot-cli-wasm3-" });
+  const dir = await Deno.makeTempDir({ prefix: "squid-cli-wasm3-" });
   try {
-    const entry = `${dir}/main.blot`;
+    const entry = `${dir}/main.sq`;
     const out = `${dir}/out.wasm`;
     await Deno.writeTextFile(entry, src);
     const code = await runCli(executable, [

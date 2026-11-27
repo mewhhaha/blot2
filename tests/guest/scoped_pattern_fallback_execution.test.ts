@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 type Row is data = $Row {text: &[U32]}
 const size = func collections: U32 => return do:
@@ -78,14 +78,14 @@ io const dynamic = func (value: U32): Array U32 => return do:
 
 Deno.test(`refutable bindings preserve iterator and exiting fallback control flow`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-pattern-fallback-",
+    prefix: "squid-pattern-fallback-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
   });
   try {
     const result = await compiler.build();

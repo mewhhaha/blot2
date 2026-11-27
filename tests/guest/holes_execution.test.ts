@@ -4,17 +4,17 @@ import { instantiateGuest } from "../../host/guest.ts";
 import type { DiagnosticType } from "../../host/type_diagnostics.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 Deno.test("typed holes reach project diagnostics and preserve the last successful revision", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({ executable, entry });
   try {
     const original =
       'import { next } from "./library"\nio const answer = func () => return next 41\n';
     const sources = {
       [entry]: original,
-      [`${directory}/library.blot`]:
+      [`${directory}/library.sq`]:
         "const next = func (value: U32) : U32 => return @u32.add value 1\n",
     };
     const first = await compiler.build({ sources });
@@ -22,7 +22,7 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
     const failed = await compiler.build({
       sources: {
         ...sources,
-        [`${directory}/library.blot`]:
+        [`${directory}/library.sq`]:
           "// 雪\nconst next = func (value: U32) : U32 => return @hole\n",
       },
     });
@@ -31,7 +31,7 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
     equal(failed.diagnostics[0].code, "typed_hole");
     ok(failed.diagnostics[0].message.includes("expected: U32"));
     ok(failed.diagnostics[0].message.includes("value: U32"));
-    equal(failed.diagnostics[0].filename, `${directory}/library.blot`);
+    equal(failed.diagnostics[0].filename, `${directory}/library.sq`);
     const diagnostic = failed.diagnostics[0];
     ok(diagnostic.hole);
     equal(diagnostic.hole.nodes[diagnostic.hole.expected].kind, "u32");
@@ -57,7 +57,7 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
 
 Deno.test("typed holes expose shared generic requirements and repeated structured rows", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({ executable, entry });
   try {
     const built = await compiler.build({

@@ -117,7 +117,7 @@ for path in sorted(ROOT.rglob('*.goose')):
             def shape(raw):
                 raw = re.sub(r'\bconst\s+', '', raw).strip().rstrip('&').strip()
                 raw = raw.replace('usize','i64').replace('isize','i64')
-                option = re.fullmatch(r'(?:blot_support::)?Option<(.+)>',raw)
+                option = re.fullmatch(r'(?:squid_support::)?Option<(.+)>',raw)
                 if option:
                     return ('optional', shape(option[1]))
                 if raw.startswith('?'):
@@ -131,7 +131,7 @@ for path in sorted(ROOT.rglob('*.goose')):
                 projections.append((source_name,member))
         scalar_projections[ns+'::'+match[1]] = projections
     for match in re.finditer(r'\bfn\s+jsonStringify\s*(?:<([^>]+)>)?\s*\(', text):
-        if ns == 'blot_json':
+        if ns == 'squid_json':
             continue
         end = balanced(text, match.end()-1, '(', ')')
         parameters = split(text[match.end():end])
@@ -139,7 +139,7 @@ for path in sorted(ROOT.rglob('*.goose')):
             continue
         receiver = parameters[0].split(':',1)[1].strip()
         receiver = re.sub(r'^const\s+', '', receiver).rstrip('&').strip()
-        if receiver.startswith('blot_'):
+        if receiver.startswith('squid_'):
             qualified = receiver
         else:
             qualified = ns+'::'+receiver
@@ -161,7 +161,7 @@ for path in sorted(ROOT.rglob('*.goose')):
 
 out = ['// Generated source by tools/write_json_adapters.py; unverified.',
        '// Exact overloads keep custom wire projections and enum tags explicit.',
-       'namespace blot_json;', 'import support.json;']
+       'namespace squid_json;', 'import support.json;']
 for _, (_, module) in models.items():
     imports.add(module)
 for _, (_, module) in structs.items():
@@ -173,36 +173,36 @@ for _, _, module in arrays:
 out.extend('import '+module+';' for module in sorted(imports) if module != 'support.json')
 for name, (generic, _) in sorted(structs.items()):
     # Intrinsic lookup metadata never appears in a diagnostic record.
-    if name in custom or name in {'blot_support::Option<T>', 'blot_json::Raw', 'blot_check_core::NumericIntrinsic'}:
+    if name in custom or name in {'squid_support::Option<T>', 'squid_json::Raw', 'squid_check_core::NumericIntrinsic'}:
         continue
     parameters = '<JsonWriter'
     if generic:
         parameters += ','+generic
     parameters += '>'
-    out.append('fn write'+parameters+'(writer:JsonWriter&,value:'+name+')->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}')
+    out.append('fn write'+parameters+'(writer:JsonWriter&,value:'+name+')->squid_error::Error {if writer.failure!=squid_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=squid_error::Error.none {return fail(writer,error);}return writer.failure;}')
 for name, (payload, _) in sorted(models.items()):
     if name in custom:
         continue
     implementation = 'unionValue' if payload else 'enumValue'
     projections = scalar_projections.get(name, [])
     if not projections:
-        out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->blot_error::Error {return '+implementation+'(writer,value);}')
+        out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->squid_error::Error {return '+implementation+'(writer,value);}')
         continue
-    out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->blot_error::Error {match value {')
+    out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->squid_error::Error {match value {')
     for variant, member in projections:
-        out.append(variant+' payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("'+variant+'"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.'+member+');if written!=blot_error::Error.none {return written;}return endObject(writer);},')
+        out.append(variant+' payload=>{let opened=beginObject(writer);if opened!=squid_error::Error.none {return opened;}let named=key(writer,sourceName("'+variant+'"));if named!=squid_error::Error.none {return named;}let written=write(writer,payload.'+member+');if written!=squid_error::Error.none {return written;}return endObject(writer);},')
     out.append('_=>{return '+implementation+'(writer,value);},}}')
 for name, (ns, generic, _, returns_error, output_bytes) in sorted(custom.items()):
     type_parameters = '<JsonWriter'
     if generic:
         type_parameters += ','+generic
     type_parameters += '>'
-    prefix = 'fn write'+type_parameters+'(writer:JsonWriter&,value:'+name+')->blot_error::Error {'
-    prefix += 'if writer.failure!=blot_error::Error.none {return writer.failure;}'
+    prefix = 'fn write'+type_parameters+'(writer:JsonWriter&,value:'+name+')->squid_error::Error {'
+    prefix += 'if writer.failure!=squid_error::Error.none {return writer.failure;}'
     if output_bytes:
         body = 'var bytes:u8[>..]=[];'+ns+'::jsonStringify(value,bytes);return write(writer,Raw{bytes[..]});'
     elif returns_error:
-        body = 'let error='+ns+'::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;'
+        body = 'let error='+ns+'::jsonStringify(value,writer);if error!=squid_error::Error.none {return fail(writer,error);}return writer.failure;'
     else:
         body = ns+'::jsonStringify(value,writer);return writer.failure;'
     out.append(prefix+body+'}')
@@ -228,5 +228,5 @@ for inner, width, _ in sorted(arrays):
         continue
     seen.add(key)
     # Fixed arrays are JSON arrays, including u8; only byte slices are strings.
-    out.append('fn write<JsonWriter>(writer:JsonWriter&,values:'+inner+'['+str(width)+'])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}')
-write_generated(ROOT/'support/json_adapters.goose','\n'.join(out)+'\n','blot_json')
+    out.append('fn write<JsonWriter>(writer:JsonWriter&,values:'+inner+'['+str(width)+'])->squid_error::Error {let opened=beginArray(writer);if opened!=squid_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=squid_error::Error.none {return error;}}return endArray(writer);}')
+write_generated(ROOT/'support/json_adapters.goose','\n'.join(out)+'\n','squid_json')

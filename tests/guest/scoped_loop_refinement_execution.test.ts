@@ -3,16 +3,16 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const entry =
-  new URL("../../compiler-goose/tests/fixtures/scoped-loop-refinement.blot", import.meta.url)
+  new URL("../../compiler-goose/tests/fixtures/scoped-loop-refinement.sq", import.meta.url)
     .pathname;
 
 Deno.test(`loop carries forget entry-only inline variant refinements`, async () => {
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
   });
   try {

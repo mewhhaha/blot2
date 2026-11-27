@@ -1,4 +1,4 @@
-// Unified Blot vNext Warm Work-Stealing `KernelPool` for Deno (§5.1).
+// Unified Squid vNext Warm Work-Stealing `KernelPool` for Deno (§5.1).
 //
 // Guarantees:
 // - Pre-instantiation private-copy `MemoryShape` & `CompiledModuleReceipt` admission
@@ -775,9 +775,9 @@ class InlineKernelGuest {
     }
     const instance = new WebAssembly.Instance(meta.module, stubImports);
     const exports = instance.exports;
-    const memory = exports["blot:memory"];
-    const allocate = exports["blot:allocate"];
-    const reset = exports["blot:reset"];
+    const memory = exports["squid:memory"];
+    const allocate = exports["squid:allocate"];
+    const reset = exports["squid:reset"];
     const entryFn = exports[manifest.name];
     if (
       !(memory instanceof WebAssembly.Memory) ||
@@ -790,7 +790,7 @@ class InlineKernelGuest {
     this.memory = memory;
     this.allocate = allocate as (bytes: number) => number;
     this.reset = reset as (arg: number) => void;
-    const finishRaw = exports["blot:finish_invocation"];
+    const finishRaw = exports["squid:finish_invocation"];
     this.finishInvocation = typeof finishRaw === "function"
       ? (finishRaw as () => void)
       : null;

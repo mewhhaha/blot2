@@ -380,7 +380,7 @@ fresh/revert witnesses.
 Reproduce using
 `benchmarks/tools/bench_repeated_edits.ts BASELINE CURRENT SNAPSHOT OUT
 7 4 both`, then
-`deno task profile:compile --blotc CURRENT --snapshot SNAPSHOT
+`deno task profile:compile --squidc CURRENT --snapshot SNAPSHOT
 --workload game --edit literal_constant --successive-literals --verify-manifest
 --codegen-workers 1 --runs 7 --reps 4`.
 Analyze its output with `benchmarks/tools/summarize_compile_profile.py DIRECTORY`.

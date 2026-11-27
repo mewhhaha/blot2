@@ -18,28 +18,28 @@ import { findCheckoutCompiler } from "./packaged_native.ts";
 import { decodeText, encodeText } from "./text.ts";
 import type { ZigProjectDiagnostic } from "./zig_project_client.ts";
 
-export type BlotGeneratorPhase = "compile" | "execute" | "result";
+export type SquidGeneratorPhase = "compile" | "execute" | "result";
 
-export class BlotGeneratorError extends Error {
+export class SquidGeneratorError extends Error {
   readonly trap?: GuestTrapInfo;
   constructor(
-    readonly phase: BlotGeneratorPhase,
+    readonly phase: SquidGeneratorPhase,
     message: string,
     options?: ErrorOptions & { readonly trap?: GuestTrapInfo },
   ) {
     super(message, options);
-    this.name = "BlotGeneratorError";
+    this.name = "SquidGeneratorError";
     if (options?.trap !== undefined) this.trap = options.trap;
     tagStage0Error(this, phase);
   }
 }
 
-export type BlotGeneratorInputMode = "bytes" | "text";
+export type SquidGeneratorInputMode = "bytes" | "text";
 
-export interface BlotGeneratorReference {
-  /** Nominal Blot type name for the host resource handle. */
+export interface SquidGeneratorReference {
+  /** Nominal Squid type name for the host resource handle. */
   readonly type: string;
-  /** Exported Blot constant name. */
+  /** Exported Squid constant name. */
   readonly export: string;
   readonly mediaType?: string;
 }
@@ -51,18 +51,18 @@ type GeneratorCompilerOptions = {
   readonly imports?: Readonly<Record<string, string | URL>>;
 };
 
-export interface BlotGeneratorOptions extends GeneratorCompilerOptions {
-  /** Path to the Stage 0 Blot entry file, relative to the working directory. */
+export interface SquidGeneratorOptions extends GeneratorCompilerOptions {
+  /** Path to the Stage 0 Squid entry file, relative to the working directory. */
   readonly generator: string | URL;
   /** Name of the generator function marked io. Defaults to generate. */
   readonly exportName?: string;
   /** Raw bytes by default, or strict UTF-8 decoded to Unicode scalars. */
-  readonly inputMode?: BlotGeneratorInputMode;
+  readonly inputMode?: SquidGeneratorInputMode;
   /** Publish the original input bytes as a host resource alongside the source. */
-  readonly reference?: BlotGeneratorReference;
+  readonly reference?: SquidGeneratorReference;
 }
 
-export interface BlotGeneratorRule {
+export interface SquidGeneratorRule {
   /** Virtual module path relative to the project root. */
   readonly module?: string;
   /** Input path relative to the project root. Required with module. */
@@ -71,8 +71,8 @@ export interface BlotGeneratorRule {
   readonly match?: string;
   readonly generator: string;
   readonly exportName?: string;
-  readonly inputMode?: BlotGeneratorInputMode;
-  readonly reference?: BlotGeneratorReference;
+  readonly inputMode?: SquidGeneratorInputMode;
+  readonly reference?: SquidGeneratorReference;
 }
 
 const std = new URL("../std/", import.meta.url);
@@ -107,21 +107,21 @@ function object(
 function validateSettings(
   input: Record<string, unknown>,
   label: string,
-): Pick<BlotGeneratorOptions, "exportName" | "inputMode" | "reference"> {
+): Pick<SquidGeneratorOptions, "exportName" | "inputMode" | "reference"> {
   const { exportName, inputMode } = input;
   if (
     exportName !== undefined &&
     (typeof exportName !== "string" || !valueName.test(exportName) ||
       reserved.has(exportName))
   ) {
-    throw new TypeError(`${label}.exportName must be a Blot function name`);
+    throw new TypeError(`${label}.exportName must be a Squid function name`);
   }
   if (
     inputMode !== undefined && inputMode !== "bytes" && inputMode !== "text"
   ) {
     throw new TypeError(`${label}.inputMode must be "bytes" or "text"`);
   }
-  let reference: BlotGeneratorReference | undefined;
+  let reference: SquidGeneratorReference | undefined;
   if (input.reference !== undefined) {
     const ref = object(
       input.reference,
@@ -135,7 +135,7 @@ function validateSettings(
       typeof name !== "string" || !valueName.test(name) || reserved.has(name)
     ) {
       throw new TypeError(
-        `${label}.reference requires Blot type and constant names`,
+        `${label}.reference requires Squid type and constant names`,
       );
     }
     if (
@@ -186,7 +186,7 @@ export function readGeneratorRules(
   value: unknown,
   root: string,
   label: string,
-): BlotGeneratorRule[] {
+): SquidGeneratorRule[] {
   if (!Array.isArray(value) || value.length > 4096) {
     throw new TypeError(
       `${label} must be an array of up to 4096 generator rules`,
@@ -204,8 +204,8 @@ export function readGeneratorRules(
       "reference",
     ], key);
     const generator = plainPath(root, raw.generator, `${key}.generator`);
-    if (!generator.endsWith(".blot")) {
-      throw new TypeError(`${key}.generator must end in .blot`);
+    if (!generator.endsWith(".sq")) {
+      throw new TypeError(`${key}.generator must end in .sq`);
     }
     const settings = validateSettings(raw, key);
     if (raw.match === undefined) {
@@ -264,7 +264,7 @@ async function projectPath(
 /** Check explicit paths and glob directories against symlink escapes. */
 export async function validateGeneratorRulePaths(
   root: string,
-  rules: readonly BlotGeneratorRule[],
+  rules: readonly SquidGeneratorRule[],
 ): Promise<void> {
   if (!rules.length) return;
   const base = await Deno.realPath(root);
@@ -273,7 +273,7 @@ export async function validateGeneratorRulePaths(
     if (match !== undefined) {
       await projectPath(base, resolve(base, dirname(match)), true);
     } else {
-      const target = module!.endsWith(".blot") ? module! : module + ".blot";
+      const target = module!.endsWith(".sq") ? module! : module + ".sq";
       await projectPath(base, resolve(base, target));
       await projectPath(base, resolve(base, input!));
     }
@@ -283,7 +283,7 @@ export async function validateGeneratorRulePaths(
 /** Expand project-relative rules to absolute asset mappings for any entry. */
 export async function expandGeneratorRules(
   root: string | URL,
-  rules: readonly BlotGeneratorRule[],
+  rules: readonly SquidGeneratorRule[],
   options: GeneratorCompilerOptions = {},
 ): Promise<AssetImports> {
   const base = await Deno.realPath(pathOf(root));
@@ -301,13 +301,13 @@ export async function expandGeneratorRules(
     const key = JSON.stringify(settings);
     let parser = parsers.get(key);
     if (!parser) {
-      parser = createBlotGenerator({ ...options, ...settings });
+      parser = createSquidGenerator({ ...options, ...settings });
       parsers.set(key, parser);
     }
     const add = async (module: string, input: string) => {
       const target = await projectPath(
         base,
-        module.endsWith(".blot") ? module : module + ".blot",
+        module.endsWith(".sq") ? module : module + ".sq",
       );
       const path = await projectPath(base, input);
       if (Object.hasOwn(assets, target)) {
@@ -343,7 +343,7 @@ export async function expandGeneratorRules(
 type SourceToken = { text: string; start: number };
 
 // Stage 0 only needs import paths and the selected entry marker. Skip line
-// comments and keep quoted strings intact so embedded Blot is never scanned
+// comments and keep quoted strings intact so embedded Squid is never scanned
 // as generator code. The native compiler still checks all source syntax.
 function scan(source: string): SourceToken[] {
   const tokens: SourceToken[] = [];
@@ -414,7 +414,7 @@ function resolveImport(
       local ? specifier : specifier.slice(match![0].length),
     );
     if (tail.startsWith("/") || tail.includes("\0")) return;
-    return resolve(prefix, tail.endsWith(".blot") ? tail : tail + ".blot");
+    return resolve(prefix, tail.endsWith(".sq") ? tail : tail + ".sq");
   } catch {
     // Report malformed paths through the native compiler.
   }
@@ -446,7 +446,7 @@ async function snapshot(
     // canonical path just as the compiler does.
     const filename = await Deno.realPath(path).catch((error) => {
       if (!(error instanceof Deno.errors.NotFound)) throw error;
-      return path; // an assetSources overlay may supply a virtual Blot file
+      return path; // an assetSources overlay may supply a virtual Squid file
     });
     paths.set(path, filename);
     if (graph.has(filename)) return filename;
@@ -489,7 +489,7 @@ function diagnostics(errors: readonly ZigProjectDiagnostic[]): string {
 }
 
 async function compile(
-  options: BlotGeneratorOptions,
+  options: SquidGeneratorOptions,
   entry: string,
   captured: Snapshot,
   signal: AbortSignal | undefined,
@@ -518,7 +518,7 @@ async function compile(
     const abi = readGuestAbi(module);
     const fn = abi.functions.find((fn) => fn.name === name);
     if (!fn) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         `Missing io entry function ${name} in generator ${entry}`,
       );
@@ -528,7 +528,7 @@ async function compile(
       fn.result !== "Array U32"
     ) return;
     if (WebAssembly.Module.imports(module).length) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         `Generator ${entry} requires Wasm host imports; Stage 0 grants no capabilities`,
       );
@@ -540,13 +540,13 @@ async function compile(
     if (initial.success) {
       const direct = validate(initial.bytes, name, false, false);
       if (direct) return direct;
-      throw new BlotGeneratorError("compile", unsupported);
+      throw new SquidGeneratorError("compile", unsupported);
     }
     if (
       !initial.diagnostics.length ||
       initial.diagnostics.some(({ code }) => code !== "entry_type")
     ) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         `Could not compile generator ${entry}:\n${
           diagnostics(initial.diagnostics)
@@ -555,7 +555,7 @@ async function compile(
     }
 
     // The installed ABI has numeric arrays, so lower the rich signature
-    // inside Blot. The native checker verifies every argument/result shape.
+    // inside Squid. The native checker verifies every argument/result shape.
     const filename = captured.entry;
     const original = captured.sources[filename];
     const tokens = scan(original);
@@ -578,7 +578,7 @@ async function compile(
       return next.text === name;
     });
     if (marker === -1) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         `Missing io entry function ${name} in generator ${entry}`,
       );
@@ -593,7 +593,7 @@ async function compile(
     const replacement = isValueDecl ? "" : "func";
     const source = original.slice(0, start) + replacement + original.slice(end);
     const usedNames = new Set(tokens.map((token) => token.text));
-    let adapter = "_blot_stage0";
+    let adapter = "_squid_stage0";
     while (usedNames.has(adapter)) adapter += "_";
 
     const recordFirst = initial.diagnostics[0].message.includes(
@@ -644,14 +644,14 @@ async function compile(
       }
     }
     if (loweringFailure) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         `Could not compile generator ${entry}:\n${
           diagnostics(loweringFailure)
         }`,
       );
     }
-    throw new BlotGeneratorError(
+    throw new SquidGeneratorError(
       "compile",
       `${unsupported}\n${diagnostics(initial.diagnostics)}`,
     );
@@ -660,9 +660,9 @@ async function compile(
   }
 }
 
-/** Compile a Blot asset parser once per source graph and run each input in a fresh guest. */
-export function createBlotGenerator(
-  options: BlotGeneratorOptions,
+/** Compile a Squid asset parser once per source graph and run each input in a fresh guest. */
+export function createSquidGenerator(
+  options: SquidGeneratorOptions,
 ): AssetParser {
   const { exportName, inputMode, reference } = validateSettings(
     { ...options },
@@ -671,7 +671,7 @@ export function createBlotGenerator(
   const generator = pathOf(options.generator);
   const capturedPath = (path: string | URL | null | undefined) =>
     path == null ? path : pathOf(path);
-  const config: BlotGeneratorOptions = {
+  const config: SquidGeneratorOptions = {
     generator,
     exportName,
     inputMode,
@@ -695,7 +695,7 @@ export function createBlotGenerator(
   if (standard !== null) aliases.unshift(["std/", pathOf(standard)]);
   aliases.sort(([a], [b]) => b.length - a.length);
   const prelude = config.prelude === undefined && !Deno.build.standalone
-    ? pathOf(new URL("prelude.blot", std))
+    ? pathOf(new URL("prelude.sq", std))
     : config.prelude as string | null | undefined;
 
   // Share in-flight compilation between assets while keeping at most one
@@ -711,7 +711,7 @@ export function createBlotGenerator(
       try {
         data = encodeText(decoder.decode(context.bytes));
       } catch (cause) {
-        throw new BlotGeneratorError(
+        throw new SquidGeneratorError(
           "execute",
           `Expected UTF-8 text for generator input ${context.path}`,
           { cause },
@@ -730,10 +730,10 @@ export function createBlotGenerator(
         cached?.graph,
       );
     } catch (cause) {
-      if (cause instanceof BlotGeneratorError || context.signal?.aborted) {
+      if (cause instanceof SquidGeneratorError || context.signal?.aborted) {
         throw cause;
       }
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "compile",
         cause instanceof Error ? cause.message : String(cause),
         { cause },
@@ -775,9 +775,9 @@ export function createBlotGenerator(
       const detail = cause instanceof WebAssembly.RuntimeError
         ? "trapped"
         : "failed";
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "execute",
-        `Blot generator ${
+        `Squid generator ${
           exportName ?? "generate"
         } ${detail} for ${context.path}: ${message}`,
         { cause, ...(trap && { trap }) },
@@ -786,13 +786,13 @@ export function createBlotGenerator(
       guest.dispose();
     }
     if (!(output instanceof Uint32Array)) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "result",
         "Generator returned an invalid Text value",
       );
     }
     if (compiled.result && output[0] !== 0 && output[0] !== 1) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "result",
         "Generator returned an invalid Result tag",
       );
@@ -801,14 +801,14 @@ export function createBlotGenerator(
     try {
       source = decodeText(compiled.result ? output.subarray(1) : output);
     } catch (cause) {
-      throw new BlotGeneratorError(
+      throw new SquidGeneratorError(
         "result",
         cause instanceof Error ? cause.message : String(cause),
         { cause },
       );
     }
     if (compiled.result && output[0] === 1) {
-      throw new BlotGeneratorError("result", source);
+      throw new SquidGeneratorError("result", source);
     }
     if (!reference) return { source };
     const ref = await context.reference(undefined, reference.mediaType);

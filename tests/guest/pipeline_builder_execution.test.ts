@@ -37,13 +37,13 @@ io const floats = func (seed: F32) => return do:
 `;
 Deno.test(`pipeline fallback preserves snapshots ragged lengths traps and F32 order`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-pipeline-controls-",
+    prefix: "squid-pipeline-controls-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
   });
   try {

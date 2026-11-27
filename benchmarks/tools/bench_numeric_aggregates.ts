@@ -37,7 +37,7 @@ assert(
 );
 await Deno.mkdir(output); // A new output directory prevents mixing campaigns.
 const fixture = numericAggregateSources();
-const entry = `${output}/main.blot`, library = `${output}/shapes.blot`;
+const entry = `${output}/main.sq`, library = `${output}/shapes.sq`;
 const sources = { [entry]: fixture.main, [library]: fixture.shapes };
 for (const [path, source] of Object.entries(sources)) {
   await Deno.writeTextFile(path, source);
@@ -55,7 +55,7 @@ async function standardLibraryPins(
     const path = new URL(entry.name + (entry.isDirectory ? "/" : ""), root);
     if (entry.isDirectory) {
       rows.push(...await standardLibraryPins(path, prefix + entry.name + "/"));
-    } else if (entry.isFile && entry.name.endsWith(".blot")) {
+    } else if (entry.isFile && entry.name.endsWith(".sq")) {
       rows.push([prefix + entry.name, await hash(await Deno.readFile(path))]);
     }
   }
@@ -126,7 +126,7 @@ for (const tier of ["development", "optimized"] as const) {
         executable: executables[variant],
         entry,
         stdRoot: new URL("../../std", import.meta.url),
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       };
       const compiler = await createZigProjectCompiler(options);
       try {
@@ -174,10 +174,10 @@ for (const tier of ["development", "optimized"] as const) {
         const runtimeModule = new WebAssembly.Module(bytes);
         assert.equal(WebAssembly.Module.imports(runtimeModule).length, 0);
         const runtime = new WebAssembly.Instance(runtimeModule).exports;
-        const enter = runtime["blot:ownership_enter"] as
+        const enter = runtime["squid:ownership_enter"] as
           | (() => void)
           | undefined;
-        const leave = runtime["blot:ownership_leave"] as
+        const leave = runtime["squid:ownership_leave"] as
           | (() => void)
           | undefined;
         try {
@@ -277,7 +277,7 @@ for (const tier of ["development", "optimized"] as const) {
                   repetitions,
               });
             }
-            for (const name of ["blot:rc_roots", "blot:rc_leases"]) {
+            for (const name of ["squid:rc_roots", "squid:rc_leases"]) {
               assert.equal(
                 (runtime[name] as WebAssembly.Global | undefined)?.value ?? 0,
                 0,

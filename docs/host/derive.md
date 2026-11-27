@@ -1,15 +1,15 @@
 # Opt-in derivation
 
 `host/derive_cli.ts` turns checked `type ... is data` declarations into ordinary
-Blot source. It emits `Type.eq`, a `std/equality.Eq` implementation, a
+Squid source. It emits `Type.eq`, a `std/equality.Eq` implementation, a
 `std/text.Format` implementation, and a `std/codec.Codec` implementation. The
 generated module is checked again before it replaces the output file. Only types
 listed in the schema manifest are derived, so a handwritten implementation can
 be used instead. The compiler has no unrestricted runtime reflection.
 
-For example, save this source as `model.blot`:
+For example, save this source as `model.sq`:
 
-```blot
+```squid
 type Ticket is data = $Ticket { number: U32, active: Bool } | $Empty
 ```
 
@@ -33,19 +33,19 @@ Run from the repository root after building the development compiler:
 
 ```sh
 deno task build:compiler:dev
-deno run -A host/derive_cli.ts --source model.blot --schema schema.json \
-  --output model_derived.blot --blotc compiler/zig-out-dev/bin/blotc
+deno run -A host/derive_cli.ts --source model.sq --schema schema.json \
+  --output model_derived.sq --squidc compiler/zig-out-dev/bin/squidc
 ```
 
 Keep the output beside the source so relative imports resolve the same way. The
 command checks the input project, reads its data-declaration CST, emits source,
 checks the generated project, and atomically publishes the output. Build or
-import `model_derived.blot` instead of `model.blot`. The supported payloads are
+import `model_derived.sq` instead of `model.sq`. The supported payloads are
 nullary, scalar, product, and named record constructors. Generic type parameters
 and array fields are supported. Recursive fields require handwritten operations
 and receive a field-naming diagnostic. A function field likewise receives a
 diagnostic naming its field and missing structural equality or formatting
-operation. Other missing contract implementations are reported by the Blot
+operation. Other missing contract implementations are reported by the Squid
 checker when the generated function is instantiated.
 
 The default derives all three operations. A type can select any nonempty subset
@@ -65,7 +65,7 @@ version or tag, missing or reordered fields, incorrect lengths, trailing words,
 and malformed element payloads. The standard library supplies U32 and Bool
 codecs. A custom field codec can enforce domain validation:
 
-```blot
+```squid
 type Positive is data = $Positive U32
 impl PositiveCodec : codec.Codec Positive = {
   const encode = func ($Positive value) => return #[value],

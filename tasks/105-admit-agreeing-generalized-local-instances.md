@@ -6,10 +6,10 @@
   acceptance scope; see the current completion record below.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
-  2026 as [issue #10](https://github.com/mewhhaha/blot2/issues/10); owner
+  2026 as [issue #10](https://github.com/mewhhaha/squid-lang/issues/10); owner
   approved the checker-side fix the same day.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -196,7 +196,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   --phase-seconds 3600` passes
   in 18 minutes: native 2 × 1178 tests with no leaks, guests 1508, harness 28
   and smoke 48.
-- Validation (17 October, app-hooks): Ink's `app-hooks.blot` builds; with
+- Validation (17 October, app-hooks): Ink's `app-hooks.sq` builds; with
   release and dev compilers `paused_frame` returns `[11, 0, 0, 0.5, 1, 2, 5, 6]`
   and `pause_events` `[11, 2, 0, 0.5, 0, 1, 2, 1, 2, 1, 2, 3, 4, 4, 5, 6]`, as
   `app-hooks_test.ts` expects, and `schedule_workload n` returns

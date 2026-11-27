@@ -32,9 +32,9 @@ available. Qualification commands must explicitly include `--guard-cpu`.
 For this cloud machine, reduce scheduling noise with an allowed CPU:
 
 ```sh
-BLOT_BENCH_CPU=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
-taskset --cpu-list "$BLOT_BENCH_CPU" deno task bench:compile \
-  --baseline OLD_BLOTC --candidate NEW_BLOTC --workload game \
+SQUID_BENCH_CPU=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+taskset --cpu-list "$SQUID_BENCH_CPU" deno task bench:compile \
+  --baseline OLD_SQUIDC --candidate NEW_SQUIDC --workload game \
   --runs 7 --no-retained --guard-cpu
 ```
 

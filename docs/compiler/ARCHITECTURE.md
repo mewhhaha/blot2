@@ -5,7 +5,7 @@ revisions. Deno supplies the optional client, formatter and guest host; it does
 not parse, infer or stage source for compilation.
 
 The
-[25 October architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_ARCHITECTURE_REVIEW.md)
+[25 October architecture review](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_ARCHITECTURE_REVIEW.md)
 separates this implemented design from proposed changes to semantic completion,
 incremental queries and development specialization. Current measurements and
 qualification are in [CT110](../qualification/CT110_QUALIFICATION.md).
@@ -139,7 +139,7 @@ handles, and resolved bodies distinguish source expressions. Store-bound
 services still enforce owner identity; equal integers from different owners are
 not interchangeable. Dense legacy Core tables keep their existing word encoding.
 
-Compiled `.blotdep` files contain typed dependency modules and their admission
+Compiled `.sqdep` files contain typed dependency modules and their admission
 metadata. Compiler identity, source changes, catalogs, nominal origins and
 compile-time dependencies participate in validity checks. Native work counters
 are instrumentation, not source-language fuel semantics.
@@ -187,7 +187,7 @@ checkpoint write per build. Immediate disposal does not join detached writers.
 See the [project client](PROJECT_CLIENT.md) for cache waiting and directory
 ownership. Missing, corrupt and unavailable caches fall back to ordinary
 compilation. Explicit checkpoint import/export remains available. This is
-separate from `.blotdep` frontend bundles and from the more permissive in-memory
+separate from `.sqdep` frontend bundles and from the more permissive in-memory
 literal projection.
 
 ## Ownership and memory
@@ -294,7 +294,7 @@ CPU time. Profiled region clocks also group caller sites by stage. They make the
 remaining elaboration boundary observable. Written `result` requirements retain
 the selected invocation row through checking and lowering; inferred conversions
 keep their existing syntax. See
-[the current work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md)
+[the current work record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md)
 for coverage, measurements and qualification status.
 
 ### CT112 completed selected results
@@ -311,7 +311,7 @@ typed views, does not drop observed negative memo facts, and does not retain
 every elaborated body. Native receipts own the additional claims; the existing
 portable schema omits nested claims and rechecks those closures after restart.
 See the
-[CT112 work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT112_WORK.md)
+[CT112 work record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT112_WORK.md)
 for verification and measurements. The generic development ABI remains a
 separate unfinished step.
 
@@ -331,7 +331,7 @@ calls during backend inference are excluded by phase. These measurements do not
 participate in identities, admission checks or semantic decisions.
 
 The
-[frontend review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
+[frontend review](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
 proposes direct instantiation from immutable producer interfaces, requirement
 dependency tracking, and fewer copies across checked/Core/frozen boundaries.
 Those larger representation changes remain unimplemented. The current changes
@@ -350,7 +350,7 @@ removes measured fresh-build saturation without changing evidence admission.
 Payload and lookup-work bounds remain fixed. The failed proof-recheck trials are
 not included: missing proof provenance still prevents replay of many otherwise
 matching body queries. See
-[the CT113 record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT113_WORK.md)
+[the CT113 record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT113_WORK.md)
 for the trial boundaries, memory tradeoff, measurements and qualification
 status.
 

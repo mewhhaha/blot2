@@ -1,5 +1,5 @@
 // Fixed map descriptors keep recursive owners free of resizable locals.
-namespace blot_support_pooled_map;
+namespace squid_support_pooled_map;
 import .word_hash;
 import dictionary;
 // Keys may define content equality in their own namespace.

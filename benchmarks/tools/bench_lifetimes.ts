@@ -55,7 +55,7 @@ io const shared = func (count: U32) => return do:
       sum := self + right.child.a + left.child.r + left.q + right.q
   break sum
 `;
-const input = `${output}/lifetimes.blot`;
+const input = `${output}/lifetimes.sq`;
 await Deno.writeTextFile(input, source);
 const sha256 = async (path: string) =>
   [
@@ -79,7 +79,7 @@ for (const variant of variants) {
       "--std-root",
       std,
       "--prelude",
-      `${std}/prelude.blot`,
+      `${std}/prelude.sq`,
     ],
     stdout: "piped",
     stderr: "piped",

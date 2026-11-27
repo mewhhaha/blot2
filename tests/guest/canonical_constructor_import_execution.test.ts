@@ -35,12 +35,12 @@ io const ordered = func () => return do:
   break @f32.add (@u32.to_f32 (@u32.add (@u32.mul count 10) x)) y
 io const folded = ordered ()
 `;
-const compiler=Deno.args[0]??new URL("../../compiler-goose/build/blotc-goose",import.meta.url).pathname;
+const compiler=Deno.args[0]??new URL("../../compiler-goose/build/squidc-goose",import.meta.url).pathname;
 for(const asynchronous of [false,true])Deno.test(`imported callable record constructors retain source arrows, captures and State argument order (${asynchronous?"JSPI":"sync"})`,async()=>{
  const dir=await Deno.makeTempDir({dir:new URL("../../build",import.meta.url).pathname,prefix:"zig-native-constructor-import-"});
  try{
-  await Deno.writeTextFile(dir+"/model.blot",producerSource);await Deno.writeTextFile(dir+"/main.blot",consumerSource);
-  const result=await new Deno.Command(compiler,{args:["build-project",dir+"/main.blot",dir+"/program.wasm","--prelude","none"],stdout:"piped",stderr:"piped"}).output();
+  await Deno.writeTextFile(dir+"/model.sq",producerSource);await Deno.writeTextFile(dir+"/main.sq",consumerSource);
+  const result=await new Deno.Command(compiler,{args:["build-project",dir+"/main.sq",dir+"/program.wasm","--prelude","none"],stdout:"piped",stderr:"piped"}).output();
   const text=new TextDecoder().decode(result.stdout);if(!result.success)throw new Error(text+new TextDecoder().decode(result.stderr));
   const metrics=text.trim().split("\n").map(line=>JSON.parse(line)).find(row=>row.kind==="compilation");strictEqual(metrics.memory.live_bytes,0);
   const bytes=await Deno.readFile(dir+"/program.wasm");strictEqual(WebAssembly.validate(bytes),true);

@@ -1,6 +1,6 @@
 // Execution choices owned by one compilation or session. They never change
 // the emitted bytes.
-namespace blot_execution_policy;
+namespace squid_execution_policy;
 
 struct Policy {
     // Workers lowering independent modules to Core.

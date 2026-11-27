@@ -17,9 +17,9 @@ async function commit(root: string) {
   await git(
     root,
     "-c",
-    "user.name=BPM fixture",
+    "user.name=SPM fixture",
     "-c",
-    "user.email=bpm@example.invalid",
+    "user.email=spm@example.invalid",
     "commit",
     "--quiet",
     "-m",
@@ -30,18 +30,18 @@ async function commit(root: string) {
 async function library(root: string, value = 42) {
   await Deno.mkdir(join(root, "src"), { recursive: true });
   await Deno.mkdir(join(root, "extra"), { recursive: true });
-  await Deno.writeTextFile(join(root, "extra/value.blot"), "const extra = 1\n");
+  await Deno.writeTextFile(join(root, "extra/value.sq"), "const extra = 1\n");
   await Deno.writeTextFile(
-    join(root, "src/value.blot"),
+    join(root, "src/value.sq"),
     `const value = ${value}\n`,
   );
   await Deno.writeTextFile(
-    join(root, "src/prelude.blot"),
+    join(root, "src/prelude.sq"),
     "const custom = 7\n",
   );
   await Deno.writeTextFile(
-    join(root, "blot-workspace.yaml"),
-    "exports:\n  .: ./src\n  extra: ./extra\nprelude: ./src/prelude.blot\n",
+    join(root, "squid-workspace.yaml"),
+    "exports:\n  .: ./src\n  extra: ./extra\nprelude: ./src/prelude.sq\n",
   );
 }
 async function repository(root: string) {
@@ -53,8 +53,8 @@ async function app(root: string, dependencies: unknown, prelude?: string) {
   await Deno.mkdir(root, { recursive: true });
   const value: Record<string, unknown> = { dependencies };
   if (prelude) value.prelude = prelude;
-  await Deno.writeTextFile(join(root, "blot.json"), JSON.stringify(value));
-  return join(root, "src/main.blot");
+  await Deno.writeTextFile(join(root, "squid.json"), JSON.stringify(value));
+  return join(root, "src/main.sq");
 }
 async function temporary(test: (directory: string) => Promise<void>) {
   const directory = await Deno.makeTempDir();
@@ -75,26 +75,26 @@ Deno.test("Git packages pin moving refs, resolve offline and update only on requ
     const entry = await app(root, { math: `${source}#main` }, "math");
     const installed = await installPackages(root, { cacheDirectory });
     equal(
-      await Deno.readTextFile(join(installed.imports["math/"], "value.blot")),
+      await Deno.readTextFile(join(installed.imports["math/"], "value.sq")),
       "const value = 42\n",
     );
     ok(installed.imports["math/extra/"].endsWith("/extra"));
-    ok(installed.prelude?.endsWith("/src/prelude.blot"));
-    const originalLock = await Deno.readTextFile(join(root, "blot.lock.json"));
+    ok(installed.prelude?.endsWith("/src/prelude.sq"));
+    const originalLock = await Deno.readTextFile(join(root, "squid.lock.json"));
     equal(JSON.parse(originalLock).packages.math.revision, first);
     await Deno.writeTextFile(
-      join(repo, "src/value.blot"),
+      join(repo, "src/value.sq"),
       "const value = 43\n",
     );
     const second = await commit(repo);
     await installPackages(root, { cacheDirectory });
-    equal(await Deno.readTextFile(join(root, "blot.lock.json")), originalLock);
+    equal(await Deno.readTextFile(join(root, "squid.lock.json")), originalLock);
     await Deno.rename(repo, `${repo}-offline`);
     try {
       const offline = await resolveProject(entry, { cacheDirectory });
       ok(offline);
       equal(
-        await Deno.readTextFile(join(offline.imports["math/"], "value.blot")),
+        await Deno.readTextFile(join(offline.imports["math/"], "value.sq")),
         "const value = 42\n",
       );
       await installPackages(root, { cacheDirectory, frozen: true });
@@ -106,12 +106,13 @@ Deno.test("Git packages pin moving refs, resolve offline and update only on requ
       update: true,
     });
     equal(
-      JSON.parse(await Deno.readTextFile(join(root, "blot.lock.json"))).packages
+      JSON.parse(await Deno.readTextFile(join(root, "squid.lock.json")))
+        .packages
         .math.revision,
       second,
     );
     equal(
-      await Deno.readTextFile(join(updated.imports["math/"], "value.blot")),
+      await Deno.readTextFile(join(updated.imports["math/"], "value.sq")),
       "const value = 43\n",
     );
   }));
@@ -135,7 +136,8 @@ Deno.test("SHA-256 repositories install by branch and restore exact frozen commi
     const entry = await app(root, { math: `${source}#main` });
     await installPackages(root, { cacheDirectory });
     equal(
-      JSON.parse(await Deno.readTextFile(join(root, "blot.lock.json"))).packages
+      JSON.parse(await Deno.readTextFile(join(root, "squid.lock.json")))
+        .packages
         .math.revision,
       revision,
     );
@@ -147,7 +149,8 @@ Deno.test("SHA-256 repositories install by branch and restore exact frozen commi
     await app(root, { math: `${source}#${revision}` });
     await installPackages(root, { cacheDirectory });
     equal(
-      JSON.parse(await Deno.readTextFile(join(root, "blot.lock.json"))).packages
+      JSON.parse(await Deno.readTextFile(join(root, "squid.lock.json")))
+        .packages
         .math.revision,
       revision,
     );
@@ -171,12 +174,12 @@ Deno.test("transitive packages share a pinned graph and reject conflicting globa
     ok(project.imports["parent/"] && project.imports["leaf/"]);
     equal(
       Object.keys(
-        JSON.parse(await Deno.readTextFile(join(root, "blot.lock.json")))
+        JSON.parse(await Deno.readTextFile(join(root, "squid.lock.json")))
           .packages,
       ),
       ["parent", "leaf"],
     );
-    const lockPath = join(root, "blot.lock.json");
+    const lockPath = join(root, "squid.lock.json");
     const lock = JSON.parse(await Deno.readTextFile(lockPath));
     lock.packages = { leaf: lock.packages.leaf, parent: lock.packages.parent };
     await Deno.writeTextFile(lockPath, JSON.stringify(lock));
@@ -206,31 +209,31 @@ Deno.test("local workspaces stay live, enforce exports and do not inject a prelu
     equal(initial.prelude, null);
     equal(initial.stdRoot, null);
     await Deno.writeTextFile(
-      join(local, "src/value.blot"),
+      join(local, "src/value.sq"),
       "const value = 99\n",
     );
     const changed = await resolveProject(entry);
     equal(
-      await Deno.readTextFile(join(changed!.imports["local/"], "value.blot")),
+      await Deno.readTextFile(join(changed!.imports["local/"], "value.sq")),
       "const value = 99\n",
     );
     await Deno.writeTextFile(
-      join(local, "blot-workspace.yaml"),
+      join(local, "squid-workspace.yaml"),
       "exports:\n  .: ../app\n",
     );
     await rejects(() => resolveProject(entry), /escapes its workspace/);
     await Deno.symlink(root, join(local, "outside"));
     await Deno.writeTextFile(
-      join(local, "blot-workspace.yaml"),
+      join(local, "squid-workspace.yaml"),
       "exports:\n  .: ./outside\n",
     );
     await rejects(() => resolveProject(entry), /escapes its workspace/);
     await Deno.writeTextFile(
-      join(local, "blot-workspace.yaml"),
+      join(local, "squid-workspace.yaml"),
       "exports:\n  .: ./src\n  .: ./extra\n",
     );
     await rejects(() => resolveProject(entry));
-    await Deno.remove(join(local, "blot-workspace.yaml"));
+    await Deno.remove(join(local, "squid-workspace.yaml"));
     await rejects(() => resolveProject(entry), /must declare its exports/);
   }));
 
@@ -244,11 +247,11 @@ Deno.test("cache modifications and ignored extra files cannot compile under a pi
     await commit(repo);
     const entry = await app(root, { math: `${pathToFileURL(repo).href}#main` });
     const project = await installPackages(root, { cacheDirectory });
-    const value = join(project.imports["math/"], "value.blot");
+    const value = join(project.imports["math/"], "value.sq");
     await Deno.writeTextFile(value, "const value = 99\n");
     await rejects(
       () => resolveProject(entry, { cacheDirectory }),
-      /Changed BPM checkout/,
+      /Changed SPM checkout/,
     );
     await Deno.writeTextFile(value, "const value = 42\n");
     await Deno.writeTextFile(
@@ -257,7 +260,7 @@ Deno.test("cache modifications and ignored extra files cannot compile under a pi
     );
     await rejects(
       () => resolveProject(entry, { cacheDirectory }),
-      /Changed BPM checkout/,
+      /Changed SPM checkout/,
     );
   }));
 
@@ -271,24 +274,24 @@ Deno.test("failed and frozen installs preserve the lock and clean unpublished do
     await app(root, { math: `${source}#main` });
     await rejects(
       () => installPackages(root, { cacheDirectory, frozen: true }),
-      /run bpm install/,
+      /run spm install/,
     );
     await installPackages(root, { cacheDirectory });
-    const lock = await Deno.readTextFile(join(root, "blot.lock.json"));
+    const lock = await Deno.readTextFile(join(root, "squid.lock.json"));
     await app(root, { math: `${source}#missing` });
     await rejects(
       () => installPackages(root, { cacheDirectory, frozen: true }),
-      /run bpm install/,
+      /run spm install/,
     );
-    equal(await Deno.readTextFile(join(root, "blot.lock.json")), lock);
+    equal(await Deno.readTextFile(join(root, "squid.lock.json")), lock);
     await app(root, { math: `${source}#main` });
-    await Deno.remove(join(repo, "blot-workspace.yaml"));
+    await Deno.remove(join(repo, "squid-workspace.yaml"));
     await commit(repo);
     await rejects(
       () => installPackages(root, { cacheDirectory, update: true }),
       /must declare its exports/,
     );
-    equal(await Deno.readTextFile(join(root, "blot.lock.json")), lock);
+    equal(await Deno.readTextFile(join(root, "squid.lock.json")), lock);
     for await (const item of Deno.readDir(join(cacheDirectory, "packages"))) {
       ok(!item.name.startsWith(".install-"));
     }
@@ -311,7 +314,7 @@ Deno.test("downloaded packages cannot reach local dependencies outside their rep
       /dependency escapes its repository/,
     );
     equal(
-      await Deno.stat(join(root, "blot.lock.json")).catch(() => null),
+      await Deno.stat(join(root, "squid.lock.json")).catch(() => null),
       null,
     );
   }));

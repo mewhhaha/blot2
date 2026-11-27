@@ -60,12 +60,12 @@ def execute(base, jobs, dataset, oracles, record):
     # Complete the checkpoint before disclosing any edited path or byte offset.
     with tempfile.TemporaryDirectory(dir=work) as temp:
         folder = Path(temp)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("BLOT_")}
-        env.update(BLOT_BASE=str(dataset / base), BLOT_SAVE=temp)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("SQUID_")}
+        env.update(SQUID_BASE=str(dataset / base), SQUID_SAVE=temp)
         if not record:
-            env["BLOT_CONTROL"] = "1"
+            env["SQUID_CONTROL"] = "1"
         read_fd, write_fd = os.pipe()
-        env["BLOT_READY_FD"] = str(write_fd)
+        env["SQUID_READY_FD"] = str(write_fd)
         with os.fdopen(read_fd, "rb") as ready, os.fdopen(write_fd,"wb") as sender, subprocess.Popen(
             [work / "probe"], env=env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, start_new_session=True, pass_fds=(write_fd,),

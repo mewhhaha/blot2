@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const [baseline, candidate] = Deno.args;
 if (!baseline || !candidate) {
-  throw new Error("Pass baseline and candidate blotc paths");
+  throw new Error("Pass baseline and candidate squidc paths");
 }
 
 let expression = "input";
@@ -20,8 +20,8 @@ const source = `io const heavy = func (input: U32) => return do:
     return 0
   return work
 `;
-const directory = await Deno.makeTempDir({ prefix: "blot-sink-bench-" });
-const input = `${directory}/main.blot`;
+const directory = await Deno.makeTempDir({ prefix: "squid-sink-bench-" });
+const input = `${directory}/main.sq`;
 await Deno.writeTextFile(input, source);
 const tools = [baseline, candidate];
 type Compilation = {

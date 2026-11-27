@@ -6,7 +6,7 @@ import {
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 // Exercise unknown callback rows, rejection and recovery with the ordinary
 // compiler configured to a process-local 256-step inference limit.
 function chain(length: number): string {
@@ -33,8 +33,8 @@ function budget(issue: ZigProjectDiagnostic, entry: string, source: string) {
 }
 
 Deno.test("CLI rejects inference budget exhaustion without publishing output", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-stage-budget-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-stage-budget-" });
+  const entry = `${directory}/main.sq`;
   const output = `${directory}/main.wasm`;
   let passed = false;
   try {
@@ -72,8 +72,8 @@ Deno.test("CLI rejects inference budget exhaustion without publishing output", a
 
 // Direct backend gap: a type variable that no use constrains is an unresolved type variable (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("fresh and retained stage-chain rejection agrees and the server recovers unchanged", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-stage-budget-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-stage-budget-" });
+  const entry = `${directory}/main.sq`;
   const options = {
     executable,
     inferenceBudget: 256,

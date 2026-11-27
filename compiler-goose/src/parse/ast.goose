@@ -1,5 +1,5 @@
 // Owned syntax tables. Edges are stable numeric IDs; zero is absent.
-namespace blot_parse_ast;
+namespace squid_parse_ast;
 import support.pooled_buffer;
 import support.error;
 import support.option;
@@ -139,13 +139,13 @@ fn integerMagnitude(node: Node) -> u64 {
     return (node.a as u64) | ((node.b as u64) << 32);
 }
 
-struct NumericFault { node: Id, code: NumericCode, span: Span, actual_token: blot_parse_token::Tag }
+struct NumericFault { node: Id, code: NumericCode, span: Span, actual_token: squid_parse_token::Tag }
 struct Diagnostic {
  code: Code, start: u32, end: u32,
  has_declaration_origin: bool = false, declaration_origin: Span = Span {..},
  has_detail_span: bool = false, detail_span: Span = Span {..},
- has_actual_token: bool = false, actual_token: blot_parse_token::Tag = blot_parse_token::eof,
- has_expected_token: bool = false, expected_token: blot_parse_token::Tag = blot_parse_token::eof
+ has_actual_token: bool = false, actual_token: squid_parse_token::Tag = squid_parse_token::eof,
+ has_expected_token: bool = false, expected_token: squid_parse_token::Tag = squid_parse_token::eof
 }
 fn message(value: Diagnostic) -> const u8[:] {
  if value.code == code_GPU_FRONTEND_SYNTAX_ERROR { return "This syntax is not allowed in this position"; }
@@ -163,129 +163,129 @@ fn message(value: Diagnostic) -> const u8[:] {
  return "Unknown syntax diagnostic";
 }
 
-struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, modifier: blot_parse_symbols::Symbol, runtime: bool, exported: bool, function_declaration: bool=false, where: List, where_node: Id, attributes: List }
-struct EntryKernelDecl { name: blot_parse_symbols::Symbol, annotation: Id, stateless: bool, first: Id, second: Id, attributes: List, name_point: u32, where: List }
-struct EntryProcessDecl { name: blot_parse_symbols::Symbol, annotation: Id, init: Id, step: Id, attributes: List, name_point: u32 }
-struct ImplementationDecl { name: blot_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
+struct ValueDecl { name: squid_parse_symbols::Symbol, body: Id, annotation: Id, modifier: squid_parse_symbols::Symbol, runtime: bool, exported: bool, function_declaration: bool=false, where: List, where_node: Id, attributes: List }
+struct EntryKernelDecl { name: squid_parse_symbols::Symbol, annotation: Id, stateless: bool, first: Id, second: Id, attributes: List, name_point: u32, where: List }
+struct EntryProcessDecl { name: squid_parse_symbols::Symbol, annotation: Id, init: Id, step: Id, attributes: List, name_point: u32 }
+struct ImplementationDecl { name: squid_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
 // `own`: the function takes the argument over (spec section 10.3).
-struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id, own: bool = false }
+struct Parameter { name: squid_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id, own: bool = false }
 struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node: Id, fallback: Id }
-struct ImportDecl { path: blot_parse_symbols::Symbol, namespace_: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
-struct ImportBinding { name: blot_parse_symbols::Symbol, alias: blot_parse_symbols::Symbol }
+struct ImportDecl { path: squid_parse_symbols::Symbol, namespace_: squid_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
+struct ImportBinding { name: squid_parse_symbols::Symbol, alias: squid_parse_symbols::Symbol }
 struct DeclarationTraits { declaration: Id, private: bool = false, is_opaque: bool = false }
-struct TestMeta { declaration: Id, display_name: blot_parse_symbols::Symbol, line: u32, is_trap: bool = false }
+struct TestMeta { declaration: Id, display_name: squid_parse_symbols::Symbol, line: u32, is_trap: bool = false }
 struct RuntimeName { declaration: Id, point: u32 }
 struct DeclarationNodes { root: Id, first: Id, end: Id }
-struct OperatorOrigin { node: Id, span: Span, member: blot_parse_symbols::Symbol = 0, member_point: u32 = 0 }
+struct OperatorOrigin { node: Id, span: Span, member: squid_parse_symbols::Symbol = 0, member_point: u32 = 0 }
 struct TypeConversionOrigin { node: Id, point: u32 }
-type TreeError = blot_error::Error;
-struct NodeBuffer { storage: Node[:]=default<Node[:]>(), items: Node[:]=default<Node[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+type TreeError = squid_error::Error;
+struct NodeBuffer { storage: Node[:]=default<Node[:]>(), items: Node[:]=default<Node[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_NodeBuffer_runs: Node[>..]=[];
 var inactive_NodeBuffer: NodeBuffer=NodeBuffer {..};
-fn ensure(self_: NodeBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_NodeBuffer_runs); return self_.failure; }
-fn ensureExact(self_: NodeBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_NodeBuffer_runs); return self_.failure; }
-fn push(self_: NodeBuffer&, value: Node) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_NodeBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: NodeBuffer&, values: const Node[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_NodeBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: NodeBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: NodeBuffer&, length: i64, value: Node) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: NodeBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: NodeBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_NodeBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct SpanBuffer { storage: Span[:]=default<Span[:]>(), items: Span[:]=default<Span[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: NodeBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_NodeBuffer_runs); return self_.failure; }
+fn ensureExact(self_: NodeBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_NodeBuffer_runs); return self_.failure; }
+fn push(self_: NodeBuffer&, value: Node) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_NodeBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: NodeBuffer&, values: const Node[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_NodeBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: NodeBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: NodeBuffer&, length: i64, value: Node) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: NodeBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: NodeBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_NodeBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct SpanBuffer { storage: Span[:]=default<Span[:]>(), items: Span[:]=default<Span[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_SpanBuffer_runs: Span[>..]=[];
 var inactive_SpanBuffer: SpanBuffer=SpanBuffer {..};
-fn ensure(self_: SpanBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_SpanBuffer_runs); return self_.failure; }
-fn ensureExact(self_: SpanBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_SpanBuffer_runs); return self_.failure; }
-fn push(self_: SpanBuffer&, value: Span) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_SpanBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: SpanBuffer&, values: const Span[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_SpanBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: SpanBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: SpanBuffer&, length: i64, value: Span) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: SpanBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: SpanBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_SpanBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct WordBuffer { storage: u32[:]=default<u32[:]>(), items: u32[:]=default<u32[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: SpanBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_SpanBuffer_runs); return self_.failure; }
+fn ensureExact(self_: SpanBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_SpanBuffer_runs); return self_.failure; }
+fn push(self_: SpanBuffer&, value: Span) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_SpanBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: SpanBuffer&, values: const Span[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_SpanBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: SpanBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: SpanBuffer&, length: i64, value: Span) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: SpanBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: SpanBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_SpanBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct WordBuffer { storage: u32[:]=default<u32[:]>(), items: u32[:]=default<u32[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_WordBuffer_runs: u32[>..]=[];
 var inactive_WordBuffer: WordBuffer=WordBuffer {..};
-fn ensure(self_: WordBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_WordBuffer_runs); return self_.failure; }
-fn ensureExact(self_: WordBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_WordBuffer_runs); return self_.failure; }
-fn push(self_: WordBuffer&, value: u32) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_WordBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: WordBuffer&, values: const u32[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_WordBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: WordBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: WordBuffer&, length: i64, value: u32) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: WordBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: WordBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_WordBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct NameBuffer { storage: RuntimeName[:]=default<RuntimeName[:]>(), items: RuntimeName[:]=default<RuntimeName[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: WordBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_WordBuffer_runs); return self_.failure; }
+fn ensureExact(self_: WordBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_WordBuffer_runs); return self_.failure; }
+fn push(self_: WordBuffer&, value: u32) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_WordBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: WordBuffer&, values: const u32[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_WordBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: WordBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: WordBuffer&, length: i64, value: u32) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: WordBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: WordBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_WordBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct NameBuffer { storage: RuntimeName[:]=default<RuntimeName[:]>(), items: RuntimeName[:]=default<RuntimeName[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_NameBuffer_runs: RuntimeName[>..]=[];
 var inactive_NameBuffer: NameBuffer=NameBuffer {..};
-fn ensure(self_: NameBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_NameBuffer_runs); return self_.failure; }
-fn ensureExact(self_: NameBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_NameBuffer_runs); return self_.failure; }
-fn push(self_: NameBuffer&, value: RuntimeName) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_NameBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: NameBuffer&, values: const RuntimeName[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_NameBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: NameBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: NameBuffer&, length: i64, value: RuntimeName) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: NameBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: NameBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_NameBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct TraitsBuffer { storage: DeclarationTraits[:]=default<DeclarationTraits[:]>(), items: DeclarationTraits[:]=default<DeclarationTraits[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: NameBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_NameBuffer_runs); return self_.failure; }
+fn ensureExact(self_: NameBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_NameBuffer_runs); return self_.failure; }
+fn push(self_: NameBuffer&, value: RuntimeName) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_NameBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: NameBuffer&, values: const RuntimeName[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_NameBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: NameBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: NameBuffer&, length: i64, value: RuntimeName) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: NameBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: NameBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_NameBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct TraitsBuffer { storage: DeclarationTraits[:]=default<DeclarationTraits[:]>(), items: DeclarationTraits[:]=default<DeclarationTraits[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_TraitsBuffer_runs: DeclarationTraits[>..]=[];
 var inactive_TraitsBuffer: TraitsBuffer=TraitsBuffer {..};
-fn ensure(self_: TraitsBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_TraitsBuffer_runs); return self_.failure; }
-fn ensureExact(self_: TraitsBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_TraitsBuffer_runs); return self_.failure; }
-fn push(self_: TraitsBuffer&, value: DeclarationTraits) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: TraitsBuffer&, values: const DeclarationTraits[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: TraitsBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: TraitsBuffer&, length: i64, value: DeclarationTraits) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: TraitsBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: TraitsBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_TraitsBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct TestBuffer { storage: TestMeta[:]=default<TestMeta[:]>(), items: TestMeta[:]=default<TestMeta[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: TraitsBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_TraitsBuffer_runs); return self_.failure; }
+fn ensureExact(self_: TraitsBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_TraitsBuffer_runs); return self_.failure; }
+fn push(self_: TraitsBuffer&, value: DeclarationTraits) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: TraitsBuffer&, values: const DeclarationTraits[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: TraitsBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: TraitsBuffer&, length: i64, value: DeclarationTraits) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: TraitsBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: TraitsBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_TraitsBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct TestBuffer { storage: TestMeta[:]=default<TestMeta[:]>(), items: TestMeta[:]=default<TestMeta[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_TestBuffer_runs: TestMeta[>..]=[];
 var inactive_TestBuffer: TestBuffer=TestBuffer {..};
-fn ensure(self_: TestBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_TestBuffer_runs); return self_.failure; }
-fn ensureExact(self_: TestBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_TestBuffer_runs); return self_.failure; }
-fn clear(self_: TestBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn push(self_: TestBuffer&, value: TestMeta) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_TestBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: TestBuffer&, values: const TestMeta[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_TestBuffer_runs); self_.len=self_.items.len; }
-fn deinit(self_: TestBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_TestBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct DeclarationBuffer { storage: DeclarationNodes[:]=default<DeclarationNodes[:]>(), items: DeclarationNodes[:]=default<DeclarationNodes[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: TestBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_TestBuffer_runs); return self_.failure; }
+fn ensureExact(self_: TestBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_TestBuffer_runs); return self_.failure; }
+fn clear(self_: TestBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn push(self_: TestBuffer&, value: TestMeta) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_TestBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: TestBuffer&, values: const TestMeta[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_TestBuffer_runs); self_.len=self_.items.len; }
+fn deinit(self_: TestBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_TestBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct DeclarationBuffer { storage: DeclarationNodes[:]=default<DeclarationNodes[:]>(), items: DeclarationNodes[:]=default<DeclarationNodes[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_DeclarationBuffer_runs: DeclarationNodes[>..]=[];
 var inactive_DeclarationBuffer: DeclarationBuffer=DeclarationBuffer {..};
-fn ensure(self_: DeclarationBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_DeclarationBuffer_runs); return self_.failure; }
-fn ensureExact(self_: DeclarationBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_DeclarationBuffer_runs); return self_.failure; }
-fn push(self_: DeclarationBuffer&, value: DeclarationNodes) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: DeclarationBuffer&, values: const DeclarationNodes[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: DeclarationBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: DeclarationBuffer&, length: i64, value: DeclarationNodes) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: DeclarationBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: DeclarationBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_DeclarationBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct DiagnosticBuffer { storage: Diagnostic[:]=default<Diagnostic[:]>(), items: Diagnostic[:]=default<Diagnostic[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: DeclarationBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_DeclarationBuffer_runs); return self_.failure; }
+fn ensureExact(self_: DeclarationBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_DeclarationBuffer_runs); return self_.failure; }
+fn push(self_: DeclarationBuffer&, value: DeclarationNodes) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: DeclarationBuffer&, values: const DeclarationNodes[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: DeclarationBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: DeclarationBuffer&, length: i64, value: DeclarationNodes) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: DeclarationBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: DeclarationBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_DeclarationBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct DiagnosticBuffer { storage: Diagnostic[:]=default<Diagnostic[:]>(), items: Diagnostic[:]=default<Diagnostic[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_DiagnosticBuffer_runs: Diagnostic[>..]=[];
 var inactive_DiagnosticBuffer: DiagnosticBuffer=DiagnosticBuffer {..};
-fn ensure(self_: DiagnosticBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_DiagnosticBuffer_runs); return self_.failure; }
-fn push(self_: DiagnosticBuffer&, value: Diagnostic) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: DiagnosticBuffer&, values: const Diagnostic[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: DiagnosticBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: DiagnosticBuffer&, length: i64, value: Diagnostic) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: DiagnosticBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: DiagnosticBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_DiagnosticBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct OperatorBuffer { storage: OperatorOrigin[:]=default<OperatorOrigin[:]>(), items: OperatorOrigin[:]=default<OperatorOrigin[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: DiagnosticBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_DiagnosticBuffer_runs); return self_.failure; }
+fn push(self_: DiagnosticBuffer&, value: Diagnostic) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: DiagnosticBuffer&, values: const Diagnostic[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: DiagnosticBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: DiagnosticBuffer&, length: i64, value: Diagnostic) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: DiagnosticBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: DiagnosticBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_DiagnosticBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct OperatorBuffer { storage: OperatorOrigin[:]=default<OperatorOrigin[:]>(), items: OperatorOrigin[:]=default<OperatorOrigin[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_OperatorBuffer_runs: OperatorOrigin[>..]=[];
 var inactive_OperatorBuffer: OperatorBuffer=OperatorBuffer {..};
-fn ensure(self_: OperatorBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_OperatorBuffer_runs); return self_.failure; }
-fn ensureExact(self_: OperatorBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_OperatorBuffer_runs); return self_.failure; }
-fn push(self_: OperatorBuffer&, value: OperatorOrigin) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: OperatorBuffer&, values: const OperatorOrigin[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: OperatorBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: OperatorBuffer&, length: i64, value: OperatorOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: OperatorBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: OperatorBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_OperatorBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct ConversionBuffer { storage: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), items: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
+fn ensure(self_: OperatorBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_OperatorBuffer_runs); return self_.failure; }
+fn ensureExact(self_: OperatorBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_OperatorBuffer_runs); return self_.failure; }
+fn push(self_: OperatorBuffer&, value: OperatorOrigin) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: OperatorBuffer&, values: const OperatorOrigin[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: OperatorBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: OperatorBuffer&, length: i64, value: OperatorOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: OperatorBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: OperatorBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_OperatorBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
+struct ConversionBuffer { storage: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), items: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), len: i64=0, failure: TreeError=squid_error::Error.none }
 reusable[] var tree_ConversionBuffer_runs: TypeConversionOrigin[>..]=[];
 var inactive_ConversionBuffer: ConversionBuffer=ConversionBuffer {..};
-fn ensure(self_: ConversionBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_ConversionBuffer_runs); return self_.failure; }
-fn ensureExact(self_: ConversionBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensureExact(self_,minimum,tree_ConversionBuffer_runs); return self_.failure; }
-fn push(self_: ConversionBuffer&, value: TypeConversionOrigin) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
-fn append(self_: ConversionBuffer&, values: const TypeConversionOrigin[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
-fn resize(self_: ConversionBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: ConversionBuffer&, length: i64, value: TypeConversionOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: ConversionBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: ConversionBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_ConversionBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+fn ensure(self_: ConversionBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensure(self_,minimum,tree_ConversionBuffer_runs); return self_.failure; }
+fn ensureExact(self_: ConversionBuffer&, minimum: i64) -> TreeError { if self_.failure!=squid_error::Error.none { return self_.failure; } self_.failure=squid_support_pooled_buffer::ensureExact(self_,minimum,tree_ConversionBuffer_runs); return self_.failure; }
+fn push(self_: ConversionBuffer&, value: TypeConversionOrigin) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: ConversionBuffer&, values: const TypeConversionOrigin[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: ConversionBuffer&, length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ConversionBuffer&, length: i64, value: TypeConversionOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ConversionBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: ConversionBuffer&) { squid_support_pooled_buffer::deinit(self_,tree_ConversionBuffer_runs); self_.len=0; self_.failure=squid_error::Error.none; }
 struct TreeState {
     references:u32=1, owner_id: u64=0, generation: u64=0,
     nodes: NodeBuffer=NodeBuffer {..},
@@ -327,7 +327,7 @@ fn canonical(self_:const Tree&)->Tree {
 }
 fn pushNodeAndSpan(nodes: NodeBuffer&, spans: SpanBuffer&, node: Node, span: Span) -> Id, TreeError {
     let n = nodes.len;
-    if n < nodes.storage.len && n < spans.storage.len && nodes.failure == blot_error::Error.none && spans.failure == blot_error::Error.none {
+    if n < nodes.storage.len && n < spans.storage.len && nodes.failure == squid_error::Error.none && spans.failure == squid_error::Error.none {
         let next = n + 1;
         nodes.storage[n] = node;
         nodes.items = nodes.storage[..next];
@@ -335,21 +335,21 @@ fn pushNodeAndSpan(nodes: NodeBuffer&, spans: SpanBuffer&, node: Node, span: Spa
         spans.storage[n] = span;
         spans.items = spans.storage[..next];
         spans.len = next;
-        return n as Id, blot_error::Error.none;
+        return n as Id, squid_error::Error.none;
     }
     nodes.push(node);
-    if nodes.failure != blot_error::Error.none { return 0, nodes.failure; }
+    if nodes.failure != squid_error::Error.none { return 0, nodes.failure; }
     spans.push(span);
-    if spans.failure != blot_error::Error.none { return 0, spans.failure; }
-    return n as Id, blot_error::Error.none;
+    if spans.failure != squid_error::Error.none { return 0, spans.failure; }
+    return n as Id, squid_error::Error.none;
 }
 fn addNodeAndSpan(tree: Tree&, node: Node, span: Span) -> Id, TreeError {
     return pushNodeAndSpan(tree.nodes, tree.spans, node, span);
 }
 fn initPooledEmpty() -> Tree,TreeError {
-    if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},blot_error::Error.out_of_memory; }
+    if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},squid_error::Error.out_of_memory; }
     let generation=next_tree_generation; next_tree_generation++;
-    let owner=blot_native::fresh_owner_id(); let index=tree_states.alloc_index(TreeState {owner_id:owner,generation:generation, ..});
+    let owner=squid_native::fresh_owner_id(); let index=tree_states.alloc_index(TreeState {owner_id:owner,generation:generation, ..});
     let state: TreeState& =tree_states[index];
     return Tree {owner_id:owner,lease:(index+1) as u32,generation:generation,
         nodes:state.nodes,
@@ -364,7 +364,7 @@ fn initPooledEmpty() -> Tree,TreeError {
         diagnostics:state.diagnostics,
         operator_origins:state.operator_origins,
         type_conversion_origins:state.type_conversion_origins,
-     ..},blot_error::Error.none;
+     ..},squid_error::Error.none;
 }
 fn resetPooled(self_: Tree&) -> TreeError {
     assert(self_.valid());
@@ -387,10 +387,10 @@ fn resetPooled(self_: Tree&) -> TreeError {
 }
 fn initPooled() -> Tree,TreeError {
     var tree,err=initPooledEmpty();
-    if err!=blot_error::Error.none { return Tree {..},err; }
+    if err!=squid_error::Error.none { return Tree {..},err; }
     tree.nodes.push(Node {..}); tree.spans.push(Span {..});
-    let error=tree.failure(); if error!=blot_error::Error.none { tree.deinit(); return Tree {..},error; }
-    return tree,blot_error::Error.none;
+    let error=tree.failure(); if error!=squid_error::Error.none { tree.deinit(); return Tree {..},error; }
+    return tree,squid_error::Error.none;
 }
 fn init() -> Tree,TreeError { return initPooled(); }
 // Copy the tables of a successful parse into the candidate's own tree.
@@ -414,28 +414,28 @@ fn copyParsed(self_:Tree&,previous:const Tree&)->TreeError {
 }
 fn failure(self_: const Tree&) -> TreeError {
     assert(self_.valid());
-    if self_.nodes.failure!=blot_error::Error.none { return self_.nodes.failure; }
-    if self_.spans.failure!=blot_error::Error.none { return self_.spans.failure; }
-    if self_.extra.failure!=blot_error::Error.none { return self_.extra.failure; }
-    if self_.roots.failure!=blot_error::Error.none { return self_.roots.failure; }
-    if self_.runtime_names.failure!=blot_error::Error.none { return self_.runtime_names.failure; }
-    if self_.constant_names.failure!=blot_error::Error.none { return self_.constant_names.failure; }
-    if self_.test_meta.failure!=blot_error::Error.none { return self_.test_meta.failure; }
-    if self_.declaration_traits.failure!=blot_error::Error.none { return self_.declaration_traits.failure; }
-    if self_.declaration_nodes.failure!=blot_error::Error.none { return self_.declaration_nodes.failure; }
-    if self_.diagnostics.failure!=blot_error::Error.none { return self_.diagnostics.failure; }
-    if self_.operator_origins.failure!=blot_error::Error.none { return self_.operator_origins.failure; }
-    if self_.type_conversion_origins.failure!=blot_error::Error.none { return self_.type_conversion_origins.failure; }
-    return blot_error::Error.none;
+    if self_.nodes.failure!=squid_error::Error.none { return self_.nodes.failure; }
+    if self_.spans.failure!=squid_error::Error.none { return self_.spans.failure; }
+    if self_.extra.failure!=squid_error::Error.none { return self_.extra.failure; }
+    if self_.roots.failure!=squid_error::Error.none { return self_.roots.failure; }
+    if self_.runtime_names.failure!=squid_error::Error.none { return self_.runtime_names.failure; }
+    if self_.constant_names.failure!=squid_error::Error.none { return self_.constant_names.failure; }
+    if self_.test_meta.failure!=squid_error::Error.none { return self_.test_meta.failure; }
+    if self_.declaration_traits.failure!=squid_error::Error.none { return self_.declaration_traits.failure; }
+    if self_.declaration_nodes.failure!=squid_error::Error.none { return self_.declaration_nodes.failure; }
+    if self_.diagnostics.failure!=squid_error::Error.none { return self_.diagnostics.failure; }
+    if self_.operator_origins.failure!=squid_error::Error.none { return self_.operator_origins.failure; }
+    if self_.type_conversion_origins.failure!=squid_error::Error.none { return self_.type_conversion_origins.failure; }
+    return squid_error::Error.none;
 }
 // Retained project syntax is immutable. The loader makes a private copy
 // before relocating any node and holds each shared tree until its revision ends.
 fn retainParsed(self_:const Tree&)->Tree,TreeError {
     assert(self_.valid() && self_.diagnostics.len==0);
     let state .= tree_states[self_.lease-1];
-    if state.references==0xffffffff {return Tree{..},blot_error::Error.out_of_memory;}
+    if state.references==0xffffffff {return Tree{..},squid_error::Error.out_of_memory;}
     state.references++;
-    return canonical(self_),blot_error::Error.none;
+    return canonical(self_),squid_error::Error.none;
 }
 fn deinit(self_: Tree&) {
     if self_.lease==0 { return; } assert(self_.valid());
@@ -467,7 +467,7 @@ fn declaration_nodes(tree: const Tree&, root: Id) -> List, bool {
  }
  return List {..}, false;
 }
-fn testMeta(tree: const Tree&, id: Id) -> blot_support::Option<TestMeta> {
+fn testMeta(tree: const Tree&, id: Id) -> squid_support::Option<TestMeta> {
     var lo = 0;
     var hi = tree.test_meta.len;
     while lo < hi {
@@ -475,9 +475,9 @@ fn testMeta(tree: const Tree&, id: Id) -> blot_support::Option<TestMeta> {
         let meta = tree.test_meta.items[mid];
         if meta.declaration < id { lo = mid + 1; }
         else if meta.declaration > id { hi = mid; }
-        else { return blot_support::some(meta); }
+        else { return squid_support::some(meta); }
     }
-    return blot_support::none<TestMeta>();
+    return squid_support::none<TestMeta>();
 }
 fn declaration_traits(tree: const Tree&, id: Id) -> DeclarationTraits {
  var lo = 0; var hi = tree.declaration_traits.len;
@@ -497,8 +497,8 @@ fn value_name_point(tree: const Tree&, id: Id) -> u32, bool {
  return find_name(tree.constant_names.items,id);
 }
 fn numeric_fault(tree: const Tree&, id: Id) -> NumericFault {
- let n = node(tree,id); var actual = blot_parse_token::float;
- if n.a == numericcode_integer_range { actual = blot_parse_token::integer; }
+ let n = node(tree,id); var actual = squid_parse_token::float;
+ if n.a == numericcode_integer_range { actual = squid_parse_token::integer; }
  return NumericFault {id, n.a, Span {n.b,n.c, ..}, actual, ..};
 }
 fn type_conversion_origin(tree: const Tree&, id: Id) -> u32 {

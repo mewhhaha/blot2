@@ -27,14 +27,14 @@ io const pipeline = func (count: U32) => return do:
 
 Deno.test(`runtime results follow imported body edit revert and restart`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-runtime-revisions-",
+    prefix: "squid-runtime-revisions-",
   });
-  const entry = `${directory}/main.blot`,
-    dependency = `${directory}/helper.blot`;
+  const entry = `${directory}/main.sq`,
+    dependency = `${directory}/helper.sq`;
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
   };
   const check = async (bytes: Uint8Array<ArrayBuffer>, delta: number) => {

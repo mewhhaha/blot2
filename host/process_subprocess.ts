@@ -1,4 +1,4 @@
-// Sandboxed Deno child subprocess for Blot vNext `Processes` (§5.2).
+// Sandboxed Deno child subprocess for Squid vNext `Processes` (§5.2).
 // Runs under `--no-prompt` with zero `--allow-run` permissions so this child
 // exclusively owns stdout's write end and cannot spawn grandchildren.
 //
@@ -211,10 +211,10 @@ async function main(): Promise<void> {
         }
         const instance = new WebAssembly.Instance(module, stubImports);
         const exports = instance.exports;
-        const memRaw = exports["blot:memory"];
-        const allocRaw = exports["blot:allocate"];
-        const resetRaw = exports["blot:reset"];
-        const finishRaw = exports["blot:finish_invocation"];
+        const memRaw = exports["squid:memory"];
+        const allocRaw = exports["squid:allocate"];
+        const resetRaw = exports["squid:reset"];
+        const finishRaw = exports["squid:finish_invocation"];
         const initRaw = exports[meta.initExport];
         const stepRaw = exports[meta.stepExport];
         if (typeof initRaw !== "function" || typeof stepRaw !== "function") {

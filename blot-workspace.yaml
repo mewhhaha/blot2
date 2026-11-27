@@ -1,4 +1,0 @@
-name: blot
-exports:
-  .: ./std
-prelude: ./std/prelude.blot

@@ -7,15 +7,15 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 Deno.test("project revisions recheck edited data, keep callers and recover from failed edits", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const leaf = dir + "/settings.blot";
+  const entry = dir + "/main.sq";
+  const leaf = dir + "/settings.sq";
   const base = "type Look is data = $Look { sun: Bool }\n" +
     "const look = $Look { sun: true }\n";
   const options = { executable: Deno.args[0], entry, prelude: null };
   const edited = base.replace("sun: true", "sun: false");
   await Deno.writeTextFile(leaf, base);
   await Deno.writeTextFile(
-    dir + "/middle.blot",
+    dir + "/middle.sq",
     'import * as s from "./settings"\nfunc lit () => return s.look.sun\n',
   );
   await Deno.writeTextFile(
@@ -69,7 +69,7 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
     assert.equal(revert.stats.freshModules, 1);
     assert.deepEqual(revert.bytes, initial.bytes);
     const branch = "func lit () => return if true then s.look.sun else false";
-    const middle = dir + "/middle.blot";
+    const middle = dir + "/middle.sq";
     await Deno.writeTextFile(
       middle,
       'import * as s from "./settings"\n' + branch + "\n",
@@ -119,14 +119,14 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
 
 Deno.test("a function edit only invalidates its own callers when an independent initializer also changes", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const settings = dir + "/settings.blot";
-  const tuning = dir + "/tuning.blot";
+  const entry = dir + "/main.sq";
+  const settings = dir + "/settings.sq";
+  const tuning = dir + "/tuning.sq";
   const options = { executable: Deno.args[0], entry, prelude: null };
   await Deno.writeTextFile(settings, "const flag = true\n");
   await Deno.writeTextFile(tuning, "func tune () => return 9\n");
   await Deno.writeTextFile(
-    dir + "/reader.blot",
+    dir + "/reader.sq",
     'import { flag } from "./settings"\nfunc enabled () => return flag\n',
   );
   await Deno.writeTextFile(
@@ -169,8 +169,8 @@ Deno.test("a function edit only invalidates its own callers when an independent 
 
 Deno.test("scalar relocations follow committed edits and decline staged and width changes", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const values = dir + "/values.blot";
+  const entry = dir + "/main.sq";
+  const values = dir + "/values.sq";
   const base = "const flag: Bool = true\nconst a: U32 = 7\nconst b: U32 = 13\n";
   const main = 'import * as v from "./values"\n' +
     "io answer (n: U32): U32 => return do:\n" +
@@ -183,7 +183,7 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
   };
   await Deno.writeTextFile(entry, main);
@@ -243,10 +243,10 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
 
 Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const prelude = dir + "/prelude.blot";
-  const first = dir + "/first.blot";
-  const last = dir + "/last.blot";
+  const entry = dir + "/main.sq";
+  const prelude = dir + "/prelude.sq";
+  const first = dir + "/first.sq";
+  const last = dir + "/last.sq";
   const operator =
     "func (-) a -> b => return @u32.sub a b\nfunc combine a -> b => return @u32.sub a b\n";
   const original =
@@ -308,15 +308,15 @@ Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits"
     );
     await expect(8, 0);
     if (Deno.build.os !== "windows") {
-      await Deno.rename(last, dir + "/three.blot");
-      await Deno.symlink(dir + "/three.blot", last);
+      await Deno.rename(last, dir + "/three.sq");
+      await Deno.symlink(dir + "/three.sq", last);
       await expect(8, 3);
       await Deno.writeTextFile(
-        dir + "/five.blot",
+        dir + "/five.sq",
         "func right () => return 5\n",
       );
       await Deno.remove(last);
-      await Deno.symlink(dir + "/five.blot", last);
+      await Deno.symlink(dir + "/five.sq", last);
       await expect(6, 3);
     }
   } finally {
@@ -327,17 +327,17 @@ Deno.test("retained syntax follows disk bytes, parser symbols and prelude edits"
 
 Deno.test("entry names can change while dependency fields and imported bindings keep their meanings", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
+  const entry = dir + "/main.sq";
   // The persistent checker starts at sixteen modules. Every hop contributes
   // to the executed answer, including the dependency that owns the host field.
   await Deno.writeTextFile(
-    dir + "/m0.blot",
+    dir + "/m0.sq",
     "type Pair is data = $Pair { pad: U32, host: U32 }\n" +
       "func read () => return ($Pair { host: 7, pad: 99 }).host\n",
   );
   for (let i = 1; i <= 14; i++) {
     await Deno.writeTextFile(
-      dir + "/m" + i + ".blot",
+      dir + "/m" + i + ".sq",
       'import * as prev from "./m' + (i - 1) +
         '"\nfunc read () => return prev.read ()\n',
     );
@@ -401,7 +401,7 @@ Deno.test("entry names can change while dependency fields and imported bindings 
     await check(extra.replace("func extra ()", "func extra ("), null);
     await check(body("unbound", "fresh_param"), null);
     await check(body("host", "@u32.add host (read ())"), 12, 1);
-    await Deno.writeTextFile(dir + "/m0.blot", "func read () => return 17\n");
+    await Deno.writeTextFile(dir + "/m0.sq", "func read () => return 17\n");
     await check(body("other", "@u32.add other (read ())"), 22);
   } finally {
     await session.dispose();
@@ -411,9 +411,9 @@ Deno.test("entry names can change while dependency fields and imported bindings 
 
 Deno.test("an imported name change preserves earlier checks and rechecks callers", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const bridge = dir + "/bridge.blot";
-  const leaf = dir + "/v0.blot";
+  const entry = dir + "/main.sq";
+  const bridge = dir + "/bridge.sq";
+  const leaf = dir + "/v0.sq";
   const initialLeaf = "type Pair is data = $Pair { first: U32, next: U32 }\n" +
     "func v0 () => return ($Pair { next: 7, first: 99 }).next\n";
   const initialBridge =
@@ -423,7 +423,7 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
   const imports = ['import { bridge } from "./bridge"'];
   for (let i = 1; i < 16; i++) {
     await Deno.writeTextFile(
-      dir + "/v" + i + ".blot",
+      dir + "/v" + i + ".sq",
       "func v" + i + " () => return " + i + "\n",
     );
     imports.push("import { v" + i + ' } from "./v' + i + '"');
@@ -506,7 +506,7 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
       [leaf]: initialLeaf.replace("next: 7", "next: 11"),
     }, 28);
     await Deno.writeTextFile(
-      dir + "/other.blot",
+      dir + "/other.sq",
       initialLeaf.replace("next: 7", "next: 8"),
     );
     await compare({ [bridge]: initialBridge.replace("./v0", "./other") }, 25);
@@ -522,12 +522,12 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
 
 Deno.test("an integer call argument can reuse a checked body across edits and rejection", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const dep = dir + "/numbers.blot";
+  const entry = dir + "/main.sq";
+  const dep = dir + "/numbers.sq";
   const numbers = "func sum (a: U32) -> (b: U32): U32 => return @u32.add a b\n";
   const imports = ['import * as numbers from "./numbers"'];
   for (let i = 0; i < 14; i++) {
-    await Deno.writeTextFile(dir + "/d" + i + ".blot", "const marker = 1\n");
+    await Deno.writeTextFile(dir + "/d" + i + ".sq", "const marker = 1\n");
     imports.push("import * as d" + i + ' from "./d' + i + '"');
   }
   const source = imports.join("\n") +
@@ -607,9 +607,9 @@ Deno.test("an integer call argument can reuse a checked body across edits and re
 
 Deno.test("retained structural replay handles panic nodes and skips wire_schema off the kernel dep cone", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const worker = dir + "/worker.blot";
-  const kernelDep = dir + "/kernel_dep.blot";
+  const entry = dir + "/main.sq";
+  const worker = dir + "/worker.sq";
+  const kernelDep = dir + "/kernel_dep.sq";
   const baseWorker = [
     "private func check_inner (n: U32): U32 => return do:",
     "  if n == 0:",
@@ -631,7 +631,7 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
     "func scale (x: U32): U32 => return @u32.mul x 3\n";
   const dummyImports: string[] = [];
   for (let i = 0; i < 14; i++) {
-    await Deno.writeTextFile(dir + `/d${i}.blot`, "const marker: U32 = 1\n");
+    await Deno.writeTextFile(dir + `/d${i}.sq`, "const marker: U32 = 1\n");
     dummyImports.push(`import * as d${i} from "./d${i}"`);
   }
   const mainSource = [
@@ -649,7 +649,7 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
     frontendWorkers: 8,
     profileBackend: true,
@@ -740,8 +740,8 @@ Deno.test("retained structural replay handles panic nodes and skips wire_schema 
 
 Deno.test("persistent trivia and single U32/F32 literal edits skip check and lower with byte-exact oracle match", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const calc = dir + "/calc.blot";
+  const entry = dir + "/main.sq";
+  const calc = dir + "/calc.sq";
   const baseCalc = [
     "func mix (n: U32): U32 => return do:",
     "  let acc: U32 = 0",
@@ -756,7 +756,7 @@ Deno.test("persistent trivia and single U32/F32 literal edits skip check and low
   ].join("\n");
   const dummyImports: string[] = [];
   for (let i = 0; i < 15; i++) {
-    await Deno.writeTextFile(dir + `/m${i}.blot`, "const tag: U32 = 1\n");
+    await Deno.writeTextFile(dir + `/m${i}.sq`, "const tag: U32 = 1\n");
     dummyImports.push(`import * as m${i} from "./m${i}"`);
   }
   const mainSource = [
@@ -771,7 +771,7 @@ Deno.test("persistent trivia and single U32/F32 literal edits skip check and low
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
     frontendWorkers: 8,
   };
@@ -830,9 +830,9 @@ Deno.test("persistent trivia and single U32/F32 literal edits skip check and low
 
 Deno.test("structural body edits before data/effect declarations with new locals and associated calls stay fresh=1 and oracle-exact", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const leaf = dir + "/leaf.blot";
-  const mid = dir + "/mid.blot";
+  const entry = dir + "/main.sq";
+  const leaf = dir + "/leaf.sq";
+  const mid = dir + "/mid.sq";
   const baseLeaf = [
     "func compute (xs: #[U32]) -> (n: U32): U32 => return do:",
     "  let acc: U32 = n",
@@ -855,7 +855,7 @@ Deno.test("structural body edits before data/effect declarations with new locals
   ].join("\n");
   const dummyImports: string[] = [];
   for (let i = 0; i < 15; i++) {
-    await Deno.writeTextFile(dir + `/d${i}.blot`, "const tag: U32 = 1\n");
+    await Deno.writeTextFile(dir + `/d${i}.sq`, "const tag: U32 = 1\n");
     dummyImports.push(`import * as d${i} from "./d${i}"`);
   }
   const mainSource = [
@@ -870,7 +870,7 @@ Deno.test("structural body edits before data/effect declarations with new locals
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
     frontendWorkers: 8,
   };
@@ -926,8 +926,8 @@ Deno.test("structural body edits before data/effect declarations with new locals
 
 Deno.test("retained declaration splices match cold Wasm and rejection diagnostics", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const leaf = dir + "/leaf.blot";
+  const entry = dir + "/main.sq";
+  const leaf = dir + "/leaf.sq";
   const base = `func edited (n: U32): U32 =>
   let x: U32 = unchanged n
   return x + 1
@@ -942,13 +942,13 @@ func odd (n: U32) => even n
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
     frontendWorkers: 8,
   };
   const imports: string[] = [];
   for (let i = 0; i < 15; i++) {
-    await Deno.writeTextFile(dir + `/padding${i}.blot`, "const tag: U32 = 1\n");
+    await Deno.writeTextFile(dir + `/padding${i}.sq`, "const tag: U32 = 1\n");
     imports.push(`import * as padding${i} from "./padding${i}"`);
   }
   await Deno.writeTextFile(leaf, base);

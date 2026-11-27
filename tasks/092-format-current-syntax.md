@@ -1,4 +1,4 @@
-# 092 — Format current Blot syntax
+# 092 — Format current Squid syntax
 
 ## Status, dependencies, and originating requirements
 
@@ -7,22 +7,22 @@
 - **Originating requirements:** reported on 11 October 2026 by a separate
   session developing gdev; tooling. Sources: that session's report.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
-`@mewhhaha/blot/format` formats every public example, the standard library and
+`@mewhhaha/squid/format` formats every public example, the standard library and
 current program syntax, and refuses only invalid sources.
 
 ## Starting point
 
-gdev's `deno task fmt:blot` rejects every current gdev source with
+gdev's `deno task fmt:squid` rejects every current gdev source with
 `Island 48
 rejected syntax`. On 11 October 2026 `formatSource` from
 [host/format.ts](../host/format.ts) also rejected the public
-`examples/ecs.blot` and `examples/syntax.blot` (at curried declarations such as
+`examples/ecs.sq` and `examples/syntax.sq` (at curried declarations such as
 `const insert_cell = func initial => return func builder => return do:`), while
-it accepted `std/prelude.blot` and a small `let … else:` block. The formatter
+it accepted `std/prelude.sq` and a small `let … else:` block. The formatter
 predates the Zig compiler, and `tests/host/format.test.ts` does not format the
 examples.
 

@@ -75,7 +75,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
   try {
     const declarations = [
       "// Unicode 🙂 café; numbers in comments: 4294967295",
-      'import { value } from "./values.blot"',
+      'import { value } from "./values.sq"',
       'const text = "🙂 where { 123 }"',
       "const from = func value => return value",
       "const selector = .add",

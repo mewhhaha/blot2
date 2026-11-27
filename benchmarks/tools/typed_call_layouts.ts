@@ -11,7 +11,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     output: { type: "string", default: "build/bench/typed-call-layouts" },
     tier: { type: "string", default: "optimized" },
@@ -28,10 +28,10 @@ const hash = async (bytes: BufferSource) =>
 const compilerSha256 = await hash(await Deno.readFile(executable));
 const sourceFiles = Object.fromEntries(
   await Promise.all([
-    "../ink/lib/tween.blot",
-    "../ink/lib/motion.blot",
-    "std/prelude.blot",
-    "std/array.blot",
+    "../ink/lib/tween.sq",
+    "../ink/lib/motion.sq",
+    "std/prelude.sq",
+    "std/array.sq",
   ].map(async (path) => {
     const absolute = resolve(root, path);
     return [absolute, await hash(await Deno.readFile(absolute))];
@@ -51,7 +51,7 @@ const constructors = [
 const midpoint = [0.5, 0.5, 0.5, 0.125, 0.875, 0.5, 1.0876975, 0, 1 / 3];
 await Deno.mkdir(output, { recursive: true });
 for (const count of [1, 2, 9]) {
-  const entry = resolve(output, `n${count}.blot`);
+  const entry = resolve(output, `n${count}.sq`);
   const calls = constructors.slice(0, count).map((kind) =>
     `  marker.push (apply_ease (${kind}) t)`
   ).join("\n");
@@ -68,7 +68,7 @@ ${calls}
     entry,
     imports: { "ink/": resolve(root, "../ink/lib") },
     stdRoot: resolve(root, "std"),
-    prelude: resolve(root, "std/prelude.blot"),
+    prelude: resolve(root, "std/prelude.sq"),
     profileBackend: true,
     startupTimeoutMs: 5000,
   });

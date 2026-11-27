@@ -3,12 +3,12 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 import { equal } from "./compile_helpers.ts";
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 Deno.test("generic receiver calls select members of a caller's type their module never imports", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`, helper = `${directory}/mix.blot`;
-  const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  const entry = `${directory}/main.sq`, helper = `${directory}/mix.sq`;
+  const prelude = new URL("../../std/prelude.sq", import.meta.url);
   const compiler = await createZigProjectCompiler({ executable, entry, prelude });
   try {
     const built = await compiler.build({

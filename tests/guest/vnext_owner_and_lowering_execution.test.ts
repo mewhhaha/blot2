@@ -347,7 +347,7 @@ io main (): #[U32] =>
       const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes));
       const exports = instance.exports;
       (exports.main as CallableFunction)();
-      const memory = exports["blot:memory"] as WebAssembly.Memory;
+      const memory = exports["squid:memory"] as WebAssembly.Memory;
       assert.ok(memory instanceof WebAssembly.Memory);
       assert.ok(
         memory.buffer.byteLength <= 131072,

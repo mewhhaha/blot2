@@ -9,7 +9,7 @@ import {
 import { runPhase, together } from "../../scripts/compiler_phase.ts";
 
 Deno.test("buffered identities preserve SHA-256 across chunk boundaries and same-size edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-digest-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-digest-" });
   try {
     const path = resolve(directory, "input");
     for (
@@ -57,7 +57,7 @@ Deno.test("preflight remembers failed repository files from real Deno JUnit shap
 
 Deno.test("phase budget kills descendants and preserves partial logs", async () => {
   if (Deno.build.os === "windows") return;
-  const directory = await Deno.makeTempDir({ prefix: "blot-gate-budget-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-gate-budget-" });
   try {
     const escaped = resolve(directory, "escaped");
     const ready = resolve(directory, "ready");
@@ -129,7 +129,7 @@ Deno.test("phase budget kills descendants and preserves partial logs", async () 
 });
 
 Deno.test("overlapping qualification waits for cancellation after either job fails", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-gate-overlap-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-gate-overlap-" });
   try {
     const controller = new AbortController();
     let completed = false;

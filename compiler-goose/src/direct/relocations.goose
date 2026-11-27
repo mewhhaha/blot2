@@ -1,7 +1,7 @@
 // One project backend runs serially in each request process. A recording lives
 // only around that emission. The writer reports scalar offsets and body IDs,
 // so no borrow of a generator, Core module or scratch buffer can escape.
-namespace blot_direct_relocations;
+namespace squid_direct_relocations;
 struct Site { unit:u32, node:u32, offset:i64 }
 struct BodySite { site:Site, function:u32, generation:i64 }
 struct BodyStart { generation:i64, position:i64 }

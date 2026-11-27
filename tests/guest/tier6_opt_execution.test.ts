@@ -3,8 +3,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -28,7 +28,7 @@ async function withModule(
   ) => void,
 ) {
   const dir = await Deno.makeTempDir({ prefix });
-  const entry = `${dir}/main.blot`;
+  const entry = `${dir}/main.sq`;
   try {
     await Deno.writeTextFile(entry, src);
     const compiler = await createZigProjectCompiler({
@@ -164,7 +164,7 @@ io indirect_step (packed: U32): #[U32] =>
         out[b] := 0
   return out
 `;
-  await withModule("blot-tier6a-", src, (guest, bytes) => {
+  await withModule("squid-tier6a-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 6A");
 
     // 1. Shape 1 contiguous across boundary sizes & step counts
@@ -364,7 +364,7 @@ io matmul_rect (packed: U32): #[U32] =>
     out[i] := f32_bits c[i]
   return out
 `;
-  await withModule("blot-tier6b1-", src, (guest, bytes) => {
+  await withModule("squid-tier6b1-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 6B-1");
 
     const refMatmul = (
@@ -508,7 +508,7 @@ io init_f32_2step (n: U32): #[U32] =>
   out[n * 2] := s
   return out
 `;
-  await withModule("blot-tier6b2-", src, (guest, bytes) => {
+  await withModule("squid-tier6b2-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 6B-2");
 
     // 1-step U32 across all mod-4 sizes, subranges, and empty/reversed ranges
@@ -589,7 +589,7 @@ Deno.test("Tier 6C: dual-stream 8-pixel v128 escape SIMD across 8-pixel, 4-pixel
       total := self + it
   return total
 `;
-  await withModule("blot-tier6c-", src, (guest, bytes) => {
+  await withModule("squid-tier6c-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 6C");
 
     const f24 = Math.fround(2.4);

@@ -7,16 +7,16 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const rounds = Number(Deno.args[0] ?? 6);
 assert(Number.isInteger(rounds) && rounds > 0);
 const root = resolve("../gdev");
-const project = await gdevProject(root, resolve("std"), "src/main.blot");
+const project = await gdevProject(root, resolve("std"), "src/main.sq");
 const inkRoot = project.imports?.["ink/"];
 assert(typeof inkRoot === "string");
-const math = resolve(inkRoot, "math.blot");
+const math = resolve(inkRoot, "math.sq");
 const addition =
   "\nfunc invalidation_probe (value: U32): U32 => return value\n";
 const cases = [];
 for (
   const [label, file] of [
-    ["gameLibrary", resolve(root, "src/library.blot")],
+    ["gameLibrary", resolve(root, "src/library.sq")],
     ["inkMath", math],
     ["prelude", project.prelude],
   ]
@@ -105,7 +105,7 @@ for (let round = 0; round <= rounds; round++) {
 }
 console.log(JSON.stringify(
   {
-    blot: await revision("."),
+    squid: await revision("."),
     gdev: await revision(root),
     ink: await revision("../ink"),
     compilerSha256: await hash(await Deno.readFile(project.executable)),

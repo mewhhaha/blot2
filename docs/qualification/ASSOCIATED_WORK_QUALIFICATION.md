@@ -84,7 +84,7 @@ regression controls, application samples and installation receipts are archived:
   SHA-256 `cb5987f7c4cba61fc83bef597af0b186d5f3662998a71b6b7ad3deb1aa5d8199`.
 
 The qualified native compiler and bundled CLI are installed as
-`~/.local/bin/blotc` and `~/.local/bin/blot`. Their hashes match the tested
+`~/.local/bin/squidc` and `~/.local/bin/squid`. Their hashes match the tested
 candidates. Installation checks exercise the embedded guide, formatter, standard
 library and README task example in synchronous and JSPI execution. The preceding
 installation is preserved in `build/budget-fix/install/previous`; older
@@ -93,5 +93,5 @@ installation backups and the two existing Git stashes are untouched.
 Release compiler SHA-256:
 `fec30aece1dccd18f4709a06a96d70f42e9cd0682f843bc53fa8e3f99fa0ab31`.
 
-The broader [completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md), including the remaining
+The broader [completion plan](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md), including the remaining
 structured-task and performance work, stays open.

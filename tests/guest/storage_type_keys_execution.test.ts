@@ -29,8 +29,8 @@ for (
   ]]
 ) {
   Deno.test(`owned selected type keys execute ${name}`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-type-key-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-type-key-" });
+    const entry = `${directory}/main.sq`;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0],
       entry,

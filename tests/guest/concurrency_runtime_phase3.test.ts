@@ -5,9 +5,9 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const compilerExecutable =
   Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
-const preludePath = new URL("../../std/prelude.blot", import.meta.url).pathname;
+const preludePath = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 async function compileToWasm(
   source: string,
@@ -24,7 +24,7 @@ async function compileToWasm(
   return outBytes;
 }
 
-// --- Binary decoder for `blot:kernels` (v1) & `blot:processes` (v1) (§3.2) ---
+// --- Binary decoder for `squid:kernels` (v1) & `squid:processes` (v1) (§3.2) ---
 
 interface WireSchema {
   kind: number;
@@ -306,31 +306,31 @@ func proj_step (st: own ProjState) -> (cmd: U32): (ProjState, #[U32]) =>
 `,
     (guest) => {
       // Turn 0 init
-      guest.call("blot:proc_init:full_proc", 5);
+      guest.call("squid:proc_init:full_proc", 5);
       // Turn 1: chain_sum = (5+1+2+3) + (15+4+5+6) = 11 + 30 = 41
       // s_val = nested_stack[0][0] (5) + nested_stack[1][1] (8) = 13
       // nested_grow[0] had [15, 16], pushed 101 -> len 3, last 101
-      const r1 = guest.call("blot:proc_step:full_proc", 1) as Uint32Array;
+      const r1 = guest.call("squid:proc_step:full_proc", 1) as Uint32Array;
       assert.deepEqual(Array.from(r1), [41, 13, 3, 101, 256, 0, 77]);
 
       // Turn 2: chain_sum = 41 + (1+0+1+2) = 45; nested_grow[0] len 4, last 102
-      const r2 = guest.call("blot:proc_step:full_proc", 2) as Uint32Array;
+      const r2 = guest.call("squid:proc_step:full_proc", 2) as Uint32Array;
       assert.deepEqual(Array.from(r2), [45, 13, 4, 102, 256, 0, 77]);
 
       // Turn 3: chain_sum = 45 + (2+1+1+2) = 51; nested_grow[0] len 5, last 103
-      const r3 = guest.call("blot:proc_step:full_proc", 3) as Uint32Array;
+      const r3 = guest.call("squid:proc_step:full_proc", 3) as Uint32Array;
       assert.deepEqual(Array.from(r3), [51, 13, 5, 103, 256, 0, 77]);
 
       // Projected interior copiedBox (wrap.big at old_blocks+4) promoted & swapped across Turns 1, 2, 3!
-      guest.call("blot:proc_init:proj_proc", 5);
+      guest.call("squid:proc_init:proj_proc", 5);
       // Turn 1: big is seed=5 (v_big=6, len 2->3, last=51), active is seed=1 (v_act=2, len 2->3, last=81)
-      const pr1 = guest.call("blot:proc_step:proj_proc", 1) as Uint32Array;
+      const pr1 = guest.call("squid:proc_step:proj_proc", 1) as Uint32Array;
       assert.deepEqual(Array.from(pr1), [6, 3, 51, 2, 3, 81]);
       // Turn 2: swapped! big is old active (seed=1, v_big=2, len 3->4, last=52), active is old big (seed=5, v_act=6, len 3->4, last=82)
-      const pr2 = guest.call("blot:proc_step:proj_proc", 2) as Uint32Array;
+      const pr2 = guest.call("squid:proc_step:proj_proc", 2) as Uint32Array;
       assert.deepEqual(Array.from(pr2), [2, 4, 52, 6, 4, 82]);
       // Turn 3: swapped again! big is seed=5 (v_big=6, len 4->5, last=53), active is seed=1 (v_act=2, len 4->5, last=83)
-      const pr3 = guest.call("blot:proc_step:proj_proc", 3) as Uint32Array;
+      const pr3 = guest.call("squid:proc_step:proj_proc", 3) as Uint32Array;
       assert.deepEqual(Array.from(pr3), [6, 5, 53, 2, 5, 83]);
     },
   );
@@ -380,16 +380,16 @@ func drift_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
 #process const drift_proc: Process [U32, U32, #[U32]] = { init: drift_init, step: drift_step }
 `,
     (guest) => {
-      guest.call("blot:proc_init:drift_proc", 0);
+      guest.call("squid:proc_init:drift_proc", 0);
       // 520 turns * 256 KiB = 130 MiB > 128 MiB heap_budget for BOTH tmp AND reply!
       for (let t = 0; t < 520; t++) {
-        const rep = guest.call("blot:proc_step:drift_proc", t) as Uint32Array;
+        const rep = guest.call("squid:proc_step:drift_proc", t) as Uint32Array;
         equal(rep.length, 65536);
         equal(rep[0], t);
         equal(rep[65535], t);
       }
       const finalCheck = guest.call(
-        "blot:proc_step:drift_proc",
+        "squid:proc_step:drift_proc",
         999,
       ) as Uint32Array;
       assert.deepEqual(Array.from(finalCheck), [78, 8000000]);
@@ -400,7 +400,7 @@ func drift_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
 // ============================================================================
 // Page-0 offset 640 (`arena_oom_flag`): logical budget trap leaves offset 640 == 0,
 // while physical retained-free-list fragmentation sets offset 640 == 1 and
-// `blot:reset` clears it back to 0 (with zero extra Wasm exports!).
+// `squid:reset` clears it back to 0 (with zero extra Wasm exports!).
 // ============================================================================
 
 Deno.test("Phase 3: Page-0 offset 640 arena_oom_flag distinguishes logical OOM (0) vs physical fragmentation OOM (1)", async () => {
@@ -438,9 +438,9 @@ io alloc_64m (_: #[U32]): #[U32] =>
   {
     const inst = new WebAssembly.Instance(mod);
     const exp = inst.exports as Record<string, unknown>;
-    const mem = exp["blot:memory"] as WebAssembly.Memory;
-    const alloc = exp["blot:allocate"] as (n: number) => number;
-    const reset = exp["blot:reset"] as () => void;
+    const mem = exp["squid:memory"] as WebAssembly.Memory;
+    const alloc = exp["squid:allocate"] as (n: number) => number;
+    const reset = exp["squid:reset"] as () => void;
     const fn = exp["logical_oom"] as (p: number) => number;
     reset();
     const p = alloc(4);
@@ -449,26 +449,26 @@ io alloc_64m (_: #[U32]): #[U32] =>
     equal(new DataView(mem.buffer).getUint32(640, true), 0);
   }
 
-  // 2. Physical retained-free-list fragmentation sets Page-0 offset 640 == 1, cleared by blot:reset!
+  // 2. Physical retained-free-list fragmentation sets Page-0 offset 640 == 1, cleared by squid:reset!
   {
     // First verify alloc_64m succeeds on a fresh instance!
     const freshInst = new WebAssembly.Instance(mod);
     const fExp = freshInst.exports as Record<string, unknown>;
-    const fMem = fExp["blot:memory"] as WebAssembly.Memory;
-    (fExp["blot:reset"] as () => void)();
-    const fp = (fExp["blot:allocate"] as (n: number) => number)(4);
+    const fMem = fExp["squid:memory"] as WebAssembly.Memory;
+    (fExp["squid:reset"] as () => void)();
+    const fp = (fExp["squid:allocate"] as (n: number) => number)(4);
     new Uint32Array(fMem.buffer, fp, 1)[0] = 0;
     const fOut = (fExp["alloc_64m"] as (p: number) => number)(fp);
     equal(new Uint32Array(fMem.buffer, fOut, 2)[1], 7);
-    (fExp["blot:finish_invocation"] as () => void)();
+    (fExp["squid:finish_invocation"] as () => void)();
 
     // Now warm with 4x16 MiB, finish, then call alloc_64m -> traps with offset 640 == 1!
     const warmInst = new WebAssembly.Instance(mod);
     const wExp = warmInst.exports as Record<string, unknown>;
-    const wMem = wExp["blot:memory"] as WebAssembly.Memory;
-    const wReset = wExp["blot:reset"] as () => void;
-    const wAlloc = wExp["blot:allocate"] as (n: number) => number;
-    const wFinish = wExp["blot:finish_invocation"] as () => void;
+    const wMem = wExp["squid:memory"] as WebAssembly.Memory;
+    const wReset = wExp["squid:reset"] as () => void;
+    const wAlloc = wExp["squid:allocate"] as (n: number) => number;
+    const wFinish = wExp["squid:finish_invocation"] as () => void;
     wReset();
     const p1 = wAlloc(4);
     new Uint32Array(wMem.buffer, p1, 1)[0] = 0;
@@ -482,7 +482,7 @@ io alloc_64m (_: #[U32]): #[U32] =>
     assert.throws(() => (wExp["alloc_64m"] as (p: number) => number)(p2));
     equal(new DataView(wMem.buffer).getUint32(640, true), 1);
 
-    // blot:reset clears offset 640 back to 0!
+    // squid:reset clears offset 640 back to 0!
     wFinish();
     wReset();
     equal(new DataView(wMem.buffer).getUint32(640, true), 0);
@@ -524,17 +524,17 @@ func l_step (st: own List) -> (add_head: U32): (List, U32) =>
 #process const deep_list: Process [U32, U32, U32] = { init: l_init, step: l_step }
 `,
     (guest) => {
-      guest.call("blot:proc_init:deep_list", 5000);
+      guest.call("squid:proc_init:deep_list", 5000);
       const expectedBase = (5000 * 4999) / 2;
-      equal(guest.call("blot:proc_step:deep_list", 7), expectedBase + 7);
-      equal(guest.call("blot:proc_step:deep_list", 13), expectedBase + 20);
+      equal(guest.call("squid:proc_step:deep_list", 7), expectedBase + 7);
+      equal(guest.call("squid:proc_step:deep_list", 13), expectedBase + 20);
     },
   );
 });
 
 // ============================================================================
 // Acceptance Law #2: ABI 8 array-to-array callback growth (8B req in 16B bank
-// + 12B/20B host reply without blot:reset), heap-at-limit transport packet,
+// + 12B/20B host reply without squid:reset), heap-at-limit transport packet,
 // and unmodified Deno strict export check with zero extra exports + unexported
 // memory for scalar-only #process.
 // ============================================================================
@@ -542,7 +542,7 @@ func l_step (st: own List) -> (add_head: U32): (List, U32) =>
 Deno.test("Phase 3 Law #2: array-to-array callback growth, heap-at-limit packet, and scalar-only process unexported memory", async () => {
   const bytes = await compileToWasm(`
 io roundtrip_cb (cb: Array U32 -> Array U32): Array U32 =>
-  // 2-word (8B payload + 4B hdr = 12B) fits in 16B bank; host replies with 3 words (16B) and 5 words (24B) without blot:reset!
+  // 2-word (8B payload + 4B hdr = 12B) fits in 16B bank; host replies with 3 words (16B) and 5 words (24B) without squid:reset!
   let r1 = cb #[11, 22]
   let r2 = cb #[33, 44]
   return #[r1.length, r1[0], r1[2], r2.length, r2[0], r2[4]]
@@ -606,7 +606,7 @@ io heap_at_limit_packet (xs: #[U32]): #[U32] =>
     }
   }
 
-  // Scalar-only #process MUST NOT export blot:memory / blot:allocate / blot:reset,
+  // Scalar-only #process MUST NOT export squid:memory / squid:allocate / squid:reset,
   // yet still loads cleanly under unmodified Deno host/guest.ts strict export check!
   const scalarProcBytes = await compileToWasm(`
 type WrapU32 is data = $WrapU32 { v: U32 }
@@ -619,19 +619,19 @@ func s_step (st: own U32) -> (cmd: WrapU32): (U32, WrapU32) =>
 `);
   const mod = new WebAssembly.Module(scalarProcBytes);
   const expNames = new Set(WebAssembly.Module.exports(mod).map((e) => e.name));
-  assert(!expNames.has("blot:memory"), "scalar-only process must not export blot:memory");
-  assert(!expNames.has("blot:allocate"), "scalar-only process must not export blot:allocate");
-  assert(!expNames.has("blot:reset"), "scalar-only process must not export blot:reset");
-  assert(expNames.has("blot:finish_invocation"));
-  assert(expNames.has("blot:proc_init:scalar_only"));
-  assert(expNames.has("blot:proc_step:scalar_only"));
+  assert(!expNames.has("squid:memory"), "scalar-only process must not export squid:memory");
+  assert(!expNames.has("squid:allocate"), "scalar-only process must not export squid:allocate");
+  assert(!expNames.has("squid:reset"), "scalar-only process must not export squid:reset");
+  assert(expNames.has("squid:finish_invocation"));
+  assert(expNames.has("squid:proc_init:scalar_only"));
+  assert(expNames.has("squid:proc_step:scalar_only"));
 
   // Verify unmodified Deno host/guest.ts loads & runs scalar-only process cleanly!
   const guest = await instantiateGuest(scalarProcBytes);
   try {
-    guest.call("blot:proc_init:scalar_only", 10);
-    equal(guest.call("blot:proc_step:scalar_only", 5), 15);
-    equal(guest.call("blot:proc_step:scalar_only", 27), 42);
+    guest.call("squid:proc_init:scalar_only", 10);
+    equal(guest.call("squid:proc_step:scalar_only", 5), 15);
+    equal(guest.call("squid:proc_step:scalar_only", 27), 42);
   } finally {
     guest.dispose();
   }
@@ -699,8 +699,8 @@ io test_box_simd_and_fork (x: U32): #[U32] =>
 // Physical-stride FlatNumeric (#[3; Big20Word], #[2; #[3; U32]], Bool),
 // std/flat (@flat.encode/@flat.decode/@flat.schema_hash/@flat.kernel_*),
 // #kernel (stateless, prepared, clear, count==0 pre-check, variable
-// output + [0xffffffff] overflow sentinel), and custom sections blot:kernels
-// & blot:processes v1 binary encoding.
+// output + [0xffffffff] overflow sentinel), and custom sections squid:kernels
+// & squid:processes v1 binary encoding.
 // ============================================================================
 
 Deno.test("Phase 3: FlatNumeric codecs, std/flat, kernel wrappers, [0xffffffff] overflow sentinel, and custom sections", async () => {
@@ -771,7 +771,7 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
   let bad_bool = case dec3 of
     $Nothing => 1
     $Some _ => 0
-  // Verify represented Kernel handle getters match blot:kernels!
+  // Verify represented Kernel handle getters match squid:kernels!
   let kid = flat.kernel_id prepared_k
   let (bh_lo, bh_hi) = flat.kernel_binding_hash prepared_k
   let (ch_lo, ch_hi) = flat.kernel_ctx_hash prepared_k
@@ -783,7 +783,7 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
 
   // Inspect custom sections!
   const mod = new WebAssembly.Module(bytes);
-  const kSecs = WebAssembly.Module.customSections(mod, "blot:kernels");
+  const kSecs = WebAssembly.Module.customSections(mod, "squid:kernels");
   equal(kSecs.length, 1);
   const parsed = parseKernelsSection(new Uint8Array(kSecs[0]));
   equal(parsed.version, 1);
@@ -797,8 +797,8 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
   assert.deepEqual(parsed.kernels[1].inSchema.wordTags, [1, 3, 2]); // a:U32, c:F32, flag:Bool (UTF-8 sorted!)
   equal(parsed.kernels[1].outSchema.stride, 2);
   assert.deepEqual(parsed.kernels[1].outSchema.wordTags, [2, 1]); // ok:Bool, sum:U32 (UTF-8 sorted!)
-  equal(parsed.kernels[1].ctxExport, "blot:kernel_ctx:prepared_k");
-  equal(parsed.kernels[1].clearExport, "blot:kernel_clear:prepared_k");
+  equal(parsed.kernels[1].ctxExport, "squid:kernel_ctx:prepared_k");
+  equal(parsed.kernels[1].clearExport, "squid:kernel_clear:prepared_k");
   equal(parsed.kernels[2].name, "var_k");
   equal(parsed.kernels[2].flags, 2);
   equal(parsed.kernels[2].outSchema.kind, 2); // VarU32
@@ -806,7 +806,7 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
 
   const guest = await instantiateGuest(bytes);
   try {
-    // 1. FlatNumeric round-trip + Kernel handle hash verification against blot:kernels
+    // 1. FlatNumeric round-trip + Kernel handle hash verification against squid:kernels
     const fr = guest.call("test_flat_roundtrip", 5) as Uint32Array;
     equal(fr[0], 67); // 60 + 1 + 6
     equal(fr[1], 1 + 30 + 24 + 205); // 260
@@ -825,7 +825,7 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
     assert.throws(() => guest.call("prepared_k", new Uint32Array([])));
 
     // Prepare context, run batch (with F32 3.0 bits = 0x40400000 and canonical Bool 1/0)
-    guest.call("blot:kernel_ctx:prepared_k", new Uint32Array([10, 99]));
+    guest.call("squid:kernel_ctx:prepared_k", new Uint32Array([10, 99]));
     const f3Bits = new Uint32Array(new Float32Array([3.0]).buffer)[0];
     const kOut = guest.call(
       "prepared_k",
@@ -842,8 +842,8 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
     assert.throws(() => guest.call("prepared_k", new Uint32Array([4, f3Bits, 2])));
 
     // Clear context (idempotent!) then count==0 traps again!
-    guest.call("blot:kernel_clear:prepared_k", null);
-    guest.call("blot:kernel_clear:prepared_k", null);
+    guest.call("squid:kernel_clear:prepared_k", null);
+    guest.call("squid:kernel_clear:prepared_k", null);
     assert.throws(() => guest.call("prepared_k", new Uint32Array([])));
 
     // 4. Variable-output kernel: normal framed rows + [0xffffffff] non-trapping overflow sentinel!
@@ -854,11 +854,11 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
     // Check raw Wasm call since host/guest.ts reads header word as array length!
     const inst = new WebAssembly.Instance(mod);
     const exports = inst.exports as Record<string, unknown>;
-    const mem = exports["blot:memory"] as WebAssembly.Memory;
-    const alloc = exports["blot:allocate"] as (n: number) => number;
-    const reset = exports["blot:reset"] as () => void;
+    const mem = exports["squid:memory"] as WebAssembly.Memory;
+    const alloc = exports["squid:allocate"] as (n: number) => number;
+    const reset = exports["squid:reset"] as () => void;
     const runVar = exports["var_k"] as (ptr: number) => number;
-    const finishInv = exports["blot:finish_invocation"] as () => void;
+    const finishInv = exports["squid:finish_invocation"] as () => void;
     reset();
     const inPtr = alloc(12); // 1 header + 2 items
     const view = new Uint32Array(mem.buffer, inPtr, 3);
@@ -876,7 +876,7 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
 
 // ============================================================================
 // Retained-build LayoutReceipt oracle tests (§4.1 item 3):
-// 1. Editing a kernel helper forces fresh emit updating blot:kernels impl_hash
+// 1. Editing a kernel helper forces fresh emit updating squid:kernels impl_hash
 //    and binding_hash + 7-word Kernel handle consts (matching fresh build!).
 // 2. Editing an imported unit read ONLY by a #run inside a kernel invalidates
 //    retained reuse (unconditional staged_dep_units collector!).
@@ -885,9 +885,9 @@ io test_flat_roundtrip (seed: U32): #[U32] =>
 // ============================================================================
 
 Deno.test("Phase 3: LayoutReceipt retained-build soundness for kernel helper, kernel #run dep, and unrelated non-kernel edits", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-phase3-receipt-" });
-  const entry = `${dir}/main.blot`;
-  const dep = `${dir}/dep.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-phase3-receipt-" });
+  const entry = `${dir}/main.sq`;
+  const dep = `${dir}/dep.sq`;
   const compiler = await createZigProjectCompiler({
     executable: compilerExecutable,
     entry,
@@ -921,7 +921,7 @@ io get_meta (_: Unit): #[U32] =>
       new Uint8Array(
         WebAssembly.Module.customSections(
           new WebAssembly.Module(b1.bytes),
-          "blot:kernels",
+          "squid:kernels",
         )[0],
       ),
     ).kernels[0];
@@ -963,7 +963,7 @@ io get_meta (_: Unit): #[U32] =>
       new Uint8Array(
         WebAssembly.Module.customSections(
           new WebAssembly.Module(b3.bytes),
-          "blot:kernels",
+          "squid:kernels",
         )[0],
       ),
     ).kernels[0];
@@ -995,7 +995,7 @@ io get_meta (_: Unit): #[U32] =>
       g4.dispose();
     }
 
-    // Build 5: edit ONLY dep.blot (factor: 5 -> 9) read ONLY by #run inside kernel!
+    // Build 5: edit ONLY dep.sq (factor: 5 -> 9) read ONLY by #run inside kernel!
     // Unconditional staged_dep_units MUST force fresh emit so work(4) == 21!
     const b5 = await compiler.build({
       sources: {
@@ -1019,11 +1019,11 @@ io get_meta (_: Unit): #[U32] =>
 
 // ============================================================================
 // Stack exact-cap free-list monotonicity + offset 640 flag, deeply-immutable
-// static_pool_flag pools in kernels/processes, blot:processes v1 section,
+// static_pool_flag pools in kernels/processes, squid:processes v1 section,
 // process status=2 trap poisoning, and fork on persistent State + trap rewind.
 // ============================================================================
 
-Deno.test("Phase 3: exact-cap stack monotonicity, blot:processes v1, deeply-immutable static pools, status=2 poison, and persistent-state fork", async () => {
+Deno.test("Phase 3: exact-cap stack monotonicity, squid:processes v1, deeply-immutable static pools, status=2 poison, and persistent-state fork", async () => {
   // 1. Stack retained-chunk fragmentation sets offset 640 == 1, and reversed-order inner-rewind succeeds cleanly!
   const stackBytes = await compileToWasm(`
 func scope_pair (n1: U32) -> (n2: U32): U32 =>
@@ -1049,22 +1049,22 @@ io reversed_rewind (_: #[U32]): #[U32] =>
     const mod = new WebAssembly.Module(stackBytes);
     const warm = new WebAssembly.Instance(mod);
     const exp = warm.exports as Record<string, unknown>;
-    const mem = exp["blot:memory"] as WebAssembly.Memory;
-    const reset = exp["blot:reset"] as () => void;
-    const alloc = exp["blot:allocate"] as (n: number) => number;
-    const finish = exp["blot:finish_invocation"] as () => void;
+    const mem = exp["squid:memory"] as WebAssembly.Memory;
+    const reset = exp["squid:reset"] as () => void;
+    const alloc = exp["squid:allocate"] as (n: number) => number;
+    const finish = exp["squid:finish_invocation"] as () => void;
 
     // Fresh fill_80m succeeds
     {
       const fresh = new WebAssembly.Instance(mod);
       const fExp = fresh.exports as Record<string, unknown>;
-      const fMem = fExp["blot:memory"] as WebAssembly.Memory;
-      (fExp["blot:reset"] as () => void)();
-      const fp = (fExp["blot:allocate"] as (n: number) => number)(4);
+      const fMem = fExp["squid:memory"] as WebAssembly.Memory;
+      (fExp["squid:reset"] as () => void)();
+      const fp = (fExp["squid:allocate"] as (n: number) => number)(4);
       new Uint32Array(fMem.buffer, fp, 1)[0] = 0;
       const fo = (fExp["fill_80m"] as (p: number) => number)(fp);
       equal(new Uint32Array(fMem.buffer, fo, 3)[1], 9);
-      (fExp["blot:finish_invocation"] as () => void)();
+      (fExp["squid:finish_invocation"] as () => void)();
     }
 
     // Warm: fill_60m then fill_80m -> logical stack_live_bytes (80M <= 128M) passes,
@@ -1095,7 +1095,7 @@ io reversed_rewind (_: #[U32]): #[U32] =>
     }
   }
 
-  // 2. Deeply-immutable static pool, blot:processes v1 binary section, status=2 trap poisoning,
+  // 2. Deeply-immutable static pool, squid:processes v1 binary section, status=2 trap poisoning,
   //    and fork rollback on persistent process State array!
   const procBytes = await compileToWasm(`
 const STATIC_LUT: #[U32] = #[10, 20, 30, 40]
@@ -1121,15 +1121,15 @@ func fp_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
 #process const fork_proc: Process [U32, U32, #[U32]] = { init: fp_init, step: fp_step }
 `);
   const pMod = new WebAssembly.Module(procBytes);
-  const pSecs = WebAssembly.Module.customSections(pMod, "blot:processes");
+  const pSecs = WebAssembly.Module.customSections(pMod, "squid:processes");
   equal(pSecs.length, 1);
   const parsedP = parseProcessesSection(new Uint8Array(pSecs[0]));
   equal(parsedP.version, 1);
   equal(parsedP.transportBudget, 2097152);
   equal(parsedP.processes.length, 1);
   equal(parsedP.processes[0].name, "fork_proc");
-  equal(parsedP.processes[0].initExport, "blot:proc_init:fork_proc");
-  equal(parsedP.processes[0].stepExport, "blot:proc_step:fork_proc");
+  equal(parsedP.processes[0].initExport, "squid:proc_init:fork_proc");
+  equal(parsedP.processes[0].stepExport, "squid:proc_step:fork_proc");
   equal(parsedP.processes[0].configSchema.wireTag, 1); // U32
   equal(parsedP.processes[0].cmdSchema.wireTag, 1); // U32
   equal(parsedP.processes[0].replySchema.kind, 2); // VarU32
@@ -1138,21 +1138,21 @@ func fp_step (st: own #[U32]) -> (cmd: U32): (#[U32], #[U32]) =>
   const pg = await instantiateGuest(procBytes);
   try {
     // Calling step before init MUST trap (status == 0 != 1)!
-    assert.throws(() => pg.call("blot:proc_step:fork_proc", 1));
-    pg.call("blot:proc_init:fork_proc", 5);
+    assert.throws(() => pg.call("squid:proc_step:fork_proc", 1));
+    pg.call("squid:proc_init:fork_proc", 5);
     // Double init MUST trap (status == 1 != 0)!
-    assert.throws(() => pg.call("blot:proc_init:fork_proc", 5));
+    assert.throws(() => pg.call("squid:proc_init:fork_proc", 5));
 
     // Turn 1: fork saw data[0]=777, len=3 -> 780; after rollback data[0]=5, pushed 11 -> len=3, lut[2]=30
-    const s1 = pg.call("blot:proc_step:fork_proc", 11) as Uint32Array;
+    const s1 = pg.call("squid:proc_step:fork_proc", 11) as Uint32Array;
     assert.deepEqual(Array.from(s1), [780, 5, 3, 30]);
     // Turn 2: fork saw data[0]=777, len=4 -> 781; after rollback data[0]=5, pushed 12 -> len=4, lut[2]=30
-    const s2 = pg.call("blot:proc_step:fork_proc", 12) as Uint32Array;
+    const s2 = pg.call("squid:proc_step:fork_proc", 12) as Uint32Array;
     assert.deepEqual(Array.from(s2), [781, 5, 4, 30]);
 
     // Turn 3 traps inside step -> status stays 2 (poisoned!), so Turn 4 MUST trap too!
-    assert.throws(() => pg.call("blot:proc_step:fork_proc", 999));
-    assert.throws(() => pg.call("blot:proc_step:fork_proc", 13));
+    assert.throws(() => pg.call("squid:proc_step:fork_proc", 999));
+    assert.throws(() => pg.call("squid:proc_step:fork_proc", 13));
   } finally {
     pg.dispose();
   }

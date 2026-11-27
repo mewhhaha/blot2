@@ -27,7 +27,7 @@ separator checks; upper-case hexadecimal prefixes preserve the native float
 parsing path. Source reads of Zig std parsing rules involved no Zig invocation.
 
 Output preserves the first Parameters structure, at most four fields resolving
-to f32 through bounded aliases, Blot identifier restrictions, insertion order and
+to f32 through bounded aliases, Squid identifier restrictions, insertion order and
 replacement of duplicate constants, and the exact type/header/value spelling.
 Source/issue messages own typed output runs; all intermediate aggregate runs
 remain live until Reader disposal, matching the native arena lifetime.

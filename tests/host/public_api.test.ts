@@ -1,24 +1,24 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import {
-  blotCompilerBinary,
-  blotStdRoot,
   createCompiler,
   instantiateGuest,
+  squidCompilerBinary,
+  squidStdRoot,
 } from "../../mod.ts";
 import { fileURLToPath } from "node:url";
 import { runCli } from "../../host/cli.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 for (const packaged of [false, true]) {
-  // The packaged iteration uses the untracked generated/compiler/blotc.gz,
+  // The packaged iteration uses the untracked generated/compiler/squidc.gz,
   // which is stale here (4 November) and cannot parse the current prelude on
   // either backend. Regenerate it with `deno task package:pack`.
   const test = packaged ? Deno.test.ignore : Deno.test;
   test(`${packaged ? "packaged" : "local"} Zig API builds, edits, rejects and recovers`, async () => {
     const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const compiler = await createCompiler({
       entry,
       ...(packaged ? {} : { executable }),
@@ -62,7 +62,7 @@ for (const packaged of [false, true]) {
   });
 }
 
-// The standalone host embeds the stale generated/compiler/blotc.gz, which
+// The standalone host embeds the stale generated/compiler/squidc.gz, which
 // cannot parse the current prelude on either backend. Regenerate it with
 // `deno task package:pack`.
 Deno.test.ignore(
@@ -77,7 +77,7 @@ Deno.test.ignore(
           JSON.stringify(new URL("../../mod.ts", import.meta.url).href)
         };
 if (!Deno.build.standalone) throw new Error("Expected a standalone executable");
-const entry = ${JSON.stringify(`${directory}/main.blot`)};
+const entry = ${JSON.stringify(`${directory}/main.sq`)};
 const compiler = await createCompiler({ entry });
 try {
   for (const number of [40, 41]) {
@@ -100,9 +100,9 @@ try {
           "--allow-write",
           "--allow-run",
           "--include",
-          fileURLToPath(blotStdRoot),
+          fileURLToPath(squidStdRoot),
           "--include",
-          fileURLToPath(blotCompilerBinary),
+          fileURLToPath(squidCompilerBinary),
           "--output",
           output,
           source,
@@ -125,9 +125,9 @@ try {
 Deno.test("CLI builds projects and dependencies, and fails without publishing invalid output", async () => {
   const directory = await Deno.makeTempDir();
   try {
-    const input = `${directory}/main.blot`,
+    const input = `${directory}/main.sq`,
       output = `${directory}/program.wasm`,
-      bundle = `${directory}/project.blotdep`;
+      bundle = `${directory}/project.sqdep`;
     await Deno.writeTextFile(
       input,
       "io const answer = func () => return 42\n",

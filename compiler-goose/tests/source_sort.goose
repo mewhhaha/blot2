@@ -24,7 +24,7 @@ fn run(size:i64,mode:i64) {
     var comparisons:i64=0;var swaps:i64=0;
     {
         let order=Order{entries:entries[..],comparisons:comparisons,swaps:swaps};
-        blot_check_source_sort::pdqContext(0,size,order);
+        squid_check_source_sort::pdqContext(0,size,order);
     }
     for value,index in entries {
         assert(value.index<size && value.text.len==1 && value.text[0]==value.index as! u8);

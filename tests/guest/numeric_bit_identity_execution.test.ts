@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const library = `const identity = func (index: U32) => return do:
   let multiplied = @u32.mul 1 index
   let masked = @u32.bit_and multiplied 0xffffffff
@@ -52,10 +52,10 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
 }
 
 Deno.test(`U32 identity proofs preserve bits traps and edits`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-bit-proof-" });
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/logic.blot`;
-  const dependencies = `${directory}/logic.blotdep`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-bit-proof-" });
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/logic.sq`;
+  const dependencies = `${directory}/logic.sqdep`;
   const options = {
     executable,
     entry,

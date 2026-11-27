@@ -10,11 +10,11 @@ assert(previousCompiler && candidateCompiler && previousGdev);
 const repeats = Number(rounds);
 assert(Number.isInteger(repeats) && repeats > 0);
 const root = resolve("../gdev");
-const entry = resolve(root, "src/main.blot");
-const world = resolve(root, "src/world_storage.blot");
-const session = resolve(root, "src/session.blot");
-const leaf = resolve(root, "src/effects/lighting_look.blot");
-const project = await gdevProject(root, resolve("std"), "src/main.blot");
+const entry = resolve(root, "src/main.sq");
+const world = resolve(root, "src/world_storage.sq");
+const session = resolve(root, "src/session.sq");
+const leaf = resolve(root, "src/effects/lighting_look.sq");
+const project = await gdevProject(root, resolve("std"), "src/main.sq");
 const decode = new TextDecoder();
 async function git(...args: string[]) {
   const r = await new Deno.Command("git", { args: ["-C", root, ...args] })
@@ -43,8 +43,8 @@ for (const layout of ["original", "session"]) {
   const base: Record<string, string> = {};
   let runner = world;
   if (layout === "original") {
-    base[entry] = await git("show", oldRevision + ":src/main.blot");
-    base[world] = await git("show", oldRevision + ":src/world_storage.blot");
+    base[entry] = await git("show", oldRevision + ":src/main.sq");
+    base[world] = await git("show", oldRevision + ":src/world_storage.sq");
   } else {
     base[entry] = await Deno.readTextFile(entry);
     base[world] = await Deno.readTextFile(world);

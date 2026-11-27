@@ -3,11 +3,11 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const source = await Deno.readTextFile(
-  new URL("../../compiler-goose/tests/fixtures/fixed_scalar_spans.blot", import.meta.url),
+  new URL("../../compiler-goose/tests/fixtures/fixed_scalar_spans.sq", import.meta.url),
 );
 Deno.test(`fixed scalar spans preserve invocation lengths lazy reads lifetimes and nested carries`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-fixed-spans-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-fixed-spans-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

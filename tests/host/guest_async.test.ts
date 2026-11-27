@@ -88,7 +88,7 @@ io const main = func (host: Array F32 -> Array F32 ! {Foreign}) => return do:
   break #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
 `);
   equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [{
-    module: "blot:host/1",
+    module: "squid:host/1",
     name: "call_array_f32_array_f32",
     kind: "function",
   }]);

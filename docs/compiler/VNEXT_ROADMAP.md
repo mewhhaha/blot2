@@ -1,4 +1,4 @@
-# Blot vNext Compiler Architecture & Pruning Roadmap
+# Squid vNext Compiler Architecture & Pruning Roadmap
 
 21 November 2026 — grounded in the actual `compiler-goose/src/` tree
 (**70,962 LOC across 221 `.goose` files**) and targeting

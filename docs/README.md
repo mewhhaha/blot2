@@ -51,12 +51,12 @@ retain their original paths; use the current entrypoints above for new runs.
 Superseded plans and issue diaries remain available at their original pinned
 revisions:
 
-- [Original compiler programme](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/PLAN.md)
-- [Earlier language proposals](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/DESIGN.md)
-- [Counted-runtime completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md)
-- [Dated issue triage](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/ISSUE_TRIAGE.md)
-- [Development timing diary](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/DEVELOPMENT_TURNAROUND.md)
-- [Earlier archived work logs](https://github.com/mewhhaha/blot2/tree/e2fbe95b4ece3e2d4fd442d95274bb6156815705)
+- [Original compiler programme](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/PLAN.md)
+- [Earlier language proposals](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/DESIGN.md)
+- [Counted-runtime completion plan](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md)
+- [Dated issue triage](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/ISSUE_TRIAGE.md)
+- [Development timing diary](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/DEVELOPMENT_TURNAROUND.md)
+- [Earlier archived work logs](https://github.com/mewhhaha/squid-lang/tree/e2fbe95b4ece3e2d4fd442d95274bb6156815705)
 
 See the [cleanup record](repository-cleanup.md) for the previous cleanup and the
 [root README](../README.md) for development commands.

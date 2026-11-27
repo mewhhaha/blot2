@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 type Mode is data = $Play | $Edit
 type Editor is data = $Editor {mode: Mode, counter: U32, nested: {mode: Mode}}
@@ -36,19 +36,19 @@ io const run = func (count: U32): Array U32 => return do:
 
 {
   Deno.test(`generic indexed fields retain invariant element types and source proof equations`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-indexed-field-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-indexed-field-" });
+    const entry = `${directory}/main.sq`;
     await Deno.writeTextFile(entry, source);
     await Deno.writeTextFile(
-      `${directory}/tokens.blot`,
+      `${directory}/tokens.sq`,
       await Deno.readTextFile(
-        new URL("../../compiler-goose/tests/fixtures/scoped-opaque/tokens.blot", import.meta.url),
+        new URL("../../compiler-goose/tests/fixtures/scoped-opaque/tokens.sq", import.meta.url),
       ),
     );
     const compiler = await createZigProjectCompiler({
       executable,
       entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     });
     try {
       const result = await compiler.build();

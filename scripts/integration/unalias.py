@@ -11,14 +11,14 @@ store written straight through `access` becomes an update too.
 A name is left alone when it is used inside a lambda (an update cannot
 rebind what a lambda captured), when it is rebound, or when another name
 is bound from it. After a file is rewritten it is checked through
-src/main.blot; a function that no longer checks is put back as it was and
+src/main.sq; a function that no longer checks is put back as it was and
 reported. (tasks/MEMORY_MODEL.md, "Next: the systems".)
 """
 import re,sys,os,subprocess,json
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 import ownify
 ROOT=ownify.ROOT
-COMPILER=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../compiler-goose/build/blotc-goose-dev'))
+COMPILER=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../compiler-goose/build/squidc-goose-dev'))
 def functions(lines):
     k=0
     while k<len(lines):
@@ -76,7 +76,7 @@ def rewrite(body):
         out.append(code+comment)
     return out,changed,len(drop)
 def check():
-    out=subprocess.run([COMPILER,'migrate-stores','src/main.blot','--project','pen.json','--dry-run','--inference-budget','20000000'],cwd=ROOT,capture_output=True,text=True).stdout
+    out=subprocess.run([COMPILER,'migrate-stores','src/main.sq','--project','pen.json','--dry-run','--inference-budget','20000000'],cwd=ROOT,capture_output=True,text=True).stdout
     bad=[]
     for line in out.split('\n'):
         try: r=json.loads(line)

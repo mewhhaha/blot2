@@ -6,8 +6,8 @@ import {
 } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 Deno.test("standard operators come from prelude and legacy infix declarations stay rejected", async () => {
   await compileExpectedFailure(
@@ -168,22 +168,22 @@ io const effectful_arg_op = func (): U32 =>
 Deno.test("custom operators support cross-module import, alias, re-export, and qualified lookup", async () => {
   const dir = await Deno.makeTempDir({
     dir: new URL("../../build", import.meta.url).pathname,
-    prefix: "blot-custom-ops-",
+    prefix: "squid-custom-ops-",
   });
   try {
     await Deno.writeTextFile(
-      `${dir}/ops.blot`,
+      `${dir}/ops.sq`,
       `func (++) (a: U32) -> (b: U32): U32 => a * 10 + b
 func (+~) (a: U32) -> (b: U32): U32 => a + b + 1
 func (<+>) left -> right => @type.call "concat" left right
 `,
     );
     await Deno.writeTextFile(
-      `${dir}/reexport.blot`,
+      `${dir}/reexport.sq`,
       `export { (++), (<+>) } from "./ops"\n`,
     );
     await Deno.writeTextFile(
-      `${dir}/main.blot`,
+      `${dir}/main.sq`,
       `import { (++), (<+>) } from "./reexport"
 import { (+~) as (+|) } from "./ops"
 import * as ops from "./ops"
@@ -197,7 +197,7 @@ io const d = func (): U32 =>
     );
     const output = `${dir}/program.wasm`;
     const result = await new Deno.Command(executable, {
-      args: ["build", `${dir}/main.blot`, output, "--prelude", prelude],
+      args: ["build", `${dir}/main.sq`, output, "--prelude", prelude],
       stdout: "piped",
       stderr: "piped",
     }).output();

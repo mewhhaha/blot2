@@ -47,7 +47,7 @@ Deno.test("explicit capabilities implement source effects, with no domain import
   const artifact = await compiled();
   const module = new WebAssembly.Module(artifact.bytes);
   equal(WebAssembly.Module.imports(module), [
-    { module: "blot:host/1", name: "call_u32_u32", kind: "function" },
+    { module: "squid:host/1", name: "call_u32_u32", kind: "function" },
   ]);
   const guest = await instantiateGuest(module);
   try {
@@ -379,7 +379,7 @@ function wasm(...sections: number[][]): WebAssembly.Module {
   );
 }
 function manifest(bytes: number[]): number[] {
-  return section(0, [...name("blot:abi"), ...bytes]);
+  return section(0, [...name("squid:abi"), ...bytes]);
 }
 
 Deno.test("ownership manifests admit only complete declared counter globals", () => {
@@ -393,10 +393,10 @@ Deno.test("ownership manifests admit only complete declared counter globals", ()
     ...counters.flatMap((
       name_,
       index,
-    ) => [...name(`blot:rc_${name_}`), 3, index]),
+    ) => [...name(`squid:rc_${name_}`), 3, index]),
   ]);
   const ownership = (state: number[]) =>
-    section(0, [...name("blot:ownership"), ...state]);
+    section(0, [...name("squid:ownership"), ...state]);
   const counted = ownership([1, 1, 0]);
   equal(
     readGuestAbi(wasm(globals, exports, manifest([2, 0, 0]), counted))
@@ -489,7 +489,7 @@ Deno.test("even a Wasm module retaining a previous invocation reference cannot r
   ];
   const module = wasm(
     section(1, [2, 96, 2, 111, 127, 1, 127, 96, 1, 111, 1, 127]),
-    section(2, [1, ...name("blot:host/1"), ...name("call_u32_u32"), 0, 0]),
+    section(2, [1, ...name("squid:host/1"), ...name("call_u32_u32"), 0, 0]),
     section(3, [1, 1]),
     section(6, [1, 111, 1, 208, 111, 11]),
     section(7, [1, ...name("main"), 0, 1]),
@@ -521,13 +521,13 @@ Deno.test("array ABI rejects malformed guest pointers and length headers", async
       ...name("array"),
       0,
       0,
-      ...name("blot:allocate"),
+      ...name("squid:allocate"),
       0,
       1,
-      ...name("blot:reset"),
+      ...name("squid:reset"),
       0,
       2,
-      ...name("blot:memory"),
+      ...name("squid:memory"),
       2,
       0,
     ]),
@@ -559,16 +559,16 @@ function rootAbiModule(
     section(6, [5, ...counters.flatMap(() => [127, 1, 65, 0, 11])]),
     section(7, [
       7,
-      ...name("blot:ownership_enter"),
+      ...name("squid:ownership_enter"),
       0,
       0,
-      ...name("blot:ownership_leave"),
+      ...name("squid:ownership_leave"),
       0,
       1,
       ...counters.flatMap((
         counter,
         index,
-      ) => [...name(`blot:rc_${counter}`), 3, index]),
+      ) => [...name(`squid:rc_${counter}`), 3, index]),
     ]),
     section(10, [
       2,
@@ -578,7 +578,7 @@ function rootAbiModule(
       ...leaveBody,
     ]),
     manifest([3, 0, 0]),
-    section(0, [...name("blot:ownership"), 2, 2, 0]),
+    section(0, [...name("squid:ownership"), 2, 2, 0]),
   );
 }
 Deno.test("ABI v3 validates both ownership signatures before entering the guest", async () => {
@@ -609,7 +609,7 @@ Deno.test("cleanup descriptors independently enforce the actual Wasm import sign
       section(1, [2, 96, 2, 111, parameter, 1, 127, 96, 1, 111, 1, 127]),
       section(2, [
         1,
-        ...name("blot:cleanup/1"),
+        ...name("squid:cleanup/1"),
         ...name("call_u32_unit"),
         0,
         0,

@@ -20,14 +20,14 @@ fn number(text: u8[>..<]&, value: u32) {
     while count > 0 { count -= 1; text.push(digits[count]); }
     text.push(' ');
 }
-fn show(text: u8[>..<]&, budgets: blot_direct_runtime::Budgets, shifted: bool) {
-    var m = blot_direct_writer::Module { .. };
+fn show(text: u8[>..<]&, budgets: squid_direct_runtime::Budgets, shifted: bool) {
+    var m = squid_direct_writer::Module { .. };
     if shifted {
-        let unit = blot_direct_writer::signature(m, [], []);
-        blot_direct_writer::importFunction(m, "host", "log", unit);
-        blot_direct_writer::addGlobal(m, blot_direct_writer::VT_f32, false, 0x3fc00000);
+        let unit = squid_direct_writer::signature(m, [], []);
+        squid_direct_writer::importFunction(m, "host", "log", unit);
+        squid_direct_writer::addGlobal(m, squid_direct_writer::VT_f32, false, 0x3fc00000);
     }
-    let r = blot_direct_runtime::emit(m, budgets);
+    let r = squid_direct_runtime::emit(m, budgets);
     let l = r.layout;
     text.append("layout ");
     for value in [l.free_lists, l.owner_table, l.owner_capacity, l.persistent_base, l.persistent_end, l.stack_base, l.stack_end, l.heap_base, l.heap_end, l.transport_base, l.transport_end, l.total] { number(text, value); }
@@ -36,14 +36,14 @@ fn show(text: u8[>..<]&, budgets: blot_direct_runtime::Budgets, shifted: bool) {
     for value in [r.owner_top, r.persistent_bottom, r.stack_pointer, r.heap_top, r.persistent_top, r.transport_top, r.effect_context, r.open, r.open_persistent, r.release, r.check, r.stack, r.heap_alloc, r.heap_free, r.address, r.length, r.push, r.pop, r.truncate, r.create, r.copy, r.persist, r.allocate, r.reset, r.packet_length] { number(text, value); }
     text.push('\n');
     var out: u8[>..<] = [];
-    blot_direct_writer::assemble(m, out);
+    squid_direct_writer::assemble(m, out);
     for value in out { text.push(hex(value >> 4)); text.push(hex(value & 15)); }
     text.push('\n');
 }
 
 fn main() {
     var text: u8[>..<] = [];
-    show(text, blot_direct_runtime::Budgets { .. }, false);
-    show(text, blot_direct_runtime::Budgets { owners: 1024, persistent: 65536, stack: 131072, heap: 262144, transport: 4096 }, true);
+    show(text, squid_direct_runtime::Budgets { .. }, false);
+    show(text, squid_direct_runtime::Budgets { owners: 1024, persistent: 65536, stack: 131072, heap: 262144, transport: 4096 }, true);
     print(text[..]);
 }

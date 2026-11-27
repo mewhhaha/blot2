@@ -8,13 +8,13 @@ Deno.test("real array library retains generic empty chunks alongside ordinary fi
   });
   try {
     await Deno.writeTextFile(
-      `${dir}/array.blot`,
+      `${dir}/array.sq`,
       await Deno.readTextFile(
-        new URL("../../std/array.blot", import.meta.url),
+        new URL("../../std/array.sq", import.meta.url),
       ),
     );
     await Deno.writeTextFile(
-      `${dir}/main.blot`,
+      `${dir}/main.sq`,
       `
 import * as array from "./array"
 const numbers = #[1, 2, 3, 4, 5]
@@ -34,15 +34,15 @@ io const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
 `,
     );
     const compiler = Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
     const output = `${dir}/main.wasm`;
     const result = await new Deno.Command(compiler, {
       args: [
         "build",
-        `${dir}/main.blot`,
+        `${dir}/main.sq`,
         output,
         "--prelude",
-        new URL("../../std/prelude.blot", import.meta.url).pathname,
+        new URL("../../std/prelude.sq", import.meta.url).pathname,
       ],
       stdout: "piped",
       stderr: "piped",
@@ -77,10 +77,10 @@ Deno.test.ignore("partial Array methods keep result evidence without constrainin
   });
   try {
     const prelude = await Deno.readTextFile(
-      new URL("../../std/prelude.blot", import.meta.url),
+      new URL("../../std/prelude.sq", import.meta.url),
     );
     await Deno.writeTextFile(
-      `${dir}/prelude.blot`,
+      `${dir}/prelude.sq`,
       prelude +
         '\nconst Array.convert = func values => return @type.result "from" (@array.length values)\n',
     );
@@ -105,7 +105,7 @@ io const runtime = func () : F32 => return #[].convert
           equal(guest.call("runtime", null), 0);
         }
       },
-      { prelude: `${dir}/prelude.blot` },
+      { prelude: `${dir}/prelude.sq` },
     );
   } finally {
     await Deno.remove(dir, { recursive: true });

@@ -3,8 +3,8 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 Deno.test("identity array sharing rechecks imported wrapper bodies across retained edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-identity-edit-" });
-  const entry = `${directory}/main.blot`, helper = `${directory}/helper.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-identity-edit-" });
+  const entry = `${directory}/main.sq`, helper = `${directory}/helper.sq`;
   const main = `import {generate} from "./helper"
 io const run = func (seed: U32) => return do:
   let saved = #[seed]
@@ -18,7 +18,7 @@ io const run = func (seed: U32) => return do:
   const options = {
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
   };
   const compiler = await createZigProjectCompiler(options);

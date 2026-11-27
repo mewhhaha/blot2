@@ -28,8 +28,8 @@ static void frame(int fd, const char *metadata, const char *payload) {
 static void worker(void) {
     int *state = malloc(sizeof *state); assert(state); *state = 0;
     unsigned revision = 0;
-    while (!blot_request_begin()) {
-        unsigned char header[8]; int input = blot_request_input_fd();
+    while (!squid_request_begin()) {
+        unsigned char header[8]; int input = squid_request_input_fd();
         assert(pread(input, header, 8, 0) == 8);
         uint32_t metadata = get32(header), payload = get32(header + 4);
         size_t prefix = metadata;
@@ -37,7 +37,7 @@ static void worker(void) {
         char request[4096] = {0}; assert(pread(input, request, prefix, 8) == (ssize_t)prefix);
         char operation = 0;
         if (payload) assert(pread(input, &operation, 1, 8 + metadata) == 1);
-        if (operation == 'm') { *state = 999; blot_request_fail_oom(blot_request_token()); }
+        if (operation == 'm') { *state = 999; squid_request_fail_oom(squid_request_token()); }
         if (operation == 'a') { write(STDOUT_FILENO, "partial", 7); abort(); }
         const char *kind = "build";
         if (strstr(request, "\"open\"")) kind = "open";
@@ -46,7 +46,7 @@ static void worker(void) {
         if (operation >= '0' && operation <= '9') { *state = operation - '0'; revision++; }
         unsigned reply_revision = revision;
         if (operation == 'r') reply_revision++;
-        uint64_t id = blot_request_token();
+        uint64_t id = squid_request_token();
         if (operation == 'i') id++;
         char reply[65536]; int n = snprintf(reply, sizeof reply,
             "{\"kind\":\"%s\",\"id\":%llu,\"epoch\":\"1\",\"revision\":%u,\"success\":true,\"value\":%d}",
@@ -70,21 +70,21 @@ static void worker(void) {
             }
             reply[n++] = '}'; reply[n] = 0; assert((size_t)n < sizeof reply);
         }
-        int output = blot_request_transport_reply_open(); assert(output >= 0);
+        int output = squid_request_transport_reply_open(); assert(output >= 0);
         assert(pwrite(output, "x", 1, 67108864) == -1 && errno == EPERM);
         unsigned char wire[8] = {0}; put32(wire, (uint32_t)n);
         if (operation == 't') put32(wire, (uint32_t)n + 1);
         assert(write(output, wire, 8) == 8 && write(output, reply, (size_t)n) == n);
         if (operation == 'x') frame(output, "{}", "");
-        assert(blot_request_transport_finish(blot_request_token()) == 0);
+        assert(squid_request_transport_finish(squid_request_token()) == 0);
     }
     _exit(0);
 }
 static int run(int input, int output) {
     assert(lseek(input, 0, SEEK_SET) == 0);
-    int role = blot_request_start(67108864, 67108864, 1000); assert(role >= 0);
-    if (role == BLOT_REQUEST_WORKER) worker();
-    int result = blot_request_transport_run(input, output);
+    int role = squid_request_start(67108864, 67108864, 1000); assert(role >= 0);
+    if (role == SQUID_REQUEST_WORKER) worker();
+    int result = squid_request_transport_run(input, output);
     int status; assert(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
     assert(lseek(output, 0, SEEK_SET) == 0); return result;
 }
@@ -95,7 +95,7 @@ static int reply(int fd, char *metadata, size_t capacity) {
     assert(length < capacity && payload == 0 && read(fd, metadata, length) == length);
     metadata[length] = 0; return 1;
 }
-static void open_frame(int fd) { frame(fd, "{\"kind\":\"open\",\"id\":1,\"version\":1,\"entry\":\"/a\\\".blot\",\"revision\":null}", ""); }
+static void open_frame(int fd) { frame(fd, "{\"kind\":\"open\",\"id\":1,\"version\":1,\"entry\":\"/a\\\".sq\",\"revision\":null}", ""); }
 static int fd_count(void) {
     DIR *directory = opendir("/proc/self/fd"); assert(directory);
     int count = 0; while (readdir(directory)) count++;
@@ -118,7 +118,7 @@ int main(void) {
     assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "\"open\""));
     assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "\"revision\":1"));
     assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "\"code\":\"out_of_memory\"") &&
-           strstr(metadata, "\"id\":3") && strstr(metadata, "\"revision\":1") && strstr(metadata, "\"filename\":\"/a\\\".blot\""));
+           strstr(metadata, "\"id\":3") && strstr(metadata, "\"revision\":1") && strstr(metadata, "\"filename\":\"/a\\\".sq\""));
     assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "\"id\":4") && strstr(metadata, "\"revision\":1") && strstr(metadata, "\"value\":7"));
     assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "\"close\""));
     assert(!reply(output, metadata, sizeof metadata)); close(input); close(output);
@@ -169,12 +169,12 @@ int main(void) {
     input = file(); output = file();
     char large[8192]; const char *prefix = "{\"kind\":\"open\",\"padding\":\"";
     size_t at = strlen(prefix); memcpy(large, prefix, at); memset(large + at, 'x', 5000); at += 5000;
-    strcpy(large + at, "\",\"\\u0069d\":1,\"entry\":\"/large.blot\"}");
+    strcpy(large + at, "\",\"\\u0069d\":1,\"entry\":\"/large.sq\"}");
     frame(input, large, "");
     frame(input, "{\"kind\":\"build\",\"id\":2}", "m");
     assert(run(input, output) == 0);
     assert(reply(output, metadata, sizeof metadata));
-    assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "/large.blot"));
+    assert(reply(output, metadata, sizeof metadata) && strstr(metadata, "/large.sq"));
     assert(!reply(output, metadata, sizeof metadata)); close(input); close(output);
     /* Opaque reply details may exceed both the typed-request depth 64 and
      * ordinary writer depth 256. Raw JSON output has no such depth policy. */

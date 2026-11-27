@@ -8,7 +8,7 @@
 - **Originating requirements:** DEMANDS: Compiler plan and retained
   dependencies. Sources: [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -17,7 +17,7 @@ loops and control/provider boundaries.
 
 ## Starting point
 
-[demand_inline.zig](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
+[demand_inline.zig](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
 uses a bounded 96-node `Plan` for known acyclic expression forwarding.
 [core.zig](../compiler/src/check/core.zig) retains `suspend_`/`force`; broader
 retained-body analysis is not implemented.
@@ -37,7 +37,7 @@ retained-body analysis is not implemented.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Analyze demands read in branches/loops, forwarded through aliases, stored in

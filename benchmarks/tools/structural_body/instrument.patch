@@ -55,7 +55,7 @@
 +                        copyReason(self_, "SIMD payload in a sum type");
                          return Error.unsupported;
                      }
-                     if all_f32 { self_.scratch_layout.push(blot_direct_writer::VT_f32); } else { self_.scratch_layout.push(i32w); }
+                     if all_f32 { self_.scratch_layout.push(squid_direct_writer::VT_f32); } else { self_.scratch_layout.push(i32w); }
 --- a/emit.goose
 +++ b/emit.goose
 @@ -327,7 +327,7 @@
@@ -84,7 +84,7 @@
  // Zig's instance_index.put: the key maps to `id` from now on.
 @@ -1021,3 +1025,8 @@
      }
-     return blot_direct_types::Error.none;
+     return squid_direct_types::Error.none;
  }
 +
 +fn trace(key: InstanceKey, found: u32) {
@@ -98,15 +98,15 @@
      let labels_mark = s.labels.len;
      let handles_mark = s.handles.len;
 +    let instance=g.s.instances[id];
-+    let track=instance.key.kind==blot_direct_emit::InstanceKind.named;
++    let track=instance.key.kind==squid_direct_emit::InstanceKind.named;
 +    let prior=trackInstance(id,track,instance.inferring,g.s.instances.len as u32);
      let error = emitInstanceBody(g, id);
 +    restoreInstance(prior);
-     blot_direct_relocations::rewind(sites_mark);
+     squid_direct_relocations::rewind(sites_mark);
      s.code.resize(code_mark);
      s.locals.resize(locals_mark);
 @@ -600,3 +604,6 @@
-         g.module.exportItem("blot:reset", blot_direct_writer::EXPORT_function, reset);
+         g.module.exportItem("squid:reset", squid_direct_writer::EXPORT_function, reset);
      }
  }
 +
@@ -127,7 +127,7 @@
          return callback;
      }
 +    stageRead(target.unit, target.binding);
-     blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+     squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
      let alias, primitive = primitiveAlias(owner, target.binding);
      if primitive {
 @@ -243,6 +245,7 @@
@@ -135,12 +135,12 @@
                  return stopStage(s, "#run depends on a runtime binding");
              }
 +            stageRead(target.unit, target.binding);
-             blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+             squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
              let body .= owner.body(target.binding);
              var root = binding.initializer;
 @@ -545,3 +548,5 @@
      }
-     return Val {ty, start, (g.s.words.len as u32) - start}, blot_direct_types::Error.none;
+     return Val {ty, start, (g.s.words.len as u32) - start}, squid_direct_types::Error.none;
  }
 +
 +extern fn stageRead(unit:u32,binding:u32)="body_stage_read";

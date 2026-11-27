@@ -35,15 +35,15 @@ io const answer = func (input: ${scalar}) => return do:
 for (const scalar of ["U32", "F32"] as const) {
   Deno.test(`reusable helpers retain captured ${scalar} values through enclosing loops`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-machine-regions-",
+      prefix: "squid-machine-regions-",
     });
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0],
       entry,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     try {
       const result = await compiler.build({

@@ -1,7 +1,7 @@
 // Concrete types of one direct compilation, hash-consed across all units, so
 // type equality is handle equality and each layout is computed once.
 // Port of compiler/src/direct/types.zig.
-namespace blot_direct_types;
+namespace squid_direct_types;
 import std;
 import check.core;
 import check.types;
@@ -23,13 +23,13 @@ let i64_: Ty = 7;
 let f64_: Ty = 8;
 let never: Ty = 9;
 // The concrete IDs follow the checked primitive IDs without the absent slot.
-fn lowerBuiltin(ty: u32) -> Ty { return ty - blot_check_types::unit; }
-type Module = blot_check_core::Module;
-type ValType = blot_direct_writer::ValType;
-type TId = blot_check_types::Id;
-type TTag = blot_check_types::Tag;
+fn lowerBuiltin(ty: u32) -> Ty { return ty - squid_check_types::unit; }
+type Module = squid_check_core::Module;
+type ValType = squid_direct_writer::ValType;
+type TId = squid_check_types::Id;
+type TTag = squid_check_types::Tag;
 type Text = const u8[:];
-type U64Map = blot_direct_map::U64Map;
+type U64Map = squid_direct_map::U64Map;
 
 // Zig's `A.Error || error{Unsupported}`, and emit.zig's Diverged. Allocation
 // failure is not an error value here.
@@ -287,15 +287,15 @@ fn init(self_: Types&) {
     // [0..1] = [VT_i32] (boxed ptr, boolean, u32_, cell)
     // [1..2] = [VT_f32] (f32_)
     // [2..6] = [VT_i32 x 4] ([2..4] fn/provider/array, [2..5] ref/link, [2..6] view)
-    self_.layout_words.push(blot_direct_writer::VT_i32);
-    self_.layout_words.push(blot_direct_writer::VT_f32);
-    self_.layout_words.push(blot_direct_writer::VT_i32);
-    self_.layout_words.push(blot_direct_writer::VT_i32);
-    self_.layout_words.push(blot_direct_writer::VT_i32);
-    self_.layout_words.push(blot_direct_writer::VT_i32);
+    self_.layout_words.push(squid_direct_writer::VT_i32);
+    self_.layout_words.push(squid_direct_writer::VT_f32);
+    self_.layout_words.push(squid_direct_writer::VT_i32);
+    self_.layout_words.push(squid_direct_writer::VT_i32);
+    self_.layout_words.push(squid_direct_writer::VT_i32);
+    self_.layout_words.push(squid_direct_writer::VT_i32);
     // [6..7] = [VT_i64], [7..8] = [VT_f64]
-    self_.layout_words.push(blot_direct_writer::VT_i64);
-    self_.layout_words.push(blot_direct_writer::VT_f64);
+    self_.layout_words.push(squid_direct_writer::VT_i64);
+    self_.layout_words.push(squid_direct_writer::VT_f64);
     // Environment node 0 ends every list.
     self_.env_nodes.push(EnvNode { 0, 0, 0, 0 });
     initUnitTables(self_);
@@ -327,11 +327,11 @@ fn recordField(self_: const Types&, ty: Ty, index: i64) -> Field {
     let pair = self_.list(n.a + (index * 2) as u32, 2);
     return Field { pair[0], pair[1] };
 }
-fn nominalIdentity(self_: const Types&, ty: Ty) -> blot_check_types::NominalIdentity {
+fn nominalIdentity(self_: const Types&, ty: Ty) -> squid_check_types::NominalIdentity {
     let n = self_.node(ty);
     assert(n.tag == Tag.nominal);
     let pair = self_.list(n.a, 2);
-    return blot_check_types::NominalIdentity { pair[0], pair[1] };
+    return squid_check_types::NominalIdentity { pair[0], pair[1] };
 }
 fn nominalArguments(self_: const Types&, ty: Ty) -> const Ty[:] {
     let n = self_.node(ty);
@@ -663,7 +663,7 @@ fn lowerFilled(self_: Types&, m: const Module&, ty: TId, env: Env, fill: Ty) -> 
     return result, error;
 }
 recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open: bool&, depth: i64) -> Ty, Error {
-    if ty >= blot_check_types::unit && ty <= blot_check_types::never { return lowerBuiltin(ty), Error.none; }
+    if ty >= squid_check_types::unit && ty <= squid_check_types::never { return lowerBuiltin(ty), Error.none; }
     if depth > 256 { return 0, fail(self_, m, ty, "type nesting exceeds 256"); }
     let closed_idx = (self_.closed_base[m.unit - 1] as i64) + (ty as i64);
     let hit = self_.closed_vals[closed_idx];
@@ -694,7 +694,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
             result = made;
         },
         product => {
-            let children = m.types.list(blot_check_types::List { n.a, n.b });
+            let children = m.types.list(squid_check_types::List { n.a, n.b });
             let mark = self_.scratch_len;
             for child in children {
                 let item, error = lowerInner(self_, m, child, env, child_open, depth + 1);
@@ -723,17 +723,17 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
         },
         nominal => {
             let arguments = m.types.nominalArguments(n);
-            if blot_check_storage_types::isLengthLiteral(n.a, n.b) {
+            if squid_check_storage_types::isLengthLiteral(n.a, n.b) {
                 result = unit;
             } else {
-            let kind = blot_check_storage_types::identity(n.a, n.b);
+            let kind = squid_check_storage_types::identity(n.a, n.b);
             if kind.present {
-                if kind.value == blot_check_storage_types::shared {
+                if kind.value == squid_check_storage_types::shared {
                     if arguments.len != 1 { return 0, fail(self_, m, ty, "storage type arity"); }
                     let inner, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
                     if error != Error.none { return 0, error; }
                     result = inner;
-                } else if blot_check_storage_types::isSized(kind.value) {
+                } else if squid_check_storage_types::isSized(kind.value) {
                     if arguments.len != 2 { return 0, fail(self_, m, ty, "storage type arity"); }
                     let element, error = lowerInner(self_, m, arguments[1], env, child_open, depth + 1);
                     if error != Error.none { return 0, error; }
@@ -745,10 +745,10 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     let element, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
                     if error != Error.none { return 0, error; }
                     var tag = Tag.link;
-                    if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
-                    else if kind.value == blot_check_storage_types::view { tag = Tag.view; }
-                    else if kind.value == blot_check_storage_types::packed { tag = Tag.packed; }
-                    else if kind.value == blot_check_storage_types::seq { tag = Tag.seq; }
+                    if kind.value == squid_check_storage_types::ref { tag = Tag.ref; }
+                    else if kind.value == squid_check_storage_types::view { tag = Tag.view; }
+                    else if kind.value == squid_check_storage_types::packed { tag = Tag.packed; }
+                    else if kind.value == squid_check_storage_types::seq { tag = Tag.seq; }
                     let made, error = intern(self_, tag, [element]);
                     if error != Error.none { return 0, error; }
                     result = made;
@@ -796,7 +796,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
             result = made;
         },
         projection => {
-            let contract_id = blot_check_types::NominalIdentity { n.a, n.b };
+            let contract_id = squid_check_types::NominalIdentity { n.a, n.b };
             let proj_member = m.types.projectionMember(n);
             let raw_args = m.types.nominalArguments(n);
             if raw_args.len > 16 { return 0, fail(self_, m, ty, "projection"); }
@@ -855,7 +855,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                     let mem_end = mem_start + (impl_.members.len as i64);
                     for mi in mem_start..mem_end {
                         let member = self_.units[unit_idx].implementation_members[mi];
-                        if member.kind == blot_reuse_principal_interface::ImplementationMemberKind.type_ && member.name == want_name {
+                        if member.kind == squid_reuse_principal_interface::ImplementationMemberKind.type_ && member.name == want_name {
                             mem_root = member.root;
                             has_mem = true;
                             break;
@@ -885,7 +885,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
 // operations (the builtin State family) lower like declared ones.
 recursive fn operation(self_: Types&, m: const Module&, ty: TId, env: Env, open: bool&, depth: i64) -> Ty, Error {
     let n = m.types.node(ty);
-    if n.tag != blot_check_types::Tag.nominal { return lowerInner(self_, m, ty, env, open, depth); }
+    if n.tag != squid_check_types::Tag.nominal { return lowerInner(self_, m, ty, env, open, depth); }
     let arguments = m.types.nominalArguments(n);
     let mark = self_.scratch_len;
     self_.pushScratch(n.a);
@@ -906,7 +906,7 @@ fn match_(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&) 
     matchInner(self_, m, pattern, actual, env, open, 0);
 }
 recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: Ty, env: Env&, open: bool&, depth: i64) {
-    if pattern <= blot_check_types::never { return; }
+    if pattern <= squid_check_types::never { return; }
     if depth > 256 { open = true; return; }
     let cidx = (self_.closed_base[m.unit - 1] as i64) + (pattern as i64);
     if self_.closed_vals[cidx] != 0xffffffff || self_.no_vars_vals[cidx] == 2 { return; }
@@ -927,7 +927,7 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
         },
         product => {
             if have.tag == Tag.tuple && have.b == n.b {
-                let children = m.types.list(blot_check_types::List { n.a, n.b });
+                let children = m.types.list(squid_check_types::List { n.a, n.b });
                 for child, at in children { matchInner(self_, m, child, self_.words[have.a + at], env, sub_open, depth + 1); }
             } else { sub_open = true; }
         },
@@ -945,15 +945,15 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
         },
         nominal => {
             let arguments = m.types.nominalArguments(n);
-            let skind = blot_check_storage_types::identity(n.a, n.b);
+            let skind = squid_check_storage_types::identity(n.a, n.b);
             if skind.present {
-                if skind.value == blot_check_storage_types::shared && arguments.len == 1 {
+                if skind.value == squid_check_storage_types::shared && arguments.len == 1 {
                     matchInner(self_, m, arguments[0], actual, env, sub_open, depth + 1);
-                } else if blot_check_storage_types::isSized(skind.value) && arguments.len == 2 {
+                } else if squid_check_storage_types::isSized(skind.value) && arguments.len == 2 {
                     if isContainer(have.tag) {
                         // Length arg[0] might be a variable or literal; mark conservative if not length literal.
                         let len_node = m.types.node(arguments[0]);
-                        if len_node.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(len_node.a, len_node.b) { sub_open = true; }
+                        if len_node.tag != squid_check_types::Tag.nominal || !squid_check_storage_types::isLengthLiteral(len_node.a, len_node.b) { sub_open = true; }
                         matchInner(self_, m, arguments[1], have.a, env, sub_open, depth + 1);
                     } else { sub_open = true; }
                 } else if arguments.len == 1 && isContainer(have.tag) {
@@ -1012,7 +1012,7 @@ fn variants(self_: Types&, ty: Ty) -> Variants, Error {
         let constructor = owner.constructor(constructor_id);
         let signature = owner.types.node(constructor.scheme.root);
         var result = constructor.scheme.root;
-        if signature.tag == blot_check_types::Tag.function { result = signature.b; }
+        if signature.tag == squid_check_types::Tag.function { result = signature.b; }
         var env = Env {};
         match_(self_, owner, result, ty, env);
         var payload = unit;
@@ -1037,7 +1037,7 @@ fn variants(self_: Types&, ty: Ty) -> Variants, Error {
     self_.variant_cache[ty] = VariantSlot { true, value };
     return value, Error.none;
 }
-fn nominalOrdinal(self_: Types&, owner: const Module&, identity: blot_check_types::NominalIdentity) -> u32, Error {
+fn nominalOrdinal(self_: Types&, owner: const Module&, identity: squid_check_types::NominalIdentity) -> u32, Error {
     let key = key64(identity.unit, identity.decl);
     let hit, cached = self_.nominal_positions.get(key);
     if cached { return hit, Error.none; }
@@ -1095,7 +1095,7 @@ fn blockFlat(self_: Types&, ty: Ty) -> const ValType[:], Error {
 }
 fn wordBytes(words: const ValType[:]) -> u32 {
     var bytes: u32 = 0;
-    for kind in words { bytes += blot_direct_writer::wordBytes(kind); }
+    for kind in words { bytes += squid_direct_writer::wordBytes(kind); }
     return bytes;
 }
 fn alignUp(v: u32, a: u32) -> u32 {
@@ -1559,14 +1559,14 @@ recursive fn flatSlot(self_: Types&, ty: Ty) -> Slot, Error {
 }
 // Pushes the flat words of `ty` on scratch_layout.
 recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
-    let i32w = blot_direct_writer::VT_i32;
+    let i32w = squid_direct_writer::VT_i32;
     let n = self_.node(ty);
     match n.tag {
         unit, never => {},
         boolean, u32_, u8_, i32_ => { self_.pushScratchLayout(i32w); },
-        u64_, i64_ => { self_.pushScratchLayout(blot_direct_writer::VT_i64); },
-        f64_ => { self_.pushScratchLayout(blot_direct_writer::VT_f64); },
-        f32_ => { self_.pushScratchLayout(blot_direct_writer::VT_f32); },
+        u64_, i64_ => { self_.pushScratchLayout(squid_direct_writer::VT_i64); },
+        f64_ => { self_.pushScratchLayout(squid_direct_writer::VT_f64); },
+        f32_ => { self_.pushScratchLayout(squid_direct_writer::VT_f32); },
         tuple => {
             for at in 0..(n.b as i64) {
                 let item, error = flatSlot(self_, self_.words[n.a + at]);
@@ -1635,10 +1635,10 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                         if position < len {
                             any_present = true;
                             let kind = self_.layout_words[start + position];
-                            if kind != blot_direct_writer::VT_f32 { all_f32 = false; }
-                            if kind != blot_direct_writer::VT_f64 { all_f64 = false; }
-                            if kind == blot_direct_writer::VT_i64 || kind == blot_direct_writer::VT_f64 { any_wide = true; }
-                            if kind == blot_direct_writer::VT_v128 { any_v128 = true; }
+                            if kind != squid_direct_writer::VT_f32 { all_f32 = false; }
+                            if kind != squid_direct_writer::VT_f64 { all_f64 = false; }
+                            if kind == squid_direct_writer::VT_i64 || kind == squid_direct_writer::VT_f64 { any_wide = true; }
+                            if kind == squid_direct_writer::VT_v128 { any_v128 = true; }
                         }
                     }
                     if any_v128 {
@@ -1646,9 +1646,9 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                         self_.failure_reason = "SIMD payload in a sum type";
                         return Error.unsupported;
                     }
-                    if any_present && all_f64 { self_.pushScratchLayout(blot_direct_writer::VT_f64); }
-                    else if any_wide { self_.pushScratchLayout(blot_direct_writer::VT_i64); }
-                    else if any_present && all_f32 { self_.pushScratchLayout(blot_direct_writer::VT_f32); }
+                    if any_present && all_f64 { self_.pushScratchLayout(squid_direct_writer::VT_f64); }
+                    else if any_wide { self_.pushScratchLayout(squid_direct_writer::VT_i64); }
+                    else if any_present && all_f32 { self_.pushScratchLayout(squid_direct_writer::VT_f32); }
                     else { self_.pushScratchLayout(i32w); }
                 }
                 self_.scratch_len = mark;

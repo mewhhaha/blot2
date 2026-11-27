@@ -9,7 +9,7 @@ produces `own_argument`. An explicit copy keeps its original pile, including
 the count and credit. The Wasm probe observes the pile rows, active index and
 cleanup journal at lengths 8, 6 and 7. All three keep their original payload
 address, capacity and generation. Run
-`deno run -A benchmarks/language/salt_ownership.ts ../gdev` from the Blot root.
+`deno run -A benchmarks/language/salt_ownership.ts ../gdev` from the Squid root.
 [Source revisions, probes and comparison](../benchmarks/evidence/measurements/2026-11-19-owned-salt-insertion.json)
 
 Editing an existing pile now takes and returns the same salt owner. Its sorted
@@ -121,7 +121,7 @@ Each phase keeps check:dev, the guest suite, Ink, the Gdev frame and the
 full gate green, and moves std, ../ink and ../gdev itself.
 
 1. **Uniqueness and `aliased_update`** — done (bf582a9c), "Phase 1 as built"
-   below. It also landed the `=` store and `blotc migrate-stores`, which
+   below. It also landed the `=` store and `squidc migrate-stores`, which
    turned 1,880 `:=` in Ink and 3,011 in Gdev into `=`. `=` stays until
    phase 3.
 2. **`own` and borrowed parameters.** The default since 16 November 2026:
@@ -134,7 +134,7 @@ full gate green, and moves std, ../ink and ../gdev itself.
    - The state `modify`, once effects are records (round 2, item 4).
 3. **Move the apps off `=`.** — **done (23 November 2026)**, "Phase 3 complete"
    below. Every `=` store across `../ink` (`71b1809` / `5ad36c0`), `../gdev`
-   (`a1aa3c9`), `../pen` (`53a89f3`), and `blot2` (tests, fixtures, examples,
+   (`a1aa3c9`), `../pen` (`53a89f3`), and `squid` (tests, fixtures, examples,
    benchmarks, docs) migrated to `own` / `:=`, and the `=` statement,
    `UpdateInfo.store` shim, and store-only grammar were deleted.
 4. **Value restriction** in full: a `let` generalizes only when its value
@@ -183,7 +183,7 @@ full gate green, and moves std, ../ink and ../gdev itself.
 - **`@storage.write`** is gone; the prelude's `values.write i v` is a `=`
   store until phase 3.
 - **Transitional:** the `=` statement (`store_stmt`, `UpdateInfo.store`) and
-  `blotc migrate-stores`.
+  `squidc migrate-stores`.
 
 ## Phase 2: what the borrowed rules reject (15 November 2026)
 
@@ -194,7 +194,7 @@ has the commands and every count, and the patch next to it rebuilds the
 variants.
 
 **Cause.** Every failing case fails with `borrowed_escape`, and 14,028 of
-the 14,687 diagnostics the suite prints are in std/prelude.blot, which each
+the 14,687 diagnostics the suite prints are in std/prelude.sq, which each
 case compiles. The branch rejects the prelude for three reasons:
 
 - It treats a type variable as an array. That rejects `identity`, `min`,
@@ -210,7 +210,7 @@ case compiles. The branch rejects the prelude for three reasons:
 **The bug.** A shallow copy of a borrowed array whose elements hold storage
 gets the one fact `borrowed`, so the copy's own storage is not unique. The
 branch therefore rejects `moved[0].position := …` after
-`let moved = @storage.copy sources` (ink/tests/next-improvements.blot:177),
+`let moved = @storage.copy sources` (ink/tests/next-improvements.sq:177),
 which phase 1 accepts. The copy needs "unique storage, borrowed elements".
 
 **Counts.** Distinct rejected sites when the rules are narrowed one step at
@@ -230,8 +230,8 @@ the Gdev build has 1 site in std, 26 in ink/lib and 17 in gdev/src:
   (`func access state -> text -> asked => return $Access {state, text, asked}`,
   Ink's `$Scene`, `$Index` and `$Geometry`).
 - 18 return a parameter that owns an array, changed or not
-  (`ground.cells := …` then `return ground` in gdev/src/world/trails.blot).
-- 6 return a constant array (`kind_name` in ink/lib/pen/semantic.blot).
+  (`ground.cells := …` then `return ground` in gdev/src/world/trails.sq).
+- 6 return a constant array (`kind_name` in ink/lib/pen/semantic.sq).
 - 1 is std's `simd.store`, which returns the storage it wrote.
 
 The 75 failing guest cases are in 39 files. 84 of their 108 diagnostics are
@@ -321,7 +321,7 @@ don't have the mutable = anymore?" This is how far that got, and what is
 left.
 
 **Done.** The rules of "Plan for the rest of phase 2" apply to every
-module; the `BLOT_BORROWED_RULES` switch is gone.
+module; the `SQUID_BORROWED_RULES` switch is gone.
 
 - std has no store. The prelude's `values.write` is gone (write
   `values[i] = v` while `=` exists); `simd.store`, `text.from_scalars` and
@@ -407,7 +407,7 @@ named `h`; 187 fixtures); Ink's suite as before (268 passed, 1 failed, 3
 did not compile); Gdev's first frame byte-identical (frame.png c1ff619f…,
 frames.trace 86d50101…; Wasm 406f4d8b…, 2,724,075 bytes).
 
-Gdev's own tests (`pen test-blot` in ../gdev) were compared module by
+Gdev's own tests (`pen test-squid` in ../gdev) were compared module by
 module with the state before: 362 pass, 27 fail and 118 do not compile,
 where 218 passed, none failed and 155 did not compile. No module that
 compiled stopped compiling and none passes fewer tests. 37 more compile,
@@ -587,7 +587,7 @@ byte-identical (Wasm 7fab4303…, 2,677,122 bytes); Gdev's tests 376 pass,
 **The stages own the world (16 November 2026).** The layer under the
 session is converted: `host.frame`, Ink's `app` (`start`, `begin_frame`,
 `run_event`, `advance`, `render`), `clock.advance`, and the ten stage
-lambdas of Gdev's `game.blot`. Each takes the world with `own` and hands
+lambdas of Gdev's `game.sq`. Each takes the world with `own` and hands
 it back; the callers rebind (`access := app.begin_frame stages access`).
 
 - `app.advance` and `clock.advance` return the plan and the world as a
@@ -611,8 +611,8 @@ it back; the callers rebind (`access := app.begin_frame stages access`).
   12 of Ink's called the changed functions. A helper that runs a frame
   takes the world `own` and returns it, or returns `(result, world)`;
   the tests rebind. Six workers converted them in parallel from one
-  brief (the patterns are in the two examples `tests/cursor.blot` and
-  `tests/menu_feedback.blot`).
+  brief (the patterns are in the two examples `tests/cursor.sq` and
+  `tests/menu_feedback.sq`).
 - `own` is not a name any more. `f own x` gives `x` away, so a constant
   called `own` (thirteen of Gdev's fixtures had one for their stage
   record) made every call that passed it read as a marker. Binding a
@@ -695,7 +695,7 @@ Not done in this layer:
 - Devtools' and the performance programs' own stage functions are still
   lent ones behind `app.lent`.
 
-Found after it, converting `tests/codec_support/counter.blot` (its
+Found after it, converting `tests/codec_support/counter.sq` (its
 `execute` held the world across calls; it takes the world and gives it
 back beside the packet now, and its two tests compile again):
 
@@ -729,7 +729,7 @@ parts of the world (`ecs.insert access.entities access.robot
 access.robot_meta index robot`), so the library's writers take a part and
 return it, and the call puts it back:
 
-```blot
+```squid
 access.robot := ecs.insert access.entities access.robot index robot
 ```
 
@@ -779,14 +779,14 @@ that owns the world, `python3 scripts/integration/unalias.py FILE...`
 replaces each name for a part (`let stacks: Array Stack =
 access.salt.stacks`) by the path, and the stores through it by updates
 (`access.salt.stacks[i] := stack`). It checks each file through
-`src/main.blot` and puts back any function that no longer checks. On the
+`src/main.sq` and puts back any function that no longer checks. On the
 66 systems it turned 26 stores into updates and put 10 functions back,
 each with `aliased_update`: a name that borrows from the world (a view
 from `ecs.rows`, a `read_state`) is still read after the update. Those
 need the read moved before the write, or the value read into a plain
 one, by hand. gdev/src went from 691 stores to 652.
 
-`blotc migrate-stores --dry-run` reports an update that would be
+`squidc migrate-stores --dry-run` reports an update that would be
 `aliased_update` as a `"kind":"store"` record, not as a diagnostic; a
 check that reads only diagnostics passes it. Both tools read the record.
 
@@ -900,7 +900,7 @@ Two limits met on the way, both left for the pass:
   borrowed a field of the old version before the loop (`let residents =
   ecs.rows access.resident`, read inside the loop) does not give it back
   to the new one, so the local is not its own after the loop. One store in
-  `gdev/tests/shared_upgrades.blot` stays `=` for it.
+  `gdev/tests/shared_upgrades.sq` stays `=` for it.
 - A borrowed value without a name (`f (reader world.a) world.b`, with `b`
   given) still holds the whole of `world` for the call, so `b` cannot be
   given beside it. Name the borrowed value first
@@ -968,7 +968,7 @@ that differs now still counts as unchanged when it is below both of the
 iteration's marks (a count, or an address from before the iteration).
 What the open item still asks for is an iteration that carries out
 memory it allocated itself, and that is what Ink's physics needs: with
-the step owned, `tests/prepared-physics.blot` still ran out of stack
+the step owned, `tests/prepared-physics.sq` still ran out of stack
 (2,048 bodies rebuilt each tick). So the physics part of the Ink
 conversion (rigid, joints, physics, prepared, springs: 108 stores) is not
 on `main`. It is commit `58e6b02` on Ink's working branch, complete and
@@ -1066,7 +1066,7 @@ it has to be converted with the caller that needs ownership back.
 `python3 scripts/integration/count_stores.py DIR...`.
 `python3 scripts/integration/harvest_stores.py PROJECT ENTRY...` turns
 into `:=` each store the compiler reports as provably unique (it runs
-`blotc migrate-stores --dry-run` with `BLOT_REPORT_STORES` set) and puts
+`squidc migrate-stores --dry-run` with `SQUID_REPORT_STORES` set) and puts
 back any the compiler would turn into a store again; none is left in the
 Gdev build, Gdev's tests or Ink's tests.
 
@@ -1244,7 +1244,7 @@ within the approved rules; the one deviation is marked.
 ### The plan, measured (16 November 2026, before it became the default)
 
 These numbers are from when the rules sat behind the environment variable
-`BLOT_BORROWED_RULES`, applied to every module at once. They are what the
+`SQUID_BORROWED_RULES`, applied to every module at once. They are what the
 per-module scheme of "Phase 2 is the default" was chosen from; the switch
 and its second reference record are gone.
 
@@ -1296,12 +1296,12 @@ passes; a module constant is one shared array, so `return table` needs
 `table.copy`.
 
 Gdev is measured with
-`BLOT_BORROWED_RULES=1 blotc migrate-stores src/main.blot --project pen.json --dry-run --inference-budget 20000000`
+`SQUID_BORROWED_RULES=1 squidc migrate-stores src/main.sq --project pen.json --dry-run --inference-budget 20000000`
 in ../gdev; the dry run reports every diagnostic it cannot rewrite, in
 every module, instead of stopping at the first. Of the 56 returns:
 
 - about 25 return a parameter, changed or not (`return ground` after
-  `ground.cells := …` in world/trails.blot, `return draws`,
+  `ground.cells := …` in world/trails.sq, `return draws`,
   `return values`): `own`, or a copy;
 - about 15 build a record from parameters' array handles (`$Scene`,
   `$FrameAccess`, `$Access`, `$Services`, `$Trails`): the parameters
@@ -1336,7 +1336,7 @@ compatibility shim (`tag_store_stmt`, `UpdateInfo.store`, and `store` grammar
 rules) has been deleted from the Goose compiler, its generated adapters, and
 the Baba host parser:
 
-- **Compiler & host parser (`blot2`):** removed `tag_store_stmt` and
+- **Compiler & host parser (`squid`):** removed `tag_store_stmt` and
   `UpdateInfo.store` across `parse/{ast,parser,source_operators}`,
   `check/{core,check,core_builder,purity,uniqueness,wire_schema}`,
   `direct/{function_control,function_data}`,
@@ -1345,20 +1345,20 @@ the Baba host parser:
   `host/parser/{grammar.baba,baba.json}`; regenerated all 7 Goose adapters and
   `generated/parser/*`; updated the `aliased_update` diagnostic text to stop
   suggesting `=`.
-- **Recorded references & suites (`blot2`):** retired store-only uniqueness
+- **Recorded references & suites (`squid`):** retired store-only uniqueness
   laws `h04_store_keeps_parameter`, `h05_store_keeps_owned`, and
   `h06_store_through_lent_keeps_unique` (`199/199` uniqueness programs pass);
-  migrated 16 fixtures (`109/109` pass), `examples/syntax.blot`,
-  `docs/language/guide.md`, all benchmark ports/idiomatic `.blot` programs and
+  migrated 16 fixtures (`109/109` pass), `examples/syntax.sq`,
+  `docs/language/guide.md`, all benchmark ports/idiomatic `.sq` programs and
   tools, and 57 guest/host test files (`deno task test:compiler` exits 0 with
   `1,091 passed, 0 failed, 76 ignored`).
 - **Apps & host (`../ink`, `../gdev`, `../pen`):** `../ink` (`71b1809` /
-  `5ad36c0`: 333/333 Blot checks, 177/177 native Rust tests), `../gdev`
+  `5ad36c0`: 333/333 Squid checks, 177/177 native Rust tests), `../gdev`
   (`a1aa3c9`: `pen check` clean, `build_gdev.ts` 6.70 s / 3,748,553 B,
-  `pen test-blot` 1,339 passed / 57 pre-existing failed with 0 regressions vs.
+  `pen test-squid` 1,339 passed / 57 pre-existing failed with 0 regressions vs.
   2026-11-17 baseline, real hardware Vulkan frame inspected at
   `attempt-4gq9mwv6/frame.png`), and `../pen` (`53a89f3`: `pen-codegen` 10/10,
-  `blot-host` 5/5, `pen-plugins` 8/8, `pen kernels` 4/4).
+  `squid-host` 5/5, `pen-plugins` 8/8, `pen kernels` 4/4).
 
 ## Phase 4 complete: the value restriction for `let` (23 November 2026)
 
@@ -1383,7 +1383,7 @@ All five phases of Memory Model A are now implemented and verified across all fo
   - Added `ownedInPlace` and enforced unique ownership on `@simd.store` (rejecting borrowed parameters, module `const`s, aliased locals, active-borrow conflicts, overlapping call arguments, and outer closure/fork captures with `aliased_update`, while preserving `deep` when all 4 stored lanes are uniquely owned and weakening `deep -> shell` only when a lane may be shared).
   - Enforced ownership on `@storage.freeze` (`seal`), blocking freezes of borrowed parameters, aliases of borrowed parameters, non-unique record fields, outer captures, and locals with active lexical borrow loans, while preserving direct module-level global `GrowArray` pools and returning a non-unique read-only `Array` when freezing a whole same-function local whose uniqueness was conservatively dropped by an earlier borrowing call.
   - Added `Op.link` (`^pool[i]`) to the borrow-and-return-at-last-read path alongside `Op.view`, `Op.ref`, and `Op.at`, and stopped wildcard `let _ = ...` (`PatternTag.wildcard`) from spuriously escaping discarded expressions.
-- **Docs & verification:** updated `docs/language/guide.md`, added Phase 5 execution/rejection tests in `tests/guest/scoped_storage_execution.test.ts` and `tests/guest/store_uniqueness_execution.test.ts`, and updated `@simd.store` test probes in `tests/guest/concurrency_purity_phase1.test.ts` and `tests/guest/concurrency_runtime_phase3.test.ts`. Zero changes required in `std/`, `../ink`, or `../gdev` (`199/199` uniqueness laws and `109/109` fixture records unchanged; `1,095/1,095` guest/host tests, `379/379` Ink Blot tests, `1,398/1,398` Gdev Blot tests + `16/16` native `gdev-tech` tests, and hardware Vulkan frame verified byte-identical).
+- **Docs & verification:** updated `docs/language/guide.md`, added Phase 5 execution/rejection tests in `tests/guest/scoped_storage_execution.test.ts` and `tests/guest/store_uniqueness_execution.test.ts`, and updated `@simd.store` test probes in `tests/guest/concurrency_purity_phase1.test.ts` and `tests/guest/concurrency_runtime_phase3.test.ts`. Zero changes required in `std/`, `../ink`, or `../gdev` (`199/199` uniqueness laws and `109/109` fixture records unchanged; `1,095/1,095` guest/host tests, `379/379` Ink Squid tests, `1,398/1,398` Gdev Squid tests + `16/16` native `gdev-tech` tests, and hardware Vulkan frame verified byte-identical).
 
 **Post-Phase-5 Council Review & Soundness Hardening (24 November 2026):**
 Following Phase 5 (`2de831a6`), a multi-harness audit of `71cf5629..2de831a6` (Claude Code / Opus 5.5: 1 verified `HIGH`; Antigravity / Neon: 4 verified `HIGH`; Codex / Sol 6 Daybreak blocked by hardware-key session authentication) surfaced five concrete soundness/codegen gaps, all fixed with dedicated regression tests:
@@ -1393,7 +1393,7 @@ Following Phase 5 (`2de831a6`), a multi-harness audit of `71cf5629..2de831a6` (C
 3. **Strict `in_same_fn` `ownedInPlace` (`check/uniqueness.goose`, Neon #2):** Removed the `!in_same_fn` `self_.captured` bypass from `ownedInPlace`, blocking `@simd.store` and `@storage.freeze` on outer locals inside closures (while keeping `checkLengthMutation`'s downward CPS allowance for `GrowArray` length updates such as `with_sources step (func sources => ...)`).
 4. **Permanent freeze invalidation (`check/uniqueness.goose`, Neon #3):** Non-moved `@storage.freeze` on a local or record field now permanently kills that owner/field (`kill` / `replace(..., none)`) and returns `Value { fact: none }` instead of a reversible borrow loan, blocking post-freeze `@storage.push` traps across `let _ = @storage.freeze xs`, `let frozen = @storage.freeze xs`, and record fields (`rec.g`). Updated `tests/guest/recursive_storage_execution.test.ts` accordingly.
 5. **Zero-fallback `@storage.freeze` + `non_escaping_params` (`check/uniqueness.goose`, Neon #4):** Removed the `local_born_unloaned` fallback completely so `@storage.freeze` strictly enforces `ownedInPlace` (blocking record/array/tuple escapes, two-hop aliases, `&GrowArray` returns, closures, partial `.push` applications, and polymorphic reader returns). Added a sound least-fixed-point `non_escaping_params` / `non_escaping_arity` scan (for saturated growable `.push`/`.truncate`, proven non-escaping local callees, and pure effect-polymorphic global downward closures) so helper patterns that only push into a `GrowArray` preserve the caller's `deep` uniqueness.
-- **Verification:** `deno task test:compiler` exit 0 (`harness` **25/25**, `reference-direct` **2/2**, `reference-uniqueness` **199/199**, `reference-fixtures` **109/109**, `guests` **1,096 passed, 0 failed, 76 ignored**), `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**), `../ink` (`71bb1a3`) `pen test-blot` **405/405** Blot tests (94 modules) + **234/234** native Rust tests, `../gdev` (`889b336`) `pen check` clean + `menu_focus`/`performance_semantics`/`pickup_visibility` compiling cleanly on release `blotc-goose` + `build_gdev.ts` (`3,830,232 B`, `6.95 s`, `306` fresh modules, `5,053` functions) + `run_pen.py --launch --hardware` (NVIDIA GeForce RTX 4080 SUPER Vulkan, `attempt-451z1ovf/frame.png`, visually inspected).
+- **Verification:** `deno task test:compiler` exit 0 (`harness` **25/25**, `reference-direct` **2/2**, `reference-uniqueness` **199/199**, `reference-fixtures` **109/109**, `guests` **1,096 passed, 0 failed, 76 ignored**), `deno fmt --check` (85 files), `deno check`, `deno task test:editor` (**6/6**), `../ink` (`71bb1a3`) `pen test-squid` **405/405** Squid tests (94 modules) + **234/234** native Rust tests, `../gdev` (`889b336`) `pen check` clean + `menu_focus`/`performance_semantics`/`pickup_visibility` compiling cleanly on release `squidc-goose` + `build_gdev.ts` (`3,830,232 B`, `6.95 s`, `306` fresh modules, `5,053` functions) + `run_pen.py --launch --hardware` (NVIDIA GeForce RTX 4080 SUPER Vulkan, `attempt-451z1ovf/frame.png`, visually inspected).
 
 Earlier measurement (15 November 2026, Zig prototype):
 [The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)
@@ -1404,7 +1404,7 @@ lines in check.zig and is not applied.
   programs check without a diagnostic.
 - **It must keep solving fields at each `let`.** A generalized `let` solves
   the pending field requirements on its way to a scheme. Without that,
-  gdev/src/buildings/cannon.blot:329 fails with `ambiguous_operator`, so
+  gdev/src/buildings/cannon.sq:329 fails with `ambiguous_operator`, so
   the patch calls `solveFields` for a plain `let` too.
 - **Gdev's Wasm changes and its frame does not.** The Wasm is 2,720,283
   bytes against 2,720,970. The first Pen frame is byte-identical on the

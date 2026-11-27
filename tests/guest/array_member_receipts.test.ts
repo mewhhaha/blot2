@@ -3,14 +3,14 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 Deno.test("shape only member calls retain method edits empty elements and captured callback behavior", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-shape-member-" });
-  const entry = `${directory}/main.blot`;
-  const prelude = `${directory}/prelude.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-shape-member-" });
+  const entry = `${directory}/main.sq`;
+  const prelude = `${directory}/prelude.sq`;
   const library = await Deno.readTextFile(
-    new URL("../../std/prelude.blot", import.meta.url),
+    new URL("../../std/prelude.sq", import.meta.url),
   );
   try {
     {
@@ -82,11 +82,11 @@ io const sibling = ${sibling}
 });
 
 Deno.test("array member receipts preserve executed sibling, method, input and failed edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-member-receipts-" });
-  const entry = `${directory}/main.blot`;
-  const prelude = `${directory}/prelude.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-member-receipts-" });
+  const entry = `${directory}/main.sq`;
+  const prelude = `${directory}/prelude.sq`;
   const library = await Deno.readTextFile(
-    new URL("../../std/prelude.blot", import.meta.url),
+    new URL("../../std/prelude.sq", import.meta.url),
   );
   await Deno.writeTextFile(
     prelude,

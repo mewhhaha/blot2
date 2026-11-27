@@ -4,7 +4,7 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 // A parameter marked `own` is taken over (tasks/MEMORY_MODEL.md rule 4): the
 // function updates it in place, the caller's name is spent, and the result
 // is the caller's alone. Only a top-level named function can take one yet.
-const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const buildDir = new URL("../../build", import.meta.url).pathname;
 
 const declarations = `type World is data = $World { counts: Array U32, size: U32 }
@@ -504,10 +504,10 @@ async function project(files: Record<string, string>): Promise<{ success: boolea
   await Deno.mkdir(buildDir, { recursive: true });
   const dir = await Deno.makeTempDir({ dir: buildDir, prefix: "own-parameter-project-" });
   try {
-    for (const [name, text] of Object.entries(files)) await Deno.writeTextFile(`${dir}/${name}.blot`, text);
+    for (const [name, text] of Object.entries(files)) await Deno.writeTextFile(`${dir}/${name}.sq`, text);
     const output = `${dir}/program.wasm`;
     const built = await new Deno.Command(compiler, {
-      args: ["build-project", `${dir}/main.blot`, output, "--prelude", new URL("../../std/prelude.blot", import.meta.url).pathname],
+      args: ["build-project", `${dir}/main.sq`, output, "--prelude", new URL("../../std/prelude.sq", import.meta.url).pathname],
       stdout: "piped",
       stderr: "piped",
     }).output();

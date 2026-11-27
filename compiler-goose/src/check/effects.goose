@@ -1,5 +1,5 @@
 // Flat rows and chronological substitutions. Graph IDs retain Zig ordinals.
-namespace blot_check_effects;
+namespace squid_check_effects;
 import support.error;
 import support.option;
 import support.pooled_buffer;
@@ -12,7 +12,7 @@ import dictionary;
 type Id = u32;
 type Label = u32;
 type Cursor = u32;
-type Error = blot_error::Error;
+type Error = squid_error::Error;
 let formal_key_bit: u32 = 0x80000000;
 let none: u32 = 0xffffffff;
 struct List { start: u32 = 0, len: u32 = 0 }
@@ -27,11 +27,11 @@ struct Version {
     shortcut_birth: u32 = none,
 }
 struct Mark { rows: i64, labels: i64, variables: i64, versions: i64, next_position: Cursor }
-struct Extraction { remaining: Id, expanded: blot_support::Option<u32>   = blot_support::Option<u32> { false, 0 , ..} }
+struct Extraction { remaining: Id, expanded: squid_support::Option<u32>   = squid_support::Option<u32> { false, 0 , ..} }
 struct ExtractionView {
     remaining: Row,
-    expanded: blot_support::Option<u32>   = blot_support::Option<u32> { false, 0 , ..},
-    saved: blot_support::Option<Id>   = blot_support::Option<Id> { false, 0 , ..},
+    expanded: squid_support::Option<u32>   = squid_support::Option<u32> { false, 0 , ..},
+    saved: squid_support::Option<Id>   = squid_support::Option<Id> { false, 0 , ..},
 }
 struct Options { resolution_cache: bool = true }
 // All table owners live in the compilation/session driver.
@@ -74,47 +74,47 @@ fn rollback(self_: Store&, point: Mark) {
     self_.next_position = point.next_position;
 }
 fn add(self_: Store&, value: Row) -> Id, Error {
-    if self_.rows.len == none { return 0, blot_error::Error.effect_limit; }
+    if self_.rows.len == none { return 0, squid_error::Error.effect_limit; }
     let id = self_.rows.len as u32;
-    self_.rows.push(value);if self_.rows.failure!=blot_error::Error.none {return 0,self_.rows.failure;}
-    return id, blot_error::Error.none;
+    self_.rows.push(value);if self_.rows.failure!=squid_error::Error.none {return 0,self_.rows.failure;}
+    return id, squid_error::Error.none;
 }
 fn rowWithList(self_: Store&, labels: List, tail: Tail) -> Id, Error {
-    if labels.len == 0 && tail == Tail.closed { return 0, blot_error::Error.none; }
+    if labels.len == 0 && tail == Tail.closed { return 0, squid_error::Error.none; }
     return add(self_, Row { labels, tail , ..});
 }
 fn row(self_: Store&, labels: const Label[:], tail: Tail) -> Id, Error {
-    if labels.len == 0 && tail == Tail.closed { return 0, blot_error::Error.none; }
-    if labels.len > none - self_.labels.len { return 0, blot_error::Error.effect_limit; }
+    if labels.len == 0 && tail == Tail.closed { return 0, squid_error::Error.none; }
+    if labels.len > none - self_.labels.len { return 0, squid_error::Error.effect_limit; }
     let start = self_.labels.len;
-    self_.labels.append(labels);if self_.labels.failure!=blot_error::Error.none {return 0,self_.labels.failure;}
+    self_.labels.append(labels);if self_.labels.failure!=squid_error::Error.none {return 0,self_.labels.failure;}
     let result, error = add(self_, Row { List { start as u32, labels.len as u32 }, tail , ..});
-    if error != blot_error::Error.none { self_.labels.pop_n(self_.labels.len - start); }
+    if error != squid_error::Error.none { self_.labels.pop_n(self_.labels.len - start); }
     return result, error;
 }
 fn rowAt(self_: Store&, labels: const Label[:], tail: Tail, at: Cursor) -> Id, Error {
     let result, error = row(self_, labels, tail);
-    if error != blot_error::Error.none { return 0, error; }
+    if error != squid_error::Error.none { return 0, error; }
     if result != 0 { self_.rows.items[result].cursor = at; }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn cursor(self_: const Store&) -> Cursor { return self_.next_position; }
 fn freeVariables(self_: Store&, root: Id) -> u32[>..], Error {
     let resolved, error = resolve(self_, root, 0);
-    if error != blot_error::Error.none { return [], error; }
+    if error != squid_error::Error.none { return [], error; }
     var result: u32[>..] = [];
     match node(self_, resolved).tail {
         variable v => { result.push(v.value); },
         _ => {},
     }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn fresh(self_: Store&) -> Id, Error {
-    if self_.variables.len >= formal_key_bit { return 0, blot_error::Error.effect_limit; }
+    if self_.variables.len >= formal_key_bit { return 0, squid_error::Error.effect_limit; }
     let index = self_.variables.len as u32;
-    self_.variables.push(Variable {..});if self_.variables.failure!=blot_error::Error.none {return 0,self_.variables.failure;}
+    self_.variables.push(Variable {..});if self_.variables.failure!=squid_error::Error.none {return 0,self_.variables.failure;}
     let result, error = row(self_, [], Tail.variable { index , ..});
-    if error != blot_error::Error.none { self_.variables.pop(); }
+    if error != squid_error::Error.none { self_.variables.pop(); }
     return result, error;
 }
 fn appendVersion(self_: Store&, variable: u32, replacement_id: Id) -> Error {
@@ -123,18 +123,18 @@ fn appendVersion(self_: Store&, variable: u32, replacement_id: Id) -> Error {
 fn appendVersionAt(self_: Store&, variable: u32, replacement_id: Id, position: Cursor) -> Error {
     assert(variable < self_.variables.len && replacement_id < self_.rows.len);
     assert(position >= self_.next_position);
-    if position == none || self_.versions.len == none { return blot_error::Error.effect_limit; }
+    if position == none || self_.versions.len == none { return squid_error::Error.effect_limit; }
     let old = self_.variables.items[variable];
     let index = self_.versions.len as u32;
     var birth = none;
     if self_.physical_epoch < none { birth = self_.physical_epoch as u32; }
-    self_.versions.push(Version { variable: variable, replacement: replacement_id, position: position, previous: old.last, birth: birth , ..});if self_.versions.failure!=blot_error::Error.none {return self_.versions.failure;}
+    self_.versions.push(Version { variable: variable, replacement: replacement_id, position: position, previous: old.last, birth: birth , ..});if self_.versions.failure!=squid_error::Error.none {return self_.versions.failure;}
     if old.last == none { self_.variables.items[variable].first = index; }
     else { self_.versions.items[old.last].next = index; }
     self_.variables.items[variable].last = index;
     self_.next_position = position + 1;
     tick(self_);
-    return blot_error::Error.none;
+    return squid_error::Error.none;
 }
 fn replacementIndex(self_: const Store&, variable: u32, at: Cursor) -> u32, bool {
     var index = self_.variables.items[variable].first;
@@ -178,7 +178,7 @@ fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
             let writes = self_.variables.items[v.value];
             // An unchanged tail still carries its cursor into later substitutions.
             if at <= original.cursor && (writes.last == none || self_.versions.items[writes.last].position < original.cursor) {
-                return root, blot_error::Error.none;
+                return root, squid_error::Error.none;
             }
             if original.labels.len == 0 && writes.first != none {
                 var pos = max(at, original.cursor);
@@ -189,7 +189,7 @@ fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
                     if w.first == none { break; }
                     let fw = self_.versions.items[w.first];
                     if fw.position < pos { break; }
-                    if fw.replacement == 0 { return 0, blot_error::Error.none; }
+                    if fw.replacement == 0 { return 0, squid_error::Error.none; }
                     let rep = node(self_, fw.replacement);
                     if rep.labels.len != 0 { break; }
                     match rep.tail {
@@ -198,12 +198,12 @@ fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
                             pos = max(fw.position + 1, rep.cursor);
                             steps += 1;
                         },
-                        _ => { return 0, blot_error::Error.none; },
+                        _ => { return 0, squid_error::Error.none; },
                     }
                 }
             }
         },
-        _ => { return root, blot_error::Error.none; },
+        _ => { return root, squid_error::Error.none; },
     }
     if !self_.use_resolution_cache || at != 0 || root == 0 ||
        self_.physical_epoch >= none || self_.mutation_epoch >= none {
@@ -219,19 +219,19 @@ fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
         if entry { previous = entry; }
     }
     if previous != root {
-        match node(self_, previous).tail { variable => {}, _ => { return previous, blot_error::Error.none; }, }
+        match node(self_, previous).tail { variable => {}, _ => { return previous, squid_error::Error.none; }, }
     }
     let result, error = resolveUncached(self_, previous, at);
-    if error != blot_error::Error.none { return 0, error; }
-    if previous != root && result == previous { return result, blot_error::Error.none; }
-    if result == root && root >= self_.resolved_high_water { return result, blot_error::Error.none; }
-    self_.resolved.insert(root, result);if self_.resolved.failure!=blot_error::Error.none {return 0,self_.resolved.failure;}
+    if error != squid_error::Error.none { return 0, error; }
+    if previous != root && result == previous { return result, squid_error::Error.none; }
+    if result == root && root >= self_.resolved_high_water { return result, squid_error::Error.none; }
+    self_.resolved.insert(root, result);if self_.resolved.failure!=squid_error::Error.none {return 0,self_.resolved.failure;}
     if root >= self_.resolved_high_water { self_.resolved_high_water = root + 1; }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn resolveUncached(self_: Store&, root: Id, at: Cursor) -> Id, Error {
     let original = node(self_, root);
-    match original.tail { variable => {}, _ => { return root, blot_error::Error.none; }, }
+    match original.tail { variable => {}, _ => { return root, squid_error::Error.none; }, }
     var position = max(at, original.cursor);
     var current = original;
     var labels: Label[>..] = [];
@@ -267,7 +267,7 @@ fn resolveUncached(self_: Store&, root: Id, at: Cursor) -> Id, Error {
         changed = true;
     }
     if !changed {
-        if position == original.cursor { return root, blot_error::Error.none; }
+        if position == original.cursor { return root, squid_error::Error.none; }
         return add(self_, Row { original.labels, original.tail, position , ..});
     }
     if current.labels.len != 0 {
@@ -279,56 +279,56 @@ fn resolveUncached(self_: Store&, root: Id, at: Cursor) -> Id, Error {
         fragments += 1;
     }
     if fragments <= 1 {
-        if single.len == 0 && current.tail == Tail.closed { return 0, blot_error::Error.none; }
+        if single.len == 0 && current.tail == Tail.closed { return 0, squid_error::Error.none; }
         return add(self_, Row { single, current.tail, position , ..});
     }
     let result, error = row(self_, labels, current.tail);
-    if error != blot_error::Error.none { return 0, error; }
+    if error != squid_error::Error.none { return 0, error; }
     if result != 0 { self_.rows.items[result].cursor = position; }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn bind(self_: Store&, variable: u32, replacement_id: Id) -> Error {
     let point = mark(self_);
     let resolved, error = resolve(self_, replacement_id, 0);
-    if error != blot_error::Error.none { rollback(self_, point); return error; }
+    if error != squid_error::Error.none { rollback(self_, point); return error; }
     match node(self_, resolved).tail {
-        variable v => { if v.value == variable { rollback(self_, point); return blot_error::Error.infinite_effect; } },
+        variable v => { if v.value == variable { rollback(self_, point); return squid_error::Error.infinite_effect; } },
         _ => {},
     }
     let written = appendVersion(self_, variable, resolved);
-    if written != blot_error::Error.none { rollback(self_, point); }
+    if written != squid_error::Error.none { rollback(self_, point); }
     return written;
 }
 fn extractInner(self_: Store&, root: Id, label: Label) -> Extraction, Error {
     let view, error = extractView(self_, node(self_, root), label);
-    if error != blot_error::Error.none { return default<Extraction>(), error; }
+    if error != squid_error::Error.none { return default<Extraction>(), error; }
     var remaining: Id = 0;
     if view.saved.present { remaining = view.saved.value; }
     else if view.remaining.labels.len != 0 || view.remaining.tail != Tail.closed {
         let result, added = add(self_, view.remaining);
-        if added != blot_error::Error.none { return default<Extraction>(), added; }
+        if added != squid_error::Error.none { return default<Extraction>(), added; }
         remaining = result;
     }
-    return Extraction { remaining, view.expanded , ..}, blot_error::Error.none;
+    return Extraction { remaining, view.expanded , ..}, squid_error::Error.none;
 }
 fn extract(self_: Store&, root: Id, label: Label) -> Extraction, Error {
     let point = mark(self_);
     let resolved, error = resolve(self_, root, 0);
-    if error != blot_error::Error.none { rollback(self_, point); return default<Extraction>(), error; }
+    if error != squid_error::Error.none { rollback(self_, point); return default<Extraction>(), error; }
     let result, extracted = extractInner(self_, resolved, label);
-    if extracted != blot_error::Error.none { rollback(self_, point); }
+    if extracted != squid_error::Error.none { rollback(self_, point); }
     return result, extracted;
 }
 fn resolveView(self_: Store&, value: Row) -> Row, Error {
     var variable: u32 = 0;
-    match value.tail { variable v => { variable = v.value; }, _ => { return value, blot_error::Error.none; }, }
+    match value.tail { variable v => { variable = v.value; }, _ => { return value, squid_error::Error.none; }, }
     let write, found = replacement(self_, variable, value.cursor);
-    if !found { return value, blot_error::Error.none; }
+    if !found { return value, squid_error::Error.none; }
     let added, error = add(self_, value);
-    if error != blot_error::Error.none { return default<Row>(), error; }
+    if error != squid_error::Error.none { return default<Row>(), error; }
     let resolved, resolution = resolve(self_, added, 0);
-    if resolution != blot_error::Error.none { return default<Row>(), resolution; }
-    return node(self_, resolved), blot_error::Error.none;
+    if resolution != squid_error::Error.none { return default<Row>(), resolution; }
+    return node(self_, resolved), squid_error::Error.none;
 }
 fn extractView(self_: Store&, value: Row, label: Label) -> ExtractionView, Error {
     let labels = list(self_, value.labels);
@@ -337,71 +337,71 @@ fn extractView(self_: Store&, value: Row, label: Label) -> ExtractionView, Error
         if index == 0 || index + 1 == labels.len {
             var start = value.labels.start;
             if index == 0 { start += 1; }
-            return ExtractionView { Row { List { start, value.labels.len - 1 }, value.tail } , ..}, blot_error::Error.none;
+            return ExtractionView { Row { List { start, value.labels.len - 1 }, value.tail } , ..}, squid_error::Error.none;
         }
         var remaining: Label[>..] = [];
         remaining.append(labels[..index]); remaining.append(labels[index + 1..]);
         let saved, error = row(self_, remaining, value.tail);
-        if error != blot_error::Error.none { return default<ExtractionView>(), error; }
-        return ExtractionView { remaining: node(self_, saved), saved: blot_support::Option<Id> { true, saved , ..} , ..}, blot_error::Error.none;
+        if error != squid_error::Error.none { return default<ExtractionView>(), error; }
+        return ExtractionView { remaining: node(self_, saved), saved: squid_support::Option<Id> { true, saved , ..} , ..}, squid_error::Error.none;
     }
     var variable: u32 = 0;
     match value.tail {
         variable v => { variable = v.value; },
-        _ => { return default<ExtractionView>(), blot_error::Error.effect_mismatch; },
+        _ => { return default<ExtractionView>(), squid_error::Error.effect_mismatch; },
     }
     let tail, error = fresh(self_);
-    if error != blot_error::Error.none { return default<ExtractionView>(), error; }
+    if error != squid_error::Error.none { return default<ExtractionView>(), error; }
     let replacement_id, added = row(self_, [label], node(self_, tail).tail);
-    if added != blot_error::Error.none { return default<ExtractionView>(), added; }
+    if added != squid_error::Error.none { return default<ExtractionView>(), added; }
     let written = appendVersion(self_, variable, replacement_id);
-    if written != blot_error::Error.none { return default<ExtractionView>(), written; }
+    if written != squid_error::Error.none { return default<ExtractionView>(), written; }
     return ExtractionView { remaining: Row { value.labels, node(self_, tail).tail, value.cursor },
-        expanded: blot_support::Option<u32> { true, variable , ..} , ..}, blot_error::Error.none;
+        expanded: squid_support::Option<u32> { true, variable , ..} , ..}, squid_error::Error.none;
 }
 fn unify(self_: Store&, left: Id, right: Id) -> Error {
-    if left == 0 && right == 0 { return blot_error::Error.none; }
+    if left == 0 && right == 0 { return squid_error::Error.none; }
     let point = mark(self_);
     let error = unifyInner(self_, left, right);
-    if error != blot_error::Error.none { rollback(self_, point); }
+    if error != squid_error::Error.none { rollback(self_, point); }
     return error;
 }
 fn unifyInner(self_: Store&, left: Id, right: Id) -> Error {
     let first, first_error = resolve(self_, left, 0);
-    if first_error != blot_error::Error.none { return first_error; }
+    if first_error != squid_error::Error.none { return first_error; }
     let second, second_error = resolve(self_, right, 0);
-    if second_error != blot_error::Error.none { return second_error; }
+    if second_error != squid_error::Error.none { return second_error; }
     var a = node(self_, first); var b = node(self_, second);
     var work: i64 = 0;
     loop {
-        if work == 65536 { return blot_error::Error.effect_limit; }
+        if work == 65536 { return squid_error::Error.effect_limit; }
         work += 1;
-        if a.labels.len == 0 && b.labels.len == 0 && a.tail == b.tail { return blot_error::Error.none; }
+        if a.labels.len == 0 && b.labels.len == 0 && a.tail == b.tail { return squid_error::Error.none; }
         if a.labels.len == 0 {
             match a.tail { variable v => {
-                let added, error = add(self_, b); if error != blot_error::Error.none { return error; }
+                let added, error = add(self_, b); if error != squid_error::Error.none { return error; }
                 return bind(self_, v.value, added);
             }, _ => {}, }
         }
         if b.labels.len == 0 {
             match b.tail { variable v => {
-                let added, error = add(self_, a); if error != blot_error::Error.none { return error; }
+                let added, error = add(self_, a); if error != squid_error::Error.none { return error; }
                 return bind(self_, v.value, added);
             }, _ => {}, }
         }
-        if a.labels.len == 0 { return blot_error::Error.effect_mismatch; }
+        if a.labels.len == 0 { return squid_error::Error.effect_mismatch; }
         let selected, error = extractView(self_, b, list(self_, a.labels)[0]);
-        if error != blot_error::Error.none { return error; }
+        if error != squid_error::Error.none { return error; }
         if selected.expanded.present {
             match a.tail { variable v => {
-                if v.value == selected.expanded.value { return blot_error::Error.infinite_effect; }
+                if v.value == selected.expanded.value { return squid_error::Error.infinite_effect; }
             }, _ => {}, }
         }
         let advanced, first_advance = resolveView(self_, Row { List { a.labels.start + 1, a.labels.len - 1 }, a.tail, a.cursor , ..});
-        if first_advance != blot_error::Error.none { return first_advance; }
+        if first_advance != squid_error::Error.none { return first_advance; }
         a = advanced;
         let selected_row, second_advance = resolveView(self_, selected.remaining);
-        if second_advance != blot_error::Error.none { return second_advance; }
+        if second_advance != squid_error::Error.none { return second_advance; }
         b = selected_row;
     }
 }
@@ -409,32 +409,32 @@ fn substitute(self_: Store&, root: Id, variable: u32, replacement_id: Id) -> Id,
     match node(self_, root).tail { variable v => {
         if v.value == variable { return replaceTail(self_, root, replacement_id); }
     }, _ => {}, }
-    return root, blot_error::Error.none;
+    return root, squid_error::Error.none;
 }
 fn substituteParameter(self_: Store&, root: Id, parameter: u32, replacement_id: Id) -> Id, Error {
     match node(self_, root).tail { parameter v => {
         if v.value == parameter { return replaceTail(self_, root, replacement_id); }
     }, _ => {}, }
-    return root, blot_error::Error.none;
+    return root, squid_error::Error.none;
 }
 fn substituteFormal(self_: Store&, root: Id, formal: u32, replacement_id: Id) -> Id, Error {
     match node(self_, root).tail { formal v => {
         if v.value == formal { return replaceTail(self_, root, replacement_id); }
     }, _ => {}, }
-    return root, blot_error::Error.none;
+    return root, squid_error::Error.none;
 }
 fn replaceTail(self_: Store&, root: Id, replacement_id: Id) -> Id, Error {
     let original = node(self_, root); let replacement_ = node(self_, replacement_id);
     var labels: Label[>..] = [];
     labels.append(list(self_, original.labels)); labels.append(list(self_, replacement_.labels));
     let result, error = row(self_, labels, replacement_.tail);
-    if error != blot_error::Error.none { return 0, error; }
+    if error != squid_error::Error.none { return 0, error; }
     if result != 0 { self_.rows.items[result].cursor = max(original.cursor, replacement_.cursor); }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn operationSet(self_: const Store&, root: Id) -> Label[>..], Error {
     let value = node(self_, root);
-    if value.tail != Tail.closed { return [], blot_error::Error.effect_mismatch; }
+    if value.tail != Tail.closed { return [], squid_error::Error.effect_mismatch; }
     var labels: Label[>..] = [];
     labels.append(list(self_, value.labels));
     sort(labels);
@@ -443,16 +443,16 @@ fn operationSet(self_: const Store&, root: Id) -> Label[>..], Error {
         if result.len != 0 && result[result.len - 1] == label { continue; }
         result.push(label);
     }
-    return result, blot_error::Error.none;
+    return result, squid_error::Error.none;
 }
 fn tailCode(value: Tail) -> u32 { match value { closed => { return 0; }, variable => { return 1; }, parameter => { return 2; }, formal => { return 3; }, } }
 fn tailFromCode(code: u32, value: u32) -> Tail, Error {
-    match code { 0 => { return Tail.closed, blot_error::Error.none; }, 1 => { return Tail.variable { value , ..}, blot_error::Error.none; }, 2 => { return Tail.parameter { value , ..}, blot_error::Error.none; }, 3 => { return Tail.formal { value , ..}, blot_error::Error.none; }, _ => { return Tail.closed, blot_error::Error.invalid_artifact; }, }
+    match code { 0 => { return Tail.closed, squid_error::Error.none; }, 1 => { return Tail.variable { value , ..}, squid_error::Error.none; }, 2 => { return Tail.parameter { value , ..}, squid_error::Error.none; }, 3 => { return Tail.formal { value , ..}, squid_error::Error.none; }, _ => { return Tail.closed, squid_error::Error.invalid_artifact; }, }
 }
-fn blot_structural::equal(left: blot_check_effects::Tail, right: blot_check_effects::Tail) -> bool { return left == right; }
-fn blot_check_effects::blotStructuralHash<S>(value: blot_check_effects::Tail,sink: S&) {
-    blot_structural::hash(sink, blot_check_effects::tailCode(value) as! u8);
-    match value { closed => {}, variable v => { blot_structural::hash(sink, v.value); }, parameter v => { blot_structural::hash(sink, v.value); }, formal v => { blot_structural::hash(sink, v.value); }, }
+fn squid_structural::equal(left: squid_check_effects::Tail, right: squid_check_effects::Tail) -> bool { return left == right; }
+fn squid_check_effects::squidStructuralHash<S>(value: squid_check_effects::Tail,sink: S&) {
+    squid_structural::hash(sink, squid_check_effects::tailCode(value) as! u8);
+    match value { closed => {}, variable v => { squid_structural::hash(sink, v.value); }, parameter v => { squid_structural::hash(sink, v.value); }, formal v => { squid_structural::hash(sink, v.value); }, }
 }
 
 struct ScalarDefaults {
@@ -491,62 +491,62 @@ var inactive_resolved=Map_resolved{..};
 reusable var owner_states:OwnerState[>..]=[];
 var next_owner_generation:u64=1;
 
-struct Table_rows {storage:Row[:]=default<Row[:]>(),items:Row[:]=default<Row[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
+struct Table_rows {storage:Row[:]=default<Row[:]>(),items:Row[:]=default<Row[:]>(),len:i64=0,failure:Error=squid_error::Error.none}
 reusable[] var pool_Table_rows:Row[>..];
-fn ensure(self_:Table_rows&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_rows);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_rows&,value:Row) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_rows);self_.len=self_.items.len;}
-fn append(self_:Table_rows&,values:const Row[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_rows);self_.len=self_.items.len;}
-fn resize(self_:Table_rows&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_rows&,length:i64,value:Row) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn ensure(self_:Table_rows&,minimum:i64)->Error {if self_.failure!=squid_error::Error.none {return self_.failure;}let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_Table_rows);if error!=squid_error::Error.none {self_.failure=error;}return error;}
+fn push(self_:Table_rows&,value:Row) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::push(self_,value,pool_Table_rows);self_.len=self_.items.len;}
+fn append(self_:Table_rows&,values:const Row[:]) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::append(self_,values,pool_Table_rows);self_.len=self_.items.len;}
+fn resize(self_:Table_rows&,length:i64) {squid_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Table_rows&,length:i64,value:Row) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=squid_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
 fn pop(self_:Table_rows&)->Row {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
 fn pop_n(self_:Table_rows&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_rows&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_rows&) {blot_support_pooled_buffer::deinit(self_,pool_Table_rows);self_.len=0;self_.failure=blot_error::Error.none;}
+fn clear(self_:Table_rows&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=squid_error::Error.none;}
+fn deinit(self_:Table_rows&) {squid_support_pooled_buffer::deinit(self_,pool_Table_rows);self_.len=0;self_.failure=squid_error::Error.none;}
 fn index_of(self_:const Table_rows&,value:const Row&)->i64 {return self_.items.index_of(value);}
 fn restore(self_:Table_rows&,values:const Row[:])->Error {self_.clear();self_.append(values);return self_.failure;}
 
-struct Table_labels {storage:Label[:]=default<Label[:]>(),items:Label[:]=default<Label[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
+struct Table_labels {storage:Label[:]=default<Label[:]>(),items:Label[:]=default<Label[:]>(),len:i64=0,failure:Error=squid_error::Error.none}
 reusable[] var pool_Table_labels:Label[>..];
-fn ensure(self_:Table_labels&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_labels);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_labels&,value:Label) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_labels);self_.len=self_.items.len;}
-fn append(self_:Table_labels&,values:const Label[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_labels);self_.len=self_.items.len;}
-fn resize(self_:Table_labels&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_labels&,length:i64,value:Label) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn ensure(self_:Table_labels&,minimum:i64)->Error {if self_.failure!=squid_error::Error.none {return self_.failure;}let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_Table_labels);if error!=squid_error::Error.none {self_.failure=error;}return error;}
+fn push(self_:Table_labels&,value:Label) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::push(self_,value,pool_Table_labels);self_.len=self_.items.len;}
+fn append(self_:Table_labels&,values:const Label[:]) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::append(self_,values,pool_Table_labels);self_.len=self_.items.len;}
+fn resize(self_:Table_labels&,length:i64) {squid_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Table_labels&,length:i64,value:Label) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=squid_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
 fn pop(self_:Table_labels&)->Label {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
 fn pop_n(self_:Table_labels&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_labels&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_labels&) {blot_support_pooled_buffer::deinit(self_,pool_Table_labels);self_.len=0;self_.failure=blot_error::Error.none;}
+fn clear(self_:Table_labels&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=squid_error::Error.none;}
+fn deinit(self_:Table_labels&) {squid_support_pooled_buffer::deinit(self_,pool_Table_labels);self_.len=0;self_.failure=squid_error::Error.none;}
 fn index_of(self_:const Table_labels&,value:const Label&)->i64 {for &item,index in self_.items {if item .== value {return index;}}return -1;}
 fn restore(self_:Table_labels&,values:const Label[:])->Error {self_.clear();self_.append(values);return self_.failure;}
 
-struct Table_variables {storage:Variable[:]=default<Variable[:]>(),items:Variable[:]=default<Variable[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
+struct Table_variables {storage:Variable[:]=default<Variable[:]>(),items:Variable[:]=default<Variable[:]>(),len:i64=0,failure:Error=squid_error::Error.none}
 reusable[] var pool_Table_variables:Variable[>..];
-fn ensure(self_:Table_variables&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_variables);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_variables&,value:Variable) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_variables);self_.len=self_.items.len;}
-fn append(self_:Table_variables&,values:const Variable[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_variables);self_.len=self_.items.len;}
-fn resize(self_:Table_variables&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_variables&,length:i64,value:Variable) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn ensure(self_:Table_variables&,minimum:i64)->Error {if self_.failure!=squid_error::Error.none {return self_.failure;}let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_Table_variables);if error!=squid_error::Error.none {self_.failure=error;}return error;}
+fn push(self_:Table_variables&,value:Variable) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::push(self_,value,pool_Table_variables);self_.len=self_.items.len;}
+fn append(self_:Table_variables&,values:const Variable[:]) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::append(self_,values,pool_Table_variables);self_.len=self_.items.len;}
+fn resize(self_:Table_variables&,length:i64) {squid_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Table_variables&,length:i64,value:Variable) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=squid_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
 fn pop(self_:Table_variables&)->Variable {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
 fn pop_n(self_:Table_variables&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_variables&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_variables&) {blot_support_pooled_buffer::deinit(self_,pool_Table_variables);self_.len=0;self_.failure=blot_error::Error.none;}
+fn clear(self_:Table_variables&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=squid_error::Error.none;}
+fn deinit(self_:Table_variables&) {squid_support_pooled_buffer::deinit(self_,pool_Table_variables);self_.len=0;self_.failure=squid_error::Error.none;}
 fn index_of(self_:const Table_variables&,value:const Variable&)->i64 {return self_.items.index_of(value);}
 fn restore(self_:Table_variables&,values:const Variable[:])->Error {self_.clear();self_.append(values);return self_.failure;}
 
-struct Table_versions {storage:Version[:]=default<Version[:]>(),items:Version[:]=default<Version[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
+struct Table_versions {storage:Version[:]=default<Version[:]>(),items:Version[:]=default<Version[:]>(),len:i64=0,failure:Error=squid_error::Error.none}
 reusable[] var pool_Table_versions:Version[>..];
-fn ensure(self_:Table_versions&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_versions);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_versions&,value:Version) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_versions);self_.len=self_.items.len;}
-fn append(self_:Table_versions&,values:const Version[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_versions);self_.len=self_.items.len;}
-fn resize(self_:Table_versions&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_versions&,length:i64,value:Version) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn ensure(self_:Table_versions&,minimum:i64)->Error {if self_.failure!=squid_error::Error.none {return self_.failure;}let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_Table_versions);if error!=squid_error::Error.none {self_.failure=error;}return error;}
+fn push(self_:Table_versions&,value:Version) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::push(self_,value,pool_Table_versions);self_.len=self_.items.len;}
+fn append(self_:Table_versions&,values:const Version[:]) {if self_.failure!=squid_error::Error.none {return;}self_.failure=squid_support_pooled_buffer::append(self_,values,pool_Table_versions);self_.len=self_.items.len;}
+fn resize(self_:Table_versions&,length:i64) {squid_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Table_versions&,length:i64,value:Version) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=squid_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
 fn pop(self_:Table_versions&)->Version {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
 fn pop_n(self_:Table_versions&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_versions&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_versions&) {blot_support_pooled_buffer::deinit(self_,pool_Table_versions);self_.len=0;self_.failure=blot_error::Error.none;}
+fn clear(self_:Table_versions&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=squid_error::Error.none;}
+fn deinit(self_:Table_versions&) {squid_support_pooled_buffer::deinit(self_,pool_Table_versions);self_.len=0;self_.failure=squid_error::Error.none;}
 fn index_of(self_:const Table_versions&,value:const Version&)->i64 {return self_.items.index_of(value);}
 fn restore(self_:Table_versions&,values:const Version[:])->Error {self_.clear();self_.append(values);return self_.failure;}
-struct Map_resolved { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<Id,Id>[:] = default<dictionary_slot<Id,Id>[:]>(), touched: i64[32] = [0; 32] }
+struct Map_resolved { count: i64 = 0, failure:Error=squid_error::Error.none, slots: dictionary_slot<Id,Id>[:] = default<dictionary_slot<Id,Id>[:]>(), touched: i64[32] = [0; 32] }
 fn probe(map: const Map_resolved&,key: Id) -> i64 {
     if map.count == 0 { return -1; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
@@ -556,16 +556,16 @@ fn get(map: const Map_resolved&,key: Id) -> Id? { let index = probe(map,key); if
 fn contains(map: const Map_resolved&,key: Id) -> bool { return probe(map,key) >= 0; }
 fn release(slots: dictionary_slot<Id,Id>[:]) { if slots.len != 0 { pool_Map_resolved.free_slice(slots); } }
 fn grow(map: Map_resolved&,capacity: i64) {
-    if map.failure != blot_error::Error.none { return; } if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = blot_error::Error.out_of_memory; return; }
+    if map.failure != squid_error::Error.none { return; } if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = squid_error::Error.out_of_memory; return; }
     let replacement = pool_Map_resolved.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; }
     var filled: i64 = 0;
     for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; if filled < 32 { map.touched[filled] = index; } filled += 1; } }
     release(map.slots); map.slots = replacement;
 }
 fn insert(map: Map_resolved&,key: Id,value: Id) -> bool {
-    if map.failure != blot_error::Error.none { return false; } if map.count > 0x1ffffffffffffffe || map.slots.len > 0x1fffffffffffffff { map.failure = blot_error::Error.out_of_memory; return false; }
+    if map.failure != squid_error::Error.none { return false; } if map.count > 0x1ffffffffffffffe || map.slots.len > 0x1fffffffffffffff { map.failure = squid_error::Error.out_of_memory; return false; }
     if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
-    if map.failure != blot_error::Error.none { return false; }
+    if map.failure != squid_error::Error.none { return false; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Id,Id> { key,value,tag }; if map.count < 32 { map.touched[map.count] = index; } map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Id,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
 }
@@ -579,16 +579,16 @@ fn clear(map: Map_resolved&) {
     if map.count <= 32 { for i in 0..map.count { map.slots[map.touched[i]].tag = 0; } map.count = 0; return; }
     for &slot in map.slots { slot.tag = 0; } map.count = 0;
 }
-fn deinit(map: Map_resolved&) { release(map.slots); map.slots=default<dictionary_slot<Id,Id>[:]>(); map.count = 0;map.failure=blot_error::Error.none; }
+fn deinit(map: Map_resolved&) { release(map.slots); map.slots=default<dictionary_slot<Id,Id>[:]>(); map.count = 0;map.failure=squid_error::Error.none; }
 fn clone(map: const Map_resolved&) -> Map_resolved { var copy = Map_resolved {..}; if map.slots.len != 0 { let slots = pool_Map_resolved.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: Map_resolved&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_Map_resolved:dictionary_slot<Id,Id>[>..];
-fn restore(map:Map_resolved&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_Map_resolved.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return blot_error::Error.none;}
+fn restore(map:Map_resolved&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return squid_error::Error.invalid_artifact;}return squid_error::Error.none;}let run=pool_Map_resolved.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return squid_error::Error.none;}
 fn valid(self_:const Store&)->bool {return self_.lease!=0 && self_.lease-1<owner_states.len && owner_states[self_.lease-1].live && owner_states[self_.lease-1].generation==self_.owner_generation;}
-fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owner_states[index];var self_=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position, ..};self_.use_resolution_cache=options.resolution_cache;self_.rows.push(Row{..});if self_.rows.failure!=blot_error::Error.none {let error=self_.rows.failure;self_.deinit();return Store{..},error;}return self_,blot_error::Error.none;}
+fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},squid_error::Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owner_states[index];var self_=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position, ..};self_.use_resolution_cache=options.resolution_cache;self_.rows.push(Row{..});if self_.rows.failure!=squid_error::Error.none {let error=self_.rows.failure;self_.deinit();return Store{..},error;}return self_,squid_error::Error.none;}
 fn init()->Store,Error {return initPooled();}
 fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
 fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.rows.deinit();self_.labels.deinit();self_.variables.deinit();self_.versions.deinit();self_.resolved.deinit();let index=self_.lease-1;owner_states[index].live=false;owner_states.free(index);self_=Store{..};}
-fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=blot_error::Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
-fn withStoreValue<C,R,F>(context:C&)->R,Error {let initialized,error=initPooled();if error!=blot_error::Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}
+fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=squid_error::Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
+fn withStoreValue<C,R,F>(context:C&)->R,Error {let initialized,error=initPooled();if error!=squid_error::Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}

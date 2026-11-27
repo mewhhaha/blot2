@@ -52,7 +52,7 @@ export function testCommand(
     "--allow-read",
     "--allow-write",
     "--allow-run",
-    "--allow-env=BLOT_CLIENT_TEST_AMBIENT",
+    "--allow-env=SQUID_CLIENT_TEST_AMBIENT",
     "--fail-fast",
   ];
   if (junit) args.push("--junit-path", junit);

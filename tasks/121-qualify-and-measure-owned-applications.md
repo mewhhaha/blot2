@@ -8,7 +8,7 @@
 
 ## Outcome and ownership
 
-Report whether the replacement works across Blot, Pen, Ink and Gdev and whether
+Report whether the replacement works across Squid, Pen, Ink and Gdev and whether
 it saves actual compilation time, runtime time and memory. Keep those quantities
 separate. This task owns benchmark/gate configuration and durable evidence;
 source fixes go to the relevant task owner, followed only by affected rechecks.
@@ -75,9 +75,9 @@ Pending. The source review and task files are not benchmark results.
 
 ## Checked arrays and release inlining
 
-On 20 November 2026, seven alternating, randomized rounds on a pinned CPU ran the same guest Wasm in both Pen release-engine modes. The two answers for the 120 × 120 tree and hill grids were 1357/565440 and 238/238. All cases matched in Blot and Rust, including recovery from a trapped invocation. Timings below are warm guest p50 / p95 in microseconds across 175 calls per cell.
+On 20 November 2026, seven alternating, randomized rounds on a pinned CPU ran the same guest Wasm in both Pen release-engine modes. The two answers for the 120 × 120 tree and hill grids were 1357/565440 and 238/238. All cases matched in Squid and Rust, including recovery from a trapped invocation. Timings below are warm guest p50 / p95 in microseconds across 175 calls per cell.
 
-| Kernel | Blot off | Blot on | Rust on |
+| Kernel | Squid off | Squid on | Rust on |
 | --- | ---: | ---: | ---: |
 | Tree sightlines | 3384 / 3499 | 1245 / 1287 | 574 / 594 |
 | Reverse BFS | 2626 / 2744 | 802 / 820 | 283 / 313 |

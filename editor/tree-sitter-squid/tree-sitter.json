@@ -1,0 +1,17 @@
+{
+  "grammars": [
+    {
+      "name": "squid",
+      "camelcase": "Squid",
+      "scope": "source.squid",
+      "path": ".",
+      "file-types": ["sq"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Highlighting for the evolving Squid syntax, not a validating compiler grammar."
+  }
+}

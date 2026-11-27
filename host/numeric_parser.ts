@@ -1,4 +1,4 @@
-// Host syntax interpreter for Blot's unchanged Baba island plan.
+// Host syntax interpreter for Squid's unchanged Baba island plan.
 // The plan is decoded by Baba's public API; its generated artifacts are never
 // rewritten. All recognition state and output use owned numeric tables.
 import {

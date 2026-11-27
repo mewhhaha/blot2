@@ -7,7 +7,7 @@
 
 __attribute__((visibility("default"))) int munmap(void *address,
                                                   size_t length) {
-  const char *directory = getenv("BLOT_CORE_PACKETS");
+  const char *directory = getenv("SQUID_CORE_PACKETS");
   if (directory && length > PERSIST_ARENA_CAPACITY &&
       length < PERSIST_ARENA_CAPACITY + 1024 * 1024) {
     struct persist_queue *queue = address;

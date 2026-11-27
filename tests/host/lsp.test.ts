@@ -17,7 +17,7 @@ import {
 const encoder = new TextEncoder();
 const executable = Deno.args[0] ??
   fileURLToPath(
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
   );
 class Bytes {
   data: Uint8Array[] = [];
@@ -92,7 +92,7 @@ async function setup(
     executable: compiler,
     prelude: null,
   });
-  const entry = directory + "/main.blot", uri = pathToFileURL(entry).href;
+  const entry = directory + "/main.sq", uri = pathToFileURL(entry).href;
   const send = (method: string, params: unknown = {}, id?: number) => {
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
     if (id !== undefined) message.id = id;
@@ -103,7 +103,7 @@ async function setup(
   await output.messages();
   const open = (text: string, version = 1, target = uri) =>
     send("textDocument/didOpen", {
-      textDocument: { uri: target, languageId: "blot", text, version },
+      textDocument: { uri: target, languageId: "squid", text, version },
     });
   const change = (text: string, version: number) =>
     send("textDocument/didChange", {
@@ -158,7 +158,7 @@ Deno.test("LSP completes unsaved UTF-16 buffers and imports without an entry and
     rows = await item.output.messages();
     equal(rows[0].result.items[0].textEdit.newText, "value");
     equal(rows[0].result.items[0].filterText, "holevalue");
-    const library = pathToFileURL(item.directory + "/library.blot").href;
+    const library = pathToFileURL(item.directory + "/library.sq").href;
     await item.open("const visible = 1.0\n", 1, library);
     const imported =
       'import {visible as renamed} from "./library"\nconst work = func () : F32 => return ren';
@@ -254,7 +254,7 @@ Deno.test("LSP invalidates a held reply when a watched source changes", async ()
     const pending = item.complete(0, 3);
     await waiting(fixture.log);
     await Deno.writeTextFile(
-      item.directory + "/changed.blot",
+      item.directory + "/changed.sq",
       "const changed = 1\n",
     );
     await pending;
@@ -319,12 +319,12 @@ Deno.test("LSP stdio recovers invalid JSON and reaps an active child on invalid 
       params: {},
     });
     ok((await message()).result.capabilities.completionProvider);
-    const uri = pathToFileURL(fixture.directory + "/main.blot").href;
+    const uri = pathToFileURL(fixture.directory + "/main.sq").href;
     await writer.send({
       jsonrpc: "2.0",
       method: "textDocument/didOpen",
       params: {
-        textDocument: { uri, languageId: "blot", version: 1, text: "val" },
+        textDocument: { uri, languageId: "squid", version: 1, text: "val" },
       },
     });
     await writer.send({
@@ -381,14 +381,14 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
   const output = new Bytes();
   const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
   const prelude = fileURLToPath(
-    new URL("../../std/prelude.blot", import.meta.url),
+    new URL("../../std/prelude.sq", import.meta.url),
   );
   const bridge = new CompletionBridge(new LspWriter(output), {
     executable,
     prelude,
     stdRoot,
   });
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const uri = pathToFileURL(entry).href;
   const send = (method: string, params: unknown = {}, id?: number) => {
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
@@ -412,7 +412,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
       "",
     ].join("\n");
     await send("textDocument/didOpen", {
-      textDocument: { uri, languageId: "blot", text: spentSource, version: 1 },
+      textDocument: { uri, languageId: "squid", text: spentSource, version: 1 },
     });
     await send("textDocument/diagnostic", { textDocument: { uri } }, 10);
     let rows = await output.messages();
@@ -420,7 +420,7 @@ Deno.test("LSP pull diagnostics emit Solid-2 blame relatedInformation and quick-
     equal(rows[0].result.items.length, 1);
     const spentDiag = rows[0].result.items[0];
     equal(spentDiag.code, "SPENT_VALUE");
-    equal(spentDiag.source, "blot");
+    equal(spentDiag.source, "squid");
     ok(spentDiag.message.includes("already moved at line 4"));
     ok(spentDiag.message.includes("fix: Pass `a.copy` at line 4"));
     equal(spentDiag.relatedInformation.length, 1);
@@ -478,17 +478,17 @@ Deno.test("LSP resolves manifest generators and completes fields from a live ass
   const item = await setup(executable, async (directory) => {
     await Promise.all([
       Deno.writeTextFile(
-        directory + "/blot.json",
+        directory + "/squid.json",
         JSON.stringify({
           generators: [{
             module: "shape",
             input: "shape.txt",
-            generator: "generator.blot",
+            generator: "generator.sq",
           }],
         }),
       ),
       Deno.writeTextFile(
-        directory + "/generator.blot",
+        directory + "/generator.sq",
         "io generate (bytes: #[U32]): #[U32] => return bytes\n",
       ),
       Deno.writeTextFile(
@@ -531,14 +531,14 @@ Deno.test("LSP suppresses spurious no_entry on library modules while reporting r
   const output = new Bytes();
   const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
   const prelude = fileURLToPath(
-    new URL("../../std/prelude.blot", import.meta.url),
+    new URL("../../std/prelude.sq", import.meta.url),
   );
   const bridge = new CompletionBridge(new LspWriter(output), {
     executable,
     prelude,
     stdRoot,
   });
-  const entry = directory + "/lib.blot";
+  const entry = directory + "/lib.sq";
   const uri = pathToFileURL(entry).href;
   const send = (method: string, params: unknown = {}, id?: number) => {
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
@@ -554,7 +554,7 @@ Deno.test("LSP suppresses spurious no_entry on library modules while reporting r
     await send("textDocument/didOpen", {
       textDocument: {
         uri,
-        languageId: "blot",
+        languageId: "squid",
         text: "func double (x: U32): U32 => return x + x\n",
         version: 1,
       },

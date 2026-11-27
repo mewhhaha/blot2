@@ -7,7 +7,7 @@ import {
 } from "./adjacent_call_cases.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 async function compile(
   source: string,
   run: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>,
@@ -17,7 +17,7 @@ async function compile(
     prefix: "adjacent-call-",
   });
   try {
-    const input = `${dir}/source.blot`, output = `${dir}/source.wasm`;
+    const input = `${dir}/source.sq`, output = `${dir}/source.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(compiler, {
       args: [
@@ -25,7 +25,7 @@ async function compile(
         input,
         output,
         "--prelude",
-        new URL("../../std/prelude.blot", import.meta.url).pathname,
+        new URL("../../std/prelude.sq", import.meta.url).pathname,
       ],
       stdout: "piped",
       stderr: "piped",
@@ -76,14 +76,14 @@ Deno.test("adjacent parenthesized calls still reject tuple, extra, Unit and scal
       prefix: "adjacent-call-negative-",
     });
     try {
-      await Deno.writeTextFile(`${dir}/source.blot`, item.source);
+      await Deno.writeTextFile(`${dir}/source.sq`, item.source);
       const result = await new Deno.Command(compiler, {
         args: [
           "build",
-          `${dir}/source.blot`,
+          `${dir}/source.sq`,
           `${dir}/source.wasm`,
           "--prelude",
-          new URL("../../std/prelude.blot", import.meta.url).pathname,
+          new URL("../../std/prelude.sq", import.meta.url).pathname,
         ],
         stdout: "piped",
         stderr: "piped",

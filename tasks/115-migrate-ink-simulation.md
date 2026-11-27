@@ -15,7 +15,7 @@ immutable snapshots and ownership-through-closure machinery.
 
 ## Exclusive ownership
 
-In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.blot` files and directories:
+In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.sq` files and directories:
 `animation`, `behavior`, `character`, `clock`, `contact`, `daylight`, `director`,
 `environment`, `field`, `field/`, `joints`, `logic`, `math`, `motion`, `motion/`,
 `navigation`, `navigation/`, `noise`, `particles`, `path`, `physics`, `physics/`,
@@ -75,4 +75,4 @@ Do not report a partial run as a pass or infer frame performance from compile ti
 
 - [Rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md)
 - [Storage rewrite](STORAGE_REWRITE.md)
-- Ink `docs/architecture.md`, `docs/blot.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.
+- Ink `docs/architecture.md`, `docs/squid.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.

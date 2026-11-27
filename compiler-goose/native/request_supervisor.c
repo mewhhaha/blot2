@@ -26,7 +26,7 @@ _Static_assert(sizeof(struct record) == 32, "fixed control record");
 static const uint64_t magic = UINT64_C(0x424c4f5452583031);
 static int channel = -1, input = -1, reply = -1, worker = -1, role = -1;
 static int stage_sender = -1, stage_child;
-extern int32_t blot_worker_quiesce(void) __attribute__((weak));
+extern int32_t squid_worker_quiesce(void) __attribute__((weak));
 static uint64_t request_bound, reply_bound, active_token, input_length, reply_length;
 /* Zero leaves request computation unbounded, like the Zig oracle: the host
  * bounds a build by disposing of the process. Control steps stay bounded. */
@@ -37,9 +37,9 @@ static void (*fork_hook)(void);
 static void (*adopt_hook)(void);
 static int32_t (*reply_validator)(int32_t, uint64_t, uint64_t);
 
-void blot_request_fork_hook(void (*hook)(void)) { fork_hook = hook; }
-void blot_request_adopt_hook(void (*hook)(void)) { adopt_hook = hook; }
-void blot_request_reply_validator(int32_t (*validate)(int32_t, uint64_t, uint64_t)) {
+void squid_request_fork_hook(void (*hook)(void)) { fork_hook = hook; }
+void squid_request_adopt_hook(void (*hook)(void)) { adopt_hook = hook; }
+void squid_request_reply_validator(int32_t (*validate)(int32_t, uint64_t, uint64_t)) {
     reply_validator = validate;
 }
 static void close_fd(int *fd) { if (*fd >= 0) close(*fd); *fd = -1; }
@@ -156,9 +156,9 @@ static int parse_unsigned(const char *text, uint64_t *value) {
     }
     return 0;
 }
-int32_t blot_request_stage_init(int *argc, char **argv) {
+int32_t squid_request_stage_init(int *argc, char **argv) {
     if (*argc < 3 || strcmp(argv[1], "--worker") ||
-        strcmp(argv[2], "--blot-request-oom")) return 0;
+        strcmp(argv[2], "--squid-request-oom")) return 0;
     uint64_t fd, token;
     if (*argc != 5 || parse_unsigned(argv[3], &fd) || fd <= 2 || fd > INT_MAX ||
         parse_unsigned(argv[4], &token) || !token) return -EINVAL;
@@ -169,8 +169,8 @@ int32_t blot_request_stage_init(int *argc, char **argv) {
     *argc = 2; argv[2] = NULL;
     return 1;
 }
-int32_t blot_request_stage_capability(void) {
-    if (role != BLOT_REQUEST_WORKER || input < 0 || !active_token) return -1;
+int32_t squid_request_stage_capability(void) {
+    if (role != SQUID_REQUEST_WORKER || input < 0 || !active_token) return -1;
     return stage_sender;
 }
 static int immutable(int fd, uint64_t length, uint64_t bound) {
@@ -188,7 +188,7 @@ static int spool(int source, uint64_t length, uint64_t bound) {
     if (length > bound || length > INT64_MAX) return -EFBIG;
     if (fstat(source, &st) || !S_ISREG(st.st_mode) || st.st_size < 0 ||
         (uint64_t)st.st_size != length) return -EINVAL;
-    int fd = memfd_create("blot-request", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    int fd = memfd_create("squid-request", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (fd < 0) return -errno;
     uint8_t buffer[16384];
     uint64_t offset = 0;
@@ -229,7 +229,7 @@ static void reap_group(int pid) {
         if (reaped < 0) return;
     }
 }
-int32_t blot_request_start(uint64_t max_request, uint64_t max_reply, uint32_t timeout_ms) {
+int32_t squid_request_start(uint64_t max_request, uint64_t max_reply, uint32_t timeout_ms) {
     if (role >= 0 || !max_request || !max_reply ||
         max_request > INT64_MAX || max_reply > INT64_MAX) return -EINVAL;
     if (prctl(PR_SET_CHILD_SUBREAPER, 1)) return -errno;
@@ -240,7 +240,7 @@ int32_t blot_request_start(uint64_t max_request, uint64_t max_reply, uint32_t ti
     pid_t pid = fork();
     if (pid < 0) { int error = errno; close(pair[0]); close(pair[1]); return -error; }
     if (!pid) {
-        close(pair[0]); channel = pair[1]; role = BLOT_REQUEST_WORKER;
+        close(pair[0]); channel = pair[1]; role = SQUID_REQUEST_WORKER;
         if (setpgid(0, 0) || prctl(PR_SET_PDEATHSIG, SIGKILL) ||
             getppid() != supervisor_pid) _exit(120);
         int null = open("/dev/null", O_WRONLY | O_CLOEXEC);
@@ -249,23 +249,23 @@ int32_t blot_request_start(uint64_t max_request, uint64_t max_reply, uint32_t ti
         return role;
     }
     close(pair[1]); setpgid(pid, pid); channel = pair[0]; worker = pid;
-    role = BLOT_REQUEST_SUPERVISOR; return role;
+    role = SQUID_REQUEST_SUPERVISOR; return role;
 }
-int32_t blot_request_reply_fd(void) { return reply; }
-uint64_t blot_request_reply_length(void) { return reply_length; }
-int32_t blot_request_input_fd(void) { return input; }
-uint64_t blot_request_input_length(void) { return input_length; }
-uint64_t blot_request_token(void) {
-    if (role != BLOT_REQUEST_WORKER && !stage_child) return 0;
+int32_t squid_request_reply_fd(void) { return reply; }
+uint64_t squid_request_reply_length(void) { return reply_length; }
+int32_t squid_request_input_fd(void) { return input; }
+uint64_t squid_request_input_length(void) { return input_length; }
+uint64_t squid_request_token(void) {
+    if (role != SQUID_REQUEST_WORKER && !stage_child) return 0;
     return active_token;
 }
-void blot_request_stop(void) {
-    if (role == BLOT_REQUEST_SUPERVISOR) { kill_group(worker); reap(worker); reap_group(worker); }
+void squid_request_stop(void) {
+    if (role == SQUID_REQUEST_SUPERVISOR) { kill_group(worker); reap(worker); reap_group(worker); }
     close_fd(&channel); close_fd(&input); close_fd(&reply); close_fd(&stage_sender);
     worker = -1; role = -1;
 }
-int32_t blot_request_begin(void) {
-    if (role != BLOT_REQUEST_WORKER || input >= 0) return -EINVAL;
+int32_t squid_request_begin(void) {
+    if (role != SQUID_REQUEST_WORKER || input >= 0) return -EINVAL;
     for (;;) {
         struct record r; int fd;
         int error = receive(channel, &r, &fd, 0);
@@ -308,25 +308,25 @@ int32_t blot_request_begin(void) {
         if (send_record(channel, IDLE, r.token, 0, 0, -1)) return -EPIPE;
     }
 }
-_Noreturn void blot_request_fail_oom(uint64_t token) {
+_Noreturn void squid_request_fail_oom(uint64_t token) {
     int fd = channel;
     if (stage_child) fd = stage_sender;
     send_record(fd, OOM, token, 0, 0, -1); _exit(121);
 }
-_Noreturn void blot_request_fail(uint64_t token) {
+_Noreturn void squid_request_fail(uint64_t token) {
     send_record(channel, FAILED, token, 0, 0, -1); _exit(122);
 }
-int32_t blot_request_finish(int32_t reply_fd, uint64_t length, uint64_t token) {
-    if (role != BLOT_REQUEST_WORKER || input < 0 || token != active_token)
-        blot_request_fail(token);
+int32_t squid_request_finish(int32_t reply_fd, uint64_t length, uint64_t token) {
+    if (role != SQUID_REQUEST_WORKER || input < 0 || token != active_token)
+        squid_request_fail(token);
     /* A copied worker writes its response before its final cleanup. Normal EOF
      * and join make that cleanup, any marker, and capability closure precede
      * FINISH. A hung worker remains subject to the supervisor request deadline. */
-    if (blot_worker_quiesce && blot_worker_quiesce()) blot_request_fail(token);
+    if (squid_worker_quiesce && squid_worker_quiesce()) squid_request_fail(token);
     close_fd(&stage_sender);
     int staged = spool(reply_fd, length, reply_bound);
     close_fd(&input); input_length = 0;
-    if (staged < 0) blot_request_fail(token);
+    if (staged < 0) squid_request_fail(token);
     int error = send_record(channel, FINISH, token, length, 0, staged);
     close(staged);
     struct record r; int fd = -1;
@@ -347,8 +347,8 @@ int32_t blot_request_finish(int32_t reply_fd, uint64_t length, uint64_t token) {
     active_token = 0;
     return 0;
 }
-int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token) {
-    if (role != BLOT_REQUEST_SUPERVISOR || !token || token <= active_token || worker <= 0)
+int32_t squid_request_submit(int32_t request_fd, uint64_t length, uint64_t token) {
+    if (role != SQUID_REQUEST_SUPERVISOR || !token || token <= active_token || worker <= 0)
         return -EINVAL;
     int request = spool(request_fd, length, request_bound);
     if (request < 0) return request;
@@ -369,26 +369,26 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
     struct record r; int candidate_channel = -1, candidate = -1;
     if (!error) error = receive(channel, &r, &candidate_channel, step_deadline());
     if (!error && r.kind == FAILED && r.token == token && candidate_channel < 0) {
-        close(request); close(stage[0]); close(stage[1]); return BLOT_REQUEST_FAILED;
+        close(request); close(stage[0]); close(stage[1]); return SQUID_REQUEST_FAILED;
     }
     if (!error && (r.kind != FORKED || r.token != token || r.pid <= 0 || candidate_channel < 0))
         error = -EPROTO;
     if (error) {
         close(request); close(stage[0]); close(stage[1]); close_fd(&candidate_channel);
         /* A lost baseline transport is terminal; it cannot promise rollback. */
-        blot_request_stop(); return -EPIPE;
+        squid_request_stop(); return -EPIPE;
     }
     candidate = r.pid;
     error = send_record(candidate_channel, STAGE_CAP, token, 0, 0, stage[1]);
     close(stage[1]);
     if (!error) error = send_record(candidate_channel, GO, token, length, 0, request);
     close(request);
-    int result = BLOT_REQUEST_FAILED, returned = -1;
+    int result = SQUID_REQUEST_FAILED, returned = -1;
     if (!error) error = receive_candidate(candidate_channel, &stage[0], token, &r, &returned, deadline);
-    if (error == 1) result = BLOT_REQUEST_OOM;
-    if (error == -ETIMEDOUT) result = BLOT_REQUEST_TIMEOUT;
+    if (error == 1) result = SQUID_REQUEST_OOM;
+    if (error == -ETIMEDOUT) result = SQUID_REQUEST_TIMEOUT;
     if (!error && r.token == token && r.kind == OOM && returned < 0 && !r.length)
-        result = BLOT_REQUEST_OOM;
+        result = SQUID_REQUEST_OOM;
     if (!error && r.token == token && r.kind == FINISH && returned >= 0 &&
         !immutable(returned, r.length, reply_bound) &&
         (!reply_validator || !reply_validator(returned, r.length, token))) {
@@ -400,7 +400,7 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
          * this request capability. Every marker must be drained through EOF. */
         if (!error && r.kind == READY && r.token == token && extra < 0 && stage[0] >= 0)
             error = stage_record(&stage[0], token, deadline);
-        if (error == 1) result = BLOT_REQUEST_OOM;
+        if (error == 1) result = SQUID_REQUEST_OOM;
         if (!error && r.kind == READY && r.token == token && extra < 0) {
             close_fd(&stage[0]);
             kill_group(worker); reap(worker); reap_group(worker);
@@ -411,12 +411,12 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
             int invalid_fd = extra >= 0;
             close_fd(&extra);
             if (error || r.kind != QUIESCENT || r.token != token || invalid_fd) {
-                blot_request_stop(); return -EPIPE;
+                squid_request_stop(); return -EPIPE;
             }
-            return BLOT_REQUEST_ACCEPTED;
+            return SQUID_REQUEST_ACCEPTED;
         }
         close_fd(&extra);
-        if (error == -ETIMEDOUT) result = BLOT_REQUEST_TIMEOUT;
+        if (error == -ETIMEDOUT) result = SQUID_REQUEST_TIMEOUT;
     }
     close_fd(&returned); close_fd(&candidate_channel); close_fd(&stage[0]);
     kill_group(candidate);
@@ -424,6 +424,6 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
     int extra = -1;
     if (!error) error = receive(channel, &r, &extra, step_deadline());
     close_fd(&extra); reap_group(candidate);
-    if (error || r.kind != IDLE || r.token != token) { blot_request_stop(); return -EPIPE; }
+    if (error || r.kind != IDLE || r.token != token) { squid_request_stop(); return -EPIPE; }
     return result;
 }

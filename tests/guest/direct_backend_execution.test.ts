@@ -6,8 +6,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 type Call = [name: string, argument: number | boolean, expected: number | boolean];
 const cases: Record<string, Call[]> = {
-  "calls.blot": [["answer", 40, 42]],
-  "data_and_control.blot": [
+  "calls.sq": [["answer", 40, 42]],
+  "data_and_control.sq": [
     ["shape_area", 0, 12],
     ["shape_area", 1, 12],
     ["shape_area", 2, 0],
@@ -20,7 +20,7 @@ const cases: Record<string, Call[]> = {
     ["sum_to", 10, 38],
     ["first_big", 20, 8],
   ],
-  "storage.blot": [
+  "storage.sq": [
     ["sum_array", 10, 285],
     ["fixed", 7, 49],
     ["records", 5, 1002],
@@ -29,12 +29,12 @@ const cases: Record<string, Call[]> = {
     ["generated", 5, 16],
     ["returned", 3, 2003],
   ],
-  "nested_updates.blot": [["run", 5, 609]],
-  "inferred_types.blot": [["run", 5, 7], ["loopuse", 4, 9]],
-  "dispatch.blot": [["ids", 3, 1], ["ids", 4, 0], ["vec", 1, 79]],
-  "open_codec.blot": [["run", 5, 12], ["written", 1, 3]],
-  "policy_record.blot": [["run", 5, 17]],
-  "boxed_records.blot": [
+  "nested_updates.sq": [["run", 5, 609]],
+  "inferred_types.sq": [["run", 5, 7], ["loopuse", 4, 9]],
+  "dispatch.sq": [["ids", 3, 1], ["ids", 4, 0], ["vec", 1, 79]],
+  "open_codec.sq": [["run", 5, 12], ["written", 1, 3]],
+  "policy_record.sq": [["run", 5, 17]],
+  "boxed_records.sq": [
     ["fields", 5, 138],
     ["nested", 2, 69],
     ["stored", 4, 87],
@@ -42,30 +42,30 @@ const cases: Record<string, Call[]> = {
     ["chosen", 7, 14],
     ["chosen", 1, 1001],
   ],
-  "view_calls.blot": [["run", 1, 25], ["run", 0, 3]],
-  "comprehensions.blot": [
+  "view_calls.sq": [["run", 1, 25], ["run", 0, 3]],
+  "comprehensions.sq": [
     ["comp", 10, 45],
     ["simple", 2, 15],
     ["guarded", 2, 7],
     ["from_view", 1, 9],
     ["nested", 4, 4],
   ],
-  "unused_stages.blot": [["top", 4, 5], ["nested", 1, 7]],
-  "simd_lanes.blot": [
+  "unused_stages.sq": [["top", 4, 5], ["nested", 1, 7]],
+  "simd_lanes.sq": [
     ["shuffled", 5, 6060],
     ["swizzled", 9, 4329],
     ["broadcast", 7, 28],
     ["shifted", 65536, 65856],
   ],
-  "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
-  "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
-  "shared_fields.blot": [["first", 5, 314]],
-  "generalized_values.blot": [["generalized", 41, 41]],
-  "captured_generalized.blot": [["captured", 2.5, 2.5], ["nested_empty", 1, 3]],
-  "closures_in_data.blot": [["builder", 41, 42], ["pair", 41, 41]],
-  "shared_field_update.blot": [["run", 0, 149], ["run", 1, 249]],
-  "unused_generic_fields.blot": [["partial", 41, 2]],
-  "miscompiles.blot": [
+  "generated_from_filter.sq": [["run", 4, 308], ["run", 10, 508]],
+  "empty_literals.sq": [["empty_generic", 5, 5], ["mixed", 3, 3]],
+  "shared_fields.sq": [["first", 5, 314]],
+  "generalized_values.sq": [["generalized", 41, 41]],
+  "captured_generalized.sq": [["captured", 2.5, 2.5], ["nested_empty", 1, 3]],
+  "closures_in_data.sq": [["builder", 41, 42], ["pair", 41, 41]],
+  "shared_field_update.sq": [["run", 0, 149], ["run", 1, 249]],
+  "unused_generic_fields.sq": [["partial", 41, 2]],
+  "miscompiles.sq": [
     ["lazy_and", false, false],
     ["lazy_or", true, true],
     ["alternatives", 38, 40],
@@ -73,22 +73,22 @@ const cases: Record<string, Call[]> = {
     ["positional", 7, 157],
     ["grown", 7, 77],
   ],
-  "recursive_data.blot": [["tree", 1, 100010], ["chain", 10, 45]],
-  "nested_updates_indexed.blot": [["grid", 10, 20], ["fields", 5, 22]],
-  "simd_conversions.blot": [["lanes", 9, 253], ["signed", -7.9, -7170]],
-  "carried_owners.blot": [["plain", 10, 40], ["callbacks", 0, 12], ["stored", 5, 20]],
-  "providers.blot": [
+  "recursive_data.sq": [["tree", 1, 100010], ["chain", 10, 45]],
+  "nested_updates_indexed.sq": [["grid", 10, 20], ["fields", 5, 22]],
+  "simd_conversions.sq": [["lanes", 9, 253], ["signed", -7.9, -7170]],
+  "carried_owners.sq": [["plain", 10, 40], ["callbacks", 0, 12], ["stored", 5, 20]],
+  "providers.sq": [
     ["nested", 1, 120],
     ["counted", 1, 42082],
     ["returned", 9, 799],
     ["returned", 1, 2099],
   ],
-  "generic_comprehensions.blot": [
+  "generic_comprehensions.sq": [
     ["annotated_count", 4, 3],
     ["generic_count", 4, 3],
     ["generic_view_count", 4, 3],
   ],
-  "closures.blot": [
+  "closures.sq": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],
     ["composed", 4, 15],
@@ -104,7 +104,7 @@ async function build(fixture: string) {
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std", import.meta.url).pathname,
   });
   try {
@@ -117,14 +117,14 @@ async function build(fixture: string) {
 }
 
 Deno.test(`global array pools stay readable across calls`, async () => {
-  const guest = await build("pools.blot");
+  const guest = await build("pools.sq");
   assert.equal(guest.call("read", 0), 41);
   assert.equal(guest.call("read", 2), 6);
   assert.deepEqual(Array.from(guest.call("doubled", Uint32Array.of(1, 2, 3)) as Uint32Array), [2, 4, 6]);
   assert.equal(guest.call("scaled", Float32Array.of(0.5, 1.5, 2)), 4);
 });
 Deno.test(`exported constants`, async () => {
-  const guest = await build("constants.blot");
+  const guest = await build("constants.sq");
   assert.equal(guest.read("answer"), 42);
   assert.equal(guest.read("unit_match"), 7);
   assert.equal(guest.read("flag"), true);
@@ -132,7 +132,7 @@ Deno.test(`exported constants`, async () => {
   assert.equal(guest.call("add", 2), 42);
 });
 Deno.test(`Foreign callbacks exchange packets`, async () => {
-  const guest = await build("host.blot");
+  const guest = await build("host.sq");
   let calls = 0;
   const host = guest.capability({
     parameter: "Array F32",

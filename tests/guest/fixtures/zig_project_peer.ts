@@ -13,7 +13,7 @@ await Deno.writeTextFile(
   JSON.stringify({
     pid: Deno.pid,
     command,
-    ambient: Deno.env.get("BLOT_CLIENT_TEST_AMBIENT") ?? null,
+    ambient: Deno.env.get("SQUID_CLIENT_TEST_AMBIENT") ?? null,
   }) + "\n",
 );
 const encoder = new TextEncoder();
@@ -43,7 +43,7 @@ async function write(bytes: Uint8Array) {
 }
 const hello = {
   kind: "hello",
-  protocol: "blot-zig-project",
+  protocol: "squid-zig-project",
   version: mode === "wrong-version" ? 2 : 1,
   compilerIdentity: identity,
   capabilities: ["project-build", "utf8_bytes", "abort-disposes-process"],
@@ -184,7 +184,7 @@ while (true) {
   }
   function relatedLocation(): unknown {
     const location: Record<string, unknown> = {
-      filename: "/library.blot",
+      filename: "/library.sq",
       start: 3,
       end: 7,
       offset_encoding: "utf8_bytes",
@@ -220,7 +220,7 @@ while (true) {
       ...common,
       success: false,
       diagnostics: [{
-        filename: "/fixture.blot",
+        filename: "/fixture.sq",
         stage: "check",
         code: mode === "invalid-hole" ? "typed_hole" : "type_mismatch",
         start: 1,

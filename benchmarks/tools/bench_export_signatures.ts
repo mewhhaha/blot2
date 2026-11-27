@@ -7,13 +7,13 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const [exe, gdev, original, exported, rounds = "6"] = Deno.args;
 assert(
   exported,
-  "Expected compiler, Gdev root, original motion.blot, public motion.blot",
+  "Expected compiler, Gdev root, original motion.sq, public motion.sq",
 );
 const count = Number(rounds);
 assert(Number.isInteger(count) && count > 0);
 const root = resolve(gdev);
-const options = await gdevProject(root, resolve("std"), "src/main.blot", exe);
-const path = resolve(root, "../ink/lib/motion.blot");
+const options = await gdevProject(root, resolve("std"), "src/main.sq", exe);
+const path = resolve(root, "../ink/lib/motion.sq");
 const bytesHash = async (bytes: Uint8Array<ArrayBuffer>) =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)).toHex();
 const inferred = await Deno.readTextFile(original);
@@ -34,7 +34,7 @@ const annotated = published.replace(
     return `private func ${name} ${parameters}: ${result} => return`;
   },
 );
-assert.equal(privateResults.size, 0, "Missing private helpers in motion.blot");
+assert.equal(privateResults.size, 0, "Missing private helpers in motion.sq");
 const cases = await Promise.all(
   [inferred, published, annotated].map(async (text, id) => {
     const bytes = new TextEncoder().encode(text);

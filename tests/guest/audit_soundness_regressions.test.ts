@@ -7,16 +7,16 @@ import {
 } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
-const prelude = `${stdRoot}/prelude.blot`;
+const prelude = `${stdRoot}/prelude.sq`;
 
 async function buildProjectFiles(
   files: Record<string, string>,
-  entryName = "main.blot",
+  entryName = "main.sq",
   extra: { testMode?: boolean } = {},
 ) {
-  const dir = await Deno.makeTempDir({ prefix: "blot-audit-reg-" });
+  const dir = await Deno.makeTempDir({ prefix: "squid-audit-reg-" });
   try {
     for (const [name, content] of Object.entries(files)) {
       await Deno.writeTextFile(`${dir}/${name}`, content);
@@ -120,7 +120,7 @@ io main (): U32 =>
 `,
     ]
   ) {
-    const res = await buildProjectFiles({ "sec.blot": sec, "main.blot": main });
+    const res = await buildProjectFiles({ "sec.sq": sec, "main.sq": main });
     equal(res.success, false);
   }
 });
@@ -474,7 +474,7 @@ io test_c13 (): U32 =>
 
 Deno.test("audit: @simd.store invalidates element cache (H1) and defer_f32_nan canonicalizes all NaNs", async () => {
   const res = await buildProjectFiles({
-    "main.blot": `
+    "main.sq": `
 import * as simd from "std/simd"
 
 func bits (x: F32): U32 =>
@@ -599,8 +599,8 @@ io test_comptime_misc (): U32 =>
 });
 
 Deno.test("audit: retained SIMD literal edits match cold oracle across all 5 vectorizers", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-simd-reloc-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-simd-reloc-" });
+  const entry = `${dir}/main.sq`;
   const cases: Array<{ name: string; v1: string; v2: string; arg: number }> = [
     {
       name: "affine_init",
@@ -731,8 +731,8 @@ io run (n: U32): U32 =>
 
 Deno.test("audit: frontend validation rejects invalid test return types, #[N; T] #entry params, duplicate with, and comptime closure capture", async () => {
   const badTest = await buildProjectFiles(
-    { "main.blot": `test "returns u32" => 42\n` },
-    "main.blot",
+    { "main.sq": `test "returns u32" => 42\n` },
+    "main.sq",
     { testMode: true },
   );
   equal(badTest.success, false);

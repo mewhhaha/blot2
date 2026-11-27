@@ -5,11 +5,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const compiler = resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose");
+const compiler = resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose");
 const std = resolve(Deno.args[1] ?? "std");
 const output = resolve(Deno.args[2] ?? "build/tmp/runtime-costs");
 const source = fileURLToPath(
-  new URL("../../scripts/fixtures/runtime_costs.blot", import.meta.url),
+  new URL("../../scripts/fixtures/runtime_costs.sq", import.meta.url),
 );
 await Deno.mkdir(output, { recursive: true });
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
@@ -21,7 +21,7 @@ for (
     compiler,
     source,
     ...["prelude", "list", "array", "vector"].map((name) =>
-      `${std}/${name}.blot`
+      `${std}/${name}.sq`
     ),
   ]
 ) {
@@ -33,7 +33,7 @@ const compiled = await new Deno.Command(compiler, {
     source,
     `${output}/runtime.wasm`,
     "--prelude",
-    `${std}/prelude.blot`,
+    `${std}/prelude.sq`,
     "--std-root",
     std,
   ],

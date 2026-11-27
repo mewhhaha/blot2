@@ -493,14 +493,14 @@ io values (): #[U32] =>
 });
 
 Deno.test("Wave 3 wide literals survive dependency bundles and retained edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-wave3-bundle-" });
-  const entry = directory + "/main.blot";
-  const library = directory + "/wide.blot";
-  const dependencies = directory + "/wide.blotdep";
+  const directory = await Deno.makeTempDir({ prefix: "squid-wave3-bundle-" });
+  const entry = directory + "/main.sq";
+  const library = directory + "/wide.sq";
+  const dependencies = directory + "/wide.sqdep";
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url)
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url)
       .pathname;
-  const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
   const source = `func mix (x: U64): U64 => x ^ 0x100000001
 func offset (x: F64): F64 => x + 1e-15
 `;

@@ -3,8 +3,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -23,7 +23,7 @@ async function withModule(
   ) => void,
 ) {
   const dir = await Deno.makeTempDir({ prefix });
-  const entry = `${dir}/main.blot`;
+  const entry = `${dir}/main.sq`;
   try {
     await Deno.writeTextFile(entry, src);
     const compiler = await createZigProjectCompiler({
@@ -144,7 +144,7 @@ io merge_dst_oob (packed: U32): #[U32] =>
   let dst = @array.fill n_dst 0
   return merge_range src dst 0 mid hi
 `;
-  await withModule("blot-tier5a-", src, (guest) => {
+  await withModule("squid-tier5a-", src, (guest) => {
     for (const n of [0, 1, 2, 3, 7, 16, 17, 63, 100]) {
       const got = asWords(guest.call("sort_vec", n));
       const expected: number[] = [];
@@ -268,7 +268,7 @@ io vec3_self_alias (n: U32): #[U32] =>
         out[i] := 0
   return out
 `;
-  await withModule("blot-tier5b-", src, (guest, bytes) => {
+  await withModule("squid-tier5b-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 5B");
     for (const mode of [0, 1]) {
       for (const steps of [1, 2, 5]) {
@@ -410,7 +410,7 @@ io matmul_oob (m: U32): F32 =>
         c[dst] := c[dst] + aik * b[k_off + col]
   return c[0]
 `;
-  await withModule("blot-tier5c-", src, (guest, bytes) => {
+  await withModule("squid-tier5c-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 5C");
     for (
       const [rows, inner, cols] of [
@@ -515,7 +515,7 @@ io unmasked_reduce (packed: U32): #[U32] =>
     xr := self ^ arr[i]
   return #[sum, xr]
 `;
-  await withModule("blot-tier5d-", src, (guest, bytes) => {
+  await withModule("squid-tier5d-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 5D");
     for (const mode of [0, 1, 2]) {
       for (
@@ -636,7 +636,7 @@ io non_dead_carry_fallback (n: U32): U32 =>
     acc := self + zr
   return total + F32.to_u32 (acc * 10.0)
 `;
-  await withModule("blot-tier5e-", src, (guest, bytes) => {
+  await withModule("squid-tier5e-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 5E");
     for (
       const [size, limit] of [
@@ -738,7 +738,7 @@ io lcg_scalar8 (n: U32): U32 =>
     acc := (self * 31) ^ (state >> 16)
   return acc ^ state
 `;
-  await withModule("blot-tier5f-", src, (guest, bytes) => {
+  await withModule("squid-tier5f-", src, (guest, bytes) => {
     ok(bytes.includes(0xfd), "Expected v128 SIMD ops in Tier 5F");
     for (const n of [0, 1, 2, 7, 8, 9, 15, 16, 17, 31, 32, 33, 100, 1007]) {
       const seed = 42;

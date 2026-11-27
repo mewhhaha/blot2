@@ -115,7 +115,7 @@
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -143,7 +143,7 @@ last so additional work can be inserted before it.
 ## Validation
 
 Apply the relevant
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 rules. Use formatting, link, consistency and evidence checks for
 documentation-only changes; run code gates only when code or build inputs
 change.

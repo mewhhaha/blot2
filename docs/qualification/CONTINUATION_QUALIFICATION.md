@@ -673,7 +673,7 @@ Evidence under `build/bench/continuation-20261013/`:
 `invocation-oom-summary.json`, `invocation-measurement-summary.json`,
 `captured-invocation/`, `public-invocation/`, `invocation-packed/equality.json`,
 `invocation-runtime.json`, and `invocation-{control,candidate}-ownership.jsonl`.
-The frozen worktree is `/var/tmp/blot2-continuation-invocation-20261013`.
+The frozen worktree is `/var/tmp/squid-continuation-invocation-20261013`.
 
 ## Qualified continuation, 14 October 2026
 
@@ -682,7 +682,7 @@ does not complete the program: 71 tasks are complete, 15 in progress and 14
 pending. No commit, push or remote workflow is claimed. The complete pre-gate
 handoff remains in the immutable source snapshot.
 
-Frozen source: `/var/tmp/blot2-continuation-reuse-repaired-20261014`. The
+Frozen source: `/var/tmp/squid-continuation-reuse-repaired-20261014`. The
 manifest contains 1,177 files and 24,341,867 bytes; SHA-256
 `1e6c2804d823e09ec96f2e75a0bd463e06d5c8280427665f7274c087e9e1d4cc`. All file
 contents and the complete tracked/untracked file set matched after the gate. The
@@ -913,7 +913,7 @@ wrong owners, mappings and rows still decline. The same declaration projection
 serves both declaration and expression proofs. A separate immutable capability
 reader fix accepts only a discarded canonical Unit constant, matching ordinary
 Source `use ()`. Noncanonical constants and effectful Unit calls still reject;
-this fixes a legitimate published summary in `examples/scalar.blot`. The two
+this fixes a legitimate published summary in `examples/scalar.sq`. The two
 original public literal/state-provider laws pass unchanged, including positive
 ECS and scalar reuse assertions.
 
@@ -991,7 +991,7 @@ files have zero analyzer findings. Smoke/harness, LLVM release/native
 compilation, native execution, packing and all guest/client tests pass together;
 repaired subsets and preceding failed attempts remain separate.
 
-Frozen source `/var/tmp/blot2-final-proof-repaired-20261015/source` is based on
+Frozen source `/var/tmp/squid-final-proof-repaired-20261015/source` is based on
 uncommitted HEAD `ef57ec5b99b5ea25fc5532fd2d3023108d3f10bb`. Manifest SHA-256
 3548546cb8660905de9a83922bab67270376a2b955f840f2bc7cf13fcefa53ec; all 1,303
 source and 41 external pins match after the gate. Documentation/status updates

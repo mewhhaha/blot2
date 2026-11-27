@@ -2,7 +2,7 @@ import { Processes, type ProcessHandle } from "../../host/processes.ts";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const source = await Deno.readTextFile(
-  new URL("../../benchmarks/language/process_replay.blot", import.meta.url),
+  new URL("../../benchmarks/language/process_replay.sq", import.meta.url),
 );
 
 Deno.test("one-thread process admissions, refusals and deliveries replay at their application tick", async () => {

@@ -104,9 +104,9 @@ io const answer = func () => return do:
 
 Deno.test("retained generic records invalidate constant values and inlined bodies after edits and recover after errors", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
+  const entry = `${directory}/main.sq`, library = `${directory}/lib.sq`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   const options = { entry, executable };
   const compiler = await createCompiler(options);
   const main = `import * as lib from "./lib"

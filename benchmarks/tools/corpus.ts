@@ -119,9 +119,9 @@ export interface SyntheticProject {
  */
 export const editSuite: SyntheticProject = {
   name: "edit_suite",
-  entry: "main.blot",
+  entry: "main.sq",
   files: {
-    "math.blot": lines([
+    "math.sq": lines([
       "type Vec2 is data = $Vec2 { x: F32, y: F32 }",
       "const zero = $Vec2 { x: 0.0, y: 0.0 }",
       "const unit = $Vec2 { x: 1.0, y: 1.0 }",
@@ -129,7 +129,7 @@ export const editSuite: SyntheticProject = {
       "const scale = func (k: F32) => return func (v: Vec2) => return $Vec2 { x: k * v.x, y: k * v.y }",
       "const add = func (a: Vec2) => return func (b: Vec2) => return $Vec2 { x: a.x + b.x, y: a.y + b.y }",
     ]),
-    "robots.blot": lines([
+    "robots.sq": lines([
       'import * as math from "./math"',
       "type Carry is data = $Carry { depth: F32, width: F32 }",
       "const floor_half_extent = 60.0",
@@ -140,12 +140,12 @@ export const editSuite: SyntheticProject = {
       "  let $Carry { depth, width } = step ($Carry { depth: x, width: 1.0 })",
       "  break depth + width",
     ]),
-    "hud.blot": lines([
+    "hud.sq": lines([
       'import * as math from "./math"',
       "const offset = math.add math.unit (math.scale 2.0 math.zero)",
       "const width = func (v: math.Vec2) => return math.dot v (math.add offset v)",
     ]),
-    "main.blot": lines([
+    "main.sq": lines([
       'import * as math from "./math"',
       'import * as robots from "./robots"',
       'import * as hud from "./hud"',
@@ -158,7 +158,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "trivia",
       replacements: [{
-        file: "robots.blot",
+        file: "robots.sq",
         search: "const floor_half_extent",
         replace: "// trivia: a comment\nconst floor_half_extent",
       }],
@@ -166,7 +166,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "literal_constant",
       replacements: [{
-        file: "robots.blot",
+        file: "robots.sq",
         search: "const floor_half_extent = 60.0",
         replace: "const floor_half_extent = 61.0",
       }],
@@ -174,7 +174,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "literal_in_body",
       replacements: [{
-        file: "robots.blot",
+        file: "robots.sq",
         search: "carry.depth + 0.5",
         replace: "carry.depth + 0.6",
       }],
@@ -182,7 +182,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "body_change",
       replacements: [{
-        file: "robots.blot",
+        file: "robots.sq",
         search: "floor phase + 1.0",
         replace: "ceil phase + 1.0",
       }],
@@ -191,22 +191,22 @@ export const editSuite: SyntheticProject = {
       name: "type_change",
       replacements: [
         {
-          file: "robots.blot",
+          file: "robots.sq",
           search: "$Carry { depth: F32, width: F32 }",
           replace: "$Carry { depth: F32, width: F32, spare: F32 }",
         },
         {
-          file: "robots.blot",
+          file: "robots.sq",
           search: "width: carry.width }",
           replace: "width: carry.width, spare: 0.0 }",
         },
         {
-          file: "robots.blot",
+          file: "robots.sq",
           search: "width: 1.0 })",
           replace: "width: 1.0, spare: 0.0 })",
         },
         {
-          file: "robots.blot",
+          file: "robots.sq",
           search: "let $Carry { depth, width }",
           replace: "let $Carry { depth, width, spare }",
         },
@@ -215,7 +215,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "imported_body",
       replacements: [{
-        file: "math.blot",
+        file: "math.sq",
         search: "a.x * b.x + a.y * b.y",
         replace: "a.y * b.y + a.x * b.x",
       }],
@@ -223,7 +223,7 @@ export const editSuite: SyntheticProject = {
     {
       name: "unused_export",
       replacements: [{
-        file: "math.blot",
+        file: "math.sq",
         search: "const unit =",
         replace:
           "const probe_unused = func (x: F32) => return x + 1.0\nconst unit =",

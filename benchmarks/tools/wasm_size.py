@@ -4,7 +4,7 @@
 python3 benchmarks/tools/wasm_size.py main.wasm --output report.json
 Counts include each instruction's complete encoding and every body byte. Unknown
 scalar/prefix encodings fail closed. Supports scalar, bulk-memory and SIMD emitted
-by Blot; this is a size decoder, not a Wasm validator or execution cost model.
+by Squid; this is a size decoder, not a Wasm validator or execution cost model.
 """
 
 import argparse

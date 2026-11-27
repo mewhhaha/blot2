@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run and chart the Programming-Language-Benchmarks (PLB) suite for Blot vs
+"""Run and chart the Programming-Language-Benchmarks (PLB) suite for Squid vs
 official unmodified PLB Go, Rust, C, and C++ reference programs.
 
 Measures single-process CPU time (ru_utime + ru_stime), wall time, and exact
@@ -24,21 +24,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-BLOT_DIR = HERE / "blot"
+SQUID_DIR = HERE / "squid"
 PLB_ROOT = REPO / "build" / "upstream-benches" / "PLB"
 PLB_ALGO = PLB_ROOT / "bench" / "algorithm"
 WORK_DIR = REPO / "build" / "plb-work"
 MEASURE_SRC = REPO / "benchmarks" / "goose-suite" / "measure_proc.c"
 
-BLOTC = REPO / "compiler-goose" / "build" / "blotc-goose"
-PRELUDE = REPO / "std" / "prelude.blot"
+SQUIDC = REPO / "compiler-goose" / "build" / "squidc-goose"
+PRELUDE = REPO / "std" / "prelude.sq"
 STD_ROOT = REPO / "std"
 
 PROBLEMS = [
     {
         "name": "helloworld",
-        "blot_file": "helloworld.blot",
-        "blot_mode": "str",
+        "squid_file": "helloworld.sq",
+        "squid_mode": "str",
         "unittests": [(["QwQ"], "QwQ_out"), (["T_T"], "T_T_out")],
         "bench_args": ["QwQ"],
         "bench_label": "arg = QwQ (process launch)",
@@ -47,8 +47,8 @@ PROBLEMS = [
     },
     {
         "name": "nsieve",
-        "blot_file": "nsieve.blot",
-        "blot_mode": "int",
+        "squid_file": "nsieve.sq",
+        "squid_mode": "int",
         "unittests": [(["4"], "4_out"), (["5"], "5_out")],
         "bench_args": ["12"],
         "bench_label": "n = 12 (up to 40,960,000)",
@@ -57,8 +57,8 @@ PROBLEMS = [
     },
     {
         "name": "binarytrees",
-        "blot_file": "binarytrees.blot",
-        "blot_mode": "int",
+        "squid_file": "binarytrees.sq",
+        "squid_mode": "int",
         "unittests": [(["6"], "6_out"), (["10"], "10_out")],
         "bench_args": ["18"],
         "bench_label": "depth = 18",
@@ -67,8 +67,8 @@ PROBLEMS = [
     },
     {
         "name": "merkletrees",
-        "blot_file": "merkletrees.blot",
-        "blot_mode": "int",
+        "squid_file": "merkletrees.sq",
+        "squid_mode": "int",
         "unittests": [(["9"], "9_out"), (["10"], "10_out")],
         "bench_args": ["17"],
         "bench_label": "depth = 17",
@@ -77,8 +77,8 @@ PROBLEMS = [
     },
     {
         "name": "fannkuch-redux",
-        "blot_file": "fannkuch_redux.blot",
-        "blot_mode": "int",
+        "squid_file": "fannkuch_redux.sq",
+        "squid_mode": "int",
         "unittests": [(["7"], "7_out"), (["10"], "10_out")],
         "bench_args": ["11"],
         "bench_label": "n = 11 (39,916,800 perms)",
@@ -87,8 +87,8 @@ PROBLEMS = [
     },
     {
         "name": "fasta",
-        "blot_file": "fasta.blot",
-        "blot_mode": "fasta",
+        "squid_file": "fasta.sq",
+        "squid_mode": "fasta",
         "unittests": [(["1000"], "1000_out")],
         "bench_args": ["2500000"],
         "bench_label": "n = 2,500,000 (25.4 MB DNA)",
@@ -97,8 +97,8 @@ PROBLEMS = [
     },
     {
         "name": "pidigits",
-        "blot_file": "pidigits.blot",
-        "blot_mode": "int",
+        "squid_file": "pidigits.sq",
+        "squid_mode": "int",
         "unittests": [(["27"], "27_out"), (["30"], "30_out")],
         "bench_args": ["8000"],
         "bench_label": "8,000 digits of pi",
@@ -107,8 +107,8 @@ PROBLEMS = [
     },
     {
         "name": "lru",
-        "blot_file": "lru.blot",
-        "blot_mode": "int",
+        "squid_file": "lru.sq",
+        "squid_mode": "int",
         "unittests": [
             (["10", "1000"], "10_1000_out"),
             (["77", "7777"], "77_7777_out"),
@@ -121,8 +121,8 @@ PROBLEMS = [
     },
     {
         "name": "coro-prime-sieve",
-        "blot_file": "coro_prime_sieve.blot",
-        "blot_mode": "int",
+        "squid_file": "coro_prime_sieve.sq",
+        "squid_mode": "int",
         "unittests": [(["100"], "100_out"), (["200"], "200_out")],
         "bench_args": ["4000"],
         "bench_label": "first 4,000 primes",
@@ -131,8 +131,8 @@ PROBLEMS = [
     },
     {
         "name": "nbody",
-        "blot_file": "nbody.blot",
-        "blot_mode": "u8",
+        "squid_file": "nbody.sq",
+        "squid_mode": "u8",
         "unittests": [(["1000"], "1000_out"), (["10000"], "10000_out")],
         "bench_args": ["5000000"],
         "bench_label": "5,000,000 steps (F64x2 SIMD)",
@@ -141,8 +141,8 @@ PROBLEMS = [
     },
     {
         "name": "spectral-norm",
-        "blot_file": "spectral_norm.blot",
-        "blot_mode": "u8",
+        "squid_file": "spectral_norm.sq",
+        "squid_mode": "u8",
         "unittests": [(["100"], "100_out"), (["101"], "101_out")],
         "bench_args": ["4000"],
         "bench_label": "n = 4,000 (F64x2 SIMD)",
@@ -151,8 +151,8 @@ PROBLEMS = [
     },
     {
         "name": "mandelbrot",
-        "blot_file": "mandelbrot.blot",
-        "blot_mode": "u8",
+        "squid_file": "mandelbrot.sq",
+        "squid_mode": "u8",
         "unittests": [(["200"], "200_out"), (["500"], "500_out")],
         "bench_args": ["5000"],
         "bench_label": "5,000 × 5,000 (4×F64x2 SIMD)",
@@ -161,9 +161,9 @@ PROBLEMS = [
     },
     {
         "name": "json-serde",
-        "blot_file": "json_serde.blot",
-        "blot_mode": "json",
-        "blot_flags": ["--transport-mb", "8"],
+        "squid_file": "json_serde.sq",
+        "squid_mode": "json",
+        "squid_flags": ["--transport-mb", "8"],
         "use_problem_cwd": True,
         "unittests": [(["sample", "10"], "sample_10_out"), (["canada", "3"], "canada_3_out")],
         "bench_args": ["canada", "15"],
@@ -174,7 +174,7 @@ PROBLEMS = [
 ]
 
 LANG_META = {
-    "blot": ("Blot", "#0d7c66"),
+    "squid": ("Squid", "#0d7c66"),
     "c": ("C (-O3)", "#64748b"),
     "cpp": ("C++ (-O3)", "#334155"),
     "rust": ("Rust", "#c2592c"),
@@ -246,8 +246,8 @@ def build_all(wtime: Path, selected: set[str] | None) -> tuple[Path, Path, dict[
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     measure_bin = WORK_DIR / "measure_proc"
     run_cmd(["clang", "-O2", str(MEASURE_SRC), "-o", str(measure_bin)])
-    runner_bin = WORK_DIR / "blot_plb_runner"
-    run_cmd(["clang", "-O2", str(HERE / "blot_plb_runner.c"), "-ldl", "-o", str(runner_bin)])
+    runner_bin = WORK_DIR / "squid_plb_runner"
+    run_cmd(["clang", "-O2", str(HERE / "squid_plb_runner.c"), "-ldl", "-o", str(runner_bin)])
 
     bins: dict[str, dict[str, dict]] = {}
     for prob in PROBLEMS:
@@ -256,25 +256,25 @@ def build_all(wtime: Path, selected: set[str] | None) -> tuple[Path, Path, dict[
             continue
         bins[name] = {}
 
-        # Blot
-        bdir = WORK_DIR / "blot"
+        # Squid
+        bdir = WORK_DIR / "squid"
         bdir.mkdir(parents=True, exist_ok=True)
         wasm = bdir / f"{name}.wasm"
         so = bdir / f"{name}.so"
         t0 = time.perf_counter()
-        extra_flags = prob.get("blot_flags", [])
-        run_cmd([str(BLOTC), "build", str(BLOT_DIR / prob["blot_file"]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT), *extra_flags])
-        blotc_ms = (time.perf_counter() - t0) * 1000.0
+        extra_flags = prob.get("squid_flags", [])
+        run_cmd([str(SQUIDC), "build", str(SQUID_DIR / prob["squid_file"]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT), *extra_flags])
+        squidc_ms = (time.perf_counter() - t0) * 1000.0
         t1 = time.perf_counter()
         run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--guard-pages", "--blot-cdylib", str(wasm), "-o", str(so)])
         aot_ms = (time.perf_counter() - t1) * 1000.0
-        bins[name]["blot"] = {
-            "argv": [str(runner_bin), prob["blot_mode"], str(so)],
-            "compile_ms": round(blotc_ms + aot_ms, 2),
-            "blotc_ms": round(blotc_ms, 2),
+        bins[name]["squid"] = {
+            "argv": [str(runner_bin), prob["squid_mode"], str(so)],
+            "compile_ms": round(squidc_ms + aot_ms, 2),
+            "squidc_ms": round(squidc_ms, 2),
             "aot_ms": round(aot_ms, 2),
             "wasm_bytes": wasm.stat().st_size,
-            "source": f"benchmarks/plb/blot/{prob['blot_file']}",
+            "source": f"benchmarks/plb/squid/{prob['squid_file']}",
         }
 
         pdir = PLB_ALGO / name
@@ -357,7 +357,7 @@ def render_svg(data: dict, out_path: Path, metric: str) -> None:
     title = (
         "Programming-Language-Benchmarks (PLB): Peak Memory (RSS)"
         if is_mem
-        else "Programming-Language-Benchmarks (PLB): Runtime (Blot vs Official Go, Rust, C &amp; C++)"
+        else "Programming-Language-Benchmarks (PLB): Runtime (Squid vs Official Go, Rust, C &amp; C++)"
     )
     subtitle = (
         f"Exact per-process peak RSS (wait4 ru_maxrss) · single-threaded · {data['meta']['cpu']} · lower is better"
@@ -375,9 +375,9 @@ def render_svg(data: dict, out_path: Path, metric: str) -> None:
         "  .ctitle { font: 700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0f172a; }",
         "  .csub { font: 400 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #64748b; }",
         "  .lbl { font: 500 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #1e293b; }",
-        "  .lbl-blot { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }",
+        "  .lbl-squid { font: 700 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }",
         "  .val { font: 600 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0f172a; }",
-        "  .val-blot { font: 700 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }",
+        "  .val-squid { font: 700 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #0d7c66; }",
         "  .badge-bg { fill: #f1f5f9; rx: 6; }",
         "  .badge-win { fill: #dcfce7; rx: 6; }",
         "  .badge-txt { font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; fill: #334155; }",
@@ -392,7 +392,7 @@ def render_svg(data: dict, out_path: Path, metric: str) -> None:
     ]
 
     lx = pad_x
-    for key in ["blot", "c", "cpp", "rust", "go"]:
+    for key in ["squid", "c", "cpp", "rust", "go"]:
         label, color = LANG_META[key]
         lines.append(f'<rect x="{lx}" y="82" width="13" height="13" rx="3" fill="{color}"/>')
         lines.append(f'<text class="leg" x="{lx + 19}" y="93">{label}</text>')
@@ -420,13 +420,13 @@ def render_svg(data: dict, out_path: Path, metric: str) -> None:
             items.append((lang, val, txt))
         items.sort(key=lambda x: x[1])
 
-        # Badge comparing Blot vs Go (present on all 9)
-        blot_val = next(v for l, v, _ in items if l == "blot")
+        # Badge comparing Squid vs Go (present on all 9)
+        squid_val = next(v for l, v, _ in items if l == "squid")
         go_val = next((v for l, v, _ in items if l == "go"), None)
         if go_val and go_val > 0:
-            ratio = blot_val / go_val
+            ratio = squid_val / go_val
             if ratio < 1.0:
-                badge = f"{go_val / blot_val:.2f}× faster than Go" if not is_mem else f"{go_val / blot_val:.1f}× less RAM vs Go"
+                badge = f"{go_val / squid_val:.2f}× faster than Go" if not is_mem else f"{go_val / squid_val:.1f}× less RAM vs Go"
                 bcls, tcls = "badge-win", "badge-win-txt"
             else:
                 badge = f"{ratio:.2f}× Go"
@@ -445,11 +445,11 @@ def render_svg(data: dict, out_path: Path, metric: str) -> None:
             y = y0 + i * step
             label, color = LANG_META[lang]
             bw = max(4.0, (val / vmax) * bar_max_w)
-            is_blot = lang == "blot"
-            lines.append(f'<text class="{"lbl-blot" if is_blot else "lbl"}" x="{cx + 16}" y="{y + 14}">{label}</text>')
+            is_squid = lang == "squid"
+            lines.append(f'<text class="{"lbl-squid" if is_squid else "lbl"}" x="{cx + 16}" y="{y + 14}">{label}</text>')
             lines.append(f'<rect class="track" x="{bar_x}" y="{y}" width="{bar_max_w}" height="20"/>')
             lines.append(f'<rect x="{bar_x}" y="{y}" width="{bw:.1f}" height="20" rx="4" fill="{color}"/>')
-            lines.append(f'<text class="{"val-blot" if is_blot else "val"}" x="{bar_x + bw + 8:.1f}" y="{y + 14}">{txt}</text>')
+            lines.append(f'<text class="{"val-squid" if is_squid else "val"}" x="{bar_x + bw + 8:.1f}" y="{y + 14}">{txt}</text>')
 
     foot = (
         "Sorted fastest → slowest per problem. Official unmodified PLB Go, Rust, C, and C++ sources run single-threaded (GOMAXPROCS=1, OMP_NUM_THREADS=1)."
@@ -524,8 +524,8 @@ def main() -> None:
                 "samples_cpu_ms": [round(x, 3) for x in cpus],
                 "samples_wall_ms": [round(x, 3) for x in walls],
             }
-            if lang == "blot":
-                results[name][lang]["blotc_ms"] = bins[name][lang]["blotc_ms"]
+            if lang == "squid":
+                results[name][lang]["squidc_ms"] = bins[name][lang]["squidc_ms"]
                 results[name][lang]["aot_ms"] = bins[name][lang]["aot_ms"]
                 results[name][lang]["wasm_bytes"] = bins[name][lang]["wasm_bytes"]
             rinfo = results[name][lang]

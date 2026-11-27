@@ -39,7 +39,7 @@ interface LspDiagnostic {
     location: { uri: string; range: LspRange };
     message: string;
   }>;
-  data?: { blotQuickFixes: LspQuickFixData[] };
+  data?: { squidQuickFixes: LspQuickFixData[] };
 }
 const utf8Encoder = new TextEncoder();
 function safeUtf16Position(text: string, offset: number): Position {
@@ -113,7 +113,7 @@ function toLspDiagnostic(
     range,
     severity: 1,
     code: analyzed.canonicalCode,
-    source: "blot",
+    source: "squid",
     message: lines.join("\n"),
   };
   if (analyzed.secondarySpan && effectiveSource !== undefined) {
@@ -136,7 +136,7 @@ function toLspDiagnostic(
   );
   if (safeQuickFixes.length > 0 && sourceText !== undefined) {
     item.data = {
-      blotQuickFixes: safeQuickFixes.map((qf) => ({
+      squidQuickFixes: safeQuickFixes.map((qf) => ({
         title: qf.title,
         range: utf16Range(sourceText, qf.startByte, qf.endByte),
         newText: qf.newText,
@@ -229,7 +229,7 @@ export class CompletionBridge {
       try {
         watcher = Deno.watchFs(path, { recursive });
       } catch (error) {
-        console.error(`blot: cannot watch ${path}: ${error}`);
+        console.error(`squid: cannot watch ${path}: ${error}`);
         continue;
       }
       this.#watchers.push(watcher);
@@ -238,13 +238,14 @@ export class CompletionBridge {
           for await (const event of watcher) {
             const projectChanged = recursive &&
               event.paths.some((file) =>
-                file.endsWith("/blot.json") || file.endsWith("/blot.lock.json")
+                file.endsWith("/squid.json") ||
+                file.endsWith("/squid.lock.json")
               );
             const assetChanged = event.paths.some((file) =>
               this.#child?.assetInputs?.has(file)
             );
             const sourceChanged = event.paths.some((file) =>
-              file === root || (recursive && file.endsWith(".blot"))
+              file === root || (recursive && file.endsWith(".sq"))
             );
             if (projectChanged) this.#projectChanged = true;
             if (
@@ -258,7 +259,7 @@ export class CompletionBridge {
             }
           }
         } catch (error) {
-          if (!this.#closed) console.error(`blot: watcher: ${error}`);
+          if (!this.#closed) console.error(`squid: watcher: ${error}`);
         }
       })();
     }
@@ -318,12 +319,12 @@ export class CompletionBridge {
     assetInputs?: ReadonlySet<string>,
   ) {
     if (!assetInputs) return { sources };
-    const blotSources: Record<string, string> = Object.create(null);
+    const squidSources: Record<string, string> = Object.create(null);
     const assetSources: Record<string, string> = Object.create(null);
     for (const [path, text] of Object.entries(sources)) {
-      (assetInputs.has(path) ? assetSources : blotSources)[path] = text;
+      (assetInputs.has(path) ? assetSources : squidSources)[path] = text;
     }
-    return { sources: blotSources, assetSources };
+    return { sources: squidSources, assetSources };
   }
   async dispose() {
     if (this.#closed) return;
@@ -526,7 +527,7 @@ export class CompletionBridge {
       for (const d of diags) {
         if (!d || typeof d !== "object") continue;
         const diag = d as LspDiagnostic;
-        const quickFixes = diag.data?.blotQuickFixes;
+        const quickFixes = diag.data?.squidQuickFixes;
         if (!Array.isArray(quickFixes)) continue;
         if (diag.range && !rangesOverlap(diag.range, reqRange)) continue;
         for (let i = 0; i < quickFixes.length; i++) {
@@ -637,7 +638,7 @@ export class CompletionBridge {
                 codeActionKinds: ["quickfix"],
               },
             },
-            serverInfo: { name: "blot" },
+            serverInfo: { name: "squid" },
           },
         });
         return;
@@ -674,7 +675,7 @@ export class CompletionBridge {
           const next = version(textDocument.version);
           if (!previous) throw new RpcError(-32602, "Document is not open");
           if (next <= previous.version) {
-            console.error("blot: ignored out-of-order document version");
+            console.error("squid: ignored out-of-order document version");
             return;
           }
           if (
@@ -749,7 +750,7 @@ export class CompletionBridge {
       await this.output.send({ jsonrpc: "2.0", id, result });
     } catch (error) {
       if (!hasId && error instanceof RpcError && error.code !== -32600) {
-        console.error(`blot: ${error.message}`);
+        console.error(`squid: ${error.message}`);
         return;
       }
       let code = -32603, message = String(error);
@@ -817,11 +818,11 @@ if (import.meta.main) {
         continue;
       }
       void bridge.handle(message).catch((error) =>
-        console.error(`blot: ${error}`)
+        console.error(`squid: ${error}`)
       );
     }
   } catch (error) {
-    console.error(`blot: ${error}`);
+    console.error(`squid: ${error}`);
     Deno.exitCode = 1;
   } finally {
     await bridge.dispose();

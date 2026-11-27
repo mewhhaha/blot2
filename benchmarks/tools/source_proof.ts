@@ -1,11 +1,11 @@
 // Tiny nominal DAG acceptance matrix; each compiler startup/build is bounded.
-// deno run -A benchmarks/tools/source_proof.ts --blotc PATH [--output FILE]
+// deno run -A benchmarks/tools/source_proof.ts --squidc PATH [--output FILE]
 import { resolve } from "node:path";
 
 const options = new Map<string, string>();
 for (let at = 0; at < Deno.args.length; at++) {
   const key = Deno.args[at];
-  if (!["--blotc", "--timeout-ms", "--output"].includes(key)) {
+  if (!["--squidc", "--timeout-ms", "--output"].includes(key)) {
     throw new Error(`Unexpected argument: ${key}`);
   }
   const value = Deno.args[++at];
@@ -18,7 +18,7 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 5000) {
 }
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const compiler = resolve(
-  options.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
+  options.get("--squidc") ?? `${repo}/compiler-goose/build/squidc-goose-dev`,
 );
 const runner = `${repo}/benchmarks/tools/scoped_calls.ts`;
 const decoder = new TextDecoder();
@@ -38,7 +38,7 @@ for (const depth of [6, 8, 10]) {
         "--no-lock",
         "-A",
         runner,
-        "--blotc",
+        "--squidc",
         compiler,
         "--nominal",
         "--fields",

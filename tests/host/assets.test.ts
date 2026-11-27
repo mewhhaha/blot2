@@ -11,7 +11,7 @@ import type {
 } from "../../mod.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const encoder = new TextEncoder();
 function success(result: ZigProjectBuildResult) {
   ok(result.success, JSON.stringify(result));
@@ -41,7 +41,7 @@ async function call(
 
 Deno.test("typed JSON modules execute, reuse, edit, reject, and recover without disk output", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   let calls = 0;
   const compiler = await createCompiler({
     executable,
@@ -105,7 +105,7 @@ io const fraction = func () => return (config.value).scale
       await fresh.dispose();
     }
     await rejects(
-      Deno.stat(`${directory}/config.json.blot`),
+      Deno.stat(`${directory}/config.json.sq`),
       Deno.errors.NotFound,
     );
     await rejects(Deno.stat(`${directory}/config.json`), Deno.errors.NotFound);
@@ -117,7 +117,7 @@ io const fraction = func () => return (config.value).scale
 
 Deno.test("shader parser exports input types and content handles with tracked includes", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   let calls = 0;
   // Explicit metadata stands in for a real shader parser. No regex reflection.
   const parser: AssetParser = async (context) => {
@@ -201,7 +201,7 @@ io const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader.shad
 
 Deno.test("asset templates own parser results and queued byte overlays", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   let result: AssetModule | undefined;
   const compiler = await createCompiler({
     executable,
@@ -268,7 +268,7 @@ Deno.test("asset disposal rejects active and queued builds even when a parser ig
   const started = Promise.withResolvers<void>();
   const paused = Promise.withResolvers<AssetModule>();
   let parserSignal: AbortSignal | undefined;
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createCompiler({
     executable,
     entry,
@@ -320,7 +320,7 @@ Deno.test("asset disposal rejects active and queued builds even when a parser ig
 
 Deno.test("asset parser rejects invalid fields, forged references and unrepresentable values", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const cases: AssetParser[] = [
     () => ({ values: { value: { type: "U32", value: -1 } } }),
     () => ({ values: { value: { type: "F32", value: Infinity } } }),
@@ -365,7 +365,7 @@ Deno.test("asset parser rejects invalid fields, forged references and unrepresen
 
 Deno.test("optional includes track absence, addition, removal and obsolete dependencies", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   let calls = 0;
   const parser: AssetParser = async (context) => {
     calls++;
@@ -425,7 +425,7 @@ Deno.test("optional includes track absence, addition, removal and obsolete depen
 
 Deno.test("asset IDs and snapshots are deterministic across parser order and shader-only edits", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const parser: AssetParser = async (context) => ({
     values: {
       shader: {
@@ -478,7 +478,7 @@ Deno.test("asset IDs and snapshots are deterministic across parser order and sha
 
 Deno.test("retargeting an asset symlink with identical bytes invalidates relative includes", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   for (const [name, value] of [["one", "42"], ["two", "43"]]) {
     await Deno.mkdir(`${directory}/${name}`);
     await Deno.writeTextFile(`${directory}/${name}/root.txt`, "identical");
@@ -525,7 +525,7 @@ Deno.test("retargeting an asset symlink with identical bytes invalidates relativ
 
 Deno.test("JSON root values always export their exact Data type, including empty shapes", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const cases = [
     ["42", "value", 42],
     ["1.5", "@f32.to_u32 value", 1],

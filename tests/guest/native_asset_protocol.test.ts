@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const executable = resolve(
   Deno.args[0] ??
-    fileURLToPath(new URL("../../compiler-goose/build/blotc-goose", import.meta.url)),
+    fileURLToPath(new URL("../../compiler-goose/build/squidc-goose", import.meta.url)),
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -64,9 +64,9 @@ async function hash(bytes: Uint8Array<ArrayBuffer>) {
 }
 async function host() {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-native-assets-wire-",
+    prefix: "squid-native-assets-wire-",
   });
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   await Deno.writeTextFile(entry, "io const answer = 42\n");
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
@@ -118,7 +118,7 @@ async function host() {
     hello.metadata.protocol,
     hello.metadata.version,
     hello.metadata.maxFrameBytes,
-  ], ["hello", "blot-zig-project", 1, 67108864]);
+  ], ["hello", "squid-zig-project", 1, 67108864]);
   ok(hello.metadata.capabilities.includes("native-assets-v1"));
   equal(hello.payload.length, 0);
   return {
@@ -188,7 +188,7 @@ async function host() {
       equal((await reader.read()).done, true);
       equal((await child.status).code, 1);
       const text = await stderr;
-      if (error) ok(text.endsWith(`blotc: ${error}\n`), text);
+      if (error) ok(text.endsWith(`squidc: ${error}\n`), text);
     },
     async cleanup() {
       try {
@@ -305,7 +305,7 @@ function definition(
   extra: Metadata = {},
 ) {
   return {
-    module: peer.directory + "/" + name + ".blot",
+    module: peer.directory + "/" + name + ".sq",
     path: peer.directory + "/" + name,
     kind,
     ...extra,
@@ -331,7 +331,7 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
     ];
     for (const [path, , input] of inputs) await peer.write(path, input);
     await peer.write(
-      "main.blot",
+      "main.sq",
       'import * as config from "./data.json"\nimport * as catalog from "./catalog.json"\nimport * as words from "./text.json"\nimport * as shader from "./shader.wgsl"\nio const answer = @u32.add (config.value).answer shader.count\nio const mesh = (catalog.meshes).second\nio const letter = @array.get (words.text).greeting 0\n',
     );
     await peer.open({
@@ -395,7 +395,7 @@ Deno.test("source and asset decimals round in their declared precision", async (
     shader.push(`const above: f32 = ${above};`);
     answers.src_above = 1 + 2 ** -23;
     answers.asset_above = 1;
-    await peer.write("main.blot", source.join("\n") + "\n");
+    await peer.write("main.sq", source.join("\n") + "\n");
     await peer.write("values.wgsl", shader.join("\n"));
     await peer.open({
       imports: [definition(peer, "values.wgsl", "wgsl")],
@@ -475,7 +475,7 @@ Deno.test("native asset wire: deterministic content handles, binary frames and o
         definition(peer, "a.bin", "reference", reference),
         {
           ...definition(peer, "a.bin", "reference", reference),
-          module: peer.directory + "/alias.blot",
+          module: peer.directory + "/alias.sq",
         },
       ],
     });
@@ -556,7 +556,7 @@ Deno.test("native asset wire: symlink retargeting changes captured inputs and du
     const link = peer.directory + "/linked.json";
     await Deno.symlink(firstPath, link);
     await peer.write(
-      "main.blot",
+      "main.sq",
       'import * as config from "./linked.json"\nio const answer=(config.value).answer\n',
     );
     await peer.open({ imports: [definition(peer, "linked.json", "json")] });
@@ -593,7 +593,7 @@ Deno.test("native asset wire: generated/source collision rejects without committ
     await success(good, { answer: 42 });
     rejection(
       await peer.build([[
-        peer.directory + "/data.json.blot",
+        peer.directory + "/data.json.sq",
         "const answer=0\n",
       ]]),
       "DuplicateAssetModule",
@@ -690,14 +690,14 @@ for (
   const [label, config, error] of [
     ["relative root", { roots: ["relative"] }, "InvalidNativeAssets"],
     ["relative module", {
-      imports: [{ module: "relative.blot", path: "/input", kind: "json" }],
+      imports: [{ module: "relative.sq", path: "/input", kind: "json" }],
     }, "InvalidNativeAssets"],
     ["module suffix", {
       imports: [{ module: "/data.json", path: "/input", kind: "json" }],
     }, "InvalidNativeAssets"],
     ["missing reference metadata", {
       imports: [{
-        module: "/asset.blot",
+        module: "/asset.sq",
         path: "/input",
         kind: "reference",
         type: "Content",
@@ -706,7 +706,7 @@ for (
     }, "InvalidNativeAssets"],
     ["extra parser metadata", {
       imports: [{
-        module: "/asset.blot",
+        module: "/asset.sq",
         path: "/input",
         kind: "json",
         type: "Content",
@@ -877,7 +877,7 @@ Deno.test("native asset wire: explicit aliases share input acquisition with norm
     const input = '{"greeting":"å"}';
     const path = await peer.write("text.json", input);
     const alias = {
-      module: peer.directory + "/alias.blot",
+      module: peer.directory + "/alias.sq",
       path,
       kind: "text",
     };
@@ -924,7 +924,7 @@ Deno.test("native asset wire: long Unicode JSON names reject with bounded UTF8 a
   try {
     const path = await peer.write("data.json", '{"answer":42}');
     await peer.write(
-      "main.blot",
+      "main.sq",
       'import * as config from "./data.json"\nio const answer = (config.value).answer\n',
     );
     await peer.open({ imports: [definition(peer, "data.json", "json")] });
@@ -937,7 +937,7 @@ Deno.test("native asset wire: long Unicode JSON names reject with bounded UTF8 a
     equal(diagnostic.filename, path);
     equal(
       diagnostic.message,
-      "Invalid Blot value/field name: " + "a".repeat(255),
+      "Invalid Squid value/field name: " + "a".repeat(255),
     );
     ok(diagnostic.message.isWellFormed());
     ok(encoder.encode(diagnostic.message).length <= 1024);

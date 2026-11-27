@@ -1,4 +1,4 @@
-"""Pair checked Blot and Rust scalar packets in the same Pen release engine."""
+"""Pair checked Squid and Rust scalar packets in the same Pen release engine."""
 import argparse
 import gzip
 import hashlib
@@ -61,8 +61,8 @@ def describe(samples):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--compiler", type=Path, default=ROOT / "compiler-goose/build/blotc-goose")
-    ap.add_argument("--baseline", type=Path, help="include a second Blot compiler")
+    ap.add_argument("--compiler", type=Path, default=ROOT / "compiler-goose/build/squidc-goose")
+    ap.add_argument("--baseline", type=Path, help="include a second Squid compiler")
     ap.add_argument("--pen", type=Path, default=ROOT.parent / "pen")
     ap.add_argument("--rounds", type=int, default=7)
     ap.add_argument("--warmups", type=int, default=5)
@@ -77,7 +77,7 @@ def main():
     host = pen / "target/release/examples/measure_packets"
     cases = inputs()
     kernels = args.kernels or list(cases)
-    versions = {"blot": args.compiler.resolve()}
+    versions = {"squid": args.compiler.resolve()}
     if args.baseline:
         versions["baseline"] = args.baseline.resolve()
     rust = ["rustc", "+1.99.0"]
@@ -85,12 +85,12 @@ def main():
              "-O", "-C", "panic=abort", "-C", "strip=debuginfo", "-C", "link-arg=--export-memory"]
     meta = {"rust": run(rust + ["-vV"]), "rust_flags": flags, "os": platform.platform(),
             "std_tree": run(["git", "-C", ROOT, "rev-parse", "HEAD:std"]).strip(),
-            "engine": "Pen release engine, Wasmtime Cranelift, native CPU; BLOT_INLINING=0 or 1",
+            "engine": "Pen release engine, Wasmtime Cranelift, native CPU; SQUID_INLINING=0 or 1",
             "cpu": platform.processor(), "affinity": sorted(os.sched_getaffinity(0)),
             "compiler_sha256": {k: sha(v) for k, v in versions.items()}, "host_sha256": sha(host),
             "pen": run(["git", "-C", pen, "rev-parse", "HEAD"]).strip(),
-            "blot": run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip(),
-            "sources": {str(p.relative_to(FIXTURES)): sha(p) for p in sorted(FIXTURES.rglob("*")) if p.suffix in (".blot", ".rs")},
+            "squid": run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip(),
+            "sources": {str(p.relative_to(FIXTURES)): sha(p) for p in sorted(FIXTURES.rglob("*")) if p.suffix in (".sq", ".rs")},
             "wasmtime_lock_sha256": sha(pen / "Cargo.lock"), "rounds": args.rounds,
             "warmups": args.warmups, "samples_per_process": args.samples, "cases": {}, "modules": {}}
     for line in Path("/proc/cpuinfo").read_text().splitlines():
@@ -109,8 +109,8 @@ def main():
             if family == "rust":
                 run(rust + flags + [FIXTURES / "rust" / (name + ".rs"), "-o", mod])
             else:
-                run([versions[family], "build-project", FIXTURES / (name + ".blot"), mod, "--std-root",
-                     ROOT / "std", "--prelude", ROOT / "std/prelude.blot"])
+                run([versions[family], "build-project", FIXTURES / (name + ".sq"), mod, "--std-root",
+                     ROOT / "std", "--prelude", ROOT / "std/prelude.sq"])
             meta["modules"][key] = {"source_compile_ns": time.perf_counter_ns() - start,
                                     "sha256": sha(mod), "wasm_bytes": mod.stat().st_size}
             for mode in (0, 1):
@@ -125,8 +125,8 @@ def main():
         for name, family in builds_this_turn:
             mod = out / "compile-replay.wasm"
             start = time.perf_counter_ns()
-            run([versions[family], "build-project", FIXTURES / (name + ".blot"), mod, "--std-root",
-                 ROOT / "std", "--prelude", ROOT / "std/prelude.blot"])
+            run([versions[family], "build-project", FIXTURES / (name + ".sq"), mod, "--std-root",
+                 ROOT / "std", "--prelude", ROOT / "std/prelude.sq"])
             elapsed = time.perf_counter_ns() - start
             key = f"{name}-{family}"
             if sha(mod) != meta["modules"][key]["sha256"]:
@@ -137,7 +137,7 @@ def main():
         random.Random(4517 + turn).shuffle(jobs)
         for key, name, mode in jobs:
             tag = f"{key}-inline{mode}"
-            env = os.environ | {"BLOT_INLINING": str(mode)}
+            env = os.environ | {"SQUID_INLINING": str(mode)}
             try:
                 result = json.loads(run([host, out / (key + ".wasm"), out / (name + ".json"), out / (tag + ".cwasm"),
                                          str(args.warmups), str(args.samples)], env=env))

@@ -95,7 +95,7 @@ io const run = func (send: U32 -> U32 ! {Foreign}) => return do:
 
 Deno.test("exclusive append arms grow a private loop carry and preserve the result of every arm", async () => {
   const fixture = new URL(
-    "../../compiler-goose/tests/fixtures/direct/branch_appends.blot",
+    "../../compiler-goose/tests/fixtures/direct/branch_appends.sq",
     import.meta.url,
   );
   await compileAndRun(await Deno.readTextFile(fixture), (guest) => {

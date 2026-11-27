@@ -48,7 +48,7 @@ without changing their semantics.
 The packed baseline was copied to `build/bench/list-span-baseline/` before the
 production build. It matched the main executable at the start of qualification.
 These are separate from the older boxed baseline,
-`build/compiler-hills/final/blotc`, whose executable hash is
+`build/compiler-hills/final/squidc`, whose executable hash is
 `150c2b032b43490434ba99c0bd91911de4bc8723fa3d4e4cf803d0f8fb88c413`. Its role and
 provenance are recorded in the preserved packed-row qualification at
 `build/compiler-hills/packed-rows-final/identity.json` and
@@ -162,7 +162,7 @@ snapshot, nested-loop and cursor coverage. Neither this result nor the older
 This follow-on implementation is under qualification. Task 002 remains open
 until its full release, ownership, differential and all-width performance checks
 pass. The pre-change production binary is preserved at
-`build/bench/list-field-qualified/pre-walk-blotc`, SHA-256
+`build/bench/list-field-qualified/pre-walk-squidc`, SHA-256
 `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`.
 
 The initial all-width comparison confirmed that the span check alone left a
@@ -242,7 +242,7 @@ The intermediate implementation is committed as `bcff12b`. Its behavior and
 ownership gates pass; the all-width performance gate remains open.
 
 The production candidate is pinned at
-`build/bench/list-sequential-qualified/blotc`, SHA-256
+`build/bench/list-sequential-qualified/squidc`, SHA-256
 `742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. Its compiler
 identity is `335693d2f998b635913318c2b72e5092b4a7a3b3ce52b1989ba93e461ff684cd`.
 The directory's `manifest.json` records the source and harness hashes, both
@@ -447,7 +447,7 @@ Its generated record loops contain the grouped loads; tuple loop bytes are
 unchanged. The F32 batch still measures roughly 1.02–1.06 times boxed CPU at
 many wider widths. This additional transformation is not accepted for landing.
 The independent U32 source is isolated in
-`/tmp/blot-row-reduction-only-prototype/`; none of these partial results
+`/tmp/squid-row-reduction-only-prototype/`; none of these partial results
 complete task 002 or the broader SIMD task.
 
 ### Leaf-capacity experiments, 9 October 2026
@@ -818,7 +818,7 @@ about active tracing or counted ownership costs.
 
 Raw distributions, source snapshots, compiler/library/workload pins, the failed
 screens and disassembly remain in
-`/var/tmp/blot2-traversal-002-joint/build/bench/joint-traversal/`. The isolated
+`/var/tmp/squid-traversal-002-joint/build/bench/joint-traversal/`. The isolated
 V9 handoff is followed by a port to the corrected 052/033/038/054 incoming tree.
 V9 subsequently failed the unchanged fanout allocation budget: 16,332,544
 requested bytes exceeded 16,179,519. It is a preserved intermediate, not an
@@ -996,7 +996,7 @@ result and teardown has zero live compiler bytes. These are small ordinary
 source controls, not a broad compiler speedup.
 
 The ignored evidence directory is `build/bench/packed-cursor/` in
-`/var/tmp/blot2-packed-cursor-047`:
+`/var/tmp/squid-packed-cursor-047`:
 `release-boxed-f32-{record,tuple}-{1,2,3}/report.json`, six `release-*-guard/`
 reports, `compiler-cost.json` and `retained-cost.json` preserve raw samples,
 compiler/harness/source pins and load. Native immutable-Core, replay, checkpoint

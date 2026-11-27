@@ -14,7 +14,7 @@ import {
   extractDeclDoc,
   extractIntraDocLinkTargets,
   extractModuleDoc,
-  formatBlotType,
+  formatSquidType,
   generateDocs,
   precompileDocExamples,
   renderCompactApi,
@@ -31,27 +31,27 @@ import {
 } from "../../host/doc_html.ts";
 
 const compilerExecutable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
-Deno.test("formatBlotType cleans arrows, arrays, own params, effects and tuples", () => {
+Deno.test("formatSquidType cleans arrows, arrays, own params, effects and tuples", () => {
   assertEquals(
-    formatBlotType("(U32 -> (Array U32 -> Array F32))"),
+    formatSquidType("(U32 -> (Array U32 -> Array F32))"),
     "U32 -> #[U32] -> #[F32]",
   );
   assertEquals(
-    formatBlotType("(Array ?t42 -> (U32 -> Maybe ?t42))", 1, 2),
+    formatSquidType("(Array ?t42 -> (U32 -> Maybe ?t42))", 1, 2),
     "own #[a] -> U32 -> Maybe a",
   );
   assertEquals(
-    formatBlotType("(U32 -> (Array U32 -> (Array U32, Array F32, Bool)))"),
+    formatSquidType("(U32 -> (Array U32 -> (Array U32, Array F32, Bool)))"),
     "U32 -> #[U32] -> (#[U32], #[F32], Bool)",
   );
   assertEquals(
-    formatBlotType("(?t1 -> (?t2 -> Bool ! { | ?e}))"),
+    formatSquidType("(?t1 -> (?t2 -> Bool ! { | ?e}))"),
     "a -> b -> Bool ! { | e}",
   );
   const renamer = new TypeVarRenamer();
-  const ty = formatBlotType("(Array ?t99 -> Array U32)", 0, 0, renamer);
+  const ty = formatSquidType("(Array ?t99 -> Array U32)", 0, 0, renamer);
   const wh = renamer.rename("Codec ?t99");
   assertEquals(ty, "#[a] -> #[U32]");
   assertEquals(wh, "Codec a");
@@ -65,7 +65,7 @@ Deno.test("doc comment extraction handles //!, //, ///, attributes, and indentat
     "// Ignored comment separated by blank line.",
     "",
     "/// Function docs.",
-    "/// ```blot",
+    "/// ```squid",
     "/// let x = 1",
     "///   x + 1",
     "/// ```",
@@ -79,14 +79,14 @@ Deno.test("doc comment extraction handles //!, //, ///, attributes, and indentat
   const declDoc = extractDeclDoc(src, 11, mod.consumedEndLine);
   assertEquals(
     declDoc,
-    "Function docs.\n```blot\nlet x = 1\n  x + 1\n```",
+    "Function docs.\n```squid\nlet x = 1\n  x + 1\n```",
   );
 });
 
 Deno.test("extractIntraDocLinkTargets skips code fences and finds all link forms", () => {
   const md = [
-    "See [`Vec2`], [dot product](`Vec2.dot`), and [codec](blot:std/codec/Codec).",
-    "```blot",
+    "See [`Vec2`], [dot product](`Vec2.dot`), and [codec](squid:std/codec/Codec).",
+    "```squid",
     "// [`NotALink`]",
     "```",
     "Also [`std/text`].",
@@ -99,18 +99,18 @@ Deno.test("extractIntraDocLinkTargets skips code fences and finds all link forms
   ]);
 });
 
-Deno.test("blot doc extracts checked API, hides opaque/private, resolves links, runs doctests, and builds runnable HTML", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-doc-test-" });
+Deno.test("squid doc extracts checked API, hides opaque/private, resolves links, runs doctests, and builds runnable HTML", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "squid-doc-test-" });
   try {
     const libDir = join(dir, "lib");
     await Deno.mkdir(libDir, { recursive: true });
     await Deno.writeTextFile(
-      join(libDir, "geom.blot"),
-      `//! Geometry primitives for testing \`blot doc\`.
+      join(libDir, "geom.sq"),
+      `//! Geometry primitives for testing \`squid doc\`.
 //!
 //! See [\`Point\`], [\`Point.manhattan\`], and [scaling](\`scale_x\`).
 //!
-//! \`\`\`blot
+//! \`\`\`squid
 //! let p = $Point { x: 3.0, y: 4.0 }
 //! p.manhattan // => 7.0
 //! \`\`\`
@@ -144,7 +144,7 @@ private func hidden_helper (n: U32) => n + 1
 
 // Manhattan distance from the origin.
 //
-// \`\`\`blot
+// \`\`\`squid
 // ($Point { x: 2.0, y: 5.0 }).manhattan // => 7.0
 // \`\`\`
 func Point.manhattan (p: Point) => F32.abs p.x + F32.abs p.y
@@ -154,7 +154,7 @@ func scale_x (p: Point) -> (k: Weight) => p.x * k
 
 // Consume an owned array and return its length.
 //
-// \`\`\`blot
+// \`\`\`squid
 // test "consume_len works":
 //   if consume_len #[10, 20, 30] != 3:
 //     @panic "bad length"
@@ -166,7 +166,7 @@ func consume_len (items: own #[U32]) => items.length
 
 // Record an event using the [\`Log\`] effect.
 //
-// \`\`\`blot check
+// \`\`\`squid check
 // func check_only (n: U32): Unit ! { Log } => use Log.emit n
 // \`\`\`
 func emit_twice (n: U32): Unit ! { Log } =>
@@ -176,29 +176,29 @@ func emit_twice (n: U32): Unit ! { Log } =>
 
 // Non-runnable snippet that still type-checks, plus an ignored snippet.
 //
-// \`\`\`blot no_run
+// \`\`\`squid no_run
 // let t: Point = $Point { x: 1.0, y: 2.0 }
 // t
 // \`\`\`
 //
-// \`\`\`blot ignore
-// this is not valid blot syntax !!!
+// \`\`\`squid ignore
+// this is not valid squid syntax !!!
 // \`\`\`
 func make_origin () => $Point { x: 0.0 }
 `,
     );
 
     await Deno.writeTextFile(
-      join(libDir, "extra.blot"),
+      join(libDir, "extra.sq"),
       `//! Secondary module linking back to [\`geom/Point\`] and [\`geom/scale_x\`].
 import { Point } from "./geom"
 
 // Greeting example returning \`Text\`.
 //
-// \`\`\`blot
-// greet () // => "hello blot"
+// \`\`\`squid
+// greet () // => "hello squid"
 // \`\`\`
-func greet (): Text => "hello blot"
+func greet (): Text => "hello squid"
 
 // Double x using imported [\`Point\`].
 func double_x (p: Point) => p.x * 2.0
@@ -321,7 +321,7 @@ func double_x (p: Point) => p.x * 2.0
     // Execute the actual generated runner.js against every precompiled example in examples.js!
     const examplesJs = await Deno.readTextFile(join(htmlOut, "examples.js"));
     const runnerFn = new Function(
-      `${examplesJs}\n${DOC_RUNNER_JS}\nreturn { examples: globalThis.__BLOT_DOC_EXAMPLES, run: globalThis.__blotDocRunExample };`,
+      `${examplesJs}\n${DOC_RUNNER_JS}\nreturn { examples: globalThis.__SQUID_DOC_EXAMPLES, run: globalThis.__squidDocRunExample };`,
     );
     const { examples: loadedExamples, run } = runnerFn() as {
       examples: Record<string, PrecompiledDocExample>;
@@ -342,8 +342,8 @@ func double_x (p: Point) => p.x * 2.0
       `missing 7.0 in ${outputs}`,
     );
     assert(
-      outputs.some((o) => o.includes('=> "hello blot"')),
-      `missing "hello blot" in ${outputs}`,
+      outputs.some((o) => o.includes('=> "hello squid"')),
+      `missing "hello squid" in ${outputs}`,
     );
     assert(
       outputs.some((o) =>
@@ -366,15 +366,15 @@ func double_x (p: Point) => p.x * 2.0
   }
 });
 
-Deno.test("blot doc detects broken intra-doc links and failing doctests", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-doc-fail-" });
+Deno.test("squid doc detects broken intra-doc links and failing doctests", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "squid-doc-fail-" });
   try {
-    const file = join(dir, "broken.blot");
+    const file = join(dir, "broken.sq");
     await Deno.writeTextFile(
       file,
       `//! Broken link to [\`DoesNotExist\`].
 //!
-//! \`\`\`blot
+//! \`\`\`squid
 //! 1 + 1 // => 3
 //! \`\`\`
 
@@ -403,8 +403,8 @@ func ok () => 1
   }
 });
 
-Deno.test("blot doc discovers pen.json alias imports", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-doc-pen-" });
+Deno.test("squid doc discovers pen.json alias imports", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "squid-doc-pen-" });
   try {
     await Deno.mkdir(join(dir, "lib"), { recursive: true });
     const stdPath = new URL("../../std", import.meta.url).pathname;
@@ -412,7 +412,7 @@ Deno.test("blot doc discovers pen.json alias imports", async () => {
       join(dir, "pen.json"),
       JSON.stringify({
         compiler: {
-          plugin: "blot",
+          plugin: "squid",
           settings: {
             std: stdPath,
             imports: { "demo/": "lib/" },
@@ -421,7 +421,7 @@ Deno.test("blot doc discovers pen.json alias imports", async () => {
       }),
     );
     await Deno.writeTextFile(
-      join(dir, "lib", "math.blot"),
+      join(dir, "lib", "math.sq"),
       `//! Demo math library.
 func triple (n: U32) => n * 3
 `,
@@ -443,7 +443,7 @@ func triple (n: U32) => n * 3
   }
 });
 
-Deno.test("blot doc std has zero broken links and all runnable examples pass", async () => {
+Deno.test("squid doc std has zero broken links and all runnable examples pass", async () => {
   const { pkg, context } = await generateDocs({
     target: "std",
     executable: compilerExecutable,

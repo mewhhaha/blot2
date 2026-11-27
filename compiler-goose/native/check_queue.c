@@ -18,7 +18,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-extern uint64_t blot_clock_ns(void);
+extern uint64_t squid_clock_ns(void);
 #endif
 
 /* Inherited by the fixed fork group. The graph and packet descriptors are
@@ -154,7 +154,7 @@ static void persist_fail_locked(struct persist_queue *queue, int error) {
     persist_notify(queue);
 }
 
-uint8_t blot_available_workers(void) {
+uint8_t squid_available_workers(void) {
     cpu_set_t cpus;
     if (sched_getaffinity(0, sizeof(cpus), &cpus) < 0) return 1;
     int count = CPU_COUNT(&cpus);
@@ -165,11 +165,11 @@ uint8_t blot_available_workers(void) {
 
 // These unreaped children belong to the current build. Abort all siblings
 // before joining, including a lane that stopped while outside the queue.
-void blot_persist_kill_child(uint32_t pid) {
+void squid_persist_kill_child(uint32_t pid) {
     if (pid > 0) (void)kill((pid_t)pid, SIGKILL);
 }
 
-uint64_t blot_persist_open(uint32_t count) {
+uint64_t squid_persist_open(uint32_t count) {
     if (count == 0 || count > PERSIST_MAX_NODES) return 0;
     uint32_t words = (count + 63) / 64;
     size_t end = offsetof(struct persist_queue, nodes) + count * sizeof(struct persist_node);
@@ -213,7 +213,7 @@ uint64_t blot_persist_open(uint32_t count) {
     return (uint64_t)(uintptr_t)queue;
 }
 
-bool blot_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
+bool squid_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue || id == 0 || id > queue->count || persist_lock(queue) != 0) return false;
     bool valid = !queue->sealed && atomic_load_explicit(&queue->failure, memory_order_relaxed) == 0 && !queue->nodes[id - 1].configured;
@@ -227,7 +227,7 @@ bool blot_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
     return valid;
 }
 
-bool blot_persist_edge(uint64_t h, uint32_t consumer, uint32_t producer) {
+bool squid_persist_edge(uint64_t h, uint32_t consumer, uint32_t producer) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue || consumer == 0 || producer == 0 || consumer == producer ||
         consumer > queue->count || producer > queue->count || persist_lock(queue) != 0)
@@ -258,14 +258,14 @@ static bool persist_worker_exited(pid_t pid, pid_t caller) {
     return kill(pid, 0) < 0 && errno == ESRCH;
 }
 
-int64_t blot_persist_claim(uint64_t h) {
+int64_t squid_persist_claim(uint64_t h) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue) return -EINVAL;
     pid_t caller = getpid();
     for (;;) {
         int error = persist_lock(queue);
         if (error != 0) return -error;
-        uint64_t now = blot_clock_ns();
+        uint64_t now = squid_clock_ns();
         if (!queue->sealed) {
             queue->sealed = true;
             queue->deadline = now + persist_timeout;
@@ -326,7 +326,7 @@ static bool persist_valid_packet(const struct persist_queue *queue, uint32_t id,
     return queue && id != 0 && id <= queue->count && kind != 0 && kind <= 2;
 }
 
-bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
+bool squid_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
                           const uint8_t *bytes, uint64_t len) {
     struct persist_queue *queue = persist_queue(h);
     if (!persist_valid_packet(queue, id, kind) || !bytes || len == 0 ||
@@ -382,7 +382,7 @@ bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
     return true;
 }
 
-int64_t blot_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
+int64_t squid_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
     struct persist_queue *queue = persist_queue(h);
     if (!persist_valid_packet(queue, id, kind)) return -EINVAL;
     const struct persist_packet *packet = &queue->nodes[id - 1].packets[kind - 1];
@@ -392,7 +392,7 @@ int64_t blot_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
     return ready ? (int64_t)packet->length : 0;
 }
 
-bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind, uint8_t *bytes, uint64_t len) {
+bool squid_persist_read(uint64_t h, uint32_t id, uint32_t kind, uint8_t *bytes, uint64_t len) {
     struct persist_queue *queue = persist_queue(h);
     if (!persist_valid_packet(queue, id, kind) || !bytes || len == 0) return false;
     const struct persist_packet *packet = &queue->nodes[id - 1].packets[kind - 1];
@@ -403,7 +403,7 @@ bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind, uint8_t *bytes, u
     return true;
 }
 
-bool blot_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
+bool squid_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
                           uint64_t byte_offset, const uint8_t *bytes, uint64_t len) {
     struct persist_queue *queue = persist_queue(h);
     if (!persist_valid_packet(queue, id, kind) || (!bytes && len != 0)) return false;
@@ -416,20 +416,20 @@ bool blot_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
     return true;
 }
 
-uint32_t blot_persist_consumers(uint64_t h, uint32_t id) {
+uint32_t squid_persist_consumers(uint64_t h, uint32_t id) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue || id == 0 || id > queue->count) return 0;
     return queue->nodes[id - 1].consumers;
 }
 
-void blot_persist_fail(uint64_t h) {
+void squid_persist_fail(uint64_t h) {
     struct persist_queue *queue = persist_queue(h);
     if (!queue || persist_lock(queue) != 0) return;
     persist_fail_locked(queue, ECANCELED);
     pthread_mutex_unlock(&queue->mutex);
 }
 
-void blot_persist_close(uint64_t h) {
+void squid_persist_close(uint64_t h) {
     struct persist_queue *queue = persist_queue(h);
     if (queue) munmap(queue, queue->map_length);
 }
@@ -470,7 +470,7 @@ static uint8_t *emit_pool_lane_buf(struct emit_pool *p, uint32_t lane) {
     return emit_pool_sync_buf(p) + (size_t)EMIT_POOL_SYNC_CAP +
            (size_t)lane * (size_t)EMIT_POOL_LANE_CAP;
 }
-uint64_t blot_emit_pool_open(uint32_t workers) {
+uint64_t squid_emit_pool_open(uint32_t workers) {
     if (workers == 0 || workers > EMIT_POOL_MAX_WORKERS) return 0;
     size_t map_len = emit_pool_header_size() + (size_t)EMIT_POOL_SYNC_CAP +
                      (size_t)workers * (size_t)EMIT_POOL_LANE_CAP;
@@ -486,17 +486,17 @@ uint64_t blot_emit_pool_open(uint32_t workers) {
     p->map_length = map_len;
     return (uint64_t)(uintptr_t)p;
 }
-void blot_emit_pool_close(uint64_t h) {
+void squid_emit_pool_close(uint64_t h) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (p) munmap(p, p->map_length);
 }
-void blot_emit_pool_stop(uint64_t h) {
+void squid_emit_pool_stop(uint64_t h) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p) return;
     atomic_store_explicit(&p->wave_gen, UINT32_MAX, memory_order_release);
     (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }
-bool blot_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
+bool squid_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
                                const uint8_t *sync_bytes, uint64_t sync_len) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p || sync_len > EMIT_POOL_SYNC_CAP || chunk_size == 0) return false;
@@ -511,16 +511,16 @@ bool blot_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_si
     (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
     return true;
 }
-bool blot_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
+bool squid_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p) return false;
     pid_t caller = getpid();
-    uint64_t deadline = blot_clock_ns() + persist_timeout;
+    uint64_t deadline = squid_clock_ns() + persist_timeout;
     for (;;) {
         uint32_t done = atomic_load_explicit(&p->done_workers, memory_order_acquire);
         if (atomic_load_explicit(&p->failed, memory_order_acquire) != 0) return false;
         if (done >= p->worker_count) return true;
-        uint64_t now = blot_clock_ns();
+        uint64_t now = squid_clock_ns();
         if (now >= deadline) {
             atomic_store_explicit(&p->failed, 1, memory_order_release);
             return false;
@@ -537,7 +537,7 @@ bool blot_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_cou
         (void)syscall(SYS_futex, &p->done_workers, FUTEX_WAIT, done, &wait, NULL, 0);
     }
 }
-int64_t blot_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) {
+int64_t squid_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p) return 0;
     for (;;) {
@@ -550,17 +550,17 @@ int64_t blot_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) {
         (void)syscall(SYS_futex, &p->wave_gen, FUTEX_WAIT, last_gen, &wait, NULL, 0);
     }
 }
-uint64_t blot_emit_pool_sync_len(uint64_t h) {
+uint64_t squid_emit_pool_sync_len(uint64_t h) {
     struct emit_pool *p = emit_pool_ptr(h);
     return p ? p->sync_len : 0;
 }
-bool blot_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) {
+bool squid_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p || len > p->sync_len) return false;
     if (len != 0) memcpy(out, emit_pool_sync_buf(p), (size_t)len);
     return true;
 }
-uint64_t blot_emit_pool_claim_chunk(uint64_t h) {
+uint64_t squid_emit_pool_claim_chunk(uint64_t h) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p) return 0;
     uint32_t start = atomic_fetch_add_explicit(&p->next_job, p->chunk_size, memory_order_relaxed);
@@ -569,7 +569,7 @@ uint64_t blot_emit_pool_claim_chunk(uint64_t h) {
     if (end > p->job_count) end = p->job_count;
     return ((uint64_t)start << 32) | (uint64_t)end;
 }
-bool blot_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
+bool squid_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
                                 const uint8_t *pkt, uint64_t len) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p || lane >= p->worker_count) return false;
@@ -582,7 +582,7 @@ bool blot_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
     p->lane_used[lane] = used + 8 + len;
     return true;
 }
-void blot_emit_pool_worker_done(uint64_t h, bool ok) {
+void squid_emit_pool_worker_done(uint64_t h, bool ok) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p) return;
     if (!ok) atomic_store_explicit(&p->failed, 1, memory_order_release);
@@ -591,67 +591,67 @@ void blot_emit_pool_worker_done(uint64_t h, bool ok) {
         (void)syscall(SYS_futex, &p->done_workers, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
     }
 }
-uint64_t blot_emit_pool_lane_size(uint64_t h, uint32_t lane) {
+uint64_t squid_emit_pool_lane_size(uint64_t h, uint32_t lane) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p || lane >= p->worker_count) return 0;
     return p->lane_used[lane];
 }
-bool blot_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
+bool squid_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
     struct emit_pool *p = emit_pool_ptr(h);
     if (!p || lane >= p->worker_count || len > p->lane_used[lane]) return false;
     if (len != 0) memcpy(out, emit_pool_lane_buf(p, lane), (size_t)len);
     return true;
 }
 #else
-uint8_t blot_available_workers(void) { return 1; }
-void blot_persist_kill_child(uint32_t pid) { (void)pid; }
-uint64_t blot_persist_open(uint32_t count) { (void)count; return 0; }
-bool blot_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
+uint8_t squid_available_workers(void) { return 1; }
+void squid_persist_kill_child(uint32_t pid) { (void)pid; }
+uint64_t squid_persist_open(uint32_t count) { (void)count; return 0; }
+bool squid_persist_node(uint64_t h, uint32_t id, uint32_t priority) {
     (void)h; (void)id; (void)priority; return false;
 }
-bool blot_persist_edge(uint64_t h, uint32_t consumer, uint32_t producer) {
+bool squid_persist_edge(uint64_t h, uint32_t consumer, uint32_t producer) {
     (void)h; (void)consumer; (void)producer; return false;
 }
-int64_t blot_persist_claim(uint64_t h) { (void)h; return -ENOTSUP; }
-bool blot_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
+int64_t squid_persist_claim(uint64_t h) { (void)h; return -ENOTSUP; }
+bool squid_persist_publish(uint64_t h, uint32_t id, uint32_t kind,
                           const uint8_t *bytes, uint64_t len) {
     (void)h; (void)id; (void)kind; (void)bytes; (void)len; return false;
 }
-int64_t blot_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
+int64_t squid_persist_size(uint64_t h, uint32_t id, uint32_t kind) {
     (void)h; (void)id; (void)kind; return -ENOTSUP;
 }
-bool blot_persist_read(uint64_t h, uint32_t id, uint32_t kind,
+bool squid_persist_read(uint64_t h, uint32_t id, uint32_t kind,
                        uint8_t *bytes, uint64_t len) {
     (void)h; (void)id; (void)kind; (void)bytes; (void)len; return false;
 }
-bool blot_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
+bool squid_persist_read_at(uint64_t h, uint32_t id, uint32_t kind,
                           uint64_t byte_offset, const uint8_t *bytes, uint64_t len) {
     (void)h; (void)id; (void)kind; (void)byte_offset; (void)bytes; (void)len; return false;
 }
-uint32_t blot_persist_consumers(uint64_t h, uint32_t id) { (void)h; (void)id; return 0; }
-void blot_persist_fail(uint64_t h) { (void)h; }
-void blot_persist_close(uint64_t h) { (void)h; }
-uint64_t blot_emit_pool_open(uint32_t workers) { (void)workers; return 0; }
-void blot_emit_pool_close(uint64_t h) { (void)h; }
-void blot_emit_pool_stop(uint64_t h) { (void)h; }
-bool blot_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
+uint32_t squid_persist_consumers(uint64_t h, uint32_t id) { (void)h; (void)id; return 0; }
+void squid_persist_fail(uint64_t h) { (void)h; }
+void squid_persist_close(uint64_t h) { (void)h; }
+uint64_t squid_emit_pool_open(uint32_t workers) { (void)workers; return 0; }
+void squid_emit_pool_close(uint64_t h) { (void)h; }
+void squid_emit_pool_stop(uint64_t h) { (void)h; }
+bool squid_emit_pool_begin_wave(uint64_t h, uint32_t job_count, uint32_t chunk_size,
                                const uint8_t *sync_bytes, uint64_t sync_len) {
     (void)h; (void)job_count; (void)chunk_size; (void)sync_bytes; (void)sync_len; return false;
 }
-bool blot_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
+bool squid_emit_pool_wait_wave(uint64_t h, const uint32_t *pids, uint32_t pid_count) {
     (void)h; (void)pids; (void)pid_count; return false;
 }
-int64_t blot_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) { (void)h; (void)last_gen; return 0; }
-uint64_t blot_emit_pool_sync_len(uint64_t h) { (void)h; return 0; }
-bool blot_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) { (void)h; (void)out; (void)len; return false; }
-uint64_t blot_emit_pool_claim_chunk(uint64_t h) { (void)h; return 0; }
-bool blot_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
+int64_t squid_emit_pool_worker_wait(uint64_t h, uint32_t last_gen) { (void)h; (void)last_gen; return 0; }
+uint64_t squid_emit_pool_sync_len(uint64_t h) { (void)h; return 0; }
+bool squid_emit_pool_sync_read(uint64_t h, uint8_t *out, uint64_t len) { (void)h; (void)out; (void)len; return false; }
+uint64_t squid_emit_pool_claim_chunk(uint64_t h) { (void)h; return 0; }
+bool squid_emit_pool_lane_append(uint64_t h, uint32_t lane, uint32_t job_idx,
                                 const uint8_t *pkt, uint64_t len) {
     (void)h; (void)lane; (void)job_idx; (void)pkt; (void)len; return false;
 }
-void blot_emit_pool_worker_done(uint64_t h, bool ok) { (void)h; (void)ok; }
-uint64_t blot_emit_pool_lane_size(uint64_t h, uint32_t lane) { (void)h; (void)lane; return 0; }
-bool blot_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
+void squid_emit_pool_worker_done(uint64_t h, bool ok) { (void)h; (void)ok; }
+uint64_t squid_emit_pool_lane_size(uint64_t h, uint32_t lane) { (void)h; (void)lane; return 0; }
+bool squid_emit_pool_lane_read(uint64_t h, uint32_t lane, uint8_t *out, uint64_t len) {
     (void)h; (void)lane; (void)out; (void)len; return false;
 }
 #endif

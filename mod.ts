@@ -1,4 +1,4 @@
-/** Blot's Zig project compiler and WebAssembly guest API. */
+/** Squid's Zig project compiler and WebAssembly guest API. */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureNativeAssets } from "./host/native_assets.ts";
@@ -24,23 +24,23 @@ import {
 export { createZigProjectCompiler } from "./host/zig_project_client.ts";
 export { jsonAssetParser } from "./host/assets.ts";
 export {
-  BlotGeneratorError,
-  type BlotGeneratorInputMode,
-  type BlotGeneratorOptions,
-  type BlotGeneratorPhase,
-  type BlotGeneratorReference,
-  type BlotGeneratorRule,
-  createBlotGenerator,
+  createSquidGenerator,
   expandGeneratorRules,
+  SquidGeneratorError,
+  type SquidGeneratorInputMode,
+  type SquidGeneratorOptions,
+  type SquidGeneratorPhase,
+  type SquidGeneratorReference,
+  type SquidGeneratorRule,
 } from "./host/generators.ts";
 export { decodeText, encodeText } from "./host/text.ts";
 export {
-  BlotRuntime,
-  type BlotRuntimeOptions,
   computeProcessBindingHash,
   createRuntime,
   RUNTIME_MAGIC,
   RUNTIME_VERSION,
+  SquidRuntime,
+  type SquidRuntimeOptions,
 } from "./host/runtime.ts";
 export {
   buildSymbolResolver,
@@ -60,7 +60,7 @@ export {
   type DocTraitMember,
   type DocType,
   type DocValue,
-  formatBlotType,
+  formatSquidType,
   type GenerateDocOptions,
   generateDocs,
   precompileDocExamples,
@@ -130,10 +130,10 @@ export type {
   TrapMetadataEntry,
 } from "./host/guest.ts";
 
-export const blotStdRoot: URL = new URL("./std/", import.meta.url);
+export const squidStdRoot: URL = new URL("./std/", import.meta.url);
 /** Include this payload when bundling the host into a desktop executable. */
-export const blotCompilerBinary: URL = new URL(
-  "./generated/compiler/blotc.gz",
+export const squidCompilerBinary: URL = new URL(
+  "./generated/compiler/squidc.gz",
   import.meta.url,
 );
 export type CompilerOptions = Omit<ZigProjectCompilerOptions, "executable"> & {
@@ -161,10 +161,10 @@ export async function createCompiler(
     entry: path(options.entry),
     prelude: options.prelude === null
       ? null
-      : path(options.prelude ?? new URL("prelude.blot", blotStdRoot)),
+      : path(options.prelude ?? new URL("prelude.sq", squidStdRoot)),
     stdRoot: options.stdRoot === null
       ? null
-      : path(options.stdRoot ?? blotStdRoot),
+      : path(options.stdRoot ?? squidStdRoot),
     dependencies: options.dependencies == null
       ? options.dependencies
       : path(options.dependencies),
@@ -203,7 +203,7 @@ export async function createCompiler(
     if (embeddedLibrary) {
       library = await extractStandardLibrary();
       if (defaultPrelude) {
-        captured.prelude = resolve(library.path, "prelude.blot");
+        captured.prelude = resolve(library.path, "prelude.sq");
       }
       if (defaultRoot) captured.stdRoot = library.path;
     }
@@ -256,7 +256,7 @@ export {
   discoverTestModules,
   formatTestRunReport,
   readTestMetadata,
-  runBlotTests,
+  runSquidTests,
   TEST_REPORT_MAGIC,
   TEST_REPORT_VERSION,
   type TestCaseResult,

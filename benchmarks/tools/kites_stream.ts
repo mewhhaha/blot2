@@ -36,11 +36,11 @@ if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const root = resolve(repo, "../gdev");
 const executable = resolve(
-  values.compiler ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
+  values.compiler ?? `${repo}/compiler-goose/build/squidc-goose-dev`,
 );
 const baselineExecutable = resolve(values["baseline-compiler"] ?? executable);
-const entry = `${root}/tests/kites_render.blot`;
-const producer = `${root}/src/actors/kites.blot`;
+const entry = `${root}/tests/kites_render.sq`;
+const producer = `${root}/src/actors/kites.sq`;
 const entrySource = await Deno.readTextFile(entry);
 const candidate = await Deno.readTextFile(producer);
 let baseline: string;
@@ -49,7 +49,7 @@ if (values["baseline-source"]) {
 } else {
   const original = await new Deno.Command("git", {
     cwd: root,
-    args: ["show", `${values["baseline-ref"]}:src/actors/kites.blot`],
+    args: ["show", `${values["baseline-ref"]}:src/actors/kites.sq`],
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -68,9 +68,9 @@ const hashText = (source: string) => hash(new TextEncoder().encode(source));
 const directory = resolve(values.output);
 await Deno.mkdir(directory, { recursive: true });
 const evidence = await Deno.makeTempDir({ dir: directory, prefix: "pair-" });
-await Deno.writeTextFile(`${evidence}/kites-original.blot`, baseline);
-await Deno.writeTextFile(`${evidence}/kites-candidate.blot`, candidate);
-await Deno.writeTextFile(`${evidence}/kites-render.blot`, entrySource);
+await Deno.writeTextFile(`${evidence}/kites-original.sq`, baseline);
+await Deno.writeTextFile(`${evidence}/kites-candidate.sq`, candidate);
+await Deno.writeTextFile(`${evidence}/kites-render.sq`, entrySource);
 const scenarios = [0, 1, 2, 4, 8, 16, 31];
 const streams = new Map<string, Map<number, Float32Array>>();
 const builds: Record<string, unknown>[] = [];
@@ -88,7 +88,7 @@ for (
     compiler = await createZigProjectCompiler({
       executable: runExecutable,
       entry,
-      prelude: `${repo}/std/prelude.blot`,
+      prelude: `${repo}/std/prelude.sq`,
       stdRoot: `${repo}/std`,
       imports: Object.fromEntries(
         Object.entries(settings.imports).map(([key, path]) => [

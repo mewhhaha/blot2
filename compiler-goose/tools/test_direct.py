@@ -50,7 +50,7 @@ def main():
     failed = False
     for name in names:
         expected = (LAWS / f"{name}.expected").read_text().strip()
-        with tempfile.TemporaryDirectory(prefix="blot-direct-") as scratch:
+        with tempfile.TemporaryDirectory(prefix="squid-direct-") as scratch:
             # The law as main.goose beside the compiler's sources.
             goose = Path(scratch)
             for part in ("direct", "support"):

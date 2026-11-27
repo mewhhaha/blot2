@@ -66,7 +66,7 @@ const save = async () =>
 for (const variant of variants) {
   const sources: Record<string, string> = {};
   for await (const file of Deno.readDir(variant.std)) {
-    if (file.isFile && file.name.endsWith(".blot")) {
+    if (file.isFile && file.name.endsWith(".sq")) {
       sources[file.name] = await hash(
         await Deno.readFile(`${variant.std}/${file.name}`),
       );
@@ -83,7 +83,7 @@ async function compile(
   source: string,
   name: string,
 ) {
-  const input = `${directory}/${name}.blot`,
+  const input = `${directory}/${name}.sq`,
     output = `${directory}/${variant.name}-${name}.wasm`;
   await Deno.writeTextFile(input, source);
   const command = await new Deno.Command(variant.compiler, {
@@ -94,7 +94,7 @@ async function compile(
       "--std-root",
       variant.std,
       "--prelude",
-      `${variant.std}/prelude.blot`,
+      `${variant.std}/prelude.sq`,
     ],
     stdout: "piped",
     stderr: "piped",
@@ -217,7 +217,7 @@ const fixture = await WebAssembly.instantiate(
 const runtime = fixture.instance.exports;
 const call = (name: string, ...args: number[]) =>
   Number((runtime[name] as CallableFunction)(...args)) >>> 0;
-call("blot:allocate", 4); // Reserve the first dynamic page; empty lists do not allocate.
+call("squid:allocate", 4); // Reserve the first dynamic page; empty lists do not allocate.
 let heap = call("heap");
 const large = call("new", 1_000_000);
 report.storage.million_element_list_bytes = call("heap") - heap;
@@ -232,15 +232,15 @@ heap = call("heap");
 call("concat", large, small);
 report.storage.concat_million_plus_thousand_bytes = call("heap") - heap;
 await save();
-const entry = `${gamePath}/src/main.blot`,
-  dependency = `${gamePath}/src/robots.blot`,
+const entry = `${gamePath}/src/main.sq`,
+  dependency = `${gamePath}/src/robots.sq`,
   packages = `${gamePath}/packages`;
 const manifest: Record<string, string> = {};
 async function scan(path: string) {
   for await (const file of Deno.readDir(path)) {
     const child = `${path}/${file.name}`;
     if (file.isDirectory) await scan(child);
-    else if (file.name.endsWith(".blot")) {
+    else if (file.name.endsWith(".sq")) {
       manifest[child.slice(gamePath.length + 1)] = await hash(
         await Deno.readFile(child),
       );
@@ -291,7 +291,7 @@ for (let run = 0; run < 5; run++) {
         "--std-root",
         variant.std,
         "--prelude",
-        `${variant.std}/prelude.blot`,
+        `${variant.std}/prelude.sq`,
       ],
       stdout: "piped",
       stderr: "piped",
@@ -323,7 +323,7 @@ for (let run = 0; run < 3; run++) {
       executable: variant.compiler,
       entry,
       stdRoot: variant.std,
-      prelude: `${variant.std}/prelude.blot`,
+      prelude: `${variant.std}/prelude.sq`,
       imports: { "gdev/": packages },
     };
     const opened = performance.now();

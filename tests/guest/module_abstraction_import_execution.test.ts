@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const producer = (offset: number) =>
   `type Token is opaque = F32
 private const offset = ${offset}.0
@@ -32,19 +32,19 @@ async function run(bytes: Uint8Array<ArrayBuffer>, expected: number) {
 }
 
 Deno.test("opaque source and compiled forwarding keep privacy through failed edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-opacity-" });
-  const entry = `${directory}/main.blot`;
-  const tokens = `${directory}/tokens.blot`;
-  const bundle = `${directory}/deps.blotdep`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-opacity-" });
+  const entry = `${directory}/main.sq`;
+  const tokens = `${directory}/tokens.sq`;
+  const bundle = `${directory}/deps.sqdep`;
   try {
     await Deno.writeTextFile(entry, main);
     await Deno.writeTextFile(tokens, producer(2));
     await Deno.writeTextFile(
-      `${directory}/facade.blot`,
+      `${directory}/facade.sq`,
       'export {Token as Ticket, make, read} from "./tokens"\n',
     );
     await Deno.writeTextFile(
-      `${directory}/outward.blot`,
+      `${directory}/outward.sq`,
       'export {Ticket, make, read} from "./facade"\n',
     );
     const packed = await new Deno.Command(executable, {
@@ -139,11 +139,11 @@ Deno.test("opaque source and compiled forwarding keep privacy through failed edi
 });
 
 Deno.test("opaque generic field requirements cannot derive hidden producer payloads", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-opaque-field-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-opaque-field-" });
+  const entry = `${directory}/main.sq`;
   try {
     await Deno.writeTextFile(
-      `${directory}/library.blot`,
+      `${directory}/library.sq`,
       "type Box is opaque = {value:U32}\nconst make = func value => return $Box {value:value}\n",
     );
     await Deno.writeTextFile(
@@ -167,9 +167,9 @@ Deno.test("opaque generic field requirements cannot derive hidden producer paylo
 });
 
 Deno.test("opaque representation edits invalidate storage while preserving the public nominal", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-opacity-abi-" });
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-opacity-abi-" });
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const options = { executable, entry, prelude: null };
   try {
     await Deno.writeTextFile(
@@ -198,7 +198,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
       } finally {
         await fresh.dispose();
       }
-      const bundle = `${directory}/deps.blotdep`;
+      const bundle = `${directory}/deps.sqdep`;
       const packed = await new Deno.Command(executable, {
         args: ["dependencies", entry, bundle, "--prelude", "none"],
         stdout: "piped",
@@ -237,12 +237,12 @@ async function writeForwardedReaders(dir: string, reader: string) {
   const imports: string[] = [];
   let sum = "0";
   for (let i = 0; i < 16; i++) {
-    await Deno.writeTextFile(dir + `/r${i}.blot`, reader);
+    await Deno.writeTextFile(dir + `/r${i}.sq`, reader);
     imports.push(`import { read as r${i} } from "./r${i}"`);
     sum = `@u32.add (${sum}) (r${i} n)`;
   }
   await Deno.writeTextFile(
-    dir + "/main.blot",
+    dir + "/main.sq",
     imports.join("\n") + "\nio answer (n: U32): U32 => return " + sum +
       "\n",
   );
@@ -250,8 +250,8 @@ async function writeForwardedReaders(dir: string, reader: string) {
 
 Deno.test("forwarded record layouts survive producer edits and recovery across workers", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const point = dir + "/point.blot";
+  const entry = dir + "/main.sq";
+  const point = dir + "/point.sq";
   const definition = (field: string, value: number) =>
     `type Point is data = $Point { other: U32, ${field}: U32 }
 func make () => return $Point { other: 90, ${field}: ${value} }
@@ -260,7 +260,7 @@ func make () => return $Point { other: 90, ${field}: ${value} }
   try {
     await Deno.writeTextFile(point, definition("x", 7));
     await Deno.writeTextFile(
-      dir + "/bridge.blot",
+      dir + "/bridge.sq",
       'import { make } from "./point"\nfunc carry () => return make ()\n',
     );
     await writeForwardedReaders(
@@ -320,7 +320,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
   const dir = await Deno.makeTempDir();
   try {
     await Deno.writeTextFile(
-      dir + "/types.blot",
+      dir + "/types.sq",
       [
         "type Point is data = $Point { other: U32, x: U32 }",
         "type Identity a { item } is trait = { id: a -> item }",
@@ -329,7 +329,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
       ].join("\n") + "\n",
     );
     await Deno.writeTextFile(
-      dir + "/bridge.blot",
+      dir + "/bridge.sq",
       [
         'import { make } from "./types"',
         'export { Identity } from "./types"',
@@ -348,7 +348,7 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
       const outputs = [];
       for (const frontendWorkers of [1, 8]) {
         const client = await createZigProjectCompiler({
-          entry: dir + "/main.blot",
+          entry: dir + "/main.sq",
           executable,
           prelude: null,
           frontendWorkers,
@@ -384,14 +384,14 @@ Deno.test("workers resolve re-exported constructors in their defining module", a
   const dir = await Deno.makeTempDir();
   try {
     await Deno.writeTextFile(
-      dir + "/types.blot",
+      dir + "/types.sq",
       [
         "type Choice is data = $Empty | $Count U32 | $Point { x: U32, y: U32 }",
         "type Box a is data = $Box { value: a }",
       ].join("\n") + "\n",
     );
     await Deno.writeTextFile(
-      dir + "/bridge.blot",
+      dir + "/bridge.sq",
       'export { Choice, Empty, Count, Point, Box } from "./types"\n',
     );
     await writeForwardedReaders(
@@ -410,7 +410,7 @@ Deno.test("workers resolve re-exported constructors in their defining module", a
     const outputs = [];
     for (const frontendWorkers of [1, 8]) {
       const client = await createZigProjectCompiler({
-        entry: dir + "/main.blot",
+        entry: dir + "/main.sq",
         executable,
         prelude: null,
         frontendWorkers,

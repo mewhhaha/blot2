@@ -11,7 +11,7 @@
   identities and handlers. Sources:
   [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -41,7 +41,7 @@ instances and row subtraction.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Nest two same-typed instances and prove each read/write reaches its own
@@ -115,7 +115,7 @@ native test names and guest JUnit report is recorded in
   closure changes no code, so no new comparison applies.
 - Remaining limitations: forms outside the rows are excluded scope under the
   owner decision of 15 October 2026 (closed acceptance above;
-  [README owner decisions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
+  [README owner decisions](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
   not open work. General capture/result/store graphs, general higher-order and
   anonymous invocation binder transport, and public generative selection schemes
   beyond the admitted invocation-version forms reject or decline conservatively

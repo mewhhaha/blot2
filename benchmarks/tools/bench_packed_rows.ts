@@ -125,7 +125,7 @@ const variants = [{ name: "before", compiler: baseline }, {
 }];
 const rows: Record<string, unknown>[] = [];
 for (const fixture of fixtures) {
-  const path = `${output}/${fixture.name}.blot`;
+  const path = `${output}/${fixture.name}.sq`;
   await Deno.writeTextFile(
     path,
     fixture.source +
@@ -143,7 +143,7 @@ for (const fixture of fixtures) {
         "--std-root",
         std,
         "--prelude",
-        `${std}/prelude.blot`,
+        `${std}/prelude.sq`,
       ],
       stdout: "piped",
       stderr: "piped",

@@ -9,7 +9,7 @@
   2026: `array.generate 4096 (func index => return #[128578, 97 + index % 26])`
   grew guest memory from 256 KiB at `86a527b` to 448 KiB at `2b2ffbb`.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

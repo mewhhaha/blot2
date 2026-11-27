@@ -1015,5 +1015,5 @@ accepts an older live capture and rejects a younger owner on compiler
 through source/archive dependencies, both tiers, sync/JSPI, checkpoint restart,
 edits and failure recovery. No production change was needed. The probe and pins
 are in
-`/var/tmp/blot2-resource-data-footprint-close-20261015/build/bench/resource-data-footprint/`.
+`/var/tmp/squid-resource-data-footprint-close-20261015/build/bench/resource-data-footprint/`.
 This focused result leaves the final combined qualification open.

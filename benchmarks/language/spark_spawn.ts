@@ -1,4 +1,4 @@
-// deno run -A benchmarks/language/spark_spawn.ts [gdev checkout] [blotc executable]
+// deno run -A benchmarks/language/spark_spawn.ts [gdev checkout] [squidc executable]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpus } from "node:os";
@@ -10,16 +10,16 @@ import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 import { selectFour } from "./route_result.js";
 
 const root = resolve(Deno.args[0] ?? "../gdev");
-const executable = resolve(Deno.args[1] ?? "compiler-goose/build/blotc-goose");
+const executable = resolve(Deno.args[1] ?? "compiler-goose/build/squidc-goose");
 const samples = 21;
 const sha = async (bytes: Uint8Array<ArrayBuffer>) =>
   new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)).toHex();
 
 async function build(stem: string) {
-  const path = "performance/modernize/" + stem + ".blot";
+  const path = "performance/modernize/" + stem + ".sq";
   const project = await gdevProject(root, resolve("std"), path, executable);
   const src = await Deno.readFile(
-    new URL("./" + stem + ".blot", import.meta.url),
+    new URL("./" + stem + ".sq", import.meta.url),
   );
   const client = await createZigProjectCompiler({
     ...project,
@@ -32,7 +32,7 @@ async function build(stem: string) {
     });
     if (!r.success) throw Error(JSON.stringify(r.diagnostics));
     if (stem === "spark_routes") {
-      const output = Deno.env.get("BLOT_ROUTE_WASM");
+      const output = Deno.env.get("SQUID_ROUTE_WASM");
       if (output) await Deno.writeFile(output, r.bytes);
     }
     return {
@@ -284,10 +284,10 @@ function identity(metadata: typeof route) {
   };
 }
 const dependencyFiles = [
-  "test_support/path_plans.blot",
-  "../ink/lib/navigation/lookahead.blot",
-  "../ink/lib/navigation/locomotion.blot",
-  "../ink/lib/navigation/ground.blot",
+  "test_support/path_plans.sq",
+  "../ink/lib/navigation/lookahead.sq",
+  "../ink/lib/navigation/locomotion.sq",
+  "../ink/lib/navigation/ground.sq",
 ];
 const deps = Object.fromEntries(
   await Promise.all(

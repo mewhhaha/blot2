@@ -7,7 +7,7 @@
 - **Originating requirements:** PLAN: Earlier programs / rolling reductions and
   summary trees. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -16,8 +16,8 @@ composable summaries.
 
 ## Starting point
 
-[std/iter.blot](../std/iter.blot) already has immutable sliding windows;
-[std/list.blot](../std/list.blot) and [std/array.blot](../std/array.blot) supply
+[std/iter.sq](../std/iter.sq) already has immutable sliding windows;
+[std/list.sq](../std/list.sq) and [std/array.sq](../std/array.sq) supply
 folds. Incremental rolling reductions and summary trees remain open.
 
 ## Implementation checklist

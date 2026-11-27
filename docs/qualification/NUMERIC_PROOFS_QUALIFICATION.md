@@ -62,7 +62,7 @@ Zig 0.17.0 Safe/noLLVM checks on 13 October 2026:
   failed-edit recovery and source/compiled imports.
 - Isolated proof source: zero analyzer findings across 382 files.
 
-Later combined focused evidence uses `zig-native/zig-out-dev/bin/blotc`, the
+Later combined focused evidence uses `zig-native/zig-out-dev/bin/squidc`, the
 actual `build:compiler:dev` output:
 
 - 18 selected-comparison native laws pass, including complete deterministic
@@ -77,7 +77,7 @@ actual `build:compiler:dev` output:
 - Typed-staging frontend additions pass 17 native syntax laws and 25 client
   syntax/formatter tests with one existing ignored test.
 
-Initial main guest logs used the older `zig-out/bin/blotc` and cannot qualify
+Initial main guest logs used the older `zig-out/bin/squidc` and cannot qualify
 the new integration. Corrected evidence is in `numeric-list-correct-guests.log`
 and `combined-checked-production-guests.log`. The build command now prints the
 exact executable path to prevent that selection error.
@@ -85,7 +85,7 @@ exact executable path to prevent that selection error.
 Logs:
 `build/bench/continuation-20261013/combined-proof-{build,native,guests}.log`,
 `proof-erasure-inspection-native-v3.log` and `proof-flow-analyzer-v2.log`. The
-private proof worktree `/var/tmp/blot2-erased-proofs-070` preserves staged
+private proof worktree `/var/tmp/squid-erased-proofs-070` preserves staged
 production base `d55ab1cd`; its actual index is untouched. Main includes its
 reviewed delta and later ownership/effect work. These focused results establish
 neither full release qualification nor a speedup.
@@ -277,6 +277,6 @@ measure proof fresh/edit ratios 1.003/1.001 and ordinary ratios 0.987/1.005;
 ordinary fresh samples are noisy. This is near-parity evidence for the counter
 repair, with exact before/after Wasm, rather than a speedup or release result.
 The acceptance map, workloads, raw samples and source pins are preserved in
-`/var/tmp/blot2-numeric-finite-qualification-20261015/build/bench/numeric-finite-qualification/`;
+`/var/tmp/squid-numeric-finite-qualification-20261015/build/bench/numeric-finite-qualification/`;
 root integration pins and logs are in
 `build/bench/complete-program-20261015/numeric-finite-qualification/`.

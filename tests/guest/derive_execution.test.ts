@@ -216,10 +216,10 @@ io const migrate_v1 = func (words: Array U32) : Array U32 => return do:
 
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("derive command validates source and generated module before publishing", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-derive-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-derive-" });
   try {
-    const source = `${directory}/model.blot`;
-    const output = `${directory}/model_derived.blot`;
+    const source = `${directory}/model.sq`;
+    const output = `${directory}/model_derived.sq`;
     const schema = `${directory}/schema.json`;
     await Deno.writeTextFile(
       source,
@@ -240,7 +240,7 @@ Deno.test.ignore("derive command validates source and generated module before pu
       }),
     );
     const compiler = Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
     const stdRoot = new URL("../../std/", import.meta.url).pathname;
     await deriveFile({
       source,
@@ -248,7 +248,7 @@ Deno.test.ignore("derive command validates source and generated module before pu
       schema,
       compiler,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     const generated = await Deno.readTextFile(output);
     assert.match(generated, /TicketDerivedCodec/);
@@ -269,14 +269,14 @@ Deno.test.ignore("derive command validates source and generated module before pu
         },
       }),
     );
-    const codecOutput = `${directory}/model_codec.blot`;
+    const codecOutput = `${directory}/model_codec.sq`;
     await deriveFile({
       source,
       output: codecOutput,
       schema,
       compiler,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     const codecOnly = await Deno.readTextFile(codecOutput);
     assert.match(codecOnly, /TicketDerivedCodec/);
@@ -291,8 +291,8 @@ Deno.test.ignore("derive command validates source and generated module before pu
         ),
       { stdRoot },
     );
-    const floatSource = `${directory}/float.blot`;
-    const floatOutput = `${directory}/float_derived.blot`;
+    const floatSource = `${directory}/float.sq`;
+    const floatOutput = `${directory}/float_derived.sq`;
     await Deno.writeTextFile(
       floatSource,
       "type Coordinate is data = $Coordinate { x: F32 }\n",
@@ -307,7 +307,7 @@ Deno.test.ignore("derive command validates source and generated module before pu
       schema,
       compiler,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     const equalityOnly = await Deno.readTextFile(floatOutput);
     assert.match(equalityOnly, /CoordinateDerivedEquality/);

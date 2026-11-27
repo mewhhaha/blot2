@@ -321,11 +321,11 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
       "invalid_literal",
       "private_marker",
     ],
-    title: "Source declaration or expression does not match Blot syntax",
+    title: "Source declaration or expression does not match Squid syntax",
     summary:
-      "The parser encountered a token that cannot appear in this position under Blot's indentation-sensitive grammar.",
+      "The parser encountered a token that cannot appear in this position under Squid's indentation-sensitive grammar.",
     why:
-      "Blot differs from Rust/TS/Python in a few specific forms: functions use `func`, curried params use `->`, return types follow `:` before `=>`, indented suites follow `:` or `=>` (no `{ ... }` blocks), and sum types require `type Name is data = $Variant ...`.",
+      "Squid differs from Rust/TS/Python in a few specific forms: functions use `func`, curried params use `->`, return types follow `:` before `=>`, indented suites follow `:` or `=>` (no `{ ... }` blocks), and sum types require `type Name is data = $Variant ...`.",
     before: `fn add (a: U32, b: U32) -> U32 {
   return a + b
 }`,
@@ -383,7 +383,7 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     summary:
       "The lexer rejected a character, numeric range, string literal/escape, or indentation layout before parsing.",
     why:
-      'Blot source must be valid UTF-8 indented with spaces (no tabs), top-level declarations start at column 1, strings close on one line using only `\\"`, `\\\\`, `\\n`, `\\r`, `\\t` escapes, and numeric literals must fit finite `U32` or `F32`.',
+      'Squid source must be valid UTF-8 indented with spaces (no tabs), top-level declarations start at column 1, strings close on one line using only `\\"`, `\\\\`, `\\n`, `\\r`, `\\t` escapes, and numeric literals must fit finite `U32` or `F32`.',
     before: `const big: U32 = 999999999999`,
     after: `const big: U32 = 4294967295`,
     checklist: [
@@ -396,9 +396,9 @@ export const DIAGNOSTIC_CATALOG: Record<string, DiagnosticExplanationEntry> = {
     code: "UNSUPPORTED_EXPRESSION",
     rawCodes: ["unsupported_expression"],
     title: "Unsupported expression syntax (commonly bare `[...]` list literal)",
-    summary: "This expression form is not supported in executable Blot code.",
+    summary: "This expression form is not supported in executable Squid code.",
     why:
-      "Bare `[1, 2, 3]` list literals are retired. Blot has one unified owned array type `#[T]` constructed with `#[1, 2, 3]`.",
+      "Bare `[1, 2, 3]` list literals are retired. Squid has one unified owned array type `#[T]` constructed with `#[1, 2, 3]`.",
     before: `io main (): #[U32] => return [1, 2, 3]`,
     after: `io main (): #[U32] => return #[1, 2, 3]`,
     checklist: [
@@ -431,7 +431,7 @@ io main (): Opt => return $Some 1`,
     summary:
       "The `.member` projection or associated call does not exist on the receiver's inferred type.",
     why:
-      "Blot arrays expose `.length` (not `.len`), records only expose declared fields, and module functions like `F32.sqrt x` are namespaced rather than implicit receiver methods unless declared as associated functions.",
+      "Squid arrays expose `.length` (not `.len`), records only expose declared fields, and module functions like `F32.sqrt x` are namespaced rather than implicit receiver methods unless declared as associated functions.",
     before: `io main (): U32 =>
   let xs = #[1, 2, 3]
   return xs.len`,
@@ -458,7 +458,7 @@ io main (): Opt => return $Some 1`,
     summary:
       "A record expression, pattern, projection, or field update either omitted a required field or named a field not declared on the record type.",
     why:
-      "Blot records are statically checked against their exact declared field set. Every field in a record literal must match the target type, and record updates (`r.field := ...`) require a physical field on `r`.",
+      "Squid records are statically checked against their exact declared field set. Every field in a record literal must match the target type, and record updates (`r.field := ...`) require a physical field on `r`.",
     before: `type Pt = { x: U32, y: U32 }
 io main (): U32 =>
   let p: Pt = { x: 1, z: 2 }
@@ -520,7 +520,7 @@ io main (): U32 =>
     summary:
       "A required contract implementation is missing, overlapping, orphan, cyclic, or fails to satisfy its prerequisites or associated type members.",
     why:
-      "Blot resolves contract constraints coherently at compile time without runtime reflection. Every required contract predicate must match a single coherent implementation whose prerequisites and associated types terminate.",
+      "Squid resolves contract constraints coherently at compile time without runtime reflection. Every required contract predicate must match a single coherent implementation whose prerequisites and associated types terminate.",
     before: `type Box = { v: U32 }
 func eq_box (a: Box) -> (b: Box): Bool => return a == b`,
     after: `type Box = { v: U32 }
@@ -543,7 +543,7 @@ func eq_box (a: Box) -> (b: Box): Bool => return a.v == b.v`,
     summary:
       "A `$Constructor` expression, pattern, or `is data` declaration used an unknown constructor name, wrong payload arity, or unboxed recursive layout.",
     why:
-      "Every algebraic data constructor in Blot starts with `$`, must match a variant declared in a `type ... is data` definition, and must receive the exact number of payload arguments.",
+      "Every algebraic data constructor in Squid starts with `$`, must match a variant declared in a `type ... is data` definition, and must receive the exact number of payload arguments.",
     before: `type Opt is data = $Some U32 | $Nothing
 io main (): Opt => return $Some 1 2`,
     after: `type Opt is data = $Some U32 | $Nothing
@@ -561,7 +561,7 @@ io main (): Opt => return $Some 1`,
     summary:
       "Two types that must be equal failed unification (for example, returning `F32` where `U32` was declared).",
     why:
-      "Blot has strict static typing with zero implicit numeric conversions (`U32` vs `F32` vs `Bool` vs `Unit`), and curried functions apply one argument at a time.",
+      "Squid has strict static typing with zero implicit numeric conversions (`U32` vs `F32` vs `Bool` vs `Unit`), and curried functions apply one argument at a time.",
     before: `io main (): U32 => return 1.5`,
     after: `io main (): F32 => return 1.5`,
     checklist: [
@@ -598,7 +598,7 @@ io main (): Opt => return $Some 1`,
     summary:
       "A type expression failed well-formedness, arity, kind, occurs-check, rank, or concrete-representation checking.",
     why:
-      "Blot requires finite, well-kinded types with concrete representations for code emission. Common causes include writing `String` instead of `Text`, passing the wrong number of type arguments (e.g. `Maybe` without `U32`), cyclic type aliases, or letting a local type variable escape.",
+      "Squid requires finite, well-kinded types with concrete representations for code emission. Common causes include writing `String` instead of `Text`, passing the wrong number of type arguments (e.g. `Maybe` without `U32`), cyclic type aliases, or letting a local type variable escape.",
     before: `io main (s: String): U32 => return s.length`,
     after: `io main (s: Text): U32 => return s.length`,
     checklist: [
@@ -614,7 +614,7 @@ io main (): Opt => return $Some 1`,
     summary:
       "This binding previously transferred ownership of its array/storage to an `own` parameter, `freeze`, or returned record, so reading it again is invalid.",
     why:
-      "Blot achieves zero-GC in-place mutation by enforcing single ownership of mutable storage. Once an `own` call takes a binding, the callee may mutate or reallocate its backing memory in place.",
+      "Squid achieves zero-GC in-place mutation by enforcing single ownership of mutable storage. Once an `own` call takes a binding, the callee may mutate or reallocate its backing memory in place.",
     before: `func consume (xs: own #[U32]): U32 => return xs.length
 io main (): U32 =>
   let a = #[1, 2, 3]
@@ -638,7 +638,7 @@ io main (): U32 =>
     summary:
       "This `:=` index write, `@storage.push`, or `@storage.truncate` mutates storage that another live name, borrow, `handler` capture, or caller may still observe.",
     why:
-      "Blot's `:=` operator updates array storage in place only when the compiler statically proves unique ownership. Updating through a borrowed parameter or while `let alias = arr` is still used later would expose mutation through an immutable alias.",
+      "Squid's `:=` operator updates array storage in place only when the compiler statically proves unique ownership. Updating through a borrowed parameter or while `let alias = arr` is still used later would expose mutation through an immutable alias.",
     before: `io main (): U32 =>
   let a = #[1, 2, 3]
   let b = a
@@ -730,7 +730,7 @@ io main (): U32 =>
     summary:
       "An expression performs an algebraic effect that is not permitted in this pure context (`const`, `let`, module initializer, or pure function signature).",
     why:
-      "Blot functions, `const` definitions, and top-level initializers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `handler` + `.handle ... .run` / `@handle`.",
+      "Squid functions, `const` definitions, and top-level initializers are pure by default. Effectful calls must be bound with `use x <- ...` inside an effectful scope or handled locally with `handler` + `.handle ... .run` / `@handle`.",
     before: `type Clock is effect = { now: Unit -> U32 }
 func read_time (): U32 =>
   let t = Clock.now ()
@@ -840,13 +840,13 @@ io main (): U32 =>
     summary:
       "Building a Wasm binary requires at least one `io`, `#kernel`, or `#process` declaration in the entry module with a supported export signature.",
     why:
-      "Library modules can be checked with `blot check`, but `blot build` needs an exported entry point declared in the entry module itself (not only in imported modules).",
+      "Library modules can be checked with `squid check`, but `squid build` needs an exported entry point declared in the entry module itself (not only in imported modules).",
     before: `func helper (x: U32): U32 => return x + 1`,
     after: `func helper (x: U32): U32 => return x + 1
 io main (x: U32): U32 => return helper x`,
     checklist: [
-      "Add an `io main (...): ... => ...`, `#kernel`, or `#process` declaration to the entry module before running `blot build`.",
-      "Use `blot check` to type-check library modules without `io` entries.",
+      "Add an `io main (...): ... => ...`, `#kernel`, or `#process` declaration to the entry module before running `squid build`.",
+      "Use `squid check` to type-check library modules without `io` entries.",
       "Keep `io` declarations in the root entry module, not inside imported library modules.",
     ],
   },
@@ -857,7 +857,7 @@ io main (x: U32): U32 => return helper x`,
     summary:
       "A `case ... of` expression or `let` destructuring misses one or more constructors of the matched algebraic data type.",
     why:
-      "Blot requires exhaustive matches so runtime match failures cannot occur silently.",
+      "Squid requires exhaustive matches so runtime match failures cannot occur silently.",
     before: `func unwrap (opt: Maybe U32): U32 =>
   let $Some value = opt
   return value`,
@@ -954,7 +954,7 @@ io main (): U32 =>
     summary:
       "This expression references a module-private symbol, inspects an abstract type's hidden representation, or invokes an intrinsic reserved for `std/`.",
     why:
-      "Blot enforces module encapsulation and abstract type boundaries across modules; internal primitives under `std/` are exposed through safe standard-library wrappers.",
+      "Squid enforces module encapsulation and abstract type boundaries across modules; internal primitives under `std/` are exposed through safe standard-library wrappers.",
     before:
       `// Accessing a private helper or std-only intrinsic from user code`,
     after:
@@ -1031,7 +1031,7 @@ io main (): U32 =>
     summary:
       "The compiler could not prove safe collector-free ownership, scoped storage lifetimes, or usage multiplicity for this value or call.",
     why:
-      "Blot compiles without a garbage collector by statically proving every allocation has a clear owner, no borrowed storage escapes its owner, and `own` functions are called directly rather than passed as first-class values.",
+      "Squid compiles without a garbage collector by statically proving every allocation has a clear owner, no borrowed storage escapes its owner, and `own` functions are called directly rather than passed as first-class values.",
     before: `func take (xs: own #[U32]): U32 => return xs.length
 io main (): U32 =>
   let f = take
@@ -1100,12 +1100,12 @@ io main (): U32 =>
     summary:
       "Loading or resolving an imported module, configured directory alias, prelude path, exported symbol, or top-level modifier failed.",
     why:
-      "Imports must use relative paths (`./foo`, `../bar`) or configured `--alias` / `blot.json` prefixes without import cycles, and every imported name must be publicly exported by the target module.",
+      "Imports must use relative paths (`./foo`, `../bar`) or configured `--alias` / `squid.json` prefixes without import cycles, and every imported name must be publicly exported by the target module.",
     before: `import { does_not_exist } from "./helper"`,
     after: `import { helper } from "./helper"`,
     checklist: [
-      "Use relative paths (`./module`) or configured aliases (`std/...`, package aliases in `blot.json`).",
-      "Verify the target `.blot` file exists, compiles cleanly, and publicly exports the imported name.",
+      "Use relative paths (`./module`) or configured aliases (`std/...`, package aliases in `squid.json`).",
+      "Verify the target `.sq` file exists, compiles cleanly, and publicly exports the imported name.",
       "Break circular `import` cycles between modules and verify top-level modifiers/attributes.",
     ],
   },
@@ -1116,14 +1116,14 @@ io main (): U32 =>
     summary:
       "Compiling, executing, or validating a Stage-0 generator or asset parser for a virtual generated module failed.",
     why:
-      "Blot's Stage-0 pipeline compiles each `.blot` generator with zero host capabilities, executes it against its input asset, and feeds the generated Blot source into the project build. Errors can occur during `compile`, `execute` (runtime trap), `result` (`$Err`), or `generated_source` checking.",
+      "Squid's Stage-0 pipeline compiles each `.sq` generator with zero host capabilities, executes it against its input asset, and feeds the generated Squid source into the project build. Errors can occur during `compile`, `execute` (runtime trap), `result` (`$Err`), or `generated_source` checking.",
     before:
-      `// Generator returns $Err "bad input" or emits invalid Blot syntax`,
+      `// Generator returns $Err "bad input" or emits invalid Squid syntax`,
     after:
-      `// Fix the input asset or Stage-0 generator and re-run \`blot check\``,
+      `// Fix the input asset or Stage-0 generator and re-run \`squid check\``,
     checklist: [
       "Inspect the `from <input> via <generator> (stage0 <phase>)` provenance line to see whether the failure is in the generator, input asset, or generated source.",
-      "Check the generator itself directly with `blot check <generator.blot>`.",
+      "Check the generator itself directly with `squid check <generator.sq>`.",
       "Verify the generator exports `generate` with a supported Stage-0 signature (`#[U32]` or `{ path, bytes/text }` -> `#[U32]` or `Result`).",
     ],
   },
@@ -1217,7 +1217,7 @@ io main (): U32 =>
     summary:
       "This construct uses an unsupported backend form, invalid custom operator/proof declaration, or a retired task/request syntax.",
     why:
-      "Blot vNext removes legacy `infix`/`infixl`/`infixr` declarations and language tasks; custom operators use parenthesized names (`func (++) ...`) with lexical precedence.",
+      "Squid vNext removes legacy `infix`/`infixl`/`infixr` declarations and language tasks; custom operators use parenthesized names (`func (++) ...`) with lexical precedence.",
     before:
       `// Using a retired task/request construct or legacy infix declaration`,
     after:
@@ -1225,7 +1225,7 @@ io main (): U32 =>
     checklist: [
       "Replace retired task/request syntax with `#kernel` / `#process` or explicit algebraic effects.",
       "Define custom operators with `func (op) a -> b => ...` or `const (op) = ...` (precedence is lexical; no `infix` header is needed).",
-      "Simplify unsupported forms into standard Blot vNext expressions (`blot guide --cheatsheet`).",
+      "Simplify unsupported forms into standard Squid vNext expressions (`squid guide --cheatsheet`).",
     ],
   },
 };
@@ -1267,7 +1267,7 @@ export function formatExplanation(code: string): string | null {
     "Checklist:",
     ...entry.checklist.map((item) => `  - ${item}`),
     "",
-    `Reference: skills/blot-diagnostics/SKILL.md#${entry.code}`,
+    `Reference: skills/squid-diagnostics/SKILL.md#${entry.code}`,
   ];
   return lines.join("\n");
 }
@@ -1277,11 +1277,11 @@ export function formatDiagnosticCodeList(): string {
   const pad = Math.max(...entries.map((e) => e.code.length));
   const rows = entries.map((e) => `  ${e.code.padEnd(pad)}  ${e.title}`);
   return [
-    "Blot diagnostic codes (run `blot explain <CODE>` for full details):",
+    "Squid diagnostic codes (run `squid explain <CODE>` for full details):",
     "",
     ...rows,
     "",
-    "Handbook: skills/blot-diagnostics/SKILL.md",
+    "Handbook: skills/squid-diagnostics/SKILL.md",
   ].join("\n");
 }
 
@@ -1647,10 +1647,10 @@ function buildHeadlineAndFix(
     let fix: string | null = null;
     if (/^fn\b/.test(trimmedLine) || snippet === "fn") {
       fix =
-        "Blot uses `func`, not `fn` (e.g. `func add (a: U32) -> (b: U32): U32 => return a + b`).";
+        "Squid uses `func`, not `fn` (e.g. `func add (a: U32) -> (b: U32): U32 => return a + b`).";
     } else if (/^(?:private\s+)?#entry\b/.test(trimmedLine)) {
       fix =
-        "Blot declares entry points with `io name (...) => ...`, `io const`, or `io let` instead of `#entry`.";
+        "Squid declares entry points with `io name (...) => ...`, `io const`, or `io let` instead of `#entry`.";
     } else if (/^type\s+[A-Z][A-Za-z0-9_]*\s*=.*\|/.test(trimmedLine)) {
       fix =
         "Sum types require `is data` and `$`-prefixed constructors: `type Opt is data = $Some U32 | $Nothing`.";
@@ -1669,22 +1669,22 @@ function buildHeadlineAndFix(
         .test(trimmedLine)
     ) {
       fix =
-        "Blot uses indented suites after `=>` or `:`, not `{ ... }` braces.";
+        "Squid uses indented suites after `=>` or `:`, not `{ ... }` braces.";
     } else if (trimmedLine.includes("&&") || trimmedLine.includes("||")) {
       fix =
-        "Blot uses `and`, `or`, and `not` (not `&&`, `||`, `!`) for boolean operators.";
+        "Squid uses `and`, `or`, and `not` (not `&&`, `||`, `!`) for boolean operators.";
     } else if (/^(?:mut|var)\s+/.test(trimmedLine)) {
       fix =
-        "Blot declares locals with `let x = ...` and updates them with `x := ...` (no `mut`/`var` keyword).";
+        "Squid declares locals with `let x = ...` and updates them with `x := ...` (no `mut`/`var` keyword).";
     } else if (expected && actual) {
       fix =
         `Expected ${expected}, found ${actual}. Check indentation, \`=>\`, and \`:\` suite headers.`;
     } else if (actual) {
       fix =
-        `Unexpected ${actual}. Check Blot syntax (see \`blot guide --cheatsheet\`).`;
+        `Unexpected ${actual}. Check Squid syntax (see \`squid guide --cheatsheet\`).`;
     } else {
       fix =
-        "Check Blot declaration and suite syntax (`blot guide --cheatsheet`).";
+        "Check Squid declaration and suite syntax (`squid guide --cheatsheet`).";
     }
     const primaryLabel = expected
       ? `expected ${expected}`
@@ -1701,8 +1701,8 @@ function buildHeadlineAndFix(
       headline: record.message,
       primaryLabel: isBareList ? "use `#[...]` here" : "unsupported expression",
       fix: isBareList
-        ? "Replace bare `[...]` with `#[...]` for Blot array literals (e.g. `#[1, 2, 3]`)."
-        : "Replace this expression with a supported Blot vNext form (`blot guide --cheatsheet`).",
+        ? "Replace bare `[...]` with `#[...]` for Squid array literals (e.g. `#[1, 2, 3]`)."
+        : "Replace this expression with a supported Squid vNext form (`squid guide --cheatsheet`).",
     };
   }
 
@@ -1722,7 +1722,7 @@ function buildHeadlineAndFix(
         headline: "Unknown value `None`.",
         primaryLabel: "use `$Nothing` instead",
         fix:
-          "Blot's prelude option constructors are `$Nothing` and `$Some x` (not `None`/`Some`).",
+          "Squid's prelude option constructors are `$Nothing` and `$Some x` (not `None`/`Some`).",
       };
     }
     if (snippet === "String" || snippet === "str") {
@@ -1730,7 +1730,7 @@ function buildHeadlineAndFix(
         headline: `Unknown value \`${snippet}\`.`,
         primaryLabel: "use `Text` instead",
         fix:
-          "Blot's Unicode scalar string type is `Text` (prelude alias for `#[U32]`) with `std/text` helpers.",
+          "Squid's Unicode scalar string type is `Text` (prelude alias for `#[U32]`) with `std/text` helpers.",
       };
     }
     if (
@@ -1740,7 +1740,7 @@ function buildHeadlineAndFix(
         headline: `Unknown value \`${snippet}\`.`,
         primaryLabel: "not in scope",
         fix:
-          "Blot's built-in scalar types are `U32`, `F32`, `Bool`, and `Unit` (capitalized).",
+          "Squid's built-in scalar types are `U32`, `F32`, `Bool`, and `Unit` (capitalized).",
       };
     }
     const typoMatch = /did you mean `([^`]+)`\?/.exec(record.message);
@@ -1767,7 +1767,7 @@ function buildHeadlineAndFix(
         headline: `Unknown or unsupported type \`${snippet}\`.`,
         primaryLabel: "use `Text` instead",
         fix:
-          "Blot's Unicode scalar string type is `Text` (prelude alias for `#[U32]`) with `std/text` helpers.",
+          "Squid's Unicode scalar string type is `Text` (prelude alias for `#[U32]`) with `std/text` helpers.",
       };
     }
     if (
@@ -1775,9 +1775,9 @@ function buildHeadlineAndFix(
     ) {
       return {
         headline: `Unsupported scalar type \`${snippet}\`.`,
-        primaryLabel: "not a Blot type",
+        primaryLabel: "not a Squid type",
         fix:
-          "Blot's built-in scalar types are `U32`, `F32`, `Bool`, and `Unit` (capitalized).",
+          "Squid's built-in scalar types are `U32`, `F32`, `Bool`, and `Unit` (capitalized).",
       };
     }
   }
@@ -1829,7 +1829,7 @@ function buildHeadlineAndFix(
         fields.map((f) => `\`${f}\``).join(", ")
       }.`;
     } else if (member === "len") {
-      fix = "Blot arrays use `.length` (not `.len`).";
+      fix = "Squid arrays use `.length` (not `.len`).";
     } else if (member === "push") {
       fix =
         "Use `arr := self.push item` (with the prelude in scope) or `arr := @storage.push self item` to append to an owned `#[T]`.";
@@ -1848,7 +1848,7 @@ function buildHeadlineAndFix(
     const numericPair = record.message.includes("F32") &&
       record.message.includes("U32");
     const fix = numericPair
-      ? "Blot has no implicit numeric conversions; match the literal (`1` vs `1.0`) or convert explicitly with `@u32.to_f32` / `@f32.to_u32`."
+      ? "Squid has no implicit numeric conversions; match the literal (`1` vs `1.0`) or convert explicitly with `@u32.to_f32` / `@f32.to_u32`."
       : "Align the expression type with the declared annotation or expected parameter type.";
     return {
       headline: record.message,
@@ -2412,8 +2412,8 @@ export function analyzeDiagnostic(
   const docEntry = lookupDiagnosticExplanation(canonical) ??
     lookupDiagnosticExplanation(record.code);
   const docRef = docEntry
-    ? `blot explain ${docEntry.code} (skills/blot-diagnostics/SKILL.md#${docEntry.code})`
-    : "blot explain --list (CHEATSHEET.md)";
+    ? `squid explain ${docEntry.code} (skills/squid-diagnostics/SKILL.md#${docEntry.code})`
+    : "squid explain --list (CHEATSHEET.md)";
 
   const quickFixes = buildQuickFixes(
     canonical,

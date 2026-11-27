@@ -1,7 +1,7 @@
 // A hash map from u64 to u32 over one grow-only array: it never shrinks, so
 // views held across an insert stay valid for the lifetime checker (Goose
 // spec 5.2 counts a dictionary insert as a shrink of its slots).
-namespace blot_direct_map;
+namespace squid_direct_map;
 import std;
 
 // words: bucket regions and nodes. A bucket holds the offset of its first

@@ -1,4 +1,4 @@
-/** Convert JavaScript text to Blot's Unicode-scalar Array U32 host value. */
+/** Convert JavaScript text to Squid's Unicode-scalar Array U32 host value. */
 export function encodeText(value: string): Uint32Array {
   const scalars: number[] = [];
   for (const scalar of value) {

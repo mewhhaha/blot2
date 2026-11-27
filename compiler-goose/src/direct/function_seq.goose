@@ -17,11 +17,11 @@
 //   - Lazy 16-byte-aligned bump slab freed at invocation exit (zero owner slots per tree node,
 //     zero Wasm overhead for programs that do not use `~[T]`).
 //   - O(1) persistent `fork` rollback via monotonic `seq_min_mutable_epoch` bumped on fork entry.
-namespace blot_direct_function;
+namespace squid_direct_function;
 import .function;
 
-let OP_i32_ctz = blot_direct_writer::OP_i32_ctz;
-let OP_i32_popcnt = blot_direct_writer::OP_i32_popcnt;
+let OP_i32_ctz = squid_direct_writer::OP_i32_ctz;
+let OP_i32_popcnt = squid_direct_writer::OP_i32_popcnt;
 
 let SEQ_KIND_INTERNAL: u32 = 0;
 let SEQ_KIND_FLAT: u32 = 1;
@@ -97,9 +97,9 @@ fn align4(v: u32) -> u32 { return (v + 3) & 0xfffffffc; }
 
 fn computeSeqPlan(g: Generator&, f: const Fn&, elem_ty: Ty, id: u32) -> SeqPlan, Error {
     let eb, eberr = flatBytes(g, f, elem_ty, id);
-    if eberr != blot_direct_types::Error.none { return SeqPlan {}, eberr; }
+    if eberr != squid_direct_types::Error.none { return SeqPlan {}, eberr; }
     let packed, perr = computePackedPlan(g, f, elem_ty, id);
-    if perr != blot_direct_types::Error.none { return SeqPlan {}, perr; }
+    if perr != squid_direct_types::Error.none { return SeqPlan {}, perr; }
     var sp = SeqPlan {
         elem_ty: elem_ty,
         elem_bytes: eb,
@@ -129,7 +129,7 @@ fn computeSeqPlan(g: Generator&, f: const Fn&, elem_ty: Ty, id: u32) -> SeqPlan,
     }
     sp.flat_leaf_bytes = align16(16 + sp.leaf_cap * eb);
     sp.focus_bytes = align16(16 + sp.leaf_cap * eb);
-    return sp, blot_direct_types::Error.none;
+    return sp, squid_direct_types::Error.none;
 }
 
 // Helper emission convenience for pushing/popping arbitrary Val words.
@@ -138,17 +138,17 @@ fn seqPushVal(g: Generator&, val: Val) {
 }
 fn seqValFromParams(g: Generator&, f: Fn&, ty: Ty, id: u32) -> Val, Error {
     let lay, lerr = g.types.layout(ty);
-    if lerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+    if lerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
     let start = g.s.words.len as u32;
     for wt in lay { g.s.words.push(local(g, f, wt)); }
-    return Val { ty, start, lay.len as u32 }, blot_direct_types::Error.none;
+    return Val { ty, start, lay.len as u32 }, squid_direct_types::Error.none;
 }
 
 // ---- Lazy Seq runtime: globals, 16-byte-aligned bump slab, release, SIMD routing ----
 
 fn ensureSeqRuntime(g: Generator&) -> Error {
-    if g.s.seq_rt_ready { return blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return blot_direct_types::Error.unsupported; }
+    if g.s.seq_rt_ready { return squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return squid_direct_types::Error.unsupported; }
     let rt = g.runtime_();
     g.s.seq_slab_head = g.module.addGlobal(VT_i32, true, 0);
     g.s.seq_bump_ptr = g.module.addGlobal(VT_i32, true, 0);
@@ -166,7 +166,7 @@ fn ensureSeqRuntime(g: Generator&) -> Error {
 
     let s .= g.s;
     let code_mark = s.code.len;
-    let sites_mark = blot_direct_relocations::mark();
+    let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len;
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
@@ -250,7 +250,7 @@ fn ensureSeqRuntime(g: Generator&) -> Error {
         lget(g, ptr);
         op(g, OP_end);
         finishWith(g, alloc_fn, nf, false, 0, 0, 0);
-        blot_direct_relocations::rewind(sites_mark);
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
     }
 
@@ -288,7 +288,7 @@ fn ensureSeqRuntime(g: Generator&) -> Error {
         close(g, nf);
         op(g, OP_end);
         finishWith(g, release_fn, nf, false, 0, 0, 0);
-        blot_direct_relocations::rewind(sites_mark);
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
     }
 
@@ -337,23 +337,23 @@ fn ensureSeqRuntime(g: Generator&) -> Error {
         op(g, OP_i32_ctz);
         op(g, OP_end);
         finishWith(g, simd_fn, nf, false, 0, 0, 0);
-        blot_direct_relocations::rewind(sites_mark);
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 fn emitSeqForkBump(g: Generator&) -> Error {
-    if !g.types.has_seq_type { return blot_direct_types::Error.none; }
+    if !g.types.has_seq_type { return squid_direct_types::Error.none; }
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return err; }
+    if err != squid_direct_types::Error.none { return err; }
     gget(g, g.s.seq_epoch);
     i32Const(g, 1);
     op(g, OP_i32_add);
     gset(g, g.s.seq_epoch);
     gget(g, g.s.seq_epoch);
     gset(g, g.s.seq_min_mutable_epoch);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 fn emitSeqReleaseCall(g: Generator&) {
@@ -365,15 +365,15 @@ fn emitSeqReleaseCall(g: Generator&) {
 
 fn ensureSeqNextEpoch(g: Generator&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(0xffffffff, 108);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(0xffffffff, 108);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let ep = local32(g, nf);
@@ -385,22 +385,22 @@ fn ensureSeqNextEpoch(g: Generator&) -> u32, Error {
     lget(g, ep);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 fn ensureSeqRebuildPrefixes(g: Generator&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(0xffffffff, 100);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(0xffffffff, 100);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], []));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let node = local(g, nf, VT_i32);
@@ -442,22 +442,22 @@ fn ensureSeqRebuildPrefixes(g: Generator&) -> u32, Error {
     close(g, nf); close(g, nf);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 fn ensureSeqNodeNew2(g: Generator&) -> u32, Error {
     let rebuild_fn, rerr = ensureSeqRebuildPrefixes(g);
-    if rerr != blot_direct_types::Error.none { return 0, rerr; }
-    let key = blot_direct_emit::key64(0xffffffff, 101);
+    if rerr != squid_direct_types::Error.none { return 0, rerr; }
+    let key = squid_direct_emit::key64(0xffffffff, 101);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let c0 = local(g, nf, VT_i32);
@@ -480,22 +480,22 @@ fn ensureSeqNodeNew2(g: Generator&) -> u32, Error {
     lget(g, node);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 fn ensureSeqNodeClone(g: Generator&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(0xffffffff, 102);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(0xffffffff, 102);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let src = local(g, nf, VT_i32);
@@ -512,22 +512,22 @@ fn ensureSeqNodeClone(g: Generator&) -> u32, Error {
     lget(g, dst);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 fn ensureSeqNodeUnrev(g: Generator&) -> u32, Error {
     let rebuild_fn, rerr = ensureSeqRebuildPrefixes(g);
-    if rerr != blot_direct_types::Error.none { return 0, rerr; }
-    let key = blot_direct_emit::key64(0xffffffff, 103);
+    if rerr != squid_direct_types::Error.none { return 0, rerr; }
+    let key = squid_direct_emit::key64(0xffffffff, 103);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -567,24 +567,24 @@ fn ensureSeqNodeUnrev(g: Generator&) -> u32, Error {
     lget(g, dst);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Slices an un-reversed internal node's children[start..end]. Returns 0 if empty,
 // the single child edge if count == 1 (automatic height collapse!), or a fresh node.
 fn ensureSeqNodeSlice(g: Generator&) -> u32, Error {
     let rebuild_fn, rerr = ensureSeqRebuildPrefixes(g);
-    if rerr != blot_direct_types::Error.none { return 0, rerr; }
-    let key = blot_direct_emit::key64(0xffffffff, 104);
+    if rerr != squid_direct_types::Error.none { return 0, rerr; }
+    let key = squid_direct_emit::key64(0xffffffff, 104);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let node = local(g, nf, VT_i32);
@@ -622,23 +622,23 @@ fn ensureSeqNodeSlice(g: Generator&) -> u32, Error {
     lget(g, dst);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 fn ensureSeqHdrOpen(g: Generator&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(0xffffffff, 105);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(0xffffffff, 105);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let rt = g.runtime_();
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let root_edge = local(g, nf, VT_i32);
@@ -659,25 +659,25 @@ fn ensureSeqHdrOpen(g: Generator&) -> u32, Error {
     callf(g, rt.open);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // O(1) persistent copy / reverse: marks source shared (unlogged so fork rollback never restores stale owner_epoch!),
 // clones 48-byte SeqHeader with fresh epoch and root_rev ^= flip_rev.
 fn ensureSeqHdrCloneShared(g: Generator&) -> u32, Error {
     let ep_fn, eerr = ensureSeqNextEpoch(g);
-    if eerr != blot_direct_types::Error.none { return 0, eerr; }
-    let key = blot_direct_emit::key64(0xffffffff, 106);
+    if eerr != squid_direct_types::Error.none { return 0, eerr; }
+    let key = squid_direct_emit::key64(0xffffffff, 106);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let rt = g.runtime_();
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
@@ -688,7 +688,7 @@ fn ensureSeqHdrCloneShared(g: Generator&) -> u32, Error {
     let dst_hdr = local32(g, nf);
     let len = local32(g, nf);
     lget(g, slot); lget(g, gen); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, src_hdr);
     // Mark source shared (unlogged write to owner_epoch = 0 -> safe even across fork!).
     lget(g, src_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
@@ -704,9 +704,9 @@ fn ensureSeqHdrCloneShared(g: Generator&) -> u32, Error {
     callf(g, rt.open);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // seq_ensure_writable(slot, gen) -> (entry, hdr, epoch):
@@ -714,16 +714,16 @@ fn ensureSeqHdrCloneShared(g: Generator&) -> u32, Error {
 // under active fork and assigns a fresh writable epoch.
 fn ensureSeqWritable(g: Generator&) -> u32, Error {
     let ep_fn, eerr = ensureSeqNextEpoch(g);
-    if eerr != blot_direct_types::Error.none { return 0, eerr; }
-    let key = blot_direct_emit::key64(0xffffffff, 109);
+    if eerr != squid_direct_types::Error.none { return 0, eerr; }
+    let key = squid_direct_emit::key64(0xffffffff, 109);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32, VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let rt = g.runtime_();
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
@@ -733,17 +733,17 @@ fn ensureSeqWritable(g: Generator&) -> u32, Error {
     let hdr = local32(g, nf);
     let ep = local32(g, nf);
     lget(g, slot); lget(g, gen); callf(g, rt.check); ltee(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-    i32Const(g, blot_direct_runtime::static_pool_flag); op(g, OP_i32_and);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+    i32Const(g, squid_direct_runtime::static_pool_flag); op(g, OP_i32_and);
     trap(g, nf);
-    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, hdr);
+    lget(g, entry); op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH); ltee(g, ep);
     gget(g, g.s.seq_min_mutable_epoch);
     op(g, OP_i32_lt_u);
     let need_ep = open(g, nf, OP_if_);
     if rt.has_fork {
         recordBeforeWrite(g, nf, slot, hdr, 0, SEQ_HDR_BYTES);
-        recordBeforeWrite(g, nf, slot, entry, blot_direct_runtime::entry_length, 4);
+        recordBeforeWrite(g, nf, slot, entry, squid_direct_runtime::entry_length, 4);
     }
     callf(g, ep_fn); lset(g, ep);
     lget(g, hdr); lget(g, ep); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
@@ -751,24 +751,24 @@ fn ensureSeqWritable(g: Generator&) -> u32, Error {
     lget(g, entry); lget(g, hdr); lget(g, ep);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // seq_iter_next_leaf(stack_mem, sp) -> (new_sp, leaf_edge):
 // Advances an explicit 8-level traversal stack to the next leaf edge (with propagated rev bit).
 fn ensureSeqIterNextLeaf(g: Generator&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(0xffffffff, 107);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(0xffffffff, 107);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let stack = local(g, nf, VT_i32);
@@ -829,9 +829,9 @@ fn ensureSeqIterNextLeaf(g: Generator&) -> u32, Error {
     i32Const(g, 0); i32Const(g, 0);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // ---- Per-element-type leaf helpers (Flat, Packed-Sum with SIMD rank, Packed-SoA, Span, Repeat, Ramp) ----
@@ -904,15 +904,15 @@ fn emitSeqSumEnsureCap(g: Generator&, f: Fn&, leaf_ptr: u32, sp: const SeqPlan&,
 // Kind 1: seq_leaf_create(epoch) -> leaf_ptr
 fn ensureSeqLeafCreate(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 1);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 1);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let epoch = local(g, nf, VT_i32);
@@ -933,23 +933,23 @@ fn ensureSeqLeafCreate(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, leaf);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 2: seq_leaf_clone(leaf_ptr, epoch) -> new_leaf_ptr (canonical leaves only)
 fn ensureSeqLeafClone(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 2);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 2);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let src = local(g, nf, VT_i32);
@@ -982,25 +982,25 @@ fn ensureSeqLeafClone(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, dst);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 3: seq_leaf_get(leaf_edge, p) -> val... (ALL 6 leaf flavors + reversal bit!)
 fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 3);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 3);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], lay));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -1031,8 +1031,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, base);
             let addr = emitOffsetAddress(g, nf, base, p, sp.elem_bytes);
             let loaded, err2 = loadElement(g, nf, addr, 0, sp.elem_ty, 0);
-            if err2 != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if err2 != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, err2;
             }
@@ -1051,8 +1051,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
                 lget(g, ptr); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, col_base);
                 let addr = emitOffsetAddress(g, nf, col_base, p, sp.packed.stream_stride[st]);
                 let loaded, err2 = loadElement(g, nf, addr, 0, fty, 0);
-                if err2 != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if err2 != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, err2;
                 }
@@ -1060,8 +1060,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             }
         }
         let assembled, aerr = assembleSoaVal(g, nf, sp.packed, fvals, 0);
-        if aerr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if aerr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, aerr;
         }
@@ -1070,8 +1070,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     } else {
         // SEQ_KIND_PACKED_SUM: load ci = tags[p], compute SIMD rank, decode variant!
         let cases, cerr = g.types.variants(sp.elem_ty);
-        if cerr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if cerr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, cerr;
         }
@@ -1093,16 +1093,16 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
                 lset(g, sub_base);
                 let addr = emitOffsetAddress(g, nf, sub_base, rank, sp.packed.stream_stride[st]);
                 let loaded, err2 = loadElement(g, nf, addr, 0, pty, 0);
-                if err2 != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if err2 != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, err2;
                 }
                 payload = loaded;
             }
             let wrapped, werr = wrapVariant(g, nf, sp.elem_ty, vtag, payload, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1124,8 +1124,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SPAN_PTR); lset(g, sbase);
         let addr = emitOffsetAddress(g, nf, sbase, p, sp.elem_bytes);
         let loaded, err2 = loadElement(g, nf, addr, 0, sp.elem_ty, 0);
-        if err2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if err2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err2;
         }
@@ -1143,8 +1143,8 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         let rbase = local32(g, nf);
         lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, rbase);
         let loaded, err2 = loadElement(g, nf, rbase, 0, sp.elem_ty, 0);
-        if err2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if err2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err2;
         }
@@ -1154,7 +1154,7 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     close(g, nf);
 
     // LEAF_RAMP (kind == 6, U32 only)
-    if sp.elem_ty == blot_direct_types::u32_ {
+    if sp.elem_ty == squid_direct_types::u32_ {
         lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_START);
         lget(g, p);
         lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_RAMP_STEP);
@@ -1165,33 +1165,33 @@ fn ensureSeqLeafGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_unreachable_);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 4: seq_leaf_append_one(leaf_ptr, val...) -> void (mutable non-full canonical leaf)
 fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let err = ensureSeqRuntime(g);
-    if err != blot_direct_types::Error.none { return 0, err; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 4);
+    if err != squid_direct_types::Error.none { return 0, err; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 4);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32];
     for wt in lay { ptypes.push(wt); }
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], []));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let leaf = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -1205,8 +1205,8 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, leaf); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, base);
             let addr = emitOffsetAddress(g, nf, base, idx, sp.elem_bytes);
             let werr = writeElement(g, nf, addr, 0, val, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1215,8 +1215,8 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         var inner_val = val;
         if sp.packed.soa_is_nominal {
             let uw, uerr = unwrapVariant(g, nf, val, sp.packed.soa_nominal_tag, 0);
-            if uerr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if uerr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, uerr;
             }
@@ -1228,16 +1228,16 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             var fv = neverVal();
             if sp.packed.soa_is_record {
                 let got, gerr = recordField(g, nf, inner_val, fi, 0);
-                if gerr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, gerr;
                 }
                 fv = got;
             } else {
                 let got, gerr = tupleItem(g, nf, inner_val, fi, 0);
-                if gerr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, gerr;
                 }
@@ -1247,8 +1247,8 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, leaf); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, cbase);
             let addr = emitOffsetAddress(g, nf, cbase, idx, sp.packed.stream_stride[st]);
             let werr = writeElement(g, nf, addr, 0, fv, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1256,15 +1256,15 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     } else {
         // SEQ_KIND_PACKED_SUM
         let cases, cerr = g.types.variants(sp.elem_ty);
-        if cerr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if cerr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, cerr;
         }
         let vtag_loc = local32(g, nf);
         let terr = emitValueTag(g, nf, val, 0);
-        if terr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if terr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, terr;
         }
@@ -1283,14 +1283,14 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
                 let sub_ptr, sub_len = emitSeqSumEnsureCap(g, nf, leaf, sp, st);
                 let addr = emitOffsetAddress(g, nf, sub_ptr, sub_len, sp.packed.stream_stride[st]);
                 let uw, uerr = unwrapVariant(g, nf, val, vtag, 0);
-                if uerr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if uerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, uerr;
                 }
                 let werr = writeElement(g, nf, addr, 0, uw, 0);
-                if werr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if werr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, werr;
                 }
@@ -1308,35 +1308,35 @@ fn ensureSeqLeafAppendOne(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_META);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 5: seq_leaf_set_canon(leaf_edge, p, val..., epoch) -> new_edge (canonical leaves kind <= 3 only)
 fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let clone_fn, cerr = ensureSeqLeafClone(g, sp);
-    if cerr != blot_direct_types::Error.none { return 0, cerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 5);
+    if cerr != squid_direct_types::Error.none { return 0, cerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 5);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32, VT_i32];
     for wt in lay { ptypes.push(wt); }
     ptypes.push(VT_i32);
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
     let p_in = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -1364,8 +1364,8 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, base);
             let addr = emitOffsetAddress(g, nf, base, p, sp.elem_bytes);
             let werr = writeElement(g, nf, addr, 0, val, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1374,8 +1374,8 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         var inner_val = val;
         if sp.packed.soa_is_nominal {
             let uw, uerr = unwrapVariant(g, nf, val, sp.packed.soa_nominal_tag, 0);
-            if uerr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if uerr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, uerr;
             }
@@ -1387,16 +1387,16 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             var fv = neverVal();
             if sp.packed.soa_is_record {
                 let got, gerr = recordField(g, nf, inner_val, fi, 0);
-                if gerr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, gerr;
                 }
                 fv = got;
             } else {
                 let got, gerr = tupleItem(g, nf, inner_val, fi, 0);
-                if gerr != blot_direct_types::Error.none {
-                    blot_direct_relocations::rewind(sites_mark);
+                if gerr != squid_direct_types::Error.none {
+                    squid_direct_relocations::rewind(sites_mark);
                     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                     return 0, gerr;
                 }
@@ -1406,8 +1406,8 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, ptr); i32Const(g, sp.soa_col_off[st]); op(g, OP_i32_add); lset(g, cbase);
             let addr = emitOffsetAddress(g, nf, cbase, p, sp.packed.stream_stride[st]);
             let werr = writeElement(g, nf, addr, 0, fv, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1415,8 +1415,8 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     } else {
         // SEQ_KIND_PACKED_SUM: update old/new variant payload using SIMD rank!
         let cases, cerr2 = g.types.variants(sp.elem_ty);
-        if cerr2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if cerr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, cerr2;
         }
@@ -1426,8 +1426,8 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, ptr); lget(g, p); op(g, OP_i32_add);
         op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, SEQ_SUM_TAGS); lset(g, old_ci);
         let terr = emitValueTag(g, nf, val, 0);
-        if terr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if terr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, terr;
         }
@@ -1454,14 +1454,14 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, ptr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_SUM_SUB_PTRS + ((st - 1) as u32) * 4); lset(g, sub_base);
             let addr = emitOffsetAddress(g, nf, sub_base, rank, sp.packed.stream_stride[st]);
             let uw, uerr = unwrapVariant(g, nf, val, vtag, 0);
-            if uerr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if uerr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, uerr;
             }
             let werr = writeElement(g, nf, addr, 0, uw, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1514,14 +1514,14 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
             lget(g, dst_a); lget(g, src_a); lget(g, mbytes); memoryCopyOp(g);
             close(g, nf);
             let uw, uerr = unwrapVariant(g, nf, val, vtag, 0);
-            if uerr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if uerr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, uerr;
             }
             let werr = writeElement(g, nf, src_a, 0, uw, 0);
-            if werr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if werr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, werr;
             }
@@ -1536,27 +1536,27 @@ fn ensureSeqLeafSetCanon(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, ptr); lget(g, rev); op(g, OP_i32_or);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 6: seq_leaf_merge(a_edge, b_edge, epoch) -> merged_leaf_ptr (two canonical leaves, len_a + len_b <= C)
 fn ensureSeqLeafMerge(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
-    if crerr != blot_direct_types::Error.none { return 0, crerr; }
+    if crerr != squid_direct_types::Error.none { return 0, crerr; }
     let get_fn, gerr = ensureSeqLeafGet(g, sp);
-    if gerr != blot_direct_types::Error.none { return 0, gerr; }
+    if gerr != squid_direct_types::Error.none { return 0, gerr; }
     let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != blot_direct_types::Error.none { return 0, aerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 6);
+    if aerr != squid_direct_types::Error.none { return 0, aerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 6);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let a_edge = local(g, nf, VT_i32);
@@ -1608,28 +1608,28 @@ fn ensureSeqLeafMerge(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, out);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 7: seq_leaf_split(leaf_edge, k, epoch) -> (left_edge, right_edge)
 // O(1) on LEAF_SPAN, LEAF_REPEAT, LEAF_RAMP! Exact split on canonical leaves!
 fn ensureSeqLeafSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
-    if crerr != blot_direct_types::Error.none { return 0, crerr; }
+    if crerr != squid_direct_types::Error.none { return 0, crerr; }
     let get_fn, gerr = ensureSeqLeafGet(g, sp);
-    if gerr != blot_direct_types::Error.none { return 0, gerr; }
+    if gerr != squid_direct_types::Error.none { return 0, gerr; }
     let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != blot_direct_types::Error.none { return 0, aerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 7);
+    if aerr != squid_direct_types::Error.none { return 0, aerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 7);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -1706,7 +1706,7 @@ fn ensureSeqLeafSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     close(g, nf);
 
     // LEAF_RAMP: O(1) two 32-byte ramp descriptors!
-    if sp.elem_ty == blot_direct_types::u32_ {
+    if sp.elem_ty == squid_direct_types::u32_ {
         lget(g, kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
         let ramp_if = open(g, nf, OP_if_);
         let rstart = local32(g, nf);
@@ -1769,27 +1769,27 @@ fn ensureSeqLeafSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     }
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 21: seq_leaf_unrev_sum(leaf_ptr, epoch) -> forward LEAF_PACKED_SUM (used by reversed fused loops)
 fn ensureSeqLeafUnrevSum(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
-    if crerr != blot_direct_types::Error.none { return 0, crerr; }
+    if crerr != squid_direct_types::Error.none { return 0, crerr; }
     let get_fn, gerr = ensureSeqLeafGet(g, sp);
-    if gerr != blot_direct_types::Error.none { return 0, gerr; }
+    if gerr != squid_direct_types::Error.none { return 0, gerr; }
     let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != blot_direct_types::Error.none { return 0, aerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 21);
+    if aerr != squid_direct_types::Error.none { return 0, aerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 21);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -1810,9 +1810,9 @@ fn ensureSeqLeafUnrevSum(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, out);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // ---- Tree operations (SIMD-routed get, balanced RRB concat, split, CoW set) ----
@@ -1820,17 +1820,17 @@ fn ensureSeqLeafUnrevSum(g: Generator&, sp: const SeqPlan&) -> u32, Error {
 // Kind 8: seq_tree_get(edge, i) -> val...
 fn ensureSeqTreeGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let leaf_get_fn, lgerr = ensureSeqLeafGet(g, sp);
-    if lgerr != blot_direct_types::Error.none { return 0, lgerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 8);
+    if lgerr != squid_direct_types::Error.none { return 0, lgerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 8);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], lay));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -1872,9 +1872,9 @@ fn ensureSeqTreeGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_unreachable_);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 9: seq_tree_concat_inner(a_edge, b_edge, epoch) -> (r1, r2)
@@ -1882,22 +1882,22 @@ fn ensureSeqTreeGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
 // and compacting adjacent internal nodes cleanly.
 fn ensureSeqTreeConcatInner(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let rebuild_fn, rerr = ensureSeqRebuildPrefixes(g);
-    if rerr != blot_direct_types::Error.none { return 0, rerr; }
+    if rerr != squid_direct_types::Error.none { return 0, rerr; }
     let clone_node_fn, cnerr = ensureSeqNodeClone(g);
-    if cnerr != blot_direct_types::Error.none { return 0, cnerr; }
+    if cnerr != squid_direct_types::Error.none { return 0, cnerr; }
     let unrev_fn, uerr = ensureSeqNodeUnrev(g);
-    if uerr != blot_direct_types::Error.none { return 0, uerr; }
+    if uerr != squid_direct_types::Error.none { return 0, uerr; }
     let merge_leaf_fn, mlerr = ensureSeqLeafMerge(g, sp);
-    if mlerr != blot_direct_types::Error.none { return 0, mlerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 9);
+    if mlerr != squid_direct_types::Error.none { return 0, mlerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 9);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let rt = g.runtime_();
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let a = local(g, nf, VT_i32);
@@ -2103,25 +2103,25 @@ fn ensureSeqTreeConcatInner(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, n1); lget(g, n2);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 10: seq_tree_concat(a_edge, b_edge, epoch) -> merged_edge
 fn ensureSeqTreeConcat(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let inner_fn, ierr = ensureSeqTreeConcatInner(g, sp);
-    if ierr != blot_direct_types::Error.none { return 0, ierr; }
+    if ierr != squid_direct_types::Error.none { return 0, ierr; }
     let new2_fn, nerr = ensureSeqNodeNew2(g);
-    if nerr != blot_direct_types::Error.none { return 0, nerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 10);
+    if nerr != squid_direct_types::Error.none { return 0, nerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 10);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let a = local(g, nf, VT_i32);
@@ -2146,27 +2146,27 @@ fn ensureSeqTreeConcat(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, r1); lget(g, r2); lget(g, h); lget(g, epoch); callf(g, new2_fn);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 11: seq_tree_split(edge, k, epoch) -> (left_edge, right_edge)
 fn ensureSeqTreeSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let leaf_split_fn, lserr = ensureSeqLeafSplit(g, sp);
-    if lserr != blot_direct_types::Error.none { return 0, lserr; }
+    if lserr != squid_direct_types::Error.none { return 0, lserr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-    if cerr != blot_direct_types::Error.none { return 0, cerr; }
+    if cerr != squid_direct_types::Error.none { return 0, cerr; }
     let slice_fn, slerr = ensureSeqNodeSlice(g);
-    if slerr != blot_direct_types::Error.none { return 0, slerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 11);
+    if slerr != squid_direct_types::Error.none { return 0, slerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 11);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], [VT_i32, VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
@@ -2238,37 +2238,37 @@ fn ensureSeqTreeSplit(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, mid_r); lget(g, rsuf); lget(g, epoch); callf(g, concat_fn);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 12: seq_tree_set_fast(edge, i, val..., epoch) -> new_edge (0 if landed on generative/span leaf)
 fn ensureSeqTreeSetFast(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let clone_node_fn, cnerr = ensureSeqNodeClone(g);
-    if cnerr != blot_direct_types::Error.none { return 0, cnerr; }
+    if cnerr != squid_direct_types::Error.none { return 0, cnerr; }
     let leaf_set_fn, lserr = ensureSeqLeafSetCanon(g, sp);
-    if lserr != blot_direct_types::Error.none { return 0, lserr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 12);
+    if lserr != squid_direct_types::Error.none { return 0, lserr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 12);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32, VT_i32];
     for wt in lay { ptypes.push(wt); }
     ptypes.push(VT_i32);
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
     let idx = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -2322,43 +2322,43 @@ fn ensureSeqTreeSetFast(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, ptr); lget(g, rev); op(g, OP_i32_or);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 13: seq_tree_set(edge, i, val..., epoch) -> new_edge
 fn ensureSeqTreeSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let fast_fn, ferr = ensureSeqTreeSetFast(g, sp);
-    if ferr != blot_direct_types::Error.none { return 0, ferr; }
+    if ferr != squid_direct_types::Error.none { return 0, ferr; }
     let split_fn, serr = ensureSeqTreeSplit(g, sp);
-    if serr != blot_direct_types::Error.none { return 0, serr; }
+    if serr != squid_direct_types::Error.none { return 0, serr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-    if cerr != blot_direct_types::Error.none { return 0, cerr; }
+    if cerr != squid_direct_types::Error.none { return 0, cerr; }
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
-    if crerr != blot_direct_types::Error.none { return 0, crerr; }
+    if crerr != squid_direct_types::Error.none { return 0, crerr; }
     let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != blot_direct_types::Error.none { return 0, aerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 13);
+    if aerr != squid_direct_types::Error.none { return 0, aerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 13);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32, VT_i32];
     for wt in lay { ptypes.push(wt); }
     ptypes.push(VT_i32);
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let edge = local(g, nf, VT_i32);
     let idx = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -2383,9 +2383,9 @@ fn ensureSeqTreeSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, right); lget(g, epoch); callf(g, concat_fn);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // ---- Readable FocusGap helpers ----
@@ -2437,17 +2437,17 @@ fn emitSeqFocusMoveGap(g: Generator&, f: Fn&, sp: const SeqPlan&, focus: u32, ta
 // Kind 14: seq_focus_to_leaf(focus_ptr, epoch) -> leaf_ptr (0 if live_len == 0)
 fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let create_fn, crerr = ensureSeqLeafCreate(g, sp);
-    if crerr != blot_direct_types::Error.none { return 0, crerr; }
+    if crerr != squid_direct_types::Error.none { return 0, crerr; }
     let app_fn, aerr = ensureSeqLeafAppendOne(g, sp);
-    if aerr != blot_direct_types::Error.none { return 0, aerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 14);
+    if aerr != squid_direct_types::Error.none { return 0, aerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 14);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let focus = local(g, nf, VT_i32);
@@ -2496,8 +2496,8 @@ fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, i); lget(g, gs); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b1);
         let a1 = emitOffsetAddress(g, nf, dbase, i, sp.elem_bytes);
         let v1, err1 = loadElement(g, nf, a1, 0, sp.elem_ty, 0);
-        if err1 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if err1 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err1;
         }
@@ -2510,8 +2510,8 @@ fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, i); lget(g, cap); op(g, OP_i32_ge_u); br(g, nf, OP_br_if, b2);
         let a2 = emitOffsetAddress(g, nf, dbase, i, sp.elem_bytes);
         let v2, err2 = loadElement(g, nf, a2, 0, sp.elem_ty, 0);
-        if err2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if err2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err2;
         }
@@ -2523,27 +2523,27 @@ fn ensureSeqFocusToLeaf(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, out);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 15: seq_normalized_root(hdr_ptr, epoch) -> root_edge (with root_rev applied & focus merged; non-destructive!)
 fn ensureSeqNormalizedRoot(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let f2l_fn, ferr = ensureSeqFocusToLeaf(g, sp);
-    if ferr != blot_direct_types::Error.none { return 0, ferr; }
+    if ferr != squid_direct_types::Error.none { return 0, ferr; }
     let split_fn, serr = ensureSeqTreeSplit(g, sp);
-    if serr != blot_direct_types::Error.none { return 0, serr; }
+    if serr != squid_direct_types::Error.none { return 0, serr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-    if cerr != blot_direct_types::Error.none { return 0, cerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 15);
+    if cerr != squid_direct_types::Error.none { return 0, cerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 15);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], [VT_i32]));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let hdr = local(g, nf, VT_i32);
@@ -2591,27 +2591,27 @@ fn ensureSeqNormalizedRoot(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_select);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 16: seq_flush_focus(hdr_ptr, epoch) -> void (mutates hdr in base frame, keeping hdr.root_rev!)
 fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let f2l_fn, ferr = ensureSeqFocusToLeaf(g, sp);
-    if ferr != blot_direct_types::Error.none { return 0, ferr; }
+    if ferr != squid_direct_types::Error.none { return 0, ferr; }
     let split_fn, serr = ensureSeqTreeSplit(g, sp);
-    if serr != blot_direct_types::Error.none { return 0, serr; }
+    if serr != squid_direct_types::Error.none { return 0, serr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-    if cerr != blot_direct_types::Error.none { return 0, cerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 16);
+    if cerr != squid_direct_types::Error.none { return 0, cerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 16);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32], []));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let hdr = local(g, nf, VT_i32);
@@ -2651,9 +2651,9 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // ---- Header-level entry helpers: get, set, insert (push/push_front/insert), remove (pop/pop_front/remove) ----
@@ -2661,18 +2661,18 @@ fn ensureSeqFlushFocus(g: Generator&, sp: const SeqPlan&) -> u32, Error {
 // Kind 17: seq_hdr_get(slot, gen, idx) -> val...
 fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let tree_get_fn, tgerr = ensureSeqTreeGet(g, sp);
-    if tgerr != blot_direct_types::Error.none { return 0, tgerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 17);
+    if tgerr != squid_direct_types::Error.none { return 0, tgerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 17);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], lay));
     g.s.seq_helpers.put(key, fn_id);
     let rt = g.runtime_();
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
@@ -2692,7 +2692,7 @@ fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let k = local32(g, nf);
     let phys = local32(g, nf);
     lget(g, slot); lget(g, gen); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, hdr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hdr);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, idx); lget(g, total); op(g, OP_i32_ge_u); trap(g, nf);
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_REV); lset(g, rev);
@@ -2722,8 +2722,8 @@ fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
         let addr = emitOffsetAddress(g, nf, dbase, phys, sp.elem_bytes);
         let loaded, err2 = loadElement(g, nf, addr, 0, sp.elem_ty, 0);
-        if err2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if err2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, err2;
         }
@@ -2740,37 +2740,37 @@ fn ensureSeqHdrGet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, p); callf(g, tree_get_fn);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 18: seq_hdr_set(slot, gen, idx, val...) -> void
 fn ensureSeqHdrSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let wr_fn, werr = ensureSeqWritable(g);
-    if werr != blot_direct_types::Error.none { return 0, werr; }
+    if werr != squid_direct_types::Error.none { return 0, werr; }
     let tset_fn, tserr = ensureSeqTreeSet(g, sp);
-    if tserr != blot_direct_types::Error.none { return 0, tserr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 18);
+    if tserr != squid_direct_types::Error.none { return 0, tserr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 18);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32, VT_i32, VT_i32];
     for wt in lay { ptypes.push(wt); }
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], []));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
     let gen = local(g, nf, VT_i32);
     let idx = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -2827,8 +2827,8 @@ fn ensureSeqHdrSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
         let addr = emitOffsetAddress(g, nf, dbase, phys, sp.elem_bytes);
         let werr2 = writeElement(g, nf, addr, 0, val, 0);
-        if werr2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if werr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, werr2;
         }
@@ -2845,37 +2845,37 @@ fn ensureSeqHdrSet(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_ROOT);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 19: seq_hdr_insert(slot, gen, idx, val...) -> void (unified O(1)-focus push / push_front / insert!)
 fn ensureSeqHdrInsert(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let wr_fn, werr = ensureSeqWritable(g);
-    if werr != blot_direct_types::Error.none { return 0, werr; }
+    if werr != squid_direct_types::Error.none { return 0, werr; }
     let flush_fn, ferr = ensureSeqFlushFocus(g, sp);
-    if ferr != blot_direct_types::Error.none { return 0, ferr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 19);
+    if ferr != squid_direct_types::Error.none { return 0, ferr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 19);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     var ptypes: ValType[>..] = [VT_i32, VT_i32, VT_i32];
     for wt in lay { ptypes.push(wt); }
     let fn_id = g.module.addFunction(g.module.signature(ptypes[..], []));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
     let gen = local(g, nf, VT_i32);
     let idx = local(g, nf, VT_i32);
     let val, verr = seqValFromParams(g, nf, sp.elem_ty, 0);
-    if verr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if verr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, verr;
     }
@@ -2969,8 +2969,8 @@ fn ensureSeqHdrInsert(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
         let addr = emitOffsetAddress(g, nf, dbase, gs, sp.elem_bytes);
         let werr2 = writeElement(g, nf, addr, 0, val, 0);
-        if werr2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if werr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, werr2;
         }
@@ -2979,32 +2979,32 @@ fn ensureSeqHdrInsert(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GSTART);
     lget(g, total); i32Const(g, 1); op(g, OP_i32_add); lset(g, ntotal);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Kind 20: seq_hdr_remove(slot, gen, idx) -> val... (unified O(1)-focus/shadow pop / pop_front / remove!)
 fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let wr_fn, werr = ensureSeqWritable(g);
-    if werr != blot_direct_types::Error.none { return 0, werr; }
+    if werr != squid_direct_types::Error.none { return 0, werr; }
     let flush_fn, ferr = ensureSeqFlushFocus(g, sp);
-    if ferr != blot_direct_types::Error.none { return 0, ferr; }
+    if ferr != squid_direct_types::Error.none { return 0, ferr; }
     let tget_fn, tgerr = ensureSeqTreeGet(g, sp);
-    if tgerr != blot_direct_types::Error.none { return 0, tgerr; }
-    let key = blot_direct_emit::key64(sp.elem_ty, 20);
+    if tgerr != squid_direct_types::Error.none { return 0, tgerr; }
+    let key = squid_direct_emit::key64(sp.elem_ty, 20);
     let existing, found = g.s.seq_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let lay, lerr = g.types.layout(sp.elem_ty);
-    if lerr != blot_direct_types::Error.none { return 0, lerr; }
+    if lerr != squid_direct_types::Error.none { return 0, lerr; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32, VT_i32, VT_i32], lay));
     g.s.seq_helpers.put(key, fn_id);
     let s .= g.s;
-    let code_mark = s.code.len; let sites_mark = blot_direct_relocations::mark();
+    let code_mark = s.code.len; let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len; let labels_mark = s.labels.len; let handles_mark = s.handles.len; let handle_cells_mark = s.handle_cells_len;
     var nf = newFn(g, 1, 0);
     let slot = local(g, nf, VT_i32);
@@ -3028,8 +3028,8 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     let root = local32(g, nf);
     let tlen = local32(g, nf);
     let res_val, rverr = fresh(g, nf, sp.elem_ty, 0);
-    if rverr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if rverr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, rverr;
     }
@@ -3073,8 +3073,8 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
         lget(g, foc); i32Const(g, SEQ_FOC_DATA); op(g, OP_i32_add); lset(g, dbase);
         let addr = emitOffsetAddress(g, nf, dbase, ge, sp.elem_bytes);
         let loaded, lerr2 = loadElement(g, nf, addr, 0, sp.elem_ty, 0);
-        if lerr2 != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if lerr2 != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, lerr2;
         }
@@ -3082,7 +3082,7 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     }
     lget(g, foc); lget(g, ge); i32Const(g, 1); op(g, OP_i32_add); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_FOC_GEND);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     seqPushVal(g, res_val); op(g, OP_return_);
     close(g, nf);
 
@@ -3093,15 +3093,15 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); lset(g, root);
     lget(g, root); lget(g, fstart); lget(g, fold); op(g, OP_i32_add); callf(g, tget_fn);
     let loaded_f, lferr = pop(g, nf, sp.elem_ty, 0);
-    if lferr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if lferr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, lferr;
     }
     let _ = copy(g, nf, loaded_f, res_val, 0);
     lget(g, hdr); lget(g, fold); i32Const(g, 1); op(g, OP_i32_add); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     seqPushVal(g, res_val); op(g, OP_return_);
     close(g, nf);
 
@@ -3112,8 +3112,8 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); lset(g, root);
     lget(g, root); lget(g, p); callf(g, tget_fn);
     let loaded_b, lberr = pop(g, nf, sp.elem_ty, 0);
-    if lberr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if lberr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, lberr;
     }
@@ -3121,7 +3121,7 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); lget(g, p); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FSTART);
     lget(g, hdr); lget(g, fold); i32Const(g, 1); op(g, OP_i32_add); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     seqPushVal(g, res_val); op(g, OP_return_);
     close(g, nf);
 
@@ -3133,8 +3133,8 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_ROOT); lset(g, root);
     lget(g, root); lget(g, p); callf(g, tget_fn);
     let loaded_t, lterr = pop(g, nf, sp.elem_ty, 0);
-    if lterr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if lterr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, lterr;
     }
@@ -3157,22 +3157,22 @@ fn ensureSeqHdrRemove(g: Generator&, sp: const SeqPlan&) -> u32, Error {
     lget(g, hdr); i32Const(g, 1); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
     close(g, nf);
     lget(g, hdr); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    lget(g, entry); lget(g, ntotal); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     seqPushVal(g, res_val);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // ---- Public emitters called by storageOp / data / calls / control ----
 
 fn emitSeqEmpty(g: Generator&, f: Fn&, ty: Ty, id: u32) -> Val, Error {
     let ep_fn, eerr = ensureSeqNextEpoch(g);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     i32Const(g, 0);
     i32Const(g, 0);
@@ -3184,18 +3184,18 @@ fn emitSeqEmpty(g: Generator&, f: Fn&, ty: Ty, id: u32) -> Val, Error {
 
 fn emitSeqFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Val, Error {
     let handle, herr = emitSeqEmpty(g, f, ty, id);
-    if herr != blot_direct_types::Error.none { return handle, herr; }
-    if values.len == 0 { return handle, blot_direct_types::Error.none; }
+    if herr != squid_direct_types::Error.none { return handle, herr; }
+    if values.len == 0 { return handle, squid_direct_types::Error.none; }
     let elem_ty, eerr = elementOf(g, f, ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ins_fn, ierr = ensureSeqHdrInsert(g, sp);
-    if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
     for idx in 0..(values.len as i64) {
         let v = g.s.vals[values.start + idx];
         let noted = noteStoreToSlot(g, f, w(g, handle, 0), v);
-        if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+        if noted != squid_direct_types::Error.none { return neverVal(), noted; }
         lget(g, w(g, handle, 0));
         lget(g, w(g, handle, 1));
         i32Const(g, idx as u32);
@@ -3203,16 +3203,16 @@ fn emitSeqFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Va
         callf(g, ins_fn);
     }
     invalidateCheckedOwner(g, f, handle);
-    return handle, blot_direct_types::Error.none;
+    return handle, squid_direct_types::Error.none;
 }
 
 fn emitSeqReadVal(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, container.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let get_fn, gerr = ensureSeqHdrGet(g, sp);
-    if gerr != blot_direct_types::Error.none { return neverVal(), gerr; }
+    if gerr != squid_direct_types::Error.none { return neverVal(), gerr; }
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
     lget(g, index);
@@ -3222,13 +3222,13 @@ fn emitSeqReadVal(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) ->
 
 fn emitSeqSetVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Val, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, container.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let set_fn, serr = ensureSeqHdrSet(g, sp);
-    if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+    if serr != squid_direct_types::Error.none { return neverVal(), serr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
-    if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
     noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
@@ -3236,7 +3236,7 @@ fn emitSeqSetVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Val, 
     seqPushVal(g, value);
     callf(g, set_fn);
     invalidateCheckedContainers(f);
-    return container, blot_direct_types::Error.none;
+    return container, squid_direct_types::Error.none;
 }
 
 recursive fn emitSeqIndexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i64) -> Val, Error {
@@ -3244,33 +3244,33 @@ recursive fn emitSeqIndexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val
     let info = m.updateInfo(id);
     let selectors = m.updateSelectors(id);
     let pos_val, perr = expr(g, f, selectors[at].index);
-    if perr != blot_direct_types::Error.none { return pos_val, perr; }
+    if perr != squid_direct_types::Error.none { return pos_val, perr; }
     let index, ierr = scalarLocal(g, f, pos_val, id);
-    if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-    if at + 1 < selectors.len && selectors[at + 1].kind == blot_check_core::UpdateKind.index {
+    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+    if at + 1 < selectors.len && selectors[at + 1].kind == squid_check_core::UpdateKind.index {
         let inner, rerr = emitSeqReadVal(g, f, container, index, id);
-        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
         let _, uerr = indexedUpdate(g, f, id, inner, at + 1);
-        if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
-        return container, blot_direct_types::Error.none;
+        if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
+        return container, squid_direct_types::Error.none;
     }
     var replacement = neverVal();
     if at + 1 == selectors.len {
         if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
             let old, rerr = emitSeqReadVal(g, f, container, index, id);
-            if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+            if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
             bindPut(g, f, info.self_binding, old);
         }
         let val, verr = stmt(g, f, info.value);
-        if verr != blot_direct_types::Error.none { return val, verr; }
-        if val.ty == blot_direct_types::never { return val, blot_direct_types::Error.none; }
+        if verr != squid_direct_types::Error.none { return val, verr; }
+        if val.ty == squid_direct_types::never { return val, squid_direct_types::Error.none; }
         replacement = val;
     } else {
         let old, rerr = emitSeqReadVal(g, f, container, index, id);
-        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
         let updated, uerr = updateAt(g, f, id, old, at + 1);
-        if uerr != blot_direct_types::Error.none { return updated, uerr; }
-        if updated.ty == blot_direct_types::never { return updated, blot_direct_types::Error.none; }
+        if uerr != squid_direct_types::Error.none { return updated, uerr; }
+        if updated.ty == squid_direct_types::never { return updated, squid_direct_types::Error.none; }
         replacement = updated;
     }
     return emitSeqSetVal(g, f, container, index, replacement, id);
@@ -3278,7 +3278,7 @@ recursive fn emitSeqIndexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val
 
 fn emitSeqPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, selective: bool = false) -> Val, Error {
     let len, lerr = lengthOf(g, f, container, id);
-    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+    if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
     return emitSeqInsertVal(g, f, container, len, value, id, selective);
 }
 
@@ -3289,13 +3289,13 @@ fn emitSeqPushFrontVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u3
 
 fn emitSeqInsertVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Val, id: u32, selective: bool = false) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, container.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ins_fn, ierr = ensureSeqHdrInsert(g, sp);
-    if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+    if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
-    if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
     noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
@@ -3303,12 +3303,12 @@ fn emitSeqInsertVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Va
     seqPushVal(g, value);
     callf(g, ins_fn);
     if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
-    return container, blot_direct_types::Error.none;
+    return container, squid_direct_types::Error.none;
 }
 
 fn emitSeqPopVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, selective: bool = false) -> Val, Error {
     let len, lerr = lengthOf(g, f, container, id);
-    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+    if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
     lget(g, len); op(g, OP_i32_eqz); trap(g, f);
     let last = local32(g, f);
     lget(g, len); i32Const(g, 1); op(g, OP_i32_sub); lset(g, last);
@@ -3322,26 +3322,26 @@ fn emitSeqPopFrontVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, se
 
 fn emitSeqRemoveVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id: u32, selective: bool = false) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, container.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let rem_fn, rerr = ensureSeqHdrRemove(g, sp);
-    if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+    if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
     noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
     lget(g, index);
     callf(g, rem_fn);
     let val, perr = pop(g, f, ty, id);
-    if perr != blot_direct_types::Error.none { return val, perr; }
+    if perr != squid_direct_types::Error.none { return val, perr; }
     if selective { invalidateCheckedOwner(g, f, container); } else { invalidateCheckedContainers(f); }
-    return val, blot_direct_types::Error.none;
+    return val, squid_direct_types::Error.none;
 }
 
 // O(1) persistent copy (48 bytes, zero focus flush!)
 fn emitSeqCopyVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> Val, Error {
     let clone_fn, cerr = ensureSeqHdrCloneShared(g);
-    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+    if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
     noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
@@ -3353,7 +3353,7 @@ fn emitSeqCopyVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> Val
 // O(1) persistent reverse (48 bytes, zero focus flush, flips root_rev ^= 1!)
 fn emitSeqReverseVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> Val, Error {
     let clone_fn, cerr = ensureSeqHdrCloneShared(g);
-    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+    if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
     noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
@@ -3365,17 +3365,17 @@ fn emitSeqReverseVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32) -> 
 // O(log_16 m) split (O(1) on LEAF_SPAN / LEAF_REPEAT / LEAF_RAMP!) -> (~[T], ~[T])
 fn emitSeqSplitVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, container.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
-    if nerr != blot_direct_types::Error.none { return neverVal(), nerr; }
+    if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
     let split_fn, serr = ensureSeqTreeSplit(g, sp);
-    if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+    if serr != squid_direct_types::Error.none { return neverVal(), serr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let rt = g.runtime_();
     let src_hdr = local32(g, f);
@@ -3387,7 +3387,7 @@ fn emitSeqSplitVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id
     let l_len = local32(g, f);
     let r_len = local32(g, f);
     lget(g, w(g, container, 0)); lget(g, w(g, container, 1)); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, src_hdr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, src_hdr);
     lget(g, src_hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, index); lget(g, total); op(g, OP_i32_gt_u); trap(g, f);
     // Mark source shared (unlogged)
@@ -3401,33 +3401,33 @@ fn emitSeqSplitVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, id
     let seq_ty = g.types.words[g.types.node(ty).a];
     lget(g, l_edge); lget(g, l_len); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let left_val, lv_err = pop(g, f, seq_ty, id);
-    if lv_err != blot_direct_types::Error.none { return neverVal(), lv_err; }
+    if lv_err != squid_direct_types::Error.none { return neverVal(), lv_err; }
     lget(g, r_edge); lget(g, r_len); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let right_val, rv_err = pop(g, f, seq_ty, id);
-    if rv_err != blot_direct_types::Error.none { return neverVal(), rv_err; }
+    if rv_err != squid_direct_types::Error.none { return neverVal(), rv_err; }
     let s .= g.s;
     let start = s.words.len as u32;
     s.words.push(w(g, left_val, 0));
     s.words.push(w(g, left_val, 1));
     s.words.push(w(g, right_val, 0));
     s.words.push(w(g, right_val, 1));
-    return Val { ty, start, 4 }, blot_direct_types::Error.none;
+    return Val { ty, start, 4 }, squid_direct_types::Error.none;
 }
 
 // O(log_16 m) non-destructive persistent concat!
 fn emitSeqConcatVal(g: Generator&, f: Fn&, left: Val, right: Val, ty: Ty, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
-    if nerr != blot_direct_types::Error.none { return neverVal(), nerr; }
+    if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
     let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+    if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let rt = g.runtime_();
     let ha = local32(g, f); let hb = local32(g, f);
@@ -3437,9 +3437,9 @@ fn emitSeqConcatVal(g: Generator&, f: Fn&, left: Val, right: Val, ty: Ty, id: u3
     let ra = local32(g, f); let rb = local32(g, f);
     let merged = local32(g, f);
     lget(g, w(g, left, 0)); lget(g, w(g, left, 1)); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, ha);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, ha);
     lget(g, w(g, right, 0)); lget(g, w(g, right, 1)); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, hb);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, hb);
     lget(g, ha); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, la);
     lget(g, hb); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, lb);
     lget(g, la); lget(g, lb); op(g, OP_i32_add); ltee(g, tot);
@@ -3457,17 +3457,17 @@ fn emitSeqConcatVal(g: Generator&, f: Fn&, left: Val, right: Val, ty: Ty, id: u3
 // O(log_16 m) non-destructive persistent slice (O(1) on SPAN / REPEAT / RAMP!)
 fn emitSeqSliceVal(g: Generator&, f: Fn&, container: Val, start_idx: u32, end_idx: u32, ty: Ty, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
-    if nerr != blot_direct_types::Error.none { return neverVal(), nerr; }
+    if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
     let split_fn, serr = ensureSeqTreeSplit(g, sp);
-    if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+    if serr != squid_direct_types::Error.none { return neverVal(), serr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let rt = g.runtime_();
     let src_hdr = local32(g, f);
@@ -3478,7 +3478,7 @@ fn emitSeqSliceVal(g: Generator&, f: Fn&, container: Val, start_idx: u32, end_id
     let mid = local32(g, f);
     let slen = local32(g, f);
     lget(g, w(g, container, 0)); lget(g, w(g, container, 1)); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, src_hdr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, src_hdr);
     lget(g, src_hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, total);
     lget(g, start_idx); lget(g, end_idx); op(g, OP_i32_gt_u);
     lget(g, end_idx); lget(g, total); op(g, OP_i32_gt_u);
@@ -3499,13 +3499,13 @@ fn emitSeqSliceVal(g: Generator&, f: Fn&, container: Val, start_idx: u32, end_id
 // O(1) generative repeat: 16 + elem_bytes for ANY count!
 fn emitSeqRepeatVal(g: Generator&, f: Fn&, count: u32, val: Val, ty: Ty, id: u32) -> Val, Error {
     let elem_ty, eerr = elementOf(g, f, ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+    if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let leaf = local32(g, f);
     i32Const(g, 0); lset(g, leaf);
@@ -3518,23 +3518,23 @@ fn emitSeqRepeatVal(g: Generator&, f: Fn&, count: u32, val: Val, ty: Ty, id: u32
     lget(g, leaf); lget(g, count); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_LEAF_LEN);
     if sp.elem_bytes != 0 {
         let werr = writeElement(g, f, leaf, SEQ_LEAF_DATA, val, id);
-        if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+        if werr != squid_direct_types::Error.none { return neverVal(), werr; }
     }
     close(g, f);
     lget(g, leaf); lget(g, count); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let handle, perr = pop(g, f, ty, id);
-    if perr != blot_direct_types::Error.none { return handle, perr; }
+    if perr != squid_direct_types::Error.none { return handle, perr; }
     let noted = noteStoreToSlot(g, f, w(g, handle, 0), val);
-    if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-    return handle, blot_direct_types::Error.none;
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+    return handle, squid_direct_types::Error.none;
 }
 
 // O(1) generative ramp: 32 bytes for 1,000,000 U32s!
 fn emitSeqRampVal(g: Generator&, f: Fn&, start_v: u32, step_v: u32, count: u32, ty: Ty, id: u32) -> Val, Error {
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let leaf = local32(g, f);
     i32Const(g, 0); lset(g, leaf);
@@ -3554,9 +3554,9 @@ fn emitSeqRampVal(g: Generator&, f: Fn&, start_v: u32, step_v: u32, count: u32, 
 // O(1) zero-copy span wrapping an immutable frozen `*#[T]` backing array!
 fn emitSeqFromFrozenVal(g: Generator&, f: Fn&, arr: Val, ty: Ty, id: u32) -> Val, Error {
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return neverVal(), eperr; }
+    if eperr != squid_direct_types::Error.none { return neverVal(), eperr; }
     let open_fn, oerr = ensureSeqHdrOpen(g);
-    if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+    if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
     noteAllocation(f);
     let base, len = ensureCheckedArray(g, f, arr);
     let leaf = local32(g, f);
@@ -3573,30 +3573,30 @@ fn emitSeqFromFrozenVal(g: Generator&, f: Fn&, arr: Val, ty: Ty, id: u32) -> Val
     close(g, f);
     lget(g, leaf); lget(g, len); i32Const(g, 0); callf(g, ep_fn); callf(g, open_fn);
     let handle, perr = pop(g, f, ty, id);
-    if perr != blot_direct_types::Error.none { return handle, perr; }
+    if perr != squid_direct_types::Error.none { return handle, perr; }
     let noted = noteStoreToSlot(g, f, w(g, handle, 0), arr);
-    if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-    return handle, blot_direct_types::Error.none;
+    if noted != squid_direct_types::Error.none { return neverVal(), noted; }
+    return handle, squid_direct_types::Error.none;
 }
 
 // Handles `extend` whenever `dst` OR `src` is `Tag.seq`.
 fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id: u32, selective: bool = false) -> Val, Error {
-    let dst_is_seq = tagOf(g, dst.ty) == blot_direct_types::Tag.seq;
-    let src_is_seq = tagOf(g, src.ty) == blot_direct_types::Tag.seq;
+    let dst_is_seq = tagOf(g, dst.ty) == squid_direct_types::Tag.seq;
+    let src_is_seq = tagOf(g, src.ty) == squid_direct_types::Tag.seq;
     let elem_ty, eerr = elementOf(g, f, dst.ty, id);
-    if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+    if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
     let holds = holdsContainer(g, elem_ty, 0);
 
     // Fast O(log_16 m) in-place tree concat when BOTH dst and src are `~[T]` and !holds!
     if dst_is_seq && src_is_seq && !holds {
         let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-        if sperr != blot_direct_types::Error.none { return neverVal(), sperr; }
+        if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
         let wr_fn, werr = ensureSeqWritable(g);
-        if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+        if werr != squid_direct_types::Error.none { return neverVal(), werr; }
         let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
-        if nerr != blot_direct_types::Error.none { return neverVal(), nerr; }
+        if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
         let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
-        if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+        if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
         noteAllocation(f);
         let rt = g.runtime_();
         let entry = local32(g, f);
@@ -3611,7 +3611,7 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         lget(g, w(g, dst, 0)); lget(g, w(g, dst, 1)); callf(g, wr_fn);
         lset(g, epoch); lset(g, dhdr); lset(g, entry);
         lget(g, w(g, src, 0)); lget(g, w(g, src, 1)); callf(g, rt.check);
-        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, shdr);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, shdr);
         lget(g, shdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); ltee(g, slen);
         let nz = open(g, f, OP_if_);
         lget(g, dhdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, dlen);
@@ -3627,56 +3627,56 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FSTART);
         lget(g, dhdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_FOLDLEN);
         lget(g, dhdr); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
-        lget(g, entry); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+        lget(g, entry); lget(g, nlen); op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
         close(g, f);
         if selective { invalidateCheckedOwner(g, f, dst); } else { invalidateCheckedContainers(f); }
-        return dst, blot_direct_types::Error.none;
+        return dst, squid_direct_types::Error.none;
     }
 
     // General loop: src is packed (use packed cursors) or array/view/seq -> push into dst!
     let src_len, slerr = lengthOf(g, f, src, id);
-    if slerr != blot_direct_types::Error.none { return neverVal(), slerr; }
+    if slerr != squid_direct_types::Error.none { return neverVal(), slerr; }
     // Pre-reserve if dst is array or packed
-    if !dst_is_seq && tagOf(g, dst.ty) == blot_direct_types::Tag.array {
+    if !dst_is_seq && tagOf(g, dst.ty) == squid_direct_types::Tag.array {
         let step, sterr = stride(g, f, elem_ty, id);
-        if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+        if sterr != squid_direct_types::Error.none { return neverVal(), sterr; }
         let dlen, dlerr = lengthOf(g, f, dst, id);
-        if dlerr != blot_direct_types::Error.none { return neverVal(), dlerr; }
+        if dlerr != squid_direct_types::Error.none { return neverVal(), dlerr; }
         let need = local32(g, f);
         lget(g, dlen); lget(g, src_len); op(g, OP_i32_add); ltee(g, need);
         lget(g, dlen); op(g, OP_i32_lt_u); trap(g, f);
         lget(g, w(g, dst, 0)); lget(g, w(g, dst, 1)); lget(g, need); i32Const(g, step);
         callf(g, g.runtime_().reserve);
         invalidateCheckedOwner(g, f, dst);
-    } else if tagOf(g, dst.ty) == blot_direct_types::Tag.packed {
+    } else if tagOf(g, dst.ty) == squid_direct_types::Tag.packed {
         let _, rerr = emitPackedReserve(g, f, dst, src_len, id, selective);
-        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
     }
 
-    if tagOf(g, src.ty) == blot_direct_types::Tag.packed {
+    if tagOf(g, src.ty) == squid_direct_types::Tag.packed {
         let plan, perr = computePackedPlan(g, f, elem_ty, id);
-        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        if perr != squid_direct_types::Error.none { return neverVal(), perr; }
         if plan.mode == PACKED_FLAT {
             let step, sterr = stride(g, f, elem_ty, id);
-            if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+            if sterr != squid_direct_types::Error.none { return neverVal(), sterr; }
             let src_base, _ = ensureCheckedArray(g, f, src);
             let idx = constLocal(g, f, 0);
             let exit = open(g, f, OP_block); let top = open(g, f, OP_loop);
             lget(g, idx); lget(g, src_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
             let saddr = emitOffsetAddress(g, f, src_base, idx, step);
             var elem_val, lerr = loadElement(g, f, saddr, 0, elem_ty, id);
-            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+            if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
             if holds {
                 let cp, cerr = deepCopyValue(g, f, elem_val, elem_ty, id, 0);
-                if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+                if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
                 elem_val = cp;
             }
             let _, perr2 = emitStoragePushVal(g, f, dst, elem_val, id, selective);
-            if perr2 != blot_direct_types::Error.none { return neverVal(), perr2; }
+            if perr2 != squid_direct_types::Error.none { return neverVal(), perr2; }
             lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
             br(g, f, OP_br, top);
             close(g, f); close(g, f);
-            return dst, blot_direct_types::Error.none;
+            return dst, squid_direct_types::Error.none;
         }
         // Multi-stream packed src -> decode step into dst
         let sbase, _ = ensureCheckedArray(g, f, src);
@@ -3692,18 +3692,18 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         let exit = open(g, f, OP_block); let top = open(g, f, OP_loop);
         lget(g, idx); lget(g, src_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
         var elem_val, derr = emitPackedDecodeStep(g, f, plan, cur_ptrs[..], tags_base, idx, id);
-        if derr != blot_direct_types::Error.none { return neverVal(), derr; }
+        if derr != squid_direct_types::Error.none { return neverVal(), derr; }
         if holds {
             let cp, cerr = deepCopyValue(g, f, elem_val, elem_ty, id, 0);
-            if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+            if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
             elem_val = cp;
         }
         let _, perr2 = emitStoragePushVal(g, f, dst, elem_val, id, selective);
-        if perr2 != blot_direct_types::Error.none { return neverVal(), perr2; }
+        if perr2 != squid_direct_types::Error.none { return neverVal(), perr2; }
         lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
         br(g, f, OP_br, top);
         close(g, f); close(g, f);
-        return dst, blot_direct_types::Error.none;
+        return dst, squid_direct_types::Error.none;
     }
 
     // src is array / view / seq -> push each element into dst
@@ -3711,34 +3711,34 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
     let exit = open(g, f, OP_block); let top = open(g, f, OP_loop);
     lget(g, idx); lget(g, src_len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
     var elem_val, rerr = readElement(g, f, src, idx, id, src_core_ty, false);
-    if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+    if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
     if holds {
         let cp, cerr = deepCopyValue(g, f, elem_val, elem_ty, id, 0);
-        if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+        if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
         elem_val = cp;
     }
     let _, perr2 = emitStoragePushVal(g, f, dst, elem_val, id, selective);
-    if perr2 != blot_direct_types::Error.none { return neverVal(), perr2; }
+    if perr2 != squid_direct_types::Error.none { return neverVal(), perr2; }
     lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
     br(g, f, OP_br, top);
     close(g, f); close(g, f);
-    if selective && !dst_is_seq && tagOf(g, dst.ty) == blot_direct_types::Tag.array {
+    if selective && !dst_is_seq && tagOf(g, dst.ty) == squid_direct_types::Tag.array {
         invalidateCheckedOwner(g, f, dst);
     } else {
         invalidateCheckedContainers(f);
     }
-    return dst, blot_direct_types::Error.none;
+    return dst, squid_direct_types::Error.none;
 }
 
 // ---- Module `const ~[T]` persistence (allocates into rt.alloc_persistent + rt.open_persistent) ----
 
 fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id: u32, depth: i64) -> u32, u32, Error {
     let elem_ty, eerr = elementOf(g, f, ty, id);
-    if eerr != blot_direct_types::Error.none { return 0, 0, eerr; }
+    if eerr != squid_direct_types::Error.none { return 0, 0, eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return 0, 0, sperr; }
+    if sperr != squid_direct_types::Error.none { return 0, 0, sperr; }
     let get_fn, gerr = ensureSeqHdrGet(g, sp);
-    if gerr != blot_direct_types::Error.none { return 0, 0, gerr; }
+    if gerr != squid_direct_types::Error.none { return 0, 0, gerr; }
     let rt = g.runtime_();
     let src_hdr = local32(g, f);
     let len = local32(g, f);
@@ -3747,7 +3747,7 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     let p_gen = local32(g, f);
     let p_leaf = local32(g, f);
     lget(g, src_slot); lget(g, src_gen); callf(g, rt.check);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base); lset(g, src_hdr);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base); lset(g, src_hdr);
     lget(g, src_hdr); op(g, OP_i32_load); uleb(g, 2); uleb(g, SEQ_HDR_LEN); lset(g, len);
     // Materialize a clean persistent LEAF_SPAN backed by persistent flat array of elements!
     // (100% persistent, zero slab pointers, O(1) slice/reverse/index, supports nested elem persistence!)
@@ -3757,7 +3757,7 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     lget(g, len);
     let nz = open(g, f, OP_if_);
     let elem_step, sterr = stride(g, f, elem_ty, id);
-    if sterr != blot_direct_types::Error.none { return 0, 0, sterr; }
+    if sterr != squid_direct_types::Error.none { return 0, 0, sterr; }
     let dbytes = emitScaledBytes(g, f, len, elem_step);
     let p_data = local32(g, f);
     lget(g, dbytes); callf(g, rt.alloc_persistent); lset(g, p_data);
@@ -3766,15 +3766,15 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     lget(g, idx); lget(g, len); op(g, OP_i32_ge_u); br(g, f, OP_br_if, exit);
     lget(g, src_slot); lget(g, src_gen); lget(g, idx); callf(g, get_fn);
     let ev, perr = pop(g, f, elem_ty, id);
-    if perr != blot_direct_types::Error.none { return 0, 0, perr; }
+    if perr != squid_direct_types::Error.none { return 0, 0, perr; }
     let dst_addr = emitOffsetAddress(g, f, p_data, idx, elem_step);
     let werr = writeElement(g, f, dst_addr, 0, ev, id);
-    if werr != blot_direct_types::Error.none { return 0, 0, werr; }
+    if werr != squid_direct_types::Error.none { return 0, 0, werr; }
     let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
-    if eherr != blot_direct_types::Error.none { return 0, 0, eherr; }
+    if eherr != squid_direct_types::Error.none { return 0, 0, eherr; }
     if elem_holds {
         let pf_err = persistFlatAt(g, f, dst_addr, 0, elem_ty, id, depth + 1);
-        if pf_err != blot_direct_types::Error.none { return 0, 0, pf_err; }
+        if pf_err != squid_direct_types::Error.none { return 0, 0, pf_err; }
     }
     lget(g, idx); i32Const(g, 1); op(g, OP_i32_add); lset(g, idx);
     br(g, f, OP_br, top);
@@ -3791,15 +3791,15 @@ fn emitSeqPersist(g: Generator&, f: Fn&, src_slot: u32, src_gen: u32, ty: Ty, id
     lget(g, p_hdr); lget(g, len); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_LEN);
     lget(g, p_hdr); i32Const(g, 0); op(g, OP_i32_store); uleb(g, 2); uleb(g, SEQ_HDR_EPOCH);
     // Open persistent owner with static_pool_flag | live_flag
-    lget(g, p_hdr); lget(g, len); i32Const(g, SEQ_HDR_BYTES | blot_direct_runtime::static_pool_flag);
+    lget(g, p_hdr); lget(g, len); i32Const(g, SEQ_HDR_BYTES | squid_direct_runtime::static_pool_flag);
     callf(g, rt.open_persistent);
     lset(g, p_gen); lset(g, p_slot);
     // Mark static_pool_flag explicitly on the opened entry
     let p_entry = local32(g, f);
     lget(g, p_slot); lget(g, p_gen); callf(g, rt.check); ltee(g, p_entry);
-    i32Const(g, SEQ_HDR_BYTES | blot_direct_runtime::static_pool_flag | blot_direct_runtime::live_flag);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-    return p_slot, p_gen, blot_direct_types::Error.none;
+    i32Const(g, SEQ_HDR_BYTES | squid_direct_runtime::static_pool_flag | squid_direct_runtime::live_flag);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+    return p_slot, p_gen, squid_direct_types::Error.none;
 }
 
 // ---- Fast Leaf-Streaming `for x in seq:` emitter (Flat / Span / Repeat / Ramp / SoA / Fused Split-Sum!) ----
@@ -3808,7 +3808,7 @@ recursive fn emitSeqLoopCore(
     g: Generator&,
     f: Fn&,
     id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     outgoing: Vals,
     slots: Words,
@@ -3819,17 +3819,17 @@ recursive fn emitSeqLoopCore(
     let m .= g.units[f.unit - 1];
     let carries = m.loopCarries(id);
     let elem_ty, eerr = elementOf(g, f, source.ty, id);
-    if eerr != blot_direct_types::Error.none { return eerr; }
+    if eerr != squid_direct_types::Error.none { return eerr; }
     let sp, sperr = computeSeqPlan(g, f, elem_ty, id);
-    if sperr != blot_direct_types::Error.none { return sperr; }
+    if sperr != squid_direct_types::Error.none { return sperr; }
     let ep_fn, eperr = ensureSeqNextEpoch(g);
-    if eperr != blot_direct_types::Error.none { return eperr; }
+    if eperr != squid_direct_types::Error.none { return eperr; }
     let norm_fn, nerr = ensureSeqNormalizedRoot(g, sp);
-    if nerr != blot_direct_types::Error.none { return nerr; }
+    if nerr != squid_direct_types::Error.none { return nerr; }
     let next_leaf_fn, nlerr = ensureSeqIterNextLeaf(g);
-    if nlerr != blot_direct_types::Error.none { return nlerr; }
+    if nlerr != squid_direct_types::Error.none { return nlerr; }
     let leaf_get_fn, lgerr = ensureSeqLeafGet(g, sp);
-    if lgerr != blot_direct_types::Error.none { return lgerr; }
+    if lgerr != squid_direct_types::Error.none { return lgerr; }
 
     // Detect touched-column SoA / fused split-sum opportunities (reusing packed analyzers!).
     var soa_virtual = false;
@@ -3843,7 +3843,7 @@ recursive fn emitSeqLoopCore(
 
     if sp.leaf_kind == SEQ_KIND_PACKED_SOA && info.pattern != 0 {
         let pnode = m.pattern(info.pattern);
-        if pnode.tag == blot_check_core::PatternTag.bind && sp.packed.soa_is_record && soa_loop_depth < 8 {
+        if pnode.tag == squid_check_core::PatternTag.bind && sp.packed.soa_is_record && soa_loop_depth < 8 {
             var budget: i64 = 1024;
             var uf: u32 = 0;
             if analyzeSoaBodyUses(g, m, info.body, pnode.a, sp.packed, uf, budget) {
@@ -3854,12 +3854,12 @@ recursive fn emitSeqLoopCore(
         } else if matchSoaDestructurePattern(g, m, info.pattern, sp.packed, soa_field_pats, soa_used_fields) {
             soa_destruct = true;
         }
-    } else if sp.leaf_kind == SEQ_KIND_PACKED_SUM && info.pattern != 0 && m.pattern(info.pattern).tag == blot_check_core::PatternTag.bind && split_sum_depth < 4 && sp.packed.variant_count <= 64 {
+    } else if sp.leaf_kind == SEQ_KIND_PACKED_SUM && info.pattern != 0 && m.pattern(info.pattern).tag == squid_check_core::PatternTag.bind && split_sum_depth < 4 && sp.packed.variant_count <= 64 {
         let ev_b = m.pattern(info.pattern).a;
         let match_root = unwrapSingleMatchNode(m, info.body);
         if match_root != 0 {
             let cases, cerr = g.types.variants(elem_ty);
-            if cerr == blot_direct_types::Error.none {
+            if cerr == squid_direct_types::Error.none {
                 var nmask: u64 = 0;
                 var smask: u64 = 0;
                 if analyzeSplitSumMatchChain(g, m, match_root, ev_b, elem_ty, cases, nmask, smask, 0) {
@@ -3873,7 +3873,7 @@ recursive fn emitSeqLoopCore(
     var unrev_sum_fn: u32 = 0;
     if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
         let uf, uferr = ensureSeqLeafUnrevSum(g, sp);
-        if uferr != blot_direct_types::Error.none { return uferr; }
+        if uferr != squid_direct_types::Error.none { return uferr; }
         unrev_sum_fn = uf;
     }
 
@@ -3888,7 +3888,7 @@ recursive fn emitSeqLoopCore(
             if g.s.words[slots.start + at] != 0 { boxed_carries = true; continue; }
             let value = g.s.vals[iteration.start + at];
             let safe, oerr = ownerSlots(g, value.ty, value.start);
-            if oerr != blot_direct_types::Error.none { s_state.scratch.resize(scratch_mark); return oerr; }
+            if oerr != squid_direct_types::Error.none { s_state.scratch.resize(scratch_mark); return oerr; }
             if !safe { release = false; }
         }
         if release {
@@ -3926,14 +3926,14 @@ recursive fn emitSeqLoopCore(
     let cur_delta = constLocal(g, f, 0);
     var ramp_val: u32 = 0;
     var ramp_delta: u32 = 0;
-    if elem_ty == blot_direct_types::u32_ {
+    if elem_ty == squid_direct_types::u32_ {
         ramp_val = constLocal(g, f, 0);
         ramp_delta = constLocal(g, f, 0);
     }
     var rep_val = neverVal();
     if sp.elem_bytes != 0 {
         let rv, rverr = fresh(g, f, elem_ty, id);
-        if rverr != blot_direct_types::Error.none { return rverr; }
+        if rverr != squid_direct_types::Error.none { return rverr; }
         rep_val = rv;
     }
     var cur_ptrs: u32[16] = [0; 16];
@@ -3963,7 +3963,7 @@ recursive fn emitSeqLoopCore(
     lget(g, leaf_edge); op(g, OP_i32_eqz);
     let done_if = open(g, f, OP_if_);
     let assigned = assign(g, f, iteration, outgoing, id);
-    if assigned != blot_direct_types::Error.none { return assigned; }
+    if assigned != squid_direct_types::Error.none { return assigned; }
     br(g, f, OP_br, exit);
     close(g, f);
     lget(g, leaf_edge); i32Const(g, 0xfffffffe); op(g, OP_i32_and); lset(g, leaf_ptr);
@@ -4007,13 +4007,13 @@ recursive fn emitSeqLoopCore(
         let rbase = local32(g, f);
         lget(g, leaf_ptr); i32Const(g, SEQ_LEAF_DATA); op(g, OP_i32_add); lset(g, rbase);
         let loaded_r, lrerr = loadElement(g, f, rbase, 0, elem_ty, id);
-        if lrerr != blot_direct_types::Error.none { return lrerr; }
+        if lrerr != squid_direct_types::Error.none { return lrerr; }
         let _ = copy(g, f, loaded_r, rep_val, id);
     }
     close(g, f);
 
     // 3) LEAF_RAMP (U32 only): hoist start & signed step!
-    if elem_ty == blot_direct_types::u32_ {
+    if elem_ty == squid_direct_types::u32_ {
         lget(g, leaf_kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
         let init_ramp = open(g, f, OP_if_);
         let rs = local32(g, f);
@@ -4122,7 +4122,7 @@ recursive fn emitSeqLoopCore(
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let fty = sp.packed.soa_field_ty[fi];
                 let fv, fverr = fresh(g, f, fty, id);
-                if fverr != blot_direct_types::Error.none { return fverr; }
+                if fverr != squid_direct_types::Error.none { return fverr; }
                 field_locs[fi] = fv;
             }
             lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
@@ -4132,7 +4132,7 @@ recursive fn emitSeqLoopCore(
                 let st = sp.packed.soa_field_stream[fi];
                 if st >= 0 {
                     let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, sp.packed.soa_field_ty[fi], id);
-                    if lerr != blot_direct_types::Error.none { return lerr; }
+                    if lerr != squid_direct_types::Error.none { return lerr; }
                     let _ = copy(g, f, loaded, field_locs[fi], id);
                     lget(g, cur_ptrs[st]); lget(g, cur_deltas[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
                 }
@@ -4140,17 +4140,17 @@ recursive fn emitSeqLoopCore(
             op(g, OP_else_);
             lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
             let full_v, fperr = pop(g, f, elem_ty, id);
-            if fperr != blot_direct_types::Error.none { return fperr; }
+            if fperr != squid_direct_types::Error.none { return fperr; }
             var inner_v = full_v;
             if sp.packed.soa_is_nominal {
                 let uw, uerr = unwrapVariant(g, f, full_v, sp.packed.soa_nominal_tag, id);
-                if uerr != blot_direct_types::Error.none { return uerr; }
+                if uerr != squid_direct_types::Error.none { return uerr; }
                 inner_v = uw;
             }
             for fi in 0..sp.packed.soa_field_count {
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let fv, gerr = recordField(g, f, inner_v, fi, id);
-                if gerr != blot_direct_types::Error.none { return gerr; }
+                if gerr != squid_direct_types::Error.none { return gerr; }
                 let _ = copy(g, f, fv, field_locs[fi], id);
             }
             close(g, f);
@@ -4170,7 +4170,7 @@ recursive fn emitSeqLoopCore(
             for fi in 0..sp.packed.soa_field_count {
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let fv, fverr = fresh(g, f, sp.packed.soa_field_ty[fi], id);
-                if fverr != blot_direct_types::Error.none { return fverr; }
+                if fverr != squid_direct_types::Error.none { return fverr; }
                 field_locs[fi] = fv;
             }
             lget(g, leaf_kind); i32Const(g, SEQ_KIND_PACKED_SOA); op(g, OP_i32_eq);
@@ -4180,7 +4180,7 @@ recursive fn emitSeqLoopCore(
                 let st = sp.packed.soa_field_stream[fi];
                 if st >= 0 {
                     let loaded, lerr = loadElement(g, f, cur_ptrs[st], 0, sp.packed.soa_field_ty[fi], id);
-                    if lerr != blot_direct_types::Error.none { return lerr; }
+                    if lerr != squid_direct_types::Error.none { return lerr; }
                     let _ = copy(g, f, loaded, field_locs[fi], id);
                     lget(g, cur_ptrs[st]); lget(g, cur_deltas[st]); op(g, OP_i32_add); lset(g, cur_ptrs[st]);
                 }
@@ -4188,11 +4188,11 @@ recursive fn emitSeqLoopCore(
             op(g, OP_else_);
             lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
             let full_v, fperr = pop(g, f, elem_ty, id);
-            if fperr != blot_direct_types::Error.none { return fperr; }
+            if fperr != squid_direct_types::Error.none { return fperr; }
             var inner_v = full_v;
             if sp.packed.soa_is_nominal {
                 let uw, uerr = unwrapVariant(g, f, full_v, sp.packed.soa_nominal_tag, id);
-                if uerr != blot_direct_types::Error.none { return uerr; }
+                if uerr != squid_direct_types::Error.none { return uerr; }
                 inner_v = uw;
             }
             for fi in 0..sp.packed.soa_field_count {
@@ -4200,11 +4200,11 @@ recursive fn emitSeqLoopCore(
                 var fv = neverVal();
                 if sp.packed.soa_is_record {
                     let got, gerr = recordField(g, f, inner_v, fi, id);
-                    if gerr != blot_direct_types::Error.none { return gerr; }
+                    if gerr != squid_direct_types::Error.none { return gerr; }
                     fv = got;
                 } else {
                     let got, gerr = tupleItem(g, f, inner_v, fi, id);
-                    if gerr != blot_direct_types::Error.none { return gerr; }
+                    if gerr != squid_direct_types::Error.none { return gerr; }
                     fv = got;
                 }
                 let _ = copy(g, f, fv, field_locs[fi], id);
@@ -4213,7 +4213,7 @@ recursive fn emitSeqLoopCore(
             for fi in 0..sp.packed.soa_field_count {
                 if ((soa_used_fields >> (fi as u32)) & 1) == 0 { continue; }
                 let terr = test_(g, f, soa_field_pats[fi], field_locs[fi], false, 0, id);
-                if terr != blot_direct_types::Error.none { return terr; }
+                if terr != squid_direct_types::Error.none { return terr; }
             }
         }
     } else if sp.leaf_kind == SEQ_KIND_PACKED_SUM && split_fused {
@@ -4234,12 +4234,12 @@ recursive fn emitSeqLoopCore(
         // Non-packed leaf (e.g. LEAF_SPAN or LEAF_REPEAT of a sum type): decode element and point cur_ptrs[s] at 1-elem stack slot!
         lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
         let ev_fb, efberr = pop(g, f, elem_ty, id);
-        if efberr != blot_direct_types::Error.none { return efberr; }
+        if efberr != squid_direct_types::Error.none { return efberr; }
         let cases, cerr = g.types.variants(elem_ty);
-        if cerr != blot_direct_types::Error.none { return cerr; }
+        if cerr != squid_direct_types::Error.none { return cerr; }
         let vtag_fb = local32(g, f);
         let terr = emitValueTag(g, f, ev_fb, id);
-        if terr != blot_direct_types::Error.none { return terr; }
+        if terr != squid_direct_types::Error.none { return terr; }
         lset(g, vtag_fb);
         for ci in 0..(cases.len as i64) {
             let vtag = g.types.variant_tags[cases.tags + ci];
@@ -4251,9 +4251,9 @@ recursive fn emitSeqLoopCore(
                 let pbytes = sp.packed.stream_stride[st];
                 let slot_mem = allocate(g, f, pbytes);
                 let uw, uerr = unwrapVariant(g, f, ev_fb, vtag, id);
-                if uerr != blot_direct_types::Error.none { return uerr; }
+                if uerr != squid_direct_types::Error.none { return uerr; }
                 let werr = writeElement(g, f, slot_mem, 0, uw, id);
-                if werr != blot_direct_types::Error.none { return werr; }
+                if werr != squid_direct_types::Error.none { return werr; }
                 lget(g, slot_mem); lset(g, cur_ptrs[st]);
             }
             close(g, f);
@@ -4276,7 +4276,7 @@ recursive fn emitSeqLoopCore(
     } else {
         // Materialize `item` via fast hoisted leaf cursor (FLAT/SPAN/RAMP/REPEAT/PACKED_SOA/PACKED_SUM)!
         let item, iferr = fresh(g, f, elem_ty, id);
-        if iferr != blot_direct_types::Error.none { return iferr; }
+        if iferr != squid_direct_types::Error.none { return iferr; }
         if sp.elem_bytes != 0 {
             let item_done = open(g, f, OP_block);
             // Fast path 1: LEAF_FLAT or LEAF_SPAN
@@ -4285,13 +4285,13 @@ recursive fn emitSeqLoopCore(
             op(g, OP_i32_or);
             let f_if = open(g, f, OP_if_);
             let loaded, lerr = loadElement(g, f, cur_ptr, 0, elem_ty, id);
-            if lerr != blot_direct_types::Error.none { return lerr; }
+            if lerr != squid_direct_types::Error.none { return lerr; }
             let _ = copy(g, f, loaded, item, id);
             lget(g, cur_ptr); lget(g, cur_delta); op(g, OP_i32_add); lset(g, cur_ptr);
             br(g, f, OP_br, item_done);
             close(g, f);
             // Fast path 2: LEAF_RAMP (U32 register counter — ZERO memory loads!)
-            if elem_ty == blot_direct_types::u32_ {
+            if elem_ty == squid_direct_types::u32_ {
                 lget(g, leaf_kind); i32Const(g, SEQ_KIND_RAMP); op(g, OP_i32_eq);
                 let r_if = open(g, f, OP_if_);
                 lget(g, ramp_val); lset(g, w(g, item, 0));
@@ -4308,21 +4308,21 @@ recursive fn emitSeqLoopCore(
             // Fast path 4: LEAF_PACKED_SUM (sequential cursor walk without SIMD rank!)
             if sp.leaf_kind == SEQ_KIND_PACKED_SUM {
                 let decoded, derr = emitPackedDecodeStep(g, f, sp.packed, cur_ptrs[..], sum_tags_ptr, cur_li, id);
-                if derr != blot_direct_types::Error.none { return derr; }
+                if derr != squid_direct_types::Error.none { return derr; }
                 let _ = copy(g, f, decoded, item, id);
                 br(g, f, OP_br, item_done);
             } else {
                 // LEAF_PACKED_SOA fallback when whole record is bound
                 lget(g, leaf_edge); lget(g, cur_li); callf(g, leaf_get_fn);
                 let got, gerr = pop(g, f, elem_ty, id);
-                if gerr != blot_direct_types::Error.none { return gerr; }
+                if gerr != squid_direct_types::Error.none { return gerr; }
                 let _ = copy(g, f, got, item, id);
             }
             close(g, f);
         }
         if info.pattern != 0 {
             let terr = test_(g, f, info.pattern, item, false, 0, id);
-            if terr != blot_direct_types::Error.none { return terr; }
+            if terr != squid_direct_types::Error.none { return terr; }
         }
     }
 
@@ -4331,11 +4331,11 @@ recursive fn emitSeqLoopCore(
     let unused = g.newSlot();
     let s_lbl .= g.s;
     let labels_mark = s_lbl.labels.len;
-    s_lbl.labels.push(blot_direct_emit::Label {
+    s_lbl.labels.push(squid_direct_emit::Label {
         target: id,
         depth: exit,
         result: unused,
-        kind: blot_direct_emit::LabelKind.loop_,
+        kind: squid_direct_emit::LabelKind.loop_,
         top: top,
         iteration: iteration,
         outgoing: outgoing,
@@ -4352,22 +4352,22 @@ recursive fn emitSeqLoopCore(
     let body, error = stmt(g, f, info.body);
     if pushed_soa_frame { soa_loop_depth -= 1; }
     if pushed_split_frame { split_sum_depth -= 1; }
-    if error != blot_direct_types::Error.none {
+    if error != squid_direct_types::Error.none {
         f.loop_depth -= 1;
         s_lbl.labels.resize(labels_mark);
         return error;
     }
 
-    if body.ty != blot_direct_types::never {
+    if body.ty != squid_direct_types::never {
         let backedge = g.reserveVals(carries.len);
         for carry, at in carries {
             let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return rerr; }
+            if rerr != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return rerr; }
             if !present { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
         let assigned_c = assignCarries(g, f, backedge, iteration, slots, unchanged, release_owner, release_stack, id);
-        if assigned_c != blot_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return assigned_c; }
+        if assigned_c != squid_direct_types::Error.none { f.loop_depth -= 1; s_lbl.labels.resize(labels_mark); return assigned_c; }
         let label = s_lbl.labels[labels_mark];
         if label.has_release {
             let iter_esc = local32(g, f);
@@ -4384,5 +4384,5 @@ recursive fn emitSeqLoopCore(
     s_lbl.labels.resize(labels_mark);
     close(g, f);
     close(g, f);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }

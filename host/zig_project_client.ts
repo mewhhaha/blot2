@@ -147,7 +147,7 @@ export interface ZigProjectCompilerOptions {
   tailCalls?: boolean;
   /** Shorthand enabling both relaxedSimd and tailCalls. */
   wasm3?: boolean;
-  /** Emit first-class `test "..."` declarations and the `blot:tests` custom section. */
+  /** Emit first-class `test "..."` declarations and the `squid:tests` custom section. */
   testMode?: boolean;
   /** Configurable stack budget in MiB (1..1024; default 128). */
   stackMb?: number;
@@ -654,10 +654,10 @@ class ProjectProcess implements ZigProjectCompiler {
     };
   }
   #profileLine(line: string) {
-    if (!line.startsWith("BLOT_PROFILE ")) return;
+    if (!line.startsWith("SQUID_PROFILE ")) return;
     let value: unknown;
     try {
-      value = JSON.parse(line.slice("BLOT_PROFILE ".length));
+      value = JSON.parse(line.slice("SQUID_PROFILE ".length));
     } catch {
       return;
     }
@@ -828,8 +828,8 @@ class ProjectProcess implements ZigProjectCompiler {
       if (!this.#profileDiscarding) {
         if (this.#profilePartial.length + fragment.length > 65_536) {
           if (
-            this.#profilePartial.startsWith("BLOT_PROFILE ") ||
-            (!this.#profilePartial && fragment.startsWith("BLOT_PROFILE "))
+            this.#profilePartial.startsWith("SQUID_PROFILE ") ||
+            (!this.#profilePartial && fragment.startsWith("SQUID_PROFILE "))
           ) {
             this.#profileDropped++;
           }
@@ -970,7 +970,7 @@ class ProjectProcess implements ZigProjectCompiler {
           const greeting = await this.#readFrame(), hello = greeting.metadata;
           if (
             greeting.payload.length || hello.kind !== "hello" ||
-            hello.protocol !== "blot-zig-project" || hello.version !== 1 ||
+            hello.protocol !== "squid-zig-project" || hello.version !== 1 ||
             hello.maxFrameBytes !== maxFrameBytes ||
             typeof hello.compilerIdentity !== "string" ||
             !/^[0-9a-f]{64}$/.test(hello.compilerIdentity)

@@ -55,8 +55,8 @@ io const breakchange = func (input: U32): Array U32 => return do:
   return #[row.first, row.second, row.steady, marker[0]]
 `;
 Deno.test(`flat loop lanes preserve zero iterations swaps and all exits`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-loop-lanes-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-loop-lanes-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

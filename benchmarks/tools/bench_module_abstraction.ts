@@ -1,6 +1,6 @@
 // Candidate-only erasure pairs. Compile overhead against a prior compiler is
 // measured separately by bench_compile.ts; these pairs preserve source types.
-// deno run --allow-all benchmarks/tools/bench_module_abstraction.ts BLOTC OUTPUT_DIR
+// deno run --allow-all benchmarks/tools/bench_module_abstraction.ts SQUIDC OUTPUT_DIR
 import { strict as assert } from "node:assert";
 import { cpuUsage } from "node:process";
 import { resolve } from "node:path";
@@ -115,7 +115,7 @@ for (const item of cases) {
       item.opaque,
     ]]
   ) {
-    const source = `${directory}/${item.name}-${name}.blot`;
+    const source = `${directory}/${item.name}-${name}.sq`;
     const output = `${directory}/${item.name}-${name}.wasm`;
     await Deno.writeTextFile(source, declarations + item.body);
     const result = await new Deno.Command(compiler, {

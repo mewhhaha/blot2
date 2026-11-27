@@ -3,13 +3,13 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 Deno.test("higher order summaries preserve callback captures rows and returned stages across retained imports", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
-  const bundle = `${directory}/library.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
+  const bundle = `${directory}/library.sqdep`;
   const depth = 6;
   const repetitions = 2 ** depth;
   const lib = [
@@ -157,8 +157,8 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
 
 Deno.test("predicate bearing callback witnesses remain mandatory for invoked and unused callback values", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const source = (invalid: boolean) =>
     [
       "type Count is data = $Count U32",

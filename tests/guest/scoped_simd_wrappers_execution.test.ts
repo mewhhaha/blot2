@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 import * as simd from "std/simd"
 const shuffled = simd.f32_shuffle
@@ -28,13 +28,13 @@ io const integers = func (values: Array U32): Array U32 => return do:
 `;
 
 Deno.test(`scoped standard SIMD wrappers retain exact lane bits`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-scoped-simd-" });
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
   });
   try {
@@ -113,13 +113,13 @@ Deno.test(`scoped standard SIMD wrappers retain exact lane bits`, async () => {
 
 // Pending the owner's decision on literal SIMD lane selectors (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("scoped standard SIMD wrappers require literal in-range selectors", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-scoped-simd-" });
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
   });
   try {

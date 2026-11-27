@@ -19,7 +19,7 @@ The earlier frozen source uses the old block-return syntax. Its source-only
 migration replaced 4,510 `return` tokens with `break` in 218 files, checked with
 the real lexer; strings and comments remain unchanged. The original snapshot is
 preserved. All 78 recorded entry/edit outcomes were remeasured, including the
-expected `non_exhaustive_match` rejection for `tests/protocol.blot`.
+expected `non_exhaustive_match` rejection for `tests/protocol.sq`.
 
 ## Qualification
 

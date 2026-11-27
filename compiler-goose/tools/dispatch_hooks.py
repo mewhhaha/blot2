@@ -37,36 +37,36 @@ def function_spans(source,names):
   yield {'start':m.start(),'end':finish,'name':name,'generic':m[2] or '', 'parameters':split(source[m.end():end]),'returns':source[end+1:body],'body':source[body:finish]}
 
 def qualify_body(body,family):
- if family=='blot_structural':names=['hash','hashFields']
+ if family=='squid_structural':names=['hash','hashFields']
  else:names=['write','fail','jsonStringify','enumValue','unionValue','beginObject','endObject','beginArray','endArray','key','field','element','nullValue','quoted','unsignedValue','signedValue','sourceName']
  pattern=r'(?<![\w:.])('+ '|'.join(names)+r')\('
  body=re.sub(pattern,lambda m:family+'::'+m[1]+'(',body)
- if family=='blot_json':body=re.sub(r'(?<![\w:])Raw\s*\{','blot_json::Raw{',body)
+ if family=='squid_json':body=re.sub(r'(?<![\w:])Raw\s*\{','squid_json::Raw{',body)
  return body
 
 def rehead(decl,family):
  params=decl['parameters'];assert len(params)==2,decl
  first,receiver=params;_,ty=receiver.split(':',1)
  ns=owner_namespace(ty,family)
- if family=='blot_structural':name='blotStructuralHash'
- else:name='blotJsonWrite'
- first=first.replace('writer: Writer&','writer: blot_json::Writer&')
+ if family=='squid_structural':name='squidStructuralHash'
+ else:name='squidJsonWrite'
+ first=first.replace('writer: Writer&','writer: squid_json::Writer&')
  return 'fn '+ns+'::'+name+decl['generic']+'('+receiver+','+first+')'+decl['returns']+qualify_body(decl['body'],family)
 
 def transformed_custom_types(source):
  result=set()
- for m in re.finditer(r'fn\s+(?:\w+::)?blotStructuralHash(?:<[^\n(]*>)?\(',source):
+ for m in re.finditer(r'fn\s+(?:\w+::)?squidStructuralHash(?:<[^\n(]*>)?\(',source):
   end=balanced(source,m.end()-1,'(',')');params=split(source[m.end():end]);ty=params[0].split(':',1)[1].strip();result.add(re.sub(r'^const\s+','',ty).rstrip('&').strip())
  return result
 
 def write_generated(target,source,family):
  # A head's body/width/custom projection is retained, only UFCS receiver order
  # and explicit namespace lookup change. Equal heads are intentionally untouched.
- if family=='blot_structural':wanted={'hash'}
+ if family=='squid_structural':wanted={'hash'}
  else:wanted={'write'}
  for decl in reversed(list(function_spans(source,wanted))):source=source[:decl['start']]+rehead(decl,family)+source[decl['end']:]
- if family=='blot_json':
+ if family=='squid_json':
   namespace_text=source+'\n'+'\n'.join(p.read_text() for p in ROOT.rglob('*.goose') if p!=target)
-  namespaces=sorted({m[1] for m in re.finditer(r'fn\s+(blot_\w+)::blotJsonWrite',namespace_text) if m[1]!=family})
-  for ns in namespaces:source+='\nfn '+ns+'::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}\n'
+  namespaces=sorted({m[1] for m in re.finditer(r'fn\s+(squid_\w+)::squidJsonWrite',namespace_text) if m[1]!=family})
+  for ns in namespaces:source+='\nfn '+ns+'::squidJsonWrite<T>(value:T?,writer:squid_json::Writer&)->squid_error::Error {if value==null {return squid_json::nullValue(writer);}return squid_json::write(writer,value);}\n'
  target.write_text(source)

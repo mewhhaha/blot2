@@ -11,7 +11,7 @@ import { captureIntents } from "./capture.ts";
 
 const root = resolve("../gdev");
 const compilerPath = resolve(
-  Deno.args[0] ?? "compiler-goose/build/blotc-goose",
+  Deno.args[0] ?? "compiler-goose/build/squidc-goose",
 );
 const trace = await captureIntents(root, compilerPath);
 const control = [
@@ -147,12 +147,12 @@ io test_${name} (observe: U32 -> U32): U32 => return do:
 const project = await gdevProject(
   root,
   resolve("std"),
-  "performance/intent_builder_probe.blot",
+  "performance/intent_builder_probe.sq",
   compilerPath,
 );
-const handles = resolve("../ink/lib/handles.blot");
+const handles = resolve("../ink/lib/handles.sq");
 const base = await Deno.readTextFile(
-  resolve("benchmarks/intent/builders.blot"),
+  resolve("benchmarks/intent/builders.sq"),
 );
 const inputs = datasets.map((rows, i) =>
   "func " + ["trace_input", "control_input"][i] +
@@ -263,12 +263,12 @@ function runner(wasm: Uint8Array<ArrayBuffer>, measured: boolean) {
     return 0;
   };
   assert.deepEqual(WebAssembly.Module.imports(mod), [{
-    module: "blot:host/1",
+    module: "squid:host/1",
     name: "call_u32_u32",
     kind: "function",
   }]);
   const instance = new WebAssembly.Instance(mod, {
-    "blot:host/1": { call_u32_u32: observe },
+    "squid:host/1": { call_u32_u32: observe },
   });
   if (measured) {
     assert.equal(
@@ -291,7 +291,7 @@ function runner(wasm: Uint8Array<ArrayBuffer>, measured: boolean) {
       assert.equal(exports[variant](1) >>> 0, hash, [variant, n, di].join(" "));
       assert.deepEqual(markers, [2, 3, 4, 5]);
     } finally {
-      exports["blot:finish_invocation"]();
+      exports["squid:finish_invocation"]();
     }
     const [s, b, j, e] = timestamps;
     const sample: Sample = {

@@ -1,10 +1,10 @@
 # The `serve-project` protocol
 
-`blotc serve-project` keeps one Blot project open in a child process and builds
+`squidc serve-project` keeps one Squid project open in a child process and builds
 it on request. A build reads its current sources, reuses eligible checked
 modules and Core, and emits the complete Wasm. A host talks to it over the child's stdin
 and stdout in length-prefixed frames. This document is enough to write a host
-without `@mewhhaha/blot`. It describes protocol version 1 as implemented by this
+without `@mewhhaha/squid`. It describes protocol version 1 as implemented by this
 repository:
 
 - the server:
@@ -27,10 +27,10 @@ session revision rules below.
 ## Starting the compiler
 
 ```
-blotc serve-project
-blotc serve-project --frontend-workers N    (N in 1..16, default automatic)
-blotc serve-project --semantic-workers N    (N in 1..16, default serial)
-blotc serve-project --inference-budget STEPS
+squidc serve-project
+squidc serve-project --frontend-workers N    (N in 1..16, default automatic)
+squidc serve-project --semantic-workers N    (N in 1..16, default serial)
+squidc serve-project --inference-budget STEPS
 ```
 
 The options may be combined, and each takes exactly one value.
@@ -45,20 +45,20 @@ The server uses the source checker when a worker cannot complete the build.
 `--inference-budget` sets the process-local inference limit (default 1,000,000);
 a value other than the default changes `compilerIdentity`. Worker counts never
 change the emitted bytes. Any other argument, a missing value or a worker count
-outside 1..16 makes the process print `blotc: InvalidServeArguments` to stderr
+outside 1..16 makes the process print `squidc: InvalidServeArguments` to stderr
 and exit 1; an inference budget that is not a positive integer prints its own
 error name.
 
 - **stdin** carries request frames and **stdout** reply frames, nothing else.
 - **stderr** is free text for people. With `profileTrace` (open) it also carries
   progress records. When the process stops on an error, its last line is
-  `blotc: <ErrorName>`. The reference client keeps the last 64 KiB of it to put
+  `squidc: <ErrorName>`. The reference client keeps the last 64 KiB of it to put
   in its error messages.
 - **Environment.** The server reads no environment variables. The reference
   client starts the child with a cleared environment.
-- **Where blotc comes from.** `@mewhhaha/blot` bundles a gzipped Linux x86-64
-  `blotc` (`generated/compiler/blotc.gz`). The reference client unpacks it to a
-  temporary `blotc-*` file before spawning it. A host can run any `blotc`
+- **Where squidc comes from.** `@mewhhaha/squid` bundles a gzipped Linux x86-64
+  `squidc` (`generated/compiler/squidc.gz`). The reference client unpacks it to a
+  temporary `squidc-*` file before spawning it. A host can run any `squidc`
   instead; the hello's `compilerIdentity` says which one it got.
 
 ## Frames
@@ -123,7 +123,7 @@ The server sends it unprompted, before reading anything. It has no payload.
 | Field              | Value                       |
 | ------------------ | --------------------------- |
 | `kind`             | `"hello"`                   |
-| `protocol`         | `"blot-zig-project"`        |
+| `protocol`         | `"squid-zig-project"`        |
 | `version`          | `1`                         |
 | `compilerIdentity` | 64 lowercase hex characters |
 | `capabilities`     | array of strings (below)    |
@@ -168,7 +168,7 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `prelude`        | path or null              | the prelude module; absent or null: none                     |
 | `stdRoot`        | path or null              | the root of the `std/` alias                                 |
 | `imports`        | array of `{prefix, root}` | more directory aliases                                       |
-| `dependencies`   | path or null              | a `.blotdep` bundle from `blot dependencies`                 |
+| `dependencies`   | path or null              | a `.sqdep` bundle from `squid dependencies`                 |
 | `profileBackend` | boolean                   | phase clocks and allocation counts per build (default false) |
 | `profileTrace`   | boolean                   | progress records on stderr (default false)                   |
 | `storage`        | object or null            | data-stack budgets; validated, then ignored (below)          |
@@ -184,7 +184,7 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
   regions and ignores these values. The field is accepted because Pen forwards
   it from a program's settings.
 - **`profileTrace`.** While each build runs, the server writes stderr lines that
-  start with `BLOT_PROFILE`, a space and one JSON record. The reference client
+  start with `SQUID_PROFILE`, a space and one JSON record. The reference client
   parses them into `profileProgress`.
 - **`nativeAssets`.** Requires `native-assets-v1`; `{}` enables an empty native
   session. `imports` and `roots` default to `[]`. Import definitions, discovery,
@@ -225,8 +225,8 @@ workers see only the dependency names. An entry-only edit can therefore add,
 remove or shadow names and reuse those workers’ results. The session checks
 the current entry against the dependencies before committing it.
 
-`@mewhhaha/blot`'s `createCompiler` passes its own `std/` as `stdRoot` and
-`std/prelude.blot` as `prelude`, unless the caller passes `null`.
+`@mewhhaha/squid`'s `createCompiler` passes its own `std/` as `stdRoot` and
+`std/prelude.sq` as `prelude`, unless the caller passes `null`.
 
 ## build
 
@@ -370,7 +370,7 @@ the fictitious source is ASCII, so its byte and UTF-16 offsets coincide:
   "success": false,
   "diagnostics": [
     {
-      "filename": "/p/src/main.blot",
+      "filename": "/p/src/main.sq",
       "stage": "check-project",
       "code": "unknown_constructor",
       "start": 120,
@@ -527,7 +527,7 @@ with no reply.
 ## Errors and cancellation
 
 **Protocol errors.** There is no error reply. On any of the following the server
-stops reading, prints `blotc: <ErrorName>` to stderr and exits 1:
+stops reading, prints `squidc: <ErrorName>` to stderr and exits 1:
 
 - a malformed or oversized frame (`TruncatedFrame`, `FrameTooLarge`);
 - invalid JSON, or an unknown, duplicate or mistyped field;
@@ -581,7 +581,7 @@ tunables and WGSL inputs and captures reference resources itself. A host sends
 errors, snapshot ownership and supported WGSL reflection.
 
 The host `assets` option ([docs/host/assets.md](../host/assets.md)) runs custom
-parser functions, sends their generated Blot as source overlays, and retains its
+parser functions, sends their generated Squid as source overlays, and retains its
 own resource manifest. It uses source-only replies. The reference client
 requires a caller to choose either `assets` or `nativeAssets` for one session.
 
@@ -600,7 +600,7 @@ The independent conformance host is
 [zig_project_protocol.test.ts](../../tests/guest/zig_project_protocol.test.ts).
 Run it against any compiler with
 `deno test --allow-read --allow-write --allow-run
-tests/guest/zig_project_protocol.test.ts -- /absolute/path/to/blotc`.
+tests/guest/zig_project_protocol.test.ts -- /absolute/path/to/squidc`.
 
 ## Source-only qualification, 11 October 2026
 

@@ -78,7 +78,7 @@ function identifier(value: unknown, upper: boolean): string {
           .split(" ").includes(name);
     }
   }
-  if (!valid) throw new TypeError("Invalid Blot asset identifier");
+  if (!valid) throw new TypeError("Invalid Squid asset identifier");
   return value as string;
 }
 export function captureNativeAssets(
@@ -104,7 +104,7 @@ export function captureNativeAssets(
     const item = object(definition, "native asset import");
     fields(item, ["module", "path", "kind", "type", "export", "mediaType"]);
     let module = localPath(item.module, base);
-    if (!module.endsWith(".blot")) module += ".blot";
+    if (!module.endsWith(".sq")) module += ".sq";
     if (module === entry || modules.has(module)) {
       throw new TypeError(
         "Native asset modules must be distinct from the entry",

@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const fields = Array.from({ length: 40 }, (_, word) => {
   if (word === 33) return `f033: #[value + 33]`;
   if (word === 34) return `f034: -0.0`;
@@ -25,15 +25,15 @@ const floating = func (value: U32) => return (make value).f034
 `;
 Deno.test("wide ownership preserves snapshots float bits and static shape relocation through retained edits in both tiers", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`,
-    producer = `${directory}/model.blot`,
-    prefix = `${directory}/prefix.blot`;
+  const entry = `${directory}/main.sq`,
+    producer = `${directory}/model.sq`,
+    prefix = `${directory}/prefix.sq`;
   try {
     {
       const options = {
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -96,7 +96,7 @@ io const bits = func (value: U32): F32 => return floating value
 
 Deno.test("wide ownership selects exact bitmap and size for differently shaped constructor updates", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const types = Array.from({ length: 40 }, (_, word) => {
     if (word === 33) return "child: Array U32";
     return `f${String(word).padStart(3, "0")}: U32`;
@@ -110,7 +110,7 @@ Deno.test("wide ownership selects exact bitmap and size for differently shaped c
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       });
       try {
         const result = await compiler.build({
@@ -155,7 +155,7 @@ io const run = func (mode: U32) => return do:
 
 Deno.test("declared callbacks use checked usage facts from a large imported catalog", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const catalog = Array.from({ length: 256 }, (_, index) => {
     let part = "U32";
     if (index > 0) part = `Layer${index - 1}`;
@@ -172,8 +172,8 @@ Deno.test("declared callbacks use checked usage facts from a large imported cata
       prelude: null,
     });
     const sources = {
-      [directory + "/catalog.blot"]: catalog,
-      [directory + "/scene.blot"]: `import * as catalog from "./catalog"
+      [directory + "/catalog.sq"]: catalog,
+      [directory + "/scene.sq"]: `import * as catalog from "./catalog"
 type Parts is data = $Parts {${fields}}
 type Frame is data = $Frame { parts: Array Parts, count: U32 }
 type Hooks = { reset: own Frame -> Frame }

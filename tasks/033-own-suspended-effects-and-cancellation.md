@@ -9,7 +9,7 @@
   DEMANDS: Completion and cancellation. Sources: [PLAN.md](../PLAN.md),
   [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -21,7 +21,7 @@ resumption, cancellation, traps and host exceptions.
 [request_runtime.zig](../compiler/src/runtime/request_runtime.zig),
 [runtime_cleanup.zig](../compiler/src/runtime/runtime_cleanup.zig),
 [host/guest.ts](../host/guest.ts) and
-[tests/demand_completion_execution.test.ts](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/tests/guest/demand_completion_execution.test.ts)
+[tests/demand_completion_execution.test.ts](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/tests/guest/demand_completion_execution.test.ts)
 preserve request and demand completion behavior. Persistent payload ownership
 remains part of the runtime program.
 
@@ -39,7 +39,7 @@ remains part of the runtime program.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Run matching synchronous and JSPI traces for nested requests, resume, cancel,

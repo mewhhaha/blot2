@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -16,8 +16,8 @@ function asWords(value: unknown): number[] {
 }
 
 Deno.test("Tier 3A: 4x unrolled 16-element v128 SIMD across tails, offsets, Bool masks, and overlaps", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-tier3a-simd-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-tier3a-simd-" });
+  const entry = `${dir}/main.sq`;
   const src = `// 1. 4x unrolled spark F32 with in-place reuse and duplicate stream
 io spark_f32_unroll (n: U32): #[F32] =>
   let px = @array.fill n 0.0
@@ -418,8 +418,8 @@ io lazy_variant_oob (n: U32): U32 =>
 });
 
 Deno.test("Tier 3F: zero-allocation fast-path commit for boxed and unboxed persistent processes + slow-path fallback", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-tier3f-persist-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-tier3f-persist-" });
+  const entry = `${dir}/main.sq`;
   const src = `// 1. Unboxed persistent process (register-carried plain-element arrays + scalar field)
 type UnboxedState is data = $UnboxedState { xs: #[U32], ys: #[U32], ticks: U32 }
 
@@ -510,29 +510,29 @@ func step_boxed (st: own BoxedState) -> (cmd: U32): (BoxedState, U32) =>
       >;
 
       // Exercise UnboxedState: init(4) -> xs=[1,1,1,1], ys=[2,2,2,2], ticks=0
-      equal(exports["blot:proc_init:unboxed_proc"](4), 0);
+      equal(exports["squid:proc_init:unboxed_proc"](4), 0);
       // cmd=1 (fast-path): xs=[3,3,3,3] (sum=12), ticks=1 => 1201
-      equal(exports["blot:proc_step:unboxed_proc"](1), 1201);
+      equal(exports["squid:proc_step:unboxed_proc"](1), 1201);
       // cmd=1 again (fast-path persists scalar+array): xs=[5,5,5,5] (sum=20), ticks=2 => 2002
-      equal(exports["blot:proc_step:unboxed_proc"](1), 2002);
+      equal(exports["squid:proc_step:unboxed_proc"](1), 2002);
       // cmd=2 (fast-path with persistent push growth): xs=[5,5,5,5,100] (sum=120), ticks=3 => 12003
-      equal(exports["blot:proc_step:unboxed_proc"](2), 12003);
+      equal(exports["squid:proc_step:unboxed_proc"](2), 12003);
       // cmd=3 (slow-path fallback replaces xs): xs=[7,7,7,7,7,7] (sum=42), ticks=13 => 4213
-      equal(exports["blot:proc_step:unboxed_proc"](3), 4213);
+      equal(exports["squid:proc_step:unboxed_proc"](3), 4213);
       // cmd=1 after slow-path (fast-path resumes on new committed handle!): xs=[9,9,9,9,7,7] wait ys.len=4 -> OOB? No, loop 0..xs.length reads ys[i]!
       // Test cmd=2 (push on new committed handle): xs=[7,7,7,7,7,7,100] (sum=142), ticks=14 => 14214
-      equal(exports["blot:proc_step:unboxed_proc"](2), 14214);
+      equal(exports["squid:proc_step:unboxed_proc"](2), 14214);
 
       // Exercise BoxedState: init(3) -> a=[1,1,1], b=[2,2,2], rev=0, extra=10
-      equal(exports["blot:proc_init:boxed_proc"](3), 0);
+      equal(exports["squid:proc_init:boxed_proc"](3), 0);
       // cmd=1 (fast-path boxed): a=[3,3,3] (sum=9), rev=1, extra=15 => 9016
-      equal(exports["blot:proc_step:boxed_proc"](1), 9016);
+      equal(exports["squid:proc_step:boxed_proc"](1), 9016);
       // cmd=2 (fast-path boxed with temp snapshot copy): sum=9, rev=10, extra=15 => 9025
-      equal(exports["blot:proc_step:boxed_proc"](2), 9025);
+      equal(exports["squid:proc_step:boxed_proc"](2), 9025);
       // cmd=3 (slow-path boxed replaces a): a=[9,9,9,9,9] (sum=45), rev=110, extra=15 => 45125
-      equal(exports["blot:proc_step:boxed_proc"](3), 45125);
+      equal(exports["squid:proc_step:boxed_proc"](3), 45125);
       // cmd=2 again after slow-path (fast-path boxed resumes on new committed handle!): sum=45, rev=155, extra=15 => 45170
-      equal(exports["blot:proc_step:boxed_proc"](2), 45170);
+      equal(exports["squid:proc_step:boxed_proc"](2), 45170);
     } finally {
       await compiler.dispose();
     }

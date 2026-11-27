@@ -39,15 +39,15 @@ io const staged = func () => return do:
 `;
 Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-owned-comprehension-",
+    prefix: "squid-owned-comprehension-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });
@@ -99,15 +99,15 @@ Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async 
 // Direct backend gap: staging expressions (`#run`) are not supported (tasks/DELETE_SCOPED.md).
 Deno.test.ignore(`owned Array comprehensions run during staging`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-owned-comprehension-",
+    prefix: "squid-owned-comprehension-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: staged } });

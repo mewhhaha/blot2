@@ -20,7 +20,7 @@ The eval agent owns check_packet_owner and type_store_packet.
 
 Current contracts:
 
-- Error is blot_error::Error; success is Error.none. Copied fallible values
+- Error is squid_error::Error; success is Error.none. Copied fallible values
   return value,Error; fallible void returns Error. Defaultable copied optionals
   use Option<T>; borrowed optionals use typed nullable references.
 - Types/Effects, parameter patterns, capability contracts, solver worklists,

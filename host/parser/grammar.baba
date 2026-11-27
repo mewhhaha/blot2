@@ -1,4 +1,4 @@
-grammar Blot
+grammar Squid
 
 // Precedence and name resolution belong to the semantic checker, not the parser.
 token IDENT = /[a-z_][a-z0-9_]*/ ;

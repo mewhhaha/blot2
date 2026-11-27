@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     }
     at += snprintf(started + at, sizeof started - (size_t)at, "\"}\n");
     write_all(log, started, (size_t)at);
-    frame("{\"kind\":\"hello\",\"protocol\":\"blot-zig-project\",\"version\":1,"
+    frame("{\"kind\":\"hello\",\"protocol\":\"squid-zig-project\",\"version\":1,"
           "\"compilerIdentity\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\","
           "\"capabilities\":[\"project-build\",\"utf8_bytes\",\"abort-disposes-process\",\"source-buffers-v1\",\"editor-completion-v1\"],"
           "\"maxFrameBytes\":67108864}");

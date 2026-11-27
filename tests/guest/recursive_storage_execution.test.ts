@@ -8,14 +8,14 @@ import {
 async function withCompiler(
   run: (compiler: ZigProjectCompiler, entry: string) => Promise<void>,
 ): Promise<void> {
-  const directory = await Deno.makeTempDir({ prefix: "blot-recursion-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-recursion-" });
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
     startupTimeoutMs: 5000,
   });
   try {
@@ -58,10 +58,10 @@ async function withGuests(
 // wrapper only supplies small initialized owners and observes the complete output.
 async function sortSource(): Promise<string> {
   const merge = await Deno.readTextFile(
-    new URL("../../benchmarks/goose/ports/sort_merge.blot", import.meta.url),
+    new URL("../../benchmarks/goose/ports/sort_merge.sq", import.meta.url),
   );
   const quick = await Deno.readTextFile(
-    new URL("../../benchmarks/goose/ports/sort_quick.blot", import.meta.url),
+    new URL("../../benchmarks/goose/ports/sort_quick.sq", import.meta.url),
   );
   const extract = (source: string, start: string, end: string) => {
     const first = source.indexOf(start);

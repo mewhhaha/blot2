@@ -6,15 +6,15 @@ import { copyPrivateBytes, instantiateGuest } from "../../host/guest.ts";
 
 const compilerExecutable = Deno.args[0] ??
   fileURLToPath(
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
   );
 const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
-const preludePath = join(stdRoot, "prelude.blot");
+const preludePath = join(stdRoot, "prelude.sq");
 
 async function compileWasm(source: string): Promise<Uint8Array<ArrayBuffer>> {
-  const dir = await Deno.makeTempDir({ prefix: "blot-rt-coord-" });
+  const dir = await Deno.makeTempDir({ prefix: "squid-rt-coord-" });
   try {
-    const entry = join(dir, "main.blot");
+    const entry = join(dir, "main.sq");
     const out = join(dir, "main.wasm");
     await Deno.writeTextFile(entry, source);
     const res = await new Deno.Command(compilerExecutable, {
@@ -42,7 +42,7 @@ async function compileWasm(source: string): Promise<Uint8Array<ArrayBuffer>> {
   }
 }
 
-Deno.test("in-language Blot coordinates stateless and prepared #kernel plus isolated #process", async () => {
+Deno.test("in-language Squid coordinates stateless and prepared #kernel plus isolated #process", async () => {
   const source = `
 import * as kernel from "std/kernel"
 import * as process from "std/process"
@@ -143,7 +143,7 @@ io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.pro
   }
 });
 
-Deno.test("in-language Blot supports non-blocking kernel fan-out and multi-process wave scheduling", async () => {
+Deno.test("in-language Squid supports non-blocking kernel fan-out and multi-process wave scheduling", async () => {
   const source = `
 import * as kernel from "std/kernel"
 import * as process from "std/process"
@@ -273,7 +273,7 @@ io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.pro
   }
 });
 
-Deno.test("pure Blot unit test can mock Runtime effect without any host", async () => {
+Deno.test("pure Squid unit test can mock Runtime effect without any host", async () => {
   const source = `
 import * as kernel from "std/kernel"
 import * as runtime from "std/runtime"
@@ -281,7 +281,7 @@ import * as runtime from "std/runtime"
 #kernel func triple (x: U32): U32 => x * 3
 
 func mock_host (req: #[U32]): #[U32] =>
-  // Return [BRT1, STATUS_OK, 30, 60] for any kernel run
+  // Return [SRT1, STATUS_OK, 30, 60] for any kernel run
   return #[runtime.magic, runtime.status_ok, 30, 60]
 
 io main (): U32 => do (@effect.provider runtime.Runtime.call mock_host):
@@ -352,9 +352,9 @@ io main (host: #[U32] -> #[U32] ! {Foreign}): U32 ! {Foreign} => do (runtime.pro
   }
 });
 
-Deno.test("shipped examples io_entries.blot and runtime_coordination.blot execute cleanly", async () => {
+Deno.test("shipped examples io_entries.sq and runtime_coordination.sq execute cleanly", async () => {
   const ioSource = await Deno.readTextFile(
-    new URL("../../examples/io_entries.blot", import.meta.url),
+    new URL("../../examples/io_entries.sq", import.meta.url),
   );
   const ioWasm = await compileWasm(ioSource);
   const ioGuest = await instantiateGuest(ioWasm);
@@ -362,7 +362,7 @@ Deno.test("shipped examples io_entries.blot and runtime_coordination.blot execut
   equal(ioGuest.call("internal_probe", 3), 10);
 
   const coordSource = await Deno.readTextFile(
-    new URL("../../examples/runtime_coordination.blot", import.meta.url),
+    new URL("../../examples/runtime_coordination.sq", import.meta.url),
   );
   const coordWasm = await compileWasm(coordSource);
   const rt = createRuntime(coordWasm, { workers: 2 });

@@ -1,6 +1,6 @@
 // Paired compile benchmark: one harness for every compiler hill.
 //
-//   deno task bench:compile --baseline OLD/blotc --candidate NEW/blotc
+//   deno task bench:compile --baseline OLD/squidc --candidate NEW/squidc
 //
 // Every build runs through `serve-project`, as pen runs it: gdev builds open
 // the project with the snapshot's pen.json imports and native asset roots.
@@ -58,7 +58,7 @@ import {
 } from "./verification.ts";
 
 const repo = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
+const usage = `Usage: deno task bench:compile --baseline SQUIDC --candidate SQUIDC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|review|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest]
@@ -67,11 +67,11 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--semantic-workers N] [--candidate-semantic-workers N]
   [--frontend-workers N] [--candidate-frontend-workers N]
 
-  --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
+  --baseline/--candidate  squidc executables. Pass one binary twice to measure noise.
   --workload              comma-separated: gdev entries (game, devtools), every
                           gdev test entry (tests, about 170 s CPU per binary and
                           run), the synthetic corpus (with the edit_suite
-                          project), or workloads by name (tests/NAME.blot).
+                          project), or workloads by name (tests/NAME.sq).
                           all = gdev and synthetic.
   --test-runs             alternating pairs for test entries (default 1).
   --no-retained           skip the retained-session phases.
@@ -88,7 +88,7 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
                           benchmarks/tools/gdev-wasm.json.
   --shared-session        also build the selected test entries in turn in one
                           session per variant and run, overlaying each at
-                          src/test_fixture.blot as pen's test workers do; each
+                          src/test_fixture.sq as pen's test workers do; each
                           must equal its fresh build.
   --write-manifest        rewrite benchmarks/tools/gdev-manifest.json from the snapshot.
   --guard-cpu             require at least three paired fresh game builds; fail
@@ -208,21 +208,21 @@ async function syntheticWorkload(
   const label = `${program.name}_${program.size}`;
   const root = `${scratch}/synthetic/${label}`;
   await Deno.mkdir(root, { recursive: true });
-  await Deno.writeTextFile(`${root}/main.blot`, program.source);
+  await Deno.writeTextFile(`${root}/main.sq`, program.source);
   return {
     name: label,
     group: "synthetic",
     root,
-    entry: `${root}/main.blot`,
+    entry: `${root}/main.sq`,
     overlay: {},
     retained: true,
     stdRoot: null,
-    prelude: `${repo}/std/prelude.blot`,
+    prelude: `${repo}/std/prelude.sq`,
     imports: {},
     nativeAssetRoots: null,
     scenarios: [{
       name: "edit",
-      replacements: [{ file: "main.blot", ...program.edit }],
+      replacements: [{ file: "main.sq", ...program.edit }],
     }],
   };
 }
@@ -245,7 +245,7 @@ async function projectWorkload(
     overlay: {},
     retained: true,
     stdRoot: `${repo}/std`,
-    prelude: `${repo}/std/prelude.blot`,
+    prelude: `${repo}/std/prelude.sq`,
     imports: {},
     nativeAssetRoots: null,
     scenarios: project.scenarios,
@@ -1028,7 +1028,7 @@ async function main(): Promise<number> {
     `${out}/results.json`,
     JSON.stringify(
       {
-        kind: "blot-compile-bench",
+        kind: "squid-compile-bench",
         success: unexpectedProblems.length === 0,
         version: 3,
         cpu_accounting:

@@ -9,9 +9,9 @@ async function trapsAtInstantiation(bytes: Uint8Array<ArrayBuffer>) {
 
 Deno.test("completed captured callbacks preserve edits and rejection recovery", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-completed-capture-",
+    prefix: "squid-completed-capture-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const source = (seed: number | null, schema: number) =>
     `const add = func extra => return ${
       seed === null ? "@f32.add extra 1.0" : `@u32.add extra ${seed}`
@@ -26,7 +26,7 @@ io const answer = func (extra: U32) : U32 => return callback extra
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -69,9 +69,9 @@ io const answer = func (extra: U32) : U32 => return callback extra
 });
 
 Deno.test("retained nested source owners preserve unrelated edits consumed closures callbacks and error recovery", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-source-owner-" });
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-source-owner-" });
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const source = (divisor: number, unused: number) =>
     `const force = func value => return value ()
 const make = func (seed: U32) => return do:
@@ -88,7 +88,7 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -131,8 +131,8 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
 });
 
 Deno.test("retained deep layered values preserve edits traps recovery and execution", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-principal-depth-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-principal-depth-" });
+  const entry = `${directory}/main.sq`;
   // Cross the retained proof importer's 128-level depth bound, while staying
   // within ordinary inference's 256-level bound. These are linear-size values.
   const layers = Array.from(
@@ -153,7 +153,7 @@ ${layers}
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -195,9 +195,9 @@ ${layers}
 
 Deno.test("recursive summaries preserve body edits traps and recovery", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-principal-summary-",
+    prefix: "squid-principal-summary-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const source = (seed: number, operation = "add", unrelated = "sub") =>
     `const local = func value => return @u32.${operation} value 1
 const subtract = func value => return @u32.sub value 2
@@ -215,7 +215,7 @@ io const third: U32 = local (odd ${seed})
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -279,9 +279,9 @@ io const third: U32 = local (odd ${seed})
 
 Deno.test("checked interfaces execute changed bodies and preserve traps and recovery", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-checked-interface-",
+    prefix: "squid-checked-interface-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const source = (operation: string, operand: number) =>
     `const add = func (x: U32) : U32 => return @u32.add x 1
 const sub = func (x: U32) : U32 => return @u32.sub x 1
@@ -294,7 +294,7 @@ io const answer: U32 = local 41
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -344,9 +344,9 @@ io const answer: U32 = local 41
 
 Deno.test("completed inferred interfaces preserve current conversions body edits traps and recovery", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-completed-interface-",
+    prefix: "squid-completed-interface-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const source = (rounding: string, member = "from") =>
     `type Token is data = $Token U32
 const Token.from = func value => return $Token (@f32.to_u32 value)
@@ -365,7 +365,7 @@ io const answer: U32 = case local 41.25 of
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };

@@ -91,12 +91,12 @@ Deno.test.ignore("partial collection shapes preserve unresolved dispatch diagnos
 
 Deno.test("partial collection shapes preserve fresh and retained output through concrete edits", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
   };
   const compiler = await createZigProjectCompiler(options);
   try {

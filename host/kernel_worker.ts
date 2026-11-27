@@ -1,4 +1,4 @@
-// Sandboxed Deno child subprocess for Blot vNext `KernelPool` (§5.1).
+// Sandboxed Deno child subprocess for Squid vNext `KernelPool` (§5.1).
 // Runs under `--no-prompt` with zero `--allow-run` permissions so this child
 // exclusively owns stdout's write end and cannot spawn grandchildren.
 //
@@ -29,7 +29,7 @@ const TAG_RUN_TRAP = 12;
 const ARENA_OOM_OFFSET = 640;
 const STREAM_SLICE_BYTES = 65_536;
 
-// Wire tag codes matching `blot:abi` / `blot:kernels`:
+// Wire tag codes matching `squid:abi` / `squid:kernels`:
 // 0=Unit, 1=U32, 2=Bool, 3=F32, 5=Array U32, 6=Array F32
 const WIRE_U32 = 1;
 const WIRE_BOOL = 2;
@@ -212,9 +212,9 @@ async function main(): Promise<void> {
         }
         const instance = new WebAssembly.Instance(module, stubImports);
         const exports = instance.exports;
-        const memory = exports["blot:memory"];
-        const allocate = exports["blot:allocate"];
-        const reset = exports["blot:reset"];
+        const memory = exports["squid:memory"];
+        const allocate = exports["squid:allocate"];
+        const reset = exports["squid:reset"];
         const entryFn = exports[meta.entryName];
         if (
           !(memory instanceof WebAssembly.Memory) ||
@@ -225,7 +225,7 @@ async function main(): Promise<void> {
           await writeHeader(TAG_INIT_FAIL, seq, 0, 0);
           continue;
         }
-        const finishRaw = exports["blot:finish_invocation"];
+        const finishRaw = exports["squid:finish_invocation"];
         const ctxRaw = meta.ctxExport !== undefined
           ? exports[meta.ctxExport]
           : undefined;

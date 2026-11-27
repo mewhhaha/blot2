@@ -1,6 +1,6 @@
 // Calls, closures applied, partial applications and generalized locals of the
 // direct backend's function emitter (compiler/src/direct/function.zig).
-namespace blot_direct_function;
+namespace squid_direct_function;
 import .function;
 
 // Generic requirements specialize in the caller's evidence context. A
@@ -11,10 +11,10 @@ fn requiresEvidence(g: const Generator&, target: BindingRef) -> bool {
     if target.binding >= m.bindings.len { return false; }
     let body .= m.body(target.binding);
     if !body { return false; }
-    if m.node(body.root).tag == blot_check_core::Tag.contract_method { return true; }
+    if m.node(body.root).tag == squid_check_core::Tag.contract_method { return true; }
     let goals = body.scheme.obligations;
     for obligation in m.obligations[goals.start..goals.start + goals.len] {
-        if obligation.kind == blot_check_types::ObligationKind.contract { return true; }
+        if obligation.kind == squid_check_types::ObligationKind.contract { return true; }
     }
     return false;
 }
@@ -24,16 +24,16 @@ fn evidenceContext(g: Generator&, f: const Fn&, target: BindingRef, id: u32) -> 
     if id != 0 && f.unit != f.evidence_context {
         let m .= g.units[f.unit - 1];
         var signature = m.typeOf(id);
-        if m.node(id).tag == blot_check_core::Tag.call { signature = m.call(id).callee_type; }
+        if m.node(id).tag == squid_check_core::Tag.call { signature = m.call(id).callee_type; }
         let _, error = g.types.lower(m, signature, Env {});
-        if error == blot_direct_types::Error.none { return f.unit; }
+        if error == squid_direct_types::Error.none { return f.unit; }
     }
     return f.evidence_context;
 }
 
 // Contract member symbols are local to each Core module. The members in
 // both copies of the declaration follow the original declaration order.
-fn memberName(origin: const Module&, context: const Module&, template: blot_reuse_principal_interface::MemberTemplate) -> u32 {
+fn memberName(origin: const Module&, context: const Module&, template: squid_reuse_principal_interface::MemberTemplate) -> u32 {
     if origin.unit == context.unit { return template.name; }
     for declared in origin.contracts {
         if declared.identity != template.contract { continue; }
@@ -92,7 +92,7 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
     var parameters: Ty[>..<] = [];
     for argument in m.types.list(template.arguments) {
         let resolved, error = g.types.lower(m, argument, f.env);
-        if error != blot_direct_types::Error.none { return BindingRef { 0, 0 }, g.typeFailure(m, id); }
+        if error != squid_direct_types::Error.none { return BindingRef { 0, 0 }, g.typeFailure(m, id); }
         if !hasContractArgumentIdentity(g, resolved, 0) {
             return BindingRef { 0, 0 }, g.fail(m, id, "a contract method whose type arguments are not first-order data");
         }
@@ -113,14 +113,14 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
                 let want = parameters[index];
                 g.types.match_(unit, head_arg, want, match_env);
                 let lowered, lerr = g.types.lower(unit, head_arg, match_env);
-                if lerr != blot_direct_types::Error.none { matches = false; break; }
+                if lerr != squid_direct_types::Error.none { matches = false; break; }
                 if lowered != want {
                     matches = false; break;
                 }
             }
             if !matches { continue; }
             for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
-                if member.name != uname || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                if member.name != uname || member.kind != squid_reuse_principal_interface::ImplementationMemberKind.value { continue; }
                 let candidate = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
                 if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
                 target = candidate;
@@ -130,23 +130,23 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
     if target.binding == 0 {
         return BindingRef { 0, 0 }, g.fail(m, id, "contract method has no selected implementation in its evidence context");
     }
-    return target, blot_direct_types::Error.none;
+    return target, squid_direct_types::Error.none;
 }
 recursive fn staticContractMethod(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let target, error = staticContractTarget(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     let arguments = m.children(id);
     let values = g.reserveVals(arguments.len);
     for argument, index in arguments {
         let value, error = expr(g, f, argument);
-        if error != blot_direct_types::Error.none { return value, error; }
+        if error != squid_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + index] = value;
     }
     let result, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     let signature, error = curried(g, values, result);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     return callTarget(g, f, target, values, signature, result, id);
 }
 
@@ -157,15 +157,15 @@ let primitive_node_bit: u32 = 0x80000000;
 fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32, is_tail: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let arrow = g.types.node(callee.ty);
-    if arrow.tag != blot_direct_types::Tag.function || callee.len != 2 { return neverVal(), g.fail(m, id, "application of a non-function value"); }
+    if arrow.tag != squid_direct_types::Tag.function || callee.len != 2 { return neverVal(), g.fail(m, id, "application of a non-function value"); }
     let parameter_words, error = layoutLen(g, f, arrow.a, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     if parameter_words != argument.len {
         g.failOpen(m, id);
         g.put("closure argument of ");
         g.putNumber(argument.len);
         g.put(" words for a ");
-        g.put(blot_direct_types::tagName(tagOf(g, arrow.a)));
+        g.put(squid_direct_types::tagName(tagOf(g, arrow.a)));
         g.put(" parameter of ");
         g.putNumber(parameter_words);
         g.put(" words");
@@ -175,22 +175,22 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32, is_t
     push(g, argument);
     lget(g, w(g, callee, 0));
     let signature, error = g.closureSignature(arrow.a, arrow.b);
-    if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
-    if is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+    if error != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_tail && f.assoc_tco_local == 0xffffffff && squid_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
         arrow.b == g.s.instances[f.instance_id].result &&
-        g.s.instances[f.instance_id].result != blot_direct_types::never {
+        g.s.instances[f.instance_id].result != squid_direct_types::never {
         opIndex(g, OP_return_call_indirect, signature);
         uleb(g, 0);
         f.emitted_return_call = true;
         f.checked_elems_len = 0;
-        return neverVal(), blot_direct_types::Error.none;
+        return neverVal(), squid_direct_types::Error.none;
     }
     opIndex(g, OP_call_indirect, signature);
     uleb(g, 0);
     f.checked_elems_len = 0;
     let arg_holds, arg_herr = g.holdsMemory(arrow.a);
-    if arg_herr == blot_direct_types::Error.none && arg_holds {
-        if tagOf(g, argument.ty) == blot_direct_types::Tag.array {
+    if arg_herr == squid_direct_types::Error.none && arg_holds {
+        if tagOf(g, argument.ty) == squid_direct_types::Tag.array {
             invalidateCheckedOwner(g, f, argument);
         } else {
             invalidateCheckedContainers(f);
@@ -207,30 +207,30 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var chain_args: u32[8] = [0; 8];
     var chain_len: i64 = 0;
     var cursor = id;
-    while m.node(cursor).tag == blot_check_core::Tag.apply && chain_len < 8 {
+    while m.node(cursor).tag == squid_check_core::Tag.apply && chain_len < 8 {
         chain_args[chain_len] = m.node(cursor).b;
         chain_len += 1;
         cursor = m.node(cursor).a;
     }
-    if chain_len > 0 && m.node(cursor).tag == blot_check_core::Tag.project {
+    if chain_len > 0 && m.node(cursor).tag == squid_check_core::Tag.project {
         let proj = m.node(cursor);
         let receiver, error = expr(g, f, proj.a);
-        if error != blot_direct_types::Error.none { return receiver, error; }
+        if error != squid_direct_types::Error.none { return receiver, error; }
         let field_val, target, is_method, error = projectFieldOrMethod(g, f, cursor, receiver);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         if is_method {
             let all_args = g.reserveVals(1 + chain_len);
             g.s.vals[all_args.start] = receiver;
             for step in 0..chain_len {
                 let arg_node = chain_args[chain_len - 1 - step];
                 let val, error = expr(g, f, arg_node);
-                if error != blot_direct_types::Error.none { return val, error; }
+                if error != squid_direct_types::Error.none { return val, error; }
                 g.s.vals[all_args.start + 1 + step] = val;
             }
             let callee, error = calleeOf(g, f, target, all_args, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             let rest, error = restType(g, f, callee, all_args.len as i64, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             if is_tail { f.tail_call_node = id; }
             let res_v, res_err = callTarget(g, f, target, all_args, callee, rest, id);
             f.tail_call_node = 0;
@@ -238,23 +238,23 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
         return applyChain(g, f, field_val, chain_args, chain_len, id, is_tail);
     }
-    if chain_len > 0 && m.node(cursor).tag != blot_check_core::Tag.operation_value {
+    if chain_len > 0 && m.node(cursor).tag != squid_check_core::Tag.operation_value {
         let head_val, herr = expr(g, f, cursor);
-        if herr != blot_direct_types::Error.none { return head_val, herr; }
+        if herr != squid_direct_types::Error.none { return head_val, herr; }
         return applyChain(g, f, head_val, chain_args, chain_len, id, is_tail);
     }
     let n = m.node(id);
     let callee, error = expr(g, f, n.a);
-    if error != blot_direct_types::Error.none { return callee, error; }
+    if error != squid_direct_types::Error.none { return callee, error; }
     let argument, error = expr(g, f, n.b);
-    if error != blot_direct_types::Error.none { return argument, error; }
+    if error != squid_direct_types::Error.none { return argument, error; }
     // An effect operation's handler (a state cell's setter, for one) may store
     // a memory-holding argument into older storage.
     var head = n.a;
-    while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; }
-    if m.node(head).tag == blot_check_core::Tag.operation_value {
+    while m.node(head).tag == squid_check_core::Tag.apply { head = m.node(head).a; }
+    if m.node(head).tag == squid_check_core::Tag.operation_value {
         let noted = noteStore(g, f, argument);
-        if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+        if noted != squid_direct_types::Error.none { return neverVal(), noted; }
     }
     return applyClosure(g, f, callee, argument, id, is_tail);
 }
@@ -263,7 +263,7 @@ recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 // arguments (stored in reverse in `chain_args[0..chain_len]`), specializing
 // and inlining statically known closures and partials without `call_indirect`.
 recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const u32[8]&, chain_len: i64, id: u32, is_tail: bool) -> Val, Error {
-    let kc_idx = if head_val.len == 2 && tagOf(g, head_val.ty) == blot_direct_types::Tag.function {
+    let kc_idx = if head_val.len == 2 && tagOf(g, head_val.ty) == squid_direct_types::Tag.function {
         findKnownClosure(f, w(g, head_val, 0), w(g, head_val, 1))
     } else { -1 };
     if kc_idx >= 0 {
@@ -272,7 +272,7 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
         for step in 0..chain_len {
             let arg_node = chain_args[chain_len - 1 - step];
             let arg_val, aerr = expr(g, f, arg_node);
-            if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+            if aerr != squid_direct_types::Error.none { return arg_val, aerr; }
             g.s.vals[eval_args.start + step] = arg_val;
         }
         if kc.kind == 1 {
@@ -281,7 +281,7 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
             for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
             for si in 0..chain_len { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
             let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
-            if rerr == blot_direct_types::Error.none {
+            if rerr == squid_direct_types::Error.none {
                 if is_tail { f.tail_call_node = id; }
                 let res_v, res_err = callTarget(g, f, BindingRef { kc.unit, kc.id }, all_args, kc.full_ty, rest, id);
                 f.tail_call_node = 0;
@@ -294,9 +294,9 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
             for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
             for si in 0..chain_len { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
             let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
-            if rerr == blot_direct_types::Error.none {
+            if rerr == squid_direct_types::Error.none {
                 let tm .= g.units[kc.unit - 1];
-                var primitive = blot_check_core::Primitive { kind: blot_check_core::PrimitiveKind.scalar, arity: 0 };
+                var primitive = squid_check_core::Primitive { kind: squid_check_core::PrimitiveKind.scalar, arity: 0 };
                 var has_prim = false;
                 if (kc.id & primitive_node_bit) != 0 {
                     primitive = tm.primitive(kc.id & 0x7fffffff);
@@ -305,7 +305,7 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
                     let alias, has_alias = primitiveAlias(tm, kc.id);
                     if has_alias { primitive = tm.primitive(alias); has_prim = true; }
                 }
-                if has_prim && primitive.kind == blot_check_core::PrimitiveKind.scalar && (all_args.len as u32) <= primitive.arity {
+                if has_prim && primitive.kind == squid_check_core::PrimitiveKind.scalar && (all_args.len as u32) <= primitive.arity {
                     return applyPrimitive(g, f, primitive, all_args, kc.full_ty, rest, BindingRef { kc.unit, kc.id }, id);
                 }
             } else {
@@ -313,34 +313,34 @@ recursive fn applyChain(g: Generator&, f: Fn&, head_val: Val, chain_args: const 
             }
         } else if kc.kind == 2 {
             let inlined, did_inline, ierr = tryInlineKnownLambda(g, f, kc, eval_args, chain_args, chain_len, id, is_tail);
-            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-            if did_inline { return inlined, blot_direct_types::Error.none; }
+            if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+            if did_inline { return inlined, squid_direct_types::Error.none; }
         }
         // Fallback: arguments are already evaluated; apply them via closure dispatch.
         var cur = head_val;
         for step in 0..chain_len {
             let applied, aerr = applyClosure(g, f, cur, g.s.vals[eval_args.start + step], id, is_tail && step + 1 == chain_len);
-            if aerr != blot_direct_types::Error.none { return applied, aerr; }
+            if aerr != squid_direct_types::Error.none { return applied, aerr; }
             cur = applied;
         }
-        return cur, blot_direct_types::Error.none;
+        return cur, squid_direct_types::Error.none;
     }
     var current = head_val;
     for step in 0..chain_len {
         let arg_node = chain_args[chain_len - 1 - step];
         let arg_val, error = expr(g, f, arg_node);
-        if error != blot_direct_types::Error.none { return arg_val, error; }
+        if error != squid_direct_types::Error.none { return arg_val, error; }
         let applied, error = applyClosure(g, f, current, arg_val, id, is_tail && step + 1 == chain_len);
-        if error != blot_direct_types::Error.none { return applied, error; }
+        if error != squid_direct_types::Error.none { return applied, error; }
         current = applied;
     }
-    return current, blot_direct_types::Error.none;
+    return current, squid_direct_types::Error.none;
 }
 
 // Applies an evaluated function value `head_val` to already-evaluated arguments,
 // dispatching statically known closures without `call_indirect`.
 recursive fn applyEvaluatedChain(g: Generator&, f: Fn&, head_val: Val, eval_args: Vals, id: u32, is_tail: bool) -> Val, Error {
-    let kc_idx = if head_val.len == 2 && tagOf(g, head_val.ty) == blot_direct_types::Tag.function {
+    let kc_idx = if head_val.len == 2 && tagOf(g, head_val.ty) == squid_direct_types::Tag.function {
         findKnownClosure(f, w(g, head_val, 0), w(g, head_val, 1))
     } else { -1 };
     if kc_idx >= 0 {
@@ -352,7 +352,7 @@ recursive fn applyEvaluatedChain(g: Generator&, f: Fn&, head_val: Val, eval_args
             for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
             for si in 0..arg_n { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
             let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
-            if rerr == blot_direct_types::Error.none {
+            if rerr == squid_direct_types::Error.none {
                 if is_tail { f.tail_call_node = id; }
                 let res_v, res_err = callTarget(g, f, BindingRef { kc.unit, kc.id }, all_args, kc.full_ty, rest, id);
                 f.tail_call_node = 0;
@@ -365,9 +365,9 @@ recursive fn applyEvaluatedChain(g: Generator&, f: Fn&, head_val: Val, eval_args
             for ci in 0..cap_n { g.s.vals[all_args.start + ci] = kc.caps[ci]; }
             for si in 0..arg_n { g.s.vals[all_args.start + cap_n + si] = g.s.vals[eval_args.start + si]; }
             let rest, rerr = restType(g, f, kc.full_ty, all_args.len as i64, id);
-            if rerr == blot_direct_types::Error.none {
+            if rerr == squid_direct_types::Error.none {
                 let tm .= g.units[kc.unit - 1];
-                var primitive = blot_check_core::Primitive { kind: blot_check_core::PrimitiveKind.scalar, arity: 0 };
+                var primitive = squid_check_core::Primitive { kind: squid_check_core::PrimitiveKind.scalar, arity: 0 };
                 var has_prim = false;
                 if (kc.id & primitive_node_bit) != 0 {
                     primitive = tm.primitive(kc.id & 0x7fffffff);
@@ -376,7 +376,7 @@ recursive fn applyEvaluatedChain(g: Generator&, f: Fn&, head_val: Val, eval_args
                     let alias, has_alias = primitiveAlias(tm, kc.id);
                     if has_alias { primitive = tm.primitive(alias); has_prim = true; }
                 }
-                if has_prim && primitive.kind == blot_check_core::PrimitiveKind.scalar && (all_args.len as u32) <= primitive.arity {
+                if has_prim && primitive.kind == squid_check_core::PrimitiveKind.scalar && (all_args.len as u32) <= primitive.arity {
                     return applyPrimitive(g, f, primitive, all_args, kc.full_ty, rest, BindingRef { kc.unit, kc.id }, id);
                 }
             } else {
@@ -385,17 +385,17 @@ recursive fn applyEvaluatedChain(g: Generator&, f: Fn&, head_val: Val, eval_args
         } else if kc.kind == 2 {
             let empty_chain: u32[8] = [0; 8];
             let inlined, did_inline, ierr = tryInlineKnownLambda(g, f, kc, eval_args, empty_chain, 0, id, is_tail);
-            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
-            if did_inline { return inlined, blot_direct_types::Error.none; }
+            if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
+            if did_inline { return inlined, squid_direct_types::Error.none; }
         }
     }
     var cur = head_val;
     for step in 0..(eval_args.len as i64) {
         let applied, aerr = applyClosure(g, f, cur, g.s.vals[eval_args.start + step], id, is_tail && step + 1 == (eval_args.len as i64));
-        if aerr != blot_direct_types::Error.none { return applied, aerr; }
+        if aerr != squid_direct_types::Error.none { return applied, aerr; }
         cur = applied;
     }
-    return cur, blot_direct_types::Error.none;
+    return cur, squid_direct_types::Error.none;
 }
 
 // Conservatively reports whether `binding` is captured by any closure node inside `id`.
@@ -449,7 +449,7 @@ recursive fn bindingCapturedInBody(m: const Module&, id: u32, binding: u32, left
                 return true;
             }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && bindingCapturedInBody(m, sel.index, binding, left) {
+                if sel.kind == squid_check_core::UpdateKind.index && bindingCapturedInBody(m, sel.index, binding, left) {
                     return true;
                 }
             }
@@ -484,13 +484,13 @@ recursive fn bindingCapturedInBody(m: const Module&, id: u32, binding: u32, left
 
 recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_args: Vals, chain_args: const u32[8]&, chain_len: i64, id: u32, is_tail: bool) -> Val, bool, Error {
     if f.inline_depth >= 4 || f.evidence_context != 0 {
-        return neverVal(), false, blot_direct_types::Error.none;
+        return neverVal(), false, squid_direct_types::Error.none;
     }
-    if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if g.s.instances[f.instance_id].key.kind == squid_direct_emit::InstanceKind.partial {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     if !g.types.concrete(kc.full_ty, 0) {
-        return neverVal(), false, blot_direct_types::Error.none;
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     var peeled: i64 = 0;
     var param_bs: u32[8] = [0; 8];
@@ -503,10 +503,10 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
         let lm .= g.units[kc.unit - 1];
         var cur = kc.id;
         while peeled < (eval_args.len as i64) && peeled < 8 {
-            if lm.node(cur).tag != blot_check_core::Tag.closure { break; }
+            if lm.node(cur).tag != squid_check_core::Tag.closure { break; }
             let cinfo = lm.closure(cur);
             if cinfo.parameter.binding == 0 { break; }
-            if tagOf(g, after_ty) != blot_direct_types::Tag.function { break; }
+            if tagOf(g, after_ty) != squid_direct_types::Tag.function { break; }
             param_bs[peeled] = cinfo.parameter.binding;
             param_tys[peeled] = cinfo.parameter.ty;
             final_closure = cur;
@@ -514,31 +514,31 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
             after_ty = g.types.node(after_ty).b;
             peeled += 1;
             let next = forwardingRoot(lm, final_body);
-            if peeled < (eval_args.len as i64) && lm.node(next).tag == blot_check_core::Tag.closure {
+            if peeled < (eval_args.len as i64) && lm.node(next).tag == squid_check_core::Tag.closure {
                 cur = next;
             } else {
                 break;
             }
         }
-        if peeled == 0 || final_body == 0 || tagOf(g, after_ty) == blot_direct_types::Tag.never || !g.types.concrete(after_ty, 0) {
-            return neverVal(), false, blot_direct_types::Error.none;
+        if peeled == 0 || final_body == 0 || tagOf(g, after_ty) == squid_direct_types::Tag.never || !g.types.concrete(after_ty, 0) {
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         let unwrapped = forwardingRoot(lm, final_body);
-        if lm.node(unwrapped).tag == blot_check_core::Tag.closure {
+        if lm.node(unwrapped).tag == squid_check_core::Tag.closure {
             if peeled != (eval_args.len as i64) || f.inline_depth >= 3 {
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
             is_partial_closure = true;
         } else {
             var budget: i64 = 192;
             if !canInlineBody(g, lm, final_body, BindingRef { 0, 0 }, budget) {
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
         }
     }
     let _, berr = g.types.boxed(after_ty);
-    if berr != blot_direct_types::Error.none {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if berr != squid_direct_types::Error.none {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     var env = kc.lambda_env;
     {
@@ -547,13 +547,13 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
             let aval = g.s.vals[eval_args.start + pi];
             g.types.match_(lm, param_tys[pi], aval.ty, env);
             let pty, perr = g.types.lower(lm, param_tys[pi], env);
-            if perr != blot_direct_types::Error.none {
+            if perr != squid_direct_types::Error.none {
                 g.dropFailure();
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
             let pwords, werr = g.types.layout(pty);
-            if werr != blot_direct_types::Error.none || (pwords.len as u32) != aval.len {
-                return neverVal(), false, blot_direct_types::Error.none;
+            if werr != squid_direct_types::Error.none || (pwords.len as u32) != aval.len {
+                return neverVal(), false, squid_direct_types::Error.none;
             }
         }
     }
@@ -635,25 +635,25 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
 
     let slot = g.newSlot();
     let made, merr = fresh(g, f, after_ty, id);
-    if merr != blot_direct_types::Error.none { return neverVal(), false, merr; }
-    g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
+    if merr != squid_direct_types::Error.none { return neverVal(), false, merr; }
+    g.s.slots[slot] = squid_direct_emit::Slot { true, made, 0, Val {} };
 
     let exit = open(g, f, OP_block);
     let s .= g.s;
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: final_closure, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+    s.labels.push(squid_direct_emit::Label { target: final_closure, depth: exit, result: slot, kind: squid_direct_emit::LabelKind.function });
 
     s.serial += 1;
     f.serial = s.serial;
     f.unit = kc.unit;
     f.env = env;
-    f.bindings = blot_support_zigmap::Map {};
-    f.with_cells = blot_support_zigmap::Map {};
-    f.unique_boxed = blot_support_zigmap::Map {};
-    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
+    f.bindings = squid_support_zigmap::Map {};
+    f.with_cells = squid_support_zigmap::Map {};
+    f.unique_boxed = squid_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = squid_support_zigmap::Map {};
     f.inlined_uncaptured = [0; 8];
     f.inlined_uncaptured_len = 0;
-    f.unique_owned = blot_support_zigmap::Map {};
+    f.unique_owned = squid_support_zigmap::Map {};
     f.reuse_nodes = [0; 4];
     f.reuse_nodes_len = 0;
     f.reuse_block = 0;
@@ -668,10 +668,10 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.tail_call_node = 0;
     f.tco_inhibit = saved_tco_inhibit + 1;
     f.owned_uses_computed = false;
-    f.owned_uses = blot_support_zigmap::Map {};
-    f.owned_flows = blot_support_zigmap::Map {};
+    f.owned_uses = squid_support_zigmap::Map {};
+    f.owned_flows = squid_support_zigmap::Map {};
     f.nan_elide_computed = false;
-    f.nan_observed = blot_support_zigmap::Map {};
+    f.nan_observed = squid_support_zigmap::Map {};
     f.finite_f32_len = 0;
     f.inlined_body_binding = 0;
     f.inlined_body_root = final_body;
@@ -705,24 +705,24 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     for pi in 0..peeled {
         bindPut(g, f, param_bs[pi], g.s.vals[eval_args.start + pi]);
         if (unique_arg_mask & ((1 as u32) << (pi as u32))) != 0 {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bs[pi], 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bs[pi], 1);
         }
         if (unique_boxed_mask & ((1 as u32) << (pi as u32))) != 0 {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bs[pi], 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bs[pi], 1);
         }
     }
     let body_val, b_err = stmt(g, f, final_body);
     var final_err = b_err;
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         let derr = deliver(g, f, body_val, slot, final_body);
-        if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[kc.unit - 1], final_body); }
-        else if derr != blot_direct_types::Error.none { final_err = derr; }
+        if derr == squid_direct_types::Error.unsupported { g.recordFailure(g.units[kc.unit - 1], final_body); }
+        else if derr != squid_direct_types::Error.none { final_err = derr; }
     }
-    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+    if final_err == squid_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         propagateSlotMask(g, f, slot, caller_locals_mark);
     }
 
@@ -773,15 +773,15 @@ recursive fn tryInlineKnownLambda(g: Generator&, f: Fn&, kc: KnownClosure, eval_
     f.peel_active = saved_peel_active;
     f.peel_force_leaf = saved_peel_force_leaf;
 
-    if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
+    if final_err != squid_direct_types::Error.none { return neverVal(), false, final_err; }
     var ret_val = g.s.slots[slot].value;
     if peeled < (eval_args.len as i64) {
         let rem_args = Vals { eval_args.start + (peeled as u32), ((eval_args.len as i64) - peeled) as u32 };
         let applied, aerr = applyEvaluatedChain(g, f, ret_val, rem_args, id, is_tail);
-        if aerr != blot_direct_types::Error.none { return applied, true, aerr; }
+        if aerr != squid_direct_types::Error.none { return applied, true, aerr; }
         ret_val = applied;
     }
-    return ret_val, true, blot_direct_types::Error.none;
+    return ret_val, true, squid_direct_types::Error.none;
 }
 
 recursive fn canInlineConstBody(g: Generator&, tm: const Module&, id: u32, target: BindingRef, budget: i64&) -> bool {
@@ -832,44 +832,44 @@ recursive fn canInlineConstBody(g: Generator&, tm: const Module&, id: u32, targe
 }
 
 recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, bool, Error {
-    if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if g.s.instances[f.instance_id].key.kind == squid_direct_emit::InstanceKind.partial {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     let boxed, berr = g.types.boxed(ty);
-    if berr != blot_direct_types::Error.none || boxed {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if berr != squid_direct_types::Error.none || boxed {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     var body_root: u32 = 0;
     var env = Env {};
-    var obligations = blot_check_types::List {};
+    var obligations = squid_check_types::List {};
     {
         let tm .= g.units[target.unit - 1];
         let body .= tm.body(target.binding);
-        if !body || body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
+        if !body || body.is_function || body.exported { return neverVal(), false, squid_direct_types::Error.none; }
         body_root = body.root;
         var budget: i64 = 24;
         if !canInlineConstBody(g, tm, body_root, target, budget) {
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         g.types.match_(tm, tm.binding(body.binding).ty, ty, env);
         obligations = body.scheme.obligations;
     }
     if obligations.len != 0 {
         let solved = g.solveObligationsPublic(g.units[target.unit - 1], obligations, env);
-        if solved != blot_direct_types::Error.none {
+        if solved != squid_direct_types::Error.none {
             g.dropFailure();
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
     }
     {
         let tm .= g.units[target.unit - 1];
         let body .= tm.body(target.binding);
-        if !body { return neverVal(), false, blot_direct_types::Error.none; }
+        if !body { return neverVal(), false, squid_direct_types::Error.none; }
         for v in tm.types.list(body.scheme.variables) {
             let _, verr = g.types.lower(tm, v, env);
-            if verr != blot_direct_types::Error.none {
+            if verr != squid_direct_types::Error.none {
                 g.dropFailure();
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
         }
     }
@@ -910,35 +910,35 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
 
     let slot = g.newSlot();
     let made, merr = fresh(g, f, ty, id);
-    if merr != blot_direct_types::Error.none { return neverVal(), false, merr; }
-    g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
+    if merr != squid_direct_types::Error.none { return neverVal(), false, merr; }
+    g.s.slots[slot] = squid_direct_emit::Slot { true, made, 0, Val {} };
 
     let exit = open(g, f, OP_block);
     let s .= g.s;
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+    s.labels.push(squid_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: squid_direct_emit::LabelKind.function });
 
     s.serial += 1;
     f.serial = s.serial;
     f.unit = target.unit;
     f.env = env;
-    f.bindings = blot_support_zigmap::Map {};
-    f.with_cells = blot_support_zigmap::Map {};
-    f.unique_boxed = blot_support_zigmap::Map {};
-    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
+    f.bindings = squid_support_zigmap::Map {};
+    f.with_cells = squid_support_zigmap::Map {};
+    f.unique_boxed = squid_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = squid_support_zigmap::Map {};
     f.inlined_uncaptured = [0; 8];
     f.inlined_uncaptured_len = 0;
-    f.unique_owned = blot_support_zigmap::Map {};
+    f.unique_owned = squid_support_zigmap::Map {};
     f.loop_depth = 0;
     f.fn_return_block = 0;
     f.self_tco_loop = 0xffffffff;
     f.tail_call_node = 0;
     f.tco_inhibit = saved_tco_inhibit + 1;
     f.owned_uses_computed = false;
-    f.owned_uses = blot_support_zigmap::Map {};
-    f.owned_flows = blot_support_zigmap::Map {};
+    f.owned_uses = squid_support_zigmap::Map {};
+    f.owned_flows = squid_support_zigmap::Map {};
     f.nan_elide_computed = false;
-    f.nan_observed = blot_support_zigmap::Map {};
+    f.nan_observed = squid_support_zigmap::Map {};
     f.finite_f32_len = 0;
     f.inlined_body_binding = target.binding;
     f.inlined_body_root = body_root;
@@ -954,16 +954,16 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
 
     let body_val, b_err = stmt(g, f, body_root);
     var final_err = b_err;
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         let derr = deliver(g, f, body_val, slot, body_root);
-        if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
-        else if derr != blot_direct_types::Error.none { final_err = derr; }
+        if derr == squid_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
+        else if derr != squid_direct_types::Error.none { final_err = derr; }
     }
-    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+    if final_err == squid_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         propagateSlotMask(g, f, slot, caller_locals_mark);
     }
 
@@ -1002,33 +1002,33 @@ recursive fn inlineSmallConst(g: Generator&, f: Fn&, target: BindingRef, ty: Ty,
     f.evidence_context = saved_evidence_context;
     f.direct_returns = saved_direct_returns;
 
-    if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
-    return g.s.slots[slot].value, true, blot_direct_types::Error.none;
+    if final_err != squid_direct_types::Error.none { return neverVal(), false, final_err; }
+    return g.s.slots[slot].value, true, squid_direct_types::Error.none;
 }
 fn constructorFunction(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let n = g.units[f.unit - 1].node(id);
     let ty, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    return partial(g, f, blot_direct_emit::InstanceKind.constructor, BindingRef { f.unit, n.a }, ty, Vals {}, id);
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
+    return partial(g, f, squid_direct_emit::InstanceKind.constructor, BindingRef { f.unit, n.a }, ty, Vals {}, id);
 }
 fn primitiveFunction(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let ty, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     // A primitive node is its own target: the unit's primitive catalog.
-    return partial(g, f, blot_direct_emit::InstanceKind.primitive, BindingRef { f.unit, id | primitive_node_bit }, ty, Vals {}, id);
+    return partial(g, f, squid_direct_emit::InstanceKind.primitive, BindingRef { f.unit, id | primitive_node_bit }, ty, Vals {}, id);
 }
 
 // A global array constant: one persistent owner per instance, initialized on
 // first use.
 fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Error {
-    let key = InstanceKey { blot_direct_emit::InstanceKind.pool, target.unit, target.binding, ty, 0, 0 };
+    let key = InstanceKey { squid_direct_emit::InstanceKind.pool, target.unit, target.binding, ty, 0, 0 };
     var instance, present = g.find(key);
     if !present {
         if g.s.parallel_readonly {
             instance = g.addParallelPool(key, ty, g.units[f.unit - 1].unit);
         } else {
             let created, error = g.addInstanceWith(key, Env {}, Tys {}, ty, false, Tys {}, g.units[f.unit - 1], id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             let at = g.s.pool_words.len as u32;
             let first = g.module.addGlobal(VT_i32, true, 0);
             let second = g.module.addGlobal(VT_i32, true, 0);
@@ -1048,16 +1048,16 @@ fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Erro
 // recursive nominal node into the persistent bump region and recursively persists
 // all nested owners and recursive pointers, recording deeply-immutable boxes in `static_blocks`.
 recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Error {
-    let key = blot_direct_emit::key64(ty, 1);
+    let key = squid_direct_emit::key64(ty, 1);
     let existing, found = g.s.persist_rec_helpers.get(key);
-    if found { return existing, blot_direct_types::Error.none; }
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if found { return existing, squid_direct_types::Error.none; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let fn_id = g.module.addFunction(g.module.signature([VT_i32], [VT_i32]));
     g.s.persist_rec_helpers.put(key, fn_id);
-    blot_direct_emit::recordParentAux(3, ty, fn_id);
+    squid_direct_emit::recordParentAux(3, ty, fn_id);
     let s .= g.s;
     let code_mark = s.code.len;
-    let sites_mark = blot_direct_relocations::mark();
+    let sites_mark = squid_direct_relocations::mark();
     let locals_mark = s.locals.len;
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
@@ -1066,8 +1066,8 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
     let old_ptr = local(g, nf, VT_i32);
     nf.parameter_words = 1;
     let bbytes, berr = blockBytes(g, nf, ty, 0);
-    if berr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if berr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, berr;
     }
@@ -1090,44 +1090,44 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
         callf(g, rt.record_static_block);
     }
     let is_rec, rec_err = g.types.isRecursive(ty);
-    if rec_err != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if rec_err != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, rec_err;
     }
     if !is_rec {
         let perr = persistFlatAt(g, nf, new_ptr, 0, ty, 0, 0);
-        if perr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if perr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, perr;
         }
     } else {
     let cases, cerr = g.types.variants(ty);
-    if cerr != blot_direct_types::Error.none {
-        blot_direct_relocations::rewind(sites_mark);
+    if cerr != squid_direct_types::Error.none {
+        squid_direct_relocations::rewind(sites_mark);
         s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
         return 0, cerr;
     }
     if cases.len == 1 {
         let perr = persistFlatAt(g, nf, new_ptr, 0, g.types.variant_payloads[cases.payloads], 0, 0);
-        if perr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if perr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, perr;
         }
     } else if cases.len > 1 {
         let _, payload_off, serr = g.types.sumTagInfo(ty);
-        if serr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if serr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, serr;
         }
         let tag_loc = local32(g, nf);
         lget(g, new_ptr);
         let tlerr = emitTagLoad(g, ty, 0);
-        if tlerr != blot_direct_types::Error.none {
-            blot_direct_relocations::rewind(sites_mark);
+        if tlerr != squid_direct_types::Error.none {
+            squid_direct_relocations::rewind(sites_mark);
             s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
             return 0, tlerr;
         }
@@ -1135,8 +1135,8 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
         for ci in 0..(cases.len as i64) {
             let pty = g.types.variant_payloads[cases.payloads + ci];
             let pholds, herr = g.contentsHoldMemory(pty);
-            if herr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if herr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, herr;
             }
@@ -1146,8 +1146,8 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
             op(g, OP_i32_eq);
             let cif = open(g, nf, OP_if_);
             let perr = persistFlatAt(g, nf, new_ptr, payload_off, pty, 0, 0);
-            if perr != blot_direct_types::Error.none {
-                blot_direct_relocations::rewind(sites_mark);
+            if perr != squid_direct_types::Error.none {
+                squid_direct_relocations::rewind(sites_mark);
                 s.code.resize(code_mark); s.locals.resize(locals_mark); s.labels.resize(labels_mark); s.handles.resize(handles_mark); s.handle_cells_len = handle_cells_mark;
                 return 0, perr;
             }
@@ -1158,27 +1158,27 @@ recursive fn ensurePersistRecHelper(g: Generator&, unit: u32, ty: Ty) -> u32, Er
     lget(g, new_ptr);
     op(g, OP_end);
     finishWith(g, fn_id, nf, false, 0, 0, 0);
-    blot_direct_relocations::rewind(sites_mark);
+    squid_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);
     s.locals.resize(locals_mark);
     s.labels.resize(labels_mark);
     s.handles.resize(handles_mark);
     s.handle_cells_len = handle_cells_mark;
-    return fn_id, blot_direct_types::Error.none;
+    return fn_id, squid_direct_types::Error.none;
 }
 
 // Recursively persists nested owned arrays and recursive boxes stored flat at `base + offset`.
 // All module const pools are deeply immutable, so nested pools always use mode = 2 (static_pool_flag | live_flag).
 recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty, id: u32, depth: i64) -> Error {
-    if depth > 32 { return blot_direct_types::Error.none; }
+    if depth > 32 { return squid_direct_types::Error.none; }
     let holds, herr = g.contentsHoldMemory(ty);
-    if herr != blot_direct_types::Error.none { return herr; }
-    if !holds { return blot_direct_types::Error.none; }
+    if herr != squid_direct_types::Error.none { return herr; }
+    if !holds { return squid_direct_types::Error.none; }
     let is_rec, rerr = g.types.isRecursive(ty);
-    if rerr != blot_direct_types::Error.none { return rerr; }
+    if rerr != squid_direct_types::Error.none { return rerr; }
     if is_rec {
         let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, ty);
-        if aerr != blot_direct_types::Error.none { return aerr; }
+        if aerr != squid_direct_types::Error.none { return aerr; }
         let old_p = local32(g, f);
         lget(g, base);
         op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
@@ -1187,7 +1187,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
         lget(g, old_p);
         callf(g, helper_fn);
         op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
     let n = g.types.node(ty);
     match n.tag {
@@ -1204,7 +1204,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             lset(g, c_gen);
             let elem_ty = n.a;
             let elem_step, serr = stride(g, f, elem_ty, id);
-            if serr != blot_direct_types::Error.none { return serr; }
+            if serr != squid_direct_types::Error.none { return serr; }
             lget(g, c_slot);
             lget(g, c_gen);
             i32Const(g, elem_step);
@@ -1219,12 +1219,12 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             lget(g, p_gen);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
             let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
-            if eherr != blot_direct_types::Error.none { return eherr; }
+            if eherr != squid_direct_types::Error.none { return eherr; }
             if elem_holds {
                 let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, id, depth + 1);
-                if perr != blot_direct_types::Error.none { return perr; }
+                if perr != squid_direct_types::Error.none { return perr; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         packed => {
             let c_slot = local32(g, f);
@@ -1236,14 +1236,14 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
             lset(g, c_gen);
             let p_slot, p_gen, perr = emitPackedPersist(g, f, c_slot, c_gen, ty, id, depth);
-            if perr != blot_direct_types::Error.none { return perr; }
+            if perr != squid_direct_types::Error.none { return perr; }
             lget(g, base);
             lget(g, p_slot);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
             lget(g, base);
             lget(g, p_gen);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         seq => {
             let c_slot = local32(g, f);
@@ -1255,14 +1255,14 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + 4);
             lset(g, c_gen);
             let p_slot, p_gen, perr = emitSeqPersist(g, f, c_slot, c_gen, ty, id, depth);
-            if perr != blot_direct_types::Error.none { return perr; }
+            if perr != squid_direct_types::Error.none { return perr; }
             lget(g, base);
             lget(g, p_slot);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
             lget(g, base);
             lget(g, p_gen);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         ref, link, view => {
             let c_slot = local32(g, f);
@@ -1279,7 +1279,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             lset(g, c_gen);
             let elem_ty = n.a;
             let elem_step, serr = stride(g, f, elem_ty, id);
-            if serr != blot_direct_types::Error.none { return serr; }
+            if serr != squid_direct_types::Error.none { return serr; }
             let p_slot = local32(g, f);
             let p_gen = local32(g, f);
             lget(g, c_slot);
@@ -1296,46 +1296,46 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
             lget(g, p_gen);
             op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + 4);
             let elem_holds, eherr = g.contentsHoldMemory(elem_ty);
-            if eherr != blot_direct_types::Error.none { return eherr; }
+            if eherr != squid_direct_types::Error.none { return eherr; }
             if elem_holds {
                 let perr = persistArrayElements(g, f, p_slot, p_gen, elem_ty, elem_step, id, depth + 1);
-                if perr != blot_direct_types::Error.none { return perr; }
+                if perr != squid_direct_types::Error.none { return perr; }
             }
             close(g, f);
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         tuple => {
             for at in 0..(n.b as i64) {
                 let item_ty = g.types.words[n.a + at];
                 let ioff, ierr = g.types.tupleItemByteOffset(ty, at);
-                if ierr != blot_direct_types::Error.none { return ierr; }
+                if ierr != squid_direct_types::Error.none { return ierr; }
                 let perr = persistFlatAt(g, f, base, offset + ioff, item_ty, id, depth + 1);
-                if perr != blot_direct_types::Error.none { return perr; }
+                if perr != squid_direct_types::Error.none { return perr; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         record => {
             for idx in 0..(n.b as i64) {
                 let field_ty = g.types.recordField(ty, idx).ty;
                 let foff, ferr = g.types.recordFieldByteOffset(ty, idx);
-                if ferr != blot_direct_types::Error.none { return ferr; }
+                if ferr != squid_direct_types::Error.none { return ferr; }
                 let perr = persistFlatAt(g, f, base, offset + foff, field_ty, id, depth + 1);
-                if perr != blot_direct_types::Error.none { return perr; }
+                if perr != squid_direct_types::Error.none { return perr; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         nominal => {
             let cases, cerr = g.types.variants(ty);
-            if cerr != blot_direct_types::Error.none { return cerr; }
+            if cerr != squid_direct_types::Error.none { return cerr; }
             if cases.len == 1 {
                 return persistFlatAt(g, f, base, offset, g.types.variant_payloads[cases.payloads], id, depth + 1);
             }
             if cases.len > 1 {
                 let is_niche, _, _, some_pty, nerr = g.types.nullableNiche(ty);
-                if nerr != blot_direct_types::Error.none { return nerr; }
+                if nerr != squid_direct_types::Error.none { return nerr; }
                 if is_niche {
                     let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, some_pty);
-                    if aerr != blot_direct_types::Error.none { return aerr; }
+                    if aerr != squid_direct_types::Error.none { return aerr; }
                     let old_p = local32(g, f);
                     lget(g, base);
                     op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
@@ -1344,21 +1344,21 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
                     lget(g, old_p);
                     callf(g, helper_fn);
                     op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
-                    return blot_direct_types::Error.none;
+                    return squid_direct_types::Error.none;
                 }
                 let _, payload_off, serr = g.types.sumTagInfo(ty);
-                if serr != blot_direct_types::Error.none { return serr; }
+                if serr != squid_direct_types::Error.none { return serr; }
                 let tag_loc = local32(g, f);
                 lget(g, base);
                 let tlerr = emitTagLoad(g, ty, offset);
-                if tlerr != blot_direct_types::Error.none { return tlerr; }
+                if tlerr != squid_direct_types::Error.none { return tlerr; }
                 lset(g, tag_loc);
                 for ci in 0..(cases.len as i64) {
                     let pty = g.types.variant_payloads[cases.payloads + ci];
                     let is_out, oerr = g.types.variantOutlined(ty, ci);
-                    if oerr != blot_direct_types::Error.none { return oerr; }
+                    if oerr != squid_direct_types::Error.none { return oerr; }
                     let pholds, pherr = g.contentsHoldMemory(pty);
-                    if pherr != blot_direct_types::Error.none { return pherr; }
+                    if pherr != squid_direct_types::Error.none { return pherr; }
                     if !is_out && !pholds { continue; }
                     lget(g, tag_loc);
                     i32Const(g, g.types.variant_tags[cases.tags + ci]);
@@ -1366,7 +1366,7 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
                     let cif = open(g, f, OP_if_);
                     if is_out {
                         let helper_fn, aerr = ensurePersistRecHelper(g, f.unit, pty);
-                        if aerr != blot_direct_types::Error.none { return aerr; }
+                        if aerr != squid_direct_types::Error.none { return aerr; }
                         let old_p = local32(g, f);
                         lget(g, base);
                         op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + payload_off);
@@ -1377,14 +1377,14 @@ recursive fn persistFlatAt(g: Generator&, f: Fn&, base: u32, offset: u32, ty: Ty
                         op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + payload_off);
                     } else {
                         let perr = persistFlatAt(g, f, base, offset + payload_off, pty, id, depth + 1);
-                        if perr != blot_direct_types::Error.none { return perr; }
+                        if perr != squid_direct_types::Error.none { return perr; }
                     }
                     close(g, f);
                 }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
-        _ => { return blot_direct_types::Error.none; },
+        _ => { return squid_direct_types::Error.none; },
     }
 }
 
@@ -1399,10 +1399,10 @@ recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32
     lget(g, p_gen);
     callf(g, rt.check);
     ltee(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, arr_base);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     lset(g, arr_len);
     i32Const(g, 0);
     lset(g, idx);
@@ -1419,7 +1419,7 @@ recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32
     op(g, OP_i32_add);
     lset(g, elem_addr);
     let perr = persistFlatAt(g, f, elem_addr, 0, elem_ty, id, depth);
-    if perr != blot_direct_types::Error.none { return perr; }
+    if perr != squid_direct_types::Error.none { return perr; }
     lget(g, idx);
     i32Const(g, 1);
     op(g, OP_i32_add);
@@ -1427,7 +1427,7 @@ recursive fn persistArrayElements(g: Generator&, f: Fn&, p_slot: u32, p_gen: u32
     br(g, f, OP_br, top);
     close(g, f);
     close(g, f);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
@@ -1455,29 +1455,29 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     let stack_mark = local32(g, f);
     markInto(g, g.s.code, owner_mark, stack_mark);
     let value_instance, error = g.named(BindingRef { key.unit, key.id }, key.ty, m, 0);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     callf(g, g.s.instances[value_instance].function);
     let value, error = pop(g, f, key.ty, 0);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     var p_slot: u32 = 0;
     var p_gen: u32 = 0;
-    if tagOf(g, key.ty) == blot_direct_types::Tag.packed {
+    if tagOf(g, key.ty) == squid_direct_types::Tag.packed {
         let ps, pg, perr = emitPackedPersist(g, f, w(g, value, 0), w(g, value, 1), key.ty, 0, 0);
-        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        if perr != squid_direct_types::Error.none { return neverVal(), perr; }
         p_slot = ps;
         p_gen = pg;
-    } else if tagOf(g, key.ty) == blot_direct_types::Tag.seq {
+    } else if tagOf(g, key.ty) == squid_direct_types::Tag.seq {
         let ps, pg, perr = emitSeqPersist(g, f, w(g, value, 0), w(g, value, 1), key.ty, 0, 0);
-        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        if perr != squid_direct_types::Error.none { return neverVal(), perr; }
         p_slot = ps;
         p_gen = pg;
     } else {
         lget(g, w(g, value, 0));
         lget(g, w(g, value, 1));
         let element, error = elementOf(g, f, key.ty, 0);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         let step, error = stride(g, f, element, 0);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         i32Const(g, step);
         // All module const pools are deeply immutable: always emit mode = 2 (static_pool_flag | live_flag).
         i32Const(g, 2);
@@ -1487,10 +1487,10 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
         lset(g, p_gen);
         lset(g, p_slot);
         let elem_holds, eherr = g.contentsHoldMemory(element);
-        if eherr != blot_direct_types::Error.none { return neverVal(), eherr; }
+        if eherr != squid_direct_types::Error.none { return neverVal(), eherr; }
         if elem_holds {
             let perr = persistArrayElements(g, f, p_slot, p_gen, element, step, 0, 0);
-            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+            if perr != squid_direct_types::Error.none { return neverVal(), perr; }
         }
     }
     lget(g, p_slot);
@@ -1504,12 +1504,12 @@ recursive fn poolBody(g: Generator&, f: Fn&, instance_id: u32) -> Val, Error {
     gset(g, state_global);
     close(g, f);
     let result, error = fresh(g, f, key.ty, 0);
-    if error != blot_direct_types::Error.none { return result, error; }
+    if error != squid_direct_types::Error.none { return result, error; }
     gget(g, slot_global);
     lset(g, w(g, result, 0));
     gget(g, generation_global);
     lset(g, w(g, result, 1));
-    return result, blot_direct_types::Error.none;
+    return result, squid_direct_types::Error.none;
 }
 
 recursive fn call(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
@@ -1534,7 +1534,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
     var gen_arg1: u32 = 0;
     var gen_out_ty: Ty = 0;
     var gen_resolved = BindingRef { 0, 0 };
-    if arguments.len == 2 && m.node(arguments[1]).tag == blot_check_core::Tag.closure && g.hasUnit(target.unit) {
+    if arguments.len == 2 && m.node(arguments[1]).tag == squid_check_core::Tag.closure && g.hasUnit(target.unit) {
         let resolved_g = followAliasTarget(g, target);
         if g.hasUnit(resolved_g.unit) {
             let tm .= g.units[resolved_g.unit - 1];
@@ -1543,11 +1543,11 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
                 let tparams = tm.bodyParameters(tbody);
                 if tparams.len == 2 {
                     let inner = unwrapSingleBody(tm, tbody.root);
-                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.array_op && tm.arrayOperation(inner) == blot_backend_collection_ops::Op.generate {
+                    if inner != 0 && tm.node(inner).tag == squid_check_core::Tag.array_op && tm.arrayOperation(inner) == squid_backend_collection_ops::Op.generate {
                         let ch = tm.children(inner);
                         if ch.len == 2 && localRef(tm, ch[0]) == tparams[0].binding && localRef(tm, ch[1]) == tparams[1].binding {
                             let out_ty, ok_out = lowerInEnv(g, m, m.typeOf(id), f.env);
-                            if ok_out && tagOf(g, out_ty) == blot_direct_types::Tag.array {
+                            if ok_out && tagOf(g, out_ty) == squid_direct_types::Tag.array {
                                 gen_wrap = true;
                                 gen_arg0 = arguments[0];
                                 gen_arg1 = arguments[1];
@@ -1562,24 +1562,24 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
     }
     if gen_wrap {
         let counted, cerr = expr(g, f, gen_arg0);
-        if cerr != blot_direct_types::Error.none { return counted, cerr; }
+        if cerr != squid_direct_types::Error.none { return counted, cerr; }
         let count_loc, clerr = scalarLocal(g, f, counted, id);
-        if clerr != blot_direct_types::Error.none { return neverVal(), clerr; }
+        if clerr != squid_direct_types::Error.none { return neverVal(), clerr; }
         let inlined, did_inline, ierr = tryEmitGenerateInlineClosure(g, f, count_loc, gen_arg1, gen_out_ty, id);
-        if ierr != blot_direct_types::Error.none { return inlined, ierr; }
+        if ierr != squid_direct_types::Error.none { return inlined, ierr; }
         if did_inline {
             g.recordInlined(gen_resolved.unit, gen_resolved.binding);
-            return inlined, blot_direct_types::Error.none;
+            return inlined, squid_direct_types::Error.none;
         }
         // Fallback: count already evaluated; build closure and run generate.
         let src_val, serr = expr(g, f, gen_arg1);
-        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        if serr != squid_direct_types::Error.none { return src_val, serr; }
         g.recordInlined(gen_resolved.unit, gen_resolved.binding);
         return emitFillOrGenerate(g, f, false, count_loc, src_val, gen_out_ty, id);
     }
     // Fast path: intercept 2-arg `@storage.extend` forwarders (e.g. `Array.extend`)
     // when arg 1 is a .rodata constant array so we never materialize `pool.*`.
-    if arguments.len == 2 && m.node(arguments[1]).tag == blot_check_core::Tag.reference && g.hasUnit(target.unit) {
+    if arguments.len == 2 && m.node(arguments[1]).tag == squid_check_core::Tag.reference && g.hasUnit(target.unit) {
         let resolved_ext = followAliasTarget(g, target);
         if g.hasUnit(resolved_ext.unit) {
             let tm .= g.units[resolved_ext.unit - 1];
@@ -1588,28 +1588,28 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
                 let tparams = tm.bodyParameters(tbody);
                 if tparams.len == 2 {
                     let inner = scratchReturned(tm, unwrapSingleBody(tm, tbody.root));
-                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.storage {
-                        let sop, sok = blot_check_storage_ops::opFromCode(tm.node(inner).c);
-                        if sok == blot_error::Error.none && sop == blot_check_storage_ops::Op.extend {
+                    if inner != 0 && tm.node(inner).tag == squid_check_core::Tag.storage {
+                        let sop, sok = squid_check_storage_ops::opFromCode(tm.node(inner).c);
+                        if sok == squid_error::Error.none && sop == squid_check_storage_ops::Op.extend {
                             let ch = tm.children(inner);
                             if ch.len == 2 && localRef(tm, ch[0]) == tparams[0].binding && localRef(tm, ch[1]) == tparams[1].binding {
                                 let rd, is_rd = tryResolveRodata(g, f, arguments[1]);
                                 if is_rd {
                                     let is_direct = localRef(m, arguments[0]) != 0;
                                     let dst, derr = expr(g, f, arguments[0]);
-                                    if derr != blot_direct_types::Error.none { return dst, derr; }
-                                    if tagOf(g, dst.ty) == blot_direct_types::Tag.array && g.types.node(dst.ty).a == rd.elem_ty {
+                                    if derr != squid_direct_types::Error.none { return dst, derr; }
+                                    if tagOf(g, dst.ty) == squid_direct_types::Tag.array && g.types.node(dst.ty).a == rd.elem_ty {
                                         g.recordInlined(resolved_ext.unit, resolved_ext.binding);
                                         return emitExtendFromRodata(g, f, dst, is_direct, rd, id);
                                     }
                                     // Type mismatch fallback (unreachable for well-typed programs).
                                     let src_val, serr = expr(g, f, arguments[1]);
-                                    if serr != blot_direct_types::Error.none { return src_val, serr; }
+                                    if serr != squid_direct_types::Error.none { return src_val, serr; }
                                     let vals2 = g.saveVals([dst, src_val]);
                                     let cty, cerr = calleeOf(g, f, target, vals2, id);
-                                    if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+                                    if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
                                     let rty, rerr = restType(g, f, cty, 2, id);
-                                    if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                                    if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
                                     return callTarget(g, f, target, vals2, cty, rty, id, elide_nan);
                                 }
                             }
@@ -1629,7 +1629,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
             if body && body.is_function && rtm.bodyParameters(body).len == arguments.len {
                 let root = forwardingRoot(rtm, body.root);
                 let node = rtm.node(root);
-                elide_vector_args = node.tag == blot_check_core::Tag.scalar && node.c == 0 &&
+                elide_vector_args = node.tag == squid_check_core::Tag.scalar && node.c == 0 &&
                     (isF32x4CoreExpr(rtm, node.a) || isF64x2CoreExpr(rtm, node.a)) &&
                     (isCanonicalF32Consumer(node.op) || canonicalV128Producer(node.op)) &&
                     simdForwardingOperands(rtm, body, node.a, node.b);
@@ -1644,7 +1644,7 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
             let palias, has_palias = primitiveAlias(rtm, resolved_prim.binding);
             if has_palias {
                 let pinfo = rtm.primitive(palias);
-                if pinfo.kind == blot_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) && isFloatCoreExpr(g, f, m, arguments[0]) {
+                if pinfo.kind == squid_check_core::PrimitiveKind.scalar && (pinfo.arity as i64) == arguments.len && isCanonicalF32Consumer(pinfo.op) && isFloatCoreExpr(g, f, m, arguments[0]) {
                     elide_args = true;
                 }
             }
@@ -1665,21 +1665,21 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
         }
         let value, error = expr(g, f, argument);
         f.elide_f32_nan_node = 0;
-        if error != blot_direct_types::Error.none { return value, error; }
+        if error != squid_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;
     }
     if deferred {
         for argument, index in arguments {
-            if g.s.vals[values.start + index].ty != blot_direct_types::never { continue; }
+            if g.s.vals[values.start + index].ty != squid_direct_types::never { continue; }
             // Still unknown: take the type the callee expects from the
             // arguments known so far, with holes for what they leave open.
             if !lowers(g, f, m.typeOf(argument)) {
                 let expected, has_expected, error = expectedArgument(g, f, target, values, index);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                if error != squid_direct_types::Error.none { return neverVal(), error; }
                 if has_expected { refine(g, f, m.typeOf(argument), expected); }
             }
             let value, error = expr(g, f, argument);
-            if error != blot_direct_types::Error.none { return value, error; }
+            if error != squid_direct_types::Error.none { return value, error; }
             g.s.vals[values.start + index] = value;
         }
     }
@@ -1695,59 +1695,59 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
                 let tparams = tm.bodyParameters(tbody);
                 if tparams.len == 1 {
                     let inner = unwrapSingleBody(tm, tbody.root);
-                    if inner != 0 && tm.node(inner).tag == blot_check_core::Tag.flat_op {
+                    if inner != 0 && tm.node(inner).tag == squid_check_core::Tag.flat_op {
                         let fn_node = tm.node(inner);
                         if localRef(tm, fn_node.a) == tparams[0].binding {
                             let arg_ct = m.typeOf(arguments[0]);
                             let res_ct = m.typeOf(id);
-                            if fn_node.c == blot_check_core::flat_op_encode && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                            if fn_node.c == squid_check_core::flat_op_encode && m.types.node(arg_ct).tag != squid_check_types::Tag.variable {
                                 let out_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatEncodeVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_decode && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                            if fn_node.c == squid_check_core::flat_op_decode && m.types.node(res_ct).tag == squid_check_types::Tag.nominal {
                                 let maybe_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatDecodeVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_encode_wire && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                            if fn_node.c == squid_check_core::flat_op_encode_wire && m.types.node(arg_ct).tag != squid_check_types::Tag.variable {
                                 let out_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatEncodeWireVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_decode_wire && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                            if fn_node.c == squid_check_core::flat_op_decode_wire && m.types.node(res_ct).tag == squid_check_types::Tag.nominal {
                                 let maybe_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatDecodeWireVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_encode_batch && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                            if fn_node.c == squid_check_core::flat_op_encode_batch && m.types.node(arg_ct).tag != squid_check_types::Tag.variable {
                                 let out_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatEncodeBatchVal(g, f, g.s.vals[values.start], arg_ct, out_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_decode_batch && m.types.node(res_ct).tag == blot_check_types::Tag.nominal {
+                            if fn_node.c == squid_check_core::flat_op_decode_batch && m.types.node(res_ct).tag == squid_check_types::Tag.nominal {
                                 let maybe_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 return emitFlatDecodeBatchVal(g, f, g.s.vals[values.start], res_ct, maybe_ty, id);
                             }
-                            if fn_node.c == blot_check_core::flat_op_schema_hash && m.types.node(arg_ct).tag != blot_check_types::Tag.variable {
+                            if fn_node.c == squid_check_core::flat_op_schema_hash && m.types.node(arg_ct).tag != squid_check_types::Tag.variable {
                                 let out_ty, ty_err = typeOf(g, f, id);
-                                if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
-                                let h, ok = blot_check_wire_schema::computeSchemaHash(g.units, f.unit, arg_ct);
+                                if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
+                                let h, ok = squid_check_wire_schema::computeSchemaHash(g.units, f.unit, arg_ct);
                                 if !ok {
-                                    return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
+                                    return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
                                 }
                                 g.recordInlined(resolved_f.unit, resolved_f.binding);
                                 let lo = constLocal(g, f, (h & 0xffffffff) as u32);
                                 let hi = constLocal(g, f, (h >> 32) as u32);
                                 let words = g.saveWords([lo, hi]);
-                                return Val { out_ty, words.start, words.len }, blot_direct_types::Error.none;
+                                return Val { out_ty, words.start, words.len }, squid_direct_types::Error.none;
                             }
                         }
                     }
@@ -1756,14 +1756,14 @@ recursive fn callInner(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) 
         }
     }
     var callee, error = g.types.lower(m, info.callee_type, f.env);
-    if error != blot_direct_types::Error.none {
+    if error != squid_direct_types::Error.none {
         let derived, error = calleeOf(g, f, target, values, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         callee = derived;
     }
     refine(g, f, info.callee_type, callee);
     let rest, error = restType(g, f, callee, values.len, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     if tail_here { f.tail_call_node = id; }
     let res_v, res_err = callTarget(g, f, target, values, callee, rest, id, elide_nan);
     f.tail_call_node = 0;
@@ -1780,55 +1780,55 @@ fn expectedArgument(g: Generator&, f: Fn&, target: BindingRef, values: Vals, ind
     for at in 0..(values.len as i64) {
         let value = g.s.vals[values.start + at];
         var n = tm.types.node(arrow);
-        while n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.usage {
+        while n.tag == squid_check_types::Tag.forall || n.tag == squid_check_types::Tag.usage {
             arrow = n.a;
             n = tm.types.node(arrow);
         }
-        if n.tag != blot_check_types::Tag.function { return 0, false, blot_direct_types::Error.none; }
+        if n.tag != squid_check_types::Tag.function { return 0, false, squid_direct_types::Error.none; }
         if at == index { has_parameter = true; parameter = n.a; }
-        else if value.ty != blot_direct_types::never { g.types.match_(tm, n.a, value.ty, env); }
+        else if value.ty != squid_direct_types::never { g.types.match_(tm, n.a, value.ty, env); }
         arrow = n.b;
     }
     let body .= tm.body(target.binding);
     if body {
         let solved = g.solveObligationsPublic(tm, body.scheme.obligations, env);
-        if solved != blot_direct_types::Error.none { return 0, false, solved; }
+        if solved != squid_direct_types::Error.none { return 0, false, solved; }
     }
-    if !has_parameter { return 0, false, blot_direct_types::Error.none; }
+    if !has_parameter { return 0, false, squid_direct_types::Error.none; }
     let expected, error = g.types.lowerHoles(tm, parameter, env);
-    if error != blot_direct_types::Error.none { return 0, false, error; }
-    if tagOf(g, expected) != blot_direct_types::Tag.never { return expected, true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return 0, false, error; }
+    if tagOf(g, expected) != squid_direct_types::Tag.never { return expected, true, squid_direct_types::Error.none; }
     // The parameter is a bare variable: its field constraints and the
     // argument's own nominal type give the argument's type arguments.
-    if !body { return 0, false, blot_direct_types::Error.none; }
+    if !body { return 0, false, squid_direct_types::Error.none; }
     return fromFieldConstraints(g, f, tm, body.scheme.obligations, parameter, env, index);
 }
 // The nominal type of argument `index` of the current call, with its type
 // arguments taken from the callee's field constraints on it.
-fn fromFieldConstraints(g: Generator&, f: Fn&, tm: const Module&, goals_span: blot_check_types::List, formal: TId, env: Env, index: i64) -> Ty, bool, Error {
+fn fromFieldConstraints(g: Generator&, f: Fn&, tm: const Module&, goals_span: squid_check_types::List, formal: TId, env: Env, index: i64) -> Ty, bool, Error {
     let m .= g.units[f.unit - 1];
     let info = m.call(f.current_call);
     let argument_type = m.typeOf(info.arguments[index]);
     let shape = m.types.node(argument_type);
-    if shape.tag != blot_check_types::Tag.nominal { return 0, false, blot_direct_types::Error.none; }
-    let identity = blot_check_types::NominalIdentity { shape.a, shape.b };
-    if !g.hasUnit(identity.unit) { return 0, false, blot_direct_types::Error.none; }
+    if shape.tag != squid_check_types::Tag.nominal { return 0, false, squid_direct_types::Error.none; }
+    let identity = squid_check_types::NominalIdentity { shape.a, shape.b };
+    if !g.hasUnit(identity.unit) { return 0, false, squid_direct_types::Error.none; }
     let owner .= g.units[identity.unit - 1];
     let ordinal, error = g.types.nominalOrdinal(owner, identity);
-    if error != blot_direct_types::Error.none { return 0, false, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return 0, false, squid_direct_types::Error.none; }
     let constructors = owner.nominalConstructors(ordinal);
-    if constructors.len != 1 { return 0, false, blot_direct_types::Error.none; }
+    if constructors.len != 1 { return 0, false, squid_direct_types::Error.none; }
     let constructor = owner.constructor(constructors[0]);
     let payload = owner.types.node(constructor.payload);
-    if payload.tag != blot_check_types::Tag.record { return 0, false, blot_direct_types::Error.none; }
+    if payload.tag != squid_check_types::Tag.record { return 0, false, squid_direct_types::Error.none; }
     var params_env = Env {};
     for at in 0..(goals_span.len as i64) {
         let goal = tm.obligations[goals_span.start + at];
-        if (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field) || goal.ty != formal || goal.result == 0 { continue; }
+        if (goal.kind != squid_check_types::ObligationKind.field && goal.kind != squid_check_types::ObligationKind.writable_field) || goal.ty != formal || goal.result == 0 { continue; }
         let spelling = tm.fieldSpelling(goal.name);
         if !spelling.present { continue; }
         let wanted, error = g.types.lowerHoles(tm, goal.result, env);
-        if error != blot_direct_types::Error.none { return 0, false, error; }
+        if error != squid_direct_types::Error.none { return 0, false, error; }
         for field_index in 0..(payload.b as i64) {
             let field = owner.types.recordField(payload, field_index);
             let name = owner.fieldSpelling(field.name);
@@ -1839,10 +1839,10 @@ fn fromFieldConstraints(g: Generator&, f: Fn&, tm: const Module&, goals_span: bl
     // The payload's fields bind the constructor's scheme variables.
     let signature = owner.types.node(constructor.scheme.root);
     var result = constructor.scheme.root;
-    if signature.tag == blot_check_types::Tag.function { result = signature.b; }
+    if signature.tag == squid_check_types::Tag.function { result = signature.b; }
     let lowered, error = g.types.lowerHoles(owner, result, params_env);
-    if error != blot_direct_types::Error.none { return 0, false, error; }
-    return lowered, true, blot_direct_types::Error.none;
+    if error != squid_direct_types::Error.none { return 0, false, error; }
+    return lowered, true, squid_direct_types::Error.none;
 }
 // `acc := @list.append acc x` (a comprehension's accumulator) where the old
 // `acc` has no other use: grow the same owner in place, so the loop carries
@@ -1850,37 +1850,37 @@ fn fromFieldConstraints(g: Generator&, f: Fn&, tm: const Module&, goals_span: bl
 recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    if n.tag != blot_check_core::Tag.array_op || m.arrayOperation(id) != blot_backend_collection_ops::Op.append { return neverVal(), false, blot_direct_types::Error.none; }
+    if n.tag != squid_check_core::Tag.array_op || m.arrayOperation(id) != squid_backend_collection_ops::Op.append { return neverVal(), false, squid_direct_types::Error.none; }
     let children = m.children(id);
-    if children.len != 2 || m.node(children[0]).tag != blot_check_core::Tag.reference { return neverVal(), false, blot_direct_types::Error.none; }
+    if children.len != 2 || m.node(children[0]).tag != squid_check_core::Tag.reference { return neverVal(), false, squid_direct_types::Error.none; }
     let ref = m.reference(children[0]);
-    if ref.unit != 0 && ref.unit != m.unit { return neverVal(), false, blot_direct_types::Error.none; }
+    if ref.unit != 0 && ref.unit != m.unit { return neverVal(), false, squid_direct_types::Error.none; }
     let list, present = bindGet(g, f, ref.binding);
-    if !present { return neverVal(), false, blot_direct_types::Error.none; }
-    if tagOf(g, list.ty) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
-    if uses(g, f, ref.binding) != 1 || !isUniqueOwned(g, f, ref.binding) || bindingCaptured(g, f, ref.binding) { return neverVal(), false, blot_direct_types::Error.none; }
+    if !present { return neverVal(), false, squid_direct_types::Error.none; }
+    if tagOf(g, list.ty) != squid_direct_types::Tag.array { return neverVal(), false, squid_direct_types::Error.none; }
+    if uses(g, f, ref.binding) != 1 || !isUniqueOwned(g, f, ref.binding) || bindingCaptured(g, f, ref.binding) { return neverVal(), false, squid_direct_types::Error.none; }
     let value, error = expr(g, f, children[1]);
-    if error != blot_direct_types::Error.none { return value, false, error; }
+    if error != squid_direct_types::Error.none { return value, false, error; }
     let push_function = g.runtime_().push;
     let address = local32(g, f);
     lget(g, w(g, list, 0));
     lget(g, w(g, list, 1));
     let element, error = elementOf(g, f, list.ty, id);
-    if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+    if error != squid_direct_types::Error.none { return neverVal(), false, error; }
     let step, error = stride(g, f, element, id);
-    if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+    if error != squid_direct_types::Error.none { return neverVal(), false, error; }
     i32Const(g, step);
     callf(g, push_function);
     lset(g, address);
     let noted = noteStoreToSlot(g, f, w(g, list, 0), value);
-    if noted != blot_direct_types::Error.none { return neverVal(), false, noted; }
+    if noted != squid_direct_types::Error.none { return neverVal(), false, noted; }
     if g.runtime_().has_fork {
         recordBeforeWrite(g, f, w(g, list, 0), address, 0, step);
     }
     let written = writeElement(g, f, address, 0, value, id);
-    if written != blot_direct_types::Error.none { return neverVal(), false, written; }
+    if written != squid_direct_types::Error.none { return neverVal(), false, written; }
     invalidateCheckedOwner(g, f, list);
-    return list, true, blot_direct_types::Error.none;
+    return list, true, squid_direct_types::Error.none;
 }
 // The value a closure captures for `binding`. Deferred polymorphic local
 // closures (`Tag.closure`) are NOT monomorphized at the enclosing closure's
@@ -1894,22 +1894,22 @@ recursive fn captureValueInner(g: Generator&, f: Fn&, binding: u32, id: u32, dep
     if depth >= 32 { return neverVal(), g.fail(g.units[f.unit - 1], id, "polymorphic capture nesting limit"); }
     let m .= g.units[f.unit - 1];
     let bound, present = bindGet(g, f, binding);
-    if present { return bound, blot_direct_types::Error.none; }
+    if present { return bound, squid_direct_types::Error.none; }
     let initializer, generalized = g.s.polymorphic.get(polyKey(f, binding));
     if !generalized { return neverVal(), g.fail(m, id, "closure capture without a value"); }
-    if m.node(initializer).tag == blot_check_core::Tag.closure {
+    if m.node(initializer).tag == squid_check_core::Tag.closure {
         return packPolyCaptures(g, f, initializer, id, depth + 1);
     }
     var chosen: Ty = 0;
     var has_chosen = false;
     var saw_open = false;
-    if m.node(id).tag == blot_check_core::Tag.closure {
+    if m.node(id).tag == squid_check_core::Tag.closure {
         let scan_err = usesTypeIn(g, f, m.closure(id).body, binding, initializer, chosen, has_chosen, saw_open, 0);
-        if scan_err != blot_direct_types::Error.none { return neverVal(), scan_err; }
+        if scan_err != squid_direct_types::Error.none { return neverVal(), scan_err; }
     }
     if !has_chosen && !saw_open {
         let fallback_ty, found, fb_err = usesType(g, f, binding, initializer, 0);
-        if fb_err != blot_direct_types::Error.none { return neverVal(), fb_err; }
+        if fb_err != squid_direct_types::Error.none { return neverVal(), fb_err; }
         if found { chosen = fallback_ty; has_chosen = true; }
     }
     var env = f.env;
@@ -1924,30 +1924,30 @@ recursive fn packPolyCaptures(g: Generator&, f: Fn&, initializer: u32, id: u32, 
     if depth >= 32 { return neverVal(), g.fail(g.units[f.unit - 1], id, "polymorphic capture nesting limit"); }
     let m .= g.units[f.unit - 1];
     let inner_caps = m.closureCaptures(initializer);
-    if inner_caps.len == 0 { return unitVal(), blot_direct_types::Error.none; }
+    if inner_caps.len == 0 { return unitVal(), squid_direct_types::Error.none; }
     if inner_caps.len == 1 { return captureValueInner(g, f, inner_caps[0], initializer, depth + 1); }
     let values = g.reserveVals(inner_caps.len);
     for cap, at in inner_caps {
         let v, err = captureValueInner(g, f, cap, initializer, depth + 1);
-        if err != blot_direct_types::Error.none { return neverVal(), err; }
+        if err != squid_direct_types::Error.none { return neverVal(), err; }
         g.s.vals[values.start + at] = v;
     }
     var items: Ty[>..] = [];
     for at in 0..(values.len as i64) { items.push(g.s.vals[values.start + at].ty); }
     let tup_ty, terr = g.types.tuple(items[..]);
-    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+    if terr != squid_direct_types::Error.none { return neverVal(), terr; }
     let boxed, berr = isBoxed(g, f, tup_ty, id);
-    if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+    if berr != squid_direct_types::Error.none { return neverVal(), berr; }
     if boxed {
         let memory_block, merr = newBlock(g, f, tup_ty, id);
-        if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+        if merr != squid_direct_types::Error.none { return neverVal(), merr; }
         for index in 0..(values.len as i64) {
             let offset, oerr = itemOffset(g, f, tup_ty, index, id);
-            if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+            if oerr != squid_direct_types::Error.none { return neverVal(), oerr; }
             let werr = writeFlat(g, f, memory_block, offset, g.s.vals[values.start + index], id);
-            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            if werr != squid_direct_types::Error.none { return neverVal(), werr; }
         }
-        return valOf1(g, tup_ty, memory_block), blot_direct_types::Error.none;
+        return valOf1(g, tup_ty, memory_block), squid_direct_types::Error.none;
     }
     let s .= g.s;
     let mark = s.scratch.len;
@@ -1959,33 +1959,33 @@ recursive fn packPolyCaptures(g: Generator&, f: Fn&, initializer: u32, id: u32, 
     let words_count = (s.scratch.len - mark) as u32;
     for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
     s.scratch.resize(mark);
-    return Val { tup_ty, start, words_count }, blot_direct_types::Error.none;
+    return Val { tup_ty, start, words_count }, squid_direct_types::Error.none;
 }
 fn polyCaptureKey(instance_id: u32, binding: u32) -> u64 {
-    return blot_direct_emit::key64(0x80000000 | instance_id, binding);
+    return squid_direct_emit::key64(0x80000000 | instance_id, binding);
 }
 recursive fn recordPolyCapture(g: Generator&, f: const Fn&, target_instance: u32, binding: u32, init_node: u32, depth: i64) {
     if depth >= 32 { return; }
     let m .= g.units[f.unit - 1];
     g.s.polymorphic.put(polyCaptureKey(target_instance, binding), init_node);
-    blot_direct_emit::recordParentPoly(target_instance, binding, init_node);
-    if m.node(init_node).tag != blot_check_core::Tag.closure { return; }
+    squid_direct_emit::recordParentPoly(target_instance, binding, init_node);
+    if m.node(init_node).tag != squid_check_core::Tag.closure { return; }
     for c in m.closureCaptures(init_node) {
         let _, bound_here = bindGet(g, f, c);
         if bound_here { continue; }
         let c_init, c_poly = g.s.polymorphic.get(polyKey(f, c));
-        if c_poly && m.node(c_init).tag == blot_check_core::Tag.closure {
+        if c_poly && m.node(c_init).tag == squid_check_core::Tag.closure {
             recordPolyCapture(g, f, target_instance, c, c_init, depth + 1);
         }
     }
 }
 recursive fn restorePolyCapture(g: Generator&, f: Fn&, instance_id: u32, binding: u32, init_node: u32, cap_val: Val, depth: i64) -> Error {
-    if depth >= 32 { return blot_direct_types::Error.none; }
+    if depth >= 32 { return squid_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     g.s.polymorphic.put(polyKey(f, binding), init_node);
-    if m.node(init_node).tag != blot_check_core::Tag.closure { return blot_direct_types::Error.none; }
+    if m.node(init_node).tag != squid_check_core::Tag.closure { return squid_direct_types::Error.none; }
     let inner_caps = m.closureCaptures(init_node);
-    if inner_caps.len == 0 { return blot_direct_types::Error.none; }
+    if inner_caps.len == 0 { return squid_direct_types::Error.none; }
     if inner_caps.len == 1 {
         let c = inner_caps[0];
         let c_init, c_poly = g.s.polymorphic.get(polyCaptureKey(instance_id, c));
@@ -1993,29 +1993,29 @@ recursive fn restorePolyCapture(g: Generator&, f: Fn&, instance_id: u32, binding
             return restorePolyCapture(g, f, instance_id, c, c_init, cap_val, depth + 1);
         }
         bindPut(g, f, c, cap_val);
-        if tagOf(g, cap_val.ty) == blot_direct_types::Tag.cell {
-            blot_support_zigmap::put(g.s.map_pool, f.with_cells, c, g.types.node(cap_val.ty).a);
+        if tagOf(g, cap_val.ty) == squid_direct_types::Tag.cell {
+            squid_support_zigmap::put(g.s.map_pool, f.with_cells, c, g.types.node(cap_val.ty).a);
         }
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
     for c, idx in inner_caps {
         let item, err = tupleItem(g, f, cap_val, idx, init_node);
-        if err != blot_direct_types::Error.none { return err; }
+        if err != squid_direct_types::Error.none { return err; }
         let c_init, c_poly = g.s.polymorphic.get(polyCaptureKey(instance_id, c));
         if c_poly {
             let rerr = restorePolyCapture(g, f, instance_id, c, c_init, item, depth + 1);
-            if rerr != blot_direct_types::Error.none { return rerr; }
+            if rerr != squid_direct_types::Error.none { return rerr; }
         } else {
             bindPut(g, f, c, item);
-            if tagOf(g, item.ty) == blot_direct_types::Tag.cell {
-                blot_support_zigmap::put(g.s.map_pool, f.with_cells, c, g.types.node(item.ty).a);
+            if tagOf(g, item.ty) == squid_direct_types::Tag.cell {
+                squid_support_zigmap::put(g.s.map_pool, f.with_cells, c, g.types.node(item.ty).a);
             }
         }
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32, chosen: Ty&, has_chosen: bool&, saw_open: bool&, depth: u32) -> Error {
-    if id == 0 || depth >= 128 { return blot_direct_types::Error.none; }
+    if id == 0 || depth >= 128 { return squid_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     match n.tag {
@@ -2023,43 +2023,43 @@ recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32,
             let target = m.references[n.a];
             if (target.unit == 0 || target.unit == m.unit) && target.binding == binding {
                 var ty, error = g.types.lower(m, m.typeOf(id), f.env);
-                if error != blot_direct_types::Error.none {
+                if error != squid_direct_types::Error.none {
                     let aliased, found, aerr = aliasType(g, f, id, site, 0);
-                    if aerr != blot_direct_types::Error.none { return aerr; }
-                    if !found { saw_open = true; return blot_direct_types::Error.none; }
+                    if aerr != squid_direct_types::Error.none { return aerr; }
+                    if !found { saw_open = true; return squid_direct_types::Error.none; }
                     ty = aliased;
                 }
                 if has_chosen {
                     if chosen != ty { return g.fail(m, site, "a local value is used at different types; give it an annotation"); }
                 } else { has_chosen = true; chosen = ty; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         comptime_if, if_value, if_stmt, state_provider => {
             let e1 = usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             let e2 = usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e2 != blot_direct_types::Error.none { return e2; }
+            if e2 != squid_direct_types::Error.none { return e2; }
             return usesTypeIn(g, f, n.c, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         suite, block_, product, record, array, array_op, storage => {
             for child in m.children(id) {
                 let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         call, contract_method, break_ => {
             for child in m.extra[n.b..n.b + n.c] {
                 let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         with_handle => {
             for child in m.extra[n.b..n.b + n.c] {
                 let err = usesTypeIn(g, f, child, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if err != blot_direct_types::Error.none { return err; }
+                if err != squid_direct_types::Error.none { return err; }
             }
             return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
@@ -2071,44 +2071,44 @@ recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32,
         },
         scalar, logical, apply, associated, type_same, effect_provider, handle, staging => {
             let e1 = usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             return usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         pattern_bind => {
             let e1 = usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             return usesTypeIn(g, f, n.c, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         update => {
             let u = m.updateInfo(id);
             let e1 = usesTypeIn(g, f, u.root, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             for step in m.updateSelectors(id) {
                 let es = usesTypeIn(g, f, step.index, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if es != blot_direct_types::Error.none { return es; }
+                if es != squid_direct_types::Error.none { return es; }
             }
             return usesTypeIn(g, f, u.value, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         loop_ => {
             let info = m.loopInfo(id);
             let e1 = usesTypeIn(g, f, info.first, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             let e2 = usesTypeIn(g, f, info.end, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e2 != blot_direct_types::Error.none { return e2; }
+            if e2 != squid_direct_types::Error.none { return e2; }
             return usesTypeIn(g, f, info.body, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         match_ => {
             for inp in m.matchInputs(id) {
                 let ei = usesTypeIn(g, f, inp, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if ei != blot_direct_types::Error.none { return ei; }
+                if ei != squid_direct_types::Error.none { return ei; }
             }
             for arm in m.matchArms(id) {
                 let eg = usesTypeIn(g, f, arm.guard_, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if eg != blot_direct_types::Error.none { return eg; }
+                if eg != squid_direct_types::Error.none { return eg; }
                 let eb = usesTypeIn(g, f, arm.body, binding, site, chosen, has_chosen, saw_open, depth + 1);
-                if eb != blot_direct_types::Error.none { return eb; }
+                if eb != squid_direct_types::Error.none { return eb; }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         closure => {
             return usesTypeIn(g, f, m.closure(id).body, binding, site, chosen, has_chosen, saw_open, depth + 1);
@@ -2116,23 +2116,23 @@ recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32,
         comptime_meta => {
             if n.c == 0 { return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1); }
             if n.c == 8 || n.c == 9 { return usesTypeIn(g, f, n.b, binding, site, chosen, has_chosen, saw_open, depth + 1); }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
         spark => {
             let info = m.sparkInfo(id);
             let e1 = usesTypeIn(g, f, info.source, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e1 != blot_direct_types::Error.none { return e1; }
+            if e1 != squid_direct_types::Error.none { return e1; }
             let e2 = usesTypeIn(g, f, info.end, binding, site, chosen, has_chosen, saw_open, depth + 1);
-            if e2 != blot_direct_types::Error.none { return e2; }
+            if e2 != squid_direct_types::Error.none { return e2; }
             return usesTypeIn(g, f, info.body, binding, site, chosen, has_chosen, saw_open, depth + 1);
         },
         flat_op => {
-            if n.c <= blot_check_core::flat_op_decode_batch {
+            if n.c <= squid_check_core::flat_op_decode_batch {
                 return usesTypeIn(g, f, n.a, binding, site, chosen, has_chosen, saw_open, depth + 1);
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         },
-        _ => { return blot_direct_types::Error.none; },
+        _ => { return squid_direct_types::Error.none; },
     }
 }
 // Binds the scheme variables of generalized local `binding` to the one
@@ -2140,9 +2140,9 @@ recursive fn usesTypeIn(g: Generator&, f: Fn&, id: u32, binding: u32, site: u32,
 // types cannot share one computed value.
 fn typeByUses(g: Generator&, f: Fn&, binding: u32, id: u32) -> Error {
     let ty, found, error = usesType(g, f, binding, id, 0);
-    if error != blot_direct_types::Error.none { return error; }
+    if error != squid_direct_types::Error.none { return error; }
     if found { refine(g, f, g.units[f.unit - 1].binding(binding).ty, ty); }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // The one concrete type the references to local `binding` agree on. A
 // reference that is the whole value of another generalized local
@@ -2154,12 +2154,12 @@ fn ensureLocalRefs(g: Generator&, m: const Module&) -> u32 {
     if base == 0xffffffff {
         base = g.s.local_refs_head.len as u32;
         g.s.local_refs_base[uid] = base;
-        blot_direct_emit::growZerosU32(g.s.local_refs_head, m.bindings.len);
+        squid_direct_emit::growZerosU32(g.s.local_refs_head, m.bindings.len);
         var idx = m.nodes.len;
         while idx > 0 {
             idx -= 1;
             let node = m.nodes[idx];
-            if node.tag != blot_check_core::Tag.reference { continue; }
+            if node.tag != squid_check_core::Tag.reference { continue; }
             let target = m.references[node.a];
             if target.unit != 0 && target.unit != m.unit { continue; }
             let slot = (base as i64) + (target.binding as i64);
@@ -2182,9 +2182,9 @@ recursive fn usesType(g: Generator&, f: Fn&, binding: u32, id: u32, depth: u32) 
         let index = g.s.local_refs_node[(cur - 1) as i64];
         cur = g.s.local_refs_next[(cur - 1) as i64];
         var ty, error = g.types.lower(m, m.typeOf(index), f.env);
-        if error != blot_direct_types::Error.none {
+        if error != squid_direct_types::Error.none {
             let aliased, found, error = aliasType(g, f, index, id, depth);
-            if error != blot_direct_types::Error.none { return 0, false, error; }
+            if error != squid_direct_types::Error.none { return 0, false, error; }
             if !found { continue; }
             ty = aliased;
         }
@@ -2192,18 +2192,18 @@ recursive fn usesType(g: Generator&, f: Fn&, binding: u32, id: u32, depth: u32) 
             if chosen != ty { return 0, false, g.fail(m, id, "a local value is used at different types; give it an annotation"); }
         } else { has_chosen = true; chosen = ty; }
     }
-    return chosen, has_chosen, blot_direct_types::Error.none;
+    return chosen, has_chosen, squid_direct_types::Error.none;
 }
 recursive fn aliasType(g: Generator&, f: Fn&, use: u32, id: u32, depth: u32) -> Ty, bool, Error {
-    if depth >= 8 { return 0, false, blot_direct_types::Error.none; }
+    if depth >= 8 { return 0, false, squid_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     for index in 0..m.nodes.len {
         let node = m.nodes[index];
-        if node.tag != blot_check_core::Tag.bind || node.b != use { continue; }
-        if m.binding(node.a).scheme.variables.len == 0 { return 0, false, blot_direct_types::Error.none; }
+        if node.tag != squid_check_core::Tag.bind || node.b != use { continue; }
+        if m.binding(node.a).scheme.variables.len == 0 { return 0, false, squid_direct_types::Error.none; }
         return usesType(g, f, node.a, id, depth + 1);
     }
-    return 0, false, blot_direct_types::Error.none;
+    return 0, false, squid_direct_types::Error.none;
 }
 // Whether Core subtree `id` reads local `binding` (directly, via branch merge,
 // loop carry, or closure capture). Conservative on excessive depth.
@@ -2266,7 +2266,7 @@ recursive fn nodeReadsBinding(m: const Module&, id: u32, binding: u32, depth: i6
             if nodeReadsBinding(m, uinfo.root, binding, depth + 1) ||
                 nodeReadsBinding(m, uinfo.value, binding, depth + 1) { return true; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && nodeReadsBinding(m, sel.index, binding, depth + 1) { return true; }
+                if sel.kind == squid_check_core::UpdateKind.index && nodeReadsBinding(m, sel.index, binding, depth + 1) { return true; }
             }
             return false;
         },
@@ -2306,22 +2306,22 @@ recursive fn terminalAppends(m: const Module&, suite: u32, incoming: u32, outgoi
         return 0;
     }
     if suite == 0 { return 0; }
-    if m.node(suite).tag != blot_check_core::Tag.suite { return 0; }
+    if m.node(suite).tag != squid_check_core::Tag.suite { return 0; }
     let statements = m.children(suite);
     if statements.len == 0 { return 0; }
     let id = statements[statements.len - 1];
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.bind {
+    if n.tag == squid_check_core::Tag.bind {
         if n.a != outgoing || n.c != 1 { return 0; }
-        if m.node(n.b).tag != blot_check_core::Tag.array_op || m.arrayOperation(n.b) != blot_backend_collection_ops::Op.append { return 0; }
+        if m.node(n.b).tag != squid_check_core::Tag.array_op || m.arrayOperation(n.b) != squid_backend_collection_ops::Op.append { return 0; }
         let args = m.children(n.b);
         if args.len == 2 && localRef(m, args[0]) == incoming { return 1; }
         return 0;
     }
     var yes: u32 = 0;
     var no: u32 = 0;
-    if n.tag == blot_check_core::Tag.if_stmt { yes = n.b; no = n.c; }
-    else if n.tag == blot_check_core::Tag.match_ && m.matchInfo(id).statement {
+    if n.tag == squid_check_core::Tag.if_stmt { yes = n.b; no = n.c; }
+    else if n.tag == squid_check_core::Tag.match_ && m.matchInfo(id).statement {
         let arms = m.matchArms(id);
         if arms.len != 2 { return 0; }
         yes = arms[0].body;
@@ -2348,16 +2348,16 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
     if base == 0xffffffff {
         base = g.s.use_count_vals.len as u32;
         g.s.use_count_base[uid] = base;
-        blot_direct_emit::growZerosU32(g.s.use_count_vals, m.bindings.len);
+        squid_direct_emit::growZerosU32(g.s.use_count_vals, m.bindings.len);
         var is_exit: u8[>..<] = [];
         is_exit.resize(m.nodes.len, 0);
         for index in 0..m.nodes.len {
-            if m.nodes[index].tag != blot_check_core::Tag.break_ { continue; }
+            if m.nodes[index].tag != squid_check_core::Tag.break_ { continue; }
             for child in m.children(index as u32) { is_exit[child] = 1; }
         }
         for index in 0..m.nodes.len {
             let node = m.nodes[index];
-            if node.tag != blot_check_core::Tag.reference || is_exit[index] != 0 { continue; }
+            if node.tag != squid_check_core::Tag.reference || is_exit[index] != 0 { continue; }
             let target = m.references[node.a];
             if target.unit != 0 && target.unit != m.unit { continue; }
             g.s.use_count_vals[(base as i64) + (target.binding as i64)] += 1;
@@ -2384,7 +2384,7 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
             for carry in m.loop_carries[loop_.carries.start..loop_.carries.start + loop_.carries.len] {
                 let slot = (base as i64) + (carry.iteration as i64);
                 let count = g.s.use_count_vals[slot];
-                if count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.array { continue; }
+                if count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != squid_check_types::Tag.array { continue; }
                 if terminalAppends(m, loop_.body, carry.iteration, carry.backedge, 0) == count {
                     g.s.use_count_vals[slot] = 1;
                 }
@@ -2410,8 +2410,8 @@ fn partialApply(g: const Generator&, f: const Fn&, id: u32) -> bool {
     let m .= g.units[f.unit - 1];
     var head = id;
     var count: i64 = 0;
-    while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; count += 1; }
-    if m.node(head).tag != blot_check_core::Tag.reference { return false; }
+    while m.node(head).tag == squid_check_core::Tag.apply { head = m.node(head).a; count += 1; }
+    if m.node(head).tag != squid_check_core::Tag.reference { return false; }
     let target = g.resolve(m, m.reference(head));
     let tm .= g.units[target.unit - 1];
     let body .= tm.body(target.binding);
@@ -2427,7 +2427,7 @@ fn pureFunctionValue(g: const Generator&, f: const Fn&, id: u32) -> bool {
 // Whether `ty` lowers under the current environment (no failure kept).
 fn lowers(g: Generator&, f: const Fn&, ty: TId) -> bool {
     let lowered, error = g.types.lower(g.units[f.unit - 1], ty, f.env);
-    return error == blot_direct_types::Error.none;
+    return error == squid_direct_types::Error.none;
 }
 recursive fn bodyContainsCall(m: const Module&, id: u32, left: i64&) -> bool {
     if id == 0 || left <= 0 { return true; }
@@ -2504,7 +2504,7 @@ fn invalidateOwnCallArgs(g: const Generator&, f: Fn&, own_mask: u32, direct: Val
     for at in 0..(direct.len as i64) {
         if at >= 32 || ((own_mask >> (at as u32)) & 1) != 0 {
             let arg_v = g.s.vals[direct.start + at];
-            if tagOf(g, arg_v.ty) == blot_direct_types::Tag.array {
+            if tagOf(g, arg_v.ty) == squid_direct_types::Tag.array {
                 invalidateCheckedOwner(g, f, arg_v);
             } else {
                 invalidateCheckedContainers(f);
@@ -2527,12 +2527,12 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         f.tail_call_node = 0;
         if arguments.len < param_count {
             let rest, error = restType(g, f, callee, arguments.len, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            return partial(g, f, blot_direct_emit::InstanceKind.partial, target, rest, arguments, id);
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
+            return partial(g, f, squid_direct_emit::InstanceKind.partial, target, rest, arguments, id);
         }
         let direct = Vals { arguments.start, param_count as u32 };
         let after, error = restType(g, f, callee, param_count, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         // Forwarding chains are short; a cycle (a function that forwards to
         // itself) ends in an ordinary call.
         var value = neverVal();
@@ -2543,7 +2543,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         let is_scc_peer = f.worker_spec >= 0 &&
             sccMemberIndex(g.s.worker_specs[f.worker_spec], target) >= 0;
         var skip_inline_for_tco = self_tco_target || is_scc_peer;
-        if !skip_inline_for_tco && is_tail && blot_direct_writer::tailCallsEnabled() {
+        if !skip_inline_for_tco && is_tail && squid_direct_writer::tailCallsEnabled() {
             var cbud: i64 = 64;
             if bodyContainsCall(tm, body.root, cbud) { skip_inline_for_tco = true; }
         }
@@ -2551,14 +2551,14 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             f.forward_depth += 1;
             let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id, elide_nan);
             f.forward_depth -= 1;
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             if was_forwarded { g.recordInlined(target.unit, target.binding); }
             value = forwarded;
             has_value = was_forwarded;
         }
         if !has_value && !skip_inline_for_tco && f.inline_depth < 3 && evidence_context == 0 {
             let inlined, was_inlined, ierr = inlineSmall(g, f, target, direct, callee, after, id, elide_nan);
-            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
             if was_inlined {
                 g.recordInlined(target.unit, target.binding);
                 value = inlined;
@@ -2570,7 +2570,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             var spec_id: u32 = 0;
             if !body.exported && evidence_context == 0 && f.closure_spec_depth < 3 &&
                 !g.s.instances[f.instance_id].inferring && f.known_closures_len > 0 {
-                var cspec = blot_direct_emit::ClosureSpec { len: 0, depth: f.closure_spec_depth + 1 };
+                var cspec = squid_direct_emit::ClosureSpec { len: 0, depth: f.closure_spec_depth + 1 };
                 for at in 0..(direct.len as i64) {
                     if at >= 32 || (cspec.len as i64) >= 4 { break; }
                     let arg_v = g.s.vals[direct.start + at];
@@ -2582,7 +2582,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                             let kc = f.known_closures[kci];
                             var slot_ok = (kc.kind == 1 || kc.kind == 2 || kc.kind == 3) &&
                                 kc.cap_count <= 4 && g.types.concrete(kc.full_ty, 0);
-                            var sl = blot_direct_emit::ClosureSpecSlot {
+                            var sl = squid_direct_emit::ClosureSpecSlot {
                                 param_idx: at as u8,
                                 word_off: off as u8,
                                 kind: kc.kind,
@@ -2596,7 +2596,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                             if slot_ok {
                                 for ci in 0..(kc.cap_count as i64) {
                                     let cty = kc.caps[ci].ty;
-                                    if !g.types.concrete(cty, 0) || tagOf(g, cty) == blot_direct_types::Tag.cell {
+                                    if !g.types.concrete(cty, 0) || tagOf(g, cty) == squid_direct_types::Tag.cell {
                                         slot_ok = false;
                                         break;
                                     }
@@ -2616,13 +2616,13 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 if cspec.len > 0 {
                     if g.s.parallel_readonly {
                         g.s.parallel_aborted = true;
-                        return neverVal(), blot_direct_types::Error.unsupported;
+                        return neverVal(), squid_direct_types::Error.unsupported;
                     }
                     let existing_spec = g.findClosureSpec(cspec);
                     var reused_inst = false;
                     if existing_spec != 0 {
-                        let probe_key = blot_direct_emit::InstanceKey {
-                            blot_direct_emit::InstanceKind.named, target.unit, target.binding, callee, existing_spec, evidence_context
+                        let probe_key = squid_direct_emit::InstanceKey {
+                            squid_direct_emit::InstanceKind.named, target.unit, target.binding, callee, existing_spec, evidence_context
                         };
                         let _, found_inst = g.find(probe_key);
                         if found_inst {
@@ -2641,20 +2641,20 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 }
             }
             let instance, error = g.namedWithSpec(target, callee, spec_id, false, m, id, evidence_context);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             if g.s.instances[instance].inferring { return neverVal(), g.fail(m, id, "recursion through a function whose result type its body determines"); }
             let instance_parameters = g.s.instances[instance].parameters;
             for at in 0..(direct.len as i64) {
                 let argument = g.s.vals[direct.start + at];
                 let parameter = g.s.tys[instance_parameters.start + at];
                 let width, error = layoutLen(g, f, parameter, id);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                if error != squid_direct_types::Error.none { return neverVal(), error; }
                 if width != argument.len {
                     g.failOpen(m, id);
                     g.put("argument of ");
                     g.putNumber(argument.len);
                     g.put(" words for a ");
-                    g.put(blot_direct_types::tagName(tagOf(g, parameter)));
+                    g.put(squid_direct_types::tagName(tagOf(g, parameter)));
                     g.put(" parameter of ");
                     g.putNumber(width);
                     g.put(" words");
@@ -2754,7 +2754,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 f.checked_le_len = 0;
                 f.const_tags_len = 0;
                 br(g, f, OP_br, f.self_tco_loop);
-                return neverVal(), blot_direct_types::Error.none;
+                return neverVal(), squid_direct_types::Error.none;
             }
             var call_spec_idx: i64 = -1;
             var call_peer_idx: i64 = -1;
@@ -2778,7 +2778,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                         let pmode = if at < 8 { sp.param_modes[at] } else { 0 };
                         if pmode == 1 || pmode == 2 || pmode == 3 {
                             let av = g.s.vals[direct.start + at];
-                            if tagOf(g, av.ty) != blot_direct_types::Tag.array || findDirectArrayBySlot(f, w(g, av, 0)) >= 0 {
+                            if tagOf(g, av.ty) != squid_direct_types::Tag.array || findDirectArrayBySlot(f, w(g, av, 0)) >= 0 {
                                 ext_ok = false;
                                 break;
                             }
@@ -2795,7 +2795,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 let spec = g.s.worker_specs[call_spec_idx];
                 if !external_worker_call && f.peel_force_leaf && call_peer_idx == f.worker_scc_idx && spec.scc_len == 1 {
                     let peeled, perr = emitPeelLeafCall(g, f, direct, id);
-                    if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                    if perr != squid_direct_types::Error.none { return neverVal(), perr; }
                     value = peeled;
                 } else {
                     for at in 0..(direct.len as i64) {
@@ -2829,7 +2829,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                         if pmode == 1 || pmode == 2 { continue; }
                         if pmode == 3 || (own_mask != 0 && (at >= 32 || ((own_mask >> (at as u32)) & 1) != 0)) {
                             let arg_v = g.s.vals[direct.start + at];
-                            if tagOf(g, arg_v.ty) == blot_direct_types::Tag.array {
+                            if tagOf(g, arg_v.ty) == squid_direct_types::Tag.array {
                                 invalidateCheckedOwner(g, f, arg_v);
                             } else {
                                 invalidateCheckedContainers(f);
@@ -2840,31 +2840,31 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                     let res_ty = g.s.instances[instance].result;
                     if !spec.no_scope_alloc {
                         let holds, herr = g.holdsMemory(res_ty);
-                        if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+                        if herr != squid_direct_types::Error.none { return neverVal(), herr; }
                         if holds { noteAllocation(f); }
                     }
                     if spec.drop_param != 0xff {
                         let drop_arg = g.s.vals[direct.start + (spec.drop_param as i64)];
                         let popped, perr = popWorkerResult(g, f, res_ty, spec.drop_word_start, drop_arg, id);
-                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                        if perr != squid_direct_types::Error.none { return neverVal(), perr; }
                         value = popped;
                     } else {
                         let popped, perr = pop(g, f, res_ty, id);
-                        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                        if perr != squid_direct_types::Error.none { return neverVal(), perr; }
                         value = popped;
                     }
                 }
                 has_value = true;
             }
-            if !has_value && is_tail && f.assoc_tco_local == 0xffffffff && blot_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
+            if !has_value && is_tail && f.assoc_tco_local == 0xffffffff && squid_direct_writer::tailCallsEnabled() && !g.s.instances[f.instance_id].inferring &&
                 g.s.instances[instance].result == g.s.instances[f.instance_id].result &&
-                g.s.instances[f.instance_id].result != blot_direct_types::never {
+                g.s.instances[f.instance_id].result != squid_direct_types::never {
                 // Opt-in Wasm 3.0 `return_call` (0x12) for non-self / mutual tail calls.
                 for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
                 opIndex(g, OP_return_call, g.s.instances[instance].function);
                 f.emitted_return_call = true;
                 f.checked_elems_len = 0;
-                return neverVal(), blot_direct_types::Error.none;
+                return neverVal(), squid_direct_types::Error.none;
             }
             if !has_value {
                 for at in 0..(direct.len as i64) { push(g, g.s.vals[direct.start + at]); }
@@ -2875,11 +2875,11 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
                 let skip_alloc_note = has_w && w_idx != 0 && ((w_idx - 1) as i64) < g.s.worker_specs.len && g.s.worker_specs[(w_idx - 1) as i64].no_scope_alloc;
                 if skip_alloc_note {
                     let returned, error = pop(g, f, g.s.instances[instance].result, id);
-                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    if error != squid_direct_types::Error.none { return neverVal(), error; }
                     value = returned;
                 } else {
                     let returned, error = received(g, f, g.s.instances[instance].result, id);
-                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    if error != squid_direct_types::Error.none { return neverVal(), error; }
                     value = returned;
                 }
             }
@@ -2887,14 +2887,14 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         if param_count < (arguments.len as i64) {
             let rem_args = Vals { arguments.start + (param_count as u32), ((arguments.len as i64) - param_count) as u32 };
             let applied, error = applyEvaluatedChain(g, f, value, rem_args, id, tail_here);
-            if error != blot_direct_types::Error.none { return applied, error; }
+            if error != squid_direct_types::Error.none { return applied, error; }
             value = applied;
         }
-        return value, blot_direct_types::Error.none;
+        return value, squid_direct_types::Error.none;
     }
     let tail_const = f.tail_call_node == id;
     f.tail_call_node = 0;
-    if body && !body.is_function && tm.node(body.root).tag == blot_check_core::Tag.reference && f.forward_depth < 8 {
+    if body && !body.is_function && tm.node(body.root).tag == squid_check_core::Tag.reference && f.forward_depth < 8 {
         let next = g.resolve(tm, tm.reference(body.root));
         if next != target {
             g.recordInlined(target.unit, target.binding);
@@ -2913,35 +2913,35 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     }
     // A constant holding a function value: apply it one argument at a time.
     var value, error = namedValue(g, f, target, callee, id);
-    if error != blot_direct_types::Error.none { return value, error; }
+    if error != squid_direct_types::Error.none { return value, error; }
     for at in 0..(arguments.len as i64) {
         let applied, error = applyClosure(g, f, value, g.s.vals[arguments.start + at], id, tail_const && at + 1 == (arguments.len as i64));
-        if error != blot_direct_types::Error.none { return applied, error; }
+        if error != squid_direct_types::Error.none { return applied, error; }
         value = applied;
     }
-    return value, blot_direct_types::Error.none;
+    return value, squid_direct_types::Error.none;
 }
 fn namedValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Error {
     let instance, error = g.namedWith(target, ty, false, g.units[f.unit - 1], id, evidenceContext(g, f, target, id));
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     callf(g, g.s.instances[instance].function);
     return received(g, f, ty, id);
 }
-fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, arguments: Vals, callee: Ty, result: Ty, target: BindingRef, id: u32, elide_nan: bool = false) -> Val, Error {
+fn applyPrimitive(g: Generator&, f: Fn&, primitive: squid_check_core::Primitive, arguments: Vals, callee: Ty, result: Ty, target: BindingRef, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
-    if primitive.kind != blot_check_core::PrimitiveKind.scalar { return neverVal(), g.fail(m, id, "array primitives are not supported yet"); }
+    if primitive.kind != squid_check_core::PrimitiveKind.scalar { return neverVal(), g.fail(m, id, "array primitives are not supported yet"); }
     if arguments.len < primitive.arity {
         let rest, error = restType(g, f, callee, arguments.len, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        return partial(g, f, blot_direct_emit::InstanceKind.primitive, target, rest, arguments, id);
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
+        return partial(g, f, squid_direct_emit::InstanceKind.primitive, target, rest, arguments, id);
     }
     if arguments.len > primitive.arity { return neverVal(), g.fail(m, id, "primitive over-application"); }
     for at in 0..(arguments.len as i64) { push(g, g.s.vals[arguments.start + at]); }
     let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id, !elide_nan, result);
-    if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
+    if emitted != squid_direct_types::Error.none { return neverVal(), emitted; }
     let popped, perr = pop(g, f, result, id);
-    if perr == blot_direct_types::Error.none && primitive.op == blot_check_core::Op.numeric_convert &&
-        arguments.len == 1 && g.s.vals[arguments.start].ty == blot_direct_types::u32_ && result == blot_direct_types::u64_ {
+    if perr == squid_direct_types::Error.none && primitive.op == squid_check_core::Op.numeric_convert &&
+        arguments.len == 1 && g.s.vals[arguments.start].ty == squid_direct_types::u32_ && result == squid_direct_types::u64_ {
         let src = g.s.vals[arguments.start];
         let cf, known = constU32(f, w(g, src, 0));
         if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
@@ -2954,10 +2954,10 @@ fn restType(g: Generator&, f: const Fn&, ty: Ty, count: i64, id: u32) -> Ty, Err
     var rest = ty;
     for step in 0..count {
         let arrow = g.types.node(rest);
-        if arrow.tag != blot_direct_types::Tag.function { return 0, g.fail(g.units[f.unit - 1], id, "too many arguments"); }
+        if arrow.tag != squid_direct_types::Tag.function { return 0, g.fail(g.units[f.unit - 1], id, "too many arguments"); }
         rest = arrow.b;
     }
-    return rest, blot_direct_types::Error.none;
+    return rest, squid_direct_types::Error.none;
 }
 // Eligibility check for direct leaf-function inlining: small, non-recursive,
 // loop-free, closure-free, non-allocating Core bodies so caller CheckedArray/
@@ -3018,18 +3018,18 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         },
         array_op => {
             let op = tm.arrayOperation(id);
-            if op == blot_backend_collection_ops::Op.fill && isSmallScalarPackedFillExpr(tm, id) {
+            if op == squid_backend_collection_ops::Op.fill && isSmallScalarPackedFillExpr(tm, id) {
                 if margin > 0 { margin = 0; }
-            } else if op != blot_backend_collection_ops::Op.length && op != blot_backend_collection_ops::Op.get { return false; }
+            } else if op != squid_backend_collection_ops::Op.length && op != squid_backend_collection_ops::Op.get { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
             return true;
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
-            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate && op_kind != blot_check_storage_ops::Op.with_capacity && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend && op_kind != blot_check_storage_ops::Op.view { return false; }
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
+            if op_kind != squid_check_storage_ops::Op.length && op_kind != squid_check_storage_ops::Op.read && op_kind != squid_check_storage_ops::Op.push && op_kind != squid_check_storage_ops::Op.pop && op_kind != squid_check_storage_ops::Op.truncate && op_kind != squid_check_storage_ops::Op.with_capacity && op_kind != squid_check_storage_ops::Op.reserve && op_kind != squid_check_storage_ops::Op.extend && op_kind != squid_check_storage_ops::Op.view { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -3052,7 +3052,7 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
             if !canInlineBodyMargin(g, tm, uinfo.root, target, budget, margin) ||
                 !canInlineBodyMargin(g, tm, uinfo.value, target, budget, margin) { return false; }
             for sel in tm.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !canInlineBodyMargin(g, tm, sel.index, target, budget, margin) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !canInlineBodyMargin(g, tm, sel.index, target, budget, margin) { return false; }
             }
             return true;
         },
@@ -3095,7 +3095,7 @@ fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool
     if base == 0xffffffff {
         base = g.s.inline_ok_vals.len as u32;
         g.s.inline_ok_base[uid] = base;
-        blot_direct_emit::growZerosU8(g.s.inline_ok_vals, g.units[uid].bindings.len);
+        squid_direct_emit::growZerosU8(g.s.inline_ok_vals, g.units[uid].bindings.len);
     }
     let slot = (base as i64) + (target.binding as i64);
     var mask = g.s.inline_ok_vals[slot];
@@ -3122,18 +3122,18 @@ fn canInlineTarget(g: Generator&, target: BindingRef, inline_depth: u32) -> bool
 }
 
 recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals, callee: Ty, after: Ty, id: u32, elide_nan: bool = false) -> Val, bool, Error {
-    if g.s.instances[f.instance_id].key.kind == blot_direct_emit::InstanceKind.partial {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if g.s.instances[f.instance_id].key.kind == squid_direct_emit::InstanceKind.partial {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
-    if tagOf(g, after) == blot_direct_types::Tag.never {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if tagOf(g, after) == squid_direct_types::Tag.never {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
-    let fn_ret = tagOf(g, after) == blot_direct_types::Tag.function;
+    let fn_ret = tagOf(g, after) == squid_direct_types::Tag.function;
     if fn_ret && !canInlineTarget(g, target, 2) {
-        return neverVal(), false, blot_direct_types::Error.none;
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     if !g.types.concrete(callee, 0) || !g.types.concrete(after, 0) {
-        return neverVal(), false, blot_direct_types::Error.none;
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     if !canInlineTarget(g, target, f.inline_depth) {
         // Pillar 3: Aggregate call-traffic inlining cost model. A non-recursive,
@@ -3145,7 +3145,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
             var total_words: i64 = 0;
             for at in 0..(direct.len as i64) { total_words += g.s.vals[direct.start + at].len as i64; }
             let ret_layout, rlerr = g.types.layout(after);
-            if rlerr == blot_direct_types::Error.none { total_words += ret_layout.len; }
+            if rlerr == squid_direct_types::Error.none { total_words += ret_layout.len; }
             if total_words >= 8 {
                 let tm .= g.units[target.unit - 1];
                 let body .= tm.body(target.binding);
@@ -3162,60 +3162,60 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
             }
         }
         if !wide_ok {
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
     }
     let boxed_ret, berr = g.types.boxed(after);
-    if berr != blot_direct_types::Error.none {
-        return neverVal(), false, blot_direct_types::Error.none;
+    if berr != squid_direct_types::Error.none {
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     if boxed_ret && !canInlineTarget(g, target, 2) {
-        return neverVal(), false, blot_direct_types::Error.none;
+        return neverVal(), false, squid_direct_types::Error.none;
     }
     var body_root: u32 = 0;
     var param_bindings: u32[16] = [0; 16];
     var param_count: i64 = 0;
-    var obligations = blot_check_types::List {};
+    var obligations = squid_check_types::List {};
     var env = Env {};
     {
         let tm .= g.units[target.unit - 1];
         let body .= tm.body(target.binding);
-        if !body || !body.is_function || body.exported { return neverVal(), false, blot_direct_types::Error.none; }
+        if !body || !body.is_function || body.exported { return neverVal(), false, squid_direct_types::Error.none; }
         body_root = body.root;
         g.types.match_(tm, tm.binding(body.binding).ty, callee, env);
         obligations = body.scheme.obligations;
     }
     if obligations.len != 0 {
         let solved = g.solveObligationsPublic(g.units[target.unit - 1], obligations, env);
-        if solved != blot_direct_types::Error.none {
+        if solved != squid_direct_types::Error.none {
             g.dropFailure();
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
     }
     {
         let tm .= g.units[target.unit - 1];
         let body .= tm.body(target.binding);
-        if !body { return neverVal(), false, blot_direct_types::Error.none; }
+        if !body { return neverVal(), false, squid_direct_types::Error.none; }
         for v in tm.types.list(body.scheme.variables) {
             let _, verr = g.types.lower(tm, v, env);
-            if verr != blot_direct_types::Error.none {
+            if verr != squid_direct_types::Error.none {
                 g.dropFailure();
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
         }
         let parameters = tm.bodyParameters(body);
         if parameters.len > 16 || parameters.len != direct.len {
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         for parameter, at in parameters {
             let pty, perr = g.types.lower(tm, parameter.ty, env);
-            if perr != blot_direct_types::Error.none {
+            if perr != squid_direct_types::Error.none {
                 g.dropFailure();
-                return neverVal(), false, blot_direct_types::Error.none;
+                return neverVal(), false, squid_direct_types::Error.none;
             }
             let pwords, werr = g.types.layout(pty);
-            if werr != blot_direct_types::Error.none || (pwords.len as u32) != g.s.vals[direct.start + at].len {
-                return neverVal(), false, blot_direct_types::Error.none;
+            if werr != squid_direct_types::Error.none || (pwords.len as u32) != g.s.vals[direct.start + at].len {
+                return neverVal(), false, squid_direct_types::Error.none;
             }
             param_bindings[at] = parameter.binding;
         }
@@ -3229,7 +3229,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     var unique_boxed_mask: u32 = 0;
     if id != 0 && param_count <= 16 {
         let cm .= g.units[f.unit - 1];
-        if cm.node(id).tag == blot_check_core::Tag.call {
+        if cm.node(id).tag == squid_check_core::Tag.call {
             let call_info = cm.call(id);
             if call_info.arguments.len == param_count {
                 var arg_bs: u32[16] = [0; 16];
@@ -3303,25 +3303,25 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
 
     let slot = g.newSlot();
     let made, merr = fresh(g, f, after, id);
-    if merr != blot_direct_types::Error.none { return neverVal(), false, merr; }
-    g.s.slots[slot] = blot_direct_emit::Slot { true, made };
+    if merr != squid_direct_types::Error.none { return neverVal(), false, merr; }
+    g.s.slots[slot] = squid_direct_emit::Slot { true, made };
 
     let exit = open(g, f, OP_block);
     let s .= g.s;
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+    s.labels.push(squid_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: squid_direct_emit::LabelKind.function });
 
     s.serial += 1;
     f.serial = s.serial;
     f.unit = target.unit;
     f.env = env;
-    f.bindings = blot_support_zigmap::Map {};
-    f.with_cells = blot_support_zigmap::Map {};
-    f.unique_boxed = blot_support_zigmap::Map {};
-    f.unique_boxed_safe_refs = blot_support_zigmap::Map {};
+    f.bindings = squid_support_zigmap::Map {};
+    f.with_cells = squid_support_zigmap::Map {};
+    f.unique_boxed = squid_support_zigmap::Map {};
+    f.unique_boxed_safe_refs = squid_support_zigmap::Map {};
     f.inlined_uncaptured = [0; 8];
     f.inlined_uncaptured_len = 0;
-    f.unique_owned = blot_support_zigmap::Map {};
+    f.unique_owned = squid_support_zigmap::Map {};
     f.reuse_nodes = [0; 4];
     f.reuse_nodes_len = 0;
     f.reuse_block = 0;
@@ -3336,10 +3336,10 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.tail_call_node = 0;
     f.tco_inhibit = saved_tco_inhibit + 1;
     f.owned_uses_computed = false;
-    f.owned_uses = blot_support_zigmap::Map {};
-    f.owned_flows = blot_support_zigmap::Map {};
+    f.owned_uses = squid_support_zigmap::Map {};
+    f.owned_flows = squid_support_zigmap::Map {};
     f.nan_elide_computed = false;
-    f.nan_observed = blot_support_zigmap::Map {};
+    f.nan_observed = squid_support_zigmap::Map {};
     f.finite_f32_len = 0;
     f.inlined_body_binding = target.binding;
     f.inlined_body_root = body_root;
@@ -3376,28 +3376,28 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
         let aval = g.s.vals[direct.start + at];
         bindPut(g, f, param_bindings[at], aval);
         if (unique_arg_mask & ((1 as u32) << (at as u32))) != 0 {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
         if (unique_boxed_mask & ((1 as u32) << (at as u32))) != 0 {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, param_bindings[at], 1);
         }
         if at < 32 && ((own_param_mask >> (at as u32)) & 1) != 0 {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_owned, param_bindings[at], 1);
         }
     }
     let body_val, b_err = stmt(g, f, body_root);
     f.defer_f32_nan = saved_defer_nan;
     var final_err = b_err;
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         let derr = deliver(g, f, body_val, slot, body_root);
-        if derr == blot_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
-        else if derr != blot_direct_types::Error.none { final_err = derr; }
+        if derr == squid_direct_types::Error.unsupported { g.recordFailure(g.units[target.unit - 1], body_root); }
+        else if derr != squid_direct_types::Error.none { final_err = derr; }
     }
-    if final_err == blot_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
+    if final_err == squid_direct_types::Error.none && s.slots[slot].deliver_count == 1 {
         propagateKnownClosures(g, f, s.slots[slot].last_src, s.slots[slot].value, exit - 1);
     }
     close(g, f);
-    if final_err == blot_direct_types::Error.none {
+    if final_err == squid_direct_types::Error.none {
         propagateSlotMask(g, f, slot, caller_locals_mark);
     }
 
@@ -3448,18 +3448,18 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
     f.peel_active = saved_peel_active;
     f.peel_force_leaf = saved_peel_force_leaf;
 
-    if final_err != blot_direct_types::Error.none { return neverVal(), false, final_err; }
+    if final_err != squid_direct_types::Error.none { return neverVal(), false, final_err; }
     let ret_val = g.s.slots[slot].value;
-    if tagOf(g, ret_val.ty) == blot_direct_types::Tag.array {
+    if tagOf(g, ret_val.ty) == squid_direct_types::Tag.array {
         let tm .= g.units[target.unit - 1];
         var matched_param = false;
         for at in 0..param_count {
             let aval = g.s.vals[direct.start + at];
-            if tagOf(g, aval.ty) != blot_direct_types::Tag.array { continue; }
+            if tagOf(g, aval.ty) != squid_direct_types::Tag.array { continue; }
             if calleeReturnsParamHandle(g, tm, body_root, param_bindings[at], 0) {
                 propagateArrayFacts(g, f, aval, ret_val);
                 if aval.ty == ret_val.ty {
-                    return aval, true, blot_direct_types::Error.none;
+                    return aval, true, squid_direct_types::Error.none;
                 }
                 matched_param = true;
                 break;
@@ -3469,28 +3469,28 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
             let rf = returnedFreshArrayExpr(tm, body_root);
             if rf != 0 {
                 var is_fresh_mut = isFreshOwnedArrayNode(g, tm, rf, 0);
-                if !is_fresh_mut && tm.node(rf).tag == blot_check_core::Tag.storage {
-                    let op_k, ok = blot_check_storage_ops::opFromCode(tm.node(rf).c);
-                    if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.with_capacity {
+                if !is_fresh_mut && tm.node(rf).tag == squid_check_core::Tag.storage {
+                    let op_k, ok = squid_check_storage_ops::opFromCode(tm.node(rf).c);
+                    if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.with_capacity {
                         is_fresh_mut = true;
                     }
                 }
                 if is_fresh_mut { recordMutable(g, f, ret_val); }
             }
         }
-    } else if tagOf(g, ret_val.ty) == blot_direct_types::Tag.tuple {
+    } else if tagOf(g, ret_val.ty) == squid_direct_types::Tag.tuple {
         let tn = g.types.node(ret_val.ty);
         let tm .= g.units[target.unit - 1];
         var woff: u32 = 0;
         for ei in 0..(tn.b as i64) {
             let ety = g.types.words[tn.a + ei];
             let elen, lerr = layoutLen(g, f, ety, id);
-            if lerr != blot_direct_types::Error.none { break; }
-            if tagOf(g, ety) == blot_direct_types::Tag.array && elen == 2 {
+            if lerr != squid_direct_types::Error.none { break; }
+            if tagOf(g, ety) == squid_direct_types::Tag.array && elen == 2 {
                 let elem_val = Val { ety, ret_val.start + woff, 2 };
                 for at in 0..param_count {
                     let aval = g.s.vals[direct.start + at];
-                    if tagOf(g, aval.ty) != blot_direct_types::Tag.array { continue; }
+                    if tagOf(g, aval.ty) != squid_direct_types::Tag.array { continue; }
                     if calleeReturnsParamAt(g, tm, body_root, param_bindings[at], ei, 0) {
                         propagateArrayFacts(g, f, aval, elem_val);
                         break;
@@ -3500,7 +3500,7 @@ recursive fn inlineSmall(g: Generator&, f: Fn&, target: BindingRef, direct: Vals
             woff += elen;
         }
     }
-    return ret_val, true, blot_direct_types::Error.none;
+    return ret_val, true, squid_direct_types::Error.none;
 }
 
 fn propagateArrayFacts(g: const Generator&, f: Fn&, src: Val, dst: Val) {
@@ -3531,14 +3531,14 @@ fn forwardingRoot(tm: const Module&, body_root: u32) -> u32 {
     var root = body_root;
     for step in 0..8 {
         let n = tm.node(root);
-        if n.tag == blot_check_core::Tag.return_ { root = n.a; }
-        else if (n.tag == blot_check_core::Tag.block_ || n.tag == blot_check_core::Tag.suite) && n.b == 1 {
+        if n.tag == squid_check_core::Tag.return_ { root = n.a; }
+        else if (n.tag == squid_check_core::Tag.block_ || n.tag == squid_check_core::Tag.suite) && n.b == 1 {
             root = tm.children(root)[0];
         } else { break; }
     }
     return root;
 }
-fn forwardedParameter(tm: const Module&, body: const blot_check_core::Body&, id: u32) -> i64 {
+fn forwardedParameter(tm: const Module&, body: const squid_check_core::Body&, id: u32) -> i64 {
     let binding = localRef(tm, id);
     if binding != 0 {
         for parameter, at in tm.bodyParameters(body) {
@@ -3547,22 +3547,22 @@ fn forwardedParameter(tm: const Module&, body: const blot_check_core::Body&, id:
     }
     return -1;
 }
-fn simdForwardingOperands(tm: const Module&, body: const blot_check_core::Body&, left: u32, right: u32) -> bool {
+fn simdForwardingOperands(tm: const Module&, body: const squid_check_core::Body&, left: u32, right: u32) -> bool {
     if forwardedParameter(tm, body, left) < 0 { return false; }
     if right == 0 || forwardedParameter(tm, body, right) >= 0 { return true; }
-    if tm.node(right).tag != blot_check_core::Tag.product { return false; }
+    if tm.node(right).tag != squid_check_core::Tag.product { return false; }
     let pair = tm.children(right);
     return pair.len == 2 && forwardedParameter(tm, body, pair[0]) >= 0 && forwardedParameter(tm, body, pair[1]) >= 0;
 }
 // Forward immutable tuple lanes by sharing their word IDs. A two-vector
 // product stays flat for select, shuffle and multiply-add, so forwarding
 // these wrappers never copies a vector through a result slot.
-fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_core::Body&, root: u32,
+fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const squid_check_core::Body&, root: u32,
     args: Vals, result: Ty, id: u32, elide_nan: bool) -> Val, bool, Error {
     let n = tm.node(root);
-    if n.tag == blot_check_core::Tag.scalar && n.c == 0 && simdForwardingOperands(tm, body, n.a, n.b) {
+    if n.tag == squid_check_core::Tag.scalar && n.c == 0 && simdForwardingOperands(tm, body, n.a, n.b) {
         let left = g.s.vals[args.start + forwardedParameter(tm, body, n.a)];
-        if (left.len == 4 || left.len == 2) && tagOf(g, left.ty) == blot_direct_types::Tag.tuple {
+        if (left.len == 4 || left.len == 2) && tagOf(g, left.ty) == squid_direct_types::Tag.tuple {
             var right = neverVal();
             if n.b != 0 {
                 let index = forwardedParameter(tm, body, n.b);
@@ -3572,7 +3572,7 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
                     let pair = tm.children(n.b);
                     let first = g.s.vals[args.start + forwardedParameter(tm, body, pair[0])];
                     let second = g.s.vals[args.start + forwardedParameter(tm, body, pair[1])];
-                    if first.len != left.len || second.len != left.len { return neverVal(), false, blot_direct_types::Error.none; }
+                    if first.len != left.len || second.len != left.len { return neverVal(), false, squid_direct_types::Error.none; }
                     let start = g.s.words.len as u32;
                     for lane in 0..(first.len as i64) { g.s.words.push(w(g, first, lane)); }
                     for lane in 0..(second.len as i64) { g.s.words.push(w(g, second, lane)); }
@@ -3583,7 +3583,7 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
             var selector_node: u32 = 0;
             if selector != 0 && f.forward_depth == 1 {
                 let cm .= g.units[f.unit - 1];
-                if cm.node(id).tag == blot_check_core::Tag.call {
+                if cm.node(id).tag == squid_check_core::Tag.call {
                     let call = cm.call(id);
                     let wrapper = BindingRef { tm.unit, body.binding };
                     if g.resolve(cm, call.target) == wrapper {
@@ -3595,36 +3595,36 @@ fn forwardSimd(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_
             let value, error = lanes(g, f, n.op, left, right, result, id, elide_nan, selector_node);
             return value, true, error;
         }
-        if left.len == 1 && (n.op == blot_check_core::Op.i8x16_splat || n.op == blot_check_core::Op.i16x8_splat) {
+        if left.len == 1 && (n.op == squid_check_core::Op.i8x16_splat || n.op == squid_check_core::Op.i16x8_splat) {
             lget(g, w(g, left, 0));
-            if n.op == blot_check_core::Op.i8x16_splat { simdOp(g, SIMD_i8x16_splat); } else { simdOp(g, SIMD_i16x8_splat); }
-            return popV128(g, f, result), true, blot_direct_types::Error.none;
+            if n.op == squid_check_core::Op.i8x16_splat { simdOp(g, SIMD_i8x16_splat); } else { simdOp(g, SIMD_i16x8_splat); }
+            return popV128(g, f, result), true, squid_direct_types::Error.none;
         }
-    } else if n.tag == blot_check_core::Tag.product && args.len == 1 && (n.b == 4 || n.b == 2) {
+    } else if n.tag == squid_check_core::Tag.product && args.len == 1 && (n.b == 4 || n.b == 2) {
         let arg = g.s.vals[args.start];
-        if n.b == 4 && (arg.ty == blot_direct_types::f32_ || arg.ty == blot_direct_types::u32_) {
+        if n.b == 4 && (arg.ty == squid_direct_types::f32_ || arg.ty == squid_direct_types::u32_) {
             for child in tm.children(root) {
-                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, blot_direct_types::Error.none; }
+                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, squid_direct_types::Error.none; }
             }
             let word = w(g, arg, 0);
             let words = g.saveWords([word, word, word, word]);
-            return Val { result, words.start, words.len }, true, blot_direct_types::Error.none;
+            return Val { result, words.start, words.len }, true, squid_direct_types::Error.none;
         }
-        if n.b == 2 && (arg.ty == blot_direct_types::f64_ || arg.ty == blot_direct_types::u64_) {
+        if n.b == 2 && (arg.ty == squid_direct_types::f64_ || arg.ty == squid_direct_types::u64_) {
             for child in tm.children(root) {
-                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, blot_direct_types::Error.none; }
+                if forwardedParameter(tm, body, child) != 0 { return neverVal(), false, squid_direct_types::Error.none; }
             }
             let word = w(g, arg, 0);
             let words = g.saveWords([word, word]);
-            return Val { result, words.start, words.len }, true, blot_direct_types::Error.none;
+            return Val { result, words.start, words.len }, true, squid_direct_types::Error.none;
         }
     }
-    return neverVal(), false, blot_direct_types::Error.none;
+    return neverVal(), false, squid_direct_types::Error.none;
 }
 
 // A wrapper whose body only passes its parameters to an intrinsic, associated
 // member or named function can be resolved at the call site.
-recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_check_core::Body&, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool) -> Val, bool, Error {
+recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const squid_check_core::Body&, arguments: Vals, callee: Ty, result: Ty, id: u32, elide_nan: bool) -> Val, bool, Error {
     let m .= g.units[f.unit - 1];
     let parameters = tm.bodyParameters(body);
     let root = forwardingRoot(tm, body.root);
@@ -3635,27 +3635,27 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
     }
     var operands: u32[8] = [0; 8];
     var operand_count: i64 = 0;
-    if n.tag == blot_check_core::Tag.associated {
+    if n.tag == squid_check_core::Tag.associated {
         operands[0] = n.a;
         operand_count = 1;
         if n.b != 0 { operands[1] = n.b; operand_count = 2; }
-    } else if n.tag == blot_check_core::Tag.call {
+    } else if n.tag == squid_check_core::Tag.call {
         let inner_arguments = tm.call(root).arguments;
-        if inner_arguments.len > 8 { return neverVal(), false, blot_direct_types::Error.none; }
+        if inner_arguments.len > 8 { return neverVal(), false, squid_direct_types::Error.none; }
         for operand, at in inner_arguments { operands[at] = operand; }
         operand_count = inner_arguments.len;
-    } else if n.tag == blot_check_core::Tag.array_op || n.tag == blot_check_core::Tag.storage {
+    } else if n.tag == squid_check_core::Tag.array_op || n.tag == squid_check_core::Tag.storage {
         let children = tm.children(root);
-        if children.len == 0 || children.len > 8 { return neverVal(), false, blot_direct_types::Error.none; }
+        if children.len == 0 || children.len > 8 { return neverVal(), false, squid_direct_types::Error.none; }
         for operand, at in children { operands[at] = operand; }
         operand_count = children.len;
-    } else { return neverVal(), false, blot_direct_types::Error.none; }
+    } else { return neverVal(), false, squid_direct_types::Error.none; }
     let forwarded = g.reserveVals(operand_count);
     for at in 0..operand_count {
         let operand = operands[at];
-        if tm.node(operand).tag != blot_check_core::Tag.reference { return neverVal(), false, blot_direct_types::Error.none; }
+        if tm.node(operand).tag != squid_check_core::Tag.reference { return neverVal(), false, squid_direct_types::Error.none; }
         let ref = tm.reference(operand);
-        if ref.unit != 0 && ref.unit != tm.unit { return neverVal(), false, blot_direct_types::Error.none; }
+        if ref.unit != 0 && ref.unit != tm.unit { return neverVal(), false, squid_direct_types::Error.none; }
         var found = false;
         for parameter, position in parameters {
             if parameter.binding == ref.binding {
@@ -3664,47 +3664,47 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 break;
             }
         }
-        if !found { return neverVal(), false, blot_direct_types::Error.none; }
+        if !found { return neverVal(), false, squid_direct_types::Error.none; }
     }
-    if n.tag == blot_check_core::Tag.array_op {
+    if n.tag == squid_check_core::Tag.array_op {
         let operation = tm.arrayOperation(root);
         match operation {
             length => {
-                if operand_count != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 1 { return neverVal(), false, squid_direct_types::Error.none; }
                 let length, error = lengthOf(g, f, g.s.vals[forwarded.start], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
-                return valOf1(g, blot_direct_types::u32_, length), true, blot_direct_types::Error.none;
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
+                return valOf1(g, squid_direct_types::u32_, length), true, squid_direct_types::Error.none;
             },
             get => {
-                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 { return neverVal(), false, squid_direct_types::Error.none; }
                 let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
                 let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
                 return value, true, error;
             },
             simd_load, simd_store, simd_load_u8x16, simd_store_u8x16, simd_load_f64x2, simd_store_f64x2 => {
                 let container = g.s.vals[forwarded.start];
                 let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
-                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), true, error; }
                 let element, error = elementOf(g, f, container.ty, id);
-                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), true, error; }
                 let step, error = stride(g, f, element, id);
-                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
-                let is_u8x16 = operation == blot_backend_collection_ops::Op.simd_load_u8x16 || operation == blot_backend_collection_ops::Op.simd_store_u8x16;
-                let is_f64x2 = operation == blot_backend_collection_ops::Op.simd_load_f64x2 || operation == blot_backend_collection_ops::Op.simd_store_f64x2;
+                if error != squid_direct_types::Error.none { return neverVal(), true, error; }
+                let is_u8x16 = operation == squid_backend_collection_ops::Op.simd_load_u8x16 || operation == squid_backend_collection_ops::Op.simd_store_u8x16;
+                let is_f64x2 = operation == squid_backend_collection_ops::Op.simd_load_f64x2 || operation == squid_backend_collection_ops::Op.simd_store_f64x2;
                 var lane_count: u32 = 4;
                 if is_u8x16 { lane_count = 16; } else if is_f64x2 { lane_count = 2; }
                 let address, error = simdAddress(g, f, container, index, step, id, 0, lane_count);
-                if error != blot_direct_types::Error.none { return neverVal(), true, error; }
-                if operation == blot_backend_collection_ops::Op.simd_load {
+                if error != squid_direct_types::Error.none { return neverVal(), true, error; }
+                if operation == squid_backend_collection_ops::Op.simd_load {
                     let value, error = simdLoadAt(g, f, address, element, step, id);
                     return value, true, error;
                 }
-                if operation == blot_backend_collection_ops::Op.simd_load_u8x16 {
+                if operation == squid_backend_collection_ops::Op.simd_load_u8x16 {
                     let value, error = simdLoadWideAt(g, f, address, false, id);
                     return value, true, error;
                 }
-                if operation == blot_backend_collection_ops::Op.simd_load_f64x2 {
+                if operation == squid_backend_collection_ops::Op.simd_load_f64x2 {
                     let value, error = simdLoadWideAt(g, f, address, true, id);
                     return value, true, error;
                 }
@@ -3720,101 +3720,101 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
                 return value, true, error;
             },
             fill, generate => {
-                if operand_count != 2 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 || tagOf(g, result) == squid_direct_types::Tag.never { return neverVal(), false, squid_direct_types::Error.none; }
                 let count, error = scalarLocal(g, f, g.s.vals[forwarded.start], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
-                let value, error = emitFillOrGenerate(g, f, operation == blot_backend_collection_ops::Op.fill, count, g.s.vals[forwarded.start + 1], result, id);
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
+                let value, error = emitFillOrGenerate(g, f, operation == squid_backend_collection_ops::Op.fill, count, g.s.vals[forwarded.start + 1], result, id);
                 return value, true, error;
             },
-            _ => { return neverVal(), false, blot_direct_types::Error.none; },
+            _ => { return neverVal(), false, squid_direct_types::Error.none; },
         }
     }
-    if n.tag == blot_check_core::Tag.storage {
-        let operation, decoded = blot_check_storage_ops::opFromCode(n.c);
-        if decoded != blot_error::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+    if n.tag == squid_check_core::Tag.storage {
+        let operation, decoded = squid_check_storage_ops::opFromCode(n.c);
+        if decoded != squid_error::Error.none { return neverVal(), false, squid_direct_types::Error.none; }
         match operation {
             length => {
-                if operand_count != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 1 { return neverVal(), false, squid_direct_types::Error.none; }
                 let length, error = lengthOf(g, f, g.s.vals[forwarded.start], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
-                return valOf1(g, blot_direct_types::u32_, length), true, blot_direct_types::Error.none;
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
+                return valOf1(g, squid_direct_types::u32_, length), true, squid_direct_types::Error.none;
             },
             read => {
-                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 { return neverVal(), false, squid_direct_types::Error.none; }
                 let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
                 let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
                 return value, true, error;
             },
             push => {
-                if operand_count != 2 || tagOf(g, result) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 || tagOf(g, result) != squid_direct_types::Tag.array { return neverVal(), false, squid_direct_types::Error.none; }
                 let pushed = g.s.vals[forwarded.start + 1];
                 let holds, herr = g.contentsHoldMemory(pushed.ty);
-                if herr != blot_direct_types::Error.none { return neverVal(), false, herr; }
-                if holds { return neverVal(), false, blot_direct_types::Error.none; }
+                if herr != squid_direct_types::Error.none { return neverVal(), false, herr; }
+                if holds { return neverVal(), false, squid_direct_types::Error.none; }
                 let value, error = emitStoragePushVal(g, f, g.s.vals[forwarded.start], pushed, id);
                 return value, true, error;
             },
             truncate => {
-                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 2 { return neverVal(), false, squid_direct_types::Error.none; }
                 let container = g.s.vals[forwarded.start];
                 let count, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
                 lget(g, w(g, container, 0));
                 lget(g, w(g, container, 1));
                 lget(g, count);
                 callf(g, g.runtime_().truncate);
-                return unitVal(), true, blot_direct_types::Error.none;
+                return unitVal(), true, squid_direct_types::Error.none;
             },
             copy => {
-                if operand_count != 1 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 1 || tagOf(g, result) == squid_direct_types::Tag.never { return neverVal(), false, squid_direct_types::Error.none; }
                 let value, error = deepCopyValue(g, f, g.s.vals[forwarded.start], result, id, 0);
                 return value, true, error;
             },
             view => {
-                if operand_count != 3 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                if operand_count != 3 || tagOf(g, result) == squid_direct_types::Tag.never { return neverVal(), false, squid_direct_types::Error.none; }
                 let start, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
                 let end, error = scalarLocal(g, f, g.s.vals[forwarded.start + 2], id);
-                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                if error != squid_direct_types::Error.none { return neverVal(), false, error; }
                 let value, error = emitStorageViewVal(g, f, g.s.vals[forwarded.start], start, end, result, id);
                 return value, true, error;
             },
-            _ => { return neverVal(), false, blot_direct_types::Error.none; },
+            _ => { return neverVal(), false, squid_direct_types::Error.none; },
         }
     }
-    if n.tag == blot_check_core::Tag.associated {
+    if n.tag == squid_check_core::Tag.associated {
         let left = g.s.vals[forwarded.start];
         let tag = g.types.node(left.ty).tag;
-        if n.op != blot_check_core::Op.none && isScalarTag(tag) {
+        if n.op != squid_check_core::Op.none && isScalarTag(tag) {
             for at in 1..(forwarded.len as i64) {
                 let value = g.s.vals[forwarded.start + at];
                 if value.ty != left.ty {
-                    g.failOpenCode(m, id, blot_check_diagnostic_code::Code.type_mismatch);
+                    g.failOpenCode(m, id, squid_check_diagnostic_code::Code.type_mismatch);
                     g.put(opName(n.op));
                     g.put(" applied to a ");
-                    g.put(blot_direct_types::tagName(tag));
+                    g.put(squid_direct_types::tagName(tag));
                     g.put(" and a ");
-                    g.put(blot_direct_types::tagName(tagOf(g, value.ty)));
+                    g.put(squid_direct_types::tagName(tagOf(g, value.ty)));
                     return neverVal(), false, g.failClose();
                 }
             }
             let machine, error = scalarMember(g, f, tm, left.ty, n.c, n.op, id);
-            if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+            if error != squid_direct_types::Error.none { return neverVal(), false, error; }
             for at in 0..(forwarded.len as i64) { push(g, g.s.vals[forwarded.start + at]); }
             let emitted = scalarOp(g, f, machine, left.ty, id, true, result);
-            if emitted != blot_direct_types::Error.none { return neverVal(), false, emitted; }
+            if emitted != squid_direct_types::Error.none { return neverVal(), false, emitted; }
             var popped_ty = result;
-            if tagOf(g, result) == blot_direct_types::Tag.never { popped_ty = scalarResult(machine, left.ty); }
+            if tagOf(g, result) == squid_direct_types::Tag.never { popped_ty = scalarResult(machine, left.ty); }
             let value, error = pop(g, f, popped_ty, id);
             return value, true, error;
         }
         let identity, has_identity = g.receiverIdentity(left.ty);
-        if !has_identity { return neverVal(), false, blot_direct_types::Error.none; }
-        let target, has_target = g.dispatchTarget(tm, identity, n.c, blot_check_types::Operator.none);
-        if !has_target { return neverVal(), false, blot_direct_types::Error.none; }
+        if !has_identity { return neverVal(), false, squid_direct_types::Error.none; }
+        let target, has_target = g.dispatchTarget(tm, identity, n.c, squid_check_types::Operator.none);
+        if !has_target { return neverVal(), false, squid_direct_types::Error.none; }
         let full, error = curried(g, forwarded, result);
-        if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+        if error != squid_direct_types::Error.none { return neverVal(), false, error; }
         let value, error = callTarget(g, f, target, forwarded, full, result, id);
         return value, true, error;
     }
@@ -3823,9 +3823,9 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
     g.types.match_(tm, tm.binding(body.binding).ty, callee, env);
     let inner = tm.call(root);
     let target = g.resolve(tm, inner.target);
-    if requiresEvidence(g, target) { return neverVal(), false, blot_direct_types::Error.none; }
+    if requiresEvidence(g, target) { return neverVal(), false, squid_direct_types::Error.none; }
     let inner_type, error = g.types.lower(tm, inner.callee_type, env);
-    if error != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return neverVal(), false, squid_direct_types::Error.none; }
     let value, error = callTarget(g, f, target, forwarded, inner_type, result, id);
     return value, true, error;
 }
@@ -3836,47 +3836,47 @@ fn curried(g: Generator&, arguments: Vals, result: Ty) -> Ty, Error {
     while at != 0 {
         at -= 1;
         let wrapped, error = g.types.function(g.s.vals[arguments.start + at].ty, ty);
-        if error != blot_direct_types::Error.none { return 0, error; }
+        if error != squid_direct_types::Error.none { return 0, error; }
         ty = wrapped;
     }
-    return ty, blot_direct_types::Error.none;
+    return ty, squid_direct_types::Error.none;
 }
 
 // Operator or member dispatch on the left operand's concrete type.
 recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    let elide_children = n.op != blot_check_core::Op.none && isCanonicalF32Consumer(n.op) && isFloatCoreExpr(g, f, m, n.a);
+    let elide_children = n.op != squid_check_core::Op.none && isCanonicalF32Consumer(n.op) && isFloatCoreExpr(g, f, m, n.a);
     if elide_children { f.elide_f32_nan_node = n.a; }
     let left, error = expr(g, f, n.a);
     f.elide_f32_nan_node = 0;
-    if error != blot_direct_types::Error.none { return left, error; }
+    if error != squid_direct_types::Error.none { return left, error; }
     var has_right = false;
     var right = neverVal();
     if n.b != 0 {
         if elide_children { f.elide_f32_nan_node = n.b; }
         let value, error = expr(g, f, n.b);
         f.elide_f32_nan_node = 0;
-        if error != blot_direct_types::Error.none { return value, error; }
+        if error != squid_direct_types::Error.none { return value, error; }
         has_right = true;
         right = value;
     }
     let result, result_error = g.types.lower(m, m.typeOf(id), f.env);
-    let has_result = result_error == blot_direct_types::Error.none;
+    let has_result = result_error == squid_direct_types::Error.none;
     let tag = g.types.node(left.ty).tag;
-    if n.op != blot_check_core::Op.none && isScalarTag(tag) {
+    if n.op != squid_check_core::Op.none && isScalarTag(tag) {
         let machine, error = scalarMember(g, f, m, left.ty, n.c, n.op, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         push(g, left);
         if has_right { push(g, right); }
         let skip_nan = elide_nan || (f.defer_f32_nan && isCanonicalF32Op(machine));
         let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan, result);
-        if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
+        if emitted != squid_direct_types::Error.none { return neverVal(), emitted; }
         var popped_ty = scalarResult(machine, left.ty);
         if has_result { popped_ty = result; }
         let popped, perr = pop(g, f, popped_ty, id);
-        if perr == blot_direct_types::Error.none && machine == blot_check_core::Op.numeric_convert &&
-            left.ty == blot_direct_types::u32_ && popped_ty == blot_direct_types::u64_ {
+        if perr == squid_direct_types::Error.none && machine == squid_check_core::Op.numeric_convert &&
+            left.ty == squid_direct_types::u32_ && popped_ty == squid_direct_types::u64_ {
             let cf, known = constU32(f, w(g, left, 0));
             if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
             else { recordExtU32U64(f, w(g, popped, 0), w(g, left, 0)); }
@@ -3887,24 +3887,24 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false)
     if !has_identity {
         g.failOpen(m, id);
         g.put("associated member on a ");
-        g.put(blot_direct_types::tagName(tag));
+        g.put(squid_direct_types::tagName(tag));
         return neverVal(), g.failClose();
     }
-    let target, has_target = g.dispatchTarget(m, identity, n.c, blot_check_types::Operator.none);
-    if !has_target { return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.missing_associated, "no associated member for this receiver"); }
+    let target, has_target = g.dispatchTarget(m, identity, n.c, squid_check_types::Operator.none);
+    if !has_target { return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.missing_associated, "no associated member for this receiver"); }
     var owned = g.saveVals([left]);
     if has_right { owned = g.saveVals([left, right]); }
     var callee: Ty = 0;
     if has_result {
         let full, error = curried(g, owned, result);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         callee = full;
     } else {
         let derived, error = calleeOf(g, f, target, owned, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         callee = derived;
     }
     let rest, error = restType(g, f, callee, owned.len, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     return callTarget(g, f, target, owned, callee, rest, id);
 }

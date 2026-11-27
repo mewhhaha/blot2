@@ -22,16 +22,16 @@ function createCompiler(entry: string) {
 
 for (
   const name of [
-    "global_call_read.blot",
-    "global_call_conditional.blot",
-    "global_call_initialization.blot",
-    "global_call_mutation.blot",
+    "global_call_read.sq",
+    "global_call_conditional.sq",
+    "global_call_initialization.sq",
+    "global_call_mutation.sq",
   ]
 ) {
   const test = Deno.test;
   test(`globals retain initialization aliases across calls: ${name}`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-global-call-" });
+    const entry = `${directory}/main.sq`;
     const compiler = await createCompiler(entry);
     try {
       {
@@ -51,7 +51,7 @@ for (
           };
           try {
             assert.equal(guest.abi.version, 8);
-            if (name === "global_call_read.blot") {
+            if (name === "global_call_read.sq") {
               for (const index of [0, 1, 2, 1, 0]) {
                 const expected = [5, 11, 17][index] + index;
                 assert.equal(await call("twice", index), expected * 2);
@@ -65,7 +65,7 @@ for (
                 WebAssembly.RuntimeError,
               );
               assert.equal(await call("twice", 0), 10);
-            } else if (name === "global_call_conditional.blot") {
+            } else if (name === "global_call_conditional.sq") {
               // The branch can be the first syntactic global reference while
               // the first executed reference occurs after that branch.
               for (const flag of [false, true, false, true]) {
@@ -73,7 +73,7 @@ for (
                 if (flag) expected = 32;
                 assert.equal(await call("answer", flag), expected);
               }
-            } else if (name === "global_call_initialization.blot") {
+            } else if (name === "global_call_initialization.sq") {
               assert.deepEqual(
                 await call("answer", 5),
                 new Uint32Array([10, 101, 203, 319, 319]),
@@ -105,10 +105,10 @@ for (
 
 // Ownership is checked at compile time: mutating a module const global is
 // rejected as aliased_update.
-for (const name of ["global_call_freeze.blot"]) {
+for (const name of ["global_call_freeze.sq"]) {
   Deno.test(`mutating a module const global is rejected at compile time: ${name}`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-global-call-" });
+    const entry = `${directory}/main.sq`;
     const compiler = await createCompiler(entry);
     try {
       const built = await compiler.build({

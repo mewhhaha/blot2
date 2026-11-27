@@ -72,13 +72,13 @@ The trace uses Pen `360f2c4`, Rust 1.99.0, Wasmtime 49.0.3 and the debug host
 profile on a Ryzen 7 3800X. The restricted run uses CPU 0 and CPU 1, two
 physical cores. Module SHA-256 is `02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69`.
 
-From the Pen checkout, using the route fixture built by Blot's
-[`spark_spawn.ts`](spark_spawn.ts) with `BLOT_ROUTE_WASM` set to the path below.
+From the Pen checkout, using the route fixture built by Squid's
+[`spark_spawn.ts`](spark_spawn.ts) with `SQUID_ROUTE_WASM` set to the path below.
 
 ```sh
-cargo build -p blot-host --example compare_routes
-target/debug/examples/compare_routes ../blot2/build/issue-qualification/routes-final.wasm --stages
-taskset -c 0,1 target/debug/examples/compare_routes ../blot2/build/issue-qualification/routes-final.wasm --stages
+cargo build -p squid-host --example compare_routes
+target/debug/examples/compare_routes ../squid-lang/build/issue-qualification/routes-final.wasm --stages
+taskset -c 0,1 target/debug/examples/compare_routes ../squid-lang/build/issue-qualification/routes-final.wasm --stages
 ```
 
 [Per-job timings, per-site copy counts and paired samples](../evidence/measurements/2026-11-20-native-route-stages.raw.json.gz)

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="favicon.svg" width="96" alt="Blot logo">
+  <img src="favicon.svg" width="96" alt="Squid logo">
 </p>
 
-<h1 align="center">Blot</h1>
+<h1 align="center">Squid</h1>
 
 <p align="center">
   <b>A zero-GC, ownership-checked language compiling straight to WebAssembly in milliseconds.</b><br>
@@ -21,9 +21,9 @@
 |:---:|:---:|:---:|:---:|
 | runtime vs expert C++<br><sub>16-suite geomean · lower is better</sub> | faster than Go<br><sub>PLB · 12 problems</sub> | peak memory vs expert C++<br><sub>16-suite geomean · lower is better</sub> | cold build → native<br><sub>8.7× faster than clang++</sub> |
 
-<sub>AMD Ryzen 7 7800X3D · <code>blotc-goose</code> → <code>wtime-aot 0.1.11</code> AOT-compiled Wasm · 100% bit-exact output parity · <a href="BENCHMARK.md">Methodology →</a></sub>
+<sub>AMD Ryzen 7 7800X3D · <code>squidc-goose</code> → <code>wtime-aot 0.1.11</code> AOT-compiled Wasm · 100% bit-exact output parity · <a href="BENCHMARK.md">Methodology →</a></sub>
 
-```blot
+```squid
 type Clock is effect = { tick: Unit -> U32 }
 type Action is data = $Add U32 | $Clear
 
@@ -43,12 +43,12 @@ io main (): #[U32] =>
     .run ($Add 5) // #[1, 2, 15]
 ```
 
-## Why Blot
+## Why Squid
 
 - **No GC, no lifetimes.** Values have a single owner, update in place with `:=`, and free deterministically when their scope ends.
 - **Native-class, no LLVM.** Direct compilation to compact WebAssembly (`wtime-aot` to native x64/ARM64) delivers millisecond cold builds and competitive runtime.
 - **Deterministic by construction.** Every guest runs in a memory-isolated sandbox where all host I/O enters through typed, swappable algebraic effects.
-- **Comptime without macros.** `#for`, `#if`, and `#fields` inspect types and generate specialized code at compile time using ordinary Blot syntax.
+- **Comptime without macros.** `#for`, `#if`, and `#fields` inspect types and generate specialized code at compile time using ordinary Squid syntax.
 
 ## Tour
 
@@ -56,7 +56,7 @@ io main (): #[U32] =>
 
 Pass `own` to mutate arrays and recursive data in place without garbage collection, borrow-checker lifetimes, or accidental aliasing.
 
-```blot
+```squid
 type Tree is data = $Leaf U32 | $Branch (Tree, Tree)
 
 func map_tree (t: own Tree) -> (k: U32): Tree => case t of
@@ -80,7 +80,7 @@ func scale (items: own #[F32]) -> (k: F32): #[F32] =>
 
 ### Data layout is a symbol
 
-Blot puts memory layout directly in the type so you choose dense storage without changing how code reads.
+Squid puts memory layout directly in the type so you choose dense storage without changing how code reads.
 
 | Write | Means |
 |---|---|
@@ -89,7 +89,7 @@ Blot puts memory layout directly in the type so you choose dense storage without
 | `%[T]` | Packed sequential storage: SoA record columns and split-stream sums |
 | `*T` | Frozen value, shared by handle with zero copying |
 
-```blot
+```squid
 type Event is data = $Hit U32 | $Miss
 
 func damage (raw: #[U32]): U32 =>
@@ -109,7 +109,7 @@ func damage (raw: #[U32]): U32 =>
 
 All I/O, randomness, and host state enter through typed effects—stack `handler` values with `layer` (or `@handle`) to test and replay deterministically.
 
-```blot
+```squid
 type Rng is effect = { next: Unit -> U32 }
 type Log is effect = { write: U32 -> Unit }
 
@@ -140,7 +140,7 @@ io main (): U32 =>
 
 Attach typed `@[...]` tags to record fields and walk `#fields t` at compile time—no proc macros, no runtime reflection.
 
-```blot
+```squid
 type Skip is data = $Skip
 type FieldId is data = $FieldId U32
 
@@ -165,9 +165,9 @@ io main (): #[U32] => encode_fields ($Player { id: 7 }) // #[10, 7, 20, 100]
 
 ### SIMD by default with `spark`
 
-Mark an elementwise comprehension with `spark` to auto-vectorize straight to Wasm `v128` SIMD—the mechanism behind Blot's **2.24×** lead over C++ on `particles`.
+Mark an elementwise comprehension with `spark` to auto-vectorize straight to Wasm `v128` SIMD—the mechanism behind Squid's **2.24×** lead over C++ on `particles`.
 
-```blot
+```squid
 func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32] =>
   let half_dt2 = 0.5 * dt * dt
   return spark #[px[i] + vx[i] * dt + ax[i] * half_dt2 | i <- 0 .. px.length]
@@ -178,7 +178,7 @@ func integrate (px: #[F32]) -> (vx: #[F32]) -> (ax: #[F32]) -> (dt: F32): #[F32]
 <details>
 <summary><b>Kernels &amp; persistent processes</b> — isolated compute kernels and long-lived stateful actors</summary>
 
-```blot
+```squid
 #kernel func shade_row (row: U32): U32 =>
   let acc: U32 = 0
   for x in 0 .. 256:
@@ -194,13 +194,13 @@ func step_counter (st: own U32) -> (delta: U32): (U32, U32) => (st + delta, st +
 }
 ```
 
-→ [Full coordination pipeline](examples/runtime_coordination.blot)
+→ [Full coordination pipeline](examples/runtime_coordination.sq)
 </details>
 
 <details>
 <summary><b>Custom operators &amp; diagnostics</b> — user-defined operators, guarded destructuring, and blame-tracked errors</summary>
 
-```blot
+```squid
 func (+*) (a: U32) -> (b: U32): U32 => a * b + 1
 
 func first_or_zero (xs: #[U32]): U32 =>
@@ -211,26 +211,26 @@ func first_or_zero (xs: #[U32]): U32 =>
 
 ```text
 [SPENT_VALUE] `items` was already moved at line 5 and can no longer be used here.
-in spent_demo.blot › io main
-at spent_demo.blot:6:14
+in spent_demo.sq › io main
+at spent_demo.sq:6:14
  5 |   let n = consume items
    |           ------------- `items` moved here
  6 |   return n + items[0]
    |              ^^^^^ `items` used after move
 fix: Pass `items.copy` at line 5 to keep `items` live, or use the owned value returned by that call.
-doc: blot explain SPENT_VALUE (skills/blot-diagnostics/SKILL.md#SPENT_VALUE)
+doc: squid explain SPENT_VALUE (skills/squid-diagnostics/SKILL.md#SPENT_VALUE)
 ```
 
-Run `deno task blot explain <CODE>` for the full cause, minimal repro, and fix guide for any diagnostic code.
+Run `deno task squid explain <CODE>` for the full cause, minimal repro, and fix guide for any diagnostic code.
 </details>
 
 ## Performance
 
-<sub>Measured on AMD Ryzen 7 7800X3D (Linux <code>x86_64</code>) · <code>blotc-goose</code> → <code>wtime-aot 0.1.11 --guard-pages</code> · single-process CPU time &amp; exact peak RSS · 100% bit-exact output parity.</sub>
+<sub>Measured on AMD Ryzen 7 7800X3D (Linux <code>x86_64</code>) · <code>squidc-goose</code> → <code>wtime-aot 0.1.11 --guard-pages</code> · single-process CPU time &amp; exact peak RSS · 100% bit-exact output parity.</sub>
 
-<img src="benchmarks/evidence/measurements/2026-11-27-goose-suite/summary_overview.svg" width="100%" alt="16-benchmark suite runtime, peak memory, and compile speed overview comparing Blot, Goose, Rust, and C++">
+<img src="benchmarks/evidence/measurements/2026-11-27-goose-suite/summary_overview.svg" width="100%" alt="16-benchmark suite runtime, peak memory, and compile speed overview comparing Squid, Goose, Rust, and C++">
 
-| Workload | Blot | Comparison | Result |
+| Workload | Squid | Comparison | Result |
 |---|---:|---:|---|
 | `particles` (16-suite) | 83.0 ms | C++ expert 185.6 ms | **#1 overall · 2.24× faster** |
 | `sum` (16-suite) | 39.6 ms | Goose 47.8 ms | **#1 overall · 1.21× faster** |
@@ -240,7 +240,7 @@ Run `deno task blot explain <CODE>` for the full cause, minimal repro, and fix g
 | PLB `merkletrees` | 372.4 ms · 17.8 MiB | Rust 678.6 ms · 34.1 MiB | **#1 speed & lowest RSS** |
 | `sexp` / `words` RSS | 109.2 / 79.6 MiB | Goose 128.0 / 138.3 MiB | **#1 lowest RSS in suite** |
 
-Where Blot trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap), and on PLB Blot trails C++/Rust on SIMD-heavy `fannkuch-redux` (`1.74 s` vs C++ `960.9 ms`) and Go's assembly `math/big` on `pidigits` (`1.14 s` vs `648.6 ms`).
+Where Squid trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap), and on PLB Squid trails C++/Rust on SIMD-heavy `fannkuch-redux` (`1.74 s` vs C++ `960.9 ms`) and Go's assembly `math/big` on `pidigits` (`1.14 s` vs `648.6 ms`).
 
 | Iteration speed | Time |
 |---|---:|
@@ -253,27 +253,27 @@ Where Blot trails: Goose leads the 16-suite geomean at `0.93×` (`1.15×` gap), 
 <details>
 <summary>PLB runtime chart (13 problems vs Go, Rust, C &amp; C++)</summary>
 
-<img src="benchmarks/evidence/measurements/2026-11-27-plb/plb_runtime.svg" width="100%" alt="Programming-Language-Benchmarks runtime comparison across 13 problems for Blot, Go, Rust, C, and C++">
+<img src="benchmarks/evidence/measurements/2026-11-27-plb/plb_runtime.svg" width="100%" alt="Programming-Language-Benchmarks runtime comparison across 13 problems for Squid, Go, Rust, C, and C++">
 </details>
 
 → **[BENCHMARK.md](BENCHMARK.md)** — full per-benchmark tables, Ink vs Bevy ECS, `bddicken/languages`, and raw JSON.
 
 ## Getting started
 
-Requires **Deno 2** (plus `clang`, `cmake`, `ninja`, and `Python 3` to build from source). Prebuilt Linux `x86_64` binaries are available on [Releases](https://github.com/mewhhaha/blot2/releases).
+Requires **Deno 2** (plus `clang`, `cmake`, `ninja`, and `Python 3` to build from source). Prebuilt Linux `x86_64` binaries are available on [Releases](https://github.com/mewhhaha/squid-lang/releases).
 
 ```sh
 # Build the compiler (first run bootstraps Goose in ~2 min; ~7 min optimized, or :dev in ~1.5 min)
 deno task build:compiler
 
 # Type-check, compile to Wasm, and format
-deno task blot check path/to/app.blot
-deno task blot build path/to/app.blot -o app.wasm
-deno task blot fmt path/to/app.blot
+deno task squid check path/to/app.sq
+deno task squid build path/to/app.sq -o app.wasm
+deno task squid fmt path/to/app.sq
 
 # Inspect diagnostics and browse the built-in cheatsheet
-deno task blot explain SPENT_VALUE
-deno task blot guide --cheatsheet
+deno task squid explain SPENT_VALUE
+deno task squid guide --cheatsheet
 
 # Run the guest and host test suite
 deno task test:guest
@@ -287,12 +287,12 @@ deno task test:guest
 | Understand the design philosophy | [Design](DESIGN.md) |
 | Read the language guide & formal spec | [Guide](docs/language/guide.md) · [Spec](docs/language/spec.md) |
 | Work with effects, handlers & host I/O | [Effects & I/O](docs/language/effects-and-io.md) |
-| Look up a compiler diagnostic | [Diagnostics Guide](skills/blot-diagnostics/SKILL.md) |
+| Look up a compiler diagnostic | [Diagnostics Guide](skills/squid-diagnostics/SKILL.md) |
 | Explore the standard library | [Standard Library](std/README.md) |
 | Inspect all benchmark suites & raw data | [Benchmarks](BENCHMARK.md) |
 | Dive into compiler internals | [Compiler README](compiler-goose/README.md) |
-| Embed Blot or inspect the Wasm ABI | [Host Runtime](host/README.md) · [Guest ABI](docs/host/guest-abi.md) |
+| Embed Squid or inspect the Wasm ABI | [Host Runtime](host/README.md) · [Guest ABI](docs/host/guest-abi.md) |
 | Contribute or check active priorities | [AGENTS.md](AGENTS.md) · [CONTINUE.md](CONTINUE.md) · [Docs Index](docs/README.md) |
 
 > [!NOTE]
-> Blot is a greenfield project under active development—expect breaking changes. Prebuilt releases currently target Linux `x86_64`, and the compiler targets WebAssembly guest ABI 8.
+> Squid is a greenfield project under active development—expect breaking changes. Prebuilt releases currently target Linux `x86_64`, and the compiler targets WebAssembly guest ABI 8.

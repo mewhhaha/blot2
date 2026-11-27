@@ -39,7 +39,7 @@ const capabilities = [
 if (mode !== "no-capability") capabilities.push("native-assets-v1");
 await write({
   kind: "hello",
-  protocol: "blot-zig-project",
+  protocol: "squid-zig-project",
   version: 1,
   maxFrameBytes: 67108864,
   compilerIdentity: "a".repeat(64),

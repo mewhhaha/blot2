@@ -174,7 +174,7 @@ construction or qualification; no compiler-build hill closes from this batch.
 ## Local installation
 
 The qualified native release and self-contained CLI are installed as
-`~/.local/bin/blotc` and `~/.local/bin/blot`. The native binary has the candidate
+`~/.local/bin/squidc` and `~/.local/bin/squid`. The native binary has the candidate
 hash above; CLI SHA-256 is
 `8e21477ee14eb042aecf203fadb74678bcb27f7098833801dbb4580a1937b478`.
 The package uses the isolated candidate's compiler, parser, guide and standard

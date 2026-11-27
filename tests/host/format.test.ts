@@ -268,16 +268,16 @@ Deno.test({
       "../../host/zig_project_client.ts"
     );
     const directory = await Deno.makeTempDir({
-      prefix: "blot-format-opacity-",
+      prefix: "squid-format-opacity-",
     });
     try {
-      const entry = `${directory}/main.blot`;
+      const entry = `${directory}/main.sq`;
       const sources = {
         [entry]:
           'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nio const answer=func (value:F32)=> return facade.read (make value)\nio const folded=facade.read (make 40.0)\n',
-        [`${directory}/tokens.blot`]:
+        [`${directory}/tokens.sq`]:
           "type Token is opaque=F32\nprivate const offset=2.0\nconst make:F32->Token=func value=> return $Token (@f32.add value offset)\nconst read:Token->F32=func ($Token value)=> return value\nprivate const Token.hidden=read\n",
-        [`${directory}/facade.blot`]:
+        [`${directory}/facade.sq`]:
           'export {Token as Ticket,read} from "./tokens"\n',
       };
       const formatted: Record<string, string> = {};
@@ -447,7 +447,7 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
     const directory of ["examples", "examples/generators", "std", "tests/std"]
   ) {
     for await (const entry of Deno.readDir(`${repo}${directory}`)) {
-      if (!entry.isFile || !entry.name.endsWith(".blot")) continue;
+      if (!entry.isFile || !entry.name.endsWith(".sq")) continue;
       const path = `${repo}${directory}/${entry.name}`;
       const once = await formatSource(await Deno.readTextFile(path));
       equal(await formatSource(once), once, path);
@@ -459,7 +459,7 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
   const { createZigProjectCompiler } = await import(
     "../../host/zig_project_client.ts"
   );
-  const prelude = `${repo}std/prelude.blot`;
+  const prelude = `${repo}std/prelude.sq`;
   const stdRoot = `${repo}std`;
   for (const entry of examples.sort()) {
     const options = {

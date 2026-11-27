@@ -103,7 +103,7 @@ io const independent = func () => return do:
 `, guest => {
     for (const count of [1, 2, 4, 32]) equal(guest.call("run", count), true);
     for (let index = 0; index < 100; index++) equal(guest.call("independent", null), 42.5);
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
 });
 
 // Direct backend gap: a `from` result typed through an operator operand is an unresolved type variable (tasks/DELETE_SCOPED.md).
@@ -113,7 +113,7 @@ const scaled = func (value: U32) => return from value / 65536.0
 io const wrong = func (index: U32) : U32 => return do:
   let x = scaled index + 0.5
   break @u32.add x 1
-`, "type_mismatch", undefined, { prelude: "std/prelude.blot" });
+`, "type_mismatch", undefined, { prelude: "std/prelude.sq" });
 });
 
 // Direct backend gap: a `from` result typed through an operator operand is an unresolved type variable (tasks/DELETE_SCOPED.md).
@@ -127,12 +127,12 @@ io const run = func (index: U32) => return do:
   break @f32.add x (@u32.to_f32 first)
 `, guest => {
     for (const index of [0, 1, 65536]) equal(guest.call("run", index), Math.fround(index / 65536 + 41.5));
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
   await compileExpectedFailure(`
 const scaled = func (value: U32) => return from value / 65536.0
 io const wrong = func (index: U32) : U32 => return do:
   let pair = (scaled index + 0.5, func value => return value)
   let (value, identity) = pair
   break @u32.add value (identity 41)
-`, "type_mismatch", undefined, { prelude: "std/prelude.blot" });
+`, "type_mismatch", undefined, { prelude: "std/prelude.sq" });
 });

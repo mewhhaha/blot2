@@ -374,19 +374,19 @@ func step (state: own #[U32]) -> (x: U32): (#[U32], U32) =>
 io expose_memory (_: Unit): #[U32] => #[0]
 `,
     (guest, bytes) => {
-      guest.call("blot:proc_init:vector_pool", 77);
-      assert.equal(guest.call("blot:proc_step:vector_pool", 99), 99);
+      guest.call("squid:proc_init:vector_pool", 77);
+      assert.equal(guest.call("squid:proc_step:vector_pool", 99), 99);
 
-      // Blot's checker rejects stores to const pools. Exercise the runtime
+      // Squid's checker rejects stores to const pools. Exercise the runtime
       // guard by marking this persistent state owner static in the raw ABI.
       const { exports } = new WebAssembly.Instance(
         new WebAssembly.Module(bytes),
       );
-      const init = exports["blot:proc_init:vector_pool"] as CallableFunction;
-      const step = exports["blot:proc_step:vector_pool"] as CallableFunction;
+      const init = exports["squid:proc_init:vector_pool"] as CallableFunction;
+      const step = exports["squid:proc_step:vector_pool"] as CallableFunction;
       init(77);
       const memory = new DataView(
-        (exports["blot:memory"] as WebAssembly.Memory).buffer,
+        (exports["squid:memory"] as WebAssembly.Memory).buffer,
       );
       const read = (at: number) => memory.getUint32(at, true);
       const initial = [77, 123, 456, 789];
@@ -554,8 +554,8 @@ io permute (input: #[U32]): #[U32] =>
 });
 
 Deno.test("Wave 2 uses the opt-in relaxed SIMD opcodes and canonicalizes their NaNs", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-wave2-relaxed-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-wave2-relaxed-" });
+  const entry = `${dir}/main.sq`;
   try {
     await Deno.writeTextFile(
       entry,
@@ -571,10 +571,10 @@ io relaxed (input: #[U32]): #[U32] =>
     );
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0] ??
-        new URL("../../compiler-goose/build/blotc-goose", import.meta.url)
+        new URL("../../compiler-goose/build/squidc-goose", import.meta.url)
           .pathname,
       entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
       stdRoot,
       relaxedSimd: true,
     });

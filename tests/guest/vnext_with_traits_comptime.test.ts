@@ -737,8 +737,8 @@ io main (): Bool =>
 
 Deno.test("comptime defaults use the defining module and update after retained edits", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const model = dir + "/model.blot";
+  const entry = dir + "/main.sq";
+  const model = dir + "/model.sq";
   const definition = `
 private func answer (): U32 => 37
 type Item is data = $Item { ready: Bool = true, amount: U32 = answer () }
@@ -747,7 +747,7 @@ func amount (item: Item): U32 => if item.ready then item.amount else 0
   try {
     await Deno.writeTextFile(model, definition);
     await Deno.writeTextFile(
-      dir + "/builder.blot",
+      dir + "/builder.sq",
       `
 func build (): t =>
   return #for field in #fields t:

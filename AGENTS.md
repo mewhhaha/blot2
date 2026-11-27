@@ -1,4 +1,4 @@
-# Working on Blot
+# Working on Squid
 
 - This is a greenfield project. Breaking changes are welcome. Remove superseded
   APIs, implementations and compatibility scaffolding; do not retain legacy
@@ -31,10 +31,10 @@
 - The compiler's build needs clang, cmake, ninja and Python 3. Its first run
   also builds the patched Goose compiler (about two minutes).
   - `deno task build:compiler:dev` builds the debug compiler,
-    `compiler-goose/build/blotc-goose-dev`, in about a minute and a half. Use
+    `compiler-goose/build/squidc-goose-dev`, in about a minute and a half. Use
     it while developing.
   - `deno task build:compiler` builds the optimized compiler,
-    `compiler-goose/build/blotc-goose`, in about seven minutes. Pen, the
+    `compiler-goose/build/squidc-goose`, in about seven minutes. Pen, the
     sibling checkouts and the tests' default path run this one.
 - `deno task test:compiler:dev [FILES...]` builds the debug compiler and runs
   the named guest test files against it (three smoke files when none is named).

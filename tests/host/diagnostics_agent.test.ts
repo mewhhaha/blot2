@@ -16,10 +16,10 @@ import {
 } from "../../host/diagnostics.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
 const prelude = fileURLToPath(
-  new URL("../../std/prelude.blot", import.meta.url),
+  new URL("../../std/prelude.sq", import.meta.url),
 );
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -120,7 +120,7 @@ Deno.test("diagnostics: canonical codes and explain catalog", async () => {
     match(explanation ?? "", /After \(fixed\):/);
     match(
       explanation ?? "",
-      new RegExp(`skills/blot-diagnostics/SKILL\\.md#${code}`),
+      new RegExp(`skills/squid-diagnostics/SKILL\\.md#${code}`),
     );
   }
 
@@ -141,7 +141,7 @@ Deno.test("diagnostics: canonical codes and explain catalog", async () => {
 
   const cheatsheetRun = await runCapturedCli(["guide", "--cheatsheet"]);
   equal(cheatsheetRun.code, 0);
-  match(cheatsheetRun.stdout, /# Blot vNext Cheatsheet/);
+  match(cheatsheetRun.stdout, /# Squid vNext Cheatsheet/);
   match(cheatsheetRun.stdout, /#\[1, 2, 3\]/);
 });
 
@@ -154,7 +154,7 @@ Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point colu
   const end = start + "bad_name".length;
   equal(bytes.length > end, true);
   const record: RawDiagnosticRecord = {
-    filename: "unicode.blot",
+    filename: "unicode.sq",
     code: "unknown_value",
     start,
     end,
@@ -162,16 +162,16 @@ Deno.test("diagnostics: UTF-8 byte offsets map to exact line and code-point colu
   };
   const rendered = formatDiagnostic(record, { source });
   match(rendered, /\[UNKNOWN_VALUE\]/);
-  match(rendered, /in unicode\.blot › io main/);
-  match(rendered, /at unicode\.blot:3:10/);
+  match(rendered, /in unicode\.sq › io main/);
+  match(rendered, /at unicode\.sq:3:10/);
   match(rendered, /3 \|   return bad_name/);
   match(rendered, /\^\^\^\^\^\^\^\^ did you mean `good_name`\?/);
   match(rendered, /fix: Replace `bad_name` with `good_name`\./);
-  match(rendered, /doc: blot explain UNKNOWN_VALUE/);
+  match(rendered, /doc: squid explain UNKNOWN_VALUE/);
 });
 
 Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes across agent pitfalls", async () => {
-  const tempDir = await Deno.makeTempDir({ prefix: "blot-diag-agent-" });
+  const tempDir = await Deno.makeTempDir({ prefix: "squid-diag-agent-" });
   try {
     const cases: {
       name: string;
@@ -180,133 +180,133 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
       patterns: RegExp[];
     }[] = [
       {
-        name: "fn_keyword.blot",
+        name: "fn_keyword.sq",
         cmd: "check",
         source: "fn add (a: U32) -> (b: U32): U32 => return a + b\n",
         patterns: [
           /\[SYNTAX_ERROR\]/,
-          /at .*fn_keyword\.blot:1:1/,
-          /fix: Blot uses `func`, not `fn`/,
-          /doc: blot explain SYNTAX_ERROR/,
+          /at .*fn_keyword\.sq:1:1/,
+          /fix: Squid uses `func`, not `fn`/,
+          /doc: squid explain SYNTAX_ERROR/,
         ],
       },
       {
-        name: "bare_list.blot",
+        name: "bare_list.sq",
         cmd: "check",
         source: "io main (): #[U32] => return [1, 2, 3]\n",
         patterns: [
           /\[UNSUPPORTED_EXPRESSION\]/,
-          /in bare_list\.blot › io main/,
-          /at .*bare_list\.blot:1:30/,
+          /in bare_list\.sq › io main/,
+          /at .*bare_list\.sq:1:30/,
           /use `#\[\.\.\.\]` here/,
           /fix: Replace bare `\[\.\.\.\]` with `#\[\.\.\.\]`/,
-          /doc: blot explain UNSUPPORTED_EXPRESSION/,
+          /doc: squid explain UNSUPPORTED_EXPRESSION/,
         ],
       },
       {
-        name: "missing_dollar.blot",
+        name: "missing_dollar.sq",
         cmd: "check",
         source:
           "type Opt is data = $Some U32 | $Nothing\nio main (): Opt => return Some 1\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in missing_dollar\.blot › io main/,
-          /at .*missing_dollar\.blot:2:27/,
+          /in missing_dollar\.sq › io main/,
+          /at .*missing_dollar\.sq:2:27/,
           /add `\$` -> `\$Some`/,
           /fix: Prefix the data constructor with `\$`: use `\$Some`/,
         ],
       },
       {
-        name: "typo_name.blot",
+        name: "typo_name.sq",
         cmd: "check",
         source:
           "func compute_total (x: U32): U32 => return x + 1\nio main (): U32 => return compute_totla 5\n",
         patterns: [
           /\[UNKNOWN_VALUE\]/,
-          /in typo_name\.blot › io main/,
-          /at .*typo_name\.blot:2:27/,
+          /in typo_name\.sq › io main/,
+          /at .*typo_name\.sq:2:27/,
           /did you mean `compute_total`\?/,
           /fix: Replace `compute_totla` with `compute_total`\./,
         ],
       },
       {
-        name: "missing_field.blot",
+        name: "missing_field.sq",
         cmd: "check",
         source:
           "type Pt = { x: U32, y: U32 }\nio main (): U32 =>\n  let p: Pt = { x: 1, y: 2 }\n  return p.z\n",
         patterns: [
           /\[MISSING_MEMBER\]/,
           /Type `\{ x: U32, y: U32 \}` has no field or member `\.z`/,
-          /in missing_field\.blot › io main/,
-          /at .*missing_field\.blot:4:10/,
+          /in missing_field\.sq › io main/,
+          /at .*missing_field\.sq:4:10/,
           /fix: Available fields on `\{ x: U32, y: U32 \}`: `x`, `y`\./,
         ],
       },
       {
-        name: "type_mismatch.blot",
+        name: "type_mismatch.sq",
         cmd: "check",
         source: "io main (): U32 => return 1.5\n",
         patterns: [
           /\[TYPE_MISMATCH\]/,
           /F32.*U32|U32.*F32/,
-          /fix: Blot has no implicit numeric conversions/,
-          /doc: blot explain TYPE_MISMATCH/,
+          /fix: Squid has no implicit numeric conversions/,
+          /doc: squid explain TYPE_MISMATCH/,
         ],
       },
       {
-        name: "spent_value.blot",
+        name: "spent_value.sq",
         cmd: "build",
         source:
           "func consume (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
         patterns: [
           /\[SPENT_VALUE\] `a` was already moved at line 4/,
-          /in spent_value\.blot › io main/,
-          /at .*spent_value\.blot:5:14/,
+          /in spent_value\.sq › io main/,
+          /at .*spent_value\.sq:5:14/,
           /--------- `a` moved here/,
           /\^\^\^\^\^\^\^\^ `a` used after move/,
           /fix: Pass `a\.copy` at line 4/,
-          /doc: blot explain SPENT_VALUE/,
+          /doc: squid explain SPENT_VALUE/,
         ],
       },
       {
-        name: "aliased_update.blot",
+        name: "aliased_update.sq",
         cmd: "build",
         source:
           "io main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate `a` in place while `b` still borrows it/,
-          /in aliased_update\.blot › io main/,
-          /at .*aliased_update\.blot:4:3/,
+          /in aliased_update\.sq › io main/,
+          /at .*aliased_update\.sq:4:3/,
           /--------- borrowed by `b` here/,
           /\^\^\^\^\^\^\^\^\^\^ mutated while borrowed/,
           /fix: Snapshot with `let b = a\.copy` \(line 3\)/,
-          /doc: blot explain ALIASED_UPDATE/,
+          /doc: squid explain ALIASED_UPDATE/,
         ],
       },
       {
-        name: "param_update.blot",
+        name: "param_update.sq",
         cmd: "build",
         source:
           "func bad (a: #[U32]): #[U32] =>\n  a[0] := 99\n  return a\nio main (): U32 => return (bad #[1, 2])[0]\n",
         patterns: [
           /\[ALIASED_UPDATE\] Cannot mutate borrowed parameter `a` in place without `own`/,
-          /in param_update\.blot › func bad/,
-          /at .*param_update\.blot:2:3/,
+          /in param_update\.sq › func bad/,
+          /at .*param_update\.sq:2:3/,
           /----------- borrowed parameter \(not `own`\)/,
           /fix: Mark the parameter `own`/,
         ],
       },
       {
-        name: "unhandled_effect.blot",
+        name: "unhandled_effect.sq",
         cmd: "build",
         source:
           "type Clock is effect = { now: Unit -> U32 }\nio main (): U32 =>\n  use t <- Clock.now ()\n  return t\n",
         patterns: [
           /\[ENTRY_TYPE\] Entry function leaves effect `Clock\.now` unhandled/,
-          /in unhandled_effect\.blot › io main/,
+          /in unhandled_effect\.sq › io main/,
           /unhandled effect `Clock\.now`/,
           /fix: Handle `Clock\.now` inside the entry function with `handler h: Clock => now /,
-          /doc: blot explain ENTRY_TYPE/,
+          /doc: squid explain ENTRY_TYPE/,
         ],
       },
     ];
@@ -333,7 +333,7 @@ Deno.test("diagnostics: real compiler CLI reports Solid-2 style blame and fixes 
 });
 
 Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported pitfalls", async () => {
-  const tempDir = await Deno.makeTempDir({ prefix: "blot-qf-replay-" });
+  const tempDir = await Deno.makeTempDir({ prefix: "squid-qf-replay-" });
   try {
     const replayCases: Array<{
       name: string;
@@ -342,66 +342,66 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
       expectedSnippet?: RegExp;
     }> = [
       {
-        name: "fn_simple.blot",
+        name: "fn_simple.sq",
         cmd: "check-project",
         source: "fn add (a: U32): U32 => return a + 1\n",
         expectedSnippet: /^func add \(a: U32\): U32 => return a \+ 1/,
       },
       {
-        name: "bare_list.blot",
+        name: "bare_list.sq",
         cmd: "build",
         source: "io main (): #[U32] => return [1, 2, 3]\n",
         expectedSnippet: /#\[1, 2, 3\]/,
       },
       {
-        name: "missing_dollar.blot",
+        name: "missing_dollar.sq",
         cmd: "check-project",
         source:
           "type Opt is data = $Some U32 | $Nothing\nfunc main (): Opt => return Some 1\n",
         expectedSnippet: /\$Some 1/,
       },
       {
-        name: "none_to_nothing.blot",
+        name: "none_to_nothing.sq",
         cmd: "check-project",
         source: "func main (): Maybe U32 => return None\n",
         expectedSnippet: /return \$Nothing/,
       },
       {
-        name: "typo_ident.blot",
+        name: "typo_ident.sq",
         cmd: "build",
         source:
           "func compute_total (x: U32): U32 => return x + 1\nio main (): U32 => return compute_totla 5\n",
         expectedSnippet: /return compute_total 5/,
       },
       {
-        name: "dot_len.blot",
+        name: "dot_len.sq",
         cmd: "build",
         source: "io main (): U32 =>\n  let xs = #[1, 2, 3]\n  return xs.len\n",
         expectedSnippet: /return xs\.length/,
       },
       {
-        name: "spent_whole_local.blot",
+        name: "spent_whole_local.sq",
         cmd: "build",
         source:
           "func consume (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let a = #[1, 2, 3]\n  let n = consume a\n  return n + a.length\n",
         expectedSnippet: /consume a\.copy/,
       },
       {
-        name: "spent_field_projection.blot",
+        name: "spent_field_projection.sq",
         cmd: "build",
         source:
           "type Row = { xs: #[U32] }\nfunc fill (xs: own #[U32]): U32 => return xs.length\nio main (): U32 =>\n  let row: Row = { xs: #[1, 2, 3] }\n  let n = fill row.xs\n  return n + row.xs.length\n",
         expectedSnippet: /fill \(row\.xs\.copy\)/,
       },
       {
-        name: "aliased_local_borrow.blot",
+        name: "aliased_local_borrow.sq",
         cmd: "build",
         source:
           "io main (): U32 =>\n  let a = #[1, 2, 3]\n  let b = a\n  a[0] := 99\n  return a[0] + b[0]\n",
         expectedSnippet: /let b = a\.copy/,
       },
       {
-        name: "aliased_nested_param.blot",
+        name: "aliased_nested_param.sq",
         cmd: "build",
         source:
           "func f (xs: #[(U32, U32)]): #[(U32, U32)] =>\n  xs[0] := (1, 2)\n  return xs\nio main (): U32 =>\n  let out = f #[(0, 0)]\n  let (a, b) = out[0]\n  return a + b\n",
@@ -409,14 +409,14 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
           /func f \(xs: own #\[\(U32, U32\)\]\): #\[\(U32, U32\)\]/,
       },
       {
-        name: "own_argument_param.blot",
+        name: "own_argument_param.sq",
         cmd: "build",
         source:
           "func consume (xs: own #[U32]): #[U32] => return xs\nfunc forward (xs: #[U32]): #[U32] => return consume xs\nio main (): U32 => return (forward #[1, 2]).length\n",
         expectedSnippet: /func forward \(xs: own #\[U32\]\): #\[U32\]/,
       },
       {
-        name: "result_not_owned.blot",
+        name: "result_not_owned.sq",
         cmd: "build",
         source:
           "func pick (xs: #[U32]): #[U32] => return xs\nio main (): U32 => return (pick #[1, 2]).length\n",
@@ -467,7 +467,7 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
     }
 
     // Rust-style fn must NOT emit a broken auto-quick-fix
-    const rustFile = join(tempDir, "rust_fn.blot");
+    const rustFile = join(tempDir, "rust_fn.sq");
     const rustSrc = "fn add (a: U32, b: U32) -> U32 { return a + b }\n";
     await Deno.writeTextFile(rustFile, rustSrc);
     const rustRun = await runCompilerRaw("check-project", rustFile);
@@ -480,7 +480,7 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
         JSON.stringify(rustAnalyzed.quickFixes)
       }`,
     );
-    match(rustAnalyzed.fix ?? "", /Blot uses `func`, not `fn`/);
+    match(rustAnalyzed.fix ?? "", /Squid uses `func`, not `fn`/);
   } finally {
     await Deno.remove(tempDir, { recursive: true });
   }
@@ -488,7 +488,7 @@ Deno.test("diagnostics: quick-fix replay compiles cleanly across all supported p
 
 Deno.test("diagnostics: 1-to-1 sync between DIAGNOSTIC_CATALOG, SKILL.md, and all compiler enums", async () => {
   const skillText = await Deno.readTextFile(
-    new URL("../../skills/blot-diagnostics/SKILL.md", import.meta.url),
+    new URL("../../skills/squid-diagnostics/SKILL.md", import.meta.url),
   );
   const skillCodes = [...skillText.matchAll(/^## ([A-Z][A-Z0-9_]+)$/gm)].map(
     (m) => m[1],
@@ -497,7 +497,7 @@ Deno.test("diagnostics: 1-to-1 sync between DIAGNOSTIC_CATALOG, SKILL.md, and al
   deepStrictEqual(
     [...skillCodes].sort(),
     [...catalogCodes].sort(),
-    "skills/blot-diagnostics/SKILL.md headings must match DIAGNOSTIC_CATALOG 1-to-1",
+    "skills/squid-diagnostics/SKILL.md headings must match DIAGNOSTIC_CATALOG 1-to-1",
   );
   equal(
     new Set(skillCodes).size,
@@ -543,9 +543,9 @@ Deno.test("diagnostics: 1-to-1 sync between DIAGNOSTIC_CATALOG, SKILL.md, and al
 });
 
 Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, and multi-file related", async () => {
-  const tempDir = await Deno.makeTempDir({ prefix: "blot-diag-json-" });
+  const tempDir = await Deno.makeTempDir({ prefix: "squid-diag-json-" });
   try {
-    const checkFile = join(tempDir, "check_err.blot");
+    const checkFile = join(tempDir, "check_err.sq");
     await Deno.writeTextFile(
       checkFile,
       "io main (): U32 => return 1.5\n",
@@ -556,7 +556,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
       JSON.parse(l)
     );
     const checkDiag = checkRecords.find((r) => r.kind === "diagnostic");
-    ok(checkDiag, "Expected diagnostic record in blot check --json");
+    ok(checkDiag, "Expected diagnostic record in squid check --json");
     equal(checkDiag.schemaVersion, DIAGNOSTIC_SCHEMA_VERSION);
     equal(checkDiag.severity, "error");
     equal(checkDiag.canonicalCode, "TYPE_MISMATCH");
@@ -571,9 +571,9 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
     ok(checkDiag.primarySpan.col >= 1);
     ok(Array.isArray(checkDiag.related));
     ok(Array.isArray(checkDiag.quickFixes));
-    match(checkDiag.docRef, /blot explain TYPE_MISMATCH/);
+    match(checkDiag.docRef, /squid explain TYPE_MISMATCH/);
 
-    const buildFile = join(tempDir, "build_err.blot");
+    const buildFile = join(tempDir, "build_err.sq");
     const buildWasm = join(tempDir, "build_err.wasm");
     await Deno.writeTextFile(
       buildFile,
@@ -590,7 +590,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
       JSON.parse(l)
     );
     const buildDiag = buildRecords.find((r) => r.kind === "diagnostic");
-    ok(buildDiag, "Expected diagnostic record in blot build --json");
+    ok(buildDiag, "Expected diagnostic record in squid build --json");
     equal(buildDiag.schemaVersion, 1);
     equal(buildDiag.canonicalCode, "SPENT_VALUE");
     equal(buildDiag.rawCode, "spent_value");
@@ -607,7 +607,7 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
 
     // Stage-0 virtual_source, provenance, multi-file related, and humanizeToken
     const virtualRecord: RawDiagnosticRecord = {
-      filename: "/virtual/shape.blot",
+      filename: "/virtual/shape.sq",
       stage: "check-project",
       code: "type_mismatch",
       start: 28,
@@ -619,32 +619,32 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
         phase: "generated_source",
         module: "shape",
         input: "shape.txt",
-        generator: "generator.blot",
+        generator: "generator.sq",
       },
-      related: { filename: "/other/caller.blot", start: 10, end: 15 },
+      related: { filename: "/other/caller.sq", start: 10, end: 15 },
     };
     const renderedVirtual = formatDiagnostic(virtualRecord, {
       relatedSources: {
-        "/other/caller.blot": "import a\nlet x = generated ()\n",
+        "/other/caller.sq": "import a\nlet x = generated ()\n",
       },
     });
     match(
       renderedVirtual,
-      /from shape\.txt via generator\.blot \(stage0 generated_source\)/,
+      /from shape\.txt via generator\.sq \(stage0 generated_source\)/,
     );
     match(renderedVirtual, /func generated \(\): U32 => return 1\.5/);
-    match(renderedVirtual, /note: related at \/other\/caller\.blot:2:2/);
+    match(renderedVirtual, /note: related at \/other\/caller\.sq:2:2/);
 
     const enrichedVirtual = enrichDiagnostic(virtualRecord, {
       relatedSources: {
-        "/other/caller.blot": "import a\nlet x = generated ()\n",
+        "/other/caller.sq": "import a\nlet x = generated ()\n",
       },
     });
     equal(enrichedVirtual.schemaVersion, 1);
     equal(enrichedVirtual.provenance?.phase, "generated_source");
     equal(enrichedVirtual.primarySpan.line, 1);
     equal(enrichedVirtual.related.length, 1);
-    equal(enrichedVirtual.related[0].filename, "/other/caller.blot");
+    equal(enrichedVirtual.related[0].filename, "/other/caller.sq");
     equal(enrichedVirtual.related[0].line, 2);
 
     equal(humanizeToken("kw_func"), "'func'");
@@ -656,28 +656,28 @@ Deno.test("diagnostics: unified v1 --json schema, virtual_source, provenance, an
   }
 });
 
-Deno.test("diagnostics: generator-backed blot check succeeds on libraries without io entries and fails on real errors", async () => {
-  const tempDir = await Deno.makeTempDir({ prefix: "blot-gen-lib-check-" });
+Deno.test("diagnostics: generator-backed squid check succeeds on libraries without io entries and fails on real errors", async () => {
+  const tempDir = await Deno.makeTempDir({ prefix: "squid-gen-lib-check-" });
   try {
     await Deno.writeTextFile(
-      join(tempDir, "blot.json"),
+      join(tempDir, "squid.json"),
       JSON.stringify({
         generators: [{
           module: "shape",
           input: "shape.txt",
-          generator: "generator.blot",
+          generator: "generator.sq",
         }],
       }),
     );
     await Deno.writeTextFile(
-      join(tempDir, "generator.blot"),
+      join(tempDir, "generator.sq"),
       "io generate (bytes: #[U32]): #[U32] => return bytes\n",
     );
     await Deno.writeTextFile(
       join(tempDir, "shape.txt"),
       "type Shape is data = $Shape { width: U32 }\n",
     );
-    const libFile = join(tempDir, "lib.blot");
+    const libFile = join(tempDir, "lib.sq");
     await Deno.writeTextFile(
       libFile,
       'import { Shape } from "./shape"\nfunc measure (s: Shape): U32 => return s.width\n',
@@ -733,7 +733,7 @@ Deno.test("diagnostics: generator-backed blot check succeeds on libraries withou
 Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel effects, Text, ENTRY_TYPE, handler alias)", () => {
   // 1. UNKNOWN_RECORD_FIELD and missing_field must never suggest `.length`
   const recField = analyzeDiagnostic({
-    filename: "r.blot",
+    filename: "r.sq",
     code: "unknown_record_field",
     start: 0,
     end: 3,
@@ -744,7 +744,7 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
   match(recField.docRef, /UNKNOWN_RECORD_FIELD/);
 
   const recLen = analyzeDiagnostic({
-    filename: "r.blot",
+    filename: "r.sq",
     code: "missing_member",
     start: 0,
     end: 5,
@@ -762,7 +762,7 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
 
   // 2. KERNEL_EFFECTFUL must never suggest `use`
   const kernelEff = analyzeDiagnostic({
-    filename: "k.blot",
+    filename: "k.sq",
     code: "kernel_effectful",
     start: 0,
     end: 10,
@@ -776,7 +776,7 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
   // 3. String / str must suggest Text, never #[U8]
   for (const code of ["unknown_value", "unsupported_type"]) {
     const strDiag = analyzeDiagnostic({
-      filename: "s.blot",
+      filename: "s.sq",
       code,
       start: 0,
       end: 6,
@@ -788,7 +788,7 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
 
   // 4. ENTRY_TYPE reflects raw io ABI-8 vs #kernel/#process
   const entryDiag = analyzeDiagnostic({
-    filename: "e.blot",
+    filename: "e.sq",
     code: "entry_type",
     start: 0,
     end: 2,
@@ -809,7 +809,7 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
   ].join("\n");
   const handlerStart = handlerSrc.indexOf("xs[0] := 9");
   const handlerDiag = analyzeDiagnostic({
-    filename: "w.blot",
+    filename: "w.sq",
     code: "aliased_update",
     start: handlerStart,
     end: handlerStart + 10,
@@ -823,17 +823,22 @@ Deno.test("diagnostics: misrouted-advice regressions (record fields, #kernel eff
 });
 
 Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile cleanly", async () => {
-  const tempDir = await Deno.makeTempDir({ prefix: "blot-doc-snippets-" });
+  const tempDir = await Deno.makeTempDir({ prefix: "squid-doc-snippets-" });
   try {
     const cheatsheet = await Deno.readTextFile(
       new URL("../../CHEATSHEET.md", import.meta.url),
     );
-    const cheatsheetBlocks = [...cheatsheet.matchAll(/```blot\n([\s\S]*?)```/g)]
+    const cheatsheetBlocks = [
+      ...cheatsheet.matchAll(/```squid\n([\s\S]*?)```/g),
+    ]
       .map((m) => m[1]);
-    ok(cheatsheetBlocks.length >= 4, "Expected blot examples in CHEATSHEET.md");
+    ok(
+      cheatsheetBlocks.length >= 4,
+      "Expected squid examples in CHEATSHEET.md",
+    );
 
     for (let i = 0; i < cheatsheetBlocks.length; i++) {
-      const file = join(tempDir, `cheatsheet_${i}.blot`);
+      const file = join(tempDir, `cheatsheet_${i}.sq`);
       await Deno.writeTextFile(file, cheatsheetBlocks[i]);
       const res = await runCompilerRaw("check-project", file);
       equal(
@@ -846,10 +851,10 @@ Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile 
     }
 
     const skill = await Deno.readTextFile(
-      new URL("../../skills/blot-diagnostics/SKILL.md", import.meta.url),
+      new URL("../../skills/squid-diagnostics/SKILL.md", import.meta.url),
     );
     const afterBlocks: string[] = [];
-    for (const m of skill.matchAll(/```blot\n([\s\S]*?)```/g)) {
+    for (const m of skill.matchAll(/```squid\n([\s\S]*?)```/g)) {
       const idx = m[1].indexOf("// After\n");
       if (idx >= 0) {
         const after = m[1].slice(idx + "// After\n".length).trim() + "\n";
@@ -865,13 +870,13 @@ Deno.test("diagnostics: positive examples in CHEATSHEET.md and SKILL.md compile 
       `Expected full-module // After snippets in SKILL.md, got ${afterBlocks.length}`,
     );
     for (let i = 0; i < afterBlocks.length; i++) {
-      const file = join(tempDir, `skill_after_${i}.blot`);
+      const file = join(tempDir, `skill_after_${i}.sq`);
       await Deno.writeTextFile(file, afterBlocks[i]);
       const res = await runCompilerRaw("check-project", file);
       equal(
         res.code,
         0,
-        `skills/blot-diagnostics/SKILL.md // After block #${i} failed to compile:\n${
+        `skills/squid-diagnostics/SKILL.md // After block #${i} failed to compile:\n${
           afterBlocks[i]
         }\n${JSON.stringify(res.diagnostics, null, 2)}`,
       );

@@ -3,9 +3,9 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const repo = new URL("../../", import.meta.url).pathname;
-const prelude = `${repo}std/prelude.blot`;
+const prelude = `${repo}std/prelude.sq`;
 
 // Named calls, closures called through their table entry and typed by the
 // callee (including a closure held by a constant), and operator methods that
@@ -34,8 +34,8 @@ io const captured = func (v: U32) : U32 => return do:
   break apply step + adder 1 1
 `;
 Deno.test("calls of every shape execute and follow edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-resolved-calls-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-resolved-calls-" });
+  const entry = `${directory}/main.sq`;
   const options = {
     executable,
     entry,

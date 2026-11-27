@@ -135,14 +135,14 @@ io const floating: F32 = from (ceil (sqrt (from count))) + 2.5
       equal(guest.read("floating"), 9.5);
     },
     {
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     },
   );
 });
 
 Deno.test("an operator supplies the expected type of a conversion on either side", async () => {
   const source = await Deno.readTextFile(new URL(
-    "../../compiler-goose/tests/fixtures/result_selected_operand.blot",
+    "../../compiler-goose/tests/fixtures/result_selected_operand.sq",
     import.meta.url,
   ));
   await compileAndRun(
@@ -205,7 +205,7 @@ io const divide = func (divisor: U32): U32 => return 42 / divisor
       equal(guest.call("divide", 7), 6);
     },
     {
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
     },
   );
 });

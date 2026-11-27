@@ -9,10 +9,10 @@ assert(baseArg && candidateArg && directoryArg);
 const baseline = resolve(baseArg), candidate = resolve(candidateArg);
 const directory = resolve(directoryArg);
 const stdRoot = fileURLToPath(new URL("../../std/", import.meta.url));
-const prelude = fileURLToPath(new URL("../../std/prelude.blot", import.meta.url));
-const stdArray = fileURLToPath(new URL("../../std/array.blot", import.meta.url));
+const prelude = fileURLToPath(new URL("../../std/prelude.sq", import.meta.url));
+const stdArray = fileURLToPath(new URL("../../std/array.sq", import.meta.url));
 await Deno.mkdir(directory);
-const entry = `${directory}/main.blot`;
+const entry = `${directory}/main.sq`;
 const source = `
 import * as array from "std/array"
 const replace = array.replace

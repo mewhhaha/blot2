@@ -89,7 +89,7 @@ export async function editedSources(
  */
 const relocated: Readonly<Record<string, string>> = {
   "../ink/lib": "ink",
-  "../blot2/std": "std",
+  "../squid-lang/std": "std",
 };
 
 interface PenSettings {
@@ -156,7 +156,7 @@ export const gameScenarios: readonly Scenario[] = [
   {
     name: "trivia",
     replacements: [{
-      file: "src/robots.blot",
+      file: "src/robots.sq",
       search: "const count = 10000\n",
       replace: "// trivia: an added comment line\nconst count = 10000\n",
     }],
@@ -164,7 +164,7 @@ export const gameScenarios: readonly Scenario[] = [
   {
     name: "literal_constant",
     replacements: [{
-      file: "src/robots.blot",
+      file: "src/robots.sq",
       search: "const floor_half_extent = 60.0",
       replace: "const floor_half_extent = 61.0",
     }],
@@ -172,7 +172,7 @@ export const gameScenarios: readonly Scenario[] = [
   {
     name: "literal_in_body",
     replacements: [{
-      file: "src/robots.blot",
+      file: "src/robots.sq",
       search: "if pose.position.y >= 0.1875 * old_scale:",
       replace: "if pose.position.y >= 0.1876 * old_scale:",
     }],
@@ -180,7 +180,7 @@ export const gameScenarios: readonly Scenario[] = [
   {
     name: "body_change",
     replacements: [{
-      file: "src/robots.blot",
+      file: "src/robots.sq",
       search:
         "const walk_material = func phase => return first_material + from (floor phase)",
       replace:
@@ -191,20 +191,20 @@ export const gameScenarios: readonly Scenario[] = [
     name: "type_change",
     replacements: [
       {
-        file: "src/robots.blot",
+        file: "src/robots.sq",
         search:
           "type Carry is data = $Carry { depth: F32, width: F32, height: F32, age: F32, random: U32 }",
         replace:
           "type Carry is data = $Carry { depth: F32, width: F32, height: F32, age: F32, random: U32, spare: F32 }",
       },
       {
-        file: "src/robots.blot",
+        file: "src/robots.sq",
         search: "        random: lanes.join values[5] values[8],\n      }",
         replace:
           "        random: lanes.join values[5] values[8], spare: 0.0,\n      }",
       },
       {
-        file: "src/robots.blot",
+        file: "src/robots.sq",
         search: "      age: 0.0, random: current.random,\n    }",
         replace: "      age: 0.0, random: current.random, spare: 0.0,\n    }",
       },
@@ -214,7 +214,7 @@ export const gameScenarios: readonly Scenario[] = [
     // ink/math is imported by most of the game and the Ink library.
     name: "imported_body",
     replacements: [{
-      file: "ink/math.blot",
+      file: "ink/math.sq",
       search:
         "const Quat.dot: Quat -> Quat -> F32 = func a => return func b => return \n  a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w",
       replace:
@@ -225,7 +225,7 @@ export const gameScenarios: readonly Scenario[] = [
     // Leaves the Wasm unchanged.
     name: "unused_export",
     replacements: [{
-      file: "ink/math.blot",
+      file: "ink/math.sq",
       search: "const zero2 = $Vec2 { x: 0.0, y: 0.0 }\n",
       replace:
         "const zero2 = $Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = func (x: F32) => return x + 1.0\n",
@@ -251,7 +251,7 @@ export async function gdevWorkloads(
     overlay: {},
     retained: true,
     stdRoot: settings.stdRoot ?? `${repo}/std`,
-    prelude: `${settings.stdRoot ?? `${repo}/std`}/prelude.blot`,
+    prelude: `${settings.stdRoot ?? `${repo}/std`}/prelude.sq`,
     imports: settings.imports,
     nativeAssetRoots: settings.nativeAssetRoots,
     nativeAssetImports: settings.nativeAssetImports,
@@ -259,14 +259,14 @@ export async function gdevWorkloads(
     scenarios,
   });
   return [
-    workload("game", "src/main.blot", gameScenarios),
-    workload("devtools", "devtools/main.blot", []),
+    workload("game", "src/main.sq", gameScenarios),
+    workload("devtools", "devtools/main.sq", []),
   ];
 }
 
 /**
- * Every `tests/*.blot` entry, built as pen builds tests: the game's
- * `src/test_fixture.blot` entry (which exists only as an overlay) holding the
+ * Every `tests/*.sq` entry, built as pen builds tests: the game's
+ * `src/test_fixture.sq` entry (which exists only as an overlay) holding the
  * test's source, so its relative imports resolve inside `src/`.
  */
 export async function testWorkloads(
@@ -274,10 +274,10 @@ export async function testWorkloads(
   snapshotRoot: string,
 ): Promise<Workload[]> {
   const [game] = await gdevWorkloads(repo, snapshotRoot);
-  const entry = `${snapshotRoot}/src/test_fixture.blot`;
+  const entry = `${snapshotRoot}/src/test_fixture.sq`;
   const names: string[] = [];
   for await (const item of Deno.readDir(`${snapshotRoot}/tests`)) {
-    if (item.isFile && item.name.endsWith(".blot")) names.push(item.name);
+    if (item.isFile && item.name.endsWith(".sq")) names.push(item.name);
   }
   const workloads: Workload[] = [];
   for (const name of names.sort()) {

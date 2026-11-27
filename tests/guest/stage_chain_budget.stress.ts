@@ -1,8 +1,8 @@
 import { strict as assert } from "node:assert";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 // Keep the adversarial production-limit regression outside routine iteration.
 Deno.test("production million-step budget rejects adversarial stage chains", async () => {
@@ -17,8 +17,8 @@ Deno.test("production million-step budget rejects adversarial stage chains", asy
   const source =
     `const holder = func () => return {\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
     stages.join("\n") + "\nio const e = func () => return s100 ()\n";
-  const directory = await Deno.makeTempDir({ prefix: "blot-stage-stress-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-stage-stress-" });
+  const entry = `${directory}/main.sq`;
   const output = `${directory}/main.wasm`;
   try {
     await Deno.writeTextFile(entry, source);

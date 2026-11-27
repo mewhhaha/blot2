@@ -1,6 +1,6 @@
 # Language coherence: one small language
 
-Source: the syntax and language coherence review by session blot2-2c on
+Source: the syntax and language coherence review by session squid-2c on
 14 November 2026, relayed to the direct-backend session. The owner's approval,
 as relayed: "These are all good suggestions, message the other process that
 they should implement it as part of their work". Sequencing against
@@ -62,7 +62,7 @@ Settle this first. It answers the "later review" in FAST_COMPILE decision 1.
 5. Add the two owner forms the apps imitate today:
    - A one-value cell, replacing `#[x]` plus `[0]`.
    - An owner group like Goose's `root struct`. It replaces `with_owners` in
-     gdev/src/world_storage.blot, which declares about 300 locals and hands
+     gdev/src/world_storage.sq, which declares about 300 locals and hands
      them to a continuation.
 6. Runtime epoch checks stay the safety baseline. Static lifetime checks can
    come later as diagnostics.
@@ -144,7 +144,7 @@ This holds the 11 November decision.
    - Open: how to express mixed operands such as `Vec3 * F32`. Gdev uses them
      (`ray.direction * distance`).
 6. `from` is resolved from the locally expected type only. A comment in
-   ink/lib/lanes.blot says it costs thousands of inference steps per use.
+   ink/lib/lanes.sq says it costs thousands of inference steps per use.
 7. With mandatory signatures (FAST_COMPILE decision 2), remove row-polymorphic
    records: `field` predicates, `@record.merge` (one app use), type-changing
    updates and `std/path`. Closed structural records and nominal data stay.
@@ -160,7 +160,7 @@ statements and build capabilities.
 
 ### Amendment to C3, C5 and C8: traits as records, `#run` fills bodies
 
-Provisional. The owner's reply to blot2-2c's proposal: "For now it seems
+Provisional. The owner's reply to squid-2c's proposal: "For now it seems
 reasonable and we can add it and then iterate on it." Spellings are open.
 
 The owner's concern behind it: "contract" is too general a word, the system

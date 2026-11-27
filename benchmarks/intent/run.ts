@@ -1,4 +1,4 @@
-// deno run -A benchmarks/intent/run.ts [path to blotc]
+// deno run -A benchmarks/intent/run.ts [path to squidc]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { captureIntents, sizes } from "./capture.ts";
@@ -27,7 +27,7 @@ try {
   const wasm = instance.exports as Record<string, (...v: number[]) => number>;
   const trace = await captureIntents(
     root,
-    resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+    resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
   );
   // A second workload covers all four variants, including Rest and Deliver,
   // which the fixture above may never produce.

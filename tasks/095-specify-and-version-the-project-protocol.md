@@ -6,11 +6,11 @@
 - **Dependencies:** None.
 - **Originating requirements:** the owner's decision of 11 October 2026, relayed
   by the gdev session and recorded in gdev's `PEN_MIGRATION.md` ("Decisions",
-  phase 1): pen drives `blotc serve-project` from Rust to keep incremental
+  phase 1): pen drives `squidc serve-project` from Rust to keep incremental
   rebuilds, so the frame protocol becomes a public, versioned contract that pen
   pins.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -42,7 +42,7 @@ Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit.
 
-- A conformance test drives `blotc serve-project` from a minimal client written
+- A conformance test drives `squidc serve-project` from a minimal client written
   only from the specification, outside the TypeScript client.
 - Version mismatch, malformed frames, oversized frames and cancellation each
   produce their specified behavior.

@@ -26,7 +26,7 @@ sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 import ownify
 ROOT=ownify.ROOT; SRC=os.path.join(ROOT,'src')+os.sep
 def rel(path): return os.path.relpath(path,ROOT)
-def module(path): return rel(path)[:-5]
+def module(path): return rel(path)[:-3]
 TOP=re.compile(r'^(lent )?(entry )?func ([\w.]+)(?: |$)')
 def owns(head,name):
     return bool(re.search(r'\(own '+re.escape(name)+r'\)|\('+re.escape(name)+r': own ',head))
@@ -78,11 +78,11 @@ def files():
     if FILES is None:
         FILES=[]
         for d in ownify.DIRS:
-            for path in sorted(glob.glob(os.path.join(ROOT,d,'**','*.blot'),recursive=True)): FILES.append(ownify.File.get(path))
+            for path in sorted(glob.glob(os.path.join(ROOT,d,'**','*.sq'),recursive=True)): FILES.append(ownify.File.get(path))
     return FILES
 def sites(mod,fn,position):
     """Each call of mod.fn: (file, line index, kind, argument name, name used)."""
-    target=os.path.normpath(os.path.join(ROOT,mod+'.blot'))
+    target=os.path.normpath(os.path.join(ROOT,mod+'.sq'))
     for f in files():
         names=names_for(f,target,fn)
         if not names: continue
@@ -143,7 +143,7 @@ def candidates():
             if d>=0 and not owns(g.lines[d],'access') and has_param(g.lines[d],'access'): out[(module(target),fn,'access')]=True
     return list(out)
 def position_of(mod,fn,name):
-    f=ownify.File.get(os.path.join(ROOT,mod+'.blot')); k=f.find(fn)
+    f=ownify.File.get(os.path.join(ROOT,mod+'.sq')); k=f.find(fn)
     if k<0: return None,'no definition'
     line=f.lines[k]
     if line.startswith('lent '): return None,'lent'

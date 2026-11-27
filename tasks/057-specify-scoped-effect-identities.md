@@ -8,7 +8,7 @@
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / generic scoped
   effects. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -62,7 +62,7 @@ change.
   pre-exposure cleanup, revocation before retirement, pending retry versus
   ready/terminal memos, JSPI rejection and longer-lived/private journal sinks.
   Traces live in ignored `build/bench/scoped-effects-057/review.json`; they are
-  design checks, not executed Blot laws.
+  design checks, not executed Squid laws.
 - Comparison: documentation only; no executable performance claim. 058–059 have
   explicit source/artifact/OOM, sync/JSPI and paired cost acceptance cases.
 - Remaining limitations: all proposed syntax, identity routing and escape

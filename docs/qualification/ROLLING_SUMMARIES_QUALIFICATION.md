@@ -13,9 +13,9 @@ SHA-256 `44af80a95af5de58c521a7d520c5d8c6ea993e09aae1c06e9031f3d5dbd9ec2b`
 source, patch, binary, script and report pins are in ignored
 `build/bench/joint-024-035-045-046/qualification-pins.json`.
 
-The APIs live in [rolling](../../std/rolling.blot) and
-[summary](../../std/summary.blot), sharing a private
-[persistent AVL tree](../../std/_summary_tree.blot). No library name grants
+The APIs live in [rolling](../../std/rolling.sq) and
+[summary](../../std/summary.sq), sharing a private
+[persistent AVL tree](../../std/_summary_tree.sq). No library name grants
 compiler privileges. Callers explicitly provide the algebra; closed pure arrows
 do not prove associativity or inverse laws. Ordered fold retains the existing
 full-window reduction order and supports effectful reducers.

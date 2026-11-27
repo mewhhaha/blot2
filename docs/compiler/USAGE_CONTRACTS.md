@@ -93,7 +93,7 @@ continues other registered cleanup attempts; the failed adapter is never
 retried.
 
 Normal returns, breaks and request cancellation emit language cleanup. A Wasm
-trap cannot run arbitrary Blot unwinding. Host invocation leave drains a
+trap cannot run arbitrary Squid unwinding. Host invocation leave drains a
 separate typed cleanup journal before revoking callbacks and releasing
 invocation roots; raw ABI callers must invoke that hook after traps or host
 rejection. During JSPI suspension the journal remains owned until settlement.
@@ -279,7 +279,7 @@ traps without replacing its obligation. Cleanup captures admit only closed data;
 loans, scoped providers and hidden callable authority reject. Independently pure
 transferred cleanup retains no ambient provider.
 
-Only transfer modules use ABI 5 and the exact typed `blot:resource/2` imports.
+Only transfer modules use ABI 5 and the exact typed `squid:resource/2` imports.
 Scope-only modules retain ABI 4; ordinary modules retain ABI 3 and no resource
 journal hooks. Owning guest inputs of primitive scalars or numeric Arrays are
 freshly boxed. Owning guest outputs remain unsupported: the host cannot observe
@@ -319,7 +319,7 @@ concurrency acceptance is claimed.
 A guest binds `cleanup ((unique T) -> Unit ! {Foreign})` with
 `guest.cleanupCapability({ parameter, result: "Unit", maxSteps, maxCalls, call })`.
 The source qualifier, immutable parameter role, ABI marker 7 and
-`blot:cleanup/1` import agree independently. Ordinary `capability()` and
+`squid:cleanup/1` import agree independently. Ordinary `capability()` and
 `capabilityAsync()` descriptors cannot satisfy this role. A cleanup import stays
 synchronous in JSPI guests; a Promise or thenable is rejected after its attempt
 has been consumed.
@@ -404,7 +404,7 @@ A public once callable keeps its exact source multiplicity at the export
 boundary. Its private Wasm guard consumes the callable before its first body
 invocation; a trap, host rejection or pending JSPI suspension cannot restore it.
 A second raw export invocation traps before resetting any active descriptor. The
-optional version-1 `blot:multiplicity` section names exactly the once function
+optional version-1 `squid:multiplicity` section names exactly the once function
 exports. The guest validates that metadata and reports `once_reused` after an
 invocation attempt. Argument validation failure before invocation does not
 consume the callable. Ordinary many exports emit no new metadata or guard.
@@ -439,7 +439,7 @@ wrong-layout and moved handles reject. Pending JSPI blocks reentry, release and
 disposal until settlement.
 
 A module exporting owners binds synchronous cleanup through the distinct
-`blot:cleanup/2` role and `blot:cleanup_bind/1` binder. Both Wasm signatures are
+`squid:cleanup/2` role and `squid:cleanup_bind/1` binder. Both Wasm signatures are
 independently exact; the ABI parameter uses marker 10. Resource registrations
 retain each binding until its cleanup/drop attempt, including across host calls.
 The checked immutable cleanup role is preserved; ordinary Foreign and Promise
@@ -476,7 +476,7 @@ at 4096 nodes and 128 levels. The retained host stub rebuilds after
 representation import so a prior layout pool's schema ID cannot gain current
 authority.
 
-The distinct `blot:cleanup_data/1` and `/2` imports carry the exact schema ID
+The distinct `squid:cleanup_data/1` and `/2` imports carry the exact schema ID
 and payload word. Their synchronous binder and actual Wasm signatures are linked
 independently. The guest checks the schema against its active or retained
 cleanup descriptor, then copies bounded data using the declared physical

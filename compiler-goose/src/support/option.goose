@@ -1,4 +1,4 @@
-namespace blot_support;
+namespace squid_support;
 
 // Only fixed values belong here. Owning tables stay with the driver; optional
 // references use Goose's native nullable reference instead.

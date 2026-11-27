@@ -93,9 +93,9 @@ async function execute(
   }
 }
 
-export const TEST_WORKER_ARG = "--blot-internal-test-worker";
+export const TEST_WORKER_ARG = "--squid-internal-test-worker";
 export const TEST_WORKER_URL = new URL("./test_worker.ts", import.meta.url);
-const workerName = "blot-test-execution";
+const workerName = "squid-test-execution";
 
 export function testTransport(
   reader: ReadableStreamBYOBReader,

@@ -7,19 +7,19 @@ import {
 import { fileURLToPath } from "node:url";
 import {
   type AssetDiagnostic,
-  blotStdRoot,
-  createBlotGenerator,
   createCompiler,
+  createSquidGenerator,
   expandGeneratorRules,
   instantiateGuest,
   resolveProject,
-  runBlotTests,
+  runSquidTests,
+  squidStdRoot,
   type ZigProjectBuildResult,
 } from "../../mod.ts";
 import { runCli } from "../../host/cli.ts";
 
 const executable = Deno.args.at(0) ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const examples = new URL("../../examples/generators/", import.meta.url);
 const wgsl = `// Reflected declarations and a real compute entry
 struct Parameters { clear: f32, dither: f32, active: bool };
@@ -39,7 +39,7 @@ function success(result: ZigProjectBuildResult) {
 
 async function workspace(run: (root: string) => Promise<void>) {
   const root = await Deno.realPath(
-    await Deno.makeTempDir({ prefix: "blot-generators-" }),
+    await Deno.makeTempDir({ prefix: "squid-generators-" }),
   );
   try {
     await run(root);
@@ -59,9 +59,9 @@ async function calls(result: ZigProjectBuildResult, ...names: string[]) {
 
 Deno.test("WGSL generators emit native types and tracked shader references, cache Wasm, and complete edited fields", () =>
   workspace(async (root) => {
-    const generator = root + "/wgsl_gen.blot";
-    const dependency = root + "/literals.blot";
-    const entry = root + "/main.blot";
+    const generator = root + "/wgsl_gen.sq";
+    const dependency = root + "/literals.sq";
+    const entry = root + "/main.sq";
     const input = root + "/salt.wgsl";
     const log = root + "/compiles";
     const observedCompiler = root + "/compiler";
@@ -80,8 +80,8 @@ Deno.test("WGSL generators emit native types and tracked shader references, cach
     const count = async () =>
       (await Deno.readTextFile(log)).trimEnd().split("\n").length;
     await Promise.all([
-      Deno.copyFile(new URL("wgsl_gen.blot", examples), generator),
-      Deno.copyFile(new URL("literals.blot", examples), dependency),
+      Deno.copyFile(new URL("wgsl_gen.sq", examples), generator),
+      Deno.copyFile(new URL("literals.sq", examples), dependency),
       Deno.writeTextFile(input, wgsl),
       Deno.writeTextFile(
         entry,
@@ -105,7 +105,7 @@ io shader_id () => return case shader of
       assets: {
         "./salt.wgsl": {
           path: input,
-          parser: createBlotGenerator({
+          parser: createSquidGenerator({
             generator,
             executable: observedCompiler,
             inputMode: "text",
@@ -220,9 +220,9 @@ io shader_id () => return case shader of
     }
   }));
 
-Deno.test("WGSL generator preserves exact unsuffixed U32 constants, scientific floats, and rejects reserved Blot keywords", () =>
+Deno.test("WGSL generator preserves exact unsuffixed U32 constants, scientific floats, and rejects reserved Squid keywords", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
+    const entry = root + "/main.sq";
     const input = root + "/shader.wgsl";
     const compiler = await createCompiler({
       executable,
@@ -230,9 +230,9 @@ Deno.test("WGSL generator preserves exact unsuffixed U32 constants, scientific f
       assets: {
         "./shader.wgsl": {
           path: input,
-          parser: createBlotGenerator({
+          parser: createSquidGenerator({
             executable,
-            generator: new URL("wgsl_gen.blot", examples),
+            generator: new URL("wgsl_gen.sq", examples),
             inputMode: "text",
           }),
         },
@@ -293,7 +293,7 @@ const whole_f = 2f;
           assetSources: { "./shader.wgsl": "struct Bad { spark: f32 };\n" },
         }),
         input,
-        /WGSL field 'spark' in Bad collides with a reserved Blot keyword/,
+        /WGSL field 'spark' in Bad collides with a reserved Squid keyword/,
       );
       checkAssetError(
         await compiler.build({
@@ -304,7 +304,7 @@ const whole_f = 2f;
           assetSources: { "./shader.wgsl": "const fork = 1u;\n" },
         }),
         input,
-        /WGSL constant 'fork' collides with a reserved Blot keyword/,
+        /WGSL constant 'fork' collides with a reserved Squid keyword/,
       );
     } finally {
       await compiler.dispose();
@@ -313,16 +313,16 @@ const whole_f = 2f;
 
 Deno.test("CSV generator embeds typed rows, decimal speed and quoted Unicode names in Wasm", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
+    const entry = root + "/main.sq";
     const compiler = await createCompiler({
       executable,
       entry,
       assets: {
         "./units.csv": {
           path: "./units.csv",
-          parser: createBlotGenerator({
+          parser: createSquidGenerator({
             executable,
-            generator: new URL("csv_gen.blot", examples),
+            generator: new URL("csv_gen.sq", examples),
             inputMode: "text",
           }),
         },
@@ -372,8 +372,8 @@ function checkAssetError(
 
 Deno.test("Stage 0 supports structural record inputs, alternate names, and the lossless bytes mode", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
-    const generator = root + "/gen.blot";
+    const entry = root + "/main.sq";
+    const generator = root + "/gen.sq";
     const input = root + "/雪.asset";
     const options = {
       sources: {
@@ -398,7 +398,7 @@ io reflect (input: { path: Text, text: Text }): Result [Text, Text] =>
       assets: {
         "./generated": {
           path: input,
-          parser: createBlotGenerator({
+          parser: createSquidGenerator({
             executable,
             generator,
             exportName: "reflect",
@@ -435,7 +435,7 @@ io reflect (input: { path: Text, text: Text }): Result [Text, Text] =>
       assets: {
         "./generated": {
           path: input,
-          parser: createBlotGenerator({ executable, generator }),
+          parser: createSquidGenerator({ executable, generator }),
         },
       },
     });
@@ -457,8 +457,8 @@ io reflect (input: { path: Text, text: Text }): Result [Text, Text] =>
 
 Deno.test("generator Err, trap, compile failure, missing export and unsupported ABI use asset diagnostics", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
-    const generator = root + "/gen.blot";
+    const entry = root + "/main.sq";
+    const generator = root + "/gen.sq";
     const input = root + "/input.txt";
     const compiler = await createCompiler({
       executable,
@@ -466,7 +466,7 @@ Deno.test("generator Err, trap, compile failure, missing export and unsupported 
       assets: {
         "./input.txt": {
           path: input,
-          parser: createBlotGenerator({ executable, generator }),
+          parser: createSquidGenerator({ executable, generator }),
         },
       },
     });
@@ -525,44 +525,44 @@ io requires_io (send: U32 -> U32 ! {Foreign}) => return send 1`,
     }
   }));
 
-Deno.test("blot.json generator rules drive blot check, build, and test from a nested entry", () =>
+Deno.test("squid.json generator rules drive squid check, build, and test from a nested entry", () =>
   workspace(async (root) => {
     await Deno.mkdir(root + "/assets");
     await Deno.mkdir(root + "/src");
-    const entry = root + "/src/main.blot";
+    const entry = root + "/src/main.sq";
     const output = root + "/main.wasm";
     const rules = [
-      { module: "aliased", input: "input.txt", generator: "gen.blot" },
+      { module: "aliased", input: "input.txt", generator: "gen.sq" },
       {
         match: "assets/*.wgsl",
-        generator: "./wgsl_gen.blot",
+        generator: "./wgsl_gen.sq",
         inputMode: "text" as const,
       },
     ];
     await Promise.all([
       Deno.writeTextFile(
-        root + "/blot.json",
+        root + "/squid.json",
         JSON.stringify({
           generators: rules,
           dependencies: {
             std: { path: fileURLToPath(new URL("../../", import.meta.url)) },
           },
           prelude: "std",
-          tests: { files: ["src/main.blot"] },
+          tests: { files: ["src/main.sq"] },
         }),
       ),
       Deno.writeTextFile(
-        root + "/gen.blot",
+        root + "/gen.sq",
         "io generate (input: #[U32]): #[U32] => return input\n",
       ),
       Deno.writeTextFile(root + "/input.txt", "const value: U32 = 20\n"),
       Deno.copyFile(
-        new URL("wgsl_gen.blot", examples),
-        root + "/wgsl_gen.blot",
+        new URL("wgsl_gen.sq", examples),
+        root + "/wgsl_gen.sq",
       ),
       Deno.copyFile(
-        new URL("literals.blot", examples),
-        root + "/literals.blot",
+        new URL("literals.sq", examples),
+        root + "/literals.sq",
       ),
       Deno.writeTextFile(root + "/assets/z.wgsl", "const value = 2u;\n"),
       Deno.writeTextFile(root + "/assets/a.wgsl", "const value = 20u;\n"),
@@ -577,13 +577,13 @@ io test_generated () => return @u32.eq (@u32.add left (@u32.add middle right)) 4
     ]);
     const expanded = await expandGeneratorRules(root, rules, { executable });
     equal(Object.keys(expanded), [
-      root + "/aliased.blot",
-      root + "/assets/a.wgsl.blot",
-      root + "/assets/z.wgsl.blot",
+      root + "/aliased.sq",
+      root + "/assets/a.wgsl.sq",
+      root + "/assets/z.wgsl.sq",
     ]);
     equal(
-      expanded[root + "/assets/a.wgsl.blot"].parser,
-      expanded[root + "/assets/z.wgsl.blot"].parser,
+      expanded[root + "/assets/a.wgsl.sq"].parser,
+      expanded[root + "/assets/z.wgsl.sq"].parser,
     );
     equal(await runCli(executable, ["check", entry]), 0);
     equal(await runCli(executable, ["build", entry, output]), 0);
@@ -622,7 +622,7 @@ Deno.exitCode = await runCli(compiler, ["check", entry, "--json"]);`,
       "check-project",
       true,
     ]);
-    const report = await runBlotTests({ executable, root, jobs: 1 });
+    const report = await runSquidTests({ executable, root, jobs: 1 });
     ok(report.success, JSON.stringify(report));
     equal(report.testsPassed, 1);
     await Deno.writeTextFile(root + "/assets/z.wgsl", "const value = nope;");
@@ -640,9 +640,9 @@ Deno.exitCode = await runCli(compiler, ["check", entry, "--json"]);`,
 
 Deno.test("manifest generator rules reject unknown fields, malformed patterns, and escaping paths", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
+    const entry = root + "/main.sq";
     const base = {
-      generator: "gen.blot",
+      generator: "gen.sq",
       module: "./virtual",
       input: "./input",
     };
@@ -650,10 +650,10 @@ Deno.test("manifest generator rules reject unknown fields, malformed patterns, a
       const rule of [
         { ...base, module: "../outside" },
         { ...base, input: "/outside" },
-        { ...base, generator: "other\0.blot" },
+        { ...base, generator: "other\0.sq" },
         { ...base, unknown: true },
         { ...base, match: "assets/*.wgsl" },
-        { generator: "gen.blot", match: "assets/**/shader.wgsl" },
+        { generator: "gen.sq", match: "assets/**/shader.wgsl" },
         {
           ...base,
           reference: { type: "Shader", export: "shader", extra: true },
@@ -661,14 +661,14 @@ Deno.test("manifest generator rules reject unknown fields, malformed patterns, a
       ]
     ) {
       await Deno.writeTextFile(
-        root + "/blot.json",
+        root + "/squid.json",
         JSON.stringify({ generators: [rule] }),
       );
       await rejects(resolveProject(entry), /generators\[0\]/);
     }
-    await Deno.symlink(fileURLToPath(blotStdRoot), root + "/outside");
+    await Deno.symlink(fileURLToPath(squidStdRoot), root + "/outside");
     await rejects(
-      expandGeneratorRules(root, [{ ...base, generator: "outside/text.blot" }]),
+      expandGeneratorRules(root, [{ ...base, generator: "outside/text.sq" }]),
       /escapes the project/,
     );
     await rejects(
@@ -677,8 +677,8 @@ Deno.test("manifest generator rules reject unknown fields, malformed patterns, a
     );
     await rejects(
       expandGeneratorRules(root, [{
-        generator: "gen.blot",
-        match: "outside/*.blot",
+        generator: "gen.sq",
+        match: "outside/*.sq",
       }]),
       /escapes the project/,
     );
@@ -686,7 +686,7 @@ Deno.test("manifest generator rules reject unknown fields, malformed patterns, a
 
 Deno.test("raw asset source validates Unicode, NUL and the combined structured size budget", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
+    const entry = root + "/main.sq";
     const input = root + "/input";
     const compiler = await createCompiler({
       executable,
@@ -722,12 +722,12 @@ Deno.test("raw asset source validates Unicode, NUL and the combined structured s
       checkAssetError(
         await build(1),
         input,
-        /well-formed Blot text without NUL/,
+        /well-formed Squid text without NUL/,
       );
       checkAssetError(
         await build(2),
         input,
-        /well-formed Blot text without NUL/,
+        /well-formed Squid text without NUL/,
       );
       checkAssetError(await build(3), input, /exceeds 16 MiB/);
     } finally {
@@ -737,17 +737,17 @@ Deno.test("raw asset source validates Unicode, NUL and the combined structured s
 
 Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile failures, and virtual generated_source diagnostics", () =>
   workspace(async (root) => {
-    const entry = root + "/main.blot";
-    const generator = root + "/gen.blot";
+    const entry = root + "/main.sq";
+    const generator = root + "/gen.sq";
     const input = root + "/shader.wgsl";
-    const virtualModule = root + "/shader.wgsl.blot";
+    const virtualModule = root + "/shader.wgsl.sq";
     const compiler = await createCompiler({
       executable,
       entry,
       assets: {
         "./shader.wgsl": {
           path: input,
-          parser: createBlotGenerator({ executable, generator }),
+          parser: createSquidGenerator({ executable, generator }),
         },
       },
     });
@@ -770,7 +770,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
       const panicDiag = panicked.diagnostics[0] as AssetDiagnostic;
       match(
         panicDiag.message,
-        /Blot generator generate trapped for .*shader\.wgsl: panic: "bad input"/,
+        /Squid generator generate trapped for .*shader\.wgsl: panic: "bad input"/,
       );
       equal(panicDiag.provenance, {
         stage: "stage0",
@@ -814,7 +814,7 @@ Deno.test("Stage 0 attaches provenance for execute panics, Err results, compile 
         generator,
       });
 
-      // 4. Generator emitting invalid Blot source preserves virtual_source + provenance.phase === "generated_source".
+      // 4. Generator emitting invalid Squid source preserves virtual_source + provenance.phase === "generated_source".
       const emitted = "const answer: U32 = true\n";
       await Deno.writeTextFile(
         generator,

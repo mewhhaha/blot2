@@ -6,7 +6,7 @@ algorithms, ownership and measurements. No source declaration name grants
 compiler privileges; existing folds, windows and collection representations keep
 their behavior. The qualified starting compiler is `2689ad5` (completed 040).
 The [guide](../language/guide.md), [ownership contract](CONTRACT.md) and current
-[iterator module](../../std/iter.blot) remain authoritative for existing behavior.
+[iterator module](../../std/iter.sq) remain authoritative for existing behavior.
 
 ## API
 

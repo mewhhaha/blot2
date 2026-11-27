@@ -3,14 +3,14 @@ import { fileURLToPath } from "node:url";
 
 const directory = new URL("../generated/compiler/", import.meta.url);
 const source = new URL(
-  "../compiler-goose/build/blotc-goose",
+  "../compiler-goose/build/squidc-goose",
   import.meta.url,
 );
-const destination = new URL("blotc.gz", directory);
+const destination = new URL("squidc.gz", directory);
 await Deno.mkdir(directory, { recursive: true });
 const temporary = await Deno.makeTempFile({
   dir: fileURLToPath(directory),
-  prefix: ".blotc-",
+  prefix: ".squidc-",
   suffix: ".gz",
 });
 try {
@@ -21,7 +21,7 @@ try {
   await Deno.writeFile(temporary, new Uint8Array(compressed));
   await Deno.rename(temporary, destination);
   console.log(
-    `Packed generated/compiler/blotc.gz (${compressed.byteLength} bytes)`,
+    `Packed generated/compiler/squidc.gz (${compressed.byteLength} bytes)`,
   );
 } finally {
   try {

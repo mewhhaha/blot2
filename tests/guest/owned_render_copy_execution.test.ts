@@ -15,13 +15,13 @@ for (const operation of ["owned", "emit"] as const) {
       let compiler;
       let guest;
       try {
-        const entry = resolve(directory, "main.blot");
+        const entry = resolve(directory, "main.sq");
         compiler = await createZigProjectCompiler({
           executable: Deno.args[0],
           entry,
           imports: { "ink/": resolve(root, "../ink/lib") },
           stdRoot: resolve(root, "std"),
-          prelude: resolve(root, "std/prelude.blot"),
+          prelude: resolve(root, "std/prelude.sq"),
           profileBackend: true,
           startupTimeoutMs: 5000,
         });

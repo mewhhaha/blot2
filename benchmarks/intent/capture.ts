@@ -10,7 +10,7 @@ export async function captureIntents(root: string, compilerPath: string) {
   const project = await gdevProject(
     root,
     resolve("std"),
-    "performance/modernize/pile_handles.blot",
+    "performance/modernize/pile_handles.sq",
     compilerPath,
   );
   const original = await Deno.readTextFile(project.entry);

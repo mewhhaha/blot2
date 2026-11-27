@@ -42,15 +42,15 @@ io const destination_first = func (index: U32): U32 => return do:
 
 Deno.test(`scalar replacements preserve aliases self bits and destination-before-RHS traps`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-scalar-replacements-",
+    prefix: "squid-scalar-replacements-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const built = await compiler.build({ sources: { [entry]: source } });

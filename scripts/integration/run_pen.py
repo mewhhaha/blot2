@@ -92,8 +92,8 @@ command += ['--headless', '--mute',
            '--frames', '1', '--fps', '60', '--size', '640x480', '--data', str(data),
            '--trace', str(OUT / 'frames.trace'), '--screenshot', str(OUT / 'frame.png')]
 identity = {'pen_sha256': hashlib.sha256(PEN.read_bytes()).hexdigest(), 'command': command,
-            'entry': 'src/main.blot:main', 'project': str(PROJECT)}
-compiler = (PROJECT / project_config['plugins']['blot']['run']['blotc']).resolve()
+            'entry': 'src/main.sq:main', 'project': str(PROJECT)}
+compiler = (PROJECT / project_config['plugins']['squid']['run']['squidc']).resolve()
 identity.update(compiler=str(compiler), compiler_sha256=hashlib.sha256(compiler.read_bytes()).hexdigest(),
                 storage=project_config['compiler']['settings']['storage'],
                 compile_invoked=compiled is None,

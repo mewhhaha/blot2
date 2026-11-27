@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -16,8 +16,8 @@ function asWords(value: unknown): number[] {
 }
 
 Deno.test("Tier 4A: deferred NaN canonicalization on spark and Maybe Vec3 loops preserves 0x7fc00000 and tags", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-tier4a-nan-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-tier4a-nan-" });
+  const entry = `${dir}/main.sq`;
   const src = `import * as simd from "std/simd"
 
 func f32_bits (x: F32): U32 =>
@@ -260,8 +260,8 @@ io merge_bounds_check (packed: U32): U32 =>
 });
 
 Deno.test("Tier 4C: 4x v128 register-blocked matmul k-loop across tails, NaNs, aliasing fallback, and OOB trap", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-tier4c-matmul-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-tier4c-matmul-" });
+  const entry = `${dir}/main.sq`;
   const src = `io matmul_rect (packed: U32): #[F32] =>
   let rows = packed & 255
   let inner = (packed >> 8) & 255

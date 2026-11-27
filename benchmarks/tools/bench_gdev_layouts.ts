@@ -6,12 +6,12 @@ import { parseArgs } from "node:util";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 
-const release = "compiler-goose/build/blotc-goose";
+const release = "compiler-goose/build/squidc-goose";
 const { values, positionals } = parseArgs({
   args: Deno.args,
   allowPositionals: true,
   options: {
-    entry: { type: "string", default: "src/main.blot" },
+    entry: { type: "string", default: "src/main.sq" },
     "control-compiler": { type: "string", default: release },
     "candidate-compiler": { type: "string", default: release },
   },

@@ -28,7 +28,7 @@ owner's lifetime. Its residual effect cannot cross scope exit.
 operation value. The names `State`, `get` and `set` grant no compiler privilege;
 ordinary effect declarations determine members and signatures.
 
-```blot
+```squid
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 
 #entry const two = func () => return @effect.scope (func (left: State U32) => return
@@ -58,7 +58,7 @@ closed specializations retain today's exact source/type identity.
 Rows may also name a capability operation or its proven operation alias.
 Parameter scope includes its function's result annotation:
 
-```blot
+```squid
 const read = func (state: State a) : a ! {state.get} => return state.get ()
 const alias = func (state: State a) => return do:
   let operation = state.get
@@ -69,7 +69,7 @@ A dependent arrow binder permits the same relationship in a complete function
 type. Its value name is in scope only in subsequent arrow/result annotations; it
 is not a general value-dependent type expression.
 
-```blot
+```squid
 const apply: (state: State a) -> ((Unit -> a ! {state.get}) -> a ! {state.get}) = func state => return func callback => return callback ()
 ```
 

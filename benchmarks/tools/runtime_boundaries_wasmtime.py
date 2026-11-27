@@ -36,16 +36,16 @@ for side in ["baseline", "candidate"]:
 
 def invoke(side, name, argument, expected):
     store, exports = guests[side]
-    exports["blot:ownership_enter"](store)
+    exports["squid:ownership_enter"](store)
     outcome = 1
     try:
         result = exports[name](store, argument) & 0xFFFFFFFF
         assert result == (expected & 0xFFFFFFFF), (side, name, result, expected)
         outcome = 0
     finally:
-        exports["blot:ownership_leave"](store, outcome)
-    assert exports["blot:rc_roots"].value(store) == 0
-    assert exports["blot:rc_leases"].value(store) == 0
+        exports["squid:ownership_leave"](store, outcome)
+    assert exports["squid:rc_roots"].value(store) == 0
+    assert exports["squid:rc_leases"].value(store) == 0
 
 
 report = dict(format=1, complete=False, engine="Wasmtime " + importlib.metadata.version("wasmtime"),
@@ -59,9 +59,9 @@ for row in reference["rows"]:
         store, exports = guests[side]
         for _ in range(5):
             invoke(side, name, argument, expected)
-        before = {key: exports["blot:" + key].value(store) for key in row[side]["counts"]}
+        before = {key: exports["squid:" + key].value(store) for key in row[side]["counts"]}
         invoke(side, name, argument, expected)
-        counts = {key: (exports["blot:" + key].value(store) - value) & 0xFFFFFFFF for key, value in before.items()}
+        counts = {key: (exports["squid:" + key].value(store) - value) & 0xFFFFFFFF for key, value in before.items()}
         assert counts == row[side]["counts"], (side, name, counts, row[side]["counts"])
         measured[side] = dict(counts=counts, samples_ms=[])
     for sample in range(args.samples):

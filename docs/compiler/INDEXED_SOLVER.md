@@ -213,7 +213,7 @@ keep the pass-by-pass retry.
   (at most 16 extra steps per added obligation). The effect-only build fails the
   operator law; the previous compiler fails both.
 
-| `blotc check`, before → after (`aef65e7` → `7589df2`) | Time          | Steps per obligation |
+| `squidc check`, before → after (`aef65e7` → `7589df2`) | Time          | Steps per obligation |
 | ----------------------------------------------------- | ------------- | -------------------: |
 | Closure record, N = 40                                | 29 → 20 ms    |                  2.2 |
 | Closure record, N = 120                               | 270 → 184 ms  |                  1.2 |

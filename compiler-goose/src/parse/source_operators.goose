@@ -1,15 +1,15 @@
 // Source contract: compiler/src/parse/source_operators.zig. Validation follows
 // lowering order, with lexical-prefix restoration and explicit context authority.
-namespace blot_parse_source_operators;
+namespace squid_parse_source_operators;
 import .ast;
 import .symbols;
 import support.error;
 import support.pooled_buffer;
 type Id=u32;
-type Symbol=blot_parse_symbols::Symbol;
-type Error=blot_error::Error;
-type Tree=blot_parse_ast::Tree;
-type Pool=blot_parse_symbols::Pool;
+type Symbol=squid_parse_symbols::Symbol;
+type Error=squid_error::Error;
+type Tree=squid_parse_ast::Tree;
+type Pool=squid_parse_symbols::Pool;
 type Code=u32;
 type Terminator=u32;
 let terminator_none: Terminator=0; let terminator_return: Terminator=1;
@@ -18,12 +18,12 @@ let record_target_record: u32=0; let record_target_other: u32=1; let record_targ
 struct Issue {
  code: Code=0, node: Id=0, point: u32=0, symbol: Symbol=0,
  implicit_type_witness: bool=false, terminator: Terminator=0,
- has_numeric_literal: bool=false, numeric_literal: blot_parse_ast::NumericFault=blot_parse_ast::NumericFault {0,0,blot_parse_ast::Span {},0}
+ has_numeric_literal: bool=false, numeric_literal: squid_parse_ast::NumericFault=squid_parse_ast::NumericFault {0,0,squid_parse_ast::Span {},0}
 }
 fn origin(tree: const Tree&,id: Id) -> u32 { let ast_visit_1_count=tree.operator_origins.items.len;for ast_visit_1_index in 0..ast_visit_1_count {let item=tree.operator_origins.items[ast_visit_1_index]; if item.node==id { return item.span.start; } } return tree.span(id).start; }
 fn numeric_issue(tree: const Tree&,id: Id,point: u32) -> Issue {
  let fault=tree.numeric_fault(id); var code=c_float_literal;
- if fault.code==blot_parse_ast::numericcode_integer_range { code=c_integer_range; } else if fault.code==blot_parse_ast::numericcode_float_range { code=c_float_range; }
+ if fault.code==squid_parse_ast::numericcode_integer_range { code=c_integer_range; } else if fault.code==squid_parse_ast::numericcode_float_range { code=c_float_range; }
  return Issue {code:code,node:id,point:point,has_numeric_literal:true,numeric_literal:fault};
 }
 fn named(pool: const Pool&,symbol: Symbol) -> bool {
@@ -32,9 +32,9 @@ fn named(pool: const Pool&,symbol: Symbol) -> bool {
 struct Validator {
  issue: Issue=Issue {}, has_issue: bool=false,
  pattern_scope: i64=-1, record_constructor: Symbol=0, loops: i64=0,
- failure: Error=blot_error::Error.none
+ failure: Error=squid_error::Error.none
 }
-fn annotations_stopped<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return self_.failure!=blot_error::Error.none||context.source_annotations_stopped(); }
+fn annotations_stopped<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return self_.failure!=squid_error::Error.none||context.source_annotations_stopped(); }
 fn validate_controls<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return context.source_control_validation(); }
 fn stopped<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return self_.has_issue||annotations_stopped(self_,tree,pool,context,locals); }
 fn fail<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,code: Code,id: Id,point: u32,symbol: Symbol) {
@@ -52,7 +52,7 @@ fn local<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,lo
 }
 fn name<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,id: Id,point: u32) {
  if stopped(self_,tree,pool,context,locals)||context.source_editor_probe(id) { return; }
- if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,point,symbol); } }
+ if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==squid_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,point,symbol); } }
 }
 fn bind<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol) { if !stopped(self_,tree,pool,context,locals)&&symbol!=0&&pool.get(symbol)!="_" { locals.push(symbol); } }
 fn record_target<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,symbol: Symbol) -> bool {
@@ -60,7 +60,7 @@ fn record_target<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,contex
  if context.source_private_constructor(symbol) { fail(self_,tree,pool,context,locals,c_private_access,id,point,symbol); return false; }
  var end=locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
  for item in locals.items[..end] { if item==symbol { fail(self_,tree,pool,context,locals,c_record_constructor,id,point,0); return false; } }
- let target,err=context.source_record_target(symbol); self_.failure=err; if err!=blot_error::Error.none { return false; }
+ let target,err=context.source_record_target(symbol); self_.failure=err; if err!=squid_error::Error.none { return false; }
  if target==record_target_record { return true; } if target==record_target_other { fail(self_,tree,pool,context,locals,c_record_constructor,id,point,0); } else { fail(self_,tree,pool,context,locals,c_unknown_constructor,id,point,symbol); } return false;
 }
 fn type_application<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) -> bool {
@@ -133,7 +133,7 @@ fn operator<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&
  if pool.get(symbol)=="and"||pool.get(symbol)=="or" { return; } let point=origin(tree,id);
  if is_named { name(self_,tree,pool,context,locals,symbol,id,point); return; }
  if stopped(self_,tree,pool,context,locals)||context.source_editor_probe(id) { return; }
- if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_operator,id,point,symbol); } }
+ if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==squid_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_operator,id,point,symbol); } }
 }
 recursive fn primitive<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,head: Id,argument_count: i64,depth: i64) {
  if stopped(self_,tree,pool,context,locals) { return; } let symbol=tree.node(head).a;
@@ -171,7 +171,7 @@ recursive fn primitive<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,
  for i in 0..arity {
   let arg=arguments[i]; if i==0&&descriptor { continue; }
   if is_product_get&&i==1 {
-   if tree.node(arg).tag==a_numeric_error&&tree.numeric_fault(arg).code==blot_parse_ast::numericcode_integer_range { numeric_failure(self_,tree,pool,context,locals,arg); }
+   if tree.node(arg).tag==a_numeric_error&&tree.numeric_fault(arg).code==squid_parse_ast::numericcode_integer_range { numeric_failure(self_,tree,pool,context,locals,arg); }
    else if tree.node(arg).tag!=a_integer { fail(self_,tree,pool,context,locals,c_product_index_literal,arg,tree.span(arg).start,0); } return;
   }
   let foreign_descriptor=(is_eff_desc&&i==0)||(is_eff_has&&i==1);
@@ -216,134 +216,134 @@ let c_unknown_modifier: Code=33;
 let c_nesting_limit: Code=34;
 // `own` marks ownership wherever it stands before a name, so it names nothing.
 let c_own_name: Code=35;
-let a_invalid=blot_parse_ast::tag_invalid;
-let a_value_decl=blot_parse_ast::tag_value_decl;
-let a_import_decl=blot_parse_ast::tag_import_decl;
-let a_export_decl=blot_parse_ast::tag_export_decl;
-let a_import_binding=blot_parse_ast::tag_import_binding;
-let a_data_decl=blot_parse_ast::tag_data_decl;
-let a_type_alias_decl=blot_parse_ast::tag_type_alias_decl;
-let a_contract_decl=blot_parse_ast::tag_contract_decl;
-let a_contract_type_member=blot_parse_ast::tag_contract_type_member;
-let a_contract_value_member=blot_parse_ast::tag_contract_value_member;
-let a_implementation_decl=blot_parse_ast::tag_implementation_decl;
-let a_effect_decl=blot_parse_ast::tag_effect_decl;
-let a_effect_type_decl=blot_parse_ast::tag_effect_type_decl;
-let a_attribute=blot_parse_ast::tag_attribute;
-let a_constraint=blot_parse_ast::tag_constraint;
-let a_where_clause=blot_parse_ast::tag_where_clause;
-let a_constructors=blot_parse_ast::tag_constructors;
-let a_effect_operations=blot_parse_ast::tag_effect_operations;
-let a_effect_operation=blot_parse_ast::tag_effect_operation;
-let a_name=blot_parse_ast::tag_name;
-let a_intrinsic=blot_parse_ast::tag_intrinsic;
-let a_integer=blot_parse_ast::tag_integer;
-let a_float=blot_parse_ast::tag_float;
-let a_string=blot_parse_ast::tag_string;
-let a_boolean=blot_parse_ast::tag_boolean;
-let a_unit=blot_parse_ast::tag_unit;
-let a_lambda=blot_parse_ast::tag_lambda;
-let a_parameter=blot_parse_ast::tag_parameter;
-let a_apply=blot_parse_ast::tag_apply;
-let a_group=blot_parse_ast::tag_group;
-let a_unary=blot_parse_ast::tag_unary;
-let a_binary=blot_parse_ast::tag_binary;
-let a_infix_chain=blot_parse_ast::tag_infix_chain;
-let a_operator_tail=blot_parse_ast::tag_operator_tail;
-let a_product=blot_parse_ast::tag_product;
-let a_array=blot_parse_ast::tag_array;
-let a_block=blot_parse_ast::tag_block;
-let a_record=blot_parse_ast::tag_record;
-let a_field=blot_parse_ast::tag_field;
-let a_selector=blot_parse_ast::tag_selector;
-let a_constructor_ref=blot_parse_ast::tag_constructor_ref;
-let a_type_witness=blot_parse_ast::tag_type_witness;
-let a_field_access=blot_parse_ast::tag_field_access;
-let a_index_access=blot_parse_ast::tag_index_access;
-let a_let_stmt=blot_parse_ast::tag_let_stmt;
-let a_rebind_stmt=blot_parse_ast::tag_rebind_stmt;
-let a_use_stmt=blot_parse_ast::tag_use_stmt;
-let a_iterator_bind=blot_parse_ast::tag_iterator_bind;
-let a_function_return_stmt=blot_parse_ast::tag_function_return_stmt;
-let a_return_stmt=blot_parse_ast::tag_return_stmt;
-let a_break_stmt=blot_parse_ast::tag_break_stmt;
-let a_continue_stmt=blot_parse_ast::tag_continue_stmt;
-let a_if_expr=blot_parse_ast::tag_if_expr;
-let a_if_stmt=blot_parse_ast::tag_if_stmt;
-let a_if_let_stmt=blot_parse_ast::tag_if_let_stmt;
-let a_for_stmt=blot_parse_ast::tag_for_stmt;
-let a_range_stmt=blot_parse_ast::tag_range_stmt;
-let a_forever_stmt=blot_parse_ast::tag_forever_stmt;
-let a_case_expr=blot_parse_ast::tag_case_expr;
-let a_case_arm=blot_parse_ast::tag_case_arm;
-let a_pattern_row=blot_parse_ast::tag_pattern_row;
-let a_pattern_name=blot_parse_ast::tag_pattern_name;
-let a_pattern_integer=blot_parse_ast::tag_pattern_integer;
-let a_pattern_boolean=blot_parse_ast::tag_pattern_boolean;
-let a_pattern_product=blot_parse_ast::tag_pattern_product;
-let a_pattern_constructor=blot_parse_ast::tag_pattern_constructor;
-let a_pattern_record=blot_parse_ast::tag_pattern_record;
-let a_pattern_field=blot_parse_ast::tag_pattern_field;
-let a_pattern_value=blot_parse_ast::tag_pattern_value;
-let a_type_name=blot_parse_ast::tag_type_name;
-let a_type_apply=blot_parse_ast::tag_type_apply;
-let a_type_function=blot_parse_ast::tag_type_function;
-let a_type_effect=blot_parse_ast::tag_type_effect;
-let a_type_product=blot_parse_ast::tag_type_product;
-let a_type_array=blot_parse_ast::tag_type_array;
-let a_type_record=blot_parse_ast::tag_type_record;
-let a_type_field=blot_parse_ast::tag_type_field;
-let a_effect_row=blot_parse_ast::tag_effect_row;
-let a_numeric_error=blot_parse_ast::tag_numeric_error;
-let a_type_binder=blot_parse_ast::tag_type_binder;
-let a_type_usage=blot_parse_ast::tag_type_usage;
-let a_fork_expr=blot_parse_ast::tag_fork_expr;
-let a_handler_stmt=blot_parse_ast::tag_handler_stmt;
-let a_comptime_for=blot_parse_ast::tag_comptime_for;
-let a_comptime_if=blot_parse_ast::tag_comptime_if;
-let a_comptime_project=blot_parse_ast::tag_comptime_project;
-let a_spark_expr=blot_parse_ast::tag_spark_expr;
-let a_entry_kernel_decl=blot_parse_ast::tag_entry_kernel_decl;
-let a_entry_process_decl=blot_parse_ast::tag_entry_process_decl;
+let a_invalid=squid_parse_ast::tag_invalid;
+let a_value_decl=squid_parse_ast::tag_value_decl;
+let a_import_decl=squid_parse_ast::tag_import_decl;
+let a_export_decl=squid_parse_ast::tag_export_decl;
+let a_import_binding=squid_parse_ast::tag_import_binding;
+let a_data_decl=squid_parse_ast::tag_data_decl;
+let a_type_alias_decl=squid_parse_ast::tag_type_alias_decl;
+let a_contract_decl=squid_parse_ast::tag_contract_decl;
+let a_contract_type_member=squid_parse_ast::tag_contract_type_member;
+let a_contract_value_member=squid_parse_ast::tag_contract_value_member;
+let a_implementation_decl=squid_parse_ast::tag_implementation_decl;
+let a_effect_decl=squid_parse_ast::tag_effect_decl;
+let a_effect_type_decl=squid_parse_ast::tag_effect_type_decl;
+let a_attribute=squid_parse_ast::tag_attribute;
+let a_constraint=squid_parse_ast::tag_constraint;
+let a_where_clause=squid_parse_ast::tag_where_clause;
+let a_constructors=squid_parse_ast::tag_constructors;
+let a_effect_operations=squid_parse_ast::tag_effect_operations;
+let a_effect_operation=squid_parse_ast::tag_effect_operation;
+let a_name=squid_parse_ast::tag_name;
+let a_intrinsic=squid_parse_ast::tag_intrinsic;
+let a_integer=squid_parse_ast::tag_integer;
+let a_float=squid_parse_ast::tag_float;
+let a_string=squid_parse_ast::tag_string;
+let a_boolean=squid_parse_ast::tag_boolean;
+let a_unit=squid_parse_ast::tag_unit;
+let a_lambda=squid_parse_ast::tag_lambda;
+let a_parameter=squid_parse_ast::tag_parameter;
+let a_apply=squid_parse_ast::tag_apply;
+let a_group=squid_parse_ast::tag_group;
+let a_unary=squid_parse_ast::tag_unary;
+let a_binary=squid_parse_ast::tag_binary;
+let a_infix_chain=squid_parse_ast::tag_infix_chain;
+let a_operator_tail=squid_parse_ast::tag_operator_tail;
+let a_product=squid_parse_ast::tag_product;
+let a_array=squid_parse_ast::tag_array;
+let a_block=squid_parse_ast::tag_block;
+let a_record=squid_parse_ast::tag_record;
+let a_field=squid_parse_ast::tag_field;
+let a_selector=squid_parse_ast::tag_selector;
+let a_constructor_ref=squid_parse_ast::tag_constructor_ref;
+let a_type_witness=squid_parse_ast::tag_type_witness;
+let a_field_access=squid_parse_ast::tag_field_access;
+let a_index_access=squid_parse_ast::tag_index_access;
+let a_let_stmt=squid_parse_ast::tag_let_stmt;
+let a_rebind_stmt=squid_parse_ast::tag_rebind_stmt;
+let a_use_stmt=squid_parse_ast::tag_use_stmt;
+let a_iterator_bind=squid_parse_ast::tag_iterator_bind;
+let a_function_return_stmt=squid_parse_ast::tag_function_return_stmt;
+let a_return_stmt=squid_parse_ast::tag_return_stmt;
+let a_break_stmt=squid_parse_ast::tag_break_stmt;
+let a_continue_stmt=squid_parse_ast::tag_continue_stmt;
+let a_if_expr=squid_parse_ast::tag_if_expr;
+let a_if_stmt=squid_parse_ast::tag_if_stmt;
+let a_if_let_stmt=squid_parse_ast::tag_if_let_stmt;
+let a_for_stmt=squid_parse_ast::tag_for_stmt;
+let a_range_stmt=squid_parse_ast::tag_range_stmt;
+let a_forever_stmt=squid_parse_ast::tag_forever_stmt;
+let a_case_expr=squid_parse_ast::tag_case_expr;
+let a_case_arm=squid_parse_ast::tag_case_arm;
+let a_pattern_row=squid_parse_ast::tag_pattern_row;
+let a_pattern_name=squid_parse_ast::tag_pattern_name;
+let a_pattern_integer=squid_parse_ast::tag_pattern_integer;
+let a_pattern_boolean=squid_parse_ast::tag_pattern_boolean;
+let a_pattern_product=squid_parse_ast::tag_pattern_product;
+let a_pattern_constructor=squid_parse_ast::tag_pattern_constructor;
+let a_pattern_record=squid_parse_ast::tag_pattern_record;
+let a_pattern_field=squid_parse_ast::tag_pattern_field;
+let a_pattern_value=squid_parse_ast::tag_pattern_value;
+let a_type_name=squid_parse_ast::tag_type_name;
+let a_type_apply=squid_parse_ast::tag_type_apply;
+let a_type_function=squid_parse_ast::tag_type_function;
+let a_type_effect=squid_parse_ast::tag_type_effect;
+let a_type_product=squid_parse_ast::tag_type_product;
+let a_type_array=squid_parse_ast::tag_type_array;
+let a_type_record=squid_parse_ast::tag_type_record;
+let a_type_field=squid_parse_ast::tag_type_field;
+let a_effect_row=squid_parse_ast::tag_effect_row;
+let a_numeric_error=squid_parse_ast::tag_numeric_error;
+let a_type_binder=squid_parse_ast::tag_type_binder;
+let a_type_usage=squid_parse_ast::tag_type_usage;
+let a_fork_expr=squid_parse_ast::tag_fork_expr;
+let a_handler_stmt=squid_parse_ast::tag_handler_stmt;
+let a_comptime_for=squid_parse_ast::tag_comptime_for;
+let a_comptime_if=squid_parse_ast::tag_comptime_if;
+let a_comptime_project=squid_parse_ast::tag_comptime_project;
+let a_spark_expr=squid_parse_ast::tag_spark_expr;
+let a_entry_kernel_decl=squid_parse_ast::tag_entry_kernel_decl;
+let a_entry_process_decl=squid_parse_ast::tag_entry_process_decl;
 recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
  if id==0 { return; }
  let n=tree.node(id);
  if (n.tag==a_name||n.tag==a_constructor_ref||n.tag==a_intrinsic)&&context.source_editor_probe(id) { return; }
  if stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
  match n.tag {
-  blot_parse_ast::tag_integer, blot_parse_ast::tag_float, blot_parse_ast::tag_boolean, blot_parse_ast::tag_unit, blot_parse_ast::tag_string => {},
-  blot_parse_ast::tag_numeric_error => { numeric_failure(self_,tree,pool,context,locals,id); },
-  blot_parse_ast::tag_name => {
+  squid_parse_ast::tag_integer, squid_parse_ast::tag_float, squid_parse_ast::tag_boolean, squid_parse_ast::tag_unit, squid_parse_ast::tag_string => {},
+  squid_parse_ast::tag_numeric_error => { numeric_failure(self_,tree,pool,context,locals,id); },
+  squid_parse_ast::tag_name => {
    if validate_controls(self_,tree,pool,context,locals)&&!local(self_,tree,pool,context,locals,n.a)&&context.source_non_callable_effect(n.a) { fail(self_,tree,pool,context,locals,c_effect_member,id,tree.span(id).start,0); }
    else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); }
   },
-  blot_parse_ast::tag_intrinsic => {
+  squid_parse_ast::tag_intrinsic => {
    if !context.source_intrinsic_known(n.a) { fail(self_,tree,pool,context,locals,c_unknown_intrinsic,id,tree.span(id).start,n.a); }
    else { let arity,found=context.source_intrinsic_arity(n.a); if found&&arity!=0 { fail(self_,tree,pool,context,locals,c_call_arity,id,tree.span(id).start,0); } }
   },
-  blot_parse_ast::tag_constructor_ref => {
-   let exists,err=context.source_operator_target_exists(n.a); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start+1,n.a); }
+  squid_parse_ast::tag_constructor_ref => {
+   let exists,err=context.source_operator_target_exists(n.a); self_.failure=err; if err==squid_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start+1,n.a); }
   },
-  blot_parse_ast::tag_type_witness => {
+  squid_parse_ast::tag_type_witness => {
    walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; } let constructor,found=pool.lookup("Type"); var exists=false;
    if found { let value,err=context.source_operator_target_exists(constructor); self_.failure=err; exists=value; }
-   if self_.failure==blot_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
+   if self_.failure==squid_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
   },
-  blot_parse_ast::tag_group, blot_parse_ast::tag_return_stmt, blot_parse_ast::tag_function_return_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); },
-  blot_parse_ast::tag_break_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_break_scope,id,tree.span(id).start,0); } },
-  blot_parse_ast::tag_continue_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_continue_scope,id,tree.span(id).start,0); } },
-  blot_parse_ast::tag_forever_stmt => { loop_scope(self_,tree,pool,context,locals,0,n.a,depth+1); },
-  blot_parse_ast::tag_field_access => {
+  squid_parse_ast::tag_group, squid_parse_ast::tag_return_stmt, squid_parse_ast::tag_function_return_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); },
+  squid_parse_ast::tag_break_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_break_scope,id,tree.span(id).start,0); } },
+  squid_parse_ast::tag_continue_stmt => { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_continue_scope,id,tree.span(id).start,0); } },
+  squid_parse_ast::tag_forever_stmt => { loop_scope(self_,tree,pool,context,locals,0,n.a,depth+1); },
+  squid_parse_ast::tag_field_access => {
    var base=n.a; while tree.node(base).tag==a_group { base=tree.node(base).a; } let source=tree.node(base);
    if source.tag==a_name&&!local(self_,tree,pool,context,locals,source.a)&&context.source_qualified_exists(source.a,n.b) { return; } walk(self_,tree,pool,context,locals,n.a,depth+1);
   },
-  blot_parse_ast::tag_field => { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } },
-  blot_parse_ast::tag_unary => { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" && pool.get(n.a)!="~" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } },
-  blot_parse_ast::tag_binary => {
+  squid_parse_ast::tag_field => { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } },
+  squid_parse_ast::tag_unary => { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" && pool.get(n.a)!="not" && pool.get(n.a)!="~" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } },
+  squid_parse_ast::tag_binary => {
    walk(self_,tree,pool,context,locals,n.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } operator(self_,tree,pool,context,locals,n.a,named(pool,n.a),id); walk(self_,tree,pool,context,locals,n.c,depth+1);
   },
-  blot_parse_ast::tag_infix_chain => {
-   walk(self_,tree,pool,context,locals,n.a,depth+1); let tails=blot_parse_ast::List {n.b,n.c};let ast_tails_count=tree.list(tails).len;
+  squid_parse_ast::tag_infix_chain => {
+   walk(self_,tree,pool,context,locals,n.a,depth+1); let tails=squid_parse_ast::List {n.b,n.c};let ast_tails_count=tree.list(tails).len;
    let ast_visit_7_source=tails;let ast_visit_7_count=tree.list(ast_visit_7_source).len;for ast_visit_7_index in 0..ast_visit_7_count {let tail=tree.list(ast_visit_7_source)[ast_visit_7_index]; if stopped(self_,tree,pool,context,locals) { return; } let op=tree.node(tail); operator(self_,tree,pool,context,locals,op.a,(op.c&1)!=0,tail); walk(self_,tree,pool,context,locals,op.b,depth+1); }
    if stopped(self_,tree,pool,context,locals) { return; } var stack=ScratchIdBuffer {};
    let ast_visit_8_source=tails;let ast_visit_8_count=tree.list(ast_visit_8_source).len;for ast_visit_8_index in 0..ast_visit_8_count {let tail=tree.list(ast_visit_8_source)[ast_visit_8_index];
@@ -357,20 +357,20 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
    }
    stack.deinit();
   },
-  blot_parse_ast::tag_apply => {
+  squid_parse_ast::tag_apply => {
    var head=id; var argument_count=0;
    loop { let current=tree.node(head); if current.tag==a_apply { argument_count++; head=current.a; } else { break; } }
    let callee=tree.node(head);
    if callee.tag==a_intrinsic { primitive(self_,tree,pool,context,locals,id,head,argument_count,depth+1); return; }
    if validate_controls(self_,tree,pool,context,locals)&&callee.tag==a_name&&tree.node(n.b).tag==a_record&&context.source_constructor_exists(callee.a)&&!local(self_,tree,pool,context,locals,callee.a) { fail(self_,tree,pool,context,locals,c_constructor_marker,id,tree.span(id).start,0); return; }
-   if callee.tag==a_name&&!local(self_,tree,pool,context,locals,callee.a) { let text=pool.get(callee.a); if text=="freeze"||text=="copy" { let exists,err=context.source_value_exists(callee.a); self_.failure=err; if err==blot_error::Error.none&&!exists { var current=id; while tree.node(current).tag==a_apply { walk(self_,tree,pool,context,locals,tree.node(current).b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } current=tree.node(current).a; } return; } } }
+   if callee.tag==a_name&&!local(self_,tree,pool,context,locals,callee.a) { let text=pool.get(callee.a); if text=="freeze"||text=="copy" { let exists,err=context.source_value_exists(callee.a); self_.failure=err; if err==squid_error::Error.none&&!exists { var current=id; while tree.node(current).tag==a_apply { walk(self_,tree,pool,context,locals,tree.node(current).b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } current=tree.node(current).a; } return; } } }
    walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
    var type_argument=type_application(self_,tree,pool,context,locals,n.a);
    if type_argument&&validate_controls(self_,tree,pool,context,locals) { let is_type,err=context.source_argument_is_type(n.a,n.b); self_.failure=err; type_argument=is_type; }
    if !type_argument { walk(self_,tree,pool,context,locals,n.b,depth+1); }
   },
-  blot_parse_ast::tag_index_access => { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); },
-  blot_parse_ast::tag_record => {
+  squid_parse_ast::tag_index_access => { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); },
+  squid_parse_ast::tag_record => {
    if n.a!=0&&!record_target(self_,tree,pool,context,locals,id,n.a) { return; } let ast_fields_source=id;let ast_fields_count=tree.children(ast_fields_source).len;
    let ast_visit_9_source=ast_fields_source;let ast_visit_9_count=tree.children(ast_visit_9_source).len;for index in 0..ast_visit_9_count {let child=tree.children(ast_visit_9_source)[index];
     let field=tree.node(child).a;
@@ -380,54 +380,54 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
    }
    if n.a!=0 { let field,missing=context.source_missing_record_field(n.a,tree.children(ast_fields_source)); if missing { fail(self_,tree,pool,context,locals,c_missing_record_field,id,tree.span(id).start+1,field); } }
   },
-  blot_parse_ast::tag_product, blot_parse_ast::tag_array => { let ast_visit_11_source=id;let ast_visit_11_count=tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,tree,pool,context,locals,child,depth+1); } },
-  blot_parse_ast::tag_lambda => {
+  squid_parse_ast::tag_product, squid_parse_ast::tag_array => { let ast_visit_11_source=id;let ast_visit_11_count=tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,tree,pool,context,locals,child,depth+1); } },
+  squid_parse_ast::tag_lambda => {
    self_.failure=context.source_expression_annotations(id); if annotations_stopped(self_,tree,pool,context,locals) { return; }
    let saved_loops=self_.loops; self_.loops=0;
    if pool.get(tree.parameter(n.a).name)=="own" { fail(self_,tree,pool,context,locals,c_own_name,id,tree.span(id).start,0); return; }
    let saved=locals.len; bind(self_,tree,pool,context,locals,tree.parameter(n.a).name); walk(self_,tree,pool,context,locals,n.b,depth+1);
    locals.resize(saved); self_.loops=saved_loops;
   },
-  blot_parse_ast::tag_block => {
+  squid_parse_ast::tag_block => {
    let saved=locals.len; suite(self_,tree,pool,context,locals,id,depth+1); locals.resize(saved); walk(self_,tree,pool,context,locals,n.c,depth+1);
   },
-  blot_parse_ast::tag_fork_expr => {
-   let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
+  squid_parse_ast::tag_fork_expr => {
+   let entries=squid_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
    for i in 0..count { let entry=tree.node(tree.list(entries)[i]); walk(self_,tree,pool,context,locals,entry.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } }
    let saved=locals.len; let saved_loops=self_.loops; self_.loops=0;
    for i in 0..count { let entry=tree.node(tree.list(entries)[i]); bind(self_,tree,pool,context,locals,entry.a); }
    walk(self_,tree,pool,context,locals,n.c,depth+1);
    locals.resize(saved); self_.loops=saved_loops;
   },
-  blot_parse_ast::tag_handler_stmt => {
+  squid_parse_ast::tag_handler_stmt => {
    walk(self_,tree,pool,context,locals,n.c,depth+1);
    bind(self_,tree,pool,context,locals,n.a);
   },
-  blot_parse_ast::tag_comptime_for => {
+  squid_parse_ast::tag_comptime_for => {
    let body=tree.extra.items[n.c];
    let saved=locals.len;
    bind(self_,tree,pool,context,locals,n.a);
    walk(self_,tree,pool,context,locals,body,depth+1);
    locals.resize(saved);
   },
-  blot_parse_ast::tag_comptime_if => {
+  squid_parse_ast::tag_comptime_if => {
    walk(self_,tree,pool,context,locals,n.a,depth+1);
    scope(self_,tree,pool,context,locals,0,n.b,depth+1);
    scope(self_,tree,pool,context,locals,0,n.c,depth+1);
   },
-  blot_parse_ast::tag_comptime_project => {
+  squid_parse_ast::tag_comptime_project => {
    walk(self_,tree,pool,context,locals,n.a,depth+1);
    if !local(self_,tree,pool,context,locals,n.b) { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start,n.b); }
   },
-  blot_parse_ast::tag_spark_expr => {
+  squid_parse_ast::tag_spark_expr => {
    walk(self_,tree,pool,context,locals,tree.spark_source(id),depth+1);
    walk(self_,tree,pool,context,locals,tree.spark_end(id),depth+1);
    let saved_loops=self_.loops; self_.loops=0;
    scope(self_,tree,pool,context,locals,n.b,n.a,depth+1);
    self_.loops=saved_loops;
   },
-  blot_parse_ast::tag_let_stmt => {
-   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
+  squid_parse_ast::tag_let_stmt => {
+   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=squid_error::Error.none { return; }
 
    pattern_names(self_,tree,pool,context,locals,binding.pattern,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
    self_.failure=context.source_binding_annotation(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
@@ -436,28 +436,28 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
    walk(self_,tree,pool,context,locals,binding.fallback,depth+1); pattern(self_,tree,pool,context,locals,binding.pattern,depth+1);
    { context.source_binding_end(scope); }
   },
-  blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind => {
+  squid_parse_ast::tag_use_stmt, squid_parse_ast::tag_iterator_bind => {
    self_.failure=context.source_expression_annotations(id); walk(self_,tree,pool,context,locals,n.b,depth+1); bind(self_,tree,pool,context,locals,n.a);
   },
-  blot_parse_ast::tag_rebind_stmt => {
+  squid_parse_ast::tag_rebind_stmt => {
    var root=n.a; while tree.node(root).tag==a_field_access||tree.node(root).tag==a_index_access { root=tree.node(root).a; } let target=tree.node(root);
    if target.tag==a_name&&!local(self_,tree,pool,context,locals,target.a) { fail(self_,tree,pool,context,locals,c_unknown_rebinding,id,tree.span(root).start,target.a); return; }
    let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
   },
-  blot_parse_ast::tag_if_expr, blot_parse_ast::tag_if_stmt, blot_parse_ast::tag_range_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); },
-  blot_parse_ast::tag_if_let_stmt => {
+  squid_parse_ast::tag_if_expr, squid_parse_ast::tag_if_stmt, squid_parse_ast::tag_range_stmt => { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); },
+  squid_parse_ast::tag_if_let_stmt => {
    pattern_names(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); let body=tree.extra.items[n.c]; let fallback=tree.extra.items[n.c+1]; scope(self_,tree,pool,context,locals,n.a,body,depth+1); scope(self_,tree,pool,context,locals,0,fallback,depth+1);
   },
-  blot_parse_ast::tag_for_stmt => {
+  squid_parse_ast::tag_for_stmt => {
    walk(self_,tree,pool,context,locals,n.b,depth+1); let end=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,end,depth+1); scope(self_,tree,pool,context,locals,n.a,body,depth+1);
   },
-  blot_parse_ast::tag_case_expr => {
-   let input=blot_parse_ast::List {tree.extra.items[n.a],tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
-   let ast_visit_13_source=blot_parse_ast::List {n.b,n.c};let ast_visit_13_count=tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+  squid_parse_ast::tag_case_expr => {
+   let input=squid_parse_ast::List {tree.extra.items[n.a],tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+   let ast_visit_13_source=squid_parse_ast::List {n.b,n.c};let ast_visit_13_count=tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
   },
-  blot_parse_ast::tag_case_arm => {
+  squid_parse_ast::tag_case_arm => {
    let saved=locals.len;
-   let rows=blot_parse_ast::List {n.a,n.b};let ast_rows_count=tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,tree,pool,context,locals,tree.list(rows)[0],depth+1); }
+   let rows=squid_parse_ast::List {n.a,n.b};let ast_rows_count=tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,tree,pool,context,locals,tree.list(rows)[0],depth+1); }
    let canonical_end=locals.len; var index=0; if ast_rows_count!=0 { index=1; }
    while index<ast_rows_count {
     let row=tree.list(rows)[index]; let previous=self_.pattern_scope; self_.pattern_scope=saved; pattern(self_,tree,pool,context,locals,row,depth+1); self_.pattern_scope=previous; if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; }
@@ -476,15 +476,15 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;
  while collected!=0 {
   collected--; let id=tree.roots.items[collected];
-  if has_duplicate&&duplicate==id { return Issue {code:c_duplicate_name,node:id,point:tree.span(id).start},true,blot_error::Error.none; }
+  if has_duplicate&&duplicate==id { return Issue {code:c_duplicate_name,node:id,point:tree.span(id).start},true,squid_error::Error.none; }
   if tree.node(id).tag!=a_data_decl { continue; }
   let ast_visit_14_source=tree.node(id).b;let ast_visit_14_count=tree.children(ast_visit_14_source).len;for ast_visit_14_index in 0..ast_visit_14_count {let constructor=tree.children(ast_visit_14_source)[ast_visit_14_index];
    let payload=tree.node(constructor).b; if payload==0||tree.node(payload).tag!=a_type_record||tree.type_conversion_origin(payload)!=tree.span(payload).start { continue; }
    let ast_fields_source=payload;let ast_fields_count=tree.children(ast_fields_source).len;
-   let ast_visit_15_source=ast_fields_source;let ast_visit_15_count=tree.children(ast_visit_15_source).len;for index in 0..ast_visit_15_count {let field=tree.children(ast_visit_15_source)[index]; let ast_visit_16_source=ast_fields_source;let ast_visit_16_start=0;let ast_visit_16_count=tree.children(ast_visit_16_source)[ast_visit_16_start..index].len;for ast_visit_16_index in 0..ast_visit_16_count {let earlier=tree.children(ast_visit_16_source)[ast_visit_16_start+ast_visit_16_index]; if tree.node(field).a==tree.node(earlier).a { return Issue {code:c_duplicate_record_field,node:field,point:tree.span(field).start,symbol:tree.node(field).a},true,blot_error::Error.none; } } }
+   let ast_visit_15_source=ast_fields_source;let ast_visit_15_count=tree.children(ast_visit_15_source).len;for index in 0..ast_visit_15_count {let field=tree.children(ast_visit_15_source)[index]; let ast_visit_16_source=ast_fields_source;let ast_visit_16_start=0;let ast_visit_16_count=tree.children(ast_visit_16_source)[ast_visit_16_start..index].len;for ast_visit_16_index in 0..ast_visit_16_count {let earlier=tree.children(ast_visit_16_source)[ast_visit_16_start+ast_visit_16_index]; if tree.node(field).a==tree.node(earlier).a { return Issue {code:c_duplicate_record_field,node:field,point:tree.span(field).start,symbol:tree.node(field).a},true,squid_error::Error.none; } } }
   }
  }
- if has_duplicate { return Issue {code:c_duplicate_name,node:duplicate,point:tree.span(duplicate).start},true,blot_error::Error.none; }
+ if has_duplicate { return Issue {code:c_duplicate_name,node:duplicate,point:tree.span(duplicate).start},true,squid_error::Error.none; }
  let locals_index=validator_locals.alloc_index(ValidatorLocals {}); let locals: ScratchIdBuffer& =validator_locals[locals_index].values;  var validator=Validator {}; var index=tree.roots.len;
  while index!=0 {
   index--; let id=tree.roots.items[index]; validator.failure=context.source_declaration_header(id);
@@ -493,7 +493,7 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
    if skip_root.len!=0 {continue;}
    let saved=locals.len; let implementation=tree.implementation(id);
    let ast_visit_19_source=implementation.members;let ast_visit_19_count=tree.list(ast_visit_19_source).len;for ast_visit_19_index in 0..ast_visit_19_count {let member=tree.list(ast_visit_19_source)[ast_visit_19_index]; if tree.node(member).tag==a_value_decl { locals.push(tree.node(member).a); } }
-   let scope,err=context.source_implementation_start(id); if err!=blot_error::Error.none { locals.resize(saved); let __cleanup_result_88_0: Issue = Issue {}; let __cleanup_result_88_1: bool = false; let __cleanup_result_88_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_88_0, __cleanup_result_88_1, __cleanup_result_88_2; }
+   let scope,err=context.source_implementation_start(id); if err!=squid_error::Error.none { locals.resize(saved); let __cleanup_result_88_0: Issue = Issue {}; let __cleanup_result_88_1: bool = false; let __cleanup_result_88_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_88_0, __cleanup_result_88_1, __cleanup_result_88_2; }
    let ast_visit_20_source=implementation.members;let ast_visit_20_count=tree.list(ast_visit_20_source).len;for ast_visit_20_index in 0..ast_visit_20_count {let member=tree.list(ast_visit_20_source)[ast_visit_20_index];
     if tree.node(member).tag!=a_value_decl { continue; }
     validator.failure=context.source_binding_annotation(member);
@@ -505,8 +505,8 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
   }
   if tree.node(id).tag==a_entry_kernel_decl {
    let decl=tree.entry_kernel_decl(id);
-   if pool.get(decl.name)=="own" { let __own_k_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_k_1: bool = true; let __own_k_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_k_0, __own_k_1, __own_k_2; }
-   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __k_err_0: Issue = Issue {}; let __k_err_1: bool = false; let __k_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __k_err_0, __k_err_1, __k_err_2; }
+   if pool.get(decl.name)=="own" { let __own_k_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_k_1: bool = true; let __own_k_2: Error = squid_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_k_0, __own_k_1, __own_k_2; }
+   let scope,err=context.source_binding_start(id); if err!=squid_error::Error.none { let __k_err_0: Issue = Issue {}; let __k_err_1: bool = false; let __k_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __k_err_0, __k_err_1, __k_err_2; }
    validator.failure=context.source_binding_annotation(id);
    if !annotations_stopped(validator,tree,pool,context,locals) {
     walk(validator,tree,pool,context,locals,decl.first,0);
@@ -522,8 +522,8 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
   }
   if tree.node(id).tag==a_entry_process_decl {
    let decl=tree.entry_process_decl(id);
-   if pool.get(decl.name)=="own" { let __own_p_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_p_1: bool = true; let __own_p_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_p_0, __own_p_1, __own_p_2; }
-   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __p_err_0: Issue = Issue {}; let __p_err_1: bool = false; let __p_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __p_err_0, __p_err_1, __p_err_2; }
+   if pool.get(decl.name)=="own" { let __own_p_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_p_1: bool = true; let __own_p_2: Error = squid_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_p_0, __own_p_1, __own_p_2; }
+   let scope,err=context.source_binding_start(id); if err!=squid_error::Error.none { let __p_err_0: Issue = Issue {}; let __p_err_1: bool = false; let __p_err_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __p_err_0, __p_err_1, __p_err_2; }
    validator.failure=context.source_binding_annotation(id);
    if !annotations_stopped(validator,tree,pool,context,locals) {
     walk(validator,tree,pool,context,locals,decl.init,0);
@@ -538,9 +538,9 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
    continue;
   }
   if tree.node(id).tag!=a_value_decl || (skip_root.len!=0 && skip_root[index]) { continue; } let value=tree.value_decl(id);
-  if pool.get(value.name)=="own" { let __own_name_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_name_1: bool = true; let __own_name_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_name_0, __own_name_1, __own_name_2; }
-  if value.modifier!=0&&(!value.exported||pool.get(value.modifier)!="io") { let __cleanup_result_91_0: Issue = Issue {code:c_unknown_modifier,node:id,point:tree.span(id).start}; let __cleanup_result_91_1: bool = true; let __cleanup_result_91_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_91_0, __cleanup_result_91_1, __cleanup_result_91_2; }
-  let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __cleanup_result_92_0: Issue = Issue {}; let __cleanup_result_92_1: bool = false; let __cleanup_result_92_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_92_0, __cleanup_result_92_1, __cleanup_result_92_2; }
+  if pool.get(value.name)=="own" { let __own_name_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_name_1: bool = true; let __own_name_2: Error = squid_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_name_0, __own_name_1, __own_name_2; }
+  if value.modifier!=0&&(!value.exported||pool.get(value.modifier)!="io") { let __cleanup_result_91_0: Issue = Issue {code:c_unknown_modifier,node:id,point:tree.span(id).start}; let __cleanup_result_91_1: bool = true; let __cleanup_result_91_2: Error = squid_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_91_0, __cleanup_result_91_1, __cleanup_result_91_2; }
+  let scope,err=context.source_binding_start(id); if err!=squid_error::Error.none { let __cleanup_result_92_0: Issue = Issue {}; let __cleanup_result_92_1: bool = false; let __cleanup_result_92_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_92_0, __cleanup_result_92_1, __cleanup_result_92_2; }
   validator.failure=context.source_binding_annotation(id);
   if !annotations_stopped(validator,tree,pool,context,locals) {
    walk(validator,tree,pool,context,locals,value.body,0); let attributes=value.attributes;let ast_attributes_count=tree.list(attributes).len; var attribute_index=value.attributes.len;
@@ -551,36 +551,36 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&,skip_root:const b
   if validator.has_issue { let __cleanup_result_93_0: Issue = validator.issue; let __cleanup_result_93_1: bool = true; let __cleanup_result_93_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_93_0, __cleanup_result_93_1, __cleanup_result_93_2; }
   if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_94_0: Issue = Issue {}; let __cleanup_result_94_1: bool = false; let __cleanup_result_94_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_94_0, __cleanup_result_94_1, __cleanup_result_94_2; }
  }
- let __cleanup_result_95_0: Issue = Issue {}; let __cleanup_result_95_1: bool = false; let __cleanup_result_95_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_95_0, __cleanup_result_95_1, __cleanup_result_95_2;
+ let __cleanup_result_95_0: Issue = Issue {}; let __cleanup_result_95_1: bool = false; let __cleanup_result_95_2: Error = squid_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_95_0, __cleanup_result_95_1, __cleanup_result_95_2;
  { locals.deinit(); validator_locals.free(locals_index); } }
 
-struct ScratchIdBuffer { storage: Id[:]=default<Id[:]>(),items: Id[:]=default<Id[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
+struct ScratchIdBuffer { storage: Id[:]=default<Id[:]>(),items: Id[:]=default<Id[:]>(),len: i64=0,failure: Error=squid_error::Error.none }
 reusable[] var pool_ScratchIdBuffer: Id[>..]=[];
-fn ensure(self_: ScratchIdBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchIdBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: ScratchIdBuffer&,value: Id) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchIdBuffer); self_.len=self_.items.len; }
-fn append(self_: ScratchIdBuffer&,values: const Id[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchIdBuffer); self_.len=self_.items.len; }
-fn resize(self_: ScratchIdBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: ScratchIdBuffer&,length: i64,value: Id) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: ScratchIdBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: ScratchIdBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchIdBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
-struct ScratchDeferredBuffer { storage: Deferred[:]=default<Deferred[:]>(),items: Deferred[:]=default<Deferred[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
+fn ensure(self_: ScratchIdBuffer&,minimum: i64) -> Error { if self_.failure!=squid_error::Error.none { return self_.failure; } let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_ScratchIdBuffer); if error!=squid_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchIdBuffer&,value: Id) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,pool_ScratchIdBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchIdBuffer&,values: const Id[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,pool_ScratchIdBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchIdBuffer&,length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchIdBuffer&,length: i64,value: Id) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchIdBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: ScratchIdBuffer&) { squid_support_pooled_buffer::deinit(self_,pool_ScratchIdBuffer); self_.len=0; self_.failure=squid_error::Error.none; }
+struct ScratchDeferredBuffer { storage: Deferred[:]=default<Deferred[:]>(),items: Deferred[:]=default<Deferred[:]>(),len: i64=0,failure: Error=squid_error::Error.none }
 reusable[] var pool_ScratchDeferredBuffer: Deferred[>..]=[];
-fn ensure(self_: ScratchDeferredBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchDeferredBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: ScratchDeferredBuffer&,value: Deferred) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchDeferredBuffer); self_.len=self_.items.len; }
-fn append(self_: ScratchDeferredBuffer&,values: const Deferred[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchDeferredBuffer); self_.len=self_.items.len; }
-fn resize(self_: ScratchDeferredBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: ScratchDeferredBuffer&,length: i64,value: Deferred) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: ScratchDeferredBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: ScratchDeferredBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchDeferredBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
-struct Scratchi64Buffer { storage: i64[:]=default<i64[:]>(),items: i64[:]=default<i64[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
+fn ensure(self_: ScratchDeferredBuffer&,minimum: i64) -> Error { if self_.failure!=squid_error::Error.none { return self_.failure; } let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_ScratchDeferredBuffer); if error!=squid_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchDeferredBuffer&,value: Deferred) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,pool_ScratchDeferredBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchDeferredBuffer&,values: const Deferred[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,pool_ScratchDeferredBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchDeferredBuffer&,length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchDeferredBuffer&,length: i64,value: Deferred) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchDeferredBuffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: ScratchDeferredBuffer&) { squid_support_pooled_buffer::deinit(self_,pool_ScratchDeferredBuffer); self_.len=0; self_.failure=squid_error::Error.none; }
+struct Scratchi64Buffer { storage: i64[:]=default<i64[:]>(),items: i64[:]=default<i64[:]>(),len: i64=0,failure: Error=squid_error::Error.none }
 reusable[] var pool_Scratchi64Buffer: i64[>..]=[];
-fn ensure(self_: Scratchi64Buffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Scratchi64Buffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: Scratchi64Buffer&,value: i64) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Scratchi64Buffer); self_.len=self_.items.len; }
-fn append(self_: Scratchi64Buffer&,values: const i64[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Scratchi64Buffer); self_.len=self_.items.len; }
-fn resize(self_: Scratchi64Buffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: Scratchi64Buffer&,length: i64,value: i64) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: Scratchi64Buffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: Scratchi64Buffer&) { blot_support_pooled_buffer::deinit(self_,pool_Scratchi64Buffer); self_.len=0; self_.failure=blot_error::Error.none; }
+fn ensure(self_: Scratchi64Buffer&,minimum: i64) -> Error { if self_.failure!=squid_error::Error.none { return self_.failure; } let error=squid_support_pooled_buffer::ensure(self_,minimum,pool_Scratchi64Buffer); if error!=squid_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: Scratchi64Buffer&,value: i64) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::push(self_,value,pool_Scratchi64Buffer); self_.len=self_.items.len; }
+fn append(self_: Scratchi64Buffer&,values: const i64[:]) { if self_.failure!=squid_error::Error.none { return; } self_.failure=squid_support_pooled_buffer::append(self_,values,pool_Scratchi64Buffer); self_.len=self_.items.len; }
+fn resize(self_: Scratchi64Buffer&,length: i64) { squid_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: Scratchi64Buffer&,length: i64,value: i64) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=squid_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: Scratchi64Buffer&) { squid_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=squid_error::Error.none; }
+fn deinit(self_: Scratchi64Buffer&) { squid_support_pooled_buffer::deinit(self_,pool_Scratchi64Buffer); self_.len=0; self_.failure=squid_error::Error.none; }
 
 struct ValidatorLocals { values: ScratchIdBuffer=ScratchIdBuffer {} }
 reusable var validator_locals: ValidatorLocals[>..]=[];

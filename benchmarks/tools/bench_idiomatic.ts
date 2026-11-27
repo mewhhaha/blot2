@@ -20,7 +20,7 @@ for (let i = 0; i < Deno.args.length; i++) {
 }
 const root = resolve(new URL("../..", import.meta.url).pathname);
 const compiler = resolve(
-  options.get("--compiler") ?? "compiler-goose/build/blotc-goose",
+  options.get("--compiler") ?? "compiler-goose/build/squidc-goose",
 );
 const output = resolve(
   options.get("--out") ?? `build/bench/idiomatic-${Date.now()}`,
@@ -139,7 +139,7 @@ const report = {
   verify_only: verifyOnly,
   selected_workloads: names,
   boundary:
-    "Small self-contained workload pairs, not whole applications. Same Deno/V8 Wasm engine. Native Rust is not measured. Fresh compiler processes with warm filesystem caches; Rust links its prebuilt standard library, Blot checks imported source. Compile times include codegen/linking, exclude wrapper startup. Runtime includes generated input/allocation/computation/destruction, scalar Wasm calls and required Blot ownership hooks, excludes module compile/instantiate and correctness witnesses. Rust iterators may fuse intermediate collections. ASCII text uses each language's native representation. No third-party libraries or I/O.",
+    "Small self-contained workload pairs, not whole applications. Same Deno/V8 Wasm engine. Native Rust is not measured. Fresh compiler processes with warm filesystem caches; Rust links its prebuilt standard library, Squid checks imported source. Compile times include codegen/linking, exclude wrapper startup. Runtime includes generated input/allocation/computation/destruction, scalar Wasm calls and required Squid ownership hooks, excludes module compile/instantiate and correctness witnesses. Rust iterators may fuse intermediate collections. ASCII text uses each language's native representation. No third-party libraries or I/O.",
   compilation: [] as Compilation[],
   runtime: [] as Runtime[],
   witnesses: [] as { name: string; outputs: number[] }[],
@@ -150,16 +150,16 @@ const save = () =>
     JSON.stringify(report, null, 2) + "\n",
   );
 await save();
-async function compile(name: string, language: "blot" | "rust", round: number) {
+async function compile(name: string, language: "squid" | "rust", round: number) {
   const wasm = `${output}/${name}-${language}.wasm`;
-  const args = language === "blot"
+  const args = language === "squid"
     ? [
       compiler,
       "build",
-      `${root}/benchmarks/idiomatic/${name}.blot`,
+      `${root}/benchmarks/idiomatic/${name}.sq`,
       wasm,
       "--prelude",
-      `${root}/std/prelude.blot`,
+      `${root}/std/prelude.sq`,
       "--std-root",
       `${root}/std`,
     ]
@@ -232,13 +232,13 @@ for (let round = 0; round < rounds; round++) {
   for (const name of round % 2 ? names.toReversed() : names) {
     for (
       const language of round % 2
-        ? ["rust", "blot"] as const
-        : ["blot", "rust"] as const
+        ? ["rust", "squid"] as const
+        : ["squid", "rust"] as const
     ) await compile(name, language, round);
     console.log("compiled", round, name);
   }
 }
-function rawBlot(module: WebAssembly.Module) {
+function rawSquid(module: WebAssembly.Module) {
   const abi = readGuestAbi(module);
   assert.equal(abi.functions.length, 1);
   assert.deepEqual(abi.functions[0], {
@@ -250,11 +250,11 @@ function rawBlot(module: WebAssembly.Module) {
   assert.equal(WebAssembly.Module.imports(module).length, 0);
   const { exports } = new WebAssembly.Instance(module);
   const run = exports.run as (seed: number) => number;
-  const enter = exports["blot:ownership_enter"] as (() => void) | undefined;
-  const leave = exports["blot:ownership_leave"] as
+  const enter = exports["squid:ownership_enter"] as (() => void) | undefined;
+  const leave = exports["squid:ownership_leave"] as
     | ((outcome: number) => void)
     | undefined;
-  const reset = exports["blot:reset"] as ((mark: number) => void) | undefined;
+  const reset = exports["squid:reset"] as ((mark: number) => void) | undefined;
   return {
     call(seed: number) {
       enter?.();
@@ -270,18 +270,18 @@ function rawBlot(module: WebAssembly.Module) {
       }
     },
     memory: () =>
-      (exports["blot:memory"] as WebAssembly.Memory | undefined)?.buffer
+      (exports["squid:memory"] as WebAssembly.Memory | undefined)?.buffer
         .byteLength ?? null,
   };
 }
 for (const name of names) {
-  const blotBytes = await Deno.readFile(`${output}/${name}-blot.wasm`);
-  const blotModule = new WebAssembly.Module(blotBytes);
+  const squidBytes = await Deno.readFile(`${output}/${name}-squid.wasm`);
+  const squidModule = new WebAssembly.Module(squidBytes);
   const rustModule = new WebAssembly.Module(
     await Deno.readFile(`${output}/${name}-rust.wasm`),
   );
   assert.equal(WebAssembly.Module.imports(rustModule).length, 0);
-  const blot = rawBlot(blotModule);
+  const squid = rawSquid(squidModule);
   const rustExports = new WebAssembly.Instance(rustModule).exports;
   const rust = {
     call: (seed: number) =>
@@ -290,19 +290,19 @@ for (const name of names) {
       (rustExports.memory as WebAssembly.Memory | undefined)?.buffer
         .byteLength ?? null,
   };
-  const guest = await instantiateGuest(blotBytes);
+  const guest = await instantiateGuest(squidBytes);
   const expected = seeds.map(workloads[name]);
   try {
     seeds.forEach((seed, i) => {
       assert.equal(
         guest.call("run", seed),
         expected[i],
-        `${name}: public Blot API, seed ${seed}`,
+        `${name}: public Squid API, seed ${seed}`,
       );
       assert.equal(
-        blot.call(seed),
+        squid.call(seed),
         expected[i],
-        `${name}: raw Blot adapter, seed ${seed}`,
+        `${name}: raw Squid adapter, seed ${seed}`,
       );
       assert.equal(rust.call(seed), expected[i], `${name}: Rust, seed ${seed}`);
     });
@@ -310,7 +310,7 @@ for (const name of names) {
     guest.dispose();
   }
   report.witnesses.push({ name, outputs: expected });
-  const variants = [{ language: "blot", ...blot }, {
+  const variants = [{ language: "squid", ...sq }, {
     language: "rust",
     ...rust,
   }];

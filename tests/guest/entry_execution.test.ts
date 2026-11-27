@@ -21,7 +21,7 @@ io const floating = func (value: F32): F32 => return value + 1.5
       equal(guest.call("factorial", value), result);
     }
     for (const value of [0, 1.25, -2.5]) equal(guest.call("floating", value), Math.fround(value + 1.5));
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
 });
 
 Deno.test("entry inference preserves unhandled operations and unresolved host parameters", async () => {
@@ -30,7 +30,7 @@ effect Read: Unit -> U32
 io const invalid = func value => return do:
   use ignored <- Read ()
   break value + 1
-`, "entry_type", undefined, { prelude: "std/prelude.blot" });
+`, "entry_type", undefined, { prelude: "std/prelude.sq" });
   await compileExpectedFailure(`io const identity = func value => return value\n`, "entry_type");
   await compileExpectedFailure(`
 effect Read: Unit -> U32
@@ -39,7 +39,7 @@ io const invalid = func (callback: Unit -> U32 ! {Read}) => return callback ()
 });
 
 Deno.test("repository prelude and syntax examples execute their exported functions", async () => {
-  const prelude = await Deno.readTextFile("examples/prelude.blot");
+  const prelude = await Deno.readTextFile("examples/prelude.sq");
   await compileAndRun(prelude, guest => {
     equal(guest.call("increment", 41), 42);
     equal(guest.call("doubled", 21), 42);
@@ -53,8 +53,8 @@ Deno.test("repository prelude and syntax examples execute their exported functio
     equal(guest.call("inspect", false), 0);
     equal(guest.call("recover", true), 42);
     equal(guest.call("recover", false), 0);
-  }, { prelude: "std/prelude.blot" });
-  const syntax = await Deno.readTextFile("examples/syntax.blot");
+  }, { prelude: "std/prelude.sq" });
+  const syntax = await Deno.readTextFile("examples/syntax.sq");
   await compileAndRun(syntax, guest => {
     equal(guest.call("short_circuit", null), false);
     equal(guest.call("lazy_fallback", null), 42);
@@ -68,5 +68,5 @@ Deno.test("repository prelude and syntax examples execute their exported functio
     equal(guest.call("array_snapshot", null), 22);
     equal(guest.call("array_update", null), 24);
     equal(guest.call("provider_example", null), 42);
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
 });

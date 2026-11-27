@@ -53,7 +53,7 @@ tuple payload returns that payload without recursively receiving its fields.
 Generic receive helpers currently require a direct receive body or an alias of
 one.
 
-```blot
+```squid
 // Pure sibling tasks.
 const scope = func body => return @task.scope body
 const spawn = func group => return func action => return @task.spawn group action
@@ -180,5 +180,5 @@ runtime performance or full concurrency completion is claimed here.
 Caller-region inference and generic capture-transfer evidence, general
 higher-order spawn forwarding, stream channels, select-one, scoped nonlocal
 exits, purity certification and CPU worker transport remain open in
-[the completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
+[the completion plan](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
 Task collect-all is implemented; comma-separated select-one syntax is not.

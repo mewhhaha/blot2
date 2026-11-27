@@ -6,10 +6,10 @@
   acceptance scope; see the current completion record below.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 17 October
-  2026 as [issue #11](https://github.com/mewhhaha/blot2/issues/11), a silent
+  2026 as [issue #11](https://github.com/mewhhaha/squid-lang/issues/11), a silent
   miscompile.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -36,7 +36,7 @@ Already wrong on `86a527b`.
       `dead_rebinding` for each last version of an enclosing name rebound in the
       block that is never read.
 - [x] Count a read of any version made in the block, including versions in
-      branches, so Ink's `lib/ui/tree.blot` focus blur is not rejected.
+      branches, so Ink's `lib/ui/tree.sq` focus blur is not rejected.
 - [x] Carry statement-`case` arm rebinding outward as chained binary merges
       (nested two-arm statement matches, like `if let`); rebinding arms inline
       their `do:` suite (`Checked.statement_arms`, cached and replayed); a

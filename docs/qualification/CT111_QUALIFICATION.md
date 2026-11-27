@@ -6,7 +6,7 @@ foundations for inferred interfaces, retained semantic queries and shared source
 graphs. Existing inferred conversions remain valid. Completed elaborated bodies
 and the expanded development generic ABI are still unimplemented; none of the
 five recommendations is complete. See the
-[implementation record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md) for exact boundaries.
+[implementation record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md) for exact boundaries.
 
 CT110 remains installed. CT111 is uncommitted and has not been pushed or
 installed. Three earlier neutral/regressing screens prompted the decision to
@@ -16,7 +16,7 @@ performance improvement.
 ## Exact candidate and scope
 
 - Source base: `e56375d18f32b0aef300fb4b80b9a3c0f2c1632d` plus the archived patch.
-- Candidate: `build/bench/ct111/candidate-8-blotc`.
+- Candidate: `build/bench/ct111/candidate-8-squidc`.
 - Release SHA-256:
   `efb953d79cf6952841e28a20d48570f2ee324a0811f475e8999131f81cb70adf`.
 - Compiler identity SHA-256:
@@ -25,7 +25,7 @@ performance improvement.
   `b0ebc5ecf07f962665fcc3cf879f5e955eb07f1341a0f2b5b8d783b963228dd2`.
 
 All 1,004 pinned compiler/test/client/tool inputs match the frozen checkout at
-`build/bench/ct111/qualification-work/blot2`. Frozen sibling fixtures prevent
+`build/bench/ct111/qualification-work/squid-lang`. Frozen sibling fixtures prevent
 unrelated live application edits from invalidating qualification. Concurrent
 changes to `backend/owned_arrays.zig`, `backend/owned_arrays_tests.zig` and
 `tests/owned_array_execution.test.ts` remain in the shared working tree and are

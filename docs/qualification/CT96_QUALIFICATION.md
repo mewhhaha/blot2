@@ -34,7 +34,7 @@ generator-owned allocation.
 
 Both variants use the same 554-file frozen gdev/Ink/std/assets workload and
 unchanged 200-million-step budget from
-[the baseline](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_MEASUREMENTS.md). Persistent caching and profiling are
+[the baseline](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_MEASUREMENTS.md). Persistent caching and profiling are
 disabled. Each sample starts a new compiler process; wall/CPU measure its build
 request after project open. CPU includes exited worker threads at Linux's 10 ms
 tick resolution. OS page caches are not flushed. Input and compiler hashes are
@@ -134,10 +134,10 @@ SHA-256 entry. Private application sources, compiler binaries, caches and
 qualification keys are excluded.
 
 Local artifacts are under `build/bench/ct96-20261023`; the qualified release is
-`candidate/blotc` there. The original snapshot and baseline binary remain under
+`candidate/squidc` there. The original snapshot and baseline binary remain under
 `build/bench/compile-cost-20261023`. The archive's `measurement-commands.json`
 records the exact commands. For a new fresh comparison, use the baseline's
 manifest/output pins with `bench:compile --runs 7 --no-retained --guard-cpu`.
 Measure retained changes and collect a CPU profile separately.
 
-Follow [the current hills](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md) for the next experiment.
+Follow [the current hills](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md) for the next experiment.

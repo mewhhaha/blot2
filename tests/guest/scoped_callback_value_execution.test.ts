@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const factory = `
 const encode = func (value: F32) => return #[value]
 const decode = func (values: Array F32) => return values[0]
@@ -26,20 +26,20 @@ io const run = func (count: U32): Array F32 => return do:
 
 Deno.test(`ordinary callback values survive imports fresh and retained builds and failed revisions`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-callback-value-",
+    prefix: "squid-callback-value-",
   });
-  const entry = `${directory}/main.blot`;
-  const producer = `${directory}/factory.blot`;
+  const entry = `${directory}/main.sq`;
+  const producer = `${directory}/factory.sq`;
   await Deno.writeTextFile(entry, source);
   await Deno.writeTextFile(producer, factory);
   await Deno.writeTextFile(
-    `${directory}/forward.blot`,
+    `${directory}/forward.sq`,
     'import * as factory from "./factory"\nconst metadata = factory.metadata\n',
   );
   const options = {
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
   };
   let compiler = await createZigProjectCompiler(options);
   try {

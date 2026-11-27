@@ -8,7 +8,7 @@ import { KernelPool } from "../../host/kernels.ts";
 import { Processes, type ProcessHandle } from "../../host/processes.ts";
 
 const program = await Deno.readTextFile(
-  new URL("../../benchmarks/language/spark_spawn.blot", import.meta.url),
+  new URL("../../benchmarks/language/spark_spawn.sq", import.meta.url),
 );
 
 Deno.test("spark source maps and KernelPool execution preserve bits, cardinality and order", async () => {

@@ -1,6 +1,6 @@
 // Canonical FlatNumeric wire layouts, PersistentSafe validation, and FNV-1a 64-bit
 // schema / implementation / binding hashes (tasks/CONCURRENCY_VNEXT.md §2.4 & §4.2.2).
-namespace blot_check_wire_schema;
+namespace squid_check_wire_schema;
 
 import std;
 import dictionary;
@@ -12,12 +12,12 @@ import check.diagnostic_code;
 import reuse.principal_interface;
 import support.option;
 
-type Module = blot_check_core::Module;
-type TId = blot_check_types::Id;
-type TTag = blot_check_types::Tag;
-type Identity = blot_check_types::NominalIdentity;
-type BindingRef = blot_check_core::BindingRef;
-type Code = blot_check_diagnostic_code::Code;
+type Module = squid_check_core::Module;
+type TId = squid_check_types::Id;
+type TTag = squid_check_types::Tag;
+type Identity = squid_check_types::NominalIdentity;
+type BindingRef = squid_check_core::BindingRef;
+type Code = squid_check_diagnostic_code::Code;
 type Chars = const u8[:];
 
 let COMPILER_SEMANTICS_VERSION: u8 = 1;
@@ -72,8 +72,8 @@ struct ProcessInfo {
 struct Issue {
     failed: bool = false,
     unit: u32 = 0,
-    span: blot_check_core::Span = blot_check_core::Span { start: 0, end: 0 },
-    code: Code = blot_check_diagnostic_code::Code.kernel_type,
+    span: squid_check_core::Span = squid_check_core::Span { start: 0, end: 0 },
+    code: Code = squid_check_diagnostic_code::Code.kernel_type,
     message: Chars = "",
 }
 
@@ -416,7 +416,7 @@ recursive fn encodeEffectRow(
     units: const Module[:],
     cache: UnitIdCache&,
     unit: u32,
-    row_id: blot_check_effects::Id,
+    row_id: squid_check_effects::Id,
     subst_start: i64,
     subst_len: i64,
     active_base: i64,
@@ -567,7 +567,7 @@ recursive fn encodeTypeId(
         product => {
             cache.out_buf.push(0x10);
             pushUleb(cache.out_buf, node.b as u64);
-            let items = m.types.list(blot_check_types::List { start: node.a, len: node.b });
+            let items = m.types.list(squid_check_types::List { start: node.a, len: node.b });
             for child in items {
                 if !encodeTypeId(units, cache, unit, child, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1) { return false; }
             }
@@ -600,7 +600,7 @@ recursive fn encodeTypeId(
             var own_flag: u8 = 0;
             var param_ty = node.a;
             let pnode = m.types.node(param_ty);
-            if pnode.tag == blot_check_types::Tag.usage && pnode.b == blot_check_types::usageCode(blot_parse_ast::usagekind_own) {
+            if pnode.tag == squid_check_types::Tag.usage && pnode.b == squid_check_types::usageCode(squid_parse_ast::usagekind_own) {
                 own_flag = 1;
                 param_ty = pnode.a;
             }
@@ -621,35 +621,35 @@ recursive fn encodeTypeId(
             return encodeTypeId(units, cache, unit, node.c, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1);
         },
         nominal => {
-            let sinfo = blot_check_storage_types::info(m.types, tid);
+            let sinfo = squid_check_storage_types::info(m.types, tid);
             if sinfo.present {
                 let kind = sinfo.value.kind;
                 let elem = sinfo.value.element;
-                if blot_check_storage_types::isSized(kind) {
-                    let len_opt = blot_check_storage_types::lengthOf(m.types, tid);
+                if squid_check_storage_types::isSized(kind) {
+                    let len_opt = squid_check_storage_types::lengthOf(m.types, tid);
                     if !len_opt.present { return false; }
                     let lnode = m.types.node(len_opt.value);
-                    if lnode.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
-                    let k = blot_check_storage_types::lengthLiteralValue(lnode.b);
-                    if kind == blot_check_storage_types::sized_array { cache.out_buf.push(0x12); }
+                    if lnode.tag != squid_check_types::Tag.nominal || !squid_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
+                    let k = squid_check_storage_types::lengthLiteralValue(lnode.b);
+                    if kind == squid_check_storage_types::sized_array { cache.out_buf.push(0x12); }
                     else { return false; }
                     pushUleb(cache.out_buf, k as u64);
                     return encodeTypeId(units, cache, unit, elem, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1);
                 }
-                if kind == blot_check_storage_types::view { cache.out_buf.push(0x23); }
-                else if kind == blot_check_storage_types::shared { cache.out_buf.push(0x24); }
-                else if kind == blot_check_storage_types::ref { cache.out_buf.push(0x2a); }
-                else if kind == blot_check_storage_types::link { cache.out_buf.push(0x2b); }
-                else if kind == blot_check_storage_types::packed { cache.out_buf.push(0x2d); }
-                else if kind == blot_check_storage_types::seq { cache.out_buf.push(0x2e); }
+                if kind == squid_check_storage_types::view { cache.out_buf.push(0x23); }
+                else if kind == squid_check_storage_types::shared { cache.out_buf.push(0x24); }
+                else if kind == squid_check_storage_types::ref { cache.out_buf.push(0x2a); }
+                else if kind == squid_check_storage_types::link { cache.out_buf.push(0x2b); }
+                else if kind == squid_check_storage_types::packed { cache.out_buf.push(0x2d); }
+                else if kind == squid_check_storage_types::seq { cache.out_buf.push(0x2e); }
                 else { return false; }
                 return encodeTypeId(units, cache, unit, elem, subst_start, subst_len, active_base, allow_generic, generic_params, generic_rows, self_unit, depth + 1);
             }
             if node.a == 0 && node.b > 1 { return false; }
             if node.a == 0xffffffff {
-                if blot_check_storage_types::isLengthLiteral(node.a, node.b) {
+                if squid_check_storage_types::isLengthLiteral(node.a, node.b) {
                     cache.out_buf.push(0x16);
-                    pushUleb(cache.out_buf, blot_check_storage_types::lengthLiteralValue(node.b) as u64);
+                    pushUleb(cache.out_buf, squid_check_storage_types::lengthLiteralValue(node.b) as u64);
                     return true;
                 }
                 return false;
@@ -680,7 +680,7 @@ recursive fn encodeTypeId(
                 for vi in 0..vars.len {
                     var target_u = unit;
                     var target_id = args[vi];
-                    if m.types.node(target_id).tag == blot_check_types::Tag.variable {
+                    if m.types.node(target_id).tag == squid_check_types::Tag.variable {
                         let mapped, ok = lookupSubstRange(cache.subst_pool[..], subst_start, subst_len, unit, target_id);
                         if ok { target_u = mapped.unit; target_id = mapped.id; }
                     }
@@ -803,7 +803,7 @@ recursive fn collectFlatNumeric(
         },
         product => {
             if node.b == 0 { return false; }
-            let items = m.types.list(blot_check_types::List { start: node.a, len: node.b });
+            let items = m.types.list(squid_check_types::List { start: node.a, len: node.b });
             for child in items {
                 if !collectFlatNumeric(units, cache, unit, child, subst_start, subst_len, active_base, word_tags, all_f32, depth + 1) { return false; }
             }
@@ -830,14 +830,14 @@ recursive fn collectFlatNumeric(
             return ok;
         },
         nominal => {
-            let sinfo = blot_check_storage_types::info(m.types, tid);
+            let sinfo = squid_check_storage_types::info(m.types, tid);
             if sinfo.present {
-                if sinfo.value.kind != blot_check_storage_types::sized_array { return false; }
-                let len_opt = blot_check_storage_types::lengthOf(m.types, tid);
+                if sinfo.value.kind != squid_check_storage_types::sized_array { return false; }
+                let len_opt = squid_check_storage_types::lengthOf(m.types, tid);
                 if !len_opt.present { return false; }
                 let lnode = m.types.node(len_opt.value);
-                if lnode.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
-                let k = blot_check_storage_types::lengthLiteralValue(lnode.b) as u64;
+                if lnode.tag != squid_check_types::Tag.nominal || !squid_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
+                let k = squid_check_storage_types::lengthLiteralValue(lnode.b) as u64;
                 if k == 0 { return false; }
                 let tmark = word_tags.len;
                 var elem_f32 = true;
@@ -874,7 +874,7 @@ recursive fn collectFlatNumeric(
             for vi in 0..vars.len {
                 var target_u = unit;
                 var target_id = args[vi];
-                if m.types.node(target_id).tag == blot_check_types::Tag.variable {
+                if m.types.node(target_id).tag == squid_check_types::Tag.variable {
                     let mapped, ok = lookupSubstRange(cache.subst_pool[..], subst_start, subst_len, unit, target_id);
                     if ok { target_u = mapped.unit; target_id = mapped.id; }
                 }
@@ -921,19 +921,19 @@ fn buildWireSchema(
     cache.active_pool.resize(amark);
 
     let node = m.types.node(tid);
-    if node.tag == blot_check_types::Tag.unit {
+    if node.tag == squid_check_types::Tag.unit {
         if !allow_unit { return result, false; }
         result.kind = SCHEMA_KIND_UNIT;
         result.wire_tag = WIRE_TAG_UNIT;
         result.stride = 0;
-    } else if node.tag == blot_check_types::Tag.array {
+    } else if node.tag == squid_check_types::Tag.array {
         if !allow_var_array { return result, false; }
         let elem = m.types.node(node.a);
-        if elem.tag == blot_check_types::Tag.unsigned32 {
+        if elem.tag == squid_check_types::Tag.unsigned32 {
             result.kind = SCHEMA_KIND_VAR_U32;
             result.wire_tag = WIRE_TAG_ARRAY_U32;
             result.stride = 0;
-        } else if elem.tag == blot_check_types::Tag.floating32 {
+        } else if elem.tag == squid_check_types::Tag.floating32 {
             result.kind = SCHEMA_KIND_VAR_F32;
             result.wire_tag = WIRE_TAG_ARRAY_F32;
             if var_f32_uses_u32_wire { result.wire_tag = WIRE_TAG_ARRAY_U32; }
@@ -988,7 +988,7 @@ fn computeSchemaHash(units: const Module[:], unit: u32, tid: TId) -> u64, bool {
         let m .= units[unit - 1];
         if (tid as i64) < m.types.nodes.len {
             let n = m.types.node(tid);
-            if n.tag == blot_check_types::Tag.nominal && hasUnit(units, n.a) && n.a != 0xffffffff {
+            if n.tag == squid_check_types::Tag.nominal && hasUnit(units, n.a) && n.a != 0xffffffff {
                 let dm .= units[n.a - 1];
                 let nidx = findNominalInUnit(dm, Identity { unit: n.a, decl: n.b });
                 if nidx >= 0 && dm.name(dm.nominals[nidx].diagnostic_name) == "Type" {
@@ -1033,7 +1033,7 @@ recursive fn checkPersistentSafe(
             return checkPersistentSafe(units, cache, unit, node.a, subst_start, subst_len, active_base, depth + 1);
         },
         product => {
-            let items = m.types.list(blot_check_types::List { start: node.a, len: node.b });
+            let items = m.types.list(squid_check_types::List { start: node.a, len: node.b });
             for child in items {
                 if !checkPersistentSafe(units, cache, unit, child, subst_start, subst_len, active_base, depth + 1) { return false; }
             }
@@ -1047,18 +1047,18 @@ recursive fn checkPersistentSafe(
             return true;
         },
         nominal => {
-            let sinfo = blot_check_storage_types::info(m.types, tid);
+            let sinfo = squid_check_storage_types::info(m.types, tid);
             if sinfo.present {
                 let kind = sinfo.value.kind;
-                if kind == blot_check_storage_types::shared ||
-                   kind == blot_check_storage_types::sized_array ||
-                   kind == blot_check_storage_types::packed ||
-                   kind == blot_check_storage_types::seq {
-                    if blot_check_storage_types::isSized(kind) {
-                        let len_opt = blot_check_storage_types::lengthOf(m.types, tid);
+                if kind == squid_check_storage_types::shared ||
+                   kind == squid_check_storage_types::sized_array ||
+                   kind == squid_check_storage_types::packed ||
+                   kind == squid_check_storage_types::seq {
+                    if squid_check_storage_types::isSized(kind) {
+                        let len_opt = squid_check_storage_types::lengthOf(m.types, tid);
                         if !len_opt.present { return false; }
                         let lnode = m.types.node(len_opt.value);
-                        if lnode.tag != blot_check_types::Tag.nominal || !blot_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
+                        if lnode.tag != squid_check_types::Tag.nominal || !squid_check_storage_types::isLengthLiteral(lnode.a, lnode.b) { return false; }
                     }
                     return checkPersistentSafe(units, cache, unit, sinfo.value.element, subst_start, subst_len, active_base, depth + 1);
                 }
@@ -1079,7 +1079,7 @@ recursive fn checkPersistentSafe(
             for vi in 0..vars.len {
                 var target_u = unit;
                 var target_id = args[vi];
-                if m.types.node(target_id).tag == blot_check_types::Tag.variable {
+                if m.types.node(target_id).tag == squid_check_types::Tag.variable {
                     let mapped, ok = lookupSubstRange(cache.subst_pool[..], subst_start, subst_len, unit, target_id);
                     if ok { target_u = mapped.unit; target_id = mapped.id; }
                 }
@@ -1116,7 +1116,7 @@ fn resolveBindingTargetTracked(units: const Module[:], from_unit: u32, ref_: Bin
         let m .= units[u - 1];
         if (b as i64) >= m.bindings.len { return BindingRef { 0, 0 }; }
         let info = m.binding(b);
-        if info.kind == blot_reuse_principal_interface::Kind.external && info.target.binding != 0 {
+        if info.kind == squid_reuse_principal_interface::Kind.external && info.target.binding != 0 {
             u = info.target.unit;
             b = info.target.binding;
             continue;
@@ -1135,7 +1135,7 @@ fn resolveBindingTarget(units: const Module[:], from_unit: u32, ref_: BindingRef
         let m .= units[u - 1];
         if (b as i64) >= m.bindings.len { return BindingRef { 0, 0 }; }
         let info = m.binding(b);
-        if info.kind == blot_reuse_principal_interface::Kind.external && info.target.binding != 0 {
+        if info.kind == squid_reuse_principal_interface::Kind.external && info.target.binding != 0 {
             u = info.target.unit;
             b = info.target.binding;
             continue;
@@ -1237,7 +1237,7 @@ fn buildImplIndex(shared: SharedHashIndex&, units: const Module[:]) {
             while mi > 0 {
                 mi -= 1;
                 let im = u_mod.implementation_members[m_start + mi];
-                if im.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                if im.kind != squid_reuse_principal_interface::ImplementationMemberKind.value { continue; }
                 var prev: u32 = 0;
                 let found = shared.impl_heads.get(key);
                 if found { prev = found; }
@@ -1315,7 +1315,7 @@ fn recordStagingSite(ctx: ImplHashCtx&, unit: u32, node_id: u32) {
 recursive fn hashPattern(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], m: const Module&, pid: u32, depth: i64) {
     if pid == 0 || depth > 128 || (pid as i64) >= m.patterns.len { fnvByte(ctx.h, 0); return; }
     let p = m.pattern(pid);
-    fnvByte(ctx.h, blot_check_core::patternTagCode(p.tag) as u8);
+    fnvByte(ctx.h, squid_check_core::patternTagCode(p.tag) as u8);
     match p.tag {
         constant => { fnvU32Le(ctx.h, p.a); },
         value => { hashNode(ctx, shared, units, m, p.a, depth + 1); },
@@ -1340,18 +1340,18 @@ recursive fn hashPattern(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: con
 recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const Module[:], m: const Module&, id: u32, depth: i64) {
     if id == 0 || depth > 256 || (id as i64) >= m.nodes.len { fnvByte(ctx.h, 0); return; }
     let n = m.node(id);
-    fnvByte(ctx.h, blot_check_core::tagCode(n.tag) as u8);
-    fnvByte(ctx.h, blot_check_core::opCode(n.op) as u8);
+    fnvByte(ctx.h, squid_check_core::tagCode(n.tag) as u8);
+    fnvByte(ctx.h, squid_check_core::opCode(n.op) as u8);
     match n.tag {
         constant => {
             fnvU32Le(ctx.h, n.a);
-            fnvByte(ctx.h, blot_check_types::tagCode(m.types.node(n.ty).tag) as u8);
+            fnvByte(ctx.h, squid_check_types::tagCode(m.types.node(n.ty).tag) as u8);
         },
         reference => {
             let r = m.reference(id);
             if r.unit == 0 && (r.binding as i64) < m.bindings.len {
                 let bk = m.binding(r.binding).kind;
-                if bk == blot_reuse_principal_interface::Kind.global || bk == blot_reuse_principal_interface::Kind.external {
+                if bk == squid_reuse_principal_interface::Kind.global || bk == squid_reuse_principal_interface::Kind.external {
                     fnvByte(ctx.h, 1);
                     enqueueBody(ctx, units, m.unit, r);
                 } else {
@@ -1445,7 +1445,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const 
         primitive_function => {
             let p = m.primitive(id);
             fnvByte(ctx.h, p.arity);
-            fnvByte(ctx.h, blot_check_core::opCode(p.op) as u8);
+            fnvByte(ctx.h, squid_check_core::opCode(p.op) as u8);
         },
         project => {
             let pr = m.projection(n.b);
@@ -1480,7 +1480,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const 
         },
         loop_ => {
             let li = m.loopInfo(id);
-            fnvByte(ctx.h, blot_check_core::loopKindCode(li.kind) as u8);
+            fnvByte(ctx.h, squid_check_core::loopKindCode(li.kind) as u8);
             hashNode(ctx, shared, units, m, li.first, depth + 1);
             hashNode(ctx, shared, units, m, li.end, depth + 1);
             hashPattern(ctx, shared, units, m, li.pattern, depth + 1);
@@ -1493,8 +1493,8 @@ recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const 
             let ui = m.updateInfo(id);
             hashNode(ctx, shared, units, m, ui.root, depth + 1);
             for st in m.updateSelectors(id) {
-                fnvByte(ctx.h, blot_check_core::updateKindCode(st.kind) as u8);
-                if st.kind == blot_check_core::UpdateKind.index { hashNode(ctx, shared, units, m, st.index, depth + 1); }
+                fnvByte(ctx.h, squid_check_core::updateKindCode(st.kind) as u8);
+                if st.kind == squid_check_core::UpdateKind.index { hashNode(ctx, shared, units, m, st.index, depth + 1); }
             }
             hashNode(ctx, shared, units, m, ui.value, depth + 1);
         },
@@ -1532,7 +1532,7 @@ recursive fn hashNode(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const 
         },
         flat_op => {
             fnvU32Le(ctx.h, n.c);
-            if n.c <= blot_check_core::flat_op_process_binding_hash {
+            if n.c <= squid_check_core::flat_op_process_binding_hash {
                 hashNode(ctx, shared, units, m, n.a, depth + 1);
             } else {
                 fnvU32Le(ctx.h, n.a);
@@ -1564,7 +1564,7 @@ fn drainImplHashQueue(ctx: ImplHashCtx&, shared: SharedHashIndex&, units: const 
     }
 }
 
-fn computeImplHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: blot_check_core::KernelDecl, all_staging_sites: u64[>..]&, dep_units: u32[>..]&) -> u64 {
+fn computeImplHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: squid_check_core::KernelDecl, all_staging_sites: u64[>..]&, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x03);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
@@ -1582,7 +1582,7 @@ fn computeImplHash(shared: SharedHashIndex&, units: const Module[:], entry: u32,
     return ctx.h.h;
 }
 
-fn computeProcessClosureHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: blot_check_core::ProcessDecl, dep_units: u32[>..]&) -> u64 {
+fn computeProcessClosureHash(shared: SharedHashIndex&, units: const Module[:], entry: u32, decl: squid_check_core::ProcessDecl, dep_units: u32[>..]&) -> u64 {
     var ctx = ImplHashCtx {};
     fnvByte(ctx.h, 0x05);
     fnvByte(ctx.h, COMPILER_SEMANTICS_VERSION);
@@ -1622,9 +1622,9 @@ fn isCoreArrayType(m: const Module&, tid: TId) -> bool {
     for _ in 0..32 {
         if cur == 0 || (cur as i64) >= m.types.nodes.len { return false; }
         let n = m.types.node(cur);
-        if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.forall { cur = n.a; continue; }
-        if n.tag == blot_check_types::Tag.array { return true; }
-        if blot_check_storage_types::info(m.types, cur).present { return true; }
+        if n.tag == squid_check_types::Tag.usage || n.tag == squid_check_types::Tag.forall { cur = n.a; continue; }
+        if n.tag == squid_check_types::Tag.array { return true; }
+        if squid_check_storage_types::info(m.types, cur).present { return true; }
         return false;
     }
     return false;
@@ -1635,7 +1635,7 @@ fn unwrapCoreType(m: const Module&, tid: TId) -> TId {
     for _ in 0..32 {
         if cur == 0 || (cur as i64) >= m.types.nodes.len { return cur; }
         let n = m.types.node(cur);
-        if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.forall { cur = n.a; continue; }
+        if n.tag == squid_check_types::Tag.usage || n.tag == squid_check_types::Tag.forall { cur = n.a; continue; }
         return cur;
     }
     return cur;
@@ -1653,13 +1653,13 @@ fn computeExportedStorage(units: const Module[:], entry: u32, info: const Progra
         let bty = unwrapCoreType(m, m.binding(body.binding).ty);
         if bty == 0 || (bty as i64) >= m.types.nodes.len { continue; }
         let fn_node = m.types.node(bty);
-        if fn_node.tag != blot_check_types::Tag.function { continue; }
+        if fn_node.tag != squid_check_types::Tag.function { continue; }
         let param_ty = unwrapCoreType(m, fn_node.a);
         let res_ty = unwrapCoreType(m, fn_node.b);
         if isCoreArrayType(m, param_ty) || isCoreArrayType(m, res_ty) { return true; }
         if param_ty != 0 && (param_ty as i64) < m.types.nodes.len {
             let pn = m.types.node(param_ty);
-            if pn.tag == blot_check_types::Tag.function && (isCoreArrayType(m, pn.a) || isCoreArrayType(m, pn.b)) { return true; }
+            if pn.tag == squid_check_types::Tag.function && (isCoreArrayType(m, pn.a) || isCoreArrayType(m, pn.b)) { return true; }
         }
     }
     return false;
@@ -1731,11 +1731,11 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
     for u, ui in units {
         if u.unit != entry {
             if u.kernels.len != 0 {
-                info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel is only valid in the entry module" };
+                info.issue = Issue { failed: true, unit: u.unit, span: u.kernels[0].span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel is only valid in the entry module" };
                 return;
             }
             if u.processes.len != 0 {
-                info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process is only valid in the entry module" };
+                info.issue = Issue { failed: true, unit: u.unit, span: u.processes[0].span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process is only valid in the entry module" };
                 return;
             }
         }
@@ -1744,7 +1744,7 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
                 if fork_flags[ui] == 2 { info.has_fork = true; }
             } else {
                 for node in u.nodes {
-                    if node.tag == blot_check_core::Tag.fork_ { info.has_fork = true; break; }
+                    if node.tag == squid_check_core::Tag.fork_ { info.has_fork = true; break; }
                 }
             }
         }
@@ -1764,17 +1764,17 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         // Verify named-function targets and exact arities across modules.
         if decl.has_context {
             if !verifyNamedFunctionArity(units, entry, decl.prepare_target, 1) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel prepare must resolve to a 1-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel prepare must resolve to a 1-argument named function" };
                 return;
             }
             if !verifyNamedFunctionArity(units, entry, decl.run_target, 2) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel run must resolve to a 2-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel run must resolve to a 2-argument named function" };
                 return;
             }
             // Validate WireCtx (`#[U32]`, `#[F32]`, or `FlatNumeric`).
             let ctx_s, ctx_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.ctx_type, false, true, false, false);
             if !ctx_ok {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel WireCtx must be FlatNumeric, #[U32], or #[F32]" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel WireCtx must be FlatNumeric, #[U32], or #[F32]" };
                 return;
             }
             kinfo.ctx_schema = ctx_s;
@@ -1783,12 +1783,12 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
             let ps_ok = decl.prepared_type != 0 && checkPersistentSafe(units, cache, entry, decl.prepared_type, 0, 0, ps_amark, 0);
             cache.active_pool.resize(ps_amark);
             if !ps_ok {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel PreparedCtx must be PersistentSafe" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel PreparedCtx must be PersistentSafe" };
                 return;
             }
         } else {
             if !verifyNamedFunctionArity(units, entry, decl.run_target, 1) {
-                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "stateless #kernel must be a 1-argument named function" };
+                info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "stateless #kernel must be a 1-argument named function" };
                 return;
             }
             kinfo.ctx_schema = WireSchema { kind: SCHEMA_KIND_UNIT, wire_tag: WIRE_TAG_UNIT, stride: 0, schema_hash: 0 };
@@ -1796,14 +1796,14 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         // Item must be non-zero-width FlatNumeric.
         let in_s, in_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.item_type, false, false, false, false);
         if !in_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel Item must be a non-zero-width FlatNumeric type within the transport budget" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel Item must be a non-zero-width FlatNumeric type within the transport budget" };
             return;
         }
         kinfo.in_schema = in_s;
         // Out must be FlatNumeric OR #[U32] / #[F32].
         let out_s, out_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.out_type, false, true, true, false);
         if !out_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#kernel Out must be FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#kernel Out must be FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         kinfo.out_schema = out_s;
@@ -1847,33 +1847,33 @@ fn analyzeWithForkFlags(units: const Module[:], entry: u32, fork_flags: const u8
         let decl = m.processes[pi];
         var pinfo = ProcessInfo { decl_index: pi as u32 };
         if !verifyNamedFunctionArity(units, entry, decl.init_target, 1) {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process init must resolve to a 1-argument named function" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process init must resolve to a 1-argument named function" };
             return;
         }
         if !verifyNamedFunctionArity(units, entry, decl.step_target, 2) {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process step must resolve to a 2-argument named function" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process step must resolve to a 2-argument named function" };
             return;
         }
         let cfg_s, cfg_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.config_type, true, true, false, true);
         if !cfg_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Config must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process Config must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let cmd_s, cmd_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.cmd_type, true, true, false, true);
         if !cmd_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Cmd must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process Cmd must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let rep_s, rep_ok = buildWireSchema(units, cache, info.word_tags, entry, decl.reply_type, true, true, false, true);
         if !rep_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process Reply must be Unit, FlatNumeric, #[U32], or #[F32]" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process Reply must be Unit, FlatNumeric, #[U32], or #[F32]" };
             return;
         }
         let ps_amark = cache.active_pool.len;
         let ps_ok = decl.state_type != 0 && checkPersistentSafe(units, cache, entry, decl.state_type, 0, 0, ps_amark, 0);
         cache.active_pool.resize(ps_amark);
         if !ps_ok {
-            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: blot_check_diagnostic_code::Code.kernel_type, message: "#process State must be PersistentSafe" };
+            info.issue = Issue { failed: true, unit: entry, span: decl.span, code: squid_check_diagnostic_code::Code.kernel_type, message: "#process State must be PersistentSafe" };
             return;
         }
         pinfo.config_schema = cfg_s;

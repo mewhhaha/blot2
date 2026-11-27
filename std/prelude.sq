@@ -1,0 +1,647 @@
+// The bootstrap prelude is ordinary Squid source. @u32.* and @f32.* are primitives.
+// Standard operators are ordinary functions built on @type.call and @pipe.
+// Boolean and/or and $ application remain language syntax.
+
+func (+) left -> right => @type.call "add" left right
+func (-) left -> right => @type.call "sub" left right
+func (*) left -> right => @type.call "mul" left right
+func (/) left -> right => @type.call "div" left right
+func (%) left -> right => @type.call "rem" left right
+func (&) left -> right => @type.call "bit_and" left right
+func (|) left -> right => @type.call "bit_or" left right
+func (^) left -> right => @type.call "bit_xor" left right
+func (<<) value -> count => @type.call "shl" value count
+func (>>) value -> count => @type.call "shr" value count
+func (==) left -> right => @type.call "eq" left right
+func (!=) left -> right => @type.call "ne" left right
+func (<) left -> right => @type.call "lt" left right
+func (<=) left -> right => @type.call "le" left right
+func (>) left -> right => @type.call "gt" left right
+func (>=) left -> right => @type.call "ge" left right
+func (|>) value -> function => @pipe value function
+func (<|) function -> value => @pipe value function
+
+func add left -> right => @type.call "add" left right
+func sub left -> right => @type.call "sub" left right
+func mul left -> right => @type.call "mul" left right
+func div left -> right => @type.call "div" left right
+func rem left -> right => @type.call "rem" left right
+func bit_and left -> right => @type.call "bit_and" left right
+func bit_or left -> right => @type.call "bit_or" left right
+func bit_xor left -> right => @type.call "bit_xor" left right
+func shl value -> count => @type.call "shl" value count
+func shr value -> count => @type.call "shr" value count
+func bit_not value => value.bit_not
+func eq left -> right => @type.call "eq" left right
+func ne left -> right => @type.call "ne" left right
+func lt left -> right => @type.call "lt" left right
+func le left -> right => @type.call "le" left right
+func gt left -> right => @type.call "gt" left right
+func ge left -> right => @type.call "ge" left right
+
+type Maybe a is data = $Some a | $Nothing
+type Result [value, error] is data = $Ok value | $Err error
+type Iteration [state, result] is data = $Continue state | $Done result
+type Type witness is data = $Type witness
+// Composable effect handler layers and handled computations.
+type Layer [inner, outer] is data = $Layer { inner: inner, outer: outer }
+type Handled [body, handler] is data = $Handled { body: body, handler: handler }
+// Represented opaque handles for compiler-verified multi-core batch kernels and isolated processes.
+type Kernel [ctx, item, out] is opaque = (U32, (U32, U32), (U32, U32), (U32, U32))
+type Process [cfg, cmd, reply] is opaque = (U32, (U32, U32))
+// Text stores Unicode scalar values; std/text validates external scalar arrays.
+type Text = #[U32]
+
+// The expected result selects its type's ordinary `from` member.
+func from value => @type.result "from" value
+
+func F32.from value => value.to_f32
+func U32.from value => value.to_u32
+func F32.to_f32 (value: F32) => value
+func U32.to_u32 (value: U32) => value
+
+func identity value => value
+func apply function -> value => function value
+func pipe value -> function => function value
+func always value -> ignored => value
+func compose outer -> inner -> value => outer (inner value)
+func flip combine -> right -> left => combine left right
+func on combine -> project -> left -> right => combine (project left) (project right)
+
+func layer inner -> outer => $Layer { inner, outer }
+func Layer.layer (self: Layer [a, b]) -> outer => $Layer { inner: self, outer }
+func Function.handle f -> h => $Handled { body: f, handler: h }
+func Function.run f -> arg => f arg
+func Handled.handle (self: Handled [b, h]) -> next => $Handled { body: self, handler: next }
+
+func Bool.not value => if value then false else true
+func Bool.eq left -> right => if left then right else Bool.not right
+func Bool.ne left -> right => Bool.not (Bool.eq left right)
+
+func Type.eq left -> right => case left, right of
+  $Type a, $Type b => @type.same a b
+func Type.ne left -> right => Bool.not (Type.eq left right)
+
+const U32.add = @u32.add
+const U32.sub = @u32.sub
+const U32.mul = @u32.mul
+// Division/remainder require a nonzero divisor. Shifts use the low five bits.
+const U32.div = @u32.div
+const U32.rem = @u32.rem
+const U32.bit_and = @u32.bit_and
+const U32.bit_or = @u32.bit_or
+const U32.bit_xor = @u32.bit_xor
+func U32.bit_not value => @u32.bit_xor value 0xFFFFFFFF
+const U32.shl = @u32.shl
+const U32.shr = @u32.shr
+func U32.abs value => value
+const U32.eq = @u32.eq
+const U32.ne = @u32.ne
+const U32.lt = @u32.lt
+const U32.le = @u32.le
+const U32.gt = @u32.gt
+const U32.ge = @u32.ge
+const U32.to_f32 = @u32.to_f32
+
+const F32.add = @f32.add
+const F32.sub = @f32.sub
+const F32.mul = @f32.mul
+const F32.div = @f32.div
+const F32.eq = @f32.eq
+const F32.ne = @f32.ne
+const F32.lt = @f32.lt
+const F32.le = @f32.le
+const F32.gt = @f32.gt
+const F32.ge = @f32.ge
+const F32.neg = @f32.neg
+const F32.abs = @f32.abs
+const F32.sqrt = @f32.sqrt
+const F32.floor = @f32.floor
+const F32.ceil = @f32.ceil
+const F32.trunc = @f32.trunc
+// Truncates toward zero and saturates; NaN/negative values become zero.
+const F32.to_u32 = @f32.to_u32
+func F32.min left -> right => if F32.lt left right then left else right
+func F32.max left -> right => if F32.gt left right then left else right
+func F32.clamp low -> high -> value => F32.min high (F32.max low value)
+func F32.lerp left -> right -> weight => F32.add left (F32.mul (F32.sub right left) weight)
+func F32.square value => F32.mul value value
+func F32.length3 x -> y -> z => F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
+func F32.is_finite value => F32.le (F32.abs value) 3.402823466e38
+
+// A positive finite period wraps finite values into [0, period).
+func F32.wrap period -> value =>
+  let wrapped = F32.sub value (F32.mul period (F32.floor (F32.div value period)))
+  if F32.ge wrapped period:
+    return 0.0
+  if F32.lt wrapped 0.0:
+    return F32.add wrapped period
+  return wrapped
+
+func F32.lerp_angle left -> right -> weight =>
+  let difference = F32.sub (F32.wrap 6.283185307 (F32.add (F32.sub right left) 3.141592654)) 3.141592654
+  return F32.add left (F32.mul difference weight)
+
+// Split 2*pi keeps range reduction accurate for |radians| <= 8192.
+// Outside that explicit range, trig returns NaN instead of inaccurate geometry.
+func f32_reduced_radians value =>
+  if F32.gt (F32.abs value) 8192.0:
+    return F32.div 0.0 0.0
+  let turns = F32.floor (F32.add (F32.mul value 0.15915494309189535) 0.5)
+  return F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
+
+// Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
+func f32_sin_reduced angle =>
+  let x = if F32.gt angle 1.570796327 then F32.sub 3.141592654 angle
+    else if F32.lt angle (-1.570796327) then F32.sub (-3.141592654) angle
+    else angle
+  let square = F32.square x
+  let term_9 = F32.add 2.755731922398589e-6 (F32.mul square (-2.505210838544172e-8))
+  let term_7 = F32.add (-1.984126984126984e-4) (F32.mul square term_9)
+  let term_5 = F32.add 8.333333333333333e-3 (F32.mul square term_7)
+  let term_3 = F32.add (-1.666666666666667e-1) (F32.mul square term_5)
+  return F32.mul x (F32.add 1.0 (F32.mul square term_3))
+
+func f32_cos_reduced value =>
+  let angle = F32.abs value
+  let outside = F32.gt angle 1.570796327
+  let x = if outside then F32.sub 3.141592654 angle else angle
+  let square = F32.square x
+  let term_10 = F32.add (-2.755731922398589e-7) (F32.mul square 2.08767569878681e-9)
+  let term_8 = F32.add 2.48015873015873e-5 (F32.mul square term_10)
+  let term_6 = F32.add (-1.388888888888889e-3) (F32.mul square term_8)
+  let term_4 = F32.add 4.166666666666667e-2 (F32.mul square term_6)
+  let term_2 = F32.add (-0.5) (F32.mul square term_4)
+  let result = F32.add 1.0 (F32.mul square term_2)
+  return if outside then F32.neg result else result
+
+func F32.sin value => f32_sin_reduced (f32_reduced_radians value)
+func F32.cos value => f32_cos_reduced (f32_reduced_radians value)
+func F32.sin_cos value =>
+  let angle = f32_reduced_radians value
+  return (f32_sin_reduced angle, f32_cos_reduced angle)
+
+// Like division, tan is unbounded near odd multiples of pi/2.
+func F32.tan value =>
+  let angle = f32_reduced_radians value
+  return F32.div (f32_sin_reduced angle) (f32_cos_reduced angle)
+
+const pi = 3.141592653589793
+const tau = 6.283185307179586
+func abs value => value.abs
+func min left -> right => if left < right then left else right
+func max left -> right => if left > right then left else right
+func clamp low -> high -> value => min high (max low value)
+func lerp left -> right => @type.call "lerp" left right
+func square value => value * value
+const sqrt = F32.sqrt
+const floor = F32.floor
+const ceil = F32.ceil
+const trunc = F32.trunc
+const sin = F32.sin
+const cos = F32.cos
+const tan = F32.tan
+const sin_cos = F32.sin_cos
+const wrap = F32.wrap
+const lerp_angle = F32.lerp_angle
+const is_finite = F32.is_finite
+const saturate = clamp 0.0 1.0
+func smoothstep low -> high -> value =>
+  let t = saturate ((value - low) / (high - low))
+  return t * t * (3.0 - 2.0 * t)
+
+func Maybe.pure value => $Some value
+func Maybe.map transform -> candidate => case candidate of
+  $Some value => $Some (transform value)
+  $Nothing => $Nothing
+func Maybe.bind candidate -> next => case candidate of
+  $Some value => next value
+  $Nothing => $Nothing
+// Finish each callback before advancing, so iteration uses constant stack.
+func Maybe.iterate initial -> step =>
+  let state = initial
+  for ever:
+    use candidate <- step state
+    if let $Some ($Done result) = candidate:
+      return $Some result
+    let $Some ($Continue next) = candidate else:
+      return $Nothing
+    state := next
+func Maybe.unwrap_or fallback -> candidate => case candidate of
+  $Some value => value
+  $Nothing => fallback
+func Maybe.is_some candidate => case candidate of
+  $Some _ => true
+  $Nothing => false
+func Maybe.filter predicate -> candidate => case candidate of
+  $Some value => if predicate value then candidate else $Nothing
+  $Nothing => $Nothing
+func Maybe.flatten candidate => case candidate of
+  $Some inner => inner
+  $Nothing => $Nothing
+func Maybe.unwrap_or_else fallback -> candidate => case candidate of
+  $Some value => value
+  $Nothing => fallback ()
+func Maybe.to_result error -> candidate => case candidate of
+  $Some value => $Ok value
+  $Nothing => $Err error
+
+func Result.pure value => $Ok value
+func Result.map transform -> candidate => case candidate of
+  $Ok value => $Ok (transform value)
+  $Err error => $Err error
+func Result.map_error transform -> candidate => case candidate of
+  $Ok value => $Ok value
+  $Err error => $Err (transform error)
+func Result.bind candidate -> next => case candidate of
+  $Ok value => next value
+  $Err error => $Err error
+func Result.iterate initial -> step =>
+  let state = initial
+  for ever:
+    use candidate <- step state
+    if let $Ok ($Continue next) = candidate:
+      state := next
+    else:
+      if let $Ok ($Done result) = candidate:
+        return $Ok result
+      if let $Err error = candidate:
+        return $Err error
+func Result.unwrap_or fallback -> candidate => case candidate of
+  $Ok value => value
+  $Err _ => fallback
+func Result.unwrap_or_else fallback -> candidate => case candidate of
+  $Ok value => value
+  $Err _ => fallback ()
+func Result.to_maybe candidate => case candidate of
+  $Ok value => $Some value
+  $Err _ => $Nothing
+
+func Array.length (values: #[a]): U32 => @array.length values
+func View.length (values: &[a]): U32 => @storage.length values
+func Array.at (values: #[a]) -> (index: U32) => @array.get values index
+func View.at (values: &[a]) -> (index: U32) => @storage.read values index
+func Array.is_empty (values: #[a]): Bool => Array.length values == 0
+func Array.get (values: #[a]) -> (index: U32): Maybe a =>
+  if index < Array.length values:
+    return $Some (@array.get values index)
+  return $Nothing
+func Array.set (values: #[a]) -> (index: U32) -> (value: a): Maybe #[a] =>
+  if index < Array.length values:
+    return $Some (@array.set values index value)
+  return $Nothing
+
+// Pool iteration borrows a captured range.
+type PoolCursor a is data = $PoolCursor { values: &[a], index: U32 }
+func Array.iter (values: #[a]) => $PoolCursor {values: &values[0..values.length], index: 0}
+func View.iter (values: &[a]) => $PoolCursor {values, index: 0}
+func PoolCursor.iter (cursor: PoolCursor a) => cursor
+func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.length then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1}) else $Nothing
+
+// Mutation dispatch keeps the owner mode explicit in each selected signature.
+func Array.with_capacity (capacity: U32): #[a] => @storage.with_capacity capacity
+func Array.reserve (values: own #[a]) -> (additional: U32): #[a] =>
+  return @storage.reserve values additional
+func Array.extend (values: own #[a]) -> (more: #[a]): #[a] =>
+  return @storage.extend values more
+func Array.extend_view (values: own #[a]) -> (more: &[a]): #[a] =>
+  return @storage.extend values more
+func Array.push (values: own #[a]) -> (value: a): #[a] =>
+  return @storage.push values value
+func Array.truncate (values: own #[a]) -> (count: U32): #[a] =>
+  @storage.truncate values count
+  return values
+func Array.pop (values: own #[a]): (#[a], a) =>
+  let value = @storage.pop values
+  return (values, value)
+// `values.copy` is independent storage with the same elements.
+func Array.copy (values: #[a]): #[a] => @storage.copy values
+func Array.view (values: #[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
+func View.view (values: &[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
+
+// Packed sequential arrays (`%[T]`): dense, non-indexable iteration storage.
+func Packed.length (values: %[a]): U32 => @storage.length values
+func Packed.is_empty (values: %[a]): Bool => Packed.length values == 0
+func Packed.with_capacity (capacity: U32): %[a] => @storage.with_capacity capacity
+func Packed.reserve (values: own %[a]) -> (additional: U32): %[a] =>
+  return @storage.reserve values additional
+func Packed.push (values: own %[a]) -> (value: a): %[a] =>
+  return @storage.push values value
+func Packed.pop (values: own %[a]): (%[a], a) =>
+  let value = @storage.pop values
+  return (values, value)
+func Packed.extend (values: own %[a]) -> (more: %[a]): %[a] =>
+  return @storage.extend values more
+func Packed.extend_array (values: own %[a]) -> (more: #[a]): %[a] =>
+  return @storage.extend values more
+func Packed.extend_view (values: own %[a]) -> (more: &[a]): %[a] =>
+  return @storage.extend values more
+func Packed.copy (values: %[a]): %[a] => @storage.copy values
+func Packed.concat (left: %[a]) -> (right: %[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (U32.add (Packed.length left) (Packed.length right))
+  out := @storage.extend out left
+  return @storage.extend out right
+func Packed.to_array (values: %[a]): #[a] =>
+  let out: #[a] = @storage.with_capacity (Packed.length values)
+  return @storage.extend out values
+func Packed.from_array (values: #[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (Array.length values)
+  return @storage.extend out values
+func Array.to_packed (values: #[a]): %[a] => Packed.from_array values
+func Array.from_packed (values: %[a]): #[a] => Packed.to_array values
+func Array.extend_packed (values: own #[a]) -> (more: %[a]): #[a] =>
+  return @storage.extend values more
+
+// Reversible generative sequences (`~[T]` / `Seq T`): 16-way SIMD-RRB tree
+// with readable inline focus gap, packed leaves (split-stream sums, SoA records),
+// zero-copy frozen spans, O(1) generative repeat/ramp, O(1) reverse/copy/freeze,
+// and O(log_16 m) split/concat/slice.
+func Seq.length (values: ~[a]): U32 => @storage.length values
+func Seq.is_empty (values: ~[a]): Bool => Seq.length values == 0
+func Seq.get (values: ~[a]) -> (index: U32): Maybe a =>
+  if index < Seq.length values:
+    return $Some (@storage.read values index)
+  return $Nothing
+func Seq.with_capacity (capacity: U32): ~[a] => @storage.with_capacity capacity
+func Seq.reserve (values: own ~[a]) -> (additional: U32): ~[a] =>
+  return @storage.reserve values additional
+func Seq.push (values: own ~[a]) -> (value: a): ~[a] =>
+  return @storage.push values value
+func Seq.pop (values: own ~[a]): (~[a], a) =>
+  let value = @storage.pop values
+  return (values, value)
+func Seq.push_front (values: own ~[a]) -> (value: a): ~[a] =>
+  return @storage.push_front values value
+func Seq.pop_front (values: own ~[a]): (~[a], a) =>
+  let value = @storage.pop_front values
+  return (values, value)
+func Seq.insert (values: own ~[a]) -> (index: U32) -> (value: a): ~[a] =>
+  return @storage.insert values index value
+func Seq.remove (values: own ~[a]) -> (index: U32): (~[a], a) =>
+  let value = @storage.remove values index
+  return (values, value)
+func Seq.reverse (values: ~[a]): ~[a] => @storage.reverse values
+func Seq.split (values: ~[a]) -> (index: U32): (~[a], ~[a]) =>
+  return @storage.split values index
+func Seq.concat (left: ~[a]) -> (right: ~[a]): ~[a] =>
+  return @storage.concat left right
+func Seq.slice (values: ~[a]) -> (start: U32) -> (end: U32): ~[a] =>
+  return @storage.slice values start end
+func Seq.reverse_range (values: ~[a]) -> (start: U32) -> (end: U32): ~[a] =>
+  let (left, rest) = @storage.split values start
+  let (mid, right) = @storage.split rest (U32.sub end start)
+  return @storage.concat (@storage.concat left (@storage.reverse mid)) right
+func Seq.repeat (count: U32) -> (value: a): ~[a] =>
+  return @storage.repeat count value
+func Seq.ramp (start: U32) -> (step: U32) -> (count: U32): ~[U32] =>
+  return @storage.ramp start step count
+func Seq.from_frozen_array (values: *#[a]): ~[a] =>
+  return @storage.from_frozen values
+func Seq.copy (values: ~[a]): ~[a] => @storage.copy values
+func Seq.extend (values: own ~[a]) -> (more: ~[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_array (values: own ~[a]) -> (more: #[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_packed (values: own ~[a]) -> (more: %[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.extend_view (values: own ~[a]) -> (more: &[a]): ~[a] =>
+  return @storage.extend values more
+func Seq.to_array (values: ~[a]): #[a] =>
+  let out: #[a] = @storage.with_capacity (Seq.length values)
+  return @storage.extend out values
+func Seq.from_array (values: #[a]): ~[a] =>
+  let out: ~[a] = @storage.with_capacity (Array.length values)
+  return @storage.extend out values
+func Seq.to_packed (values: ~[a]): %[a] =>
+  let out: %[a] = @storage.with_capacity (Seq.length values)
+  return @storage.extend out values
+func Seq.from_packed (values: %[a]): ~[a] =>
+  let out: ~[a] = @storage.with_capacity (Packed.length values)
+  return @storage.extend out values
+func Array.to_seq (values: #[a]): ~[a] => Seq.from_array values
+func Array.from_seq (values: ~[a]): #[a] => Seq.to_array values
+func Array.extend_seq (values: own #[a]) -> (more: ~[a]): #[a] =>
+  return @storage.extend values more
+func Packed.to_seq (values: %[a]): ~[a] => Seq.from_packed values
+func Packed.from_seq (values: ~[a]): %[a] => Seq.to_packed values
+func Packed.extend_seq (values: own %[a]) -> (more: ~[a]): %[a] =>
+  return @storage.extend values more
+
+func U8.from value : U8 => value.to_u8
+const U8.add = @u8.add
+const U8.sub = @u8.sub
+const U8.mul = @u8.mul
+const U8.div = @u8.div
+const U8.rem = @u8.rem
+const U8.eq = @u8.eq
+const U8.ne = @u8.ne
+const U8.lt = @u8.lt
+const U8.le = @u8.le
+const U8.gt = @u8.gt
+const U8.ge = @u8.ge
+const U8.bit_and = @u8.bit_and
+const U8.bit_or = @u8.bit_or
+const U8.bit_xor = @u8.bit_xor
+const U8.bit_not = @u8.bit_not
+const U8.shl = @u8.shl
+const U8.shr = @u8.shr
+const U8.abs = @u8.abs
+const U8.to_u8 = @u8.to_u8
+const U8.to_u32 = @u8.to_u32
+const U8.to_i32 = @u8.to_i32
+const U8.to_u64 = @u8.to_u64
+const U8.to_i64 = @u8.to_i64
+const U8.to_f32 = @u8.to_f32
+const U8.to_f64 = @u8.to_f64
+
+const U32.to_u8 = @u32.to_u8
+const U32.to_i32 = @u32.to_i32
+const U32.to_u64 = @u32.to_u64
+const U32.to_i64 = @u32.to_i64
+const U32.to_f64 = @u32.to_f64
+
+func I32.from value : I32 => value.to_i32
+const I32.add = @i32.add
+const I32.sub = @i32.sub
+const I32.mul = @i32.mul
+const I32.div = @i32.div
+const I32.rem = @i32.rem
+const I32.eq = @i32.eq
+const I32.ne = @i32.ne
+const I32.lt = @i32.lt
+const I32.le = @i32.le
+const I32.gt = @i32.gt
+const I32.ge = @i32.ge
+const I32.bit_and = @i32.bit_and
+const I32.bit_or = @i32.bit_or
+const I32.bit_xor = @i32.bit_xor
+const I32.bit_not = @i32.bit_not
+const I32.shl = @i32.shl
+const I32.shr = @i32.shr
+const I32.neg = @i32.neg
+const I32.abs = @i32.abs
+const I32.to_u8 = @i32.to_u8
+const I32.to_u32 = @i32.to_u32
+const I32.to_i32 = @i32.to_i32
+const I32.to_u64 = @i32.to_u64
+const I32.to_i64 = @i32.to_i64
+const I32.to_f32 = @i32.to_f32
+const I32.to_f64 = @i32.to_f64
+
+func U64.from value : U64 => value.to_u64
+const U64.add = @u64.add
+const U64.sub = @u64.sub
+const U64.mul = @u64.mul
+const U64.mul_wide = @u64.mul_wide
+const U64.div = @u64.div
+const U64.rem = @u64.rem
+const U64.eq = @u64.eq
+const U64.ne = @u64.ne
+const U64.lt = @u64.lt
+const U64.le = @u64.le
+const U64.gt = @u64.gt
+const U64.ge = @u64.ge
+const U64.bit_and = @u64.bit_and
+const U64.bit_or = @u64.bit_or
+const U64.bit_xor = @u64.bit_xor
+const U64.bit_not = @u64.bit_not
+const U64.shl = @u64.shl
+const U64.shr = @u64.shr
+const U64.abs = @u64.abs
+const U64.to_u8 = @u64.to_u8
+const U64.to_u32 = @u64.to_u32
+const U64.to_i32 = @u64.to_i32
+const U64.to_u64 = @u64.to_u64
+const U64.to_i64 = @u64.to_i64
+const U64.to_f32 = @u64.to_f32
+const U64.to_f64 = @u64.to_f64
+
+func I64.from value : I64 => value.to_i64
+const I64.add = @i64.add
+const I64.sub = @i64.sub
+const I64.mul = @i64.mul
+const I64.div = @i64.div
+const I64.rem = @i64.rem
+const I64.eq = @i64.eq
+const I64.ne = @i64.ne
+const I64.lt = @i64.lt
+const I64.le = @i64.le
+const I64.gt = @i64.gt
+const I64.ge = @i64.ge
+const I64.bit_and = @i64.bit_and
+const I64.bit_or = @i64.bit_or
+const I64.bit_xor = @i64.bit_xor
+const I64.bit_not = @i64.bit_not
+const I64.shl = @i64.shl
+const I64.shr = @i64.shr
+const I64.neg = @i64.neg
+const I64.abs = @i64.abs
+const I64.to_u8 = @i64.to_u8
+const I64.to_u32 = @i64.to_u32
+const I64.to_i32 = @i64.to_i32
+const I64.to_u64 = @i64.to_u64
+const I64.to_i64 = @i64.to_i64
+const I64.to_f32 = @i64.to_f32
+const I64.to_f64 = @i64.to_f64
+
+const F32.to_bits = @f32.to_bits
+const F32.from_bits = @f32.from_bits
+const F32.to_u8 = @f32.to_u8
+const F32.to_i32 = @f32.to_i32
+const F32.to_u64 = @f32.to_u64
+const F32.to_i64 = @f32.to_i64
+const F32.to_f64 = @f32.to_f64
+
+func F64.from value : F64 => value.to_f64
+const F64.to_bits = @f64.to_bits
+const F64.from_bits = @f64.from_bits
+const F64.add = @f64.add
+const F64.sub = @f64.sub
+const F64.mul = @f64.mul
+const F64.div = @f64.div
+const F64.eq = @f64.eq
+const F64.ne = @f64.ne
+const F64.lt = @f64.lt
+const F64.le = @f64.le
+const F64.gt = @f64.gt
+const F64.ge = @f64.ge
+const F64.neg = @f64.neg
+const F64.abs = @f64.abs
+const F64.sqrt = @f64.sqrt
+const F64.floor = @f64.floor
+const F64.ceil = @f64.ceil
+const F64.trunc = @f64.trunc
+const F64.min = @f64.min
+const F64.max = @f64.max
+func F64.clamp (low: F64) -> (high: F64) -> (value: F64): F64 => F64.min high (F64.max low value)
+func F64.lerp (left: F64) -> (right: F64) -> (weight: F64): F64 => F64.add left (F64.mul (F64.sub right left) weight)
+func F64.square (value: F64): F64 => F64.mul value value
+func F64.is_finite (value: F64): Bool => F64.le (F64.abs value) 1.7976931348623157e308
+
+// Split 2*pi range reduction keeps F64 trig accurate for |radians| <= 1e6.
+private func f64_reduced_radians (value: F64): F64 =>
+  if F64.gt (F64.abs value) 1000000.0:
+    return F64.div 0.0 0.0
+  let turns = F64.floor (F64.add (F64.mul value 0.15915494309189533576888376337251) 0.5)
+  let r1 = F64.sub value (F64.mul turns 6.28318530717958623199592693708837)
+  return F64.sub r1 (F64.mul turns 2.4492935982947063544521318645828e-16)
+
+private func f64_sin_reduced (angle: F64): F64 =>
+  let half_pi: F64 = 1.57079632679489661923132169163975
+  let pi_hi: F64 = 3.14159265358979311599796346854419
+  let pi_lo: F64 = 1.224646799147353177226065932275e-16
+  let x = if F64.gt angle half_pi then F64.add (F64.sub pi_hi angle) pi_lo
+    else if F64.lt angle (F64.neg half_pi) then F64.sub (F64.sub (F64.neg pi_hi) angle) pi_lo
+    else angle
+  let s = F64.square x
+  let p = F64.add (-2.8114572543455208e-15) (F64.mul s 8.22063524662433e-18)
+  let p = F64.add (-1.6059043836821615e-10) (F64.mul s (F64.add 7.6471637318198165e-13 (F64.mul s p)))
+  let p = F64.add 2.5052108385441720e-8 (F64.mul s p)
+  let p = F64.add (-2.7557319223985893e-6) (F64.mul s p)
+  let p = F64.add 1.9841269841269841e-4 (F64.mul s p)
+  let p = F64.add (-8.3333333333333332e-3) (F64.mul s p)
+  let p = F64.add 1.6666666666666666e-1 (F64.mul s p)
+  return F64.sub x (F64.mul x (F64.mul s p))
+
+private func f64_cos_reduced (value: F64): F64 =>
+  let half_pi: F64 = 1.57079632679489661923132169163975
+  let pi_hi: F64 = 3.14159265358979311599796346854419
+  let pi_lo: F64 = 1.224646799147353177226065932275e-16
+  let angle = F64.abs value
+  let outside = F64.gt angle half_pi
+  let x = if outside then F64.add (F64.sub pi_hi angle) pi_lo else angle
+  let s = F64.square x
+  let p = F64.add 4.7794773323873853e-14 (F64.mul s (-1.5619206968586226e-16))
+  let p = F64.add (-1.1470745597729725e-11) (F64.mul s p)
+  let p = F64.add 2.0876756987868099e-9 (F64.mul s p)
+  let p = F64.add (-2.7557319223985893e-7) (F64.mul s p)
+  let p = F64.add 2.4801587301587302e-5 (F64.mul s p)
+  let p = F64.add (-1.3888888888888889e-3) (F64.mul s p)
+  let p = F64.add 4.1666666666666664e-2 (F64.mul s p)
+  let p = F64.add (-0.5) (F64.mul s p)
+  let res = F64.add 1.0 (F64.mul s p)
+  return if outside then F64.neg res else res
+
+func F64.sin (value: F64): F64 => f64_sin_reduced (f64_reduced_radians value)
+func F64.cos (value: F64): F64 => f64_cos_reduced (f64_reduced_radians value)
+func F64.sin_cos (value: F64): (F64, F64) =>
+  let angle = f64_reduced_radians value
+  return (f64_sin_reduced angle, f64_cos_reduced angle)
+func F64.tan (value: F64): F64 =>
+  let angle = f64_reduced_radians value
+  return F64.div (f64_sin_reduced angle) (f64_cos_reduced angle)
+const F64.to_u8 = @f64.to_u8
+const F64.to_u32 = @f64.to_u32
+const F64.to_i32 = @f64.to_i32
+const F64.to_u64 = @f64.to_u64
+const F64.to_i64 = @f64.to_i64
+const F64.to_f32 = @f64.to_f32
+const F64.to_f64 = @f64.to_f64
+
+// Dense arrays use the element's storage layout.
+func Array.create (count: U32) -> value => @array.fill count value
+func Array.clone (values: #[a]): #[a] => @storage.copy values
+func Array.slice (values: #[a]) -> (start: U32) -> (count: U32): #[a] =>
+  @array.slice values start count
+func Array.concat (left: #[a]) -> (right: #[a]): #[a] =>
+  @array.concat left right

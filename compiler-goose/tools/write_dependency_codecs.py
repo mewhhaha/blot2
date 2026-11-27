@@ -5,14 +5,14 @@ import re,json,sys
 REPO=Path(__file__).resolve().parents[2]
 GOOSE=REPO/'compiler-goose/src'
 OWNER_DISPATCH='''// Decode storage belongs to the concrete caller's allocation journal.
-fn allocateDecoded<T>(owner:Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_format::alloc<T>(owner,length);}
-fn allocateDecoded<T>(owner:blot_reuse_dependency_payload::Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_payload::alloc<T>(owner,length);}
+fn allocateDecoded<T>(owner:Owner&,length:i64)->T[:],Error {return squid_reuse_dependency_format::alloc<T>(owner,length);}
+fn allocateDecoded<T>(owner:squid_reuse_dependency_payload::Owner&,length:i64)->T[:],Error {return squid_reuse_dependency_payload::alloc<T>(owner,length);}
 '''
 if sys.argv[1:]==['--repair-owner-dispatch']:
  # Preserve later syntax/semantic repairs when updating this generator frontier.
  path=GOOSE/'reuse/dependency_format_codecs.goose'
  source=path.read_text()
- source,count=re.subn(r'blot_reuse_dependency_format::alloc<([^;]+?)>\(reader\.owner,([^;]*?)\)',r'allocateDecoded<\1>(reader.owner,\2)',source)
+ source,count=re.subn(r'squid_reuse_dependency_format::alloc<([^;]+?)>\(reader\.owner,([^;]*?)\)',r'allocateDecoded<\1>(reader.owner,\2)',source)
  source,receiver_count=re.subn(r'reader\.owner\.alloc<([^;]+?)>\(([^;]*?)\)',r'allocateDecoded<\1>(reader.owner,\2)',source)
  count+=receiver_count
  if not count and OWNER_DISPATCH not in source:raise SystemExit('no decoder allocation sites found')
@@ -112,17 +112,17 @@ def scalar_bounds(p):
  bits=int(p[1:]);return ((0,(1<<bits)-1) if p[0]=='u' else (-(1<<(bits-1)),(1<<(bits-1))-1))
 imports={'support.error','support.option','support.native','support.blake3','reuse.dependency_format','reuse.dependency_payload','check.core','check.types'}
 for d in ORDER:
- for namespace in re.findall(r'\b(blot_\w+)::',actual(d)):
+ for namespace in re.findall(r'\b(squid_\w+)::',actual(d)):
   if namespace in GF:imports.add(GF[namespace])
 # The port's spelling: qualified errors, varint_, unqualified match patterns.
 SYNTAX_TYPES={'T','bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
 for path in GOOSE.rglob('*.goose'):SYNTAX_TYPES.update(re.findall(r'\b(?:struct|enum|type)\s+(\w+)',path.read_text()))
 def port_syntax(text):return finish_syntax(normalize(text,SYNTAX_TYPES))
-lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n',OWNER_DISPATCH]
+lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace squid_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n',OWNER_DISPATCH]
 for d in ORDER:
  t=actual(d);name=proc(d);kind=d['kind']
  # The schema's spelling is independent of Goose public/private owner fields.
- lines.append(f'fn describe_{name}(hasher:blot_support_blake3::State&,value:{t}) {{hasher.update({q(d["name"])});hasher.update([0]);')
+ lines.append(f'fn describe_{name}(hasher:squid_support_blake3::State&,value:{t}) {{hasher.update({q(d["name"])});hasher.update([0]);')
  if kind=='struct':
   for field,child,target in d['fields']:lines.append(f'hasher.update({q(field)});hasher.update([0]);describe_{proc(child)}(hasher,default<{actual(child)}>());')
  elif kind in ('array','slice','optional'):lines.append(f'describe_{proc(d["children"][0])}(hasher,default<{actual(d["children"][0])}>());')
@@ -138,7 +138,7 @@ for d in ORDER:
   p=d['primitive']
   if p=='void':lines.append('return Error.none;')
   elif p=='bool':lines.append('var bit:u64=0;if value {bit=1;}return writer.integer(bit,1);')
-  elif p in ('f32','f64'):lines.append(f'return writer.integer(blot_native::{p}_bits(value) as u64,{int(p[1:])//8});')
+  elif p in ('f32','f64'):lines.append(f'return writer.integer(squid_native::{p}_bits(value) as u64,{int(p[1:])//8});')
   else:
    lo,hi=scalar_bounds(p);bits=int(p[1:]) if p not in ('usize','isize') else 64
    if p=='usize':lines.append('if value<0 {return Error.artifact_limit;}')
@@ -186,7 +186,7 @@ for d in ORDER:
   p=d['primitive']
   if p=='void':lines.append('return Void{},Error.none;')
   elif p=='bool':lines.append('let bits,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if bits>1 {'+error_return(d,'Error.invalid_artifact')+'}return bits!=0,Error.none;')
-  elif p in ('f32','f64'):lines.append(f'let bits,error=reader.integer({int(p[1:])//8});if error!=Error.none {{{error_return(d)}}}return blot_native::{p}_from_bits(bits as '+('u32' if p=='f32' else 'u64')+'),Error.none;')
+  elif p in ('f32','f64'):lines.append(f'let bits,error=reader.integer({int(p[1:])//8});if error!=Error.none {{{error_return(d)}}}return squid_native::{p}_from_bits(bits as '+('u32' if p=='f32' else 'u64')+'),Error.none;')
   else:
    bits=int(p[1:]) if p not in ('usize','isize') else 64;lo,hi=scalar_bounds(p);raw='reader.integer(1)' if bits<=8 else 'reader.varint()'
    lines.append(f'let bits,error={raw};if error!=Error.none {{{error_return(d)}}}')
@@ -209,7 +209,7 @@ for d in ORDER:
   for field,child,target in d['fields']:
    code=step(d,f'read_{proc(child)}(reader,level+1)','result.'+target)
    lines.append(code)
-  if t in G and G[t][0]=='struct' and 'owner_id' in dict(G[t][1]):lines.append('result.owner_id=blot_native::fresh_owner_id();')
+  if t in G and G[t][0]=='struct' and 'owner_id' in dict(G[t][1]):lines.append('result.owner_id=squid_native::fresh_owner_id();')
   lines.append('return result,Error.none;')
  elif kind=='array':
   child=d['children'][0];lines.append(f'var result=default<{t}>();for index in 0..{d["count"]} '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]')+'return result,Error.none;')
@@ -221,7 +221,7 @@ for d in ORDER:
   else:lines.append('for index in 0..count as i64 '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]'))
   lines.append('return result,Error.none;')
  elif kind=='optional':
-  child=d['children'][0];option_type=t[len('blot_support::Option<'):-1];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return blot_support::none<'+option_type+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return blot_support::Option<'+option_type+'>{true,value},Error.none;')
+  child=d['children'][0];option_type=t[len('squid_support::Option<'):-1];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return squid_support::none<'+option_type+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return squid_support::Option<'+option_type+'>{true,value},Error.none;')
  elif kind=='union':
   lines.append('let error=reader.depth(level+1);if error!=Error.none {'+error_return(d)+'}let tag,error=reader.varint();if error!=Error.none {'+error_return(d)+'}')
   for field,ordinal,target,child,fs in d['variants']:
@@ -239,7 +239,7 @@ for d in ROOTS:
  seen_roots.add(t);name=proc(d)
  lines.append(f'fn writeValue(writer:Encoder&,value:{t},level:i64)->Error {{return write_{name}(writer,value,level);}}\n')
  lines.append(f'fn readValue<O>(reader:Decoder<O>&,witness:{t},level:i64)->{t},Error {{return read_{name}(reader,level);}}\n')
- lines.append(f'fn describe(hasher:blot_support_blake3::State&,value:{t}) {{describe_{name}(hasher,value);}}\n')
+ lines.append(f'fn describe(hasher:squid_support_blake3::State&,value:{t}) {{describe_{name}(hasher,value);}}\n')
 (GOOSE/'reuse/dependency_format_codecs.goose').write_text(''.join(lines))
 # Decode allocation journal: one finite ADT and reusable typed pool per actual
 # Goose element type. Rollback/deinit never traverse partially built records.
@@ -247,13 +247,13 @@ elements={}
 for d in ORDER:
  if d['kind']=='slice':elements.setdefault(actual(d['children'][0]),d['children'][0])
 elements.setdefault('u32',DESCS['u32'])
-owner=['// Typed archive decode runs; this owner is distinct from Payload.Owner.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]
+owner=['// Typed archive decode runs; this owner is distinct from Payload.Owner.\nnamespace squid_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]
 owner+=['struct Owner {lease:u32=0,generation:u64=0}\n','enum Run {inactive,\n']
 for t in elements:owner.append('run_'+ident(t)+'{values:'+t+'[:]},\n')
 owner+=['}\n','struct Link {run:Run=Run.inactive,next:u32=0}\n','struct Lease {head:u32=0,generation:u64=0,live:bool=false}\n','reusable var links:Link[>..]=[];\n','reusable var owners:Lease[>..]=[];\n']
 for t in elements:owner.append('reusable[] var pool_'+ident(t)+':'+t+'[>..]=[];\n')
 owner.append('''fn valid(self:const Owner&)->bool {return self.lease!=0 && self.lease-1<owners.len && owners[self.lease-1].live && owners[self.lease-1].generation==self.generation;}
-fn initOwner()->Owner,Error {if owners.len>=0xffffffff {return Owner{},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=owners.alloc_index(Lease{generation:generation,live:true});return Owner{(at+1) as u32,generation},Error.none;}
+fn initOwner()->Owner,Error {if owners.len>=0xffffffff {return Owner{},Error.out_of_memory;}let generation=squid_native::fresh_owner_id();let at=owners.alloc_index(Lease{generation:generation,live:true});return Owner{(at+1) as u32,generation},Error.none;}
 fn remember(self:Owner&,run:Run)->Error {assert(self.valid());if links.len>=0xffffffff {return Error.out_of_memory;}let at=links.alloc_index(Link{run,owners[self.lease-1].head});owners[self.lease-1].head=(at+1) as u32;return Error.none;}
 fn mark(self:const Owner&)->u32 {assert(self.valid());return owners[self.lease-1].head;}
 fn freeRun(run:Run) {match run {Run.inactive=>{},
@@ -266,7 +266,7 @@ fn alloc<T>(self:Owner&,length:i64)->T[:],Error {return allocate(self,default<T>
 ''')
 for t in elements:
  tag=ident(t);owner.append(f'''fn allocate(self:Owner&,witness:{t},length:i64)->{t}[:],Error {{assert(self.valid());if length<0 {{return [],Error.artifact_limit;}}if length==0 {{return [],Error.none;}}let values=pool_{tag}.alloc_slice(length);let error=self.remember(Run.run_{tag}{{values}});if error!=Error.none {{pool_{tag}.free_slice(values);return [],error;}}return values,Error.none;}}
-fn mutable(self:const Owner&,values:const {t}[:])->{t}[:] {{assert(self.valid());if values.len==0 {{return [];}}var link=owners[self.lease-1].head;while link!=0 {{let entry=links[link-1];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}link=entry.next;}}abort("archive slice is outside its owner");}}
+fn mutable(self:const Owner&,values:const {t}[:])->{t}[:] {{assert(self.valid());if values.len==0 {{return [];}}var link=owners[self.lease-1].head;while link!=0 {{let entry=links[link-1];match entry.run {{Run.run_{tag} run=>{{if squid_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}link=entry.next;}}abort("archive slice is outside its owner");}}
 ''')
 def owner_syntax(text):
  # Receivers are `self_` in the port, and an empty typed slice is spelled out.
@@ -309,7 +309,7 @@ with (GOOSE/'reuse/dependency_format_codecs.goose').open('a') as file:file.write
 (GOOSE/'reuse/dependency_format_codecs.goose').write_text(port_syntax((GOOSE/'reuse/dependency_format_codecs.goose').read_text()))
 release_owner=[]
 for t in elements:
- tag=ident(t);release_owner.append(f'''fn releaseSlice(self:Owner&,values:const {t}[:]) {{assert(self.valid());if values.len==0 {{return;}}var previous:u32=0;var link=owners[self.lease-1].head;while link!=0 {{let at=link-1;let entry=links[at];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{if previous==0 {{owners[self.lease-1].head=entry.next;}}else {{links[previous-1].next=entry.next;}}freeRun(entry.run);links[at]=Link{{}};links.free(at);return;}}}},_=>{{}}}}previous=link;link=entry.next;}}abort("partial field cleanup requires its exact archive owner");}}
+ tag=ident(t);release_owner.append(f'''fn releaseSlice(self:Owner&,values:const {t}[:]) {{assert(self.valid());if values.len==0 {{return;}}var previous:u32=0;var link=owners[self.lease-1].head;while link!=0 {{let at=link-1;let entry=links[at];match entry.run {{Run.run_{tag} run=>{{if squid_support::same_slice_identity(run.values,values) {{if previous==0 {{owners[self.lease-1].head=entry.next;}}else {{links[previous-1].next=entry.next;}}freeRun(entry.run);links[at]=Link{{}};links.free(at);return;}}}},_=>{{}}}}previous=link;link=entry.next;}}abort("partial field cleanup requires its exact archive owner");}}
 ''')
 with (GOOSE/'reuse/dependency_format_owners.goose').open('a') as file:file.write(''.join(release_owner))
 (GOOSE/'reuse/dependency_format_owners.goose').write_text(owner_syntax((GOOSE/'reuse/dependency_format_owners.goose').read_text()))

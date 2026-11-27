@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = (seed: number) => `
 const a = func value => return @u32.add value ${seed}
 const b = func value => return @u32.add value 2
@@ -16,8 +16,8 @@ io const recursive: U32 -> U32 = func value => return even value
 `;
 
 Deno.test("private semantic workers preserve fresh retained edited Wasm and failed source diagnostics", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-semantic-jobs-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-semantic-jobs-" });
+  const entry = `${directory}/main.sq`;
   try {
     const options = {
       executable,
@@ -100,7 +100,7 @@ Deno.test("private semantic worker counts reject invalid options before spawning
     await assert.rejects(
       createZigProjectCompiler({
         executable: "/missing-compiler",
-        entry: "/main.blot",
+        entry: "/main.sq",
         semanticWorkers,
       }),
       /semanticWorkers must be an integer in 1\.\.16/,
@@ -109,8 +109,8 @@ Deno.test("private semantic worker counts reject invalid options before spawning
 });
 
 Deno.test("semantic worker profiling does not change Wasm", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-worker-profile-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-worker-profile-" });
+  const entry = `${directory}/main.sq`;
   try {
     const outputs = [];
     for (const profileBackend of [false, true]) {

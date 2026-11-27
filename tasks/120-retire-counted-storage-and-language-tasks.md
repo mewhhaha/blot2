@@ -19,7 +19,7 @@ files only after previous owners hand them off. Inventory candidates include
 `runtime/{shared_rc,cycles_runtime,root_runtime,session_heap,public_owners,
 runtime_cleanup,region_runtime,cohort_runtime,list_runtime}.zig`,
 task ABI/context/ safepoint modules, guest task wiring, and Pen
-`crates/blot-host/src/tasks.rs`. These are candidates for dependency review, not
+`crates/squid-host/src/tasks.rs`. These are candidates for dependency review, not
 an instruction to delete whole shared modules blindly. Preserve reusable IR,
 typechecking and host-compiler allocation machinery.
 
@@ -48,7 +48,7 @@ typechecking and host-compiler allocation machinery.
       delete unrelated failures to obtain a passing inventory.
 - [ ] Update grammar/formatter/stdlib/guide and contract documents to the final
       admitted profile. Replace active old memory/concurrency claims across
-      Blot, Pen, Ink and Gdev. Keep clearly labeled historical evidence and
+      Squid, Pen, Ink and Gdev. Keep clearly labeled historical evidence and
       source hashes.
 - [ ] Ensure compiler/cache/host ABI versions cannot accept artifacts built for
       the removed runtime. Update schemas/templates, then regenerate bindings.
@@ -74,7 +74,7 @@ model, including scalar-only programs, and a new ABI 8 data-stack profile.
 Copied packet allocation/reset remains; counted roots, public owner adapters,
 resources and task extensions do not belong to that profile. The TypeScript
 guest must stop treating every version above 2 as counted-root ownership. Pen's
-shared reader is `crates/pen-runtime/src/abi.rs`, reexported by `blot-host`;
+shared reader is `crates/pen-runtime/src/abi.rs`, reexported by `squid-host`;
 update it for native and browser hosts together. Native packaged metadata also
 needs a version bump so old binaries require repackaging. Preserve workers,
 worker sessions, copied queues and Foreign/JSPI. Preserve compiler session

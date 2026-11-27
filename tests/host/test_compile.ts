@@ -5,10 +5,10 @@ export async function compile(
   source: string,
 ): Promise<{ bytes: Uint8Array<ArrayBuffer> }> {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
     prelude: null,
   });

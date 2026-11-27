@@ -14,7 +14,7 @@
 - **Originating requirements:** PLAN: Hill 17 follow-up / first remote analyzer
   run. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -46,7 +46,7 @@ baseline.
 ## Validation
 
 Apply the relevant
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 rules. Use formatting, link, consistency and evidence checks for
 documentation-only changes; run code gates only when code or build inputs
 change.
@@ -101,7 +101,7 @@ change.
   zero findings across all 486 source files and the fixture module over
   `23a934f`; the only source change since then is the `2b2ffbb` contract fix.
 - Remote observation (read-only, 15 October 2026): the latest successful
-  [run 37935729382](https://github.com/mewhhaha/blot2/actions/runs/37935729382)
+  [run 37935729382](https://github.com/mewhhaha/squid-lang/actions/runs/37935729382)
   at `65dccda29d56d4eaf6d23ff81ca05f1720824d23` used workflow SHA-256
   `1e53d90913450bbb9b4bd46a502fcb8ecc972172cac10555588138b806b1803b`, which
   differs from the local

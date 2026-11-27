@@ -47,7 +47,7 @@ async function check(
       `${source}:${diagnostic.start}: ${diagnostic.code}: ${diagnostic.message}`,
     );
   }
-  throw new Error(new TextDecoder().decode(run.stderr) || "Blot check failed");
+  throw new Error(new TextDecoder().decode(run.stderr) || "Squid check failed");
 }
 
 /** Render source from declaration text and explicit derivation metadata. */
@@ -122,7 +122,7 @@ export async function deriveFile(options: {
 }): Promise<void> {
   const { source, output, schema, compiler, stdRoot, prelude } = options;
   if (dirname(source) !== dirname(output) || source === output) {
-    throw new Error("Output must be a different .blot file beside the source");
+    throw new Error("Output must be a different .sq file beside the source");
   }
   await check(compiler, source, stdRoot, prelude);
   const text = await Deno.readTextFile(source);
@@ -133,7 +133,7 @@ export async function deriveFile(options: {
   const temporary = await Deno.makeTempFile({
     dir: dirname(output),
     prefix: ".derive-",
-    suffix: ".blot",
+    suffix: ".sq",
   });
   try {
     await Deno.writeTextFile(temporary, contents);
@@ -155,13 +155,13 @@ if (import.meta.main) {
       source: option("--source"),
       output: option("--output"),
       schema: option("--schema"),
-      compiler: option("--blotc"),
+      compiler: option("--squidc"),
       stdRoot: Deno.args.includes("--std-root")
         ? option("--std-root")
         : `${root}/std`,
       prelude: Deno.args.includes("--prelude")
         ? option("--prelude")
-        : `${root}/std/prelude.blot`,
+        : `${root}/std/prelude.sq`,
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

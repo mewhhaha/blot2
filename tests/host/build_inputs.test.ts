@@ -2,11 +2,11 @@ import { strict as assert } from "node:assert";
 import { createCompiler, instantiateGuest } from "../../mod.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 Deno.test("a staged asset catalog reads only the selected files and rolls back a missing input", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
-  const select = dir + "/select.blot";
+  const entry = dir + "/main.sq";
+  const select = dir + "/select.sq";
   const names = ["light", "dark"];
   const compiler = await createCompiler({
     entry,
@@ -88,8 +88,8 @@ io lookup (i: U32): U32 => return (#run (make_lookup ())) i
       (read) => read.filename,
     );
     assert(files.includes(select));
-    assert(files.includes(dir + "/light.blot"));
-    assert(!files.includes(dir + "/dark.blot"));
+    assert(files.includes(dir + "/light.sq"));
+    assert(!files.includes(dir + "/dark.sq"));
     const edited = await verify(false, "bb", null);
     assert.equal(edited.stats.reusedStagedWasm, false);
     assert.notDeepEqual(edited.bytes, first.bytes);
@@ -108,7 +108,7 @@ io lookup (i: U32): U32 => return (#run (make_lookup ())) i
 
 Deno.test("a file can choose the next input and a rejected branch preserves the last receipt", async () => {
   const dir = await Deno.makeTempDir();
-  const entry = dir + "/main.blot";
+  const entry = dir + "/main.sq";
   const paths = ["mode", "left", "right"];
   const c = await createCompiler({
     entry,

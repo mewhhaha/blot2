@@ -11,7 +11,7 @@ that admit an in-process previous revision. This record follows
 ## The persisted owner
 
 [semantic_archive.zig](../../compiler/src/reuse/semantic_archive.zig) encodes, under settings
-key `blot-semantic-archive-v1`, a section of claim `selected_complete_proof`
+key `squid-semantic-archive-v1`, a section of claim `selected_complete_proof`
 (kind `specialization`, schema 1) together with the graphs those receipts name:
 
 | Part                      | Contents                                                                                                                                                          |
@@ -92,7 +92,7 @@ every captured value and publishes atomically.
 
 - Resolver continuations bind the checker's synthetic local payload, so Core
   closures can carry a `.local` parameter binding. Frozen Core validation
-  required `.parameter`, so `blotc dependencies` failed with `InvalidArtifact`
+  required `.parameter`, so `squidc dependencies` failed with `InvalidArtifact`
   for any library containing a monadic `do`. Validation now admits `.local`
   parameter bindings; a dependency artifact with a monadic library packs, loads
   and executes.

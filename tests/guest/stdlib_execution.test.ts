@@ -159,11 +159,11 @@ io const captured = func (count: U32) => return do:
 
 Deno.test("retained collection wrapper bodies invalidate after append becomes prepend", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
+  const entry = `${directory}/main.sq`, library = `${directory}/lib.sq`;
   const options = {
     entry,
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
   };
   const compiler = await createCompiler(options);
   const declarations =

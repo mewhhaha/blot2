@@ -1,0 +1,4 @@
+name: squid
+exports:
+  .: ./std
+prelude: ./std/prelude.sq

@@ -1,7 +1,7 @@
 import { type ParseRange, type PreparedSource, SourceError } from "./syntax.ts";
 
 // Baba parses INTEGER tokens as signed I32. Neutralize just those spans while
-// leaving the original source available for CST text and Blot's U32 policy.
+// leaving the original source available for CST text and Squid's U32 policy.
 // Slices also preserve UTF-16 offsets, including astral Unicode and CRLF.
 export function parserSource(
   prepared: PreparedSource,

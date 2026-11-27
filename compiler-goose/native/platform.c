@@ -32,7 +32,7 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53,
                "the compiler requires IEEE binary64");
 
 static _Atomic uint64_t next_owner = 1;
-uint64_t blot_owner_id(void) {
+uint64_t squid_owner_id(void) {
     uint64_t current = atomic_load_explicit(&next_owner, memory_order_relaxed);
     for (;;) {
         if (current == UINT64_MAX) return 0;
@@ -40,35 +40,35 @@ uint64_t blot_owner_id(void) {
                 memory_order_relaxed, memory_order_relaxed)) return current;
     }
 }
-uint32_t blot_f32_bits(float value) { uint32_t bits; memcpy(&bits, &value, 4); return bits; }
-float blot_f32_from_bits(uint32_t bits) { float value; memcpy(&value, &bits, 4); return value; }
-uint64_t blot_f64_bits(double value) { uint64_t bits; memcpy(&bits, &value, 8); return bits; }
-double blot_f64_from_bits(uint64_t bits) { double value; memcpy(&value, &bits, 8); return value; }
-void blot_copy_u32(uint32_t *dst, const uint8_t *src, uint64_t count) {
+uint32_t squid_f32_bits(float value) { uint32_t bits; memcpy(&bits, &value, 4); return bits; }
+float squid_f32_from_bits(uint32_t bits) { float value; memcpy(&value, &bits, 4); return value; }
+uint64_t squid_f64_bits(double value) { uint64_t bits; memcpy(&bits, &value, 8); return bits; }
+double squid_f64_from_bits(uint64_t bits) { double value; memcpy(&value, &bits, 8); return value; }
+void squid_copy_u32(uint32_t *dst, const uint8_t *src, uint64_t count) {
     if (count) memcpy(dst, src, (size_t)(count * 4));
 }
-void blot_copy_u8(uint8_t *dst, const uint8_t *src, uint64_t count) {
+void squid_copy_u8(uint8_t *dst, const uint8_t *src, uint64_t count) {
     if (count) memcpy(dst, src, (size_t)count);
 }
-void blot_copy_flat(const uint8_t *dst, const uint8_t *src, uint64_t count) {
+void squid_copy_flat(const uint8_t *dst, const uint8_t *src, uint64_t count) {
     if (count) memcpy((void *)dst, src, (size_t)count);
 }
 
-int64_t blot_read(int32_t fd, uint8_t *out, uint64_t count) {
+int64_t squid_read(int32_t fd, uint8_t *out, uint64_t count) {
     if (count > SSIZE_MAX) return -EINVAL;
     ssize_t result;
     do { result = read(fd, out, (size_t)count); } while (result < 0 && errno == EINTR);
     if (result < 0) return -(int64_t)errno;
     return result;
 }
-int64_t blot_write(int32_t fd, const uint8_t *bytes, uint64_t count) {
+int64_t squid_write(int32_t fd, const uint8_t *bytes, uint64_t count) {
     if (count > SSIZE_MAX) return -EINVAL;
     ssize_t result;
     do { result = write(fd, bytes, (size_t)count); } while (result < 0 && errno == EINTR);
     if (result < 0) return -(int64_t)errno;
     return result;
 }
-int32_t blot_open_read(const uint8_t *path) {
+int32_t squid_open_read(const uint8_t *path) {
     int fd;
     do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC); } while (fd < 0 && errno == EINTR);
     if (fd < 0) return -errno;
@@ -76,7 +76,7 @@ int32_t blot_open_read(const uint8_t *path) {
 }
 /* Import discovery may look ahead of the parser. Only sample bounded regular
    files, and never wait for a pipe that the real project might not import. */
-int32_t blot_open_regular(const uint8_t *path, uint64_t maximum) {
+int32_t squid_open_regular(const uint8_t *path, uint64_t maximum) {
     int fd;
     do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY); }
     while (fd < 0 && errno == EINTR);
@@ -89,7 +89,7 @@ int32_t blot_open_regular(const uint8_t *path, uint64_t maximum) {
     }
     return fd;
 }
-int32_t blot_open_regular_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+int32_t squid_open_regular_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
     int fd;
     do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY); }
     while (fd < 0 && errno == EINTR);
@@ -104,7 +104,7 @@ int32_t blot_open_regular_sized(const uint8_t *path, uint64_t maximum, int64_t *
     memcpy(size_out, &sz, sizeof(sz));
     return fd;
 }
-int32_t blot_open_regular_nofollow_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
+int32_t squid_open_regular_nofollow_sized(const uint8_t *path, uint64_t maximum, int64_t *size_out) {
     int fd;
     do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY); }
     while (fd < 0 && errno == EINTR);
@@ -119,7 +119,7 @@ int32_t blot_open_regular_nofollow_sized(const uint8_t *path, uint64_t maximum, 
     memcpy(size_out, &sz, sizeof(sz));
     return fd;
 }
-int32_t blot_open_write(const uint8_t *path, _Bool exclusive) {
+int32_t squid_open_write(const uint8_t *path, _Bool exclusive) {
     int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
     if (exclusive) flags |= O_EXCL;
     else flags |= O_TRUNC;
@@ -128,33 +128,33 @@ int32_t blot_open_write(const uint8_t *path, _Bool exclusive) {
     if (fd < 0) return -errno;
     return fd;
 }
-int32_t blot_close(int32_t fd) { if (close(fd) < 0) return -errno; return 0; }
-int32_t blot_sync(int32_t fd) { if (fsync(fd) < 0) return -errno; return 0; }
-int64_t blot_file_size(int32_t fd) {
+int32_t squid_close(int32_t fd) { if (close(fd) < 0) return -errno; return 0; }
+int32_t squid_sync(int32_t fd) { if (fsync(fd) < 0) return -errno; return 0; }
+int64_t squid_file_size(int32_t fd) {
     struct stat info;
     if (fstat(fd, &info) < 0) return -(int64_t)errno;
     if (info.st_size < 0) return -EOVERFLOW;
     return info.st_size;
 }
-int32_t blot_rename(const uint8_t *before, const uint8_t *after) {
+int32_t squid_rename(const uint8_t *before, const uint8_t *after) {
     if (rename((const char *)before, (const char *)after) < 0) return -errno;
     return 0;
 }
-int32_t blot_remove(const uint8_t *path) { if (unlink((const char *)path) < 0) return -errno; return 0; }
-int32_t blot_mkdir(const uint8_t *path) { if (mkdir((const char *)path, 0777) < 0) return -errno; return 0; }
+int32_t squid_remove(const uint8_t *path) { if (unlink((const char *)path) < 0) return -errno; return 0; }
+int32_t squid_mkdir(const uint8_t *path) { if (mkdir((const char *)path, 0777) < 0) return -errno; return 0; }
 static uint64_t read_clock(clockid_t clock) {
     struct timespec now;
     if (clock_gettime(clock, &now) < 0) return 0;
     return (uint64_t)now.tv_sec * UINT64_C(1000000000) + (uint64_t)now.tv_nsec;
 }
-uint64_t blot_clock_ns(void) { return read_clock(CLOCK_MONOTONIC); }
-uint64_t blot_thread_cpu_ns(void) { return read_clock(CLOCK_THREAD_CPUTIME_ID); }
-uint64_t blot_thread_id(void) {
+uint64_t squid_clock_ns(void) { return read_clock(CLOCK_MONOTONIC); }
+uint64_t squid_thread_cpu_ns(void) { return read_clock(CLOCK_THREAD_CPUTIME_ID); }
+uint64_t squid_thread_id(void) {
     /* Goose workers are ordinary single-threaded process programs. Their
      * initial-thread Linux TID is their PID and stays unique across workers. */
     return (uint64_t)getpid();
 }
-uint64_t blot_peak_rss_kib(void) {
+uint64_t squid_peak_rss_kib(void) {
 #ifdef __linux__
     FILE *file = fopen("/proc/self/status", "r");
     if (!file) return 0;
@@ -172,18 +172,18 @@ uint64_t blot_peak_rss_kib(void) {
     return (uint64_t)usage.ru_maxrss;
 #endif
 }
-uint64_t blot_random_u64(void) {
+uint64_t squid_random_u64(void) {
     uint64_t value = 0;
     int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
     if (fd >= 0) {
-        int64_t count = blot_read(fd, (uint8_t *)&value, sizeof value);
-        blot_close(fd);
+        int64_t count = squid_read(fd, (uint8_t *)&value, sizeof value);
+        squid_close(fd);
         if (count == sizeof value) return value;
     }
-    return blot_clock_ns() ^ ((uint64_t)getpid() << 32) ^ blot_owner_id();
+    return squid_clock_ns() ^ ((uint64_t)getpid() << 32) ^ squid_owner_id();
 }
-uint32_t blot_process_id(void) { return (uint32_t)getpid(); }
-int64_t blot_real_path(const uint8_t *path, uint8_t *out, uint64_t capacity) {
+uint32_t squid_process_id(void) { return (uint32_t)getpid(); }
+int64_t squid_real_path(const uint8_t *path, uint8_t *out, uint64_t capacity) {
     char *resolved = realpath((const char *)path, NULL);
     if (!resolved) return -(int64_t)errno;
     size_t length = strlen(resolved);
@@ -203,40 +203,40 @@ static uint64_t scalar_load(const uint64_t *value) {
 static void scalar_store(uint64_t *value, uint64_t next) {
     memcpy(value, &next, sizeof(next));
 }
-uint64_t blot_atomic_add(uint64_t *value, uint64_t amount) {
+uint64_t squid_atomic_add(uint64_t *value, uint64_t amount) {
     pthread_mutex_lock(&scalar_atomic_lock);
     uint64_t before = scalar_load(value);
     scalar_store(value, before + amount);
     pthread_mutex_unlock(&scalar_atomic_lock);
     return before;
 }
-uint64_t blot_atomic_sub(uint64_t *value, uint64_t amount) {
+uint64_t squid_atomic_sub(uint64_t *value, uint64_t amount) {
     pthread_mutex_lock(&scalar_atomic_lock);
     uint64_t before = scalar_load(value);
     scalar_store(value, before - amount);
     pthread_mutex_unlock(&scalar_atomic_lock);
     return before;
 }
-uint64_t blot_atomic_max(uint64_t *value, uint64_t candidate) {
+uint64_t squid_atomic_max(uint64_t *value, uint64_t candidate) {
     pthread_mutex_lock(&scalar_atomic_lock);
     uint64_t before = scalar_load(value);
     if (candidate > before) scalar_store(value, candidate);
     pthread_mutex_unlock(&scalar_atomic_lock);
     return before;
 }
-uint64_t blot_atomic_load(const uint64_t *value) {
+uint64_t squid_atomic_load(const uint64_t *value) {
     pthread_mutex_lock(&scalar_atomic_lock);
     uint64_t result = scalar_load(value);
     pthread_mutex_unlock(&scalar_atomic_lock);
     return result;
 }
-void blot_atomic_store(uint64_t *value, uint64_t next) {
+void squid_atomic_store(uint64_t *value, uint64_t next) {
     pthread_mutex_lock(&scalar_atomic_lock);
     scalar_store(value, next);
     pthread_mutex_unlock(&scalar_atomic_lock);
 }
 
-uint32_t blot_platform_is_linux(void) {
+uint32_t squid_platform_is_linux(void) {
 #if defined(__linux__)
     return 1;
 #else
@@ -244,22 +244,22 @@ uint32_t blot_platform_is_linux(void) {
 #endif
 }
 
-uint32_t blot_i32_bits(int32_t value) {
+uint32_t squid_i32_bits(int32_t value) {
     uint32_t result;
     memcpy(&result, &value, sizeof(result));
     return result;
 }
-int32_t blot_i32_from_bits(uint32_t value) {
+int32_t squid_i32_from_bits(uint32_t value) {
     int32_t result;
     memcpy(&result, &value, sizeof(result));
     return result;
 }
-float blot_f32_mul_add(float left, float right, float addend) {
+float squid_f32_mul_add(float left, float right, float addend) {
     return fmaf(left, right, addend);
 }
 
 static pthread_mutex_t debug_print_lock = PTHREAD_MUTEX_INITIALIZER;
-void blot_debug_write(const unsigned char *bytes, uint64_t count) {
+void squid_debug_write(const unsigned char *bytes, uint64_t count) {
     pthread_mutex_lock(&debug_print_lock);
     while (count != 0) {
         size_t chunk = (size_t)count;
@@ -274,11 +274,11 @@ void blot_debug_write(const unsigned char *bytes, uint64_t count) {
 }
 
 /* The C host retains only process arguments and operating-system handles. */
-static int blot_argc;
-static char **blot_argv;
-void blot_platform_entry_init(int argc, char **argv) {
-    blot_argc = argc;
-    blot_argv = argv;
+static int squid_argc;
+static char **squid_argv;
+void squid_platform_entry_init(int argc, char **argv) {
+    squid_argc = argc;
+    squid_argv = argv;
     signal(SIGPIPE, SIG_IGN);
 #ifdef __linux__
     if (argc > 1 && strcmp(argv[1], "--worker") == 0) {
@@ -287,24 +287,24 @@ void blot_platform_entry_init(int argc, char **argv) {
     }
 #endif
 }
-int64_t blot_argument_count(void) { return blot_argc; }
-int64_t blot_argument_size(int64_t index) {
-    if (index < 0 || index >= blot_argc) return -EINVAL;
-    return (int64_t)strlen(blot_argv[index]);
+int64_t squid_argument_count(void) { return squid_argc; }
+int64_t squid_argument_size(int64_t index) {
+    if (index < 0 || index >= squid_argc) return -EINVAL;
+    return (int64_t)strlen(squid_argv[index]);
 }
-int64_t blot_argument_copy(int64_t index, uint8_t *out, uint64_t capacity) {
-    int64_t size = blot_argument_size(index);
+int64_t squid_argument_copy(int64_t index, uint8_t *out, uint64_t capacity) {
+    int64_t size = squid_argument_size(index);
     if (size < 0) return size;
     if ((uint64_t)size > capacity) return -ENAMETOOLONG;
-    memcpy(out, blot_argv[index], (size_t)size);
+    memcpy(out, squid_argv[index], (size_t)size);
     return size;
 }
-int64_t blot_environment_size(const uint8_t *name) {
+int64_t squid_environment_size(const uint8_t *name) {
     const char *value = getenv((const char *)name);
     if (!value) return -ENOENT;
     return (int64_t)strlen(value);
 }
-int64_t blot_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capacity) {
+int64_t squid_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capacity) {
     const char *value = getenv((const char *)name);
     if (!value) return -ENOENT;
     size_t size = strlen(value);
@@ -312,13 +312,13 @@ int64_t blot_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capaci
     memcpy(out, value, size);
     return (int64_t)size;
 }
-struct blot_worker_process { pid_t pid; int input; int output; };
-static struct blot_worker_process blot_workers[16];
+struct squid_worker_process { pid_t pid; int input; int output; };
+static struct squid_worker_process squid_workers[16];
 extern char **environ;
-extern int32_t blot_request_stage_capability(void) __attribute__((weak));
-extern uint64_t blot_request_token(void) __attribute__((weak));
-int64_t blot_worker_spawn(uint32_t slot) {
-    if (slot >= 16 || blot_workers[slot].pid) return -EINVAL;
+extern int32_t squid_request_stage_capability(void) __attribute__((weak));
+extern uint64_t squid_request_token(void) __attribute__((weak));
+int64_t squid_worker_spawn(uint32_t slot) {
+    if (slot >= 16 || squid_workers[slot].pid) return -EINVAL;
     char executable[PATH_MAX];
     ssize_t size = readlink("/proc/self/exe", executable, sizeof executable - 1);
     if (size < 0) return -errno;
@@ -337,8 +337,8 @@ int64_t blot_worker_spawn(uint32_t slot) {
     }
     int capability = -1;
     uint64_t token = 0;
-    if (blot_request_stage_capability && blot_request_token) {
-        int source = blot_request_stage_capability();
+    if (squid_request_stage_capability && squid_request_token) {
+        int source = squid_request_stage_capability();
         if (source >= 0) {
             capability = fcntl(source, F_DUPFD_CLOEXEC, 3);
             if (capability < 0) {
@@ -346,7 +346,7 @@ int64_t blot_worker_spawn(uint32_t slot) {
                 for (size_t i = 0; i < 4; ++i) close(all[i]);
                 return -saved;
             }
-            token = blot_request_token();
+            token = squid_request_token();
         }
     }
     posix_spawn_file_actions_t actions;
@@ -367,7 +367,7 @@ int64_t blot_worker_spawn(uint32_t slot) {
         snprintf(token_text, sizeof token_text, "%llu", (unsigned long long)token);
         char *arguments[] = { executable, "--worker", NULL, NULL, NULL, NULL };
         if (capability >= 0) {
-            arguments[2] = "--blot-request-oom";
+            arguments[2] = "--squid-request-oom";
             arguments[3] = fd_text;
             arguments[4] = token_text;
         }
@@ -378,7 +378,7 @@ int64_t blot_worker_spawn(uint32_t slot) {
         capability = -1;
         if (!error) {
             close(request[0]); close(response[1]);
-            blot_workers[slot] = (struct blot_worker_process){ pid, request[1], response[0] };
+            squid_workers[slot] = (struct squid_worker_process){ pid, request[1], response[0] };
             return pid;
         }
     }
@@ -386,25 +386,25 @@ int64_t blot_worker_spawn(uint32_t slot) {
     for (size_t i = 0; i < 4; ++i) close(all[i]);
     return -error;
 }
-int32_t blot_worker_descriptor(uint32_t slot, _Bool writing) {
-    if (slot >= 16 || !blot_workers[slot].pid) return -EBADF;
-    if (writing) return blot_workers[slot].input;
-    return blot_workers[slot].output;
+int32_t squid_worker_descriptor(uint32_t slot, _Bool writing) {
+    if (slot >= 16 || !squid_workers[slot].pid) return -EBADF;
+    if (writing) return squid_workers[slot].input;
+    return squid_workers[slot].output;
 }
 /* A forked request candidate owns copied descriptors, never the baseline's
  * worker processes. Detach without signalling or waiting for those workers. */
-void blot_worker_detach(void) {
+void squid_worker_detach(void) {
     for (size_t slot = 0; slot < 16; ++slot) {
-        struct blot_worker_process worker = blot_workers[slot];
-        blot_workers[slot] = (struct blot_worker_process){0};
+        struct squid_worker_process worker = squid_workers[slot];
+        squid_workers[slot] = (struct squid_worker_process){0};
         if (worker.pid) { close(worker.input); close(worker.output); }
     }
 }
-int32_t blot_worker_stop(uint32_t slot) {
+int32_t squid_worker_stop(uint32_t slot) {
     if (slot >= 16) return -EINVAL;
-    struct blot_worker_process worker = blot_workers[slot];
+    struct squid_worker_process worker = squid_workers[slot];
     if (!worker.pid) return 0;
-    blot_workers[slot] = (struct blot_worker_process){0};
+    squid_workers[slot] = (struct squid_worker_process){0};
     close(worker.input); close(worker.output);
     if (kill(worker.pid, SIGKILL) < 0 && errno != ESRCH) return -errno;
     int status;
@@ -416,18 +416,18 @@ int32_t blot_worker_stop(uint32_t slot) {
 /* Finish only candidate-owned jobs through EOF and runtime cleanup, so a
  * response cannot race adoption with a subsequent allocation refusal. All
  * inputs close before any join; the outer supervisor bounds a stuck child. */
-int32_t blot_worker_quiesce(void) {
+int32_t squid_worker_quiesce(void) {
     for (size_t slot = 0; slot < 16; ++slot) {
-        if (blot_workers[slot].pid) {
-            close(blot_workers[slot].input);
-            blot_workers[slot].input = -1;
+        if (squid_workers[slot].pid) {
+            close(squid_workers[slot].input);
+            squid_workers[slot].input = -1;
         }
     }
     int error = 0;
     for (size_t slot = 0; slot < 16; ++slot) {
-        struct blot_worker_process worker = blot_workers[slot];
+        struct squid_worker_process worker = squid_workers[slot];
         if (!worker.pid) continue;
-        blot_workers[slot] = (struct blot_worker_process){0};
+        squid_workers[slot] = (struct squid_worker_process){0};
         int status = 0;
         pid_t waited;
         do { waited = waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
@@ -437,36 +437,36 @@ int32_t blot_worker_quiesce(void) {
     return error;
 }
 
-int32_t blot_lock_open(const uint8_t *path) {
+int32_t squid_lock_open(const uint8_t *path) {
     int fd;
     do { fd = open((const char *)path, O_RDWR | O_CREAT | O_CLOEXEC, 0666); } while (fd < 0 && errno == EINTR);
     if (fd < 0) return -errno;
     return fd;
 }
-int32_t blot_try_lock(int32_t fd, _Bool exclusive) {
+int32_t squid_try_lock(int32_t fd, _Bool exclusive) {
     int operation = LOCK_SH | LOCK_NB;
     if (exclusive) operation = LOCK_EX | LOCK_NB;
     if (flock(fd, operation) < 0) return -errno;
     return 0;
 }
-int32_t blot_unlock(int32_t fd) { if (flock(fd, LOCK_UN) < 0) return -errno; return 0; }
-int32_t blot_truncate(int32_t fd, uint64_t length) {
+int32_t squid_unlock(int32_t fd) { if (flock(fd, LOCK_UN) < 0) return -errno; return 0; }
+int32_t squid_truncate(int32_t fd, uint64_t length) {
     if (length > INT64_MAX) return -EOVERFLOW;
     if (ftruncate(fd, (off_t)length) < 0) return -errno;
     return 0;
 }
-int64_t blot_pwrite(int32_t fd, const uint8_t *data, uint64_t count, uint64_t offset) {
+int64_t squid_pwrite(int32_t fd, const uint8_t *data, uint64_t count, uint64_t offset) {
     if (count > SSIZE_MAX || offset > INT64_MAX) return -EOVERFLOW;
     ssize_t written;
     do { written = pwrite(fd, data, (size_t)count, (off_t)offset); } while (written < 0 && errno == EINTR);
     if (written < 0) return -(int64_t)errno;
     return written;
 }
-void blot_sleep_ms(uint64_t milliseconds) {
+void squid_sleep_ms(uint64_t milliseconds) {
     struct timespec pause = { (time_t)(milliseconds / 1000), (long)((milliseconds % 1000) * 1000000) };
     while (nanosleep(&pause, &pause) < 0 && errno == EINTR) {}
 }
-int64_t blot_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errno; return pid; }
+int64_t squid_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errno; return pid; }
 
 /* Each checker process gets one bounded, demand-paged reply area. It writes
  * frames in order. The parent reads them only after joining that process. */
@@ -475,16 +475,16 @@ struct check_reply {
     uint64_t used;
     uint8_t bytes[];
 };
-uint64_t blot_check_reply_open(void) {
+uint64_t squid_check_reply_open(void) {
     void *mapping = mmap(NULL, sizeof(struct check_reply) + CHECK_REPLY_CAPACITY,
                          PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (mapping == MAP_FAILED) return 0;
     return (uint64_t)(uintptr_t)mapping;
 }
-void blot_check_reply_close(uint64_t handle) {
+void squid_check_reply_close(uint64_t handle) {
     munmap((void *)(uintptr_t)handle, sizeof(struct check_reply) + CHECK_REPLY_CAPACITY);
 }
-_Bool blot_check_reply_append(uint64_t handle, const uint8_t *bytes, uint64_t length) {
+_Bool squid_check_reply_append(uint64_t handle, const uint8_t *bytes, uint64_t length) {
     struct check_reply *reply = (void *)(uintptr_t)handle;
     const uint64_t offset = reply->used;
     if (length == 0 || offset > CHECK_REPLY_CAPACITY ||
@@ -495,7 +495,7 @@ _Bool blot_check_reply_append(uint64_t handle, const uint8_t *bytes, uint64_t le
     reply->used = offset + sizeof(length) + length;
     return 1;
 }
-int64_t blot_check_reply_size(uint64_t handle, uint64_t offset) {
+int64_t squid_check_reply_size(uint64_t handle, uint64_t offset) {
     const struct check_reply *reply = (const void *)(uintptr_t)handle;
     if (reply->used > CHECK_REPLY_CAPACITY || offset > reply->used) return -1;
     if (offset == reply->used) return 0;
@@ -505,22 +505,22 @@ int64_t blot_check_reply_size(uint64_t handle, uint64_t offset) {
     if (length == 0 || length > reply->used - offset - sizeof(length)) return -1;
     return (int64_t)length;
 }
-int64_t blot_check_reply_copy(uint64_t handle, uint64_t offset, uint8_t *bytes, uint64_t length) {
-    if (length == 0 || blot_check_reply_size(handle, offset) != (int64_t)length) return -1;
+int64_t squid_check_reply_copy(uint64_t handle, uint64_t offset, uint8_t *bytes, uint64_t length) {
+    if (length == 0 || squid_check_reply_size(handle, offset) != (int64_t)length) return -1;
     const struct check_reply *reply = (const void *)(uintptr_t)handle;
     memcpy(bytes, reply->bytes + offset + sizeof(length), length);
     return (int64_t)(offset + sizeof(length) + length);
 }
 /* A checker copy releases nothing and flushes nothing at exit. */
-_Noreturn void blot_job_exit(int32_t status) { _exit(status); }
-int32_t blot_detach_session(void) { if (setsid() < 0) return -errno; return 0; }
-_Bool blot_wait_success(uint32_t pid) {
+_Noreturn void squid_job_exit(int32_t status) { _exit(status); }
+int32_t squid_detach_session(void) { if (setsid() < 0) return -errno; return 0; }
+_Bool squid_wait_success(uint32_t pid) {
     int status;
     pid_t result;
     do { result = waitpid((pid_t)pid, &status, 0); } while (result < 0 && errno == EINTR);
     return result == (pid_t)pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
-void blot_null_standard_io(void) {
+void squid_null_standard_io(void) {
     int sink = open("/dev/null", O_RDWR);
     if (sink < 0) return;
     for (int fd = 0; fd < 3; ++fd) dup2(sink, fd);
@@ -528,8 +528,8 @@ void blot_null_standard_io(void) {
 }
 
 /* Opaque OS directory cursors. Selection and source generation stay in Goose. */
-struct blot_directory { DIR *stream; struct dirent *pending; };
-int32_t blot_path_kind(const uint8_t *path) {
+struct squid_directory { DIR *stream; struct dirent *pending; };
+int32_t squid_path_kind(const uint8_t *path) {
     struct stat info;
     int result;
     do { result = stat((const char *)path, &info); } while (result < 0 && errno == EINTR);
@@ -538,19 +538,19 @@ int32_t blot_path_kind(const uint8_t *path) {
     if (S_ISDIR(info.st_mode)) return 2;
     return -1;
 }
-int64_t blot_directory_open(const uint8_t *path) {
+int64_t squid_directory_open(const uint8_t *path) {
     DIR *stream = opendir((const char *)path);
     if (!stream) { if (errno == ENOENT) return 0; return -1; }
     int descriptor = dirfd(stream);
     if (descriptor < 0 || fcntl(descriptor, F_SETFD, FD_CLOEXEC) < 0) { closedir(stream); return -1; }
-    struct blot_directory *cursor = malloc(sizeof *cursor);
+    struct squid_directory *cursor = malloc(sizeof *cursor);
     if (!cursor) { closedir(stream); return -1; }
-    *cursor = (struct blot_directory){stream, NULL};
+    *cursor = (struct squid_directory){stream, NULL};
     return (int64_t)(uintptr_t)cursor;
 }
-int64_t blot_directory_next(int64_t handle, uint8_t *out, uint64_t capacity) {
+int64_t squid_directory_next(int64_t handle, uint8_t *out, uint64_t capacity) {
     if (handle <= 0) return -1;
-    struct blot_directory *cursor = (struct blot_directory *)(uintptr_t)handle;
+    struct squid_directory *cursor = (struct squid_directory *)(uintptr_t)handle;
     for (;;) {
         struct dirent *entry = cursor->pending;
         if (!entry) {
@@ -573,33 +573,33 @@ int64_t blot_directory_next(int64_t handle, uint8_t *out, uint64_t capacity) {
         return (int64_t)length;
     }
 }
-int32_t blot_directory_close(int64_t handle) {
+int32_t squid_directory_close(int64_t handle) {
     if (handle <= 0) return -1;
-    struct blot_directory *cursor = (struct blot_directory *)(uintptr_t)handle;
+    struct squid_directory *cursor = (struct squid_directory *)(uintptr_t)handle;
     int result = closedir(cursor->stream);
     free(cursor);
     if (result < 0) return -1;
     return 0;
 }
-int32_t blot_last_errno(void) { return errno; }
+int32_t squid_last_errno(void) { return errno; }
 
 /* The observer is optional in ordinary engines. Field zero snapshots its
  * covered counters and returns the coverage mask; other fields read that
  * snapshot. No linked observer means zero coverage, never invented liveness. */
 #if defined(__GNUC__) || defined(__clang__)
-extern uint64_t blot_allocation_observer_value(uint32_t field) __attribute__((weak));
+extern uint64_t squid_allocation_observer_value(uint32_t field) __attribute__((weak));
 #endif
 #if defined(__GNUC__) || defined(__clang__)
-extern void blot_allocation_observer_mark(void) __attribute__((weak));
+extern void squid_allocation_observer_mark(void) __attribute__((weak));
 #endif
-void blot_runtime_memory_mark(void) {
+void squid_runtime_memory_mark(void) {
 #if defined(__GNUC__) || defined(__clang__)
-    if (blot_allocation_observer_mark) blot_allocation_observer_mark();
+    if (squid_allocation_observer_mark) squid_allocation_observer_mark();
 #endif
 }
-uint64_t blot_runtime_observation(uint32_t field) {
+uint64_t squid_runtime_observation(uint32_t field) {
 #if defined(__GNUC__) || defined(__clang__)
-    if (blot_allocation_observer_value) return blot_allocation_observer_value(field);
+    if (squid_allocation_observer_value) return squid_allocation_observer_value(field);
 #else
     (void)field;
 #endif

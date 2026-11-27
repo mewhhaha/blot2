@@ -9,12 +9,12 @@ const work = resolve("build/structural-body");
 const dataset = await Deno.makeTempDir({ dir: work, prefix: "capture-" });
 const game = resolve(dataset, "gdev");
 const compiler = resolve(
-  Deno.env.get("BLOT_COMPILER") ?? "compiler-goose/build/blotc-goose-pgo",
+  Deno.env.get("SQUID_COMPILER") ?? "compiler-goose/build/squidc-goose-pgo",
 );
 const pins = {
   gdev: "cc4bbbf22d35d7b91acd02957a8bdce38bdda90b",
   ink: "77697fef9dda8caf06f5a7c92141372fa1e99cde",
-  blot2: "bdd1f6788418d0a5c2ee547cfa196d84028b7cb3",
+  squid: "bdd1f6788418d0a5c2ee547cfa196d84028b7cb3",
 };
 
 async function snapshot(repo: keyof typeof pins, paths: string[]) {
@@ -53,13 +53,13 @@ const compilerSha256 = await digest(compiler);
 await Promise.all([
   snapshot("gdev", ["src", "pen", "devtools", "tests", "pen.json"]),
   snapshot("ink", ["lib"]),
-  snapshot("blot2", ["std"]),
+  snapshot("squid", ["std"]),
 ]);
 const read = (path: string) => Deno.readTextFile(resolve(game, path));
-const simulation = "src/game/simulation.blot";
-const render = "src/game/presentation.blot";
-const events = "src/game/events.blot";
-const arena = "src/world/arena.blot";
+const simulation = "src/game/simulation.sq";
+const render = "src/game/presentation.sq";
+const events = "src/game/events.sq";
+const arena = "src/world/arena.sq";
 const hover = "hover.update access seconds";
 function change(source: string, marker: string, replacement: string) {
   assert.equal(source.split(marker).length, 2, marker);
@@ -163,7 +163,7 @@ for (const [name, edits] of Object.entries(variants)) {
     [
       "#!/bin/sh",
       "export LD_PRELOAD=" + quote(resolve(work, "capture.so")),
-      "export BLOT_CORE_PACKETS=" + quote(directory),
+      "export SQUID_CORE_PACKETS=" + quote(directory),
       "exec " + quote(compiler) + ' "$@"',
     ].join("\n") + "\n",
     { mode: 0o755 },
@@ -171,8 +171,8 @@ for (const [name, edits] of Object.entries(variants)) {
   for (const capture of [true, false]) {
     const cfg = await gdevProject(
       game,
-      resolve(dataset, "blot2/std"),
-      "src/main.blot",
+      resolve(dataset, "squid-lang/std"),
+      "src/main.sq",
       capture ? wrapper : compiler,
     );
     const client = await createZigProjectCompiler({

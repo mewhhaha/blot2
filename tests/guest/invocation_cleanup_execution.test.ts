@@ -17,7 +17,7 @@ Deno.test("ABI 8 scalar invocations release scoped owners on normal return and t
     equal(guest.abi.version, 8);
     equal(guest.abi.invocationFinish, true);
     const exports = WebAssembly.Module.exports(new WebAssembly.Module(bytes));
-    ok(!exports.some((entry) => entry.name === "blot:reset"));
+    ok(!exports.some((entry) => entry.name === "squid:reset"));
     const trace: number[] = [];
     const capability = guest.capability({
       parameter: "U32",

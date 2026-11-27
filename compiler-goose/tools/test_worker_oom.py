@@ -42,14 +42,14 @@ def main():
     for name, extra in [('native', []), ('sanitized', ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'])]:
         flags = ['-std=gnu11', '-O1', '-g', '-pthread', *extra]
         entry = work/(name+'-entry.o')
-        run([args.cc, *flags, '-Wall', '-Wextra', '-Werror', '-Dmain=blot_native_main',
+        run([args.cc, *flags, '-Wall', '-Wextra', '-Werror', '-Dmain=squid_native_main',
              '-c', ROOT/'native/main.c', '-o', entry])
         binary = work/('worker-oom-'+name)
         run([args.cc, *flags, wrapper, entry, ROOT/'native/platform.c',
              ROOT/'native/request_supervisor.c', ROOT/'native/request_cache.c',
              ROOT/'native/allocation_observer.c', '-lm', '-o', binary])
         env = dict(os.environ)
-        for key in ('BLOT_GOOSE_FAIL_AT', 'BLOT_GOOSE_FAIL_REQUEST', 'BLOT_GOOSE_FAIL_KIND'):
+        for key in ('SQUID_GOOSE_FAIL_AT', 'SQUID_GOOSE_FAIL_REQUEST', 'SQUID_GOOSE_FAIL_KIND'):
             env.pop(key, None)
         env['ASAN_OPTIONS'] = 'detect_leaks=0:allocator_may_return_null=1'
         env['UBSAN_OPTIONS'] = 'halt_on_error=1'

@@ -1,18 +1,18 @@
 # Runtime representation boundaries
 
 These public kernels reproduce the numeric-row and ownership costs reported in
-issues #29–#36. `rows.blot` keeps the wide constructor behind an import, so the
+issues #29–#36. `rows.sq` keeps the wide constructor behind an import, so the
 construction case exercises the module boundary too. The two-field nominal and
 flat structural cases are controls. Optional values exercise tagged numeric
 rows; record/map/flatten pipelines exercise one-destination construction.
-`acyclic-updates.blot` forces retained copies of nested plain data, reproducing
+`acyclic-updates.sq` forces retained copies of nested plain data, reproducing
 the missing acyclic marks found in gdev.
 
 Run with two LLVM release compiler executables:
 
 ```sh
 deno run -A benchmarks/tools/runtime_boundaries.ts \
-  --baseline /path/to/before/blotc --candidate /path/to/after/blotc \
+  --baseline /path/to/before/squidc --candidate /path/to/after/squidc \
   --baseline-std /path/to/before/std \
   --output build/bench/runtime-boundaries
 ```
@@ -26,7 +26,7 @@ output sizes and production counter deltas. Results are written before work
 starts and marked complete only after the final input checks.
 
 Runtime measurements include the host ownership boundary and checksum check.
-They use the same Deno/V8 engine for both modules and Blot's optimized codegen
+They use the same Deno/V8 engine for both modules and Squid's optimized codegen
 tier, without an external `wasm-opt` pass. They are distinct from the reporter's
 Node/external-O3 samples. No Wasm bodies are patched or instrumented.
 Retirements and retain/release operations measure traffic, not peak live memory

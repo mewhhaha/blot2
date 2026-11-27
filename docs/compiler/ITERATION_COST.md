@@ -187,7 +187,7 @@ Neither acceptance law was weakened. The full gate catches a recorded failure in
 | 9    | Save failed guest files from JUnit and run them immediately after the development build.                          | Real full-gate retry catches the known failure in 0.84 s. Failed files persist in the chosen timing directory. Full final guest coverage is unchanged.                                                              |
 | 10   | Cache successful local lint results using tool/configuration and transitive source contents.                      | Combined unchanged local check: 0.214 s. Isolated leaf edit: 0.127 s; shared edit affecting 214 files: 4.634 s; revert: 0.188 s. Complete lint always scans all 403 files (zero findings).                          |
 | 11   | Resume successful native phases only after exact input/toolchain/binary/log verification.                         | Full-runner fixture proves guest repair reuses both native phases and a native edit reruns both. Missing/changed evidence and aborted/failed runs cannot qualify. Real resumed LLVM gate remains unmeasured.        |
-| 12   | Preserve ownership rejection function/fallback, owned detail, useful source location and failed generated source. | Existing stage failure now points to bytes 155–185 and explains missing ownership roots; the test prints its retained `main.blot` path.                                                                             |
+| 12   | Preserve ownership rejection function/fallback, owned detail, useful source location and failed generated source. | Existing stage failure now points to bytes 155–185 and explains missing ownership roots; the test prints its retained `main.sq` path.                                                                             |
 | 13   | Read production fingerprint inputs once; remove duplicate budget fingerprint/build work.                          | Exact source bytes and configuration still define identity. ABBA revealed an additional unchanged incremental-build cost; cached development builds are now the default (details below).                            |
 | 14   | Add whole-run/per-phase budgets, heartbeats, process-group cancellation and durable partial reports.              | A deliberately uncooperative descendant is killed; partial logs survive. Development defaults: 60 s total/phase. Full gate: 900 s total, 600 s per phase. Timeout is failure, never a completed check.              |
 
@@ -285,7 +285,7 @@ not qualify the compiler or reach the complete guest phase.
 Tiny system-command and real native-runner probes both execute two shards
 concurrently, including the installed-artifact dependency shape. The long run's
 shard overlap is not yet established. The runner now emits one
-`BLOT_NATIVE_SHARD` timing record per executing shard (monotonic start/end and
+`SQUID_NATIVE_SHARD` timing record per executing shard (monotonic start/end and
 selected count); list mode and failure behavior stay unchanged. Its harness
 passes. Measure the next complete run before changing the scheduler. Logs and
 probe sources are under `build/bench/continuation-20261014/`.

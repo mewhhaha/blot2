@@ -56,15 +56,15 @@ async function withGuest(
 }
 
 Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts effects and trap recovery in both tiers", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-bit-laws-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-bit-laws-" });
+  const entry = `${directory}/main.sq`;
   try {
     {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
         stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
+        prelude: `${stdRoot}/prelude.sq`,
       });
       try {
         let source = "";
@@ -201,13 +201,13 @@ io const effects = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => retur
 
 
 Deno.test("retained bit proofs observe helper edits rejected revisions and exact reverts", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-bit-edits-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-bit-edits-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const original = recurrence("bits", 8, 0xEDB88320);

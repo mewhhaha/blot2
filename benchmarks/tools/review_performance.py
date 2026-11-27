@@ -129,7 +129,7 @@ assert native['success'] and native['allocation_failures'] == 'full'
 tests, shard_ns = [], Counter()
 for shard in range(4):
     for line in qualified(f'{native_dir}/shard-{shard}.stderr.log').splitlines():
-        marker = 'BLOT_NATIVE_TEST\t'
+        marker = 'SQUID_NATIVE_TEST\t'
         if marker not in line:
             continue
         test = json.loads(line.split(marker, 1)[1])
@@ -159,14 +159,14 @@ for test in oom_meta['tests']:
     assert test['exit_code'] == 0
     sweeps, results = [], []
     for line in read(args.oom, test['stderr'], 'oom').splitlines():
-        if 'BLOT_OOM_PROFILE\t' in line:
-            sweep = json.loads(line.split('BLOT_OOM_PROFILE\t', 1)[1])
+        if 'SQUID_OOM_PROFILE\t' in line:
+            sweep = json.loads(line.split('SQUID_OOM_PROFILE\t', 1)[1])
             assert sweep['completed'] and sweep['runs'] == sweep['allocations'] + 1
             for field in ['scenario_source', 'source']:
                 sweep[field]['file_name'] = sweep[field]['file_name'].split('/compiler/', 1)[-1]
             sweeps.append(sweep)
-        elif 'BLOT_NATIVE_TEST\t' in line:
-            results.append(json.loads(line.split('BLOT_NATIVE_TEST\t', 1)[1]))
+        elif 'SQUID_NATIVE_TEST\t' in line:
+            results.append(json.loads(line.split('SQUID_NATIVE_TEST\t', 1)[1]))
     assert len(results) == 1 and results[0]['name'] == test['name']
     assert results[0]['status'] == 'passed' and results[0]['allocation_failures'] == 'full'
     assert results[0]['leaks'] == results[0]['logged_errors'] == 0

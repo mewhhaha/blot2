@@ -1,9 +1,9 @@
-# Blot executable language guide
+# Squid executable language guide
 
-Read this before writing Blot. This describes the current executable language;
-[spec.md](spec.md) records the full **Blot vNext** specification, and
+Read this before writing Squid. This describes the current executable language;
+[spec.md](spec.md) records the full **Squid vNext** specification, and
 [VNEXT_ROADMAP.md](../compiler/VNEXT_ROADMAP.md) tracks the compiler pruning
-roadmap. Each `blot` code block below is an independent, compilable module.
+roadmap. Each `squid` code block below is an independent, compilable module.
 
 The Goose compiler emits Wasm directly. Applications use named owners, explicit
 copies and invocation-local borrows with guest ABI 8. The
@@ -11,7 +11,7 @@ copies and invocation-local borrows with guest ABI 8. The
 The [migration handoff](../../CONTINUE.md) tracks current frontier metrics and
 qualification.
 
-## Blot vNext quick reference (implemented today)
+## Squid vNext quick reference (implemented today)
 
 - **Function syntax:** single-expression `func x => expr` (implicit return) and
   block-bodied `func x =>` indented suites with explicit `return value` /
@@ -40,15 +40,15 @@ qualification.
 
 ## Commands
 
-From the Blot repository:
+From the Squid repository:
 
 ```sh
 just guide                                  # this reference; no compiler build
-deno task blot guide                        # same CLI command
-deno task blot fmt examples/syntax.blot      # normalize spacing
+deno task squid guide                        # same CLI command
+deno task squid fmt examples/syntax.sq      # normalize spacing
 deno task build:compiler
-deno task blot check examples/arrays.blot
-deno task blot build examples/arrays.blot build/arrays.wasm
+deno task squid check examples/arrays.sq
+deno task squid build examples/arrays.sq build/arrays.wasm
 ```
 
 The host loads the Wasm module and calls the `io`, `io const` and
@@ -114,7 +114,7 @@ rejected.
 Module functions may also use a named declaration. Parameters, currying, result
 annotations and explicit returns work like function values:
 
-```blot
+```squid
 func add (left: U32) -> (right: U32): U32 => return @u32.add left right
 const plus_two = add 2
 io answer (): U32 => return plus_two 40
@@ -143,7 +143,7 @@ requires updating callers. Field expressions run once in their written order,
 even when that differs from the record type's order; unknown and duplicate
 supplied fields receive diagnostics at the supplied field.
 
-```blot
+```squid
 func rectangle (left: U32) -> (top: U32) -> (width: U32) -> (height: U32) => return
   @u32.add (@u32.add left top) (@u32.mul width height)
 const placed = rectangle 2 3
@@ -156,7 +156,7 @@ A record parameter gives callers named fields in any order. Small scalar-record
 helpers can be inlined without a record allocation in optimized builds; the
 development tier may allocate a temporary record.
 
-```blot
+```squid
 func twice value => return value + value
 func apply_twice transform => return func value => return transform (transform value)
 io factorial (value: U32) : U32 => return do:
@@ -237,7 +237,7 @@ to `break value`, and change monadic `return $ wrapped` to `break $ wrapped`.
 Keep `return value` where the intent is to leave the whole function, including
 from a nested match arm. A bare `break` still leaves only the nearest loop.
 
-```blot
+```squid
 io choose (flag: Bool) : U32 => return do:
   let inner = do:
     if flag:
@@ -254,7 +254,7 @@ io from_case (flag: Bool) : U32 => return do:
   break 0
 ```
 
-```blot
+```squid
 type Beat is data = $Up | $Down
 io count (up: Bool) : U32 => return do:
   let beat = if up then $Up else $Down
@@ -267,7 +267,7 @@ io count (up: Bool) : U32 => return do:
   break total
 ```
 
-```blot
+```squid
 type Builder is data = $Builder U32
 func add_step amount => return func builder => return case builder of
   $Builder value => $Builder (value + amount)
@@ -330,7 +330,7 @@ Use `let pattern = value else: continue` as a flat pattern guard. A successful
 match binds names for the rest of the loop body; a failed match starts the next
 iteration.
 
-```blot
+```squid
 type Candidate is data = $Keep U32 | $Skip
 io kept_total () => return do:
   let total = 0
@@ -343,7 +343,7 @@ io kept_total () => return do:
   break total
 ```
 
-```blot
+```squid
 io sum_to (end: U32) => return do:
   let total = 0
   for index in 0..end:
@@ -383,7 +383,7 @@ tuple, or record to bind several types. These shapes can nest; record arguments
 match by field name. Record constructor declarations also support field
 shorthand.
 
-```blot
+```squid
 type Entry { head, tail } is data = $Entry { head, tail }
 type Pair [left, right] is data = $Pair (left, right)
 type Curried left => type right is data = $Curried (left, right)
@@ -410,7 +410,7 @@ declaration bodies cannot hide an unbound effect row through an alias. Pass the
 full callable type as a type parameter, such as the `f` in
 `type Box f is data = $Box f`, or use an alias with a closed row.
 
-```blot
+```squid
 type Coordinate = F32
 type Pair a = (a, a)
 type Position = Pair Coordinate
@@ -452,7 +452,7 @@ record reuses the other record. Nominal constructor values must be explicitly
 unpacked before merging. A generic function can retain this shape equation using
 a `merge Left Right Result` predicate:
 
-```blot
+```squid
 type Merge [a, b, c] is contract = { merge a b c }
 const extend: a -> b -> c where { Merge [a, b, c] } =
   func left => return func right => return @record.merge left right
@@ -471,7 +471,7 @@ existing U32/Bool local, parameter, or constant instead of binding a new name.
 `if let` conditionally matches; `let pattern = value else:` requires an exiting
 failure branch.
 
-```blot
+```squid
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
 io const selected = 7
 func length position => return do:
@@ -508,7 +508,7 @@ Precedence and associativity are determined lexically by each operator's spellin
 
 Custom and standard symbolic operators are ordinary functions or bindings named in parentheses:
 
-```blot
+```squid
 func (++) (a: Text) -> (b: Text): Text => a.concat b
 const (><) = func left -> right => left * 10 + right
 import { (++) } from "./ops"
@@ -517,7 +517,7 @@ let sum = fold (+) 0 xs
 
 Parenthesized operator names work in `func`, `const`, `let`, `import`/`export`, first-class value references (`(+)`), and module-qualified lookups (`ops.(++)`).
 
-The standard operators (`+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `|>`, `<|`) are ordinary Blot definitions in `std/prelude.blot`, implemented with `@type.call` and `@pipe`. For example, `func (+) left -> right => @type.call "add" left right` and `func (|>) value -> function => @pipe value function`. User-defined operators written the same way get the same compile-time associated/trait dispatch and zero-overhead lowering.
+The standard operators (`+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `|>`, `<|`) are ordinary Squid definitions in `std/prelude.sq`, implemented with `@type.call` and `@pipe`. For example, `func (+) left -> right => @type.call "add" left right` and `func (|>) value -> function => @pipe value function`. User-defined operators written the same way get the same compile-time associated/trait dispatch and zero-overhead lowering.
 
 With `@type.call "member" left right`, the left operand's type supplies `member` (either via a trait implementation or an associated function in the type's defining module); its signature determines which right operand it accepts. Use an explicit qualified call for other operand orders. A compatible left implementation wins even if its result conflicts with an annotation. `@type.call` accepts any literal member name.
 
@@ -562,7 +562,7 @@ unique (see [Owned updates and copies](#owned-updates-and-copies)).
 Nested path updates rebuild records cleanly while preserving existing aliases
 and even changing a field's type:
 
-```blot
+```squid
 func set_position_x (replacement: F32) -> (source: { position: { x: U32, y: U32 }, health: U32 }) =>
   let updated = source
   updated.position.x := replacement
@@ -596,11 +596,11 @@ enough type information to resolve dispatch; annotate unconstrained parameters.
 unless an implementation explicitly accepts them. `/` supports F32 and U32; U32
 division truncates and a zero divisor fails/traps. Bool supports ordinary
 equality. Structural equality for arrays, records and algebraic data is opt-in
-through [std/equality](../../std/equality.blot) and the
+through [std/equality](../../std/equality.sq) and the
 [derivation tool](../host/derive.md), which can also generate debug formatting
 and explicitly versioned codecs from checked declarations.
 
-```blot
+```squid
 type Count is data = $Count U32
 type Other is data = $Other U32
 io const same_value = 1 == 2
@@ -613,7 +613,7 @@ io compare () => return do:
   break head == witness
 ```
 
-```blot
+```squid
 type Box a is data = $Box a
 const Box.add = func left => return func right => return case left, right of
   $Box a, $Box b => $Box (a + b)
@@ -685,7 +685,7 @@ space (`f #[1]`), or write `f(#[1])`.
 Spreads append or prepend elements into a fresh array while preserving written
 evaluation order:
 
-```blot
+```squid
 func prepend (value: U32) -> (values: #[U32]): #[U32] => return #[value, ...values]
 func append (value: U32) -> (values: #[U32]): #[U32] => return #[...values, value]
 func surrounded (values: #[U32]): #[U32] => return #[0, ...values, 99]
@@ -695,7 +695,7 @@ One spread is allowed, with any number of prefix and suffix elements.
 
 Comprehensions construct owned arrays with `#[...]`:
 
-```blot
+```squid
 const squares: #[U32] = #[x * x | x <- #[1, 2, 3]]
 const pairs: #[U32] = #[x * 10 + y | x <- #[1, 2], y <- #[3, 4]]
 const selected: #[U32] = #[square | x <- #[1, 2, 3], x > 1, let square = x * x]
@@ -715,7 +715,7 @@ returns `$Some (value, next_cursor)` or `$Nothing`. These are the usual prelude
 Maybe constructors. Iterator types and adapters receive no name-specific
 optimization.
 
-```blot
+```squid
 type Countdown is data = $Countdown U32
 const Countdown.iter = func (cursor: Countdown) => return cursor
 const Countdown.next = func (cursor: Countdown) => return do:
@@ -742,7 +742,7 @@ apply. Copy the input first when traversal needs an earlier version.
 `std/array` provides structural and higher-order array operations with the
 collection last for pipelines:
 
-```blot
+```squid
 import * as array from "std/array"
 
 io answer (): U32 =>
@@ -776,7 +776,7 @@ length ranges` accepts a pure indexed reader over the
 same range representation. This avoids retaining an array of borrowed child
 collections.
 
-```blot
+```squid
 import * as array from "std/array"
 io answer () => return do:
   let payload = #[10, 20, 30, 40]
@@ -821,7 +821,7 @@ Branches keep uniqueness only when every arm that continues keeps it; an arm
 that returns contributes nothing. A loop carry is unique when its first value
 and every value it carries back are.
 
-```blot
+```squid
 func set_second (items: own #[U32]) -> (value: U32): #[U32] =>
   items[1] := value
   return items
@@ -847,7 +847,7 @@ A function's result belongs to its caller alone, and a call only borrows
 its arguments. So a local stays unique after it is passed to a function,
 and what a function returns can be updated in place with `:=`:
 
-```blot
+```squid
 func scaled (rows: Array U32) -> (k: U32): Array U32 => return #[x * k | x <- rows]
 
 io run (n: U32) : U32 => return do:
@@ -880,7 +880,7 @@ an array nothing else holds.
 **Names that borrow.** Binding a name to something a local still holds
 shares it only while the name is in use:
 
-```blot
+```squid
 let response = access.response     // access is shared from here
 program.append response outgoing   // the last read of response
 access := step access              // access is its holder's own again
@@ -899,7 +899,7 @@ A borrowed value needs no name. The result of a call that borrows its
 arguments is given back as soon as what is written around it is done with
 it, when that keeps nothing:
 
-```blot
+```squid
 let stored = salt.stored (salt.read_state access)       // an argument of a call
 let site = (buildings.read_state access).sites[0].plot  // a plain value read out of it
 for stack in stacks_of access:                          // what a loop walks,
@@ -929,7 +929,7 @@ and an in-place `:=` on either side is `aliased_update` until one is
 copied. The same holds for a generic function that puts its argument into
 growable storage it was given (`bag.push rows`).
 
-```blot
+```squid
 let grid = #[#[1, 2], #[3, 4]]
 let row = grid.at 0          // shares with grid
 let mine = (grid.at 0).copy  // an array of its own; grid stays unique
@@ -954,7 +954,7 @@ part that borrows: nothing a function does can keep a function it was
 lent (storing or pushing one is `kept_value`). So afterwards the local is
 unique again:
 
-```blot
+```squid
 func collect_lengths (rows: #[#[U32]]): *#[U32] =>
   let seen: #[U32] = #[]
   for row in rows:
@@ -982,7 +982,7 @@ A function or a lambda can take a parameter over by writing `own` before
 its type. Inside the function the parameter is unique, so `:=`
 through it writes in place, and it can be returned.
 
-```blot
+```squid
 type World is data = $World { counts: Array U32, size: U32 }
 
 func World.damage (world: own World) -> (index: U32): World => return do:
@@ -1018,7 +1018,7 @@ World` is a function that takes its first argument over. So an `own`
 function is a value like any other, and a parameter, a record field or a
 local can hold one:
 
-```blot
+```squid
 type Hooks is data = $Hooks { step: own World -> U32 -> World }
 
 func run (hooks: Hooks) -> (world: own World): World => return do:
@@ -1036,7 +1036,7 @@ type is known it changes nothing. Where it is not (a function that came
 in as an untyped parameter, or as a field of one) it is what tells the
 compiler that the function takes the argument over:
 
-```blot
+```squid
 func twice step -> (own state) => return do:
   state := step (own state) 1
   state := step (own state) 2
@@ -1048,7 +1048,7 @@ value. The field is spent until something is put back in it, usually by
 the same statement; the other fields stay usable meanwhile, and the local
 cannot be read as a whole:
 
-```blot
+```squid
 world.robots := ecs.insert world.entities world.robots index robot
 ```
 
@@ -1061,7 +1061,7 @@ what it computes keeps nothing of it: `world := step world (count world)`.
 A view borrows the field it is made of, so one field can be lent as a view
 while another is given in the same call:
 
-```blot
+```squid
 world.out := write (&world.rows[0..world.rows.length]) world.out
 ```
 
@@ -1069,7 +1069,7 @@ An arm of a `case` or an `if` that just names a local at its last read
 hands that value on, so a world can be rebound from arms that change it
 and arms that do not:
 
-```blot
+```squid
 world := case kind of
   0 => damage world 0
   _ => world
@@ -1079,7 +1079,7 @@ A field also leaves with the function. `return stream.output` hands the
 caller that field of a local of the function's own, and a returned record,
 constructor or tuple may be made of such fields. Each can leave once:
 
-```blot
+```squid
 func bind (parts: own Parts): World => return $World { rows: parts.rows, marks: parts.marks }
 func split (world: own World) => return (world.rows, world.marks)
 ```
@@ -1088,7 +1088,7 @@ A function written against any record with certain fields can index and
 update through them without saying what kind of array each is; the element
 type comes from the record it is called with:
 
-```blot
+```squid
 func count (own access) => return do:
   access.log[0] := access.log[0] + 1
   @storage.push access.log 7
@@ -1171,7 +1171,7 @@ Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 `get`/`set` return Maybe on bounds failure; folds propagate callback effects;
 `any`/`all` stop early.
 
-```blot
+```squid
 import * as array from "std/array"
 
 const squares = array.generate 4 (func index => return index * index)
@@ -1209,7 +1209,7 @@ come last for pipelines. Construction callbacks are pure; use `fold_left` or a
 loop to sequence effects. Import `Vec2` and `Vec3` from `std/vector` for vector
 operators and receiver members such as `dot`, `length`, and `normalized`.
 
-```blot
+```squid
 import * as array from "std/array"
 import { Vec2 } from "std/vector"
 
@@ -1228,7 +1228,7 @@ grapheme clusters; the example has seven elements. Equality in `std/text`
 compares scalar sequences exactly and does not perform Unicode normalization.
 Text has no implicit IO.
 
-```blot
+```squid
 import * as text from "std/text"
 
 io greeting () => return text.join " " #["Hello,", "世界🙂"]
@@ -1258,7 +1258,7 @@ an empty source has no lines and a terminal LF does not add another line.
 Keep the source alive while using either iterator or any returned slice.
 For example, the following sums decimal tokens (rejecting malformed words):
 
-```blot
+```squid
 import * as text from "std/text"
 io total (source: Text): U32 => do:
   let sum = 0
@@ -1287,7 +1287,7 @@ with zero copy. `text.join` uses this path.
 Construct or destructure lanes with tuples and use ordinary partial application
 on the source functions:
 
-```blot
+```squid
 import * as simd from "std/simd"
 func translated lanes => return simd.u32_add lanes (1, 2, 3, 4)
 func scaled lanes => return simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
@@ -1351,7 +1351,7 @@ be silently regrouped: `f32_sum` adds left to right, while `f32_sum_pairwise`
 explicitly chooses `(a + b) + (c + d)` and can round differently. Earlier
 backend-specific automatic-vectorization admission and private-value optimizer
 measurements remain in
-[the historical guide](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guide.md#simd).
+[the historical guide](https://github.com/mewhhaha/squid-lang/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guide.md#simd).
 They are not cost or representation guarantees for the owned-storage profile.
 
 ## Effects and host capabilities
@@ -1366,7 +1366,7 @@ Host callbacks are explicit values with the sealed `Foreign` effect; source
 cannot declare or handle it. Executable exports cannot leave ordinary source
 effects unhandled. Closures retain their latent effects.
 
-```blot
+```squid
 type Reader a is effect = { ask: Unit -> a }
 func read_twice () => return do:
   use first <- Reader.ask U32 ()
@@ -1397,7 +1397,7 @@ they cannot be runtime-reachable or create authority.
 is one `case request of`, with distinct `effect` clauses and exactly one
 `complete` clause:
 
-```blot
+```squid
 type Validate is effect = { check: U32 -> U32 }
 
 func checked computation => return do:
@@ -1442,7 +1442,7 @@ effect family. `State.get U32` names that instance's `get` operation, and
 `State.get U32 ()` calls it. Each concrete type selects distinct operations. The
 single-operation form uses the family name as its operation name.
 
-```blot
+```squid
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -1477,7 +1477,7 @@ Generic effect operations are ordinary functions. Their family arguments are
 inferred from the operation's value argument and result context. A library can
 express the relationship to a constructor witness with ordinary annotations:
 
-```blot
+```squid
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -1595,7 +1595,7 @@ or effect operations it needs as constraints on its type. A caller selects the
 implementation when it supplies concrete arguments. You may write the same
 constraints explicitly after a complete binding annotation:
 
-```blot
+```squid
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const first: a -> b where { field "first" a b } = func value => return value.first
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
@@ -1622,7 +1622,7 @@ fallback implementation. The selected member must accept `Input`, return
 `Output`, and satisfy the optional invocation effect row. For an effectful
 conversion, share that row with the function annotation:
 
-```blot
+```squid
 const convert: a -> b ! {| e} where { result "from" a b ! {| e} } =
   func value => return @type.result "from" value
 ```
@@ -1638,7 +1638,7 @@ explicitly curried type parameters, and be imported by name or namespace. They
 introduce no runtime values or dictionaries; the ordinary evidence and
 associated-dispatch rules still choose implementations.
 
-```blot
+```squid
 type Add a is contract = { associated "add" a a a }
 type Arithmetic a is contract = { Add a, associated "mul" a a a }
 type Project [owner, value] is contract = { field "value" owner value }
@@ -1659,7 +1659,7 @@ Contracts also declare defined type equations, abstract types and complete
 abstract function signatures. Members share one name space. Contract parameters
 scope over each member; members cannot introduce additional type or row binders.
 
-```blot
+```squid
 type Identity a is contract = { type Item = a }
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 type View a = Identity.Item a
@@ -1689,7 +1689,7 @@ An explicit implementation supplies every abstract type and function member. Its
 named parameters must be determined by its head; prerequisites cannot introduce
 extra binders. Defined equations cannot be overridden.
 
-```blot
+```squid
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 impl ArraySource a : Source (Array a) = {
   type Item = a,
@@ -1725,7 +1725,7 @@ With several tags, the nearest runs first: `@[f] @[g] const x = value` binds
 `f (g value)`. The declaration's type annotation constrains the result of all
 tags, including when the initializer is a function.
 
-```blot
+```squid
 func add amount => return func value => return value + amount
 @[add 1]
 @[func value => return value * 2] io const answer: U32 = 20
@@ -1740,7 +1740,7 @@ receive `unsupported_attribute`.
 
 ## Modules, constants, current limits
 
-Use `blotc check-exports FILE...` to check that a module writes the types of
+Use `squidc check-exports FILE...` to check that a module writes the types of
 its public values. Named functions may annotate their parameters and result;
 `const` and `let` may annotate the whole declaration. A unit parameter spells
 its own type. Local functions keep ordinary inference. The command parses the
@@ -1757,7 +1757,7 @@ the implementation of a function with a declared type. For example, the
 following function calculates the four entries during compilation. The runtime
 argument selects an entry.
 
-```blot
+```squid
 func lookup (base: U32): (U32 -> U32) => return do:
   let rows: Array U32 = @array.generate 4 (func i => return @u32.add base i)
   return func (i: U32): U32 => return @array.get rows i
@@ -1777,7 +1777,7 @@ arithmetic wraps as in Wasm. Integer division by zero fails compilation.
 `#do:` is shorthand for `#run do:`. Its local statements execute at compile
 time, and `break` supplies the resulting value:
 
-```blot
+```squid
 io answer () => return #do:
   let base = 40
   break base + 2
@@ -1793,7 +1793,7 @@ A project can grant a named file to a build by declaring a native asset with
 kind `input`. Its module exports `file`. Pass that value to the ordinary
 `include` function from `std/build` inside `#run`.
 
-```blot
+```squid
 import { include } from "std/build"
 import { file as icon } from "./icon"
 func header file => return do:
@@ -1817,7 +1817,7 @@ reads, `val.(field) := expr` reflected updates, field metadata (`field.name`,
 `field.tag`), and expression-position reflected record builders (`let built: T =
 #for field in #fields T: ... break value`):
 
-```blot
+```squid
 type Config is data = $Config {
   width: U32 = 800,
   height: U32 = 600,
@@ -1838,7 +1838,7 @@ io area (): U32 =>
 All owned arrays share the unified `#[T]` (`Array T`) type and literal syntax,
 with in-place element writes and dynamic growth/truncation:
 
-```blot
+```squid
 io answer (): U32 =>
   let items: #[U32] = #[41]
   let score = 42
@@ -1888,11 +1888,11 @@ supported operations, lifetime checks, capacity limits and remaining work.
 
 Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
-omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
+omit `.sq`; the CLI maps `std/` to the source library. Cycles are errors.
 Top-level declarations are public by default. `private` before a value, alias,
 data, opaque, contract, effect or named function declaration keeps its name inside its defining module;
 constructors and operations inherit that visibility. `private io` keeps
-the host export while hiding the Blot import. Importing a type does not import
+the host export while hiding the Squid import. Importing a type does not import
 differently named constructors. Imported operator functions need local fixity
 declarations. `export { answer as forwarded, Token } from "./producer"` forwards
 selected public names while retaining their original producer and kind.
@@ -1927,7 +1927,7 @@ an effect unhandled is an error. Only the entry module reaches the host, so a
 module it imports cannot declare entries. `io` is contextual at top level (`io main () => ...`, `io const`, `io let`), so `io`, `entry`, `kernel` and `process` remain ordinary
 names elsewhere, as in `func launch io => io ()`.
 
-```blot
+```squid
 func helper (value: U32) => return value + 1
 io answer () => return helper 41
 io let started: U32 = helper 1
@@ -1971,7 +1971,7 @@ does not supply implicit handlers.
 
 Monadic blocks use an ordinary prelude adapter:
 
-```blot
+```squid
 const try = monad Maybe
 func sequence candidate => return do try:
   use value <- candidate
@@ -1994,7 +1994,7 @@ returns a wrapped `$Continue state` or `$Done result` using the prelude's
 call stack; failure skips later steps, and `break value` still exits the nearest
 `do`. Custom monads need an `iterate` member only for blocks containing loops.
 
-```blot
+```squid
 func step count => return
   if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
 io answer () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
@@ -2033,7 +2033,7 @@ chooses that type's ordinary `from` function. Primitive implementations use
 `to_f32`/`to_u32`; custom types can define their own conversions. There is no
 default target when the context leaves it ambiguous.
 
-```blot
+```squid
 io normalized (first: U32) => return from first / 6555.0
 io explicit (value: U32) => return do:
   let converted: F32 = from value
@@ -2060,7 +2060,7 @@ Use an ordinary Unit callback for work that should run only when selected. `and`
 and `or` are primitive short-circuit operators; their right operand runs only
 when needed. Function arguments otherwise evaluate eagerly.
 
-```blot
+```squid
 func choose enabled -> callback => return
   if enabled then callback () else 42
 io answer () => return
@@ -2081,7 +2081,7 @@ Alternative rows bind the same names and share one body. A failed guard falls
 through to the next arm. Guards do not count toward exhaustiveness: retain an
 unguarded fallback covering their cases.
 
-```blot
+```squid
 type Choice is data =
   | $First U32
   | $Second U32
@@ -2096,14 +2096,14 @@ io answer value => return case $Second value of
 Indented expression continuations extend the preceding expression; `:` and `of`
 open statement and case suites. Leading `|` can align with the first alternative
 in a case arm. Parentheses also allow continuation across lines.
-`blot fmt path.blot` normalizes spacing and blank lines, separates long data
+`squid fmt path.sq` normalizes spacing and blank lines, separates long data
 alternatives, and removes parentheses that do not affect expression grouping.
 `--check` checks without writing. The formatter verifies that the parsed
 structure is unchanged before writing.
 
 ## Sparks, kernels and isolated processes
 
-Blot provides three orthogonal, compiler-verified concurrency primitives:
+Squid provides three orthogonal, compiler-verified concurrency primitives:
 
 1. **`spark #[expr | pat <- source]`** — synchronous, pure (`! {}`), ordered
    data-parallel map over a single unguarded irrefutable array or `U32` range
@@ -2115,13 +2115,13 @@ Blot provides three orthogonal, compiler-verified concurrency primitives:
    (stateless `#kernel func name (x: Item): Out => ...` or prepared-context
    `#kernel const name: Kernel [WireCtx, Item, Out] = { prepare: p, run: r }`),
    binding an opaque entry-module `Kernel [Ctx, Item, Out]` handle and emitting
-   schema-validated `blot:kernels` metadata for warm host `KernelPool`s.
+   schema-validated `squid:kernels` metadata for warm host `KernelPool`s.
 3. **`#process`** — isolated stateful sequential actors
    (`#process const name: Process [Config, Cmd, Reply] = { init: i, step: s }` where
-   `step` takes `own State`), emitting `blot:processes` metadata for
+   `step` takes `own State`), emitting `squid:processes` metadata for
    deterministic host schedulers (`Processes`).
 
-```blot
+```squid
 // Pure data-parallel map (vectorizes to 4-wide Wasm SIMD):
 io double (xs: #[U32]): #[U32] =>
   return spark #[x * 2 | x <- xs]

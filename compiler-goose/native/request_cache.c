@@ -24,21 +24,21 @@ struct artifact {
 static struct artifact queue[PARTS];
 /* Ordinary CLI builds need no supervisor. A request exists only while the
  * candidate owns its immutable input; after finish, publication uses no Goose. */
-extern int32_t blot_request_input_fd(void) __attribute__((weak));
-int32_t blot_request_cache_active(void) {
-    if (blot_request_input_fd) return blot_request_input_fd() >= 0;
+extern int32_t squid_request_input_fd(void) __attribute__((weak));
+int32_t squid_request_cache_active(void) {
+    if (squid_request_input_fd) return squid_request_input_fd() >= 0;
     return 0;
 }
 static void close_artifact(struct artifact *item) {
     if (item->occupied && item->fd >= 0) close(item->fd);
     memset(item, 0, sizeof *item);
 }
-uint32_t blot_request_cache_pending(void) {
+uint32_t squid_request_cache_pending(void) {
     uint32_t count = 0;
     for (unsigned i = 0; i < PARTS; i++) if (queue[i].occupied) count++;
     return count;
 }
-void blot_request_cache_discard(void) {
+void squid_request_cache_discard(void) {
     for (unsigned i = 0; i < PARTS; i++) close_artifact(&queue[i]);
 }
 static int copy_path(char out[PATH_MAX], const uint8_t *in, uint64_t length) {
@@ -64,7 +64,7 @@ static int prepare(struct artifact *next, uint32_t part,
     const uint8_t *lock, uint64_t lock_length,
     const uint8_t *target, uint64_t target_length,
     const uint8_t *temporary, uint64_t temporary_length) {
-    if (!blot_request_cache_active() || part >= PARTS) return -EINVAL;
+    if (!squid_request_cache_active() || part >= PARTS) return -EINVAL;
     memset(next, 0, sizeof *next); next->fd = -1;
     int error = copy_path(next->directory, directory, directory_length);
     if (!error) error = copy_path(next->lock, lock, lock_length);
@@ -89,7 +89,7 @@ static int prepare(struct artifact *next, uint32_t part,
     }
     return 0;
 }
-int32_t blot_request_cache_stage_write(uint32_t part,
+int32_t squid_request_cache_stage_write(uint32_t part,
     const uint8_t *directory, uint64_t directory_length,
     const uint8_t *lock, uint64_t lock_length,
     const uint8_t *target, uint64_t target_length,
@@ -101,7 +101,7 @@ int32_t blot_request_cache_stage_write(uint32_t part,
                         target, target_length, temporary, temporary_length);
     if (error) return error;
     if (!temporary) return -EINVAL;
-    int fd = memfd_create("blot-request-cache", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    int fd = memfd_create("squid-request-cache", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (fd < 0) return -errno;
     uint64_t offset = 0;
     while (offset < length) {
@@ -119,7 +119,7 @@ int32_t blot_request_cache_stage_write(uint32_t part,
     close_artifact(&queue[part]); queue[part] = next;
     return 0;
 }
-int32_t blot_request_cache_stage_remove(uint32_t part,
+int32_t squid_request_cache_stage_remove(uint32_t part,
     const uint8_t *directory, uint64_t directory_length,
     const uint8_t *lock, uint64_t lock_length,
     const uint8_t *target, uint64_t target_length) {
@@ -194,7 +194,7 @@ static int publish_one(const struct artifact *item, int64_t deadline) {
     if (good && in_time(deadline) && !rename(item->temporary, item->target)) return 0;
     unlink(item->temporary); return -1;
 }
-void blot_request_cache_publish(void) {
+void squid_request_cache_publish(void) {
     unsigned first = 0;
     while (first < PARTS && !queue[first].occupied) first++;
     if (first == PARTS) return;
@@ -207,5 +207,5 @@ void blot_request_cache_publish(void) {
             if (queue[i].occupied && in_time(deadline)) publish_one(&queue[i], deadline);
         flock(fd, LOCK_UN); close(fd);
     }
-    blot_request_cache_discard();
+    squid_request_cache_discard();
 }

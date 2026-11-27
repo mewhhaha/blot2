@@ -23,7 +23,7 @@ if (
   !Number.isSafeInteger(samples) || samples < 3 ||
   !Number.isSafeInteger(batch) || batch < 1
 ) throw new Error("Invalid samples/batch");
-const profile = await Deno.makeTempDir({ prefix: "blot-firefox-benchmark-" });
+const profile = await Deno.makeTempDir({ prefix: "squid-firefox-benchmark-" });
 await Deno.writeTextFile(
   `${profile}/user.js`,
   'user_pref("privacy.reduceTimerPrecision", false);\nuser_pref("browser.shell.checkDefaultBrowser", false);\n',
@@ -33,7 +33,7 @@ const completed = new Promise<Record<string, unknown>>((resolve) => {
   finish = resolve;
 });
 const html =
-  `<!doctype html><meta charset="utf-8"><title>Blot runtime benchmark</title><pre id="status">Running…</pre><script type="module">
+  `<!doctype html><meta charset="utf-8"><title>Squid runtime benchmark</title><pre id="status">Running…</pre><script type="module">
 const check = (condition, message) => { if (!condition) throw Error(message); };
 try {
   const reference = await (await fetch("/reference")).json();
@@ -45,20 +45,20 @@ try {
     guests[side] = (await WebAssembly.instantiate(bytes)).instance.exports;
   }
   const invoke = (side, row) => {
-    const raw = guests[side]; raw["blot:ownership_enter"]();
+    const raw = guests[side]; raw["squid:ownership_enter"]();
     let outcome = 1;
     try { check((raw[row.name](row.argument) >>> 0) === (row.expected >>> 0), row.name + " result"); outcome = 0; }
-    finally { raw["blot:ownership_leave"](outcome); }
-    check(raw["blot:rc_roots"].value === 0 and raw["blot:rc_leases"].value === 0, "Owners remain");
+    finally { raw["squid:ownership_leave"](outcome); }
+    check(raw["squid:rc_roots"].value === 0 and raw["squid:rc_leases"].value === 0, "Owners remain");
   };
   const report = {format: 1, complete: false, engine: navigator.userAgent, scope: "Headless Firefox, isolated profile with timer rounding disabled. Uninstrumented Wasm and ownership enter/leave. Same pinned binaries and counter budgets as the native-host suite.", samples: ${samples}, batch: ${batch}, builds: reference.builds, rows: []};
   for (const row of reference.rows) {
     const measured = {};
     for (const side of ["baseline", "candidate"]) {
       for (let i = 0; i < 10; i++) invoke(side, row);
-      const before = Object.fromEntries(Object.keys(row[side].counts).map(key => [key, guests[side]["blot:" + key].value]));
+      const before = Object.fromEntries(Object.keys(row[side].counts).map(key => [key, guests[side]["squid:" + key].value]));
       invoke(side, row);
-      const counts = Object.fromEntries(Object.entries(before).map(([key, value]) => [key, (guests[side]["blot:" + key].value - value) >>> 0]));
+      const counts = Object.fromEntries(Object.entries(before).map(([key, value]) => [key, (guests[side]["squid:" + key].value - value) >>> 0]));
       check(JSON.stringify(counts) === JSON.stringify(row[side].counts), row.name + " counters");
       measured[side] = {counts, samples_ms: []};
     }

@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installBlotLanguage } from "./languages.ts";
+import { installSquidLanguage } from "./languages.ts";
 
 const highlightingOnly = Deno.args[0] === "--highlight-only";
 if (Deno.args.length > 1 || (Deno.args.length === 1 && !highlightingOnly)) {
@@ -9,7 +9,7 @@ if (Deno.args.length > 1 || (Deno.args.length === 1 && !highlightingOnly)) {
 
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 const grammarDirectory = fileURLToPath(
-  new URL("../tree-sitter-blot2/", import.meta.url),
+  new URL("../tree-sitter-squid/", import.meta.url),
 );
 const extensions: Partial<Record<typeof Deno.build.os, string>> = {
   linux: "so",
@@ -31,7 +31,7 @@ if (!configDirectory) {
 }
 const helixDirectory = join(configDirectory, "helix");
 const languagesPath = join(helixDirectory, "languages.toml");
-const libraryName = `blot.${extension}`;
+const libraryName = `squid.${extension}`;
 const builtLibrary = join(grammarDirectory, libraryName);
 
 let existingLanguages = "";
@@ -42,7 +42,7 @@ try {
 }
 let installedLanguages = existingLanguages;
 if (!highlightingOnly) {
-  installedLanguages = installBlotLanguage(existingLanguages, {
+  installedLanguages = installSquidLanguage(existingLanguages, {
     repository,
     definition: await Deno.readTextFile(
       new URL("./languages.toml", import.meta.url),
@@ -72,7 +72,7 @@ const replacements: {
 ];
 for (const name of ["highlights.scm", "rainbows.scm"]) {
   replacements.push({
-    relativePath: join("runtime", "queries", "blot", name),
+    relativePath: join("runtime", "queries", "squid", name),
     contents: await Deno.readFile(join(grammarDirectory, "queries", name)),
   });
 }
@@ -89,16 +89,16 @@ if (!highlightingOnly) {
     ]
   ) {
     replacements.push({
-      relativePath: join("runtime", "queries", "blot", name),
+      relativePath: join("runtime", "queries", "squid", name),
       contents: undefined,
     });
   }
   // Retire the separate runtime installed by the initial project-local setup.
   for (
     const relativePath of [
-      join("runtime", "grammars", `blot2.${extension}`),
-      join("runtime", "queries", "blot2", "highlights.scm"),
-      join("runtime", "queries", "blot2", "rainbows.scm"),
+      join("runtime", "grammars", `squid.${extension}`),
+      join("runtime", "queries", "squid", "highlights.scm"),
+      join("runtime", "queries", "squid", "rainbows.scm"),
     ]
   ) {
     replacements.push({ relativePath, contents: undefined });
@@ -142,7 +142,7 @@ await Deno.mkdir(helixDirectory, { recursive: true });
 if (changes.some(({ previous }) => previous !== undefined)) {
   const backupDirectory = await Deno.makeTempDir({
     dir: helixDirectory,
-    prefix: "blot-backup-",
+    prefix: "squid-backup-",
   });
   for (const { relativePath, previous } of changes) {
     if (previous === undefined) continue;
@@ -150,7 +150,7 @@ if (changes.some(({ previous }) => previous !== undefined)) {
     await Deno.mkdir(dirname(backup), { recursive: true });
     await Deno.writeFile(backup, previous);
   }
-  console.log(`Backed up replaced Blot files to ${backupDirectory}`);
+  console.log(`Backed up replaced Squid files to ${backupDirectory}`);
 }
 
 for (const { relativePath, contents } of changes) {
@@ -169,7 +169,7 @@ for (const { relativePath, contents } of changes) {
 
 // Run outside the checkout so project-local registration cannot mask a failure.
 const health = await new Deno.Command("hx", {
-  args: ["--health", "blot"],
+  args: ["--health", "squid"],
   cwd: helixDirectory,
   env: { XDG_CONFIG_HOME: configDirectory, NO_COLOR: "1" },
 }).output();
@@ -188,16 +188,16 @@ if (!highlightingOnly) {
 }
 if (!health.success || required.some((line) => !report.includes(line))) {
   throw new Error(
-    `Helix did not load the installed Blot configuration:\n${report}${
+    `Helix did not load the installed Squid configuration:\n${report}${
       new TextDecoder().decode(health.stderr)
     }`,
   );
 }
 console.log(report.trimEnd());
 if (highlightingOnly) {
-  console.log("Restart Helix to load the updated Blot highlighting.");
+  console.log("Restart Helix to load the updated Squid highlighting.");
 } else {
   console.log(
-    "Restart Helix to use Blot completion. In insert mode, Ctrl-x requests suggestions.",
+    "Restart Helix to use Squid completion. In insert mode, Ctrl-x requests suggestions.",
   );
 }

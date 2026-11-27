@@ -73,12 +73,12 @@ io next (values: Array U32): U32 => do:
 
 Deno.test("an array length member supplied by a prelude keeps its own semantics", async () => {
   const prelude = await Deno.readTextFile(
-    new URL("../../std/prelude.blot", import.meta.url),
+    new URL("../../std/prelude.sq", import.meta.url),
   );
   const standard =
     "func Array.length (values: #[a]): U32 => @array.length values";
   assert.ok(prelude.includes(standard));
-  const file = await Deno.makeTempFile({ suffix: ".blot" });
+  const file = await Deno.makeTempFile({ suffix: ".sq" });
   try {
     await Deno.writeTextFile(
       file,

@@ -28,7 +28,7 @@ identity anomaly is preserved separately; the final release forces
 reconfiguration and checks the current source identity.
 
 The isolated qualification record, exact source delta and pins live in
-`/var/tmp/blot2-adapter-state-047/build/bench/adapter-state/`. The parent owns
+`/var/tmp/squid-adapter-state-047/build/bench/adapter-state/`. The parent owns
 the merged full native/guest/analyzer gate. This change removes admitted tagged
 step cells; child tuples, cursors and other adapter state still retain
 allocations. It establishes neither task 047 completion nor a general compiler

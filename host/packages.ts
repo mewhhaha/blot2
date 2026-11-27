@@ -1,8 +1,8 @@
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parse } from "jsr:@std/yaml@1.3.0";
 import {
-  type BlotGeneratorRule,
   readGeneratorRules,
+  type SquidGeneratorRule,
   validateGeneratorRulePaths,
 } from "./generators.ts";
 
@@ -11,7 +11,7 @@ type Manifest = {
   dependencies: Record<string, Dependency>;
   prelude?: string | null;
   tests?: PackageTests;
-  generators?: readonly BlotGeneratorRule[];
+  generators?: readonly SquidGeneratorRule[];
 };
 type Pin = { source: string; ref: string; revision: string };
 type Lock = { version: 1; packages: Record<string, Pin> };
@@ -27,7 +27,7 @@ export type PackageProject = {
   prelude: string | null;
   stdRoot: null;
   tests?: PackageTests;
-  generators?: readonly BlotGeneratorRule[];
+  generators?: readonly SquidGeneratorRule[];
 };
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -90,7 +90,7 @@ async function manifest(
   required = false,
   boundary?: string,
 ): Promise<Manifest | undefined> {
-  const path = join(root, "blot.json"), source = await read(path, boundary);
+  const path = join(root, "squid.json"), source = await read(path, boundary);
   if (source === undefined) {
     if (required) throw new Error(`${path}: manifest not found`);
     return;
@@ -184,13 +184,13 @@ async function hash(value: string): Promise<string> {
 }
 function cacheRoot(options: PackageOptions): string {
   if (options.cacheDirectory) return resolve(options.cacheDirectory);
-  const custom = Deno.env.get("BPM_CACHE_DIR");
+  const custom = Deno.env.get("SPM_CACHE_DIR");
   if (custom) return resolve(custom);
   const xdg = Deno.env.get("XDG_CACHE_HOME");
-  if (xdg) return resolve(xdg, "bpm");
+  if (xdg) return resolve(xdg, "spm");
   const home = Deno.env.get("HOME");
-  if (!home) throw new Error("Set BPM_CACHE_DIR or pass --cache DIR");
-  return resolve(home, ".cache", "bpm");
+  if (!home) throw new Error("Set SPM_CACHE_DIR or pass --cache DIR");
+  return resolve(home, ".cache", "spm");
 }
 async function git(args: string[]): Promise<string> {
   const process = await new Deno.Command("git", {
@@ -219,12 +219,12 @@ async function cached(cache: string, pin: Pin): Promise<string | undefined> {
   if (metadata === undefined) return;
   const info = object(JSON.parse(metadata), "cached package");
   if (info.source !== pin.source || info.revision !== pin.revision) {
-    throw new Error(`Invalid BPM cache entry: ${folder}`);
+    throw new Error(`Invalid SPM cache entry: ${folder}`);
   }
   const root = join(folder, "source");
   const head = await read(join(root, ".git", "HEAD"));
   if (head?.trim() !== pin.revision) {
-    throw new Error(`Changed BPM checkout: ${root}`);
+    throw new Error(`Changed SPM checkout: ${root}`);
   }
   const changes = await git([
     "-c",
@@ -238,7 +238,7 @@ async function cached(cache: string, pin: Pin): Promise<string | undefined> {
     "--untracked-files=all",
     "--ignored=matching",
   ]);
-  if (changes) throw new Error(`Changed BPM checkout: ${root}`);
+  if (changes) throw new Error(`Changed SPM checkout: ${root}`);
   return root;
 }
 async function download(
@@ -339,13 +339,13 @@ async function inside(
   if (directory && !info.isDirectory || !directory && !info.isFile) {
     throw new Error(`Invalid package export: ${path}`);
   }
-  if (!directory && !target.endsWith(".blot")) {
-    throw new Error("Prelude must be a .blot file");
+  if (!directory && !target.endsWith(".sq")) {
+    throw new Error("Prelude must be a .sq file");
   }
   return target;
 }
 async function workspace(root: string): Promise<Workspace> {
-  const filename = join(root, "blot-workspace.yaml"),
+  const filename = join(root, "squid-workspace.yaml"),
     source = await read(filename, await Deno.realPath(root));
   if (source === undefined) {
     throw new Error(`${filename}: package must declare its exports`);
@@ -381,7 +381,7 @@ async function workspace(root: string): Promise<Workspace> {
   return result;
 }
 async function readLock(root: string): Promise<Lock | undefined> {
-  const path = join(root, "blot.lock.json"), source = await read(path);
+  const path = join(root, "squid.lock.json"), source = await read(path);
   if (source === undefined) return;
   const value = object(JSON.parse(source), path);
   fields(value, ["version", "packages"], path);
@@ -455,13 +455,15 @@ async function graph(
           pin = undefined;
         }
         if (!pin && (mode === "resolve" || frozen)) {
-          throw new Error(`${alias}: run bpm install to update blot.lock.json`);
+          throw new Error(
+            `${alias}: run spm install to update squid.lock.json`,
+          );
         }
         const cache = cacheRoot(options);
         let found: string | undefined;
         if (pin && mode !== "update") found = await cached(cache, pin);
         if (mode === "resolve" && !found) {
-          throw new Error(`${alias}: cached package missing; run bpm install`);
+          throw new Error(`${alias}: cached package missing; run spm install`);
         }
         if (!found) {
           let revision: string | undefined;
@@ -498,7 +500,7 @@ async function graph(
   }
   await visit(root, input.dependencies);
   if (frozen && !sameLock(lock, old)) {
-    throw new Error("blot.lock.json needs updating; run bpm install");
+    throw new Error("squid.lock.json needs updating; run spm install");
   }
   const imports: Record<string, string> = Object.create(null);
   for (const [alias, item] of packages) {
@@ -602,14 +604,14 @@ export async function installPackages(
   if (!options.frozen) {
     const temporary = await Deno.makeTempFile({
       dir: root,
-      prefix: ".blot-lock-",
+      prefix: ".sq-lock-",
     });
     try {
       await Deno.writeTextFile(
         temporary,
         JSON.stringify(result.lock, null, 2) + "\n",
       );
-      await Deno.rename(temporary, join(root, "blot.lock.json"));
+      await Deno.rename(temporary, join(root, "squid.lock.json"));
     } finally {
       await Deno.remove(temporary).catch((error) => {
         if (!(error instanceof Deno.errors.NotFound)) throw error;

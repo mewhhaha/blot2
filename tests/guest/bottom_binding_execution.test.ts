@@ -1,5 +1,5 @@
 import {compileAndRun,equal} from "./compile_helpers.ts";
-const source = await Deno.readTextFile(new URL("./bottom_bindings.blot",import.meta.url));
+const source = await Deno.readTextFile(new URL("./bottom_bindings.sq",import.meta.url));
 for(const asynchronous of [false,true]) Deno.test(`diverging binding initializers preserve selected scalar values and effects (${asynchronous?"JSPI":"sync"})`,async()=>{
   await compileAndRun(source,async guest=>{
           equal(guest.read("folded"),42);

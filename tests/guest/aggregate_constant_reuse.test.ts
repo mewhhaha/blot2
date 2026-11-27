@@ -6,15 +6,15 @@ import { instantiateGuest } from "../../host/guest.ts";
 // equal a fresh build through moved code, element edits, a trapping constant
 // and recovery. A trapping constant compiles and traps when it is first read.
 Deno.test("retained builds of aggregate constants match fresh builds through movement, traps and recovery", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-aggregate-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-aggregate-" });
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(
-    `${directory}/dep.blot`,
+    `${directory}/dep.sq`,
     "const shared: Array U32 = #[1, 2, 3]\n",
   );
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
     prelude: null,
   };

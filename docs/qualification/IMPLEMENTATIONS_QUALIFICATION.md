@@ -3,7 +3,7 @@
 Task 056 implements the declaration, coherence and selection rules in
 [associated contracts](../compiler/ASSOCIATED_CONTRACTS.md). The combined release gate
 passes at local commit `10fab46`. The earlier isolated development record
-remains in `/var/tmp/blot2-implementations-056-port-ec6a2ae`; it is not release
+remains in `/var/tmp/squid-implementations-056-port-ec6a2ae`; it is not release
 evidence.
 
 ## Checked behavior

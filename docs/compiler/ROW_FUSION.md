@@ -72,7 +72,7 @@ Those failed logs remain separate from accepted checks.
 The isolated source tree is `e191930790cbc616fbbcfc6fb1e7695aa4dac91f`, based on
 record `f80a1f7`. Standard Zig 0.17.0 LLVM/Fast binary SHA256:
 `468aa4e851cb65c08e9991dd38bc245319d0a8b195f12855c1573264cda886af`. It is
-immutable at`build/bench/row-fusion-040/blotc-isolated`. The baseline is the
+immutable at`build/bench/row-fusion-040/squidc-isolated`. The baseline is the
 accepted 039/055 binary
 `47021c966f75fbb6063b9de52d476fe944a8aa16dc6bc47aeae66cfbf4dd9095`. Pins,
 sources, Wasm, 31 raw paired samples and compiler phases are in
@@ -134,8 +134,8 @@ The reproducible benchmark command is:
 
 ```sh
 taskset -c 7 deno run -A build/bench/row-fusion-040/measure.ts \
-  build/bench/joint-024-035-039-055/blotc-final-candidate \
-  build/bench/joint-024-035-040/blotc-initial-candidate \
+  build/bench/joint-024-035-039-055/squidc-final-candidate \
+  build/bench/joint-024-035-040/squidc-initial-candidate \
   build/bench/joint-024-035-040/rows
 ```
 

@@ -11,7 +11,7 @@ operator, receiver, field or result-selected dispatch.
 Contract bodies retain their comma-separated predicates and contract inclusions.
 They may additionally declare these members:
 
-```blot
+```squid
 type Identity a is contract = { type Item = a }
 type Source s is contract = {
   type Item,
@@ -77,7 +77,7 @@ predicates inside a contract still use their current dispatch rules.
 
 An implementation has an explicit declaration name and explicit parameters:
 
-```blot
+```squid
 impl ArraySource a : Source (Array a) = {
   type Item = a,
   const first = func values => return @array.get values 0,
@@ -177,7 +177,7 @@ equality test, coercion or representation equality. In a given scheme it is a
 logical equation; at a concrete use it must be discharged. Legacy named bundles
 may include it without becoming nominal implementation-requiring contracts.
 
-```blot
+```squid
 const keep: a -> a where { Identity a, type_eq (Identity.Item a) a } =
   func value => return value
 ```

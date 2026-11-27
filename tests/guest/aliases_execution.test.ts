@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 Deno.test("aliases use the underlying layout, dispatch and independent type instantiations", async () => {
   await compileAndRun(
@@ -27,8 +27,8 @@ io const fraction = func () => return first (1.5, 2.5)
 
 Deno.test("imported aliases survive retained revisions, type changes and fresh builds", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`,
-    dependency = `${directory}/types.blot`;
+  const entry = `${directory}/main.sq`,
+    dependency = `${directory}/types.sq`;
   const compiler = await createZigProjectCompiler({ executable, entry });
   const original =
     "type Number = U32\ntype Pair a = (a, a)\nconst read = func (pair: Pair Number) => return @product.get pair 0\n";
@@ -105,9 +105,9 @@ io const carried = func (send: U32 -> U32 ! {Foreign}) => return packed ($Carry 
 
 Deno.test("aliases preserve interfaces in serialized dependency bundles", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`,
-    library = `${directory}/library.blot`,
-    bundle = `${directory}/dependencies.blotdep`;
+  const entry = `${directory}/main.sq`,
+    library = `${directory}/library.sq`,
+    bundle = `${directory}/dependencies.sqdep`;
   try {
     await Deno.writeTextFile(
       library,

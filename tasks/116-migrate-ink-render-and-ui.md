@@ -15,7 +15,7 @@ rather than preserving whole immutable worlds or page trees.
 
 ## Exclusive ownership
 
-In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.blot` files and directories:
+In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.sq` files and directories:
 `audio`, `brush`, `camera`, `color`, `debug`, `events`, `gizmos`, `graphics`,
 `input`, `input/`, `lighting`, `locale`, `menu`, `orbit`, `picking`, `profile`,
 `render`, `render/`, `shadow`, `sound`, `text`, `ui`, `ui/`, `view`.
@@ -71,4 +71,4 @@ Do not report a partial run as a pass or infer frame performance from compile ti
 
 - [Rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md)
 - [Storage rewrite](STORAGE_REWRITE.md)
-- Ink `docs/architecture.md`, `docs/blot.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.
+- Ink `docs/architecture.md`, `docs/squid.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.

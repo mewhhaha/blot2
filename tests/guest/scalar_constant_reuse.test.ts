@@ -3,11 +3,11 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 Deno.test("retained callers validate scalar constants through edits traps and reverts", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-scalar-constant-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-scalar-constant-" });
+  const entry = `${directory}/main.sq`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
     prelude: null,
   };
@@ -59,12 +59,12 @@ io const unrelated = func () => return other
 });
 
 Deno.test("runtime body cutoff rebuilds executable and staged results through trapping revisions", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-body-cutoff-" });
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/values.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-body-cutoff-" });
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/values.sq`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
     prelude: null,
   };

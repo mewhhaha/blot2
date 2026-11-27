@@ -14,7 +14,7 @@ const out = resolve(outArg),
   root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 await Deno.mkdir(out);
 const source = numericAggregateSources();
-const entry = `${out}/main.blot`, library = `${out}/shapes.blot`;
+const entry = `${out}/main.sq`, library = `${out}/shapes.sq`;
 const sources = { [entry]: source.main, [library]: source.shapes };
 for (const [path, body] of Object.entries(sources)) {
   await Deno.writeTextFile(path, body);
@@ -34,7 +34,7 @@ for (
   ]
 ) pins[p] = await sha(await Deno.readFile(p));
 for await (const file of Deno.readDir(`${root}/std`)) {
-  if (file.isFile && file.name.endsWith(".blot")) {
+  if (file.isFile && file.name.endsWith(".sq")) {
     const path = `${root}/std/${file.name}`;
     pins[path] = await sha(await Deno.readFile(path));
   }
@@ -46,7 +46,7 @@ for (const tier of ["development", "optimized"] as const) {
       executable,
       entry,
       stdRoot: `${root}/std`,
-      prelude: `${root}/std/prelude.blot`,
+      prelude: `${root}/std/prelude.sq`,
     });
     try {
       const result = await compiler.build({ sources });
@@ -63,11 +63,11 @@ for (const tier of ["development", "optimized"] as const) {
         arg: number,
         expected: number,
       ) {
-        (exports["blot:ownership_enter"] as (() => void) | undefined)?.();
+        (exports["squid:ownership_enter"] as (() => void) | undefined)?.();
         try {
           assert.equal((exports[name] as (n: number) => number)(arg), expected);
         } finally {
-          (exports["blot:ownership_leave"] as (() => void) | undefined)?.();
+          (exports["squid:ownership_leave"] as (() => void) | undefined)?.();
         }
       }
       for (const [shape] of numericShapes) {
@@ -102,7 +102,7 @@ for (const tier of ["development", "optimized"] as const) {
             invoke(observed, c.name, c.arg, c.expected);
           }
           const end = traffic(observed);
-          for (const name of ["blot:rc_roots", "blot:rc_leases"]) {
+          for (const name of ["squid:rc_roots", "squid:rc_leases"]) {
             assert.equal(
               (observed[name] as WebAssembly.Global | undefined)?.value ?? 0,
               0,

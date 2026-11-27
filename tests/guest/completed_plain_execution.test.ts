@@ -89,8 +89,8 @@ function toBits(value: number): number {
   return floatBytes.getUint32(0);
 }
 Deno.test(`completed plain plans preserve nominal updates and typed bits across modules`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-plain-plans-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-plain-plans-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
@@ -101,9 +101,9 @@ Deno.test(`completed plain plans preserve nominal updates and typed bits across 
     const built = await compiler.build({
       sources: {
         [entry]: mainSource,
-        [`${directory}/common.blot`]: commonSource,
-        [`${directory}/left.blot`]: callerSource,
-        [`${directory}/right.blot`]: callerSource,
+        [`${directory}/common.sq`]: commonSource,
+        [`${directory}/left.sq`]: callerSource,
+        [`${directory}/right.sq`]: callerSource,
       },
     });
     assert(built.success, JSON.stringify(built));
@@ -169,9 +169,9 @@ Deno.test(`completed plain plans preserve nominal updates and typed bits across 
 });
 Deno.test(`completed plain plans keep hidden pools and host effects`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-plain-fallback-",
+    prefix: "squid-plain-fallback-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
@@ -278,9 +278,9 @@ io const answer = func (bits: U32): Array U32 => return do:
 
 Deno.test(`completed plain word ABI preserves scalar floats nullary results variants and scratch`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-plain-boundaries-",
+    prefix: "squid-plain-boundaries-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

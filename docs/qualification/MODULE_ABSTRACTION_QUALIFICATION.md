@@ -142,7 +142,7 @@ The qualified Tree-sitter 0.27.1 CLI generates from `grammar.js` with ABI 14.
 bare export/private/opaque identifiers. No generated output was hand-edited. The
 input-only patch requires both generator tasks before host/editor validation.
 
-Fifteen alternating CPU-6 formatter pairs on `examples/syntax.blot` preserve
+Fifteen alternating CPU-6 formatter pairs on `examples/syntax.sq` preserve
 identical formatted text. Median CPU is 41.636 → 49.008 ms; paired median/p90
 ratios are 1.0824/1.5455 (host load 4.86). This short screen includes frontend
 creation and variable JIT/GC costs; it shows additional host cost, not a
@@ -179,7 +179,7 @@ to +960. Every teardown has zero live requested bytes. No overall speedup is
 established. Twelve modules intentionally change Wasm for counted ownership
 helpers; the scalar module stays byte equal, and each variant is stable across
 its seven repeats. Semantic/prepared counters match except the exact
-`requests.blot` allocation-role correction, 19 → 20, caused by proper
+`requests.sq` allocation-role correction, 19 → 20, caused by proper
 Request/Pair reference classification. The harness permits only that change.
 
 Seven further alternating pairs cover four synthetic graphs through fresh,

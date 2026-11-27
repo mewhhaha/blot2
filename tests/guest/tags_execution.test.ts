@@ -6,11 +6,11 @@ import {
 } from "./compile_helpers.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 Deno.test("tags stack nearest first and annotate complete scalar or function initializers", async () => {
   const source = await Deno.readTextFile(
-    new URL("../../examples/tags.blot", import.meta.url),
+    new URL("../../examples/tags.sq", import.meta.url),
   );
   await compileAndRun(source, (guest) => {
     equal(guest.read("answer"), 41);
@@ -27,22 +27,22 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
   });
   try {
     await Deno.writeTextFile(
-      `${dir}/lib.blot`,
+      `${dir}/lib.sq`,
       "const inc=func value=> return value+1\nconst add=func amount=> return func value=> return value+amount\n",
     );
     await Deno.writeTextFile(
-      `${dir}/main.blot`,
+      `${dir}/main.sq`,
       'import { inc as imported } from "./lib"\nimport * as lib from "./lib"\nconst alias=imported\n@[alias] io const local:U32=41\n@[imported] io const named:U32=41\n@[lib.add 1] io const qualified:U32=41\n',
     );
     const run = await new Deno.Command(compiler, {
       args: [
         "build",
-        `${dir}/main.blot`,
+        `${dir}/main.sq`,
         `${dir}/program.wasm`,
         "--std-root",
         "std",
         "--prelude",
-        new URL("../../std/prelude.blot", import.meta.url).pathname,
+        new URL("../../std/prelude.sq", import.meta.url).pathname,
       ],
       stdout: "piped",
       stderr: "piped",

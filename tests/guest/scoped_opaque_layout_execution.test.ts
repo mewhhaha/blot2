@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest, readGuestAbi } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const fixture = new URL("../../compiler-goose/tests/fixtures/scoped-opaque/", import.meta.url);
 
 async function execute(bytes: Uint8Array<ArrayBuffer>, asynchronous: boolean) {
@@ -44,11 +44,11 @@ async function execute(bytes: Uint8Array<ArrayBuffer>, asynchronous: boolean) {
 }
 
 Deno.test(`opaque variant layouts preserve private identity and representation edits`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-opaque-" });
-  const entry = `${directory}/main.blot`;
-  const tokens = `${directory}/tokens.blot`;
-  const original = await Deno.readTextFile(new URL("tokens.blot", fixture));
-  const main = await Deno.readTextFile(new URL("main.blot", fixture));
+  const directory = await Deno.makeTempDir({ prefix: "squid-scoped-opaque-" });
+  const entry = `${directory}/main.sq`;
+  const tokens = `${directory}/tokens.sq`;
+  const original = await Deno.readTextFile(new URL("tokens.sq", fixture));
+  const main = await Deno.readTextFile(new URL("main.sq", fixture));
   const changed = original.replace(
     "{ kind: kind, region:",
     "{ padding: U32, kind: kind, region:",
@@ -57,8 +57,8 @@ Deno.test(`opaque variant layouts preserve private identity and representation e
   await Deno.writeTextFile(entry, main);
   await Deno.writeTextFile(tokens, original);
   await Deno.writeTextFile(
-    `${directory}/facade.blot`,
-    await Deno.readTextFile(new URL("facade.blot", fixture)),
+    `${directory}/facade.sq`,
+    await Deno.readTextFile(new URL("facade.sq", fixture)),
   );
   const options = {
     executable,

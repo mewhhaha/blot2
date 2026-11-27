@@ -4,7 +4,7 @@
 
 Gdev's pile-handle benchmark produced 144 Idle and 144 Collect intents across
 the six workers' incoming and outgoing plans. The sequence comes from executing
-the Blot fixture for pile counts 2, 8 and 64. The main game does not use this
+the Squid fixture for pile counts 2, 8 and 64. The main game does not use this
 candidate planner. A separate balanced control exercises Deliver and Rest too.
 
 | Wasm layout | Bytes per intent | Tags only | All fields | Concatenate |
@@ -20,7 +20,7 @@ uses 7 bytes per intent and scans all fields in 183.1 µs. Fixed-width storage
 takes 214.5 µs. The byte counts cover list contents, excluding allocator and
 owner headers.
 
-Run `deno run -A benchmarks/intent/run.ts` from the Blot root with the Gdev and
+Run `deno run -A benchmarks/intent/run.ts` from the Squid root with the Gdev and
 Ink siblings present. The driver builds the actual Gdev fixture with a source
 overlay to collect the input. Clang compiles three kernels to Wasm to isolate
 layout cost. Each timing is the median of nine rotated rounds in V8. Each round
@@ -28,11 +28,11 @@ warms the kernel and checks 100 results. Concatenation copies two spans in
 reverse order and checks the resulting sequence with an order-sensitive hash.
 
 These measurements support a split representation for sequential lists of
-varying-width cases. Blot still emits its existing fixed-stride list layout.
-The following Blot benchmark exercises repeated append and shared tails. [Raw measurements](../evidence/measurements/2026-11-18-intent-layout.json)
+varying-width cases. Squid still emits its existing fixed-stride list layout.
+The following Squid benchmark exercises repeated append and shared tails. [Raw measurements](../evidence/measurements/2026-11-18-intent-layout.json)
 
 
-## Building and sharing lists in Blot
+## Building and sharing lists in Squid
 
 The released compiler builds the actual Gdev `plan.Intent` type, including its
 opaque four-word pile handle. The fixture supplies 288 captured intents and a
@@ -72,7 +72,7 @@ and took 99.6 µs, down from 116.9 µs for fixed-width shared chunks.
 Fresh 19-module builds of the shared-tail probe emitted 30,529 bytes for
 fixed rows, 33,508 for packed words and 34,051 for grouped payloads. Their
 medians were 162, 158 and 158 ms across 18 fresh builds per layout. All
-three still use Blot's regular List operations. The shipping list layout is
+three still use Squid's regular List operations. The shipping list layout is
 fixed stride. The main game uses a different planner.
 
 Each checksum includes every active payload word in order. Small controls
@@ -80,7 +80,7 @@ cover empty inputs, all tag alignments, partial tag words and saved operands.
 Three processes timed unmodified release Wasm with rotated variant order.
 A separate instrumented guest verified the same checksum and counted
 `memory.copy` bytes. Sub-microsecond join timings include the callback
-boundary. [Measurements](../evidence/measurements/2026-11-18-blot-list-builders.json) · [Per-process samples](../evidence/measurements/2026-11-18-blot-list-builders.raw.json.gz)
+boundary. [Measurements](../evidence/measurements/2026-11-18-squid-list-builders.json) · [Per-process samples](../evidence/measurements/2026-11-18-squid-list-builders.raw.json.gz)
 
 ### Growing one list across case arms
 

@@ -39,10 +39,10 @@ io const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
 
 Deno.test("trait output type edits preserve the last good revision", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-associated-revisions-",
+    prefix: "squid-associated-revisions-",
   });
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const source = `import { Identity, make } from "./library"
 io const answer: Unit -> (Identity.item U32) = func () => return make 42
 `;

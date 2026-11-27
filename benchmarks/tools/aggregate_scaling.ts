@@ -20,7 +20,7 @@ const kinds = [
 type Kind = typeof kinds[number];
 const { values } = parseArgs({
   options: {
-    compiler: { type: "string", default: "compiler-goose/build/blotc-goose" },
+    compiler: { type: "string", default: "compiler-goose/build/squidc-goose" },
     widths: { type: "string", default: "8,32,128" },
     operations: { type: "string", default: "1,8,32" },
     kinds: { type: "string", default: "scalar,branch,loop,shared,distinct" },
@@ -155,7 +155,7 @@ for (const width of widths) {
   for (const count of operations) {
     for (const kind of selected) {
       const name = `${kind}-w${width}-n${count}`;
-      const entry = `${output}/${name}.blot`;
+      const entry = `${output}/${name}.sq`;
       const source = sourceFor(kind, width, count);
       await Deno.writeTextFile(entry, source);
       const sourceSha256 = await hash(encode(source));

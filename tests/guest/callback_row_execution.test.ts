@@ -8,7 +8,7 @@ import {
 for (const name of ["parameter", "record", "capture"] as const) {
   Deno.test(`Foreign callback ${name} use composes with handled effects`, async () => {
     const source = await Deno.readTextFile(
-      new URL(`../../compiler-goose/tests/fixtures/callback-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../../compiler-goose/tests/fixtures/callback-fixtures/${name}.sq`, import.meta.url),
     );
     for (const asynchronous of [false, true]) {
       await compileAndRun(source, async (guest) => {

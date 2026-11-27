@@ -226,9 +226,9 @@ io const answer = func () => return do reader:
   }
 });
 
-// Direct backend gap: examples/ecs.blot is rejected ("unresolved type variable at a reference") (tasks/DELETE_SCOPED.md).
+// Direct backend gap: examples/ecs.sq is rejected ("unresolved type variable at a reference") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("the source ECS example stages heterogeneous worlds and executes their scoped callbacks", async () => {
-  const source = await Deno.readTextFile(new URL("../../examples/ecs.blot", import.meta.url));
+  const source = await Deno.readTextFile(new URL("../../examples/ecs.sq", import.meta.url));
   await compileAndRun(source, guest => {
     for (let repeat = 0; repeat < 3; repeat++) {
       for (const ticks of [0, 1, 2, 10, 100]) {
@@ -237,7 +237,7 @@ Deno.test.ignore("the source ECS example stages heterogeneous worlds and execute
       }
       equal(guest.call("snapshot", null), 6);
     }
-  }, { prelude: "std/prelude.blot", stdRoot: "std" });
+  }, { prelude: "std/prelude.sq", stdRoot: "std" });
 });
 
 Deno.test("selected binary methods retain curried results and their invocation effects", async () => {
@@ -292,7 +292,7 @@ io const partial = func () => return do:
       for (const value of [0, 2, 40, 42, -2, 1.5]) equal(guest.call("answer", value), value + (42 - value) * 0.5);
       equal(guest.call("partial", null), 25);
     }
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
 });
 
 Deno.test("#run folds scalar calls and #do blocks to literal Wasm", async () => {

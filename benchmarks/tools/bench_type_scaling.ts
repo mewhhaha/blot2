@@ -2,9 +2,9 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
-const executable = resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose");
+const executable = resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose");
 const directory = await Deno.makeTempDir();
-const entry = resolve(directory, "main.blot");
+const entry = resolve(directory, "main.sq");
 const compositionSeeds = new Map([
   ["composition", "(x, x)"],
   ["mixedComposition", "(x, 0, x)"],

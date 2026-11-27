@@ -10,7 +10,7 @@ The Goose port originally called for repairing lifetimes, building the executabl
 then checking request OOM, retention and behavior against Zig. Batches were
 qualified at the boundary between source families.
 
-The original [RFC #46](https://github.com/mewhhaha/blot2/issues/46) migration
+The original [RFC #46](https://github.com/mewhhaha/squid-lang/issues/46) migration
 used Zig first, then Goose. Its scope is recorded in
 [the language migration](../docs/language/NEXT_MIGRATION.md).
 The named-function source migration covers std, Ink and Gdev: 8,964 functions
@@ -148,7 +148,7 @@ machine are not prerequisites or current evidence.
 
 See [the ownership contract](../docs/compiler/SCOPED_STORAGE.md) and
 [decision review](../docs/compiler/STORAGE_REWRITE_REVIEW.md). The
-[historical integration log](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/STORAGE_REWRITE.md)
+[historical integration log](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/STORAGE_REWRITE.md)
 retains earlier batches and measurements; it is not a list of checks passed now.
 
 ## Tasks and handoffs
@@ -186,7 +186,7 @@ create another design-only phase before implementing modules.
    qualification.
 3. Reuse the installed native test inventory for exact laws. Group
    executed-Wasm, copied-host and worker witnesses. Consumer gates use the same
-   compiler artifact; do not accidentally test the old `zig-out/bin/blotc`
+   compiler artifact; do not accidentally test the old `zig-out/bin/squidc`
    binary.
 4. After coherent consumer batches, run the required Ink generation/format and
    tests, Gdev check/codegen/tests, and relevant Pen native/browser checks. Run

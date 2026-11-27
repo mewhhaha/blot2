@@ -6,7 +6,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const modules = 18;
 const functions = 32;
 const groups = 4;
@@ -45,10 +45,10 @@ function entrySource(): string {
 
 async function project(directory: string, bumps: number[]) {
   const sources: Record<string, string> = {
-    [`${directory}/main.blot`]: entrySource(),
+    [`${directory}/main.sq`]: entrySource(),
   };
   for (let m = 0; m < modules; m++) {
-    sources[`${directory}/m${m}.blot`] = moduleSource(m, bumps[m]);
+    sources[`${directory}/m${m}.sq`] = moduleSource(m, bumps[m]);
   }
   for (const [path, text] of Object.entries(sources)) {
     await Deno.writeTextFile(path, text);
@@ -57,10 +57,10 @@ async function project(directory: string, bumps: number[]) {
 }
 
 Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for every worker count", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-workers-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-workers-" });
   const base = {
     executable,
-    entry: `${directory}/main.blot`,
+    entry: `${directory}/main.sq`,
     prelude: null,
   };
   try {
@@ -68,11 +68,11 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
     const original = await project(directory, zero);
     // The edit changes two dependencies, so a retained build lowers both.
     const edited = { ...original };
-    edited[`${directory}/m1.blot`] = moduleSource(1, 7);
-    edited[`${directory}/m4.blot`] = moduleSource(4, 9);
+    edited[`${directory}/m1.sq`] = moduleSource(1, 7);
+    edited[`${directory}/m4.sq`] = moduleSource(4, 9);
     const broken = { ...original };
-    broken[`${directory}/m2.blot`] += "const wrong: U32 = func value => return value\n";
-    broken[`${directory}/m5.blot`] += "const other: U32 = func value => return value\n";
+    broken[`${directory}/m2.sq`] += "const wrong: U32 = func value => return value\n";
+    broken[`${directory}/m5.sq`] += "const other: U32 = func value => return value\n";
     const results: Uint8Array[][] = [];
     const rejections: unknown[] = [];
     const counts = [[1, 1], [2, 1], [4, 1], [1, 4], [4, 4]];
@@ -140,16 +140,16 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
 
 Deno.test("parallel import discovery skips pipes and preserves the serial syntax diagnostic", async () => {
   if (Deno.build.os !== "linux") return;
-  const directory = await Deno.makeTempDir({ prefix: "blot-import-discovery-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-import-discovery-" });
   try {
     const files = await project(directory, Array(modules).fill(0));
-    const entry = directory + "/main.blot";
+    const entry = directory + "/main.sq";
     // Neither a hidden overlay nor a FIFO named by a malformed module is an input.
     files[entry] = 'import * as ignored from "./pipe"\n' +
       'import * as hidden from "./absent"\n' + files[entry] + "func invalid => )\n";
-    const pipe = await new Deno.Command("mkfifo", { args: [directory + "/pipe.blot"] }).output();
+    const pipe = await new Deno.Command("mkfifo", { args: [directory + "/pipe.sq"] }).output();
     assert(pipe.success);
-    const sources = { ...files, [directory + "/absent.blot"]: null };
+    const sources = { ...files, [directory + "/absent.sq"]: null };
     let serial;
     for (const frontendWorkers of [1, 8]) {
       const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, frontendWorkers });
@@ -169,10 +169,10 @@ Deno.test("parallel import discovery skips pipes and preserves the serial syntax
 });
 
 Deno.test("project workers preserve the exact associated type budget across imports", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-worker-budget-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-worker-budget-" });
   try {
     await Deno.writeTextFile(
-      `${directory}/shared.blot`,
+      `${directory}/shared.sq`,
       [
         "type Identity a { item } is trait = { id: a -> item }",
         "const U32.Identity: Identity U32 { item: U32 } = { id: func value => return value }",
@@ -194,12 +194,12 @@ Deno.test("project workers preserve the exact associated type budget across impo
           `func read${f} (value: U32): U32 => return shared.unwrap {number: shared.generic value}`,
         );
       }
-      await Deno.writeTextFile(`${directory}/m${index}.blot`, body.join("\n") + "\n");
+      await Deno.writeTextFile(`${directory}/m${index}.sq`, body.join("\n") + "\n");
       lines.push(`import { read0 as value${index} } from "./m${index}"`);
       sum = `@u32.add (${sum}) (value${index} value)`;
     }
     lines.push(`io run (value: U32): U32 => return ${sum}`);
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     await Deno.writeTextFile(entry, lines.join("\n") + "\n");
     for (const inferenceBudget of [18_136, 18_135]) {
       const outcomes = [];
@@ -238,14 +238,14 @@ Deno.test("project workers preserve the exact associated type budget across impo
 });
 
 Deno.test("staged imports use parallel workers and observe current Core after a retained edit", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-staged-workers-" });
-  const entry = directory + "/main.blot";
-  const provider = directory + "/math.blot";
+  const directory = await Deno.makeTempDir({ prefix: "squid-staged-workers-" });
+  const entry = directory + "/main.sq";
+  const provider = directory + "/math.sq";
   try {
     const imports = ['import { plus, base, spin } from "./math"'];
     for (let index = 0; index < 15; index++) {
       imports.push(`import * as side${index} from "./side${index}"`);
-      await Deno.writeTextFile(`${directory}/side${index}.blot`, `const v = ${index}\n`);
+      await Deno.writeTextFile(`${directory}/side${index}.sq`, `const v = ${index}\n`);
     }
     const main = (expr: string) => imports.join("\n") + "\nio answer (arg: U32): U32 => return " + expr + "\n";
     const source = (base: number) => `const base: Bool = ${base === 40}\nfunc plus (a: U32) -> (b: U32): U32 => return @u32.add a b\nfunc spin (n: U32): U32 => return spin n\n`;

@@ -17,8 +17,8 @@ async function answer(result: ZigProjectBuildResult, expected: number) {
   );
 }
 async function fixture() {
-  const root = await Deno.makeTempDir({ prefix: "blot-source-overlays-" });
-  const entry = root + "/main.blot", dependency = root + "/dep.blot";
+  const root = await Deno.makeTempDir({ prefix: "squid-source-overlays-" });
+  const entry = root + "/main.sq", dependency = root + "/dep.sq";
   return {
     root,
     entry,
@@ -34,20 +34,20 @@ Deno.test("source buffers compile virtual entry dependencies prelude and aliases
   const root = item.root + "/never-created";
   const compiler = await createZigProjectCompiler({
     executable,
-    entry: root + "/main.blot",
-    prelude: root + "/prelude.blot",
+    entry: root + "/main.sq",
+    prelude: root + "/prelude.sq",
     imports: { "pkg/": root + "/packages" },
   });
   try {
     const result = await compiler.build({
       sources: {
-        [root + "/main.blot"]:
+        [root + "/main.sq"]:
           'import {value} from "./dep"\nimport {extra} from "pkg/extra"\nio const answer: U32 = @u32.add value extra\n',
-        [root + "/dep.blot"]:
+        [root + "/dep.sq"]:
           "const values = #[1, 2]\nconst value: U32 = values[1]\n",
-        [root + "/prelude.blot"]:
+        [root + "/prelude.sq"]:
           "const increment = func (x: U32) : U32 => return @u32.add x 1\n",
-        [root + "/packages/extra.blot"]: "const extra: U32 = increment 39\n",
+        [root + "/packages/extra.sq"]: "const extra: U32 = increment 39\n",
       },
     });
     await answer(result, 42);
@@ -161,7 +161,7 @@ Deno.test("source buffer validation leaves the process usable and detects canoni
     const conflict = await compiler.build({
       sources: {
         [item.entry]: "io const answer = 1\n",
-        [item.root + "/alias/main.blot"]: "io const answer = 2\n",
+        [item.root + "/alias/main.sq"]: "io const answer = 2\n",
       },
     });
     ok(!conflict.success);

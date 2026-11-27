@@ -8,7 +8,7 @@
 - **Originating requirements:** PLAN: Hill 20 remainder / owner-reviewed
   artifacts. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -35,7 +35,7 @@ directories outside the previously approved deletion list. `build/bench/` and
 ## Validation
 
 Apply the relevant
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 rules. Use formatting, link, consistency and evidence checks for
 documentation-only changes; run code gates only when code or build inputs
 change.
@@ -66,10 +66,10 @@ change.
     `benchmarks/evidence/qualification/`) are the remaining evidence of record. Any
     boxed/packed baseline binaries or measurement evidence that lived only in
     `build/` left with it.
-  - Delete every `.zig-cache` directory under `/var/tmp/blot2-*`, and nothing
-    else. The `/var/tmp/blot2` symlink to this repository and the active
+  - Delete every `.zig-cache` directory under `/var/tmp/squid-*`, and nothing
+    else. The `/var/tmp/squid-lang` symlink to this repository and the active
     `compiler/.zig-cache` were excluded.
-- Inventory before deletion: `/var/tmp` held 566 `blot2-*` freeze directories
+- Inventory before deletion: `/var/tmp` held 566 `squid-*` freeze directories
   (about 1.3 TB apparent size) with 659 `.zig-cache` directories; no process had
   a working directory in them; the disk was 97% full.
 - Result: all 659 cache directories were removed; used space on `/home` fell
@@ -82,7 +82,7 @@ change.
   October) went with `build/` and was replaced by the decision above.
 - Incident, 15 October 2026: before any owner decision, a delegated task removed
   exactly
-  `/var/tmp/blot2-structured-tasks-20261015/source/compiler/.zig-cache` (about
+  `/var/tmp/squid-structured-tasks-20261015/source/compiler/.zig-cache` (about
   15 GiB reported; exact bytes not captured). This violated the approval
   requirement and is not an approved cleanup. Further deletion stopped; the
   three semantic slice source manifests and the Task-v1 failure binaries were

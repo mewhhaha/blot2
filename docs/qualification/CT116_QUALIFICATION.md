@@ -4,7 +4,7 @@ Fresh profiled frontend time falls from 1.600 to 1.036 s; checking from 1.214 to
 0.649 s. Checker allocation requests fall 51.1% and requested allocation bytes
 fall 15.7%. These are instrumented phase measurements, distinct from the
 unprofiled build timings below. See
-[the work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT116_WORK.md).
+[the work record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT116_WORK.md).
 
 ## Implementation
 
@@ -70,17 +70,17 @@ edit speedup. Fresh peak RSS rises from 483.5 to 491.8 MiB, so lower allocation
 traffic is not a demonstrated retained-memory saving. Backend work still takes
 about 5.68 s in the profiled builds and dominates the whole compilation.
 
-The public eighteen-program Blot/Rust comparison measures fresh compilation and
+The public eighteen-program Squid/Rust comparison measures fresh compilation and
 same-engine Wasm execution, with independent output witnesses. See the
-[README table](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#idiomatic-blot-and-rust-benchmarks),
+[README table](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#idiomatic-squid-and-rust-benchmarks),
 [methodology](../../benchmarks/idiomatic/README.md) and
 [raw report](../../benchmarks/results/ct116-2026-10-25.json). Do not generalize the
 small-program compile times to gdev or other whole applications.
 
-Blot compiles the small public programs in about 6–10 ms, versus Rust's 42–83
+Squid compiles the small public programs in about 6–10 ms, versus Rust's 42–83
 ms. Rust's runtime median is lower in every case, from a near tie for GCD to
 roughly 139× for decimal formatting. The list pipeline is about 133× slower in
-Blot and CSV numbers about 90×. These results include collection, text and
+Squid and CSV numbers about 90×. These results include collection, text and
 ownership representation differences; they do not isolate a backend instruction-
 selection cost. Runtime profiling is the next step before attributing the gaps.
 

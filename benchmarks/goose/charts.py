@@ -18,7 +18,7 @@ LABELS = {
     "sort_merge": "Merge sort",
     "sort_quick": "Quicksort",
 }
-COLORS = {"blot": "#c94d3f", "goose": "#087f8c"}
+COLORS = {"squid": "#c94d3f", "goose": "#087f8c"}
 
 
 def chart(rows, field, title, subtitle, filename, limit, ticks, series):
@@ -79,7 +79,7 @@ def chart(rows, field, title, subtitle, filename, limit, ticks, series):
     figure.text(
         0.04,
         0.025,
-        "2026-11-04 · shared-host medians · Blot vs Goose direct Wasm",
+        "2026-11-04 · shared-host medians · Squid vs Goose direct Wasm",
         fontsize=9,
         color="#64748b",
     )
@@ -97,7 +97,7 @@ def chart(rows, field, title, subtitle, filename, limit, ticks, series):
 
 
 def main():
-    rcParams.update({"svg.fonttype": "none", "svg.hashsalt": "blot-goose"})
+    rcParams.update({"svg.fonttype": "none", "svg.hashsalt": "squid-goose"})
     evidence = json.loads(EVIDENCE.read_text())
     builds = [row for row in evidence["build_summary"] if row["phase"] == "cold"]
     runtime = [
@@ -111,7 +111,7 @@ def main():
         "compilation.svg",
         150,
         [0, 25, 50, 75, 100, 125, 150],
-        [("blot", "Blot", COLORS["blot"]), ("goose", "Goose", COLORS["goose"])],
+        [("squid", "Squid", COLORS["squid"]), ("goose", "Goose", COLORS["goose"])],
     )
     chart(
         runtime,
@@ -122,7 +122,7 @@ def main():
         200,
         [0, 50, 100, 150, 200],
         [
-            ("blot", "Blot", COLORS["blot"]),
+            ("squid", "Squid", COLORS["squid"]),
             ("goose", "Goose", COLORS["goose"]),
         ],
     )

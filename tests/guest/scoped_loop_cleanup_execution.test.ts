@@ -3,9 +3,9 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const entry =
-  new URL("../../compiler-goose/tests/fixtures/scoped-loop-cleanup.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/tests/fixtures/scoped-loop-cleanup.sq", import.meta.url).pathname;
 
 {
   Deno.test(`loop cleanup preserves temporary owners and conditional returns`, async () => {
@@ -134,13 +134,13 @@ io main (count: U32): U32 =>
   return total
 `;
     const dir = await Deno.makeTempDir();
-    const path = `${dir}/main.blot`;
+    const path = `${dir}/main.sq`;
     await Deno.writeTextFile(path, source);
     const compiler = await createZigProjectCompiler({
       executable,
       entry: path,
       stdRoot: new URL("../../std", import.meta.url).pathname,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
       storage: {
         temporaryBytes: 2048,
         growerBytes: 65536,

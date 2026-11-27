@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 // A read shares what the state holds, so a function that hands it on copies it.
@@ -42,14 +42,14 @@ io const alternate = func (seed: U32) => return do:
 `;
 
 Deno.test("State provider reads keep replaced fields alive across owner destruction cancellation and callback-mode edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-state-owner-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-state-owner-" });
+  const entry = `${directory}/main.sq`;
   try {
     {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       });
       try {
         for (const text of [source, source + callback, source]) {
@@ -58,7 +58,7 @@ Deno.test("State provider reads keep replaced fields alive across owner destruct
           const fresh = await createZigProjectCompiler({
             executable,
             entry,
-            prelude: new URL("../../std/prelude.blot", import.meta.url),
+            prelude: new URL("../../std/prelude.sq", import.meta.url),
           });
           try {
             const rebuilt = await fresh.build({ sources: { [entry]: text } });

@@ -9,7 +9,7 @@
 // is a struct of references to them. Slices Zig allocates in arenas are spans
 // of grow-only pools in State, and the function emitter's per-body lists are
 // stacks in State that each body truncates to its own mark.
-namespace blot_direct_emit;
+namespace squid_direct_emit;
 import std;
 import binary;
 import support.native;
@@ -27,25 +27,25 @@ import support.zigmap;
 import direct.function;
 
 type Ty = u32;
-type Error = blot_direct_types::Error;
-type Env = blot_direct_types::Env;
-type Module = blot_check_core::Module;
-type Code = blot_check_diagnostic_code::Code;
-type Span = blot_check_core::Span;
-type BindingRef = blot_check_core::BindingRef;
-type TId = blot_check_types::Id;
-type NominalIdentity = blot_check_types::NominalIdentity;
-type Operator = blot_check_types::Operator;
-type ValType = blot_direct_writer::ValType;
-type U64Map = blot_direct_map::U64Map;
-type Runtime = blot_direct_runtime::Runtime;
+type Error = squid_direct_types::Error;
+type Env = squid_direct_types::Env;
+type Module = squid_check_core::Module;
+type Code = squid_check_diagnostic_code::Code;
+type Span = squid_check_core::Span;
+type BindingRef = squid_check_core::BindingRef;
+type TId = squid_check_types::Id;
+type NominalIdentity = squid_check_types::NominalIdentity;
+type Operator = squid_check_types::Operator;
+type ValType = squid_direct_writer::ValType;
+type U64Map = squid_direct_map::U64Map;
+type Runtime = squid_direct_runtime::Runtime;
 type Chars = const u8[:];
 
 // Bytes in State.text.
 struct Text { start: u32 = 0, len: u32 = 0 }
 // `code` is storage_unsupported for a form the direct backend lacks; any
 // other code is an error in the program itself.
-struct Failure { unit: u32 = 0, span: Span = Span { 0, 0 }, message: Text = Text {}, code: Code = blot_check_diagnostic_code::Code.storage_unsupported }
+struct Failure { unit: u32 = 0, span: Span = Span { 0, 0 }, message: Text = Text {}, code: Code = squid_check_diagnostic_code::Code.storage_unsupported }
 
 // A value: one Wasm local per word of its type's layout. The locals are
 // `len` words at `start` in State.words.
@@ -263,7 +263,7 @@ root struct State {
     rt_flags_known: bool = false,
     rt_has_fork: bool = false,
     rt_has_persistent: bool = false,
-    rt: Runtime = Runtime { layout: blot_direct_runtime::Layout {} },
+    rt: Runtime = Runtime { layout: squid_direct_runtime::Layout {} },
     // Host callback imports by (parameter, result) ABI kinds.
     host_imports: U64Map = U64Map {},
     exported_storage: bool = false,
@@ -328,8 +328,8 @@ root struct State {
     inlined_callees: U64Map = U64Map {},
     persist_rec_helpers: U64Map = U64Map {},
     deep_copy_helpers: U64Map = U64Map {},
-    kernels: blot_check_wire_schema::KernelInfo[>..] = [],
-    processes: blot_check_wire_schema::ProcessInfo[>..] = [],
+    kernels: squid_check_wire_schema::KernelInfo[>..] = [],
+    processes: squid_check_wire_schema::ProcessInfo[>..] = [],
     wire_word_tags: u8[>..] = [],
     sparks_vectorized: i64 = 0,
     sparks_scalar_fallback: i64 = 0,
@@ -337,7 +337,7 @@ root struct State {
     staged_dep_units_valid: bool = false,
     staged_dep_units: u32[>..] = [],
     staged_value_digest: u64 = 0xcbf29ce484222325,
-    // Recorded runtime trap sites for the optional `blot:traps` v1 custom section.
+    // Recorded runtime trap sites for the optional `squid:traps` v1 custom section.
     traps: TrapEntry[>..] = [],
     trap_text: u8[>..] = [],
     // Direct .rodata constant scalar array tables: (unit, binding) -> 1-based index into rodata_entries.
@@ -423,7 +423,7 @@ fn resetAllCaches(s: State&) {
 // `g.units[unit - 1]` in place: a module reference returned by a helper is
 // bounded by `g` for the lifetime checker and then conflicts with every
 // stack truncation (Goose spec 5.2).
-struct Generator { types: blot_direct_types::Types&, module: blot_direct_writer::Module&, s: State&, units: const Module[:], build_inputs:i64 = -1 }
+struct Generator { types: squid_direct_types::Types&, module: squid_direct_writer::Module&, s: State&, units: const Module[:], build_inputs:i64 = -1 }
 
 fn key64(high: u32, low: u32) -> u64 { let wide: u64 = high; return (wide << 32) | low; }
 
@@ -533,7 +533,7 @@ fn failClose(g: Generator&) -> Error {
         g.s.failure.message = Text { g.s.compose_start, (g.s.text.len as u32) - g.s.compose_start };
         g.s.has_failure = true;
     }
-    return blot_direct_types::Error.unsupported;
+    return squid_direct_types::Error.unsupported;
 }
 fn fail(g: Generator&, m: const Module&, id: u32, text: Chars) -> Error {
     failOpen(g, m, id);
@@ -552,14 +552,14 @@ fn failSpanCode(g: Generator&, unit: u32, span: Span, code: Code, text: Chars) -
         g.s.failure = Failure { unit: unit, span: span, message: Text { start, (g.s.text.len as u32) - start }, code: code };
         g.s.has_failure = true;
     }
-    return blot_direct_types::Error.unsupported;
+    return squid_direct_types::Error.unsupported;
 }
 // The Zig spelling of a Core node tag.
-fn nodeTagName(tag: blot_check_core::Tag) -> Chars {
-    if tag == blot_check_core::Tag.block_ { return "block"; }
-    if tag == blot_check_core::Tag.match_ { return "match"; }
-    if tag == blot_check_core::Tag.loop_ { return "loop"; }
-    match tag { const for <N, V> in variants<blot_check_core::Tag> { V => { return N; }, } }
+fn nodeTagName(tag: squid_check_core::Tag) -> Chars {
+    if tag == squid_check_core::Tag.block_ { return "block"; }
+    if tag == squid_check_core::Tag.match_ { return "match"; }
+    if tag == squid_check_core::Tag.loop_ { return "loop"; }
+    match tag { const for <N, V> in variants<squid_check_core::Tag> { V => { return N; }, } }
 }
 fn typeFailure(g: Generator&, m: const Module&, id: u32) -> Error {
     failOpen(g, m, id);
@@ -606,7 +606,7 @@ fn summary(g: Generator&) -> Failure, bool {
     // An error in the program outranks forms the backend lacks.
     for at in 0..g.s.failures.len {
         let item = g.s.failures[at].failure;
-        if item.code != blot_check_diagnostic_code::Code.storage_unsupported { return item, true; }
+        if item.code != squid_check_diagnostic_code::Code.storage_unsupported { return item, true; }
     }
     let start = g.s.text.len as u32;
     g.s.text.append("Direct backend: ");
@@ -652,7 +652,7 @@ fn resolve(g: const Generator&, m: const Module&, target: BindingRef) -> Binding
     for step in 0..64 {
         if !hasUnit(g, current.unit) { return current; }
         let binding = unitModule(g, current.unit).binding(current.binding);
-        if binding.kind != blot_reuse_principal_interface::Kind.external { return current; }
+        if binding.kind != squid_reuse_principal_interface::Kind.external { return current; }
         var next_unit = binding.target.unit;
         if next_unit == 0 { next_unit = current.unit; }
         current = BindingRef { next_unit, binding.target.binding };
@@ -665,23 +665,23 @@ fn receiverIdentity(g: const Generator&, ty: Ty) -> NominalIdentity, bool {
     let n = g.types.node(ty);
     match n.tag {
         nominal => { return g.types.nominalIdentity(ty), true; },
-        u32_ => { return NominalIdentity { 0, blot_check_types::u32_type }, true; },
-        f32_ => { return NominalIdentity { 0, blot_check_types::f32_type }, true; },
-        u8_ => { return NominalIdentity { 0, blot_check_types::u8_type }, true; },
-        i32_ => { return NominalIdentity { 0, blot_check_types::i32_type }, true; },
-        u64_ => { return NominalIdentity { 0, blot_check_types::u64_type }, true; },
-        i64_ => { return NominalIdentity { 0, blot_check_types::i64_type }, true; },
-        f64_ => { return NominalIdentity { 0, blot_check_types::f64_type }, true; },
-        boolean => { return NominalIdentity { 0, blot_check_types::boolean }, true; },
-        unit => { return NominalIdentity { 0, blot_check_types::unit }, true; },
+        u32_ => { return NominalIdentity { 0, squid_check_types::u32_type }, true; },
+        f32_ => { return NominalIdentity { 0, squid_check_types::f32_type }, true; },
+        u8_ => { return NominalIdentity { 0, squid_check_types::u8_type }, true; },
+        i32_ => { return NominalIdentity { 0, squid_check_types::i32_type }, true; },
+        u64_ => { return NominalIdentity { 0, squid_check_types::u64_type }, true; },
+        i64_ => { return NominalIdentity { 0, squid_check_types::i64_type }, true; },
+        f64_ => { return NominalIdentity { 0, squid_check_types::f64_type }, true; },
+        boolean => { return NominalIdentity { 0, squid_check_types::boolean }, true; },
+        unit => { return NominalIdentity { 0, squid_check_types::unit }, true; },
         array => { return NominalIdentity { 0, 0xffffffff }, true; },
-        packed => { return NominalIdentity { 0xffffffff, blot_check_storage_types::packed }, true; },
-        seq => { return NominalIdentity { 0xffffffff, blot_check_storage_types::seq }, true; },
+        packed => { return NominalIdentity { 0xffffffff, squid_check_storage_types::packed }, true; },
+        seq => { return NominalIdentity { 0xffffffff, squid_check_storage_types::seq }, true; },
         function => { return NominalIdentity { 0, 0xfffffffc }, true; },
         // Storage capabilities are compiler-owned nominal identities.
-        ref => { return NominalIdentity { 0xffffffff, blot_check_storage_types::ref }, true; },
-        view => { return NominalIdentity { 0xffffffff, blot_check_storage_types::view }, true; },
-        link => { return NominalIdentity { 0xffffffff, blot_check_storage_types::link }, true; },
+        ref => { return NominalIdentity { 0xffffffff, squid_check_storage_types::ref }, true; },
+        view => { return NominalIdentity { 0xffffffff, squid_check_storage_types::view }, true; },
+        link => { return NominalIdentity { 0xffffffff, squid_check_storage_types::link }, true; },
         _ => { return NominalIdentity { 0, 0 }, false; },
     }
 }
@@ -741,21 +741,21 @@ fn findDispatchTarget(g: const Generator&, m: const Module&, identity: NominalId
 // closure of type `parameter -> result`.
 fn closureSignature(g: Generator&, parameter: Ty, result: Ty) -> u32, Error {
     let parameter_words, error = g.types.layout(parameter);
-    if error != blot_direct_types::Error.none { return 0, error; }
+    if error != squid_direct_types::Error.none { return 0, error; }
     let result_words, error = g.types.layout(result);
-    if error != blot_direct_types::Error.none { return 0, error; }
+    if error != squid_direct_types::Error.none { return 0, error; }
     if parameter_words.len < 32 {
         var small: ValType[32] = [0; 32];
-        small[0] = blot_direct_writer::VT_i32;
+        small[0] = squid_direct_writer::VT_i32;
         for w, i in parameter_words { small[i + 1] = w; }
-        if g.s.parallel_readonly { return recordParallelSig(g, small[..parameter_words.len + 1], result_words), blot_direct_types::Error.none; }
-        return g.module.signature(small[..parameter_words.len + 1], result_words), blot_direct_types::Error.none;
+        if g.s.parallel_readonly { return recordParallelSig(g, small[..parameter_words.len + 1], result_words), squid_direct_types::Error.none; }
+        return g.module.signature(small[..parameter_words.len + 1], result_words), squid_direct_types::Error.none;
     }
     var words: ValType[>..<] = [];
-    words.push(blot_direct_writer::VT_i32);
+    words.push(squid_direct_writer::VT_i32);
     words.append(parameter_words);
-    if g.s.parallel_readonly { return recordParallelSig(g, words[..], result_words), blot_direct_types::Error.none; }
-    return g.module.signature(words[..], result_words), blot_direct_types::Error.none;
+    if g.s.parallel_readonly { return recordParallelSig(g, words[..], result_words), squid_direct_types::Error.none; }
+    return g.module.signature(words[..], result_words), squid_direct_types::Error.none;
 }
 fn find(g: Generator&, key: InstanceKey) -> u32, bool {
     let head, known = g.s.instance_index.get(hashKey(key));
@@ -792,7 +792,7 @@ fn indexPut(g: Generator&, key: InstanceKey, id: u32) {
 fn unitsHaveFork(units: const Module[:]) -> bool {
     for m in units {
         for node in m.nodes {
-            if node.tag == blot_check_core::Tag.fork_ { return true; }
+            if node.tag == squid_check_core::Tag.fork_ { return true; }
         }
     }
     return false;
@@ -812,13 +812,13 @@ fn runtime_(g: Generator&) -> const Runtime& {
             hf = unitsHaveFork(g.units);
             hp = unitsHavePersistentState(g.units);
         }
-        let budgets = blot_direct_runtime::Budgets {
-            stack: blot_direct_writer::stackBudget(),
-            heap: blot_direct_writer::heapBudget(),
-            transport: blot_direct_writer::transportBudget(),
+        let budgets = squid_direct_runtime::Budgets {
+            stack: squid_direct_writer::stackBudget(),
+            heap: squid_direct_writer::heapBudget(),
+            transport: squid_direct_writer::transportBudget(),
             ..
         };
-        g.s.rt = blot_direct_runtime::emitWithOptions(g.module, budgets, hf, hp);
+        g.s.rt = squid_direct_runtime::emitWithOptions(g.module, budgets, hf, hp);
         g.s.has_rt = true;
     }
     return g.s.rt;
@@ -829,15 +829,15 @@ fn runtime_(g: Generator&) -> const Runtime& {
 recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     if (ty as i64) < g.s.contents_memory.len {
         let hit = g.s.contents_memory[ty];
-        if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
+        if hit != 0 { return hit == 2, squid_direct_types::Error.none; }
     } else {
         growZerosU8(g.s.contents_memory, g.types.nodes.len - g.s.contents_memory.len);
     }
     // A recursive type's flat form (or an outlined sum's variant) holds a pointer into scope memory.
     let is_recursive, recursive_error = g.types.isRecursive(ty);
-    if recursive_error == blot_direct_types::Error.none && is_recursive { return true, blot_direct_types::Error.none; }
+    if recursive_error == squid_direct_types::Error.none && is_recursive { return true, squid_direct_types::Error.none; }
     let has_out, out_error = g.types.hasOutlinedVariants(ty);
-    if out_error == blot_direct_types::Error.none && has_out { return true, blot_direct_types::Error.none; }
+    if out_error == squid_direct_types::Error.none && has_out { return true, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     var result = false;
     match n.tag {
@@ -845,50 +845,50 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
         function, provider, array, packed, seq, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
-            if error != blot_direct_types::Error.none { return false, error; }
+            if error != squid_direct_types::Error.none { return false, error; }
             result = held;
         },
         tuple => {
             for at in 0..(n.b as i64) {
                 let held, error = contentsHoldMemory(g, g.types.words[n.a + at]);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
         record => {
             for index in 0..(n.b as i64) {
                 let held, error = contentsHoldMemory(g, g.types.recordField(ty, index).ty);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
         nominal => {
             g.s.contents_memory[ty] = 1; // recursion guard
             let cases, error = g.types.variants(ty);
-            if error != blot_direct_types::Error.none { return false, error; }
+            if error != squid_direct_types::Error.none { return false, error; }
             for at in 0..(cases.len as i64) {
                 let held, error = contentsHoldMemory(g, g.types.variant_payloads[cases.payloads + at]);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
     }
     if result { g.s.contents_memory[ty] = 2; } else { g.s.contents_memory[ty] = 1; }
-    return result, blot_direct_types::Error.none;
+    return result, squid_direct_types::Error.none;
 }
 // Whether a value of `ty` can refer to scope-allocated memory.
 recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     if (ty as i64) < g.s.holds_memory.len {
         let hit = g.s.holds_memory[ty];
-        if hit != 0 { return hit == 2, blot_direct_types::Error.none; }
+        if hit != 0 { return hit == 2, squid_direct_types::Error.none; }
     } else {
         growZerosU8(g.s.holds_memory, g.types.nodes.len - g.s.holds_memory.len);
     }
     // A boxed value is a pointer into scope memory.
     let is_boxed, boxed_error = g.types.boxed(ty);
-    if boxed_error == blot_direct_types::Error.none && is_boxed {
+    if boxed_error == squid_direct_types::Error.none && is_boxed {
         g.s.holds_memory[ty] = 2;
-        return true, blot_direct_types::Error.none;
+        return true, squid_direct_types::Error.none;
     }
     let n = g.types.node(ty);
     var result = false;
@@ -897,36 +897,36 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
         function, provider, array, packed, seq, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
-            if error != blot_direct_types::Error.none { return false, error; }
+            if error != squid_direct_types::Error.none { return false, error; }
             result = held;
         },
         tuple => {
             for at in 0..(n.b as i64) {
                 let held, error = holdsMemory(g, g.types.words[n.a + at]);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
         record => {
             for index in 0..(n.b as i64) {
                 let held, error = holdsMemory(g, g.types.recordField(ty, index).ty);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
         nominal => {
             g.s.holds_memory[ty] = 1; // recursion guard
             let cases, error = g.types.variants(ty);
-            if error != blot_direct_types::Error.none { return false, error; }
+            if error != squid_direct_types::Error.none { return false, error; }
             for at in 0..(cases.len as i64) {
                 let held, error = holdsMemory(g, g.types.variant_payloads[cases.payloads + at]);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 if held { result = true; break; }
             }
         },
     }
     if result { g.s.holds_memory[ty] = 2; } else { g.s.holds_memory[ty] = 1; }
-    return result, blot_direct_types::Error.none;
+    return result, squid_direct_types::Error.none;
 }
 
 fn signatureOf(g: Generator&, parameters: const Ty[:], result: Ty) -> u32, Error {
@@ -936,7 +936,7 @@ fn signatureOf(g: Generator&, parameters: const Ty[:], result: Ty) -> u32, Error
     var words: ValType[>..<] = [];
     for parameter in parameters {
         let layout, error = g.types.layout(parameter);
-        if error != blot_direct_types::Error.none { return 0, error; }
+        if error != squid_direct_types::Error.none { return 0, error; }
         if !overflow && small_len + layout.len <= 32 {
             for w in layout { small[small_len] = w; small_len += 1; }
         } else {
@@ -945,9 +945,9 @@ fn signatureOf(g: Generator&, parameters: const Ty[:], result: Ty) -> u32, Error
         }
     }
     let result_words, error = g.types.layout(result);
-    if error != blot_direct_types::Error.none { return 0, error; }
-    if !overflow { return g.module.signature(small[..small_len], result_words), blot_direct_types::Error.none; }
-    return g.module.signature(words[..], result_words), blot_direct_types::Error.none;
+    if error != squid_direct_types::Error.none { return 0, error; }
+    if !overflow { return g.module.signature(small[..small_len], result_words), squid_direct_types::Error.none; }
+    return g.module.signature(words[..], result_words), squid_direct_types::Error.none;
 }
 
 // The provider frame id of effect operation `operation` (from 1).
@@ -960,7 +960,7 @@ fn operationId(g: Generator&, operation: Ty) -> u32 {
     recordParentAux(1, operation, id);
     return id;
 }
-recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: const blot_check_types::List[:], mark: i64, depth: i64) {
+recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: const squid_check_types::List[:], mark: i64, depth: i64) {
     var total_obs: i64 = 0;
     for span in obligations { total_obs += span.len as i64; }
     if total_obs == 0 { return; }
@@ -976,7 +976,7 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                 // Exactly what solveObligations can derive: a field,
                 // element, update, type equality, or shared callee use of a
                 // reachable receiver.
-                if goal.kind == blot_check_types::ObligationKind.type_eq {
+                if goal.kind == squid_check_types::ObligationKind.type_eq {
                     let has_l = within(g, m, goal.ty, mark);
                     let has_r = within(g, m, goal.other, mark);
                     if !has_l && !has_r { continue; }
@@ -987,18 +987,18 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                     if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
                     continue;
                 }
-                if goal.kind == blot_check_types::ObligationKind.callee_use {
+                if goal.kind == squid_check_types::ObligationKind.callee_use {
                     if depth >= 16 { continue; }
                     let decl = goal.identity.decl;
                     if decl == 0 || decl >= m.bindings.len { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
                     let pn = m.types.node(goal.ty);
-                    if pn.tag != blot_check_types::Tag.product { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
+                    if pn.tag != squid_check_types::Tag.product { if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); } continue; }
                     let cb = m.binding(decl);
                     var arg_ids: u32[64] = [0; 64];
                     var pvar_ids: u32[64] = [0; 64];
                     var count_p: i64 = 0;
                     {
-                        let args = m.types.list(blot_check_types::List { pn.a, pn.b });
+                        let args = m.types.list(squid_check_types::List { pn.a, pn.b });
                         let pvars = m.types.list(cb.public_variables);
                         count_p = args.len;
                         if pvars.len < count_p { count_p = pvars.len; }
@@ -1021,7 +1021,7 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                     for pi in 0..count_p {
                         if known[pi] { mentions(g, m, pvar_ids[pi], cmark, 0); }
                     }
-                    var cobs: blot_check_types::List[2] = [cb.scheme.obligations, blot_check_types::List {}];
+                    var cobs: squid_check_types::List[2] = [cb.scheme.obligations, squid_check_types::List {}];
                     let cbody .= m.body(decl);
                     if cbody && (cbody.scheme.obligations.start != cb.scheme.obligations.start || cbody.scheme.obligations.len != cb.scheme.obligations.len) {
                         cobs[1] = cbody.scheme.obligations;
@@ -1043,7 +1043,7 @@ recursive fn propagateObligations(g: Generator&, m: const Module&, obligations: 
                     if all_reached && si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
                     continue;
                 }
-                if goal.result == 0 || (goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection && goal.kind != blot_check_types::ObligationKind.update) {
+                if goal.result == 0 || (goal.kind != squid_check_types::ObligationKind.field && goal.kind != squid_check_types::ObligationKind.writable_field && goal.kind != squid_check_types::ObligationKind.collection && goal.kind != squid_check_types::ObligationKind.update) {
                     if si < 2 && at < 64 { done[si] |= ((1 as u64) << (at as u64)); }
                     continue;
                 }
@@ -1079,13 +1079,13 @@ fn isQuantified(g: Generator&, m: const Module&, ty: TId) -> bool {
             if binding.scheme.variables.len == 0 && (!body || body.scheme.variables.len == 0) { continue; }
             s.scratch.resize(mark);
             mentions(g, m, binding.ty, mark, 0);
-            var obligations: blot_check_types::List[2] = [binding.scheme.obligations, blot_check_types::List {}];
+            var obligations: squid_check_types::List[2] = [binding.scheme.obligations, squid_check_types::List {}];
             if body && (body.scheme.obligations.start != binding.scheme.obligations.start || body.scheme.obligations.len != binding.scheme.obligations.len) {
                 obligations[1] = body.scheme.obligations;
             }
             // Obligations on reachable receivers reach their results.
             propagateObligations(g, m, obligations[..], mark, 0);
-            var schemes: blot_check_types::List[2] = [binding.scheme.variables, blot_check_types::List {}];
+            var schemes: squid_check_types::List[2] = [binding.scheme.variables, squid_check_types::List {}];
             if body && (body.scheme.variables.start != binding.scheme.variables.start || body.scheme.variables.len != binding.scheme.variables.len) {
                 schemes[1] = body.scheme.variables;
             }
@@ -1106,7 +1106,7 @@ fn inScratch(g: const Generator&, from: i64, to: i64, value: u32) -> bool {
 // Adds the variables of `ty` to the set that starts at `from` on the scratch
 // stack and ends at its top.
 recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth: i64) {
-    if ty <= blot_check_types::never || depth > 64 { return; }
+    if ty <= squid_check_types::never || depth > 64 { return; }
     if g.types.isNoVars(m.unit, ty) { return; }
     let n = m.types.node(ty);
     match n.tag {
@@ -1116,7 +1116,7 @@ recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth
             mentions(g, m, n.a, from, depth + 1);
             mentions(g, m, n.b, from, depth + 1);
         },
-        product => { for child in m.types.list(blot_check_types::List { n.a, n.b }) { mentions(g, m, child, from, depth + 1); } },
+        product => { for child in m.types.list(squid_check_types::List { n.a, n.b }) { mentions(g, m, child, from, depth + 1); } },
         record => { for index in 0..(n.b as i64) { mentions(g, m, m.types.recordField(n, index).ty, from, depth + 1); } },
         nominal => { for argument in m.types.nominalArguments(n) { mentions(g, m, argument, from, depth + 1); } },
         _ => {},
@@ -1125,7 +1125,7 @@ recursive fn mentions(g: Generator&, m: const Module&, ty: TId, from: i64, depth
 // Whether every variable of `ty` is in the set at `reach` on the scratch
 // stack (the set ends where this call's own set begins).
 fn within(g: Generator&, m: const Module&, ty: TId, reach: i64) -> bool {
-    if ty <= blot_check_types::never || g.types.isNoVars(m.unit, ty) { return true; }
+    if ty <= squid_check_types::never || g.types.isNoVars(m.unit, ty) { return true; }
     let s .= g.s;
     let found = s.scratch.len;
     mentions(g, m, ty, found, 0);
@@ -1177,7 +1177,7 @@ fn internClosureSpec(g: Generator&, spec: ClosureSpec) -> u32 {
 recursive fn namedWithSpec(g: Generator&, target: BindingRef, ty: Ty, spec_id: u32, unused_holes: bool, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
     let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, spec_id, evidence_context };
     let found, present = find(g, key);
-    if present { return found, blot_direct_types::Error.none; }
+    if present { return found, squid_direct_types::Error.none; }
     let m .= unitModule(g, target.unit);
     let body .= m.body(target.binding);
     if !body { return 0, fail(g, site, site_id, "call target has no body"); }
@@ -1185,39 +1185,39 @@ recursive fn namedWithSpec(g: Generator&, target: BindingRef, ty: Ty, spec_id: u
     var env = Env {};
     g.types.match_(m, binding.ty, ty, env);
     let solved = solveObligations(g, m, body.scheme.obligations, env);
-    if solved != blot_direct_types::Error.none { return 0, solved; }
+    if solved != squid_direct_types::Error.none { return 0, solved; }
     let parameters = m.bodyParameters(body);
     let lowered = Tys { g.s.tys.len as u32, parameters.len as u32 };
     for parameter in parameters { g.s.tys.push(0); }
     for parameter, at in parameters {
         let parameter_ty, error = g.types.lower(m, parameter.ty, env);
-        if error != blot_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
+        if error != squid_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
         g.s.tys[lowered.start + at] = parameter_ty;
     }
     // A body such as `@panic` leaves its own type open or `never`; a complete
     // instance type still fixes the result.
     let peeled, has_peeled = peeledResult(g, ty, parameters.len);
     var result, error = g.types.lower(m, m.typeOf(body.root), env);
-    if error != blot_direct_types::Error.none {
+    if error != squid_direct_types::Error.none {
         // Otherwise the body determines its result type: emit it now.
         if !has_peeled { return inferResultWith(g, key, env, lowered, unused_holes, site, site_id); }
         result = peeled;
     }
-    if result == blot_direct_types::never && has_peeled { result = peeled; }
+    if result == squid_direct_types::never && has_peeled { result = peeled; }
     if g.s.parallel_readonly {
-        return addParallelNamed(g, key, env, lowered, result, unused_holes, site.unit), blot_direct_types::Error.none;
+        return addParallelNamed(g, key, env, lowered, result, unused_holes, site.unit), squid_direct_types::Error.none;
     }
     let id, error = addInstance(g, key, env, lowered, result, site, site_id);
-    if error != blot_direct_types::Error.none { return 0, error; }
+    if error != squid_direct_types::Error.none { return 0, error; }
     g.s.instances[id].unused_holes = unused_holes;
-    return id, blot_direct_types::Error.none;
+    return id, squid_direct_types::Error.none;
 }
 // The result of `ty` after `count` parameters, when it has no holes.
 fn peeledResult(g: const Generator&, ty: Ty, count: i64) -> Ty, bool {
     var result = ty;
     for step in 0..count {
         let n = g.types.node(result);
-        if n.tag != blot_direct_types::Tag.function { return 0, false; }
+        if n.tag != squid_direct_types::Tag.function { return 0, false; }
         result = n.b;
     }
     if g.types.concrete(result, 0) { return result, true; }
@@ -1229,35 +1229,35 @@ fn inferResult(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, site:
     return inferResultWith(g, key, env, parameters, false, site, site_id);
 }
 recursive fn inferResultWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, unused_holes: bool, site: const Module&, site_id: u32) -> u32, Error {
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
-    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, inferring: true, emitted: true, unused_holes: unused_holes, was_inferred: true });
+    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: squid_direct_types::never, inferring: true, emitted: true, unused_holes: unused_holes, was_inferred: true });
     nameFunction(g, function, key);
     indexPut(g, key, id);
     recordDep(g, id);
-    let emitted = blot_direct_function::emitInstance(g, id);
-    if emitted != blot_direct_types::Error.none { return 0, emitted; }
+    let emitted = squid_direct_function::emitInstance(g, id);
+    if emitted != squid_direct_types::Error.none { return 0, emitted; }
     g.s.instances[id].inferring = false;
     let signature, error = signatureOf(g, tysOf(g, parameters), g.s.instances[id].result);
-    if error != blot_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
+    if error != squid_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
     g.module.functions[function - g.module.imports.len].signature = signature;
-    return id, blot_direct_types::Error.none;
+    return id, squid_direct_types::Error.none;
 }
 fn addInstance(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, result: Ty, site: const Module&, site_id: u32) -> u32, Error {
     return addInstanceWith(g, key, env, parameters, result, false, Tys {}, site, site_id);
 }
 fn addInstanceWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, result: Ty, closure: bool, captures: Tys, site: const Module&, site_id: u32) -> u32, Error {
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     var signature: u32 = 0;
     if closure {
         if parameters.len != 1 { return 0, fail(g, site, site_id, "closures take one parameter"); }
         let made, error = closureSignature(g, g.s.tys[parameters.start], result);
-        if error != blot_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
+        if error != squid_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
         signature = made;
     } else {
         let made, error = signatureOf(g, tysOf(g, parameters), result);
-        if error != blot_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
+        if error != squid_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
         signature = made;
     }
     let function = g.module.addFunction(signature);
@@ -1269,7 +1269,7 @@ fn addInstanceWith(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, r
     indexPut(g, key, id);
     recordDep(g, id);
     g.s.queue.push(id);
-    return id, blot_direct_types::Error.none;
+    return id, squid_direct_types::Error.none;
 }
 
 var name_scratch: u8[>..<] = [];
@@ -1297,7 +1297,7 @@ fn nameFunction(g: Generator&, function: u32, key: InstanceKey) {
     }
     name_scratch.push('#');
     putIntStack(name_scratch, function);
-    blot_direct_writer::setName(g.module, function, name_scratch[mark..]);
+    squid_direct_writer::setName(g.module, function, name_scratch[mark..]);
     name_scratch.resize(mark);
 }
 // The concrete type of `target` when applied to arguments of the types
@@ -1311,53 +1311,53 @@ recursive fn calleeFromArguments(g: Generator&, target: BindingRef, arguments: T
     for argument_at in 0..(arguments.len as i64) {
         let argument = g.s.tys[arguments.start + argument_at];
         var n = m.types.node(arrow);
-        while n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.usage {
+        while n.tag == squid_check_types::Tag.forall || n.tag == squid_check_types::Tag.usage {
             arrow = n.a;
             n = m.types.node(arrow);
         }
-        if n.tag != blot_check_types::Tag.function { break; }
+        if n.tag != squid_check_types::Tag.function { break; }
         g.types.match_(m, n.a, argument, env);
         arrow = n.b;
     }
     let body .= m.body(target.binding);
     if body {
         let solved = solveObligations(g, m, body.scheme.obligations, env);
-        if solved != blot_direct_types::Error.none { return 0, solved; }
+        if solved != squid_direct_types::Error.none { return 0, solved; }
     }
     let solved = solveObligations(g, m, binding.scheme.obligations, env);
-    if solved != blot_direct_types::Error.none { return 0, solved; }
+    if solved != squid_direct_types::Error.none { return 0, solved; }
     let ty, error = g.types.lower(m, binding.ty, env);
-    if error == blot_direct_types::Error.none { return ty, blot_direct_types::Error.none; }
+    if error == squid_direct_types::Error.none { return ty, squid_direct_types::Error.none; }
     // Only the body determines the result: key the instance by its parameter
     // types, infer the result, and alias the full type.
     if !body { return 0, typeFailure(g, site, site_id); }
     let parameters = m.bodyParameters(body);
     if !body.is_function || arguments.len < parameters.len { return 0, typeFailure(g, site, site_id); }
     let instance_id, error = namedByParameters(g, target, Tys { arguments.start, parameters.len as u32 }, site, site_id, evidence_context);
-    if error != blot_direct_types::Error.none { return 0, error; }
+    if error != squid_direct_types::Error.none { return 0, error; }
     var full = g.s.instances[instance_id].result;
     var at = parameters.len;
     while at != 0 {
         at -= 1;
         let wrapped, error = g.types.function(g.s.tys[arguments.start + at], full);
-        if error != blot_direct_types::Error.none { return 0, error; }
+        if error != squid_direct_types::Error.none { return 0, error; }
         full = wrapped;
     }
     indexPut(g, InstanceKey { InstanceKind.named, target.unit, target.binding, full, 0, evidence_context }, instance_id);
-    return full, blot_direct_types::Error.none;
+    return full, squid_direct_types::Error.none;
 }
 recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
-    var marker = blot_direct_types::never;
+    var marker = squid_direct_types::never;
     var at = arguments.len as i64;
     while at != 0 {
         at -= 1;
         let wrapped, error = g.types.function(g.s.tys[arguments.start + at], marker);
-        if error != blot_direct_types::Error.none { return 0, error; }
+        if error != squid_direct_types::Error.none { return 0, error; }
         marker = wrapped;
     }
     let key = InstanceKey { InstanceKind.named, target.unit, target.binding, marker, 0, evidence_context };
     let found, present = find(g, key);
-    if present { return found, blot_direct_types::Error.none; }
+    if present { return found, squid_direct_types::Error.none; }
     let m .= unitModule(g, target.unit);
     let body .= m.body(target.binding);
     assert(body);
@@ -1370,37 +1370,37 @@ recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys
         g.s.tys.push(argument);
     }
     let solved = solveObligations(g, m, body.scheme.obligations, env);
-    if solved != blot_direct_types::Error.none { return 0, solved; }
+    if solved != squid_direct_types::Error.none { return 0, solved; }
     let result, error = g.types.lower(m, m.typeOf(body.root), env);
-    if error != blot_direct_types::Error.none { return inferResult(g, key, env, lowered, site, site_id); }
+    if error != squid_direct_types::Error.none { return inferResult(g, key, env, lowered, site, site_id); }
     return addInstance(g, key, env, lowered, result, site, site_id);
 }
 
-fn solveObligationsPublic(g: Generator&, m: const Module&, goals_span: blot_check_types::List, env: Env&) -> Error { return solveObligations(g, m, goals_span, env); }
+fn solveObligationsPublic(g: Generator&, m: const Module&, goals_span: squid_check_types::List, env: Env&) -> Error { return solveObligations(g, m, goals_span, env); }
 // A lambda instance whose result type its body determines.
 recursive fn inferClosure(g: Generator&, key: InstanceKey, env: Env, parameters: Tys, captures: Tys, site: const Module&, site_id: u32) -> u32, Error {
-    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, blot_direct_types::Error.unsupported; }
+    if g.s.parallel_readonly { g.s.parallel_aborted = true; return 0, squid_direct_types::Error.unsupported; }
     let function = g.module.addFunction(g.module.signature([], []));
     let id = g.s.instances.len as u32;
     let slot = g.module.tableSlot(function);
-    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: blot_direct_types::never, closure: true, captures: captures, slot: slot, inferring: true, emitted: true, was_inferred: true });
+    g.s.instances.push(Instance { key: key, env: env, function: function, parameters: parameters, result: squid_direct_types::never, closure: true, captures: captures, slot: slot, inferring: true, emitted: true, was_inferred: true });
     nameFunction(g, function, key);
     indexPut(g, key, id);
     recordDep(g, id);
-    let emitted = blot_direct_function::emitInstance(g, id);
-    if emitted != blot_direct_types::Error.none { return 0, emitted; }
+    let emitted = squid_direct_function::emitInstance(g, id);
+    if emitted != squid_direct_types::Error.none { return 0, emitted; }
     g.s.instances[id].inferring = false;
     if parameters.len != 1 { return 0, fail(g, site, site_id, "closures take one parameter"); }
     let signature, error = closureSignature(g, g.s.tys[parameters.start], g.s.instances[id].result);
-    if error != blot_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
+    if error != squid_direct_types::Error.none { return 0, typeFailure(g, site, site_id); }
     g.module.functions[function - g.module.imports.len].signature = signature;
-    return id, blot_direct_types::Error.none;
+    return id, squid_direct_types::Error.none;
 }
 // Dependent type variables (field and element results) follow from the
 // receivers the instance's parameters already fixed.
-recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_check_types::List, env: Env&) -> Error {
+recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: squid_check_types::List, env: Env&) -> Error {
     let count = goals_span.len as i64;
-    if count == 0 { return blot_direct_types::Error.none; }
+    if count == 0 { return squid_direct_types::Error.none; }
     var done: u64 = 0;
     var pass: i64 = 0;
     while pass <= count {
@@ -1408,32 +1408,32 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
         for at in 0..count {
             if at < 64 && ((done >> (at as u64)) & 1) != 0 { continue; }
             let goal = m.obligations[goals_span.start + at];
-            if goal.kind == blot_check_types::ObligationKind.type_eq {
+            if goal.kind == squid_check_types::ObligationKind.type_eq {
                 let left, lerr = g.types.lower(m, goal.ty, env);
-                if lerr == blot_direct_types::Error.none {
+                if lerr == squid_direct_types::Error.none {
                     g.types.match_(m, goal.other, left, env);
                     if at < 64 { done |= ((1 as u64) << (at as u64)); }
                 } else {
                     let right, rerr = g.types.lower(m, goal.other, env);
-                    if rerr == blot_direct_types::Error.none {
+                    if rerr == squid_direct_types::Error.none {
                         g.types.match_(m, goal.ty, right, env);
                         if at < 64 { done |= ((1 as u64) << (at as u64)); }
                     }
                 }
                 continue;
             }
-            if goal.kind == blot_check_types::ObligationKind.callee_use {
+            if goal.kind == squid_check_types::ObligationKind.callee_use {
                 if g.s.solve_depth >= 32 { continue; }
                 let decl = goal.identity.decl;
                 if decl == 0 || decl >= m.bindings.len { continue; }
                 let pn = m.types.node(goal.ty);
-                if pn.tag != blot_check_types::Tag.product { continue; }
+                if pn.tag != squid_check_types::Tag.product { continue; }
                 let cb = m.binding(decl);
                 var arg_ids: u32[64] = [0; 64];
                 var pvar_ids: u32[64] = [0; 64];
                 var count_p: i64 = 0;
                 {
-                    let args = m.types.list(blot_check_types::List { pn.a, pn.b });
+                    let args = m.types.list(squid_check_types::List { pn.a, pn.b });
                     let pvars = m.types.list(cb.public_variables);
                     count_p = args.len;
                     if pvars.len < count_p { count_p = pvars.len; }
@@ -1448,7 +1448,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 var any_known = false;
                 for pi in 0..count_p {
                     let cty, cerr = g.types.lower(m, arg_ids[pi], env);
-                    if cerr == blot_direct_types::Error.none {
+                    if cerr == squid_direct_types::Error.none {
                         g.types.match_(m, pvar_ids[pi], cty, cenv);
                         any_known = true;
                     }
@@ -1456,32 +1456,32 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 if !any_known { continue; }
                 g.s.solve_depth += 1;
                 let cerr1 = solveObligations(g, m, cb.scheme.obligations, cenv);
-                if cerr1 != blot_direct_types::Error.none { g.s.solve_depth -= 1; return cerr1; }
+                if cerr1 != squid_direct_types::Error.none { g.s.solve_depth -= 1; return cerr1; }
                 let cbody .= m.body(decl);
                 if cbody && (cbody.scheme.obligations.start != cb.scheme.obligations.start || cbody.scheme.obligations.len != cb.scheme.obligations.len) {
                     let cerr2 = solveObligations(g, m, cbody.scheme.obligations, cenv);
-                    if cerr2 != blot_direct_types::Error.none { g.s.solve_depth -= 1; return cerr2; }
+                    if cerr2 != squid_direct_types::Error.none { g.s.solve_depth -= 1; return cerr2; }
                 }
                 g.s.solve_depth -= 1;
                 for pi in 0..count_p {
                     let derived, derr = g.types.lower(m, pvar_ids[pi], cenv);
-                    if derr == blot_direct_types::Error.none {
+                    if derr == squid_direct_types::Error.none {
                         g.types.match_(m, arg_ids[pi], derived, env);
                     }
                 }
                 continue;
             }
             if goal.result == 0 { continue; }
-            if goal.kind == blot_check_types::ObligationKind.update {
+            if goal.kind == squid_check_types::ObligationKind.update {
                 let receiver, error = g.types.lower(m, goal.ty, env);
-                if error != blot_direct_types::Error.none { continue; }
+                if error != squid_direct_types::Error.none { continue; }
                 let n = g.types.node(receiver);
                 let name, has_name = g.types.fieldNameOf(m, goal.name, true);
                 if !has_name { continue; }
-                if n.tag == blot_direct_types::Tag.nominal {
+                if n.tag == squid_direct_types::Tag.nominal {
                     var record = receiver;
                     let cases, verr = g.types.variants(receiver);
-                    if verr == blot_direct_types::Error.none && cases.len == 1 { record = g.types.variant_payloads[cases.payloads]; }
+                    if verr == squid_direct_types::Error.none && cases.len == 1 { record = g.types.variant_payloads[cases.payloads]; }
                     let position = g.types.findField(record, name);
                     if position >= 0 {
                         let old_ty = g.types.recordField(record, position).ty;
@@ -1489,21 +1489,21 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                         if n.b == 0 {
                             g.types.match_(m, goal.other, old_ty, env);
                             g.types.match_(m, goal.result, receiver, env);
-                        } else if aerr == blot_direct_types::Error.none {
+                        } else if aerr == squid_direct_types::Error.none {
                             if assigned == old_ty {
                                 g.types.match_(m, goal.result, receiver, env);
                             } else {
                                 let owner_unit = g.types.words[n.a];
                                 if g.hasUnit(owner_unit) {
                                     let owner .= g.units[owner_unit - 1];
-                                    let identity = blot_check_types::NominalIdentity { owner_unit, g.types.words[n.a + 1] };
+                                    let identity = squid_check_types::NominalIdentity { owner_unit, g.types.words[n.a + 1] };
                                     let ordinal, oerr = g.types.nominalOrdinal(owner, identity);
-                                    if oerr == blot_direct_types::Error.none {
+                                    if oerr == squid_direct_types::Error.none {
                                         let ctors = owner.nominalConstructors(ordinal);
                                         if ctors.len == 1 {
                                             let ctor = owner.constructor(ctors[0]);
                                             let payload = owner.types.node(ctor.payload);
-                                            if payload.tag == blot_check_types::Tag.record {
+                                            if payload.tag == squid_check_types::Tag.record {
                                                 var penv = Env {};
                                                 for fi in 0..(payload.b as i64) {
                                                     let pf = owner.types.recordField(payload, fi);
@@ -1518,9 +1518,9 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                                                 }
                                                 let sig = owner.types.node(ctor.scheme.root);
                                                 var ret = ctor.scheme.root;
-                                                if sig.tag == blot_check_types::Tag.function { ret = sig.b; }
+                                                if sig.tag == squid_check_types::Tag.function { ret = sig.b; }
                                                 let updated, uerr = g.types.lower(owner, ret, penv);
-                                                if uerr == blot_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
+                                                if uerr == squid_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
                                             }
                                         }
                                     }
@@ -1530,23 +1530,23 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                     }
                     continue;
                 }
-                if n.tag == blot_direct_types::Tag.record {
+                if n.tag == squid_direct_types::Tag.record {
                     let position = g.types.findField(receiver, name);
                     if position >= 0 {
                         let old_ty = g.types.recordField(receiver, position).ty;
                         let assigned, aerr = g.types.lower(m, goal.other, env);
-                        if aerr == blot_direct_types::Error.none {
+                        if aerr == squid_direct_types::Error.none {
                             if assigned == old_ty {
                                 g.types.match_(m, goal.result, receiver, env);
                             } else {
-                                var fields: blot_direct_types::Field[>..<] = [];
+                                var fields: squid_direct_types::Field[>..<] = [];
                                 for fi in 0..(n.b as i64) {
                                     var fld = g.types.recordField(receiver, fi);
                                     if fi == position { fld.ty = assigned; }
                                     fields.push(fld);
                                 }
                                 let updated, uerr = g.types.record(fields[..]);
-                                if uerr == blot_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
+                                if uerr == squid_direct_types::Error.none { g.types.match_(m, goal.result, updated, env); }
                             }
                         }
                     }
@@ -1554,14 +1554,14 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
                 }
                 continue;
             }
-            if goal.kind != blot_check_types::ObligationKind.field && goal.kind != blot_check_types::ObligationKind.writable_field && goal.kind != blot_check_types::ObligationKind.collection {
+            if goal.kind != squid_check_types::ObligationKind.field && goal.kind != squid_check_types::ObligationKind.writable_field && goal.kind != squid_check_types::ObligationKind.collection {
                 if at < 64 { done |= ((1 as u64) << (at as u64)); }
                 continue;
             }
             let receiver, error = g.types.lower(m, goal.ty, env);
-            if error != blot_direct_types::Error.none { continue; }
+            if error != squid_direct_types::Error.none { continue; }
             let n = g.types.node(receiver);
-            if goal.kind == blot_check_types::ObligationKind.collection {
+            if goal.kind == squid_check_types::ObligationKind.collection {
                 match n.tag {
                     array, packed, seq, view => { g.types.match_(m, goal.result, n.a, env); },
                     _ => {},
@@ -1572,9 +1572,9 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let name, has_name = g.types.fieldNameOf(m, goal.name, true);
             if !has_name { continue; }
             var record = receiver;
-            if n.tag == blot_direct_types::Tag.nominal {
+            if n.tag == squid_direct_types::Tag.nominal {
                 let cases, error = g.types.variants(receiver);
-                if error == blot_direct_types::Error.none && cases.len == 1 { record = g.types.variant_payloads[cases.payloads]; }
+                if error == squid_direct_types::Error.none && cases.len == 1 { record = g.types.variant_payloads[cases.payloads]; }
             }
             let position = g.types.findField(record, name);
             if position >= 0 {
@@ -1586,26 +1586,26 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             if g.s.solve_depth >= 32 { continue; }
             let identity, has_identity = receiverIdentity(g, receiver);
             if !has_identity { continue; }
-            let target, has_target = dispatchTarget(g, m, identity, goal.name, blot_check_types::Operator.none);
+            let target, has_target = dispatchTarget(g, m, identity, goal.name, squid_check_types::Operator.none);
             if !has_target { continue; }
             g.s.solve_depth += 1;
             let callee, error = calleeFromArguments(g, target, saveTys(g, [receiver]), m, 0, 0);
             g.s.solve_depth -= 1;
-            if error != blot_direct_types::Error.none {
-                if error == blot_direct_types::Error.unsupported { dropFailure(g); continue; }
+            if error != squid_direct_types::Error.none {
+                if error == squid_direct_types::Error.unsupported { dropFailure(g); continue; }
                 return error;
             }
             let arrow = g.types.node(callee);
-            if arrow.tag == blot_direct_types::Tag.function {
+            if arrow.tag == squid_direct_types::Tag.function {
                 g.types.match_(m, goal.result, arrow.b, env);
                 if at < 64 { done |= ((1 as u64) << (at as u64)); }
             }
         }
-        if env.count == before { return blot_direct_types::Error.none; }
-        if count <= 63 && done == (((1 as u64) << (count as u64)) - 1) { return blot_direct_types::Error.none; }
+        if env.count == before { return squid_direct_types::Error.none; }
+        if count <= 63 && done == (((1 as u64) << (count as u64)) - 1) { return squid_direct_types::Error.none; }
         pass += 1;
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 let PAR_EV_TRAP: u8 = 1;
@@ -1707,14 +1707,14 @@ fn packU64(out: u8[>..<]&, v: u64) {
     packU32(out, (v >> 32) as! u32);
 }
 
-recursive fn packTyGrow(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..]&) {
+recursive fn packTyGrow(types: const squid_direct_types::Types&, ty: Ty, out: u8[>..]&) {
     if (ty as i64) < par_base_types {
         out.push(0);
         packU32Grow(out, ty);
         return;
     }
     let n = types.node(ty);
-    out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
+    out.push((squid_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         array, packed, seq, ref, view, link, provider, cell => {
@@ -1758,14 +1758,14 @@ recursive fn packTyGrow(types: const blot_direct_types::Types&, ty: Ty, out: u8[
     }
 }
 
-recursive fn packTy(types: const blot_direct_types::Types&, ty: Ty, out: u8[>..<]&) {
+recursive fn packTy(types: const squid_direct_types::Types&, ty: Ty, out: u8[>..<]&) {
     if (ty as i64) < par_base_types {
         out.push(0);
         packU32(out, ty);
         return;
     }
     let n = types.node(ty);
-    out.push((blot_direct_types::tagCode(n.tag) + 1) as! u8);
+    out.push((squid_direct_types::tagCode(n.tag) + 1) as! u8);
     match n.tag {
         unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
         array, packed, seq, ref, view, link, provider, cell => {
@@ -1813,19 +1813,19 @@ fn pushUnpackU32(buf: u32[>..]&, len: i64&, value: u32) {
     if len < buf.len { buf[len] = value; } else { buf.push(value); }
     len += 1;
 }
-fn pushUnpackField(buf: blot_direct_types::Field[>..]&, len: i64&, value: blot_direct_types::Field) {
+fn pushUnpackField(buf: squid_direct_types::Field[>..]&, len: i64&, value: squid_direct_types::Field) {
     if len < buf.len { buf[len] = value; } else { buf.push(value); }
     len += 1;
 }
 
 recursive fn unpackTy(
-    types: blot_direct_types::Types&,
+    types: squid_direct_types::Types&,
     pkt: const u8[:],
     pos: i64&,
     ok: bool&,
     u32_buf: u32[>..]&,
     u32_len: i64&,
-    fld_buf: blot_direct_types::Field[>..]&,
+    fld_buf: squid_direct_types::Field[>..]&,
     fld_len: i64&,
 ) -> Ty {
     if !ok || pos >= pkt.len { ok = false; return 0; }
@@ -1843,22 +1843,22 @@ recursive fn unpackTy(
         let b = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
         if !ok { return 0; }
         let res, err = types.function(a, b);
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     if code == 9 || code == 12 || code == 13 || code == 14 || code == 15 || code == 17 || code == 23 || code == 24 {
         let a = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
         if !ok { return 0; }
-        var tag = blot_direct_types::Tag.array;
-        if code == 12 { tag = blot_direct_types::Tag.ref; }
-        else if code == 13 { tag = blot_direct_types::Tag.view; }
-        else if code == 14 { tag = blot_direct_types::Tag.link; }
-        else if code == 15 { tag = blot_direct_types::Tag.provider; }
-        else if code == 17 { tag = blot_direct_types::Tag.cell; }
-        else if code == 23 { tag = blot_direct_types::Tag.packed; }
-        else if code == 24 { tag = blot_direct_types::Tag.seq; }
+        var tag = squid_direct_types::Tag.array;
+        if code == 12 { tag = squid_direct_types::Tag.ref; }
+        else if code == 13 { tag = squid_direct_types::Tag.view; }
+        else if code == 14 { tag = squid_direct_types::Tag.link; }
+        else if code == 15 { tag = squid_direct_types::Tag.provider; }
+        else if code == 17 { tag = squid_direct_types::Tag.cell; }
+        else if code == 23 { tag = squid_direct_types::Tag.packed; }
+        else if code == 24 { tag = squid_direct_types::Tag.seq; }
         let res, err = types.intern(tag, [a]);
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     if code == 5 {
@@ -1874,7 +1874,7 @@ recursive fn unpackTy(
         }
         let res, err = types.tuple(u32_buf[mark..mark + count]);
         u32_len = mark;
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     if code == 16 {
@@ -1882,8 +1882,8 @@ recursive fn unpackTy(
         let b = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
         let c = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
         if !ok { return 0; }
-        let res, err = types.intern(blot_direct_types::Tag.state_provider, [a, b, c]);
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        let res, err = types.intern(squid_direct_types::Tag.state_provider, [a, b, c]);
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     if code == 7 {
@@ -1901,9 +1901,9 @@ recursive fn unpackTy(
             if !ok { u32_len = mark; return 0; }
             u32_buf[mark + 2 + i] = item;
         }
-        let res, err = types.intern(blot_direct_types::Tag.nominal, u32_buf[mark..mark + 2 + count]);
+        let res, err = types.intern(squid_direct_types::Tag.nominal, u32_buf[mark..mark + 2 + count]);
         u32_len = mark;
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     if code == 6 {
@@ -1911,7 +1911,7 @@ recursive fn unpackTy(
         let count = binary::u32le(pkt, pos) as i64;
         pos += 4;
         let mark = fld_len;
-        for i in 0..count { pushUnpackField(fld_buf, fld_len, blot_direct_types::Field { 0, 0 }); }
+        for i in 0..count { pushUnpackField(fld_buf, fld_len, squid_direct_types::Field { 0, 0 }); }
         for i in 0..count {
             if pos >= pkt.len { fld_len = mark; ok = false; return 0; }
             let nmode = pkt[pos];
@@ -1931,11 +1931,11 @@ recursive fn unpackTy(
             }
             let fty = unpackTy(types, pkt, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
             if !ok { fld_len = mark; return 0; }
-            fld_buf[mark + i] = blot_direct_types::Field { name_id, fty };
+            fld_buf[mark + i] = squid_direct_types::Field { name_id, fty };
         }
         let res, err = types.record(fld_buf[mark..mark + count]);
         fld_len = mark;
-        if err != blot_direct_types::Error.none { ok = false; return 0; }
+        if err != squid_direct_types::Error.none { ok = false; return 0; }
         return res;
     }
     ok = false;
@@ -2015,7 +2015,7 @@ fn tryPatchSlot(g: Generator&, slot: u32) -> bool {
     if (slot & PAR_PROV_BIT) == 0 { return false; }
     let idx = par_job_slot_base + ((slot & PAR_PROV_MASK) as i64);
     if idx >= par_slot_ev.len { g.s.parallel_aborted = true; return false; }
-    g.s.code.push(blot_direct_writer::OP_i32_const);
+    g.s.code.push(squid_direct_writer::OP_i32_const);
     par_patches.push(ParPatch { kind: PAR_PATCH_SLOT, code_off: g.s.code.len as u32, ev_idx: par_slot_ev[idx] });
     g.s.code.push(0);
     return true;
@@ -2039,7 +2039,7 @@ fn pushProvisionalInstance(g: Generator&, key: InstanceKey, env: Env, parameters
     return id;
 }
 
-fn packEnv(types: const blot_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..<]&, full_out: u8&) {
+fn packEnv(types: const squid_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..<]&, full_out: u8&) {
     var nodes: u32[>..<] = [];
     var at = head;
     while at != stop_head && at != 0 {
@@ -2056,7 +2056,7 @@ fn packEnv(types: const blot_direct_types::Types&, head: u32, stop_head: u32, ou
     }
 }
 
-fn packEnvGrow(types: const blot_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..]&, full_out: u8&) {
+fn packEnvGrow(types: const squid_direct_types::Types&, head: u32, stop_head: u32, out: u8[>..]&, full_out: u8&) {
     var nodes: u32[>..<] = [];
     var at = head;
     while at != stop_head && at != 0 {
@@ -2200,7 +2200,7 @@ fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
         has_rt: g.s.has_rt,
         exported_storage: g.s.exported_storage,
         trap_closures: g.s.trap_closures,
-        reloc_staged: blot_direct_relocations::hasStagedFlag(),
+        reloc_staged: squid_direct_relocations::hasStagedFlag(),
         push_entry_helper: g.s.push_entry_helper,
         worker_specs_len: g.s.worker_specs.len,
         closure_specs_len: g.s.closure_specs.len,
@@ -2261,10 +2261,10 @@ fn emitWaveSerial(g: Generator&, wave_start: i64, wave_end: i64) -> Error {
         let id = g.s.queue[pos];
         if g.s.instances[id].emitted { continue; }
         g.s.instances[id].emitted = true;
-        let error = blot_direct_function::emitInstance(g, id);
-        if error != blot_direct_types::Error.none { return error; }
+        let error = squid_direct_function::emitInstance(g, id);
+        if error != squid_direct_types::Error.none { return error; }
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 struct EmitPool {
@@ -2288,18 +2288,18 @@ struct EmitPool {
 
 fn closeEmitPool(pool: EmitPool&) {
     if pool.handle == 0 { return; }
-    blot_native::emit_pool_stop(pool.handle);
+    squid_native::emit_pool_stop(pool.handle);
     for i in 0..pool.width {
         let pid = pool.pids[i];
         if pid != 0 {
-            if !blot_native::wait_success(pid) {
-                blot_native::persist_kill_child(pid);
-                blot_native::wait_success(pid);
+            if !squid_native::wait_success(pid) {
+                squid_native::persist_kill_child(pid);
+                squid_native::wait_success(pid);
             }
             pool.pids[i] = 0;
         }
     }
-    blot_native::emit_pool_close(pool.handle);
+    squid_native::emit_pool_close(pool.handle);
     pool.handle = 0;
     pool.width = 0;
     par_track_aux = false;
@@ -2314,8 +2314,8 @@ fn packSyncDelta(g: const Generator&, pool: EmitPool&, wave_start: i64, wave_end
     packU32(out, sig_count as u32);
     for si in pool.synced_sigs..g.module.signatures.len {
         let s = g.module.signatures[si];
-        let ps = blot_direct_writer::types(g.module, s.params);
-        let rs = blot_direct_writer::types(g.module, s.results);
+        let ps = squid_direct_writer::types(g.module, s.params);
+        let rs = squid_direct_writer::types(g.module, s.results);
         packU32(out, ps.len as u32);
         out.append(ps);
         packU32(out, rs.len as u32);
@@ -2418,7 +2418,7 @@ fn applySyncDelta(
     sync: const u8[:],
     wave_ids: u32[>..<]&,
     u32_buf: u32[>..]&,
-    fld_buf: blot_direct_types::Field[>..]&,
+    fld_buf: squid_direct_types::Field[>..]&,
     eu: u32[>..<]&,
     et: u32[>..<]&,
     ev: Ty[>..<]&,
@@ -2607,30 +2607,30 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
     par_base_spellings = g.types.spellings.len;
     par_base_insts = g.s.instances.len;
     par_job_epoch = 0;
-    let recording = blot_direct_relocations::isRecording();
+    let recording = squid_direct_relocations::isRecording();
     var sync_buf: u8[>..<] = [];
     var wave_ids: u32[>..<] = [];
     var pkt: u8[>..<] = [];
     var u32_buf: u32[>..] = [];
-    var fld_buf: blot_direct_types::Field[>..] = [];
+    var fld_buf: squid_direct_types::Field[>..] = [];
     var eu: u32[>..<] = [];
     var et: u32[>..<] = [];
     var ev: Ty[>..<] = [];
     var last_gen: u32 = 0;
     loop {
-        let next_gen = blot_native::emit_pool_worker_wait(handle, last_gen);
+        let next_gen = squid_native::emit_pool_worker_wait(handle, last_gen);
         if next_gen <= 0 { return; }
         last_gen = next_gen as u32;
-        let slen = blot_native::emit_pool_sync_len(handle) as i64;
+        let slen = squid_native::emit_pool_sync_len(handle) as i64;
         if slen > sync_buf.len { sync_buf.resize(max(slen, sync_buf.len * 2), 0); }
-        if slen == 0 || !blot_native::emit_pool_sync_read(handle, sync_buf[0], slen as u64) {
-            blot_native::emit_pool_worker_done(handle, false);
+        if slen == 0 || !squid_native::emit_pool_sync_read(handle, sync_buf[0], slen as u64) {
+            squid_native::emit_pool_worker_done(handle, false);
             return;
         }
         g.s.parallel_readonly = false;
         g.module.readonly = false;
         if !applySyncDelta(g, sync_buf[..slen], wave_ids, u32_buf, fld_buf, eu, et, ev) {
-            blot_native::emit_pool_worker_done(handle, false);
+            squid_native::emit_pool_worker_done(handle, false);
             return;
         }
         g.s.parallel_readonly = true;
@@ -2638,7 +2638,7 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
         let base_snap = takeSnapshot(g);
         var poisoned = false;
         loop {
-            let span = blot_native::emit_pool_claim_chunk(handle);
+            let span = squid_native::emit_pool_claim_chunk(handle);
             let start = (span >> 32) as i64;
             let end = (span & 0xffffffff) as i64;
             if start >= end { break; }
@@ -2675,12 +2675,12 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
                 let save_sbytes = g.s.scratch_bytes.len;
                 let save_stypes = g.s.scratch_types.len;
                 let save_depscratch = g.s.dep_scratch.len;
-                let save_reloc_mark = blot_direct_relocations::mark();
-                let before_bodies = blot_direct_relocations::bodyCount();
+                let save_reloc_mark = squid_direct_relocations::mark();
+                let before_bodies = squid_direct_relocations::bodyCount();
                 g.s.instances[w_id].emitted = true;
-                let err = blot_direct_function::emitInstance(g, w_id);
+                let err = squid_direct_function::emitInstance(g, w_id);
                 let unchanged = sameSnapshot(base_snap, takeSnapshot(g));
-                let clean = err == blot_direct_types::Error.none && !g.s.parallel_aborted && !g.module.readonly_hit && !g.s.has_failure && unchanged;
+                let clean = err == squid_direct_types::Error.none && !g.s.parallel_aborted && !g.module.readonly_hit && !g.s.has_failure && unchanged;
                 if clean {
                     pkt.clear();
                     let sv = (g.s.sparks_vectorized - before_vec) as! u64;
@@ -2688,7 +2688,7 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
                     let body_len = par_body_len as u32;
                     let deps_len = if g.s.track_deps { (g.s.dep_list.len - before_deps) as u32 } else { 0 };
                     let inl_len = if g.s.track_deps { (parallel_inlined.len - before_inl) as u32 } else { 0 };
-                    let sites_len = if recording { (blot_direct_relocations::bodyCount() - before_bodies) as u32 } else { 0 };
+                    let sites_len = if recording { (squid_direct_relocations::bodyCount() - before_bodies) as u32 } else { 0 };
                     let ev_count = par_job_ev_count;
                     let ev_bytes_len = (par_ev_bytes.len - before_ev_bytes) as u32;
                     let patches_len = (par_patches.len - par_job_patch_base) as u32;
@@ -2722,7 +2722,7 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
                     }
                     if sites_len != 0 {
                         for si in 0..(sites_len as i64) {
-                            let rec = blot_direct_relocations::bodyAt(before_bodies + si);
+                            let rec = squid_direct_relocations::bodyAt(before_bodies + si);
                             packU32(pkt, rec.site.unit);
                             packU32(pkt, rec.site.node);
                             packU64(pkt, rec.site.offset as! u64);
@@ -2740,7 +2740,7 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
                             packU32(pkt, p.ev_idx);
                         }
                     }
-                    blot_native::emit_pool_lane_append(handle, lane, idx as u32, pkt[0], pkt.len as u64);
+                    squid_native::emit_pool_lane_append(handle, lane, idx as u32, pkt[0], pkt.len as u64);
                 }
                 g.s.sparks_vectorized = before_vec;
                 g.s.sparks_scalar_fallback = before_fb;
@@ -2753,18 +2753,18 @@ fn runEmitPoolWorker(g: Generator&, handle: u64, lane: u32) {
                 g.s.scratch_bytes.resize(save_sbytes);
                 g.s.scratch_types.resize(save_stypes);
                 g.s.dep_scratch.resize(save_depscratch);
-                blot_direct_relocations::rewind(save_reloc_mark);
-                blot_direct_relocations::rewindBodies(before_bodies);
+                squid_direct_relocations::rewind(save_reloc_mark);
+                squid_direct_relocations::rewindBodies(before_bodies);
                 if !unchanged { poisoned = true; }
             }
         }
-        blot_native::emit_pool_worker_done(handle, !poisoned);
+        squid_native::emit_pool_worker_done(handle, !poisoned);
         if poisoned { return; }
     }
 }
 
 fn openEmitPool(g: Generator&, pool: EmitPool&, width: i64) -> bool {
-    let handle = blot_native::emit_pool_open(width as u32);
+    let handle = squid_native::emit_pool_open(width as u32);
     if handle == 0 { return false; }
     pool.handle = handle;
     pool.width = width;
@@ -2783,10 +2783,10 @@ fn openEmitPool(g: Generator&, pool: EmitPool&, width: i64) -> bool {
     pool.exported_storage = g.s.exported_storage;
     var spawned: i64 = 0;
     for lane in 0..width {
-        let pid = blot_native::fork_process();
+        let pid = squid_native::fork_process();
         if pid == 0 {
             runEmitPoolWorker(g, handle, lane as u32);
-            blot_native::job_exit(0);
+            squid_native::job_exit(0);
         }
         if pid > 0 {
             pool.pids[lane] = pid as u32;
@@ -2811,7 +2811,7 @@ fn replayParallelEvents(
     ev_vals: u32[>..<]&,
     ev_insts: u32[>..<]&,
     u32_buf: u32[>..]&,
-    fld_buf: blot_direct_types::Field[>..]&,
+    fld_buf: squid_direct_types::Field[>..]&,
     eu: u32[>..<]&,
     et: u32[>..<]&,
     ev: Ty[>..<]&,
@@ -2823,18 +2823,18 @@ fn replayParallelEvents(
     var fld_len: i64 = 0;
     var pos: i64 = 0;
     for ei in 0..ev_count {
-        if pos >= ev_slice.len { return false, blot_direct_types::Error.none; }
+        if pos >= ev_slice.len { return false, squid_direct_types::Error.none; }
         let tag = ev_slice[pos];
         pos += 1;
         if tag == PAR_EV_TRAP {
-            if pos + 17 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 17 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let kind = ev_slice[pos];
             let unit = binary::u32le(ev_slice, pos + 1);
             let sp_start = binary::u32le(ev_slice, pos + 5);
             let sp_end = binary::u32le(ev_slice, pos + 9);
             let mlen = binary::u32le(ev_slice, pos + 13) as i64;
             pos += 17;
-            if pos + mlen > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + mlen > ev_slice.len { return false, squid_direct_types::Error.none; }
             let msg_start = g.s.trap_text.len as u32;
             if mlen != 0 { g.s.trap_text.append(ev_slice[pos..pos + mlen]); }
             pos += mlen;
@@ -2842,13 +2842,13 @@ fn replayParallelEvents(
             ev_vals.push(g.s.traps.len as u32);
             ev_insts.push(0);
         } else if tag == PAR_EV_NAMED {
-            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 8 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let unit = binary::u32le(ev_slice, pos);
             let binding = binary::u32le(ev_slice, pos + 4);
             pos += 8;
             var ok = true;
             let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-            if !ok || pos + 13 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if !ok || pos + 13 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let unused_holes = ev_slice[pos] != 0;
             let site_unit = binary::u32le(ev_slice, pos + 1);
             let ev_ctx = binary::u32le(ev_slice, pos + 5);
@@ -2858,25 +2858,25 @@ fn replayParallelEvents(
             et.clear();
             ev.clear();
             for i in 0..env_len {
-                if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+                if pos + 8 > ev_slice.len { return false, squid_direct_types::Error.none; }
                 eu.push(binary::u32le(ev_slice, pos));
                 et.push(binary::u32le(ev_slice, pos + 4));
                 pos += 8;
                 let v = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-                if !ok { return false, blot_direct_types::Error.none; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 ev.push(v);
             }
-            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 4 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let param_len = binary::u32le(ev_slice, pos) as i64;
             pos += 4;
             ptmp.clear();
             for i in 0..param_len {
                 let pt = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-                if !ok { return false, blot_direct_types::Error.none; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 ptmp.push(pt);
             }
             let result_ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-            if !ok { return false, blot_direct_types::Error.none; }
+            if !ok { return false, squid_direct_types::Error.none; }
             let key = InstanceKey { InstanceKind.named, unit, binding, ty, 0, ev_ctx };
             var real_id, present = find(g, key);
             if !present {
@@ -2889,38 +2889,38 @@ fn replayParallelEvents(
                 let pstart = g.s.tys.len as u32;
                 for pt in ptmp { g.s.tys.push(pt); }
                 let made, err = addInstance(g, key, env, Tys { pstart, param_len as u32 }, result_ty, g.units[site_unit - 1], 0);
-                if err != blot_direct_types::Error.none { return false, err; }
+                if err != squid_direct_types::Error.none { return false, err; }
                 g.s.instances[made].unused_holes = unused_holes;
                 real_id = made;
             }
             ev_vals.push(g.s.instances[real_id].function);
             ev_insts.push(real_id);
         } else if tag == PAR_EV_SIG {
-            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 4 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let plen = binary::u32le(ev_slice, pos) as i64;
             pos += 4;
-            if pos + plen + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + plen + 4 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let pstart = pos;
             pos += plen;
             let rlen = binary::u32le(ev_slice, pos) as i64;
             pos += 4;
-            if pos + rlen > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + rlen > ev_slice.len { return false, squid_direct_types::Error.none; }
             let rstart = pos;
             pos += rlen;
             let real_sig = g.module.signature(ev_slice[pstart..pstart + plen], ev_slice[rstart..rstart + rlen]);
             ev_vals.push(real_sig);
             ev_insts.push(0);
         } else if tag == PAR_EV_PARTIAL {
-            if pos + 9 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 9 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let kcode = ev_slice[pos];
             let unit = binary::u32le(ev_slice, pos + 1);
             let item_id = binary::u32le(ev_slice, pos + 5);
             pos += 9;
             let kind, kok = kindFromCode(kcode);
-            if !kok { return false, blot_direct_types::Error.none; }
+            if !kok { return false, squid_direct_types::Error.none; }
             var ok = true;
             let full_ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-            if !ok || pos + 12 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if !ok || pos + 12 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let count = binary::u32le(ev_slice, pos);
             let ev_ctx = binary::u32le(ev_slice, pos + 4);
             let site_unit = binary::u32le(ev_slice, pos + 8);
@@ -2938,30 +2938,30 @@ fn replayParallelEvents(
                 let arrow = g.types.node(rest);
                 let parameters = saveTys(g, [arrow.a]);
                 let made, err = addInstanceWith(g, key, Env {}, parameters, arrow.b, true, captures, g.units[site_unit - 1], 0);
-                if err != blot_direct_types::Error.none { return false, err; }
+                if err != squid_direct_types::Error.none { return false, err; }
                 real_id = made;
             }
             ev_vals.push(g.s.instances[real_id].slot);
             ev_insts.push(real_id);
         } else if tag == PAR_EV_POOL {
-            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 8 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let unit = binary::u32le(ev_slice, pos);
             let binding = binary::u32le(ev_slice, pos + 4);
             pos += 8;
             var ok = true;
             let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-            if !ok || pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if !ok || pos + 4 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let site_unit = binary::u32le(ev_slice, pos);
             pos += 4;
             let key = InstanceKey { InstanceKind.pool, unit, binding, ty, 0, 0 };
             var real_id, present = find(g, key);
             if !present {
                 let created, err = addInstanceWith(g, key, Env {}, Tys {}, ty, false, Tys {}, g.units[site_unit - 1], 0);
-                if err != blot_direct_types::Error.none { return false, err; }
+                if err != squid_direct_types::Error.none { return false, err; }
                 let at = g.s.pool_words.len as u32;
-                let first = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
-                let second = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
-                let third = g.module.addGlobal(blot_direct_writer::VT_i32, true, 0);
+                let first = g.module.addGlobal(squid_direct_writer::VT_i32, true, 0);
+                let second = g.module.addGlobal(squid_direct_writer::VT_i32, true, 0);
+                let third = g.module.addGlobal(squid_direct_writer::VT_i32, true, 0);
                 g.s.pool_words.push(first);
                 g.s.pool_words.push(second);
                 g.s.pool_words.push(third);
@@ -2972,13 +2972,13 @@ fn replayParallelEvents(
             ev_vals.push(g.s.instances[real_id].function);
             ev_insts.push(real_id);
         } else if tag == PAR_EV_LAMBDA {
-            if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 8 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let unit = binary::u32le(ev_slice, pos);
             let node_id = binary::u32le(ev_slice, pos + 4);
             pos += 8;
             var ok = true;
             let ty = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-            if !ok || pos + 17 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if !ok || pos + 17 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let parent_id = binary::u32le(ev_slice, pos);
             let ev_ctx = binary::u32le(ev_slice, pos + 4);
             let site_unit = binary::u32le(ev_slice, pos + 8);
@@ -2989,21 +2989,21 @@ fn replayParallelEvents(
             et.clear();
             ev.clear();
             for i in 0..env_len {
-                if pos + 8 > ev_slice.len { return false, blot_direct_types::Error.none; }
+                if pos + 8 > ev_slice.len { return false, squid_direct_types::Error.none; }
                 eu.push(binary::u32le(ev_slice, pos));
                 et.push(binary::u32le(ev_slice, pos + 4));
                 pos += 8;
                 let v = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-                if !ok { return false, blot_direct_types::Error.none; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 ev.push(v);
             }
-            if pos + 4 > ev_slice.len { return false, blot_direct_types::Error.none; }
+            if pos + 4 > ev_slice.len { return false, squid_direct_types::Error.none; }
             let cap_len = binary::u32le(ev_slice, pos) as i64;
             pos += 4;
             ptmp.clear();
             for i in 0..cap_len {
                 let ct = unpackTy(g.types, ev_slice, pos, ok, u32_buf, u32_len, fld_buf, fld_len);
-                if !ok { return false, blot_direct_types::Error.none; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 ptmp.push(ct);
             }
             let key = InstanceKey { InstanceKind.lambda, unit, node_id, ty, parent_id, ev_ctx };
@@ -3021,16 +3021,16 @@ fn replayParallelEvents(
                 let arrow = g.types.node(ty);
                 let parameters = saveTys(g, [arrow.a]);
                 let made, err = addInstanceWith(g, key, env, parameters, arrow.b, true, Tys { cap_start, cap_len as u32 }, g.units[site_unit - 1], 0);
-                if err != blot_direct_types::Error.none { return false, err; }
+                if err != squid_direct_types::Error.none { return false, err; }
                 real_id = made;
             }
             ev_vals.push(g.s.instances[real_id].slot);
             ev_insts.push(real_id);
         } else {
-            return false, blot_direct_types::Error.none;
+            return false, squid_direct_types::Error.none;
         }
     }
-    return pos == ev_slice.len, blot_direct_types::Error.none;
+    return pos == ev_slice.len, squid_direct_types::Error.none;
 }
 
 fn emitWavePool(
@@ -3045,7 +3045,7 @@ fn emitWavePool(
     ev_vals: u32[>..<]&,
     ev_insts: u32[>..<]&,
     u32_buf: u32[>..]&,
-    fld_buf: blot_direct_types::Field[>..]&,
+    fld_buf: squid_direct_types::Field[>..]&,
     eu: u32[>..<]&,
     et: u32[>..<]&,
     ev: Ty[>..<]&,
@@ -3057,23 +3057,23 @@ fn emitWavePool(
     let count = wave_end - wave_start;
     packSyncDelta(g, pool, wave_start, wave_end, sync_buf);
     let chunk_size = max(1, min(8, count / (pool.width * 4))) as u32;
-    if !blot_native::emit_pool_begin_wave(pool.handle, count as u32, chunk_size, sync_buf[0], sync_buf.len as u64) ||
-       !blot_native::emit_pool_wait_wave(pool.handle, pool.pids[0], pool.width as u32) {
+    if !squid_native::emit_pool_begin_wave(pool.handle, count as u32, chunk_size, sync_buf[0], sync_buf.len as u64) ||
+       !squid_native::emit_pool_wait_wave(pool.handle, pool.pids[0], pool.width as u32) {
         closeEmitPool(pool);
         return emitWaveSerial(g, wave_start, wave_end), 0;
     }
     var total_bytes: i64 = 0;
     for lane in 0..pool.width {
-        total_bytes += blot_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
+        total_bytes += squid_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
     }
     all_lanes.clear();
     if total_bytes > 0 {
         all_lanes.resize(total_bytes, 0);
         var dst_pos: i64 = 0;
         for lane in 0..pool.width {
-            let lsz = blot_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
+            let lsz = squid_native::emit_pool_lane_size(pool.handle, lane as u32) as i64;
             if lsz > 0 {
-                blot_native::emit_pool_lane_read(pool.handle, lane as u32, all_lanes[dst_pos], lsz as u64);
+                squid_native::emit_pool_lane_read(pool.handle, lane as u32, all_lanes[dst_pos], lsz as u64);
                 dst_pos += lsz;
             }
         }
@@ -3094,8 +3094,8 @@ fn emitWavePool(
         }
         scan += plen;
     }
-    let recording = blot_direct_relocations::isRecording();
-    var wave_err = blot_direct_types::Error.none;
+    let recording = squid_direct_relocations::isRecording();
+    var wave_err = squid_direct_types::Error.none;
     var applied_count: i64 = 0;
     for idx in 0..count {
         let id = g.s.queue[wave_start + idx];
@@ -3125,7 +3125,7 @@ fn emitWavePool(
                 var ev_ok = true;
                 if ev_count != 0 {
                     let rok, rerr = replayParallelEvents(g, pkt[ev_pos..ev_pos + ev_bytes_len], ev_count, ev_vals, ev_insts, u32_buf, fld_buf, eu, et, ev, ptmp);
-                    if rerr != blot_direct_types::Error.none { wave_err = rerr; break; }
+                    if rerr != squid_direct_types::Error.none { wave_err = rerr; break; }
                     ev_ok = rok;
                 } else {
                     ev_vals.clear();
@@ -3150,9 +3150,9 @@ fn emitWavePool(
                             let pval = ev_vals[pev];
                             enc.clear();
                             if pkind == PAR_PATCH_CALL || pkind == PAR_PATCH_SIG {
-                                blot_direct_writer::uleb(enc, pval as u64);
+                                squid_direct_writer::uleb(enc, pval as u64);
                             } else {
-                                blot_direct_writer::sleb(enc, pval as! i32);
+                                squid_direct_writer::sleb(enc, pval as! i32);
                             }
                             g.module.text.append(enc[..]);
                             let d = enc.len - 1;
@@ -3166,7 +3166,7 @@ fn emitWavePool(
                     }
                     let final_body_len = g.module.text.len - body_start;
                     let fn_idx = g.s.instances[id].function - (g.module.imports.len as u32);
-                    g.module.functions[fn_idx].body = blot_direct_writer::Range { start: body_start, len: final_body_len };
+                    g.module.functions[fn_idx].body = squid_direct_writer::Range { start: body_start, len: final_body_len };
                     if g.s.track_deps {
                         let dep_start = g.s.dep_list.len as u32;
                         var dpos = deps_pos;
@@ -3201,7 +3201,7 @@ fn emitWavePool(
                                 }
                                 soff += adj;
                             }
-                            blot_direct_relocations::pushBodySite(blot_direct_relocations::Site { sunit, snode, soff }, fn_idx, body_start);
+                            squid_direct_relocations::pushBodySite(squid_direct_relocations::Site { sunit, snode, soff }, fn_idx, body_start);
                         }
                     }
                     g.s.instances[id].emitted = true;
@@ -3212,8 +3212,8 @@ fn emitWavePool(
         }
         if !applied {
             g.s.instances[id].emitted = true;
-            let error = blot_direct_function::emitInstance(g, id);
-            if error != blot_direct_types::Error.none { wave_err = error; break; }
+            let error = squid_direct_function::emitInstance(g, id);
+            if error != squid_direct_types::Error.none { wave_err = error; break; }
         }
     }
     return wave_err, applied_count;
@@ -3221,8 +3221,8 @@ fn emitWavePool(
 
 fn emitAll(g: Generator&) -> Error {
     var next: i64 = 0;
-    let workers = blot_direct_writer::emitWorkers();
-    var allow_parallel = workers > 1 && blot_native::platform_is_linux() != 0 && !g.s.replaying;
+    let workers = squid_direct_writer::emitWorkers();
+    var allow_parallel = workers > 1 && squid_native::platform_is_linux() != 0 && !g.s.replaying;
     var pool_width: i64 = 0;
     if allow_parallel {
         var total_core_nodes: i64 = 0;
@@ -3242,7 +3242,7 @@ fn emitAll(g: Generator&) -> Error {
     var ev_vals: u32[>..<] = [];
     var ev_insts: u32[>..<] = [];
     var u32_buf: u32[>..] = [];
-    var fld_buf: blot_direct_types::Field[>..] = [];
+    var fld_buf: squid_direct_types::Field[>..] = [];
     var eu: u32[>..<] = [];
     var et: u32[>..<] = [];
     var ev: Ty[>..<] = [];
@@ -3251,7 +3251,7 @@ fn emitAll(g: Generator&) -> Error {
     var patch_deltas: i64[>..<] = [];
     var enc: u8[>..<] = [];
     var failed_waves: i64 = 0;
-    var result_err = blot_direct_types::Error.none;
+    var result_err = squid_direct_types::Error.none;
     while next < g.s.queue.len {
         if allow_parallel {
             let pending = g.s.queue.len - next;
@@ -3279,7 +3279,7 @@ fn emitAll(g: Generator&) -> Error {
                         ev_vals, ev_insts, u32_buf, fld_buf, eu, et, ev, ptmp,
                         patch_offs, patch_deltas, enc
                     );
-                    if werr != blot_direct_types::Error.none { result_err = werr; break; }
+                    if werr != squid_direct_types::Error.none { result_err = werr; break; }
                     if applied == 0 {
                         failed_waves += 1;
                         if failed_waves >= 2 {
@@ -3297,8 +3297,8 @@ fn emitAll(g: Generator&) -> Error {
         next += 1;
         if g.s.instances[id].emitted { continue; }
         g.s.instances[id].emitted = true;
-        let error = blot_direct_function::emitInstance(g, id);
-        if error != blot_direct_types::Error.none { result_err = error; break; }
+        let error = squid_direct_function::emitInstance(g, id);
+        if error != squid_direct_types::Error.none { result_err = error; break; }
     }
     closeEmitPool(pool);
     return result_err;

@@ -9,12 +9,12 @@ There are no `@ecs.*`, `@window.*`, `@render.*`, `@input.*`, or `@asset.*`
 primitives.
 
 ECS registration, storage, entity lifecycle, queries, scheduling, and render
-packet formats belong in Blot libraries. Source wrappers around compiler domain
+packet formats belong in Squid libraries. Source wrappers around compiler domain
 hooks would not satisfy this boundary.
 
 ## Generic effects
 
-```blot
+```squid
 type Reader a is effect = { ask: Unit -> a }
 
 const read_twice = func () => return do:
@@ -68,7 +68,7 @@ request loop. Capturing does not run the thunk. Each operation clause can reply
 with `yield`, finish the handler's enclosing `do` with `break value`, or exit
 the function with `return value`:
 
-```blot
+```squid
 type Validate is effect = { check: U32 -> U32 }
 
 const checked = func computation => return do:
@@ -113,14 +113,14 @@ These forms are compiler syntax: `@computation`, `@requests`, `effect`,
 `complete`, `yield`, `return`, and `break`. They do not require prelude request
 constructors. The API permits one reply or cancellation per request; exposing or
 invoking an arbitrary continuation remains outside this interface. See
-[the executable example](../../examples/requests.blot) for cancellation and state.
+[the executable example](../../examples/requests.sq) for cancellation and state.
 
 ## Scoped state
 
 Ordinary providers return each operation result directly. A source-declared
 effect family gives each concrete state type its own read/write operations:
 
-```blot
+```squid
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -151,7 +151,7 @@ add continuation/resumption semantics.
 
 Generic libraries can let monomorphization select a family instance:
 
-```blot
+```squid
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -191,7 +191,7 @@ effect-row annotations such as `! {State a}` remain unsupported. Unhandled
 effects remain visible in function types; pure annotations and const evaluation
 reject unhandled calls.
 
-In the sibling gdev checkout, `src/ecs.blot` implements the source ECS using
+In the sibling gdev checkout, `src/ecs.sq` implements the source ECS using
 these operations. `insert_resource initial` and `register_component exemplar`
 compose nested state and access closures in a const builder. Duplicate types,
 including resource/component conflicts, fail during const evaluation.
@@ -231,13 +231,13 @@ Host functions are passed explicitly to entry functions (`io` / `io const`), the
 module's only exports. The boundary accepts one scalar or numeric-array callback
 and returns a scalar or numeric array. For example:
 
-```blot
+```squid
 io const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   break next
 ```
 
-Run `just demo-host`; [the executable example](../../examples/host_io.blot) also
+Run `just demo-host`; [the executable example](../../examples/host_io.sq) also
 forwards a source operation through that callback. [Guest ABI](../host/guest-abi.md)
 defines the manifest, value codecs, opaque references, lifetime and failure
 rules. The compiler does not recognize `main`, `advance`, or any service name.
@@ -249,7 +249,7 @@ can also name source operations, as in `Unit -> U32 ! {Reader.ask}`.
 
 Cross-boundary record bundles, Text/buffers and persistent world values still
 need implementation. The executable
-[Blot example](../../examples/host_capabilities.blot) uses the current scalar ABI
+[Squid example](../../examples/host_capabilities.sq) uses the current scalar ABI
 instead, constructing ordinary records of typed callbacks inside the guest.
 
 Effect rows describe requirements. Capabilities grant authority. A source

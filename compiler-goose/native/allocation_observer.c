@@ -7,7 +7,7 @@ typedef int (*try_fn)(int, uint64_t, uint64_t);
 typedef void (*oom_fn)(int, uint64_t);
 extern void gs_runtime_observer_install(event_fn, try_fn, oom_fn) __attribute__((weak));
 
-static blot_allocation_stats stats;
+static squid_allocation_stats stats;
 static uint64_t selected_failure;
 static int selected_kind;
 static oom_fn terminal_oom;
@@ -40,12 +40,12 @@ static void event(int kind, uint64_t owner, uint64_t old_bytes,
                   uint64_t new_bytes, uint64_t capacity) {
     (void)owner;
     switch (kind) {
-        case BLOT_OBS_POOL_ALLOC:
+        case SQUID_OBS_POOL_ALLOC:
             stats.pool_allocations++;
             stats.pool_payload_allocated_bytes += new_bytes;
             grown();
             break;
-        case BLOT_OBS_POOL_REALLOC:
+        case SQUID_OBS_POOL_REALLOC:
             stats.pool_reallocations++;
             if (new_bytes > old_bytes) {
                 stats.pool_payload_allocated_bytes += new_bytes - old_bytes;
@@ -53,32 +53,32 @@ static void event(int kind, uint64_t owner, uint64_t old_bytes,
             } else
                 stats.pool_payload_freed_bytes += old_bytes - new_bytes;
             break;
-        case BLOT_OBS_POOL_FREE:
+        case SQUID_OBS_POOL_FREE:
             stats.pool_frees++;
             stats.pool_payload_freed_bytes += old_bytes;
             break;
-        case BLOT_OBS_POOL_CAPACITY_GROW:
+        case SQUID_OBS_POOL_CAPACITY_GROW:
             stats.pool_capacity_growth_bytes += new_bytes - old_bytes;
             break;
-        case BLOT_OBS_POOL_REUSE:
+        case SQUID_OBS_POOL_REUSE:
             stats.pool_reuses++;
             break;
-        case BLOT_OBS_REGION_RESERVE:
+        case SQUID_OBS_REGION_RESERVE:
             stats.region_reservations++;
             stats.region_reserved_bytes += capacity;
             if (stats.region_reserved_bytes > stats.region_reserved_peak_bytes)
                 stats.region_reserved_peak_bytes = stats.region_reserved_bytes;
             break;
-        case BLOT_OBS_REGION_RELEASE:
+        case SQUID_OBS_REGION_RELEASE:
             stats.region_releases++;
             /* The runtime supplies the original mapping's size, including gap. */
             stats.region_reserved_bytes -= capacity;
             break;
-        case BLOT_OBS_STACK_REQUEST:
+        case SQUID_OBS_STACK_REQUEST:
             stats.explicit_capacity_requests++;
             stats.explicit_capacity_requested_bytes += new_bytes;
             break;
-        case BLOT_OBS_REGISTRY_ALLOC:
+        case SQUID_OBS_REGISTRY_ALLOC:
             stats.registry_allocated_bytes += new_bytes;
             break;
         default:
@@ -87,15 +87,15 @@ static void event(int kind, uint64_t owner, uint64_t old_bytes,
     }
 }
 
-void blot_allocation_observer_install(void (*oom)(int, uint64_t)) {
+void squid_allocation_observer_install(void (*oom)(int, uint64_t)) {
     if (!gs_runtime_observer_install) return;
     terminal_oom = oom;
-    stats.coverage = BLOT_OBS_POOL_OPERATIONS | BLOT_OBS_REGION_RESERVATIONS |
-        BLOT_OBS_EXPLICIT_CAPACITY_REQUESTS | BLOT_OBS_REGISTRY_ALLOCATION;
+    stats.coverage = SQUID_OBS_POOL_OPERATIONS | SQUID_OBS_REGION_RESERVATIONS |
+        SQUID_OBS_EXPLICIT_CAPACITY_REQUESTS | SQUID_OBS_REGISTRY_ALLOCATION;
     gs_runtime_observer_install(event, attempt, refusal);
 }
 
-void blot_allocation_observer_begin(uint64_t request, uint64_t fail_at, int fail_kind) {
+void squid_allocation_observer_begin(uint64_t request, uint64_t fail_at, int fail_kind) {
     uint64_t reserved = stats.region_reserved_bytes;
     uint64_t peak = stats.region_reserved_peak_bytes;
     uint32_t coverage = stats.coverage;
@@ -109,17 +109,17 @@ void blot_allocation_observer_begin(uint64_t request, uint64_t fail_at, int fail
 }
 
 /* The peak restarts at the payload live now. */
-void blot_allocation_observer_mark(void) {
+void squid_allocation_observer_mark(void) {
     stats.pool_payload_peak_bytes = 0;
     grown();
 }
 
-const blot_allocation_stats *blot_allocation_observer_stats(void) {
+const squid_allocation_stats *squid_allocation_observer_stats(void) {
     return &stats;
 }
 
-uint64_t blot_allocation_observer_value(uint32_t field) {
-    static blot_allocation_stats snapshot;
+uint64_t squid_allocation_observer_value(uint32_t field) {
+    static squid_allocation_stats snapshot;
     if (field == 0) {
         snapshot = stats;
         return snapshot.coverage;

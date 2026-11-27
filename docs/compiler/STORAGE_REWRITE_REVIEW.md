@@ -38,9 +38,9 @@ not a claim of full Goose language or implementation parity. See the
 | Every simultaneous owner reserves 1 MiB; at most 255 slots. Owner openings consume a global 24-bit generation. | `src/runtime/data_stacks.zig:9,44,94` | Pack compatible extents, budget growers, and separate wide owner identity from regions: 111. |
 | Globals must be literal arrays of plain inline elements. | `src/backend/scoped_backend.zig:457` | Computed pool initialization and stable instance lifetime: 113. |
 | Foreign request and response coexist in a single 1 MiB scratch region. | `src/runtime/storage_packets.zig:14`, `src/backend/scoped_backend.zig:439` | Budget the combined crossing explicitly; independent 600 KiB input/output currently exceeds capacity: 113. |
-| Ink ECS uses three-level COW columns; checkpoint creation keeps the same array value. | `../../ink/lib/ecs.blot:11,94` | Changing array types alone would turn snapshots into aliases. Replace storage and copy explicitly: 114. |
-| Ink systems, state providers and policies retain function values. | `../../ink/lib/app.blot:14`, `../../ink/lib/ecs.blot:28,64` | Static composition and explicit pool parameters avoid general closures/handlers: 114–119. |
-| The session keeps previous and candidate worlds until presentation is accepted. | `../../ink/lib/pen/program.blot:55` | Remove implicit simulation rollback with an explicit protocol change: 117. |
+| Ink ECS uses three-level COW columns; checkpoint creation keeps the same array value. | `../../ink/lib/ecs.sq:11,94` | Changing array types alone would turn snapshots into aliases. Replace storage and copy explicitly: 114. |
+| Ink systems, state providers and policies retain function values. | `../../ink/lib/app.sq:14`, `../../ink/lib/ecs.sq:28,64` | Static composition and explicit pool parameters avoid general closures/handlers: 114–119. |
+| The session keeps previous and candidate worlds until presentation is accepted. | `../../ink/lib/pen/program.sq:55` | Remove implicit simulation rollback with an explicit protocol change: 117. |
 
 The generation limit is an availability defect, not evidence of a dangling
 reference: the runtime traps rather than wrapping. It is reached after
@@ -50,7 +50,7 @@ boundary can test the replacement without a soak run.
 
 The consumer review found 63 Gdev source modules using ECS and 53 Ink library
 modules mentioning pages/map/buffer. Storage migration therefore includes scene,
-physics, UI, rendering and caches. It is not finished by changing `ecs.blot`.
+physics, UI, rendering and caches. It is not finished by changing `ecs.sq`.
 
 ## Working decisions for implementation
 
@@ -149,7 +149,7 @@ automatic transaction. Initialization publishes only completed new owners.
 
 The user's greenfield replacement and chosen worker-only concurrency supersede
 the old counted-runtime and language-task implementation direction in tasks
-030–035 and 072–074 and the [historical runtime plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
+030–035 and 072–074 and the [historical runtime plan](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
 Keep those evidence records; do not execute them to reconstruct removed features.
 Unrelated compiler work remains separate.
 

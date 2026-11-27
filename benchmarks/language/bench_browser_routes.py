@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--chrome", required=True)
-    parser.add_argument("--wasm", type=Path, required=True, help="compiled spark_routes.blot from the Gdev project")
+    parser.add_argument("--wasm", type=Path, required=True, help="compiled spark_routes.sq from the Gdev project")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     wasm = args.wasm.read_bytes()

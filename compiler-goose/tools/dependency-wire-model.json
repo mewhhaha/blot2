@@ -23,7 +23,7 @@
     {
       "name": "reuse.dependency_format.Key",
       "kind": "struct",
-      "goose": "blot_reuse_dependency_format::Key",
+      "goose": "squid_reuse_dependency_format::Key",
       "fields": [
         [
           "compiler",
@@ -66,7 +66,7 @@
     {
       "name": "reuse.frozen_dependency.FrozenDependency",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::FrozenDependency",
+      "goose": "squid_reuse_frozen_dependency::FrozenDependency",
       "fields": [
         [
           "symbols",
@@ -84,7 +84,7 @@
     {
       "name": "reuse.frozen_dependency.Symbol",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::Symbol",
+      "goose": "squid_reuse_frozen_dependency::Symbol",
       "fields": [
         [
           "text",
@@ -105,7 +105,7 @@
     {
       "name": "[]reuse.frozen_dependency.Symbol",
       "kind": "slice",
-      "goose": "blot_reuse_frozen_dependency::Symbol[:]",
+      "goose": "squid_reuse_frozen_dependency::Symbol[:]",
       "children": [
         "reuse.frozen_dependency.Symbol"
       ]
@@ -113,7 +113,7 @@
     {
       "name": "reuse.frozen_dependency.Module",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::Module",
+      "goose": "squid_reuse_frozen_dependency::Module",
       "fields": [
         [
           "identity",
@@ -156,7 +156,7 @@
     {
       "name": "reuse.frozen_dependency.Identity",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::Identity",
+      "goose": "squid_reuse_frozen_dependency::Identity",
       "fields": [
         [
           "normalized_path",
@@ -204,7 +204,7 @@
     {
       "name": "reuse.frozen_dependency.ImportResolution",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::ImportResolution",
+      "goose": "squid_reuse_frozen_dependency::ImportResolution",
       "fields": [
         [
           "path",
@@ -222,7 +222,7 @@
     {
       "name": "[]reuse.frozen_dependency.ImportResolution",
       "kind": "slice",
-      "goose": "blot_reuse_frozen_dependency::ImportResolution[:]",
+      "goose": "squid_reuse_frozen_dependency::ImportResolution[:]",
       "children": [
         "reuse.frozen_dependency.ImportResolution"
       ]
@@ -230,7 +230,7 @@
     {
       "name": "check.core.Module",
       "kind": "struct",
-      "goose": "blot_check_core::Module",
+      "goose": "squid_check_core::Module",
       "fields": [
         [
           "field_names",
@@ -492,7 +492,7 @@
     {
       "name": "check.core.FieldName",
       "kind": "struct",
-      "goose": "blot_check_core::FieldName",
+      "goose": "squid_check_core::FieldName",
       "fields": [
         [
           "symbol",
@@ -510,7 +510,7 @@
     {
       "name": "check.core.Name",
       "kind": "struct",
-      "goose": "blot_check_core::Name",
+      "goose": "squid_check_core::Name",
       "fields": [
         [
           "start",
@@ -528,7 +528,7 @@
     {
       "name": "[]check.core.FieldName",
       "kind": "slice",
-      "goose": "blot_check_core::FieldName[:]",
+      "goose": "squid_check_core::FieldName[:]",
       "children": [
         "check.core.FieldName"
       ]
@@ -536,7 +536,7 @@
     {
       "name": "check.core.RuntimeName",
       "kind": "struct",
-      "goose": "blot_check_core::RuntimeName",
+      "goose": "squid_check_core::RuntimeName",
       "fields": [
         [
           "binding",
@@ -554,7 +554,7 @@
     {
       "name": "[]check.core.RuntimeName",
       "kind": "slice",
-      "goose": "blot_check_core::RuntimeName[:]",
+      "goose": "squid_check_core::RuntimeName[:]",
       "children": [
         "check.core.RuntimeName"
       ]
@@ -562,7 +562,7 @@
     {
       "name": "check.core.List",
       "kind": "struct",
-      "goose": "blot_check_core::List",
+      "goose": "squid_check_core::List",
       "fields": [
         [
           "start",
@@ -580,7 +580,7 @@
     {
       "name": "check.core.Types",
       "kind": "struct",
-      "goose": "blot_check_core::Types",
+      "goose": "squid_check_core::Types",
       "fields": [
         [
           "nodes",
@@ -610,7 +610,7 @@
     {
       "name": "check.types.Node",
       "kind": "struct",
-      "goose": "blot_check_types::Node",
+      "goose": "squid_check_types::Node",
       "fields": [
         [
           "tag",
@@ -641,7 +641,7 @@
     {
       "name": "check.types.Tag",
       "kind": "enum",
-      "goose": "blot_check_types::Tag",
+      "goose": "squid_check_types::Tag",
       "variants": [
         [
           "absent",
@@ -813,7 +813,7 @@
     {
       "name": "[]check.types.Node",
       "kind": "slice",
-      "goose": "blot_check_types::Node[:]",
+      "goose": "squid_check_types::Node[:]",
       "children": [
         "check.types.Node"
       ]
@@ -821,7 +821,7 @@
     {
       "name": "check.core.EffectRows",
       "kind": "struct",
-      "goose": "blot_check_core::EffectRows",
+      "goose": "squid_check_core::EffectRows",
       "fields": [
         [
           "rows",
@@ -844,7 +844,7 @@
     {
       "name": "check.effects.Row",
       "kind": "struct",
-      "goose": "blot_check_effects::Row",
+      "goose": "squid_check_effects::Row",
       "fields": [
         [
           "labels",
@@ -867,7 +867,7 @@
     {
       "name": "check.effects.List",
       "kind": "struct",
-      "goose": "blot_check_effects::List",
+      "goose": "squid_check_effects::List",
       "fields": [
         [
           "start",
@@ -885,7 +885,7 @@
     {
       "name": "check.effects.Tail",
       "kind": "union",
-      "goose": "blot_check_effects::Tail",
+      "goose": "squid_check_effects::Tail",
       "variants": [
         [
           "closed",
@@ -969,7 +969,7 @@
     {
       "name": "[]check.effects.Row",
       "kind": "slice",
-      "goose": "blot_check_effects::Row[:]",
+      "goose": "squid_check_effects::Row[:]",
       "children": [
         "check.effects.Row"
       ]
@@ -977,7 +977,7 @@
     {
       "name": "check.types.Operation",
       "kind": "struct",
-      "goose": "blot_check_types::Operation",
+      "goose": "squid_check_types::Operation",
       "fields": [
         [
           "identity",
@@ -1000,7 +1000,7 @@
     {
       "name": "check.types.NominalIdentity",
       "kind": "struct",
-      "goose": "blot_check_types::NominalIdentity",
+      "goose": "squid_check_types::NominalIdentity",
       "fields": [
         [
           "unit",
@@ -1018,7 +1018,7 @@
     {
       "name": "check.types.List",
       "kind": "struct",
-      "goose": "blot_check_types::List",
+      "goose": "squid_check_types::List",
       "fields": [
         [
           "start",
@@ -1036,7 +1036,7 @@
     {
       "name": "[]check.types.Operation",
       "kind": "slice",
-      "goose": "blot_check_types::Operation[:]",
+      "goose": "squid_check_types::Operation[:]",
       "children": [
         "check.types.Operation"
       ]
@@ -1044,7 +1044,7 @@
     {
       "name": "check.types.Obligation",
       "kind": "struct",
-      "goose": "blot_check_types::Obligation",
+      "goose": "squid_check_types::Obligation",
       "fields": [
         [
           "ty",
@@ -1112,7 +1112,7 @@
     {
       "name": "check.types.ObligationKind",
       "kind": "enum",
-      "goose": "blot_check_types::ObligationKind",
+      "goose": "squid_check_types::ObligationKind",
       "variants": [
         [
           "arithmetic",
@@ -1214,7 +1214,7 @@
     {
       "name": "check.types.Operator",
       "kind": "enum",
-      "goose": "blot_check_types::Operator",
+      "goose": "squid_check_types::Operator",
       "variants": [
         [
           "none",
@@ -1306,7 +1306,7 @@
     {
       "name": "parse.ast.Span",
       "kind": "struct",
-      "goose": "blot_parse_ast::Span",
+      "goose": "squid_parse_ast::Span",
       "fields": [
         [
           "start",
@@ -1324,7 +1324,7 @@
     {
       "name": "?parse.ast.Span",
       "kind": "optional",
-      "goose": "blot_support::Option<blot_parse_ast::Span>",
+      "goose": "squid_support::Option<squid_parse_ast::Span>",
       "children": [
         "parse.ast.Span"
       ]
@@ -1332,7 +1332,7 @@
     {
       "name": "[]check.types.Obligation",
       "kind": "slice",
-      "goose": "blot_check_types::Obligation[:]",
+      "goose": "squid_check_types::Obligation[:]",
       "children": [
         "check.types.Obligation"
       ]
@@ -1340,7 +1340,7 @@
     {
       "name": "check.core.Node",
       "kind": "struct",
-      "goose": "blot_check_core::Node",
+      "goose": "squid_check_core::Node",
       "fields": [
         [
           "tag",
@@ -1378,7 +1378,7 @@
     {
       "name": "check.core.Tag",
       "kind": "enum",
-      "goose": "blot_check_core::Tag",
+      "goose": "squid_check_core::Tag",
       "variants": [
         [
           "invalid",
@@ -1620,7 +1620,7 @@
     {
       "name": "check.core.Op",
       "kind": "enum",
-      "goose": "blot_check_core::Op",
+      "goose": "squid_check_core::Op",
       "variants": [
         [
           "none",
@@ -1967,7 +1967,7 @@
     {
       "name": "[]check.core.Node",
       "kind": "slice",
-      "goose": "blot_check_core::Node[:]",
+      "goose": "squid_check_core::Node[:]",
       "children": [
         "check.core.Node"
       ]
@@ -1975,7 +1975,7 @@
     {
       "name": "[]parse.ast.Span",
       "kind": "slice",
-      "goose": "blot_parse_ast::Span[:]",
+      "goose": "squid_parse_ast::Span[:]",
       "children": [
         "parse.ast.Span"
       ]
@@ -1983,7 +1983,7 @@
     {
       "name": "check.core.Binding",
       "kind": "struct",
-      "goose": "blot_check_core::Binding",
+      "goose": "squid_check_core::Binding",
       "fields": [
         [
           "capability_parameters",
@@ -2051,7 +2051,7 @@
     {
       "name": "check.capability_flow.Parameters",
       "kind": "struct",
-      "goose": "blot_check_capability_flow::Parameters",
+      "goose": "squid_check_capability_flow::Parameters",
       "fields": [
         [
           "own",
@@ -2091,7 +2091,7 @@
     {
       "name": "reuse.principal_interface.Kind",
       "kind": "enum",
-      "goose": "blot_reuse_principal_interface::Kind",
+      "goose": "squid_reuse_principal_interface::Kind",
       "variants": [
         [
           "global",
@@ -2118,7 +2118,7 @@
     {
       "name": "check.types.Scheme",
       "kind": "struct",
-      "goose": "blot_check_types::Scheme",
+      "goose": "squid_check_types::Scheme",
       "fields": [
         [
           "root",
@@ -2156,7 +2156,7 @@
     {
       "name": "check.core.BindingRef",
       "kind": "struct",
-      "goose": "blot_check_core::BindingRef",
+      "goose": "squid_check_core::BindingRef",
       "fields": [
         [
           "unit",
@@ -2174,7 +2174,7 @@
     {
       "name": "[]check.core.Binding",
       "kind": "slice",
-      "goose": "blot_check_core::Binding[:]",
+      "goose": "squid_check_core::Binding[:]",
       "children": [
         "check.core.Binding"
       ]
@@ -2182,7 +2182,7 @@
     {
       "name": "check.core.Body",
       "kind": "struct",
-      "goose": "blot_check_core::Body",
+      "goose": "squid_check_core::Body",
       "fields": [
         [
           "binding",
@@ -2265,7 +2265,7 @@
     {
       "name": "check.core.SparkInfo",
       "kind": "struct",
-      "goose": "blot_check_core::SparkInfo",
+      "goose": "squid_check_core::SparkInfo",
       "fields": [
         [
           "is_range",
@@ -2303,7 +2303,7 @@
     {
       "name": "[]check.core.SparkInfo",
       "kind": "slice",
-      "goose": "blot_check_core::SparkInfo[:]",
+      "goose": "squid_check_core::SparkInfo[:]",
       "children": [
         "check.core.SparkInfo"
       ]
@@ -2311,7 +2311,7 @@
     {
       "name": "check.core.KernelDecl",
       "kind": "struct",
-      "goose": "blot_check_core::KernelDecl",
+      "goose": "squid_check_core::KernelDecl",
       "fields": [
         [
           "name",
@@ -2369,7 +2369,7 @@
     {
       "name": "[]check.core.KernelDecl",
       "kind": "slice",
-      "goose": "blot_check_core::KernelDecl[:]",
+      "goose": "squid_check_core::KernelDecl[:]",
       "children": [
         "check.core.KernelDecl"
       ]
@@ -2377,7 +2377,7 @@
     {
       "name": "check.core.ProcessDecl",
       "kind": "struct",
-      "goose": "blot_check_core::ProcessDecl",
+      "goose": "squid_check_core::ProcessDecl",
       "fields": [
         [
           "name",
@@ -2430,7 +2430,7 @@
     {
       "name": "[]check.core.ProcessDecl",
       "kind": "slice",
-      "goose": "blot_check_core::ProcessDecl[:]",
+      "goose": "squid_check_core::ProcessDecl[:]",
       "children": [
         "check.core.ProcessDecl"
       ]
@@ -2438,7 +2438,7 @@
     {
       "name": "[]check.core.Body",
       "kind": "slice",
-      "goose": "blot_check_core::Body[:]",
+      "goose": "squid_check_core::Body[:]",
       "children": [
         "check.core.Body"
       ]
@@ -2446,7 +2446,7 @@
     {
       "name": "check.core.Parameter",
       "kind": "struct",
-      "goose": "blot_check_core::Parameter",
+      "goose": "squid_check_core::Parameter",
       "fields": [
         [
           "binding",
@@ -2474,7 +2474,7 @@
     {
       "name": "[]check.core.Parameter",
       "kind": "slice",
-      "goose": "blot_check_core::Parameter[:]",
+      "goose": "squid_check_core::Parameter[:]",
       "children": [
         "check.core.Parameter"
       ]
@@ -2482,7 +2482,7 @@
     {
       "name": "[]check.core.BindingRef",
       "kind": "slice",
-      "goose": "blot_check_core::BindingRef[:]",
+      "goose": "squid_check_core::BindingRef[:]",
       "children": [
         "check.core.BindingRef"
       ]
@@ -2490,7 +2490,7 @@
     {
       "name": "check.core.CallInfo",
       "kind": "struct",
-      "goose": "blot_check_core::CallInfo",
+      "goose": "squid_check_core::CallInfo",
       "fields": [
         [
           "target",
@@ -2513,7 +2513,7 @@
     {
       "name": "[]check.core.CallInfo",
       "kind": "slice",
-      "goose": "blot_check_core::CallInfo[:]",
+      "goose": "squid_check_core::CallInfo[:]",
       "children": [
         "check.core.CallInfo"
       ]
@@ -2521,7 +2521,7 @@
     {
       "name": "check.core.Merge",
       "kind": "struct",
-      "goose": "blot_check_core::Merge",
+      "goose": "squid_check_core::Merge",
       "fields": [
         [
           "node",
@@ -2549,7 +2549,7 @@
     {
       "name": "[]check.core.Merge",
       "kind": "slice",
-      "goose": "blot_check_core::Merge[:]",
+      "goose": "squid_check_core::Merge[:]",
       "children": [
         "check.core.Merge"
       ]
@@ -2557,7 +2557,7 @@
     {
       "name": "[]check.core.List",
       "kind": "slice",
-      "goose": "blot_check_core::List[:]",
+      "goose": "squid_check_core::List[:]",
       "children": [
         "check.core.List"
       ]
@@ -2565,7 +2565,7 @@
     {
       "name": "check.core.Obligation",
       "kind": "struct",
-      "goose": "blot_check_core::Obligation",
+      "goose": "squid_check_core::Obligation",
       "fields": [
         [
           "ty",
@@ -2638,7 +2638,7 @@
     {
       "name": "[]check.core.Obligation",
       "kind": "slice",
-      "goose": "blot_check_core::Obligation[:]",
+      "goose": "squid_check_core::Obligation[:]",
       "children": [
         "check.core.Obligation"
       ]
@@ -2646,7 +2646,7 @@
     {
       "name": "check.core.Nominal",
       "kind": "struct",
-      "goose": "blot_check_core::Nominal",
+      "goose": "squid_check_core::Nominal",
       "fields": [
         [
           "affine",
@@ -2714,7 +2714,7 @@
     {
       "name": "check.opaque_storage.Storage",
       "kind": "struct",
-      "goose": "blot_backend_opaque_storage::Storage",
+      "goose": "squid_backend_opaque_storage::Storage",
       "fields": [
         [
           "kind",
@@ -2737,7 +2737,7 @@
     {
       "name": "check.opaque_storage.Storage.kind",
       "kind": "enum",
-      "goose": "blot_backend_opaque_storage::Kind",
+      "goose": "squid_backend_opaque_storage::Kind",
       "variants": [
         [
           "unknown",
@@ -2779,7 +2779,7 @@
     {
       "name": "[]check.core.Nominal",
       "kind": "slice",
-      "goose": "blot_check_core::Nominal[:]",
+      "goose": "squid_check_core::Nominal[:]",
       "children": [
         "check.core.Nominal"
       ]
@@ -2787,7 +2787,7 @@
     {
       "name": "check.core.OperationName",
       "kind": "struct",
-      "goose": "blot_check_core::OperationName",
+      "goose": "squid_check_core::OperationName",
       "fields": [
         [
           "identity",
@@ -2830,7 +2830,7 @@
     {
       "name": "[]check.core.OperationName",
       "kind": "slice",
-      "goose": "blot_check_core::OperationName[:]",
+      "goose": "squid_check_core::OperationName[:]",
       "children": [
         "check.core.OperationName"
       ]
@@ -2838,7 +2838,7 @@
     {
       "name": "check.core.Constructor",
       "kind": "struct",
-      "goose": "blot_check_core::Constructor",
+      "goose": "squid_check_core::Constructor",
       "fields": [
         [
           "identity",
@@ -2876,7 +2876,7 @@
     {
       "name": "[]check.core.Constructor",
       "kind": "slice",
-      "goose": "blot_check_core::Constructor[:]",
+      "goose": "squid_check_core::Constructor[:]",
       "children": [
         "check.core.Constructor"
       ]
@@ -2884,7 +2884,7 @@
     {
       "name": "check.core.TypeTag",
       "kind": "struct",
-      "goose": "blot_check_core::TypeTag",
+      "goose": "squid_check_core::TypeTag",
       "fields": [
         [
           "nominal",
@@ -2922,7 +2922,7 @@
     {
       "name": "[]check.core.TypeTag",
       "kind": "slice",
-      "goose": "blot_check_core::TypeTag[:]",
+      "goose": "squid_check_core::TypeTag[:]",
       "children": [
         "check.core.TypeTag"
       ]
@@ -2930,7 +2930,7 @@
     {
       "name": "check.core.Projection",
       "kind": "struct",
-      "goose": "blot_check_core::Projection",
+      "goose": "squid_check_core::Projection",
       "fields": [
         [
           "nominal",
@@ -2968,7 +2968,7 @@
     {
       "name": "[]check.core.Projection",
       "kind": "slice",
-      "goose": "blot_check_core::Projection[:]",
+      "goose": "squid_check_core::Projection[:]",
       "children": [
         "check.core.Projection"
       ]
@@ -2976,7 +2976,7 @@
     {
       "name": "check.core.ProjectionVariant",
       "kind": "struct",
-      "goose": "blot_check_core::ProjectionVariant",
+      "goose": "squid_check_core::ProjectionVariant",
       "fields": [
         [
           "tag",
@@ -2994,7 +2994,7 @@
     {
       "name": "[]check.core.ProjectionVariant",
       "kind": "slice",
-      "goose": "blot_check_core::ProjectionVariant[:]",
+      "goose": "squid_check_core::ProjectionVariant[:]",
       "children": [
         "check.core.ProjectionVariant"
       ]
@@ -3002,7 +3002,7 @@
     {
       "name": "check.core.Pattern",
       "kind": "struct",
-      "goose": "blot_check_core::Pattern",
+      "goose": "squid_check_core::Pattern",
       "fields": [
         [
           "tag",
@@ -3040,7 +3040,7 @@
     {
       "name": "check.core.PatternTag",
       "kind": "enum",
-      "goose": "blot_check_core::PatternTag",
+      "goose": "squid_check_core::PatternTag",
       "variants": [
         [
           "invalid",
@@ -3087,7 +3087,7 @@
     {
       "name": "[]check.core.Pattern",
       "kind": "slice",
-      "goose": "blot_check_core::Pattern[:]",
+      "goose": "squid_check_core::Pattern[:]",
       "children": [
         "check.core.Pattern"
       ]
@@ -3095,7 +3095,7 @@
     {
       "name": "check.core.PatternRow",
       "kind": "struct",
-      "goose": "blot_check_core::PatternRow",
+      "goose": "squid_check_core::PatternRow",
       "fields": [
         [
           "patterns",
@@ -3108,7 +3108,7 @@
     {
       "name": "[]check.core.PatternRow",
       "kind": "slice",
-      "goose": "blot_check_core::PatternRow[:]",
+      "goose": "squid_check_core::PatternRow[:]",
       "children": [
         "check.core.PatternRow"
       ]
@@ -3116,7 +3116,7 @@
     {
       "name": "check.core.MatchArm",
       "kind": "struct",
-      "goose": "blot_check_core::MatchArm",
+      "goose": "squid_check_core::MatchArm",
       "fields": [
         [
           "rows",
@@ -3144,7 +3144,7 @@
     {
       "name": "[]check.core.MatchArm",
       "kind": "slice",
-      "goose": "blot_check_core::MatchArm[:]",
+      "goose": "squid_check_core::MatchArm[:]",
       "children": [
         "check.core.MatchArm"
       ]
@@ -3152,7 +3152,7 @@
     {
       "name": "check.core.MatchInfo",
       "kind": "struct",
-      "goose": "blot_check_core::MatchInfo",
+      "goose": "squid_check_core::MatchInfo",
       "fields": [
         [
           "inputs",
@@ -3175,7 +3175,7 @@
     {
       "name": "[]check.core.MatchInfo",
       "kind": "slice",
-      "goose": "blot_check_core::MatchInfo[:]",
+      "goose": "squid_check_core::MatchInfo[:]",
       "children": [
         "check.core.MatchInfo"
       ]
@@ -3183,7 +3183,7 @@
     {
       "name": "check.core.UpdateInfo",
       "kind": "struct",
-      "goose": "blot_check_core::UpdateInfo",
+      "goose": "squid_check_core::UpdateInfo",
       "fields": [
         [
           "root",
@@ -3216,7 +3216,7 @@
     {
       "name": "[]check.core.UpdateInfo",
       "kind": "slice",
-      "goose": "blot_check_core::UpdateInfo[:]",
+      "goose": "squid_check_core::UpdateInfo[:]",
       "children": [
         "check.core.UpdateInfo"
       ]
@@ -3224,7 +3224,7 @@
     {
       "name": "check.core.UpdateStep",
       "kind": "struct",
-      "goose": "blot_check_core::UpdateStep",
+      "goose": "squid_check_core::UpdateStep",
       "fields": [
         [
           "kind",
@@ -3257,7 +3257,7 @@
     {
       "name": "check.core.UpdateKind",
       "kind": "enum",
-      "goose": "blot_check_core::UpdateKind",
+      "goose": "squid_check_core::UpdateKind",
       "variants": [
         [
           "field",
@@ -3279,7 +3279,7 @@
     {
       "name": "[]check.core.UpdateStep",
       "kind": "slice",
-      "goose": "blot_check_core::UpdateStep[:]",
+      "goose": "squid_check_core::UpdateStep[:]",
       "children": [
         "check.core.UpdateStep"
       ]
@@ -3287,7 +3287,7 @@
     {
       "name": "check.core.ClosureInfo",
       "kind": "struct",
-      "goose": "blot_check_core::ClosureInfo",
+      "goose": "squid_check_core::ClosureInfo",
       "fields": [
         [
           "qualifier",
@@ -3325,7 +3325,7 @@
     {
       "name": "[]check.core.ClosureInfo",
       "kind": "slice",
-      "goose": "blot_check_core::ClosureInfo[:]",
+      "goose": "squid_check_core::ClosureInfo[:]",
       "children": [
         "check.core.ClosureInfo"
       ]
@@ -3333,7 +3333,7 @@
     {
       "name": "check.core.Associated",
       "kind": "struct",
-      "goose": "blot_check_core::Associated",
+      "goose": "squid_check_core::Associated",
       "fields": [
         [
           "identity",
@@ -3361,7 +3361,7 @@
     {
       "name": "[]check.core.Associated",
       "kind": "slice",
-      "goose": "blot_check_core::Associated[:]",
+      "goose": "squid_check_core::Associated[:]",
       "children": [
         "check.core.Associated"
       ]
@@ -3369,7 +3369,7 @@
     {
       "name": "check.core.Contract",
       "kind": "struct",
-      "goose": "blot_check_core::Contract",
+      "goose": "squid_check_core::Contract",
       "fields": [
         [
           "private",
@@ -3432,7 +3432,7 @@
     {
       "name": "[]check.core.Contract",
       "kind": "slice",
-      "goose": "blot_check_core::Contract[:]",
+      "goose": "squid_check_core::Contract[:]",
       "children": [
         "check.core.Contract"
       ]
@@ -3440,7 +3440,7 @@
     {
       "name": "reuse.principal_interface.ContractMember",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::ContractMember",
+      "goose": "squid_reuse_principal_interface::ContractMember",
       "fields": [
         [
           "contract",
@@ -3468,7 +3468,7 @@
     {
       "name": "reuse.principal_interface.ContractMember.kind",
       "kind": "enum",
-      "goose": "blot_reuse_principal_interface::ContractMemberKind",
+      "goose": "squid_reuse_principal_interface::ContractMemberKind",
       "variants": [
         [
           "defined_type",
@@ -3490,7 +3490,7 @@
     {
       "name": "[]reuse.principal_interface.ContractMember",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::ContractMember[:]",
+      "goose": "squid_reuse_principal_interface::ContractMember[:]",
       "children": [
         "reuse.principal_interface.ContractMember"
       ]
@@ -3498,7 +3498,7 @@
     {
       "name": "reuse.principal_interface.Implementation",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Implementation",
+      "goose": "squid_reuse_principal_interface::Implementation",
       "fields": [
         [
           "origin_span",
@@ -3576,7 +3576,7 @@
     {
       "name": "[]reuse.principal_interface.Implementation",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Implementation[:]",
+      "goose": "squid_reuse_principal_interface::Implementation[:]",
       "children": [
         "reuse.principal_interface.Implementation"
       ]
@@ -3584,7 +3584,7 @@
     {
       "name": "reuse.principal_interface.ImplementationMember",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::ImplementationMember",
+      "goose": "squid_reuse_principal_interface::ImplementationMember",
       "fields": [
         [
           "name",
@@ -3612,7 +3612,7 @@
     {
       "name": "reuse.principal_interface.ImplementationMember.kind",
       "kind": "enum",
-      "goose": "blot_reuse_principal_interface::ImplementationMemberKind",
+      "goose": "squid_reuse_principal_interface::ImplementationMemberKind",
       "variants": [
         [
           "type_",
@@ -3629,7 +3629,7 @@
     {
       "name": "reuse.principal_interface.ExternalTarget",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::ExternalTarget",
+      "goose": "squid_reuse_principal_interface::ExternalTarget",
       "fields": [
         [
           "unit",
@@ -3647,7 +3647,7 @@
     {
       "name": "[]reuse.principal_interface.ImplementationMember",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::ImplementationMember[:]",
+      "goose": "squid_reuse_principal_interface::ImplementationMember[:]",
       "children": [
         "reuse.principal_interface.ImplementationMember"
       ]
@@ -3655,7 +3655,7 @@
     {
       "name": "reuse.principal_interface.MemberTemplate",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::MemberTemplate",
+      "goose": "squid_reuse_principal_interface::MemberTemplate",
       "fields": [
         [
           "binding",
@@ -3683,7 +3683,7 @@
     {
       "name": "[]reuse.principal_interface.MemberTemplate",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::MemberTemplate[:]",
+      "goose": "squid_reuse_principal_interface::MemberTemplate[:]",
       "children": [
         "reuse.principal_interface.MemberTemplate"
       ]
@@ -3691,7 +3691,7 @@
     {
       "name": "check.core.Primitive",
       "kind": "struct",
-      "goose": "blot_check_core::Primitive",
+      "goose": "squid_check_core::Primitive",
       "fields": [
         [
           "kind",
@@ -3719,7 +3719,7 @@
     {
       "name": "check.core.PrimitiveKind",
       "kind": "enum",
-      "goose": "blot_check_core::PrimitiveKind",
+      "goose": "squid_check_core::PrimitiveKind",
       "variants": [
         [
           "scalar",
@@ -3736,7 +3736,7 @@
     {
       "name": "check.collection_ops.Op",
       "kind": "enum",
-      "goose": "blot_backend_collection_ops::Op",
+      "goose": "squid_backend_collection_ops::Op",
       "variants": [
         [
           "length",
@@ -3828,7 +3828,7 @@
     {
       "name": "[]check.core.Primitive",
       "kind": "slice",
-      "goose": "blot_check_core::Primitive[:]",
+      "goose": "squid_check_core::Primitive[:]",
       "children": [
         "check.core.Primitive"
       ]
@@ -3836,7 +3836,7 @@
     {
       "name": "check.core.LoopInfo",
       "kind": "struct",
-      "goose": "blot_check_core::LoopInfo",
+      "goose": "squid_check_core::LoopInfo",
       "fields": [
         [
           "kind",
@@ -3879,7 +3879,7 @@
     {
       "name": "check.core.LoopKind",
       "kind": "enum",
-      "goose": "blot_check_core::LoopKind",
+      "goose": "squid_check_core::LoopKind",
       "variants": [
         [
           "forever",
@@ -3901,7 +3901,7 @@
     {
       "name": "[]check.core.LoopInfo",
       "kind": "slice",
-      "goose": "blot_check_core::LoopInfo[:]",
+      "goose": "squid_check_core::LoopInfo[:]",
       "children": [
         "check.core.LoopInfo"
       ]
@@ -3909,7 +3909,7 @@
     {
       "name": "check.core.LoopCarry",
       "kind": "struct",
-      "goose": "blot_check_core::LoopCarry",
+      "goose": "squid_check_core::LoopCarry",
       "fields": [
         [
           "incoming",
@@ -3937,7 +3937,7 @@
     {
       "name": "[]check.core.LoopCarry",
       "kind": "slice",
-      "goose": "blot_check_core::LoopCarry[:]",
+      "goose": "squid_check_core::LoopCarry[:]",
       "children": [
         "check.core.LoopCarry"
       ]
@@ -3945,7 +3945,7 @@
     {
       "name": "check.core.OperationValue",
       "kind": "struct",
-      "goose": "blot_check_core::OperationValue",
+      "goose": "squid_check_core::OperationValue",
       "fields": [
         [
           "identity",
@@ -3988,7 +3988,7 @@
     {
       "name": "[]check.core.OperationValue",
       "kind": "slice",
-      "goose": "blot_check_core::OperationValue[:]",
+      "goose": "squid_check_core::OperationValue[:]",
       "children": [
         "check.core.OperationValue"
       ]
@@ -3996,7 +3996,7 @@
     {
       "name": "check.core.HandleEffects",
       "kind": "struct",
-      "goose": "blot_check_core::HandleEffects",
+      "goose": "squid_check_core::HandleEffects",
       "fields": [
         [
           "node",
@@ -4029,7 +4029,7 @@
     {
       "name": "[]check.core.HandleEffects",
       "kind": "slice",
-      "goose": "blot_check_core::HandleEffects[:]",
+      "goose": "squid_check_core::HandleEffects[:]",
       "children": [
         "check.core.HandleEffects"
       ]
@@ -4037,7 +4037,7 @@
     {
       "name": "check.core.Diagnostic",
       "kind": "struct",
-      "goose": "blot_check_core::Diagnostic",
+      "goose": "squid_check_core::Diagnostic",
       "fields": [
         [
           "code",
@@ -4055,7 +4055,7 @@
     {
       "name": "check.core.Code",
       "kind": "enum",
-      "goose": "blot_check_core::Code",
+      "goose": "squid_check_core::Code",
       "variants": [
         [
           "unchecked",
@@ -4122,7 +4122,7 @@
     {
       "name": "[]check.core.Diagnostic",
       "kind": "slice",
-      "goose": "blot_check_core::Diagnostic[:]",
+      "goose": "squid_check_core::Diagnostic[:]",
       "children": [
         "check.core.Diagnostic"
       ]
@@ -4136,7 +4136,7 @@
     {
       "name": "reuse.principal_interface.Interface",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Interface",
+      "goose": "squid_reuse_principal_interface::Interface",
       "fields": [
         [
           "unit",
@@ -4229,7 +4229,7 @@
     {
       "name": "check.frozen_types.Graph",
       "kind": "struct",
-      "goose": "blot_check_frozen_types::Graph",
+      "goose": "squid_check_frozen_types::Graph",
       "fields": [
         [
           "nodes",
@@ -4267,7 +4267,7 @@
     {
       "name": "check.frozen_types.PatternGraph",
       "kind": "struct",
-      "goose": "blot_check_frozen_types::PatternGraph",
+      "goose": "squid_check_frozen_types::PatternGraph",
       "fields": [
         [
           "nodes",
@@ -4285,7 +4285,7 @@
     {
       "name": "check.parameter_patterns.Node",
       "kind": "struct",
-      "goose": "blot_check_parameter_patterns::Node",
+      "goose": "squid_check_parameter_patterns::Node",
       "fields": [
         [
           "kind",
@@ -4308,7 +4308,7 @@
     {
       "name": "check.parameter_patterns.Kind",
       "kind": "enum",
-      "goose": "blot_check_parameter_patterns::Kind",
+      "goose": "squid_check_parameter_patterns::Kind",
       "variants": [
         [
           "binding",
@@ -4335,7 +4335,7 @@
     {
       "name": "[]check.parameter_patterns.Node",
       "kind": "slice",
-      "goose": "blot_check_parameter_patterns::Node[:]",
+      "goose": "squid_check_parameter_patterns::Node[:]",
       "children": [
         "check.parameter_patterns.Node"
       ]
@@ -4343,7 +4343,7 @@
     {
       "name": "reuse.principal_interface.Binding",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Binding",
+      "goose": "squid_reuse_principal_interface::Binding",
       "fields": [
         [
           "capability_parameters",
@@ -4391,7 +4391,7 @@
     {
       "name": "?reuse.principal_interface.ExternalTarget",
       "kind": "optional",
-      "goose": "blot_support::Option<blot_reuse_principal_interface::ExternalTarget>",
+      "goose": "squid_support::Option<squid_reuse_principal_interface::ExternalTarget>",
       "children": [
         "reuse.principal_interface.ExternalTarget"
       ]
@@ -4399,7 +4399,7 @@
     {
       "name": "[]reuse.principal_interface.Binding",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Binding[:]",
+      "goose": "squid_reuse_principal_interface::Binding[:]",
       "children": [
         "reuse.principal_interface.Binding"
       ]
@@ -4407,7 +4407,7 @@
     {
       "name": "reuse.principal_interface.Nominal",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Nominal",
+      "goose": "squid_reuse_principal_interface::Nominal",
       "fields": [
         [
           "affine",
@@ -4495,7 +4495,7 @@
     {
       "name": "[]reuse.principal_interface.Nominal",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Nominal[:]",
+      "goose": "squid_reuse_principal_interface::Nominal[:]",
       "children": [
         "reuse.principal_interface.Nominal"
       ]
@@ -4503,7 +4503,7 @@
     {
       "name": "reuse.principal_interface.Constructor",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Constructor",
+      "goose": "squid_reuse_principal_interface::Constructor",
       "fields": [
         [
           "private",
@@ -4553,7 +4553,7 @@
     {
       "name": "[]reuse.principal_interface.Constructor",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Constructor[:]",
+      "goose": "squid_reuse_principal_interface::Constructor[:]",
       "children": [
         "reuse.principal_interface.Constructor"
       ]
@@ -4561,7 +4561,7 @@
     {
       "name": "reuse.principal_interface.EffectFamily",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::EffectFamily",
+      "goose": "squid_reuse_principal_interface::EffectFamily",
       "fields": [
         [
           "private",
@@ -4614,7 +4614,7 @@
     {
       "name": "[]reuse.principal_interface.EffectFamily",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::EffectFamily[:]",
+      "goose": "squid_reuse_principal_interface::EffectFamily[:]",
       "children": [
         "reuse.principal_interface.EffectFamily"
       ]
@@ -4622,7 +4622,7 @@
     {
       "name": "reuse.principal_interface.EffectTemplate",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::EffectTemplate",
+      "goose": "squid_reuse_principal_interface::EffectTemplate",
       "fields": [
         [
           "identity",
@@ -4655,7 +4655,7 @@
     {
       "name": "[]reuse.principal_interface.EffectTemplate",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::EffectTemplate[:]",
+      "goose": "squid_reuse_principal_interface::EffectTemplate[:]",
       "children": [
         "reuse.principal_interface.EffectTemplate"
       ]
@@ -4663,7 +4663,7 @@
     {
       "name": "reuse.principal_interface.Associated",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Associated",
+      "goose": "squid_reuse_principal_interface::Associated",
       "fields": [
         [
           "identity",
@@ -4691,7 +4691,7 @@
     {
       "name": "[]reuse.principal_interface.Associated",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Associated[:]",
+      "goose": "squid_reuse_principal_interface::Associated[:]",
       "children": [
         "reuse.principal_interface.Associated"
       ]
@@ -4699,7 +4699,7 @@
     {
       "name": "reuse.principal_interface.Contract",
       "kind": "struct",
-      "goose": "blot_reuse_principal_interface::Contract",
+      "goose": "squid_reuse_principal_interface::Contract",
       "fields": [
         [
           "declaration",
@@ -4777,7 +4777,7 @@
     {
       "name": "[]reuse.principal_interface.Contract",
       "kind": "slice",
-      "goose": "blot_reuse_principal_interface::Contract[:]",
+      "goose": "squid_reuse_principal_interface::Contract[:]",
       "children": [
         "reuse.principal_interface.Contract"
       ]
@@ -4785,7 +4785,7 @@
     {
       "name": "reuse.frozen_dependency.Export",
       "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::Export",
+      "goose": "squid_reuse_frozen_dependency::Export",
       "fields": [
         [
           "name",
@@ -4813,7 +4813,7 @@
     {
       "name": "reuse.frozen_dependency.Export.kind",
       "kind": "enum",
-      "goose": "blot_reuse_frozen_dependency::ExportKind",
+      "goose": "squid_reuse_frozen_dependency::ExportKind",
       "variants": [
         [
           "value",
@@ -4850,7 +4850,7 @@
     {
       "name": "[]reuse.frozen_dependency.Export",
       "kind": "slice",
-      "goose": "blot_reuse_frozen_dependency::Export[:]",
+      "goose": "squid_reuse_frozen_dependency::Export[:]",
       "children": [
         "reuse.frozen_dependency.Export"
       ]
@@ -4858,7 +4858,7 @@
     {
       "name": "[]reuse.frozen_dependency.Module",
       "kind": "slice",
-      "goose": "blot_reuse_frozen_dependency::Module[:]",
+      "goose": "squid_reuse_frozen_dependency::Module[:]",
       "children": [
         "reuse.frozen_dependency.Module"
       ]

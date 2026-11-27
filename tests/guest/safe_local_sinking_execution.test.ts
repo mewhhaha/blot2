@@ -89,9 +89,9 @@ io const choice = func (input: U32) => return do:
 });
 
 Deno.test("safe sinks and eager traps preserve behavior in both codegen tiers", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-safe-sink-" });
-  const entry = `${directory}/main.blot`;
-  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  const directory = await Deno.makeTempDir({ prefix: "squid-safe-sink-" });
+  const entry = `${directory}/main.sq`;
+  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   const source = `
 const helper = func (value: U32) => return @u32.div 7 value
 io const branch = func (input: U32) => return do:

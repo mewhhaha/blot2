@@ -3,7 +3,7 @@
 Issue #19 is implemented as a checked source-generation tool. A manifest opts
 individual data types into equality, debug formatting, codecs, or any subset.
 The command checks the original project, reads its data-declaration CST,
-generates ordinary Blot source, checks the generated project, and atomically
+generates ordinary Squid source, checks the generated project, and atomically
 publishes the output. Equality uses the explicit `std/equality.Eq` contract;
 debug output uses `std/text.Format`; codecs use `std/codec.Codec`. This keeps
 the new structural contracts out of the implicit prelude. Ordinary Bool equality

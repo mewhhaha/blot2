@@ -27,7 +27,7 @@ field dereferencing before the application slice can run.
 
 ## Exclusive ownership
 
-In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.blot` files and directories:
+In the sibling checkout `/home/mewhhaha/src/ink/lib/`, own these `.sq` files and directories:
 `arrays`, `buffer`, `pages`, `map`, `map/`, `set`, `hash`, `lookup`, `handles`,
 `changes`, `messages`, `journal`, `relations`, `history`, `reconcile`, `graph`,
 `partition`, `claims`, `task_queue`, `ecs`, `ecs/`, `schedule`, `derived`,
@@ -57,7 +57,7 @@ an explicit ownership transfer from the root integrator.
 
 ## Lean acceptance
 
-The real `Ink/tests/ecs.blot` module now compiles and executes with the shared
+The real `Ink/tests/ecs.sq` module now compiles and executes with the shared
 development compiler: five checks pass (growth/view/checkpoint independence,
 structural commands, query revision invalidation, journal retention reset and
 explicit span-payload copying). Evidence is in
@@ -86,4 +86,4 @@ Do not report a partial run as a pass or infer frame performance from compile ti
 
 - [Rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md)
 - [Storage rewrite](STORAGE_REWRITE.md)
-- Ink `docs/architecture.md`, `docs/blot.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.
+- Ink `docs/architecture.md`, `docs/squid.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.

@@ -7,13 +7,13 @@
 - **19 October 2026:** the compile-time hills cut the gdev literal edit to about
   1.0 s, from 1.88 s before CT9. Results for CT9, CT12, CT14–CT17, CT22, CT27
   and CT89 are in
-  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** discovered while qualifying task
   [023](023-narrow-literal-edit-invalidation.md); PLAN: Hill 6 / literal edits
   under 30 ms. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -51,7 +51,7 @@ recorded measurements.**
   ([attribution](../docs/compiler/RETAINED_EDIT_COST.md#attribution)). That
   workload cannot be re-measured: the frozen gdev manifest was waived on 11
   October and `build/` was removed on 15 October (see
-  [README](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)).
+  [README](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)).
 - On the current 93-unit captured project, an LLVM release profile of a retained
   scalar edit at `2798ff9` reports 51–53 ms of constant work and 19 ms of value
   evaluation against 545–549 ms of inference
@@ -110,7 +110,7 @@ before the local milestone commit.
   does not count.
 - Runs: at least seven alternating paired retained top-level scalar literal
   edits, reporting medians of edits 2 onward, with child user plus system CPU, a
-  phase profile (`blotc build ... --profile` or the project server's profile)
+  phase profile (`squidc build ... --profile` or the project server's profile)
   and the constant-receipt counters.
 - Quantity C: CPU per edit spent evaluating constants whose recorded inputs did
   not change, including inference nested in that evaluation, plus re-serializing
@@ -155,7 +155,7 @@ If the work proceeds:
 - Compound replay (ordered dependency reads, reachable typed views, collection
   buffer frontiers, one ordinary retry after a post-demand mismatch, OOM never
   retried) landed in `23a934f`. Its delta was frozen as
-  `/var/tmp/blot2-task086-demand-frontier-freeze-v2-20261015`, patch SHA-256
+  `/var/tmp/squid-task086-demand-frontier-freeze-v2-20261015`, patch SHA-256
   `2a1cb59e6cc374e861da4250b3c63231b61b41a02d25badc396b5d241d6fb202`; ten
   focused native laws and seven guest groups passed, with complete
   allocation-failure controls. One captured development pair preserves exact

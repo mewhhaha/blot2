@@ -26,7 +26,7 @@ structurally; rank comparison alpha-renames matching binder sorts. Polymorphic
 recursion needs an explicit principal. No arbitrary forall is guessed for an
 unannotated value.
 
-```blot
+```squid
 // Proposed: the callback must be valid independently for every a.
 const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return
   (identity 42, identity 3.0)
@@ -63,7 +63,7 @@ capturing its opened representation is rejected. Returning an unconsumed
 unrestricted sealed package is legal; a consumed affine owner must leave by
 explicit repacking.
 
-```blot
+```squid
 type Render a is contract = { const show: a -> U32 }
 impl Number : Render U32 = { const show = func value => return value }
 impl Flag : Render Bool = { const show = func value => return if value then 1 else 0 }

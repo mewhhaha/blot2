@@ -1,6 +1,6 @@
 // Process-local project/check/lower wire images. Only typed data crosses this
 // boundary; owner leases, callbacks and references are rebuilt in the child.
-namespace blot_project_packet;
+namespace squid_project_packet;
 import binary;
 import support.error;
 import support.native;
@@ -13,33 +13,33 @@ import check.parameter_patterns;
 import .project_packet_owners;
 import .project_packet_codecs;
 import .project_packet_contexts;
-type Error=blot_error::Error;
+type Error=squid_error::Error;
 let limit:i64=536870912;
 let element_limit:i64=67108864;
 let depth_limit:i64=128;
-struct Writer {output:u8[>..<]&,failure:Error=blot_error::Error.none,depth:i64=0}
-struct Reader {bytes:const u8[:],owner:Owner,at:i64=0,failure:Error=blot_error::Error.none,remaining:i64=element_limit,depth:i64=0}
-fn room(receiver:Writer&,amount:i64)->bool {if receiver.failure!=blot_error::Error.none {return false;}if amount<0||receiver.output.len>limit||amount>limit-receiver.output.len {receiver.failure=blot_error::Error.artifact_limit;return false;}return true;}
-fn available(receiver:Reader&,amount:i64)->bool {if receiver.failure!=blot_error::Error.none {return false;}if amount<0||receiver.at>receiver.bytes.len||amount>receiver.bytes.len-receiver.at {receiver.failure=blot_error::Error.invalid_artifact;return false;}return true;}
-fn enter(receiver:Writer&)->bool {if receiver.failure!=blot_error::Error.none {return false;}if receiver.depth>=depth_limit {receiver.failure=blot_error::Error.artifact_limit;return false;}receiver.depth++;return true;}
-fn enter(receiver:Reader&)->bool {if receiver.failure!=blot_error::Error.none {return false;}if receiver.depth>=depth_limit {receiver.failure=blot_error::Error.artifact_limit;return false;}receiver.depth++;return true;}
+struct Writer {output:u8[>..<]&,failure:Error=squid_error::Error.none,depth:i64=0}
+struct Reader {bytes:const u8[:],owner:Owner,at:i64=0,failure:Error=squid_error::Error.none,remaining:i64=element_limit,depth:i64=0}
+fn room(receiver:Writer&,amount:i64)->bool {if receiver.failure!=squid_error::Error.none {return false;}if amount<0||receiver.output.len>limit||amount>limit-receiver.output.len {receiver.failure=squid_error::Error.artifact_limit;return false;}return true;}
+fn available(receiver:Reader&,amount:i64)->bool {if receiver.failure!=squid_error::Error.none {return false;}if amount<0||receiver.at>receiver.bytes.len||amount>receiver.bytes.len-receiver.at {receiver.failure=squid_error::Error.invalid_artifact;return false;}return true;}
+fn enter(receiver:Writer&)->bool {if receiver.failure!=squid_error::Error.none {return false;}if receiver.depth>=depth_limit {receiver.failure=squid_error::Error.artifact_limit;return false;}receiver.depth++;return true;}
+fn enter(receiver:Reader&)->bool {if receiver.failure!=squid_error::Error.none {return false;}if receiver.depth>=depth_limit {receiver.failure=squid_error::Error.artifact_limit;return false;}receiver.depth++;return true;}
 fn put(receiver:Writer&,value:bool) {var bit:u8=0;if value {bit=1;}put(receiver,bit);}
-fn get(receiver:Reader&,value:bool&) {var bit:u8=0;get(receiver,bit);if bit>1 {receiver.failure=blot_error::Error.invalid_artifact;return;}value=bit==1;}
-fn count(receiver:Writer&,length:i64) {if length<0||length>element_limit {receiver.failure=blot_error::Error.artifact_limit;return;}put(receiver,length as u64);}
-fn count(receiver:Reader&)->i64 {var length:u64=0;get(receiver,length);if receiver.failure!=blot_error::Error.none {return 0;}if length>receiver.remaining as u64||length>(receiver.bytes.len-receiver.at) as u64 {receiver.failure=blot_error::Error.artifact_limit;return 0;}receiver.remaining-=length as i64;return length as i64;}
+fn get(receiver:Reader&,value:bool&) {var bit:u8=0;get(receiver,bit);if bit>1 {receiver.failure=squid_error::Error.invalid_artifact;return;}value=bit==1;}
+fn count(receiver:Writer&,length:i64) {if length<0||length>element_limit {receiver.failure=squid_error::Error.artifact_limit;return;}put(receiver,length as u64);}
+fn count(receiver:Reader&)->i64 {var length:u64=0;get(receiver,length);if receiver.failure!=squid_error::Error.none {return 0;}if length>receiver.remaining as u64||length>(receiver.bytes.len-receiver.at) as u64 {receiver.failure=squid_error::Error.artifact_limit;return 0;}receiver.remaining-=length as i64;return length as i64;}
 fn put<T>(receiver:Writer&,value:const T[:]) {if !receiver.enter() {return;}count(receiver,value.len);for item in value {put(receiver,item);}receiver.depth--;}
-fn get<T>(receiver:Reader&,value:T[:]& ) {if !receiver.enter() {return;}let length=count(receiver);if receiver.failure!=blot_error::Error.none {receiver.depth--;return;}let run,error=allocate(receiver.owner,length,default<T>());if error!=blot_error::Error.none {receiver.failure=error;receiver.depth--;return;}value=run;for &item in run {get(receiver,item);if receiver.failure!=blot_error::Error.none {break;}}receiver.depth--;}
+fn get<T>(receiver:Reader&,value:T[:]& ) {if !receiver.enter() {return;}let length=count(receiver);if receiver.failure!=squid_error::Error.none {receiver.depth--;return;}let run,error=allocate(receiver.owner,length,default<T>());if error!=squid_error::Error.none {receiver.failure=error;receiver.depth--;return;}value=run;for &item in run {get(receiver,item);if receiver.failure!=squid_error::Error.none {break;}}receiver.depth--;}
 fn get<T>(receiver:Reader&,value:(const T[:])&) {var run:T[:]=default<T[:]>();get(receiver,run);value=run;}
-fn put<T>(receiver:Writer&,value:blot_support::Option<T>) {put(receiver,value.present);if value.present {put(receiver,value.value);}}
-fn get<T>(receiver:Reader&,value:blot_support::Option<T>&) {get(receiver,value.present);if receiver.failure!=blot_error::Error.none {return;}if value.present {get(receiver,value.value);}}
+fn put<T>(receiver:Writer&,value:squid_support::Option<T>) {put(receiver,value.present);if value.present {put(receiver,value.value);}}
+fn get<T>(receiver:Reader&,value:squid_support::Option<T>&) {get(receiver,value.present);if receiver.failure!=squid_error::Error.none {return;}if value.present {get(receiver,value.value);}}
 fn putOptional<T>(receiver:Writer&,value:T?) {put(receiver,value!=null);if value {let item:T=value;put(receiver,item);}}
-fn readOptional<T>(receiver:Reader&,witness:T)->T? {var present=false;get(receiver,present);if receiver.failure!=blot_error::Error.none||!present {return null;}let run,error=allocate(receiver.owner,1,default<T>());if error!=blot_error::Error.none {receiver.failure=error;return null;}get(receiver,run[0]);if receiver.failure!=blot_error::Error.none {return null;}return run[0];}
+fn readOptional<T>(receiver:Reader&,witness:T)->T? {var present=false;get(receiver,present);if receiver.failure!=squid_error::Error.none||!present {return null;}let run,error=allocate(receiver.owner,1,default<T>());if error!=squid_error::Error.none {receiver.failure=error;return null;}get(receiver,run[0]);if receiver.failure!=squid_error::Error.none {return null;}return run[0];}
 fn put<K,V>(receiver:Writer&,value:dictionary_slot<K,V>) {put(receiver,value.tag);if value.tag!=0 {put(receiver,value.key);put(receiver,value.val);}}
 fn get<K,V>(receiver:Reader&,value:dictionary_slot<K,V>&) {get(receiver,value.tag);if value.tag!=0 {get(receiver,value.key);get(receiver,value.val);}}
 
 // A list is exactly two little-endian words. At the packet boundary the
 // scalar codec can still complete the first word before the second fails.
-fn put(writer: Writer&, value: blot_check_types::List) {
+fn put(writer: Writer&, value: squid_check_types::List) {
     if !writer.enter() { return; }
     if writer.output.len <= limit - 8 {
         let words = (value.len as u64 << 32) | value.start;
@@ -52,7 +52,7 @@ fn put(writer: Writer&, value: blot_check_types::List) {
     }
     writer.depth--;
 }
-fn get(reader: Reader&, value: blot_check_types::List&) {
+fn get(reader: Reader&, value: squid_check_types::List&) {
     if !reader.enter() { return; }
     if reader.at <= reader.bytes.len - 8 {
         let words = binary::u64le(reader.bytes, reader.at);
@@ -82,18 +82,18 @@ fn putFlat<T>(receiver:Writer&,values:const T[:]) {
 }
 fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
+    if receiver.failure!=squid_error::Error.none {return;}
     if length==0 {value=default<T[:]>();return;}
     var size:u64=0;
     get(receiver,size);
-    if size>limit as u64 {receiver.failure=blot_error::Error.invalid_artifact;return;}
+    if size>limit as u64 {receiver.failure=squid_error::Error.invalid_artifact;return;}
     let bytes=size as i64;
     if !receiver.available(bytes) {return;}
     let end=receiver.at+bytes;
     let values,valid=from_bytes<T[>..]>(receiver.bytes[receiver.at..end]);
-    if !valid || values.len!=length {receiver.failure=blot_error::Error.invalid_artifact;return;}
+    if !valid || values.len!=length {receiver.failure=squid_error::Error.invalid_artifact;return;}
     let run,error=allocate(receiver.owner,length,default<T>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     run.move_from(values[..]);
     value=run;
     receiver.at=end;
@@ -107,18 +107,18 @@ fn putRawFlat<T>(receiver:Writer&,values:const T[:]) {
 }
 fn getRawFlat<T>(receiver:Reader&,value:T[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
+    if receiver.failure!=squid_error::Error.none {return;}
     if length==0 {value=default<T[:]>();return;}
     var sample:T[1]=[default<T>()];
     let elem_size=bytes_of(sample[..]).len;
-    if elem_size<=0 || length>limit/elem_size {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if elem_size<=0 || length>limit/elem_size {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*elem_size;
     if !receiver.available(byte_len) {return;}
     let run,error=allocate(receiver.owner,length,default<T>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     let dst=bytes_of(run);
     assert(dst.len==byte_len);
-    blot_native::copy_flat(dst[0],receiver.bytes[receiver.at],byte_len as u64);
+    squid_native::copy_flat(dst[0],receiver.bytes[receiver.at],byte_len as u64);
     receiver.at+=byte_len;
     value=run;
 }
@@ -131,11 +131,11 @@ fn put(receiver:Writer&,values:const u8[:]) {
 }
 fn get(receiver:Reader&,value:u8[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
+    if receiver.failure!=squid_error::Error.none {return;}
     if length==0 {value=default<u8[:]>();return;}
     if !receiver.available(length) {return;}
     let run,error=allocate(receiver.owner,length,0 as u8);
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     run.move_from(receiver.bytes[receiver.at..receiver.at+length]);
     receiver.at+=length;
     value=run;
@@ -149,266 +149,266 @@ fn put(receiver:Writer&,values:const u32[:]) {
 }
 fn get(receiver:Reader&,value:u32[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
+    if receiver.failure!=squid_error::Error.none {return;}
     if length==0 {value=default<u32[:]>();return;}
-    if length>limit/4 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if length>limit/4 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*4;
     if !receiver.available(byte_len) {return;}
     let run,error=allocate(receiver.owner,length,0 as u32);
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
-    blot_native::copy_u32(run[0],receiver.bytes[receiver.at],length as u64);
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
+    squid_native::copy_u32(run[0],receiver.bytes[receiver.at],length as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_parse_ast::Span[:]) {
+fn put(receiver:Writer&,values:const squid_parse_ast::Span[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_parse_ast::Span[:]&) {
+fn get(receiver:Reader&,value:squid_parse_ast::Span[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_parse_ast::Span[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_parse_ast::Span[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_parse_ast::Span>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_parse_ast::Span>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::List[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::List[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::List[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::List[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::List[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::List[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::List>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::List>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_types::List[:]) {
+fn put(receiver:Writer&,values:const squid_check_types::List[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_types::List[:]&) {
+fn get(receiver:Reader&,value:squid_check_types::List[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_types::List[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_types::List[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_types::List>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_types::List>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].start,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::BindingRef[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::BindingRef[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::BindingRef[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::BindingRef[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::BindingRef[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::BindingRef[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::BindingRef>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::BindingRef>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].unit,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].unit,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::CallInfo[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::CallInfo[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::CallInfo[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::CallInfo[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::CallInfo[:]>();return;}
-    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::CallInfo[:]>();return;}
+    if length>limit/16 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*16;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::CallInfo>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::CallInfo>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].target.unit,receiver.bytes[receiver.at],(length*4) as u64);
+    squid_native::copy_u32(run[0].target.unit,receiver.bytes[receiver.at],(length*4) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::FieldName[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::FieldName[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::FieldName[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::FieldName[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::FieldName[:]>();return;}
-    if length>limit/12 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::FieldName[:]>();return;}
+    if length>limit/12 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*12;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::FieldName>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::FieldName>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].symbol,receiver.bytes[receiver.at],(length*3) as u64);
+    squid_native::copy_u32(run[0].symbol,receiver.bytes[receiver.at],(length*3) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::RuntimeName[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::RuntimeName[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::RuntimeName[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::RuntimeName[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::RuntimeName[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::RuntimeName[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::RuntimeName>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::RuntimeName>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].binding,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].binding,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::Merge[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::Merge[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::Merge[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::Merge[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::Merge[:]>();return;}
-    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::Merge[:]>();return;}
+    if length>limit/16 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*16;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::Merge>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::Merge>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*4) as u64);
+    squid_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*4) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::LoopCarry[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::LoopCarry[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::LoopCarry[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::LoopCarry[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::LoopCarry[:]>();return;}
-    if length>limit/16 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::LoopCarry[:]>();return;}
+    if length>limit/16 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*16;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::LoopCarry>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::LoopCarry>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].incoming,receiver.bytes[receiver.at],(length*4) as u64);
+    squid_native::copy_u32(run[0].incoming,receiver.bytes[receiver.at],(length*4) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::ProjectionVariant[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::ProjectionVariant[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::ProjectionVariant[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::ProjectionVariant[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::ProjectionVariant[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::ProjectionVariant[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::ProjectionVariant>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::ProjectionVariant>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].tag,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].tag,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::PatternRow[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::PatternRow[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::PatternRow[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::PatternRow[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::PatternRow[:]>();return;}
-    if length>limit/8 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::PatternRow[:]>();return;}
+    if length>limit/8 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*8;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::PatternRow>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::PatternRow>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].patterns.start,receiver.bytes[receiver.at],(length*2) as u64);
+    squid_native::copy_u32(run[0].patterns.start,receiver.bytes[receiver.at],(length*2) as u64);
     receiver.at+=byte_len;
     value=run;
 }
-fn put(receiver:Writer&,values:const blot_check_core::HandleEffects[:]) {
+fn put(receiver:Writer&,values:const squid_check_core::HandleEffects[:]) {
     count(receiver,values.len);
     if values.len==0 {return;}
     let raw=bytes_of(values);
     if !receiver.room(raw.len) {return;}
     receiver.output.append(raw);
 }
-fn get(receiver:Reader&,value:blot_check_core::HandleEffects[:]&) {
+fn get(receiver:Reader&,value:squid_check_core::HandleEffects[:]&) {
     let length=count(receiver);
-    if receiver.failure!=blot_error::Error.none {return;}
-    if length==0 {value=default<blot_check_core::HandleEffects[:]>();return;}
-    if length>limit/20 {receiver.failure=blot_error::Error.artifact_limit;return;}
+    if receiver.failure!=squid_error::Error.none {return;}
+    if length==0 {value=default<squid_check_core::HandleEffects[:]>();return;}
+    if length>limit/20 {receiver.failure=squid_error::Error.artifact_limit;return;}
     let byte_len=length*20;
     if !receiver.available(byte_len) {return;}
-    let run,error=allocate(receiver.owner,length,default<blot_check_core::HandleEffects>());
-    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    let run,error=allocate(receiver.owner,length,default<squid_check_core::HandleEffects>());
+    if error!=squid_error::Error.none {receiver.failure=error;return;}
     assert(bytes_of(run).len==byte_len);
-    blot_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*5) as u64);
+    squid_native::copy_u32(run[0].node,receiver.bytes[receiver.at],(length*5) as u64);
     receiver.at+=byte_len;
     value=run;
 }
@@ -434,31 +434,31 @@ fn appendExecutionTable<T>(writer:Writer&,values:const T[:])->u32,bool {
     return raw.len as u32,true;
 }
 
-fn putExecutionCoreHeader(writer:Writer&,module:blot_check_core::Module) {
+fn putExecutionCoreHeader(writer:Writer&,module:squid_check_core::Module) {
     var header=module;
-    header.constructors=default<blot_check_core::Constructor[:]>();
-    header.runtime_names=default<blot_check_core::RuntimeName[:]>();
-    header.source_names=default<blot_check_core::RuntimeName[:]>();
-    header.declaration_dependencies=default<blot_check_core::DeclarationDependencies[:]>();
-    header.dependency_references=default<blot_check_core::BindingRef[:]>();
-    header.dependency_members=default<blot_check_core::DependencyMember[:]>();
-    header.erased_declaration_references=default<blot_check_core::ErasedDeclarationReference[:]>();
+    header.constructors=default<squid_check_core::Constructor[:]>();
+    header.runtime_names=default<squid_check_core::RuntimeName[:]>();
+    header.source_names=default<squid_check_core::RuntimeName[:]>();
+    header.declaration_dependencies=default<squid_check_core::DeclarationDependencies[:]>();
+    header.dependency_references=default<squid_check_core::BindingRef[:]>();
+    header.dependency_members=default<squid_check_core::DependencyMember[:]>();
+    header.erased_declaration_references=default<squid_check_core::ErasedDeclarationReference[:]>();
     // The 15 bulk tables are appended raw after the prefix.
-    header.nodes=default<blot_check_core::Node[:]>();
-    header.spans=default<blot_check_core::Span[:]>();
-    header.extra=default<blot_check_core::Id[:]>();
-    header.bindings=default<blot_check_core::Binding[:]>();
-    header.bodies=default<blot_check_core::Body[:]>();
-    header.parameters=default<blot_check_core::Parameter[:]>();
-    header.references=default<blot_check_core::BindingRef[:]>();
-    header.calls=default<blot_check_core::CallInfo[:]>();
+    header.nodes=default<squid_check_core::Node[:]>();
+    header.spans=default<squid_check_core::Span[:]>();
+    header.extra=default<squid_check_core::Id[:]>();
+    header.bindings=default<squid_check_core::Binding[:]>();
+    header.bodies=default<squid_check_core::Body[:]>();
+    header.parameters=default<squid_check_core::Parameter[:]>();
+    header.references=default<squid_check_core::BindingRef[:]>();
+    header.calls=default<squid_check_core::CallInfo[:]>();
     header.names=default<u8[:]>();
-    header.types.nodes=default<const blot_check_types::Node[:]>();
-    header.types.extra=default<const blot_check_types::Id[:]>();
-    header.patterns=default<blot_check_core::Pattern[:]>();
-    header.obligations=default<blot_check_core::Obligation[:]>();
-    header.merges=default<blot_check_core::Merge[:]>();
-    header.merge_ranges=default<blot_check_core::List[:]>();
+    header.types.nodes=default<const squid_check_types::Node[:]>();
+    header.types.extra=default<const squid_check_types::Id[:]>();
+    header.patterns=default<squid_check_core::Pattern[:]>();
+    header.obligations=default<squid_check_core::Obligation[:]>();
+    header.merges=default<squid_check_core::Merge[:]>();
+    header.merge_ranges=default<squid_check_core::List[:]>();
     put(writer,header);
     count(writer,module.constructors.len);
     for c in module.constructors {
@@ -477,10 +477,10 @@ fn putExecutionCoreHeader(writer:Writer&,module:blot_check_core::Module) {
     }
 }
 
-fn putExecutionCoreTables(writer:Writer&,module:blot_check_core::Module) {
-    if writer.failure!=blot_error::Error.none {return;}
+fn putExecutionCoreTables(writer:Writer&,module:squid_check_core::Module) {
+    if writer.failure!=squid_error::Error.none {return;}
     let prefix_len=writer.output.len-execution_core_header_bytes;
-    if prefix_len<0 || prefix_len>0xffffffff {writer.failure=blot_error::Error.artifact_limit;return;}
+    if prefix_len<0 || prefix_len>0xffffffff {writer.failure=squid_error::Error.artifact_limit;return;}
     writeU32LeAt(writer.output,0,prefix_len as u32);
     var lens:u32[15]=[0;15];
     var ok=true;
@@ -499,20 +499,20 @@ fn putExecutionCoreTables(writer:Writer&,module:blot_check_core::Module) {
     if ok {let l,s=appendExecutionTable(writer,module.obligations);lens[12]=l;ok=s;}
     if ok {let l,s=appendExecutionTable(writer,module.merges);lens[13]=l;ok=s;}
     if ok {let l,s=appendExecutionTable(writer,module.merge_ranges);lens[14]=l;ok=s;}
-    if !ok {if writer.failure==blot_error::Error.none {writer.failure=blot_error::Error.artifact_limit;}return;}
+    if !ok {if writer.failure==squid_error::Error.none {writer.failure=squid_error::Error.artifact_limit;}return;}
     for i in 0..15 {writeU32LeAt(writer.output,4+i*4,lens[i]);}
 }
 
-fn getExecutionCoreHeader(reader:Reader&,module:blot_check_core::Module&) {
+fn getExecutionCoreHeader(reader:Reader&,module:squid_check_core::Module&) {
     get(reader,module);
-    if reader.failure!=blot_error::Error.none {return;}
-    if module.unit==0 || module.constructors.len!=0 {reader.failure=blot_error::Error.invalid_artifact;return;}
+    if reader.failure!=squid_error::Error.none {return;}
+    if module.unit==0 || module.constructors.len!=0 {reader.failure=squid_error::Error.invalid_artifact;return;}
     let length=count(reader);
-    if reader.failure!=blot_error::Error.none || !reader.available(length*24) {return;}
-    let constructors,error=allocate(reader.owner,length,default<blot_check_core::Constructor>());
-    if error!=blot_error::Error.none {reader.failure=error;return;}
+    if reader.failure!=squid_error::Error.none || !reader.available(length*24) {return;}
+    let constructors,error=allocate(reader.owner,length,default<squid_check_core::Constructor>());
+    if error!=squid_error::Error.none {reader.failure=error;return;}
     for &c in constructors {
-        c=default<blot_check_core::Constructor>();
+        c=default<squid_check_core::Constructor>();
         if !reader.available(24) {return;}
         let at=reader.at;
         c.identity.unit=binary::u32le(reader.bytes,at);
@@ -524,45 +524,45 @@ fn getExecutionCoreHeader(reader:Reader&,module:blot_check_core::Module&) {
         reader.at=at+24;
         if c.identity.unit==module.unit {
             get(reader,c.scheme);
-            if reader.failure!=blot_error::Error.none {return;}
+            if reader.failure!=squid_error::Error.none {return;}
         }
     }
     module.constructors=constructors;
 }
 
 fn readPersistTable<T>(shared:u64,id:u32,kind:u32,at:i64&,total:i64,byte_len:i64,owner:Owner,witness:T)->T[:],Error {
-    if byte_len==0 {return default<T[:]>(),blot_error::Error.none;}
-    if byte_len<0 || byte_len>total-at || byte_len>limit {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    if byte_len==0 {return default<T[:]>(),squid_error::Error.none;}
+    if byte_len<0 || byte_len>total-at || byte_len>limit {return default<T[:]>(),squid_error::Error.invalid_artifact;}
     var sample:T[1]=[witness];
     let elem_size=bytes_of(sample[..]).len;
-    if elem_size<=0 || byte_len%elem_size!=0 {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    if elem_size<=0 || byte_len%elem_size!=0 {return default<T[:]>(),squid_error::Error.invalid_artifact;}
     let count=byte_len/elem_size;
-    if count>element_limit {return default<T[:]>(),blot_error::Error.artifact_limit;}
+    if count>element_limit {return default<T[:]>(),squid_error::Error.artifact_limit;}
     let run,error=allocate(owner,count,witness);
-    if error!=blot_error::Error.none {return default<T[:]>(),error;}
+    if error!=squid_error::Error.none {return default<T[:]>(),error;}
     let dst=bytes_of(run);
     assert(dst.len==byte_len);
-    if !blot_native::persist_read_at(shared,id,kind,at as u64,dst[0],byte_len as u64) {return default<T[:]>(),blot_error::Error.invalid_artifact;}
+    if !squid_native::persist_read_at(shared,id,kind,at as u64,dst[0],byte_len as u64) {return default<T[:]>(),squid_error::Error.invalid_artifact;}
     at+=byte_len;
-    return run,blot_error::Error.none;
+    return run,squid_error::Error.none;
 }
 
-fn getExecutionCoreTablesFromPersist(shared:u64,id:u32,kind:u32,at:i64&,total:i64,lens:const i64[:],owner:Owner,module:blot_check_core::Module&)->Error {
-    let nodes,e0=readPersistTable(shared,id,kind,at,total,lens[0],owner,default<blot_check_core::Node>());if e0!=blot_error::Error.none {return e0;}module.nodes=nodes;
-    let spans,e1=readPersistTable(shared,id,kind,at,total,lens[1],owner,default<blot_check_core::Span>());if e1!=blot_error::Error.none {return e1;}module.spans=spans;
-    let extra,e2=readPersistTable(shared,id,kind,at,total,lens[2],owner,0 as u32);if e2!=blot_error::Error.none {return e2;}module.extra=extra;
-    let bindings,e3=readPersistTable(shared,id,kind,at,total,lens[3],owner,default<blot_check_core::Binding>());if e3!=blot_error::Error.none {return e3;}module.bindings=bindings;
-    let bodies,e4=readPersistTable(shared,id,kind,at,total,lens[4],owner,default<blot_check_core::Body>());if e4!=blot_error::Error.none {return e4;}module.bodies=bodies;
-    let parameters,e5=readPersistTable(shared,id,kind,at,total,lens[5],owner,default<blot_check_core::Parameter>());if e5!=blot_error::Error.none {return e5;}module.parameters=parameters;
-    let references,e6=readPersistTable(shared,id,kind,at,total,lens[6],owner,default<blot_check_core::BindingRef>());if e6!=blot_error::Error.none {return e6;}module.references=references;
-    let calls,e7=readPersistTable(shared,id,kind,at,total,lens[7],owner,default<blot_check_core::CallInfo>());if e7!=blot_error::Error.none {return e7;}module.calls=calls;
-    let names,e8=readPersistTable(shared,id,kind,at,total,lens[8],owner,0 as u8);if e8!=blot_error::Error.none {return e8;}module.names=names;
-    let tnodes,e9=readPersistTable(shared,id,kind,at,total,lens[9],owner,default<blot_check_types::Node>());if e9!=blot_error::Error.none {return e9;}module.types.nodes=tnodes;
-    let textra,e10=readPersistTable(shared,id,kind,at,total,lens[10],owner,0 as u32);if e10!=blot_error::Error.none {return e10;}module.types.extra=textra;
-    let patterns,e11=readPersistTable(shared,id,kind,at,total,lens[11],owner,default<blot_check_core::Pattern>());if e11!=blot_error::Error.none {return e11;}module.patterns=patterns;
-    let obligations,e12=readPersistTable(shared,id,kind,at,total,lens[12],owner,default<blot_check_core::Obligation>());if e12!=blot_error::Error.none {return e12;}module.obligations=obligations;
-    let merges,e13=readPersistTable(shared,id,kind,at,total,lens[13],owner,default<blot_check_core::Merge>());if e13!=blot_error::Error.none {return e13;}module.merges=merges;
-    let merge_ranges,e14=readPersistTable(shared,id,kind,at,total,lens[14],owner,default<blot_check_core::List>());if e14!=blot_error::Error.none {return e14;}module.merge_ranges=merge_ranges;
-    if at!=total {return blot_error::Error.invalid_artifact;}
-    return blot_error::Error.none;
+fn getExecutionCoreTablesFromPersist(shared:u64,id:u32,kind:u32,at:i64&,total:i64,lens:const i64[:],owner:Owner,module:squid_check_core::Module&)->Error {
+    let nodes,e0=readPersistTable(shared,id,kind,at,total,lens[0],owner,default<squid_check_core::Node>());if e0!=squid_error::Error.none {return e0;}module.nodes=nodes;
+    let spans,e1=readPersistTable(shared,id,kind,at,total,lens[1],owner,default<squid_check_core::Span>());if e1!=squid_error::Error.none {return e1;}module.spans=spans;
+    let extra,e2=readPersistTable(shared,id,kind,at,total,lens[2],owner,0 as u32);if e2!=squid_error::Error.none {return e2;}module.extra=extra;
+    let bindings,e3=readPersistTable(shared,id,kind,at,total,lens[3],owner,default<squid_check_core::Binding>());if e3!=squid_error::Error.none {return e3;}module.bindings=bindings;
+    let bodies,e4=readPersistTable(shared,id,kind,at,total,lens[4],owner,default<squid_check_core::Body>());if e4!=squid_error::Error.none {return e4;}module.bodies=bodies;
+    let parameters,e5=readPersistTable(shared,id,kind,at,total,lens[5],owner,default<squid_check_core::Parameter>());if e5!=squid_error::Error.none {return e5;}module.parameters=parameters;
+    let references,e6=readPersistTable(shared,id,kind,at,total,lens[6],owner,default<squid_check_core::BindingRef>());if e6!=squid_error::Error.none {return e6;}module.references=references;
+    let calls,e7=readPersistTable(shared,id,kind,at,total,lens[7],owner,default<squid_check_core::CallInfo>());if e7!=squid_error::Error.none {return e7;}module.calls=calls;
+    let names,e8=readPersistTable(shared,id,kind,at,total,lens[8],owner,0 as u8);if e8!=squid_error::Error.none {return e8;}module.names=names;
+    let tnodes,e9=readPersistTable(shared,id,kind,at,total,lens[9],owner,default<squid_check_types::Node>());if e9!=squid_error::Error.none {return e9;}module.types.nodes=tnodes;
+    let textra,e10=readPersistTable(shared,id,kind,at,total,lens[10],owner,0 as u32);if e10!=squid_error::Error.none {return e10;}module.types.extra=textra;
+    let patterns,e11=readPersistTable(shared,id,kind,at,total,lens[11],owner,default<squid_check_core::Pattern>());if e11!=squid_error::Error.none {return e11;}module.patterns=patterns;
+    let obligations,e12=readPersistTable(shared,id,kind,at,total,lens[12],owner,default<squid_check_core::Obligation>());if e12!=squid_error::Error.none {return e12;}module.obligations=obligations;
+    let merges,e13=readPersistTable(shared,id,kind,at,total,lens[13],owner,default<squid_check_core::Merge>());if e13!=squid_error::Error.none {return e13;}module.merges=merges;
+    let merge_ranges,e14=readPersistTable(shared,id,kind,at,total,lens[14],owner,default<squid_check_core::List>());if e14!=squid_error::Error.none {return e14;}module.merge_ranges=merge_ranges;
+    if at!=total {return squid_error::Error.invalid_artifact;}
+    return squid_error::Error.none;
 }

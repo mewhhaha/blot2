@@ -1,6 +1,6 @@
 # Type-directed language migration
 
-Target: [RFC #46](https://github.com/mewhhaha/blot2/issues/46), including its
+Target: [RFC #46](https://github.com/mewhhaha/squid-lang/issues/46), including its
 8 November 2026 collection and automatic-copy decisions. The owner chose the
 working Zig compiler first, followed by the Goose implementation. This document
 tracks the migration; [guide.md](guide.md) remains the executable reference.
@@ -60,7 +60,7 @@ Decided 11 November 2026. Today there are two disjoint systems:
 
 They become one system:
 
-```blot
+```squid
 type Add [left, right] is contract = { type Output, func add: left -> right -> Add.Output [left, right] }
 type Eq a is contract = {
   func equal: a -> a -> Bool,

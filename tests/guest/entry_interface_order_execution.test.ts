@@ -21,7 +21,7 @@ Deno.test("generic value interfaces reject before constant bounds while explicit
     );
   }
   const prelude =
-    new URL("./entry-interface-order/prelude.blot", import.meta.url).pathname;
+    new URL("./entry-interface-order/prelude.sq", import.meta.url).pathname;
   await compileExpectedFailure(
     "io const answer = #[].first\n",
     "entry_type",
@@ -97,7 +97,7 @@ for (
   const test = ignored ? Deno.test.ignore : Deno.test;
   test(`entry interface ${name} reports ${code}`, async () => {
     const compiler = Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
     const directory = await Deno.makeTempDir({
       dir: new URL("../../build", import.meta.url).pathname,
       prefix: "entry-interface-import-",
@@ -107,11 +107,11 @@ for (
       const result = await new Deno.Command(compiler, {
         args: [
           "build",
-          new URL(`./entry-interface-order/${name}.blot`, import.meta.url)
+          new URL(`./entry-interface-order/${name}.sq`, import.meta.url)
             .pathname,
           output,
           "--prelude",
-          new URL("./entry-interface-order/prelude.blot", import.meta.url)
+          new URL("./entry-interface-order/prelude.sq", import.meta.url)
             .pathname,
         ],
         stdout: "piped",

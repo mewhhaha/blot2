@@ -10,7 +10,7 @@ if (Deno.args.length > 2) throw new Error("Expected [COMPILER [OUTPUT]]");
 const out = resolve(Deno.args[1] ?? `${root}/build/bench/staging-current-cost`);
 await Deno.mkdir(out, { recursive: true });
 const executable = resolve(
-  Deno.args[0] ?? `${root}/compiler-goose/build/blotc-goose`,
+  Deno.args[0] ?? `${root}/compiler-goose/build/squidc-goose`,
 );
 const samples: Record<string, unknown>[] = [];
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
@@ -42,9 +42,9 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const variant = staged ? "staged" : "ordinary";
         const directory = `${out}/${codegenTier}-${archive}-${run}-${variant}`;
         await Deno.mkdir(directory, { recursive: true });
-        const entry = `${directory}/main.blot`,
-          producer = `${directory}/producer.blot`,
-          bundle = `${directory}/producer.blotdep`;
+        const entry = `${directory}/main.sq`,
+          producer = `${directory}/producer.sq`,
+          bundle = `${directory}/producer.sqdep`;
         const entrySource = (seed: number) =>
           `import {generated, build} from "./producer"
 const first = build ${seed}
@@ -99,7 +99,7 @@ const build = func (value: U32) => return ${
                 args: ["dependencies", entry, bundle, "--prelude", "none"],
                 stdout: "piped",
                 stderr: "piped",
-                env: { BLOT_CACHE_DIR: "" },
+                env: { SQUID_CACHE_DIR: "" },
               }).output();
               assert(
                 packed.success,
@@ -198,14 +198,14 @@ for (const variant of ["ordinary", "staged"]) {
   const result = await new Deno.Command(executable, {
     args: [
       "build",
-      `${directory}/main.blot`,
+      `${directory}/main.sq`,
       `${directory}/fresh-cli.wasm`,
       "--prelude",
       "none",
     ],
     stdout: "piped",
     stderr: "piped",
-    env: { BLOT_CACHE_DIR: "" },
+    env: { SQUID_CACHE_DIR: "" },
   }).output();
   assert(
     result.success,

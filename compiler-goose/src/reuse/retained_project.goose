@@ -1,6 +1,6 @@
 // A session retains the latest successful checked project and its Core.
 // Each candidate reloads the project before deciding which interfaces still hold.
-namespace blot_reuse_partial_dependency;
+namespace squid_reuse_partial_dependency;
 import .partial_dependency;
 import reuse.project_check_engine;
 import reuse.project_check_owners;
@@ -9,9 +9,9 @@ import inference_limits;
 import reuse.persistent_unit;
 import check.typed_staging_names;
 
-type Tree=blot_parse_ast::Tree;
-type Unit=blot_reuse_project::Unit;
-type ModuleDebit=blot_reuse_project_check::ModuleDebit;
+type Tree=squid_parse_ast::Tree;
+type Unit=squid_reuse_project::Unit;
+type ModuleDebit=squid_reuse_project_check::ModuleDebit;
 reusable[] var retained_packet_tables:(const u8[:])[>..]=[];
 
 struct Retained {
@@ -26,14 +26,14 @@ struct Retained {
 fn deinit(self_:Retained&) {
  self_.checked.deinit();
  self_.source.deinit();
- blot_reuse_project_check::releaseModuleDebits(self_.debits);
+ squid_reuse_project_check::releaseModuleDebits(self_.debits);
  releaseRetainedPackets(self_.packets);
  self_=Retained{};
 }
 
 fn adopt(self_:Retained&,source:Project&,checked:CheckedProject&,parsed_symbols:i64,debits:const ModuleDebit[:]) {
  self_.adoptSource(source,parsed_symbols,debits);
- self_.checked=blot_reuse_project_check::canonicalOwnedResult(checked);
+ self_.checked=squid_reuse_project_check::canonicalOwnedResult(checked);
  checked=CheckedProject{..};
 }
 
@@ -41,10 +41,10 @@ fn adoptSource(self_:Retained&,source:Project&,parsed_symbols:i64,debits:const M
  assert(self_.source.lease==0 && self_.checked.owner.slot==0);
  // This checkpoint owns every loaded unit. Portable dependency catalogs
  // have a separate lifetime in the project session.
- self_.source=blot_reuse_project::canonicalLoaded(source,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>());
+ self_.source=squid_reuse_project::canonicalLoaded(source,default<const squid_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>());
  self_.parsed_symbols=parsed_symbols;
- self_.inference_limit=blot_inference_limits::configured();
- self_.debits=blot_reuse_project_check::canonicalModuleDebits(debits);
+ self_.inference_limit=squid_inference_limits::configured();
+ self_.debits=squid_reuse_project_check::canonicalModuleDebits(debits);
  source=Project{..};
 }
 
@@ -59,7 +59,7 @@ fn completeFrom(self_:Retained&,previous:Retained&) {
   }
   return;
  }
- blot_reuse_project_check::moveSkippedModules(self_.checked,previous.checked);
+ squid_reuse_project_check::moveSkippedModules(self_.checked,previous.checked);
 }
 
 fn allocateRetainedPackets(length:i64)->const u8[:][:] {
@@ -70,23 +70,23 @@ fn allocateRetainedPackets(length:i64)->const u8[:][:] {
 
 fn releaseRetainedPackets(packets:const u8[:][:]) {
  if packets.len==0 {return;}
- for packet in packets {blot_reuse_project_check::releaseOwned(packet);}
+ for packet in packets {squid_reuse_project_check::releaseOwned(packet);}
  retained_packet_tables.free_slice(packets);
 }
 
-fn adoptPersistent(self_:Retained&,source:Project&,symbols:blot_parse_symbols::Pool&,parsed:i64,debits:const ModuleDebit[:],packets:const u8[:][:]) {
+fn adoptPersistent(self_:Retained&,source:Project&,symbols:squid_parse_symbols::Pool&,parsed:i64,debits:const ModuleDebit[:],packets:const u8[:][:]) {
  source.symbols.deinit();
- source.symbols=blot_parse_symbols::canonical(symbols);
- symbols=blot_parse_symbols::Pool{..};
+ source.symbols=squid_parse_symbols::canonical(symbols);
+ symbols=squid_parse_symbols::Pool{..};
  self_.adoptSource(source,parsed,debits);
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
- assert(blot_support::same_slice_identity(owned,packets));
+ assert(squid_support::same_slice_identity(owned,packets));
  self_.packets=owned;
 }
 
 fn prepareRetainableProject(source:Project&,entry_path:const u8[:],candidate:Retained&)->Preparation,Error {
  let empty=Frozen{..};
- return prepareProjectMode(source,entry_path,blot_support::none<const u8[:]>(),empty,candidate);
+ return prepareProjectMode(source,entry_path,squid_support::none<const u8[:]>(),empty,candidate);
 }
 
 fn sameWords(left:const u32[:],right:const u32[:])->bool {
@@ -100,8 +100,8 @@ fn sameWords(left:const u32[:],right:const u32[:])->bool {
 fn entryOnlyEdit(source:const Project&,previous:const Retained&)->bool {
  let old .= previous.source;
  if previous.packets.len==0 || old.lease==0 || source.entry==0 || source.entry!=old.entry ||
-    source.units.len!=old.units.len || blot_reuse_project::entryPacket(source).len==0 ||
-    blot_reuse_project::entryPacket(old).len==0 {return false;}
+    source.units.len!=old.units.len || squid_reuse_project::entryPacket(source).len==0 ||
+    squid_reuse_project::entryPacket(old).len==0 {return false;}
  if source.unit(source.entry).source==old.unit(old.entry).source ||
     source.unit(source.entry).parse_start!=old.unit(old.entry).parse_start {return false;}
  for unit,i in source.units.items {
@@ -111,7 +111,7 @@ fn entryOnlyEdit(source:const Project&,previous:const Retained&)->bool {
 }
 fn sameGraph(source:const Project&,previous:const Retained&,entry_only:bool,scoped:bool)->bool {
  let old:const Project& =previous.source;
- if old.lease==0 || source.diagnostics.len!=0 || source.compiled_modules.len!=0 || previous.inference_limit!=blot_inference_limits::configured() {return false;}
+ if old.lease==0 || source.diagnostics.len!=0 || source.compiled_modules.len!=0 || previous.inference_limit!=squid_inference_limits::configured() {return false;}
  if source.input_mode!=old.input_mode || source.entry!=old.entry || source.prelude_unit!=old.prelude_unit || source.units.len!=old.units.len || source.checking.workers!=old.checking.workers {return false;}
  if !sameWords(source.order.items,old.order.items) {return false;}
  var prefix=previous.parsed_symbols;
@@ -140,8 +140,8 @@ fn sameGraph(source:const Project&,previous:const Retained&,entry_only:bool,scop
 recursive fn constructorHead(tree:const Tree&,id:u32,depth:i64)->bool {
  if id==0 || depth==256 {return false;}
  let node=tree.node(id);
- if node.tag==blot_parse_ast::tag_constructor_ref {return true;}
- if node.tag==blot_parse_ast::tag_apply || node.tag==blot_parse_ast::tag_group {return constructorHead(tree,node.a,depth+1);}
+ if node.tag==squid_parse_ast::tag_constructor_ref {return true;}
+ if node.tag==squid_parse_ast::tag_apply || node.tag==squid_parse_ast::tag_group {return constructorHead(tree,node.a,depth+1);}
  return false;
 }
 
@@ -151,20 +151,20 @@ recursive fn initializerLeaves(tree:const Tree&,id:u32,leaves:u32[>..<]&,depth:i
  if id==0 || depth==256 {return false;}
  let node=tree.node(id);
  match node.tag {
-  blot_parse_ast::tag_boolean=>{leaves.push(id);return true;},
-  blot_parse_ast::tag_integer,blot_parse_ast::tag_float,blot_parse_ast::tag_string,blot_parse_ast::tag_unit,blot_parse_ast::tag_constructor_ref=>{return true;},
-  blot_parse_ast::tag_group=>{return initializerLeaves(tree,node.a,leaves,depth+1);},
-  blot_parse_ast::tag_apply=>{
+  squid_parse_ast::tag_boolean=>{leaves.push(id);return true;},
+  squid_parse_ast::tag_integer,squid_parse_ast::tag_float,squid_parse_ast::tag_string,squid_parse_ast::tag_unit,squid_parse_ast::tag_constructor_ref=>{return true;},
+  squid_parse_ast::tag_group=>{return initializerLeaves(tree,node.a,leaves,depth+1);},
+  squid_parse_ast::tag_apply=>{
    if !constructorHead(tree,node.a,depth+1) {return false;}
    return initializerLeaves(tree,node.a,leaves,depth+1) && initializerLeaves(tree,node.b,leaves,depth+1);
   },
-  blot_parse_ast::tag_record=>{
+  squid_parse_ast::tag_record=>{
    for child in tree.children(id) {
     if !initializerLeaves(tree,tree.node(child).b,leaves,depth+1) {return false;}
    }
    return true;
   },
-  blot_parse_ast::tag_product=>{
+  squid_parse_ast::tag_product=>{
    for child in tree.children(id) {if !initializerLeaves(tree,child,leaves,depth+1) {return false;}}
    return true;
   },
@@ -175,7 +175,7 @@ recursive fn initializerLeaves(tree:const Tree&,id:u32,leaves:u32[>..<]&,depth:i
 fn markInitializerLeaves(tree:const Tree&,eligible:bool[:]) {
  var leaves:u32[>..<]=[];
  for root in tree.roots.items {
-  if tree.node(root).tag!=blot_parse_ast::tag_value_decl {continue;}
+  if tree.node(root).tag!=squid_parse_ast::tag_value_decl {continue;}
   let decl=tree.value_decl(root);
   if decl.runtime || decl.function_declaration || decl.where.len!=0 || decl.attributes.len!=0 || decl.modifier!=0 {continue;}
   leaves.clear();
@@ -213,12 +213,12 @@ fn sameInitializerShape(old:const Unit&,new_:const Unit&)->bool {
  return old_end!=0 && old.source[old_end..]==new_.source[new_end..];
 }
 
-fn needsLiveValues(tree:const Tree&,symbols:const blot_parse_symbols::Pool&)->bool {
+fn needsLiveValues(tree:const Tree&,symbols:const squid_parse_symbols::Pool&)->bool {
  if !tree.has_typed_staging {return false;}
  for node in tree.nodes.items {
-  if node.tag!=blot_parse_ast::tag_intrinsic {continue;}
-  let operation,staged=blot_check_typed_staging::lookup(symbols.get(node.a));
-  if staged && operation!=blot_check_typed_staging::Op.evaluate {return true;}
+  if node.tag!=squid_parse_ast::tag_intrinsic {continue;}
+  let operation,staged=squid_check_typed_staging::lookup(symbols.get(node.a));
+  if staged && operation!=squid_check_typed_staging::Op.evaluate {return true;}
  }
  return false;
 }
@@ -230,7 +230,7 @@ fn planModules(source:const Project&,previous:const Project&,changed:bool[:],pro
   let old:const Unit& =previous.units.items[index];
   value_observer=value_observer || needsLiveValues(unit.tree,source.symbols);
   if unit.source==old.source {continue;}
-  if blot_check_check::hasNumericFailure(unit.tree) {return false,false;}
+  if squid_check_check::hasNumericFailure(unit.tree) {return false,false;}
   if index+1==source.prelude_unit || !sameInitializerShape(old,unit) {
    propagates[index]=true;
   }
@@ -257,8 +257,8 @@ fn includeDependents(source:const Project&,changed:bool[:]) {
 fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core:const Prepared&,candidate:Retained&)->Preparation,Error {
  let entry_only=entryOnlyEdit(source,previous);
  let scoped=previous.packets.len!=0 && source.lease!=0 && previous.source.lease!=0 &&
-    blot_reuse_project::projects[source.lease-1].parser_symbols.lease!=0 &&
-    blot_reuse_project::projects[previous.source.lease-1].parser_symbols.lease!=0;
+    squid_reuse_project::projects[source.lease-1].parser_symbols.lease!=0 &&
+    squid_reuse_project::projects[previous.source.lease-1].parser_symbols.lease!=0;
  var common:i64=0;
  if scoped {
   let limit=min(previous.parsed_symbols,source.symbols.entries.len);
@@ -268,12 +268,12 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
    common++;
   }
  }
- if !sameGraph(source,previous,entry_only,scoped) {return Preparation.inactive,blot_error::Error.none;}
+ if !sameGraph(source,previous,entry_only,scoped) {return Preparation.inactive,squid_error::Error.none;}
  var changed:bool[>..]=[];
  changed.resize(source.units.len,false);
  var propagates:bool[>..]=[];propagates.resize(changed.len,false);
  let edited,admitted=planModules(source,previous.source,changed[..],propagates[..]);
- if !admitted {return Preparation.inactive,blot_error::Error.none;}
+ if !admitted {return Preparation.inactive,squid_error::Error.none;}
  if !edited {
   let empty=CheckedProject{..};
   return prepareWithRetainedCore(source,empty,previous_core,changed[..]);
@@ -295,39 +295,39 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
  }
  includeDependents(source,propagates[..]);
  for dirty,i in propagates {if dirty {changed[i]=true;}}
- if previous.debits.len!=source.units.len {return Preparation.inactive,blot_error::Error.none;}
+ if previous.debits.len!=source.units.len {return Preparation.inactive,squid_error::Error.none;}
  var any_reused=false;
  for dirty in changed {any_reused=any_reused || !dirty;}
- if !any_reused {return Preparation.inactive,blot_error::Error.none;}
+ if !any_reused {return Preparation.inactive,squid_error::Error.none;}
  if previous.packets.len!=0 {
   return prepareRetainedPersistent(source,previous,previous_core,changed[..],affected[..],symbol_shifted[..],scoped || entry_only,candidate);
  }
 
  // A fallback starts with the loaded parser symbols exactly as they were.
  // Only this private pool receives names while the checker replays the prefix.
- var symbols,error=blot_parse_symbols::initPooled();
- if error!=blot_error::Error.none {return declineRetained(error);}
- let debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
+ var symbols,error=squid_parse_symbols::initPooled();
+ if error!=squid_error::Error.none {return declineRetained(error);}
+ let debits=squid_reuse_project_check::allocateModuleDebits(source.units.len);
  let value,error=prepareRetainedWithSymbols(source,previous,previous_core,changed[..],symbols,debits,candidate);
  symbols.deinit();
- if candidate.source.lease==0 {blot_reuse_project_check::releaseModuleDebits(debits);}
+ if candidate.source.lease==0 {squid_reuse_project_check::releaseModuleDebits(debits);}
  return value,error;
 }
 
-fn prepareRetainedWithSymbols(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&,debits:ModuleDebit[:],candidate:Retained&)->Preparation,Error {
- let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,previous.parsed_symbols);
- if error!=blot_error::Error.none {return declineRetained(error);}
- var checking=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
- checking.symbols=blot_parse_symbols::canonical(symbols);
- var checked,error=blot_reuse_project_check::checkRetainedModules(checking,previous.checked,changed,previous.debits,debits,previous.source.symbols);
- if error!=blot_error::Error.none {return declineRetained(error);}
- if checked.diagnostics.len!=0 {checked.deinit();return Preparation.inactive,blot_error::Error.none;}
+fn prepareRetainedWithSymbols(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:squid_parse_symbols::Pool&,debits:ModuleDebit[:],candidate:Retained&)->Preparation,Error {
+ let error=squid_reuse_project_check::replaySymbols(symbols,source.symbols,previous.parsed_symbols);
+ if error!=squid_error::Error.none {return declineRetained(error);}
+ var checking=squid_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
+ checking.symbols=squid_parse_symbols::canonical(symbols);
+ var checked,error=squid_reuse_project_check::checkRetainedModules(checking,previous.checked,changed,previous.debits,debits,previous.source.symbols);
+ if error!=squid_error::Error.none {return declineRetained(error);}
+ if checked.diagnostics.len!=0 {checked.deinit();return Preparation.inactive,squid_error::Error.none;}
  let result,error=prepareWithRetainedCore(checking,checked,previous_core,changed);
  match result {
   ready=>{
    source.symbols.deinit();
-   source.symbols=blot_parse_symbols::canonical(symbols);
-   symbols=blot_parse_symbols::Pool{..};
+   source.symbols=squid_parse_symbols::canonical(symbols);
+   symbols=squid_parse_symbols::Pool{..};
    candidate.adopt(source,checked,previous.parsed_symbols,debits);
   },
   _=>{},
@@ -337,130 +337,130 @@ fn prepareRetainedWithSymbols(source:Project&,previous:const Retained&,previous_
 }
 
 fn declineRetained(error:Error)->Preparation,Error {
- if error==blot_error::Error.out_of_memory {return Preparation.inactive,error;}
- return Preparation.inactive,blot_error::Error.none;
+ if error==squid_error::Error.out_of_memory {return Preparation.inactive,error;}
+ return Preparation.inactive,squid_error::Error.none;
 }
 
 fn prepareWithRetainedCore(source:const Project&,checked:const CheckedProject&,previous:const Prepared&,changed:const bool[:])->Preparation,Error {
- let owner,error=blot_reuse_dependency_payload::init();
- if error!=blot_error::Error.none {return Preparation.inactive,error;}
+ let owner,error=squid_reuse_dependency_payload::init();
+ if error!=squid_error::Error.none {return Preparation.inactive,error;}
  var ready=Prepared{entry:source.entry,source_bytes:source.source_bytes,stats:Stats{body_elaborations:checked.body_elaborations,imported_schemes:checked.imported_schemes,normalization:checked.normalization},catalog_owner:owner};
  let complete,error=lowerWithRetainedCore(source,checked,previous,changed,ready);
- if !complete || error!=blot_error::Error.none {ready.deinit();return declineRetained(error);}
- return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
+ if !complete || error!=squid_error::Error.none {ready.deinit();return declineRetained(error);}
+ return Preparation.ready{publishPrepared(ready)},squid_error::Error.none;
 }
 
 fn lowerWithRetainedCore(source:const Project&,checked:const CheckedProject&,previous:const Prepared&,changed:const bool[:],ready:Prepared&)->bool,Error {
  assert(changed.len==previous.units.len && changed.len==source.units.len);
  let error=allocateCatalog(ready,changed.len);
- if error!=blot_error::Error.none {return false,error;}
+ if error!=squid_error::Error.none {return false,error;}
  for edited,index in changed {
   let id=(index+1) as u32;
   let path,error=ready.catalog_owner.copy(source.filename(id));
-  if error!=blot_error::Error.none {return false,error;}
+  if error!=squid_error::Error.none {return false,error;}
   ready.paths[index]=path;
-  var issue=blot_error::Error.none;
+  var issue=squid_error::Error.none;
   if edited {issue=lowerRetainedUnit(source,checked.module(id).checked,id,ready);}
   else {issue=reuseRetainedCore(previous,index,ready);}
-  if issue!=blot_error::Error.none {return false,issue;}
+  if issue!=squid_error::Error.none {return false,issue;}
  }
- return true,blot_error::Error.none;
+ return true,squid_error::Error.none;
 }
 
-fn lowerRetainedUnit(source:const Project&,checked:const blot_check_check::Checked&,id:u32,ready:Prepared&)->Error {
+fn lowerRetainedUnit(source:const Project&,checked:const squid_check_check::Checked&,id:u32,ready:Prepared&)->Error {
  let unit .= source.unit(id);
- let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
- var core,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked,blot_reuse_project_check::moduleOrigins(source),true);
+ let timing=squid_phase_profile::enter(squid_phase_profile::Phase.lower);
+ var core,error=squid_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked,squid_reuse_project_check::moduleOrigins(source),true);
  timing.exit();
- if error!=blot_error::Error.none {return error;}
- if core.value.diagnostics.len!=0 {core.owner.release();return blot_error::Error.invalid_artifact;}
+ if error!=squid_error::Error.none {return error;}
+ if core.value.diagnostics.len!=0 {core.owner.release();return squid_error::Error.invalid_artifact;}
  core.value.unit=id;
  ready.stats.body_lowerings+=core.value.body_lowerings;
  ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
- ready.units[id-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
+ ready.units[id-1]=squid_reuse_dependency_owned_headers::canonical(core.owner,core.value);
  ready.unit_owners[id-1].tables=core.owner;
  ready.unit_has_fork[id-1]=scanUnitFork(ready.units[id-1]);
- return blot_error::Error.none;
+ return squid_error::Error.none;
 }
 
 fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&,literal:u32=0,bits:u32=0)->Error {
  let prior=previous.unit_owners[index];
  if prior.tables.lease!=0 {
   let owner,error=prior.tables.retain();
-  if error!=blot_error::Error.none {return error;}
+  if error!=squid_error::Error.none {return error;}
   ready.unit_owners[index].tables=owner;
  } else if ready.wire_owner.slot==0 {
   // The initial parallel check puts every unit's tables in one immutable packet.
   let owner,error=previous.wire_owner.retain();
-  if error!=blot_error::Error.none {return error;}
+  if error!=squid_error::Error.none {return error;}
   ready.wire_owner=owner;
  }
  let units=previous.catalog_owner.mutable(previous.units);
  ready.units[index]=units[index];
  if literal!=0 {
-  let owner,error=blot_reuse_dependency_payload::init();
-  if error!=blot_error::Error.none {return error;}
+  let owner,error=squid_reuse_dependency_payload::init();
+  if error!=squid_error::Error.none {return error;}
   ready.unit_owners[index].nodes=owner;
-  let nodes,error=blot_reuse_dependency_payload::copy<blot_check_core::Node>(ready.unit_owners[index].nodes,units[index].nodes);
-  if error!=blot_error::Error.none {return error;}
+  let nodes,error=squid_reuse_dependency_payload::copy<squid_check_core::Node>(ready.unit_owners[index].nodes,units[index].nodes);
+  if error!=squid_error::Error.none {return error;}
   nodes[literal].a=bits;
   ready.units[index].nodes=nodes;
-  ready.units[index].owner_id=blot_native::fresh_owner_id();
+  ready.units[index].owner_id=squid_native::fresh_owner_id();
  } else if prior.nodes.lease!=0 {
   let owner,error=prior.nodes.retain();
-  if error!=blot_error::Error.none {return error;}
+  if error!=squid_error::Error.none {return error;}
   ready.unit_owners[index].nodes=owner;
  }
  ready.borrowed[index]=literal==0;
  ready.unit_has_fork[index]=previous.unit_has_fork[index];
- return blot_error::Error.none;
+ return squid_error::Error.none;
 }
 
 fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
- var symbols,error=blot_parse_symbols::initPooled();
- if error!=blot_error::Error.none {return declineRetained(error);}
+ var symbols,error=squid_parse_symbols::initPooled();
+ if error!=squid_error::Error.none {return declineRetained(error);}
  let packets=allocateRetainedPackets(changed.len);
- let debits=blot_reuse_project_check::allocateModuleDebits(changed.len);
+ let debits=squid_reuse_project_check::allocateModuleDebits(changed.len);
  let value,error=checkRetainedPersistent(source,previous,previous_core,changed,affected,symbol_shifted,symbols,packets,debits,verified_suffix,candidate);
  symbols.deinit();
  if candidate.source.lease==0 {
   releaseRetainedPackets(packets);
-  blot_reuse_project_check::releaseModuleDebits(debits);
+  squid_reuse_project_check::releaseModuleDebits(debits);
  }
  return value,error;
 }
 
-fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
+fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],symbols:squid_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],verified_suffix:bool,candidate:Retained&)->Preparation,Error {
  let parsed=source.symbols.entries.len;
- let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,parsed);
- if error!=blot_error::Error.none {return declineRetained(error);}
- var input=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
- input.symbols=blot_parse_symbols::canonical(symbols);
- let prepared,error=blot_reuse_project_check::preparePersistentNames(input);
- if error!=blot_error::Error.none {return declineRetained(error);}
+ let error=squid_reuse_project_check::replaySymbols(symbols,source.symbols,parsed);
+ if error!=squid_error::Error.none {return declineRetained(error);}
+ var input=squid_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
+ input.symbols=squid_parse_symbols::canonical(symbols);
+ let prepared,error=squid_reuse_project_check::preparePersistentNames(input);
+ if error!=squid_error::Error.none {return declineRetained(error);}
  let end=symbols.entries.len;
- if !prepared || (!verified_suffix && end!=previous.source.symbols.entries.len) {return Preparation.inactive,blot_error::Error.none;}
+ if !prepared || (!verified_suffix && end!=previous.source.symbols.entries.len) {return Preparation.inactive,squid_error::Error.none;}
  var verified=parsed;
  if verified_suffix {verified=end;}
  for index in verified..end {
   let id=(index+1) as u32;
-  if symbols.get(id)!=previous.source.symbols.get(id) {return Preparation.inactive,blot_error::Error.none;}
+  if symbols.get(id)!=previous.source.symbols.get(id) {return Preparation.inactive,squid_error::Error.none;}
  }
- var engine,error=blot_reuse_project_check::initPersistentWorker(input);
- if error!=blot_error::Error.none {return declineRetained(error);}
+ var engine,error=squid_reuse_project_check::initPersistentWorker(input);
+ if error!=squid_error::Error.none {return declineRetained(error);}
  engine.persistent_previous=previous.packets;
  engine.persistent_candidate=packets;
  engine.persistent_changed=changed;
- let owner,error=blot_reuse_dependency_payload::init();
- if error!=blot_error::Error.none {engine.deinit();return declineRetained(error);}
+ let owner,error=squid_reuse_dependency_payload::init();
+ if error!=squid_error::Error.none {engine.deinit();return declineRetained(error);}
  var ready=Prepared{entry:source.entry,source_bytes:source.source_bytes,catalog_owner:owner,..};
  let allocated=allocateCatalog(ready,changed.len);
  var failure=allocated;
- if failure==blot_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,affected,symbol_shifted,debits,packets,ready);}
+ if failure==squid_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,affected,symbol_shifted,debits,packets,ready);}
  engine.deinit();
- if failure!=blot_error::Error.none {ready.deinit();return declineRetained(failure);}
+ if failure!=squid_error::Error.none {ready.deinit();return declineRetained(failure);}
  candidate.adoptPersistent(source,symbols,parsed,debits,packets);
- return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
+ return Preparation.ready{publishPrepared(ready)},squid_error::Error.none;
 }
 
 // A U32 passed by value to an ordinary function has the same type, effects
@@ -472,7 +472,7 @@ fn editedInteger(old:const Unit&,next:const Unit&)->u32 {
  while first<old.source.len && old.source[first]==next.source[first] {first++;}
  if first==old.source.len {return 0;}
  for node,i in next.tree.nodes.items {
-  if node.tag!=blot_parse_ast::tag_integer {continue;}
+  if node.tag!=squid_parse_ast::tag_integer {continue;}
   let span=next.tree.spans.items[i];
   if span.start>first || span.end<=first {continue;}
   let prior=old.tree.nodes.items[i];
@@ -491,18 +491,18 @@ fn editedInteger(old:const Unit&,next:const Unit&)->u32 {
 // intrinsic, or proof can depend on the value of an integer during checking.
 fn boundIntegerCall(tree:const Tree&,literal:u32)->u32 {
  for node,i in tree.nodes.items {
-  if node.tag!=blot_parse_ast::tag_let_stmt {continue;}
+  if node.tag!=squid_parse_ast::tag_let_stmt {continue;}
   let binding=tree.binding(i as u32);
-  if binding.fallback!=0 || binding.where.len!=0 || tree.node(binding.pattern).tag!=blot_parse_ast::tag_pattern_name {continue;}
+  if binding.fallback!=0 || binding.where.len!=0 || tree.node(binding.pattern).tag!=squid_parse_ast::tag_pattern_name {continue;}
   var head=binding.value;
   var found=false;
-  while tree.node(head).tag==blot_parse_ast::tag_apply {
+  while tree.node(head).tag==squid_parse_ast::tag_apply {
    let apply=tree.node(head);
-   if tree.node(apply.b).tag!=blot_parse_ast::tag_integer {break;}
+   if tree.node(apply.b).tag!=squid_parse_ast::tag_integer {break;}
    found=found || apply.b==literal;
    head=apply.a;
   }
-  if found && tree.node(head).tag==blot_parse_ast::tag_name {return binding.value;}
+  if found && tree.node(head).tag==squid_parse_ast::tag_name {return binding.value;}
  }
  return 0;
 }
@@ -519,11 +519,11 @@ fn revisedCallLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,u3
  for node,i in core.nodes {
   let site=core.spans[i];
   if site.start==span.start && site.end==span.end {
-   if id!=0 || node.tag!=blot_check_core::Tag.constant || node.ty!=blot_check_types::u32_type ||
+   if id!=0 || node.tag!=squid_check_core::Tag.constant || node.ty!=squid_check_types::u32_type ||
       node.a!=old.tree.node(literal).a {return 0,0;}
    id=i as u32;
   }
-  if site.start==call_span.start && site.end==call_span.end && node.tag==blot_check_core::Tag.call {
+  if site.start==call_span.start && site.end==call_span.end && node.tag==squid_check_core::Tag.call {
    if target!=0 || core.calls[node.a].target.unit==0 || core.calls[node.a].target.unit==core.unit {return 0,0;}
    target=i as u32;
   }
@@ -536,7 +536,7 @@ fn revisedCallLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,u3
  return 0,0;
 }
 
-fn sameSymbolPrefix(old:const blot_parse_symbols::Pool&,next:const blot_parse_symbols::Pool&)->bool {
+fn sameSymbolPrefix(old:const squid_parse_symbols::Pool&,next:const squid_parse_symbols::Pool&)->bool {
  if old.entries.len>next.entries.len || old.bytes.len>next.bytes.len {return false;}
  if old.bytes.items!=next.bytes.items[..old.bytes.len] {return false;}
  for i in 0..old.entries.len {
@@ -555,7 +555,7 @@ fn sameTests(old: const Tree&, next: const Tree&) -> bool {
  }
  return true;
 }
-fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const blot_parse_symbols::Pool&,next_syms:const blot_parse_symbols::Pool&)->bool {
+fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const squid_parse_symbols::Pool&,next_syms:const squid_parse_symbols::Pool&)->bool {
  let ot:const Tree& =old.tree;
  let nt:const Tree& =next.tree;
  if ot.diagnostics.len!=0 || nt.diagnostics.len!=0 {return false;}
@@ -566,7 +566,7 @@ fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const blot_parse_s
   let a=ot.nodes.items[i];
   let b=nt.nodes.items[i];
   if a.tag!=b.tag || a.a!=b.a || a.b!=b.b || a.c!=b.c {return false;}
-  if a.tag==blot_parse_ast::tag_string {
+  if a.tag==squid_parse_ast::tag_string {
    let sa=ot.spans.items[i];
    let sb=nt.spans.items[i];
    if sa.end>old.source.len || sb.end>next.source.len || old.source[sa.start..sa.end]!=next.source[sb.start..sb.end] {return false;}
@@ -575,11 +575,11 @@ fn sameTriviaSyntax(old:const Unit&,next:const Unit&,old_syms:const blot_parse_s
  return true;
 }
 
-fn spanInFunctionDecl(tree:const Tree&,span:blot_parse_ast::Span)->bool {
+fn spanInFunctionDecl(tree:const Tree&,span:squid_parse_ast::Span)->bool {
  for root in tree.roots.items {
   let rs=tree.span(root);
   if span.start<rs.start || span.end>rs.end {continue;}
-  if tree.node(root).tag!=blot_parse_ast::tag_value_decl {return false;}
+  if tree.node(root).tag!=squid_parse_ast::tag_value_decl {return false;}
   let decl=tree.value_decl(root);
   if !decl.function_declaration || decl.where.len!=0 || decl.attributes.len!=0 {return false;}
   let bs=tree.span(decl.body);
@@ -617,7 +617,7 @@ fn isSafeU32LiteralUse(core:const Core&,id:u32,old_bits:u32,new_bits:u32)->bool 
     for arg in ci.arguments {
      if arg==id {
       if ci.target.unit==0 && (ci.target.binding as i64)<core.bindings.len {
-       if core.bindings[ci.target.binding].kind==blot_reuse_principal_interface::Kind.external && core.bindings[ci.target.binding].target.binding==0 {return false;}
+       if core.bindings[ci.target.binding].kind==squid_reuse_principal_interface::Kind.external && core.bindings[ci.target.binding].target.binding==0 {return false;}
       }
      }
     }
@@ -681,9 +681,9 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
   if sa.start!=sb.start || sa.end!=sb.end {return 0,0;}
   if a.tag!=b.tag {return 0,0;}
   if a.a!=b.a || a.b!=b.b || a.c!=b.c {
-   if a.tag==blot_parse_ast::tag_integer && (a.b!=0 || b.b!=0) {return 0,0;}
+   if a.tag==squid_parse_ast::tag_integer && (a.b!=0 || b.b!=0) {return 0,0;}
    if lit!=0 {return 0,0;}
-   if a.tag!=blot_parse_ast::tag_integer && a.tag!=blot_parse_ast::tag_float {return 0,0;}
+   if a.tag!=squid_parse_ast::tag_integer && a.tag!=squid_parse_ast::tag_float {return 0,0;}
    if (sb.start as i64)>first || (sb.end as i64)<=first {return 0,0;}
    lit=i as u32;
   }
@@ -697,15 +697,15 @@ fn revisedScalarLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,
  }
  let old_bits=ot.nodes.items[lit].a;
  let new_bits=nt.nodes.items[lit].a;
- let is_float=nt.nodes.items[lit].tag==blot_parse_ast::tag_float;
+ let is_float=nt.nodes.items[lit].tag==squid_parse_ast::tag_float;
  if is_float && (old_bits==0x7f800000 || new_bits==0x7f800000 || !isSafeF32LiteralPatch(old_bits,new_bits)) {return 0,0;}
- var want_ty=blot_check_types::u32_type;
- if is_float {want_ty=blot_check_types::f32_type;}
+ var want_ty=squid_check_types::u32_type;
+ if is_float {want_ty=squid_check_types::f32_type;}
  var id:u32=0;
  for node,i in core.nodes {
   let site=core.spans[i];
   if site.start==span.start && site.end==span.end {
-   if id!=0 || node.tag!=blot_check_core::Tag.constant || node.ty!=want_ty || node.a!=old_bits {return 0,0;}
+   if id!=0 || node.tag!=squid_check_core::Tag.constant || node.ty!=want_ty || node.a!=old_bits {return 0,0;}
    id=i as u32;
   }
  }
@@ -737,15 +737,15 @@ fn selectiveRoots(old:const Unit&,next:const Unit&,skip_root:bool[>..]&)->bool {
   let br=b.roots.items[index];
   let tag=a.node(ar).tag;
   if tag!=b.node(br).tag {return false;}
-  if tag!=blot_parse_ast::tag_value_decl {
+  if tag!=squid_parse_ast::tag_value_decl {
    if !sameAstSubtree(old,ar,next,br) {return false;}
    skip_root.push(true);
    continue;
   }
   let av=a.value_decl(ar);
   let bv=b.value_decl(br);
-  let at=blot_parse_ast::declaration_traits(a,ar);
-  let bt=blot_parse_ast::declaration_traits(b,br);
+  let at=squid_parse_ast::declaration_traits(a,ar);
+  let bt=squid_parse_ast::declaration_traits(b,br);
   if av.name!=bv.name || at.private!=bt.private || at.is_opaque!=bt.is_opaque ||
      av.runtime!=bv.runtime || av.exported!=bv.exported || av.modifier!=bv.modifier ||
      av.function_declaration!=bv.function_declaration || av.where.len!=bv.where.len ||
@@ -755,8 +755,8 @@ fn selectiveRoots(old:const Unit&,next:const Unit&,skip_root:bool[>..]&)->bool {
   for attr,i in a.list(av.attributes) {
    if !sameAstSubtree(old,attr,next,b.list(bv.attributes)[i]) {return false;}
   }
-  let a_lambda=a.node(av.body).tag==blot_parse_ast::tag_lambda;
-  let b_lambda=b.node(bv.body).tag==blot_parse_ast::tag_lambda;
+  let a_lambda=a.node(av.body).tag==squid_parse_ast::tag_lambda;
+  let b_lambda=b.node(bv.body).tag==squid_parse_ast::tag_lambda;
   if a_lambda!=b_lambda {return false;}
   let same=sameAstSubtree(old,ar,next,br) && sameAstSubtree(old,av.body,next,bv.body);
   if same {unchanged+=1;}
@@ -765,7 +765,7 @@ fn selectiveRoots(old:const Unit&,next:const Unit&,skip_root:bool[>..]&)->bool {
    var first:u32=1;
    if index!=0 {first=a.roots.items[index-1]+1;}
    for node in a.nodes.items[first..ar] {
-    if node.tag==blot_parse_ast::tag_fork_expr {return false;}
+    if node.tag==squid_parse_ast::tag_fork_expr {return false;}
    }
    edited+=1;
    if edited>16 {return false;}
@@ -775,7 +775,7 @@ fn selectiveRoots(old:const Unit&,next:const Unit&,skip_root:bool[>..]&)->bool {
  return edited!=0 && unchanged>=4;
 }
 
-fn trySelectiveRetainedUnit(engine:blot_reuse_project_check::Engine&,unit:u32,old_tree:const Tree&,previous:const Core&,skip_root:const bool[:],ready:Prepared&)->bool,Error {
+fn trySelectiveRetainedUnit(engine:squid_reuse_project_check::Engine&,unit:u32,old_tree:const Tree&,previous:const Core&,skip_root:const bool[:],ready:Prepared&)->bool,Error {
  let source=engine.source.unit(unit);
  // Bound the append-only tables even when one session keeps editing the
  // same body. A normal rebuild drops unreachable versions of edited bodies.
@@ -783,41 +783,41 @@ fn trySelectiveRetainedUnit(engine:blot_reuse_project_check::Engine&,unit:u32,ol
  // when the module has a small syntax tree. Splices reuse those bindings.
  let binding_budget=2*source.tree.nodes.len+previous.associated.len;
  if previous.nodes.len>2*source.tree.nodes.len || previous.bindings.len>binding_budget {
-  return false,blot_error::Error.none;
+  return false,squid_error::Error.none;
  }
- var checked=default<blot_check_check::Checked>();
- let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
+ var checked=default<squid_check_check::Checked>();
+ let check=squid_phase_profile::enter(squid_phase_profile::Phase.check);
  let error=engine.checkModuleBody(unit,previous,skip_root,checked);
  check.exit();
- if error!=blot_error::Error.none {return false,error;}
- let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
- var shifts:blot_check_core_builder::SourceShift[>..]=[];
+ if error!=squid_error::Error.none {return false,error;}
+ let timing=squid_phase_profile::enter(squid_phase_profile::Phase.lower);
+ var shifts:squid_check_core_builder::SourceShift[>..]=[];
  var offset:i64=0;
  for root,index in old_tree.roots.items {
   let start=old_tree.span(root).start;
   let next=source.tree.span(source.tree.roots.items[index]).start as i64-start;
   if next==offset {continue;}
-  shifts.push(blot_check_core_builder::SourceShift{start:start,offset:next});
+  shifts.push(squid_check_core_builder::SourceShift{start:start,offset:next});
   offset=next;
  }
- let core,error=blot_check_core_builder::lowerRetainedUnitSelective(source.tree,engine.source.symbols,checked,blot_reuse_project_check::moduleOrigins(engine.source),previous,skip_root,shifts[..]);
+ let core,error=squid_check_core_builder::lowerRetainedUnitSelective(source.tree,engine.source.symbols,checked,squid_reuse_project_check::moduleOrigins(engine.source),previous,skip_root,shifts[..]);
  timing.exit();
- if error==blot_error::Error.none {
+ if error==squid_error::Error.none {
   ready.stats.body_elaborations+=checked.body_elaborations;
   ready.stats.imported_schemes+=checked.imported_schemes;
   ready.stats.normalization.merge(checked.types.normalization);
   ready.stats.body_lowerings+=core.value.body_lowerings;
   ready.stats.syntax_nodes+=source.tree.nodes.len-1;
-  ready.units[unit-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
+  ready.units[unit-1]=squid_reuse_dependency_owned_headers::canonical(core.owner,core.value);
   ready.unit_owners[unit-1].tables=core.owner;
   ready.unit_has_fork[unit-1]=scanUnitFork(ready.units[unit-1]);
   ready.spliced_unit=unit;
  }
  checked.deinit();
- return error==blot_error::Error.none,error;
+ return error==squid_error::Error.none,error;
 }
 
-fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
+fn rebuildRetainedPersistent(engine:squid_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],symbol_shifted:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
  let cache .= engine.persistentCache();
  // An unchanged packet certifies the complete catalog that a caller reads.
@@ -826,7 +826,7 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
  for unit in engine.source.order.items {
   let index=unit-1;
   let path,error=ready.catalog_owner.copy(engine.source.filename(unit));
-  if error!=blot_error::Error.none {return error;}
+  if error!=squid_error::Error.none {return error;}
   ready.paths[index]=path;
   var inherited=false;
   if changed[index] {
@@ -849,12 +849,12 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   }
   if !changed[index] {
    let debit=previous.debits[index];
-   if debit.resolution>engine.resolution_remaining || debit.associated>engine.associated_remaining {return blot_error::Error.invalid_artifact;}
+   if debit.resolution>engine.resolution_remaining || debit.associated>engine.associated_remaining {return squid_error::Error.invalid_artifact;}
    engine.resolution_remaining-=debit.resolution;
    engine.associated_remaining-=debit.associated;
    debits[index]=debit;
    let error=reuseRetainedCore(previous_core,index,ready,literal,bits);
-   if error!=blot_error::Error.none {return error;}
+   if error!=squid_error::Error.none {return error;}
    continue;
   }
   let resolution=engine.resolution_remaining;
@@ -869,15 +869,15 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
    var skip_root:bool[>..]=[];
    if selectiveRoots(previous.source.unit(unit),engine.source.unit(unit),skip_root) {
     let accepted,error=trySelectiveRetainedUnit(engine,unit,previous.source.unit(unit).tree,previous_core.units[index],skip_root[..],ready);
-    if error==blot_error::Error.out_of_memory {return error;}
+    if error==squid_error::Error.out_of_memory {return error;}
     if engine.source.symbols.outsideView() || engine.source.symbols.missing_name ||
-       engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
+       engine.source.symbols.entries.len!=symbol_count {return squid_error::Error.invalid_artifact;}
     if accepted {
-     owned[index]=blot_reuse_project_check::copyOwned(previous.packets[index]);
+     owned[index]=squid_reuse_project_check::copyOwned(previous.packets[index]);
      let debit=previous.debits[index];
      // The prior debit covers unchanged work. Charge the trial's projections
      // too, so a selective success cannot give later modules more budget.
-     if debit.resolution>resolution || debit.associated>engine.associated_remaining {return blot_error::Error.invalid_artifact;}
+     if debit.resolution>resolution || debit.associated>engine.associated_remaining {return squid_error::Error.invalid_artifact;}
      engine.resolution_remaining=resolution-debit.resolution;
      engine.associated_remaining-=debit.associated;
      debits[index]=ModuleDebit{debit.resolution,associated-engine.associated_remaining,symbol_count};
@@ -888,33 +888,33 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
     engine.associated_remaining=associated;
    }
   }
-  let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
+  let check=squid_phase_profile::enter(squid_phase_profile::Phase.check);
   let continued,error=engine.checkOrdered(unit);
   check.exit();
-  if error!=blot_error::Error.none {return error;}
-  if !continued || cache.error!=blot_error::Error.none || engine.source.symbols.missing_name || engine.diagnostics.items.len!=0 {
-   if cache.error!=blot_error::Error.none {return cache.error;}
-   return blot_error::Error.invalid_artifact;
+  if error!=squid_error::Error.none {return error;}
+  if !continued || cache.error!=squid_error::Error.none || engine.source.symbols.missing_name || engine.diagnostics.items.len!=0 {
+   if cache.error!=squid_error::Error.none {return cache.error;}
+   return squid_error::Error.invalid_artifact;
   }
-  let slots=blot_reuse_project_check::moduleSlots(engine.result);
-  let module:const blot_reuse_project_check::Module& =slots[index].value;
+  let slots=squid_reuse_project_check::moduleSlots(engine.result);
+  let module:const squid_reuse_project_check::Module& =slots[index].value;
   var packet:u8[>..<]=[];
-  let freeze=blot_phase_profile::enter(blot_phase_profile::Phase.freeze);
-  let encoded=blot_reuse_project_check::encodePersistentInterface(engine.source.prelude_unit,engine.source.unit(unit).tree,module,unit,packet);
+  let freeze=squid_phase_profile::enter(squid_phase_profile::Phase.freeze);
+  let encoded=squid_reuse_project_check::encodePersistentInterface(engine.source.prelude_unit,engine.source.unit(unit).tree,module,unit,packet);
   freeze.exit();
-  if encoded!=blot_error::Error.none {return encoded;}
+  if encoded!=squid_error::Error.none {return encoded;}
   propagated[index]=inherited || symbol_shifted[index] || packet[..]!=previous.packets[index];
-  owned[index]=blot_reuse_project_check::copyOwned(packet[..]);
+  owned[index]=squid_reuse_project_check::copyOwned(packet[..]);
   let lowered=lowerRetainedUnit(engine.source,module.checked,unit,ready);
-  if lowered!=blot_error::Error.none {return lowered;}
-  if engine.source.symbols.outsideView() || engine.source.symbols.missing_name || engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
+  if lowered!=squid_error::Error.none {return lowered;}
+  if engine.source.symbols.outsideView() || engine.source.symbols.missing_name || engine.source.symbols.entries.len!=symbol_count {return squid_error::Error.invalid_artifact;}
   ready.stats.body_elaborations+=module.checked.body_elaborations;
   ready.stats.imported_schemes+=module.checked.imported_schemes;
   ready.stats.normalization.merge(module.checked.types.normalization);
   debits[index]=ModuleDebit{resolution-engine.resolution_remaining,associated-engine.associated_remaining,symbol_count};
   slots[index].value.deinit();
-  slots[index]=blot_support::none<blot_reuse_project_check::Module>();
+  slots[index]=squid_support::none<squid_reuse_project_check::Module>();
   cache.current=0;
  }
- return blot_error::Error.none;
+ return squid_error::Error.none;
 }

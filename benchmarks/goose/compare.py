@@ -29,13 +29,13 @@ from reference import PROFILES, checksum
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 CASES = {
-    "fannkuch": ("CLBG::Fannkuchredux", "fannkuch.goose", "fannkuch.blot"),
-    "crc32": ("Hash::CRC32", "hash_crc32.goose", "crc32.blot"),
-    "custom_hash": ("Hash::SHA256", "hash_sha256.goose", "custom_hash.blot"),
-    "sieve": ("Etc::Sieve", "sieve.goose", "sieve.blot"),
-    "sort_merge": ("Sort::Merge", "sort_merge.goose", "sort_merge.blot"),
-    "sort_quick": ("Sort::Quick", "sort_quick.goose", "sort_quick.blot"),
-    "mandelbrot_f32": ("CLBG::Mandelbrot", "mandelbrot.goose", "mandelbrot.blot"),
+    "fannkuch": ("CLBG::Fannkuchredux", "fannkuch.goose", "fannkuch.sq"),
+    "crc32": ("Hash::CRC32", "hash_crc32.goose", "crc32.sq"),
+    "custom_hash": ("Hash::SHA256", "hash_sha256.goose", "custom_hash.sq"),
+    "sieve": ("Etc::Sieve", "sieve.goose", "sieve.sq"),
+    "sort_merge": ("Sort::Merge", "sort_merge.goose", "sort_merge.sq"),
+    "sort_quick": ("Sort::Quick", "sort_quick.goose", "sort_quick.sq"),
+    "mandelbrot_f32": ("CLBG::Mandelbrot", "mandelbrot.goose", "mandelbrot.sq"),
 }
 CONTROLS = {"mandelbrot_f32": HERE / "ports/mandelbrot_f32.goose"}
 
@@ -104,7 +104,7 @@ def write_results(output, report):
             if k not in ["stdout", "stderr", "driver_stats"]
         }
         stats = row.get("driver_stats", {})
-        if row["backend"] == "blot":
+        if row["backend"] == "squid":
             item["driver_stats"] = {k: v for k, v in stats.items() if k != "stats"}
             item["phase_profile"] = dict(stats.get("stats", {}).get("phaseProfile", {}))
             # Only phase timings; large normalization counters remain in raw data.
@@ -127,13 +127,13 @@ def write_results(output, report):
     (output / "summary.json").write_text(json.dumps(compact, indent=2) + "\n")
     profile_mode = report["configuration"]["profile_backend"]
     lines = [
-        "# Blot / Goose direct Wasm",
+        "# Squid / Goose direct Wasm",
         "",
-        f"Status: {report['status']}. Node {report['environment']['node']['node']}; V8 {report['environment']['node']['v8']}. Blot compiler profiling: {profile_mode}.",
+        f"Status: {report['status']}. Node {report['environment']['node']['node']}; V8 {report['environment']['node']['v8']}. Squid compiler profiling: {profile_mode}.",
         "",
         "Cold builds are fresh uncached driver processes; medians include startup. Runtime rows use identical parameters and checked checksums, with preparation and warmup outside the kernel clock.",
         "",
-        "| Case | Build Blot / Goose (ms) | Wasm Blot / Goose (B) |",
+        "| Case | Build Squid / Goose (ms) | Wasm Squid / Goose (B) |",
         "| --- | ---: | ---: |",
     ]
 
@@ -141,25 +141,25 @@ def write_results(output, report):
         return next(r for r in rows if all(r.get(k) == v for k, v in fields.items()))
 
     for short in report["cases"]:
-        blot = find(report["build_summary"], case=short, backend="blot", phase="cold")
+        squid = find(report["build_summary"], case=short, backend="squid", phase="cold")
         goose = find(report["build_summary"], case=short, backend="goose", phase="cold")
         cells = []
-        for row in [blot, goose]:
+        for row in [squid, goose]:
             value = "unavailable"
             if row["wall_ms"]:
                 value = f"{row['wall_ms']['median']:.2f}"
             cells.append(value)
         lines.append(
-            f"| {short} | {' / '.join(cells)} | {blot['wasm_bytes']} / {goose['wasm_bytes']} |"
+            f"| {short} | {' / '.join(cells)} | {squid['wasm_bytes']} / {goose['wasm_bytes']} |"
         )
     lines += [
         "",
-        "| Profile / case | Kernel Blot / Goose (ms) | Paired Blot / Goose |",
+        "| Profile / case | Kernel Squid / Goose (ms) | Paired Squid / Goose |",
         "| --- | ---: | ---: |",
     ]
     for row in report["paired_runtime"]:
         display = []
-        for backend in ["blot", "goose"]:
+        for backend in ["squid", "goose"]:
             cell = find(
                 report["runtime_summary"],
                 case=row["case"],
@@ -178,7 +178,7 @@ def write_results(output, report):
         )
     lines += [
         "",
-        "Bounded uses production problem sizes with explicitly reduced repetition counts. It is not an official LangArena production score. Blot byte buffers have 4x Goose's element payload bytes (U32 vs U8); owner and arena overhead are separate. Mandelbrot is an explicit F32 control for both languages; the original F64 workload is unavailable in Blot. Unsupported builds remain visible and receive no timing. Coverage and qualification are recorded per case; the 50-task catalog is not covered. Process wall includes the common TypeScript runner for both backends. V8 only; no Wasmtime result.",
+        "Bounded uses production problem sizes with explicitly reduced repetition counts. It is not an official LangArena production score. Squid byte buffers have 4x Goose's element payload bytes (U32 vs U8); owner and arena overhead are separate. Mandelbrot is an explicit F32 control for both languages; the original F64 workload is unavailable in Squid. Unsupported builds remain visible and receive no timing. Coverage and qualification are recorded per case; the 50-task catalog is not covered. Process wall includes the common TypeScript runner for both backends. V8 only; no Wasmtime result.",
         "",
         "Failures:",
     ]
@@ -236,7 +236,7 @@ def main():
         help="Freeze reference scripts/catalog/ports from this Git revision; the binary is pinned separately.",
     )
     parser.add_argument(
-        "--blotc", type=Path, default=ROOT / "compiler-goose/build/blotc-goose"
+        "--squidc", type=Path, default=ROOT / "compiler-goose/build/squidc-goose"
     )
     parser.add_argument("--node", type=Path, default=Path("node"))
     parser.add_argument("--deno", default="deno")
@@ -251,7 +251,7 @@ def main():
     parser.add_argument(
         "--profile-backend",
         action="store_true",
-        help="instrument Blot compiler; diagnostic compile timings only",
+        help="instrument Squid compiler; diagnostic compile timings only",
     )
     parser.add_argument("--samples", type=int, default=5)
     parser.add_argument(
@@ -272,7 +272,7 @@ def main():
         parser.error("invalid sample count or timeout; each child is capped at 30s")
     goose_root = args.goose_root.resolve()
     goose = (args.goose or goose_root / "build/bin/goose").resolve()
-    blot = args.blotc.resolve()
+    squid = args.squidc.resolve()
     node_path = shutil.which(str(args.node))
     if node_path is None:
         parser.error("Node executable not found; supply --node PATH")
@@ -313,18 +313,18 @@ def main():
     spec.loader.exec_module(arena)
     manifest = arena.load_manifest()
     catalog = {c["name"]: c for c in manifest["cases"]}
-    for backend, executable in [("goose", goose), ("blot", blot)]:
+    for backend, executable in [("goose", goose), ("squid", squid)]:
         destination = frozen / backend / "bin" / executable.name
         destination.parent.mkdir(parents=True)
         shutil.copy2(executable, destination)
         if sha(executable) != sha(destination):
             raise RuntimeError("compiler changed while freezing")
     goose_copy = frozen / "goose/bin" / goose.name
-    blot_copy = frozen / "blot/bin" / blot.name
+    squid_copy = frozen / "squid/bin" / squid.name
     shutil.copytree(goose.parent / "stdlib", goose_copy.parent / "stdlib")
     shutil.copy2(
-        blot.parent.parent / "compiler-identity.bin",
-        blot_copy.parent.parent / "compiler-identity.bin",
+        squid.parent.parent / "compiler-identity.bin",
+        squid_copy.parent.parent / "compiler-identity.bin",
     )
     goose_runner = frozen / "run_wasm.mjs"
     shutil.copy2(reference_root / "scripts/run_wasm.mjs", goose_runner)
@@ -333,7 +333,7 @@ def main():
     ).strip()
     cases = {}
     for short in args.cases:
-        task, goose_name, blot_name = CASES[short]
+        task, goose_name, squid_name = CASES[short]
         catalog_case = dict(catalog[task])
         bounded = next(r for r in PROFILES["bounded"] if r[0] == short)
         _, parameter, iterations, warmups, _ = bounded
@@ -371,9 +371,9 @@ def main():
         row["variant"] = "original numeric workload"
         if short in CONTROLS:
             row["variant"] = (
-                "explicit F32 control; original Mandelbrot F64 unavailable in Blot"
+                "explicit F32 control; original Mandelbrot F64 unavailable in Squid"
             )
-        for backend in ["goose", "blot"]:
+        for backend in ["goose", "squid"]:
             folder = output / "sources" / short / backend
             folder.mkdir(parents=True)
             if backend == "goose":
@@ -387,23 +387,23 @@ def main():
                     folder / "common.goose",
                 )
             else:
-                file = folder / blot_name
-                shutil.copy2(HERE / "ports" / blot_name, file)
+                file = folder / squid_name
+                shutil.copy2(HERE / "ports" / squid_name, file)
             row["sources"][backend] = str(file)
         cases[short] = row
     tracked = [
         Path(__file__),
         HERE / "reference.py",
         HERE / "runtime.ts",
-        HERE / "build_blot.ts",
+        HERE / "build_squid.ts",
     ]
     tracked += [reference_root / path for path in reference_files]
-    tracked += list((HERE / "ports").glob("*.blot"))
+    tracked += list((HERE / "ports").glob("*.sq"))
     tracked += list((HERE / "ports").glob("*.goose"))
     tracked += list((ROOT / "compiler").glob("*.ts"))
-    tracked += list((ROOT / "std").rglob("*.blot"))
+    tracked += list((ROOT / "std").rglob("*.sq"))
     report = {
-        "schema": "blot-goose-comparison-v1",
+        "schema": "squid-goose-comparison-v1",
         "status": "incomplete",
         "started_utc": datetime.now(UTC).isoformat(),
         "configuration": {
@@ -437,7 +437,7 @@ def main():
             "goose_checkout_status": subprocess.check_output(
                 ["git", "status", "--short"], cwd=goose_root, text=True
             ).splitlines(),
-            "compiler_sha256": {"blot": sha(blot_copy), "goose": sha(goose_copy)},
+            "compiler_sha256": {"squid": sha(squid_copy), "goose": sha(goose_copy)},
             "goose_stdlib": fingerprint_tree(goose_copy.parent / "stdlib"),
             "goose_toolchain": json.loads((reference_root / "toolchain.json").read_text()),
             "goose_reference_source_root": str(goose_root),
@@ -453,7 +453,7 @@ def main():
             "numeric_controls": [s for s in cases if s in CONTROLS],
             "original_numeric_attempts": [s for s in cases if s not in CONTROLS],
             "original_numeric_unavailable": [
-                "CLBG::Mandelbrot: F64 is unavailable in Blot"
+                "CLBG::Mandelbrot: F64 is unavailable in Squid"
             ],
             "unported": [
                 c["name"]
@@ -466,8 +466,8 @@ def main():
         },
         "method": {
             "cold_build": "Fresh driver and compiler per sample; cache disabled. OS and installed-library caches retained. Source staging outside timer. Complete wall and native build phases retained.",
-            "runtime": "Same Node/V8 and flags for both. test/run use official inputs/iterations/warmups. bounded retains production problem sizes with reduced counts recorded per case. Same state retained after warmup. Preparation, startup, engine compilation and output outside clock; no per-element host calls. Two Blot clock packet crossings versus two Goose scalar imports are part of their ABI costs. Common process wall includes parsing the Blot TypeScript guest host for both backends; it is not Goose's standalone runner startup score.",
-            "representation": "Goose byte buffers use U8; Blot stores identical values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed backing capacities retained. Sort U32 values are nonnegative and preserve I32 ordering; ports restrict sizes to100000/400000, where exact integer RNG conversion matches every Goose F64 RNG state. Mandelbrot uses explicit ordered F32 in BOTH sources; original F64 remains unavailable. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is not cryptographic SHA-256.",
+            "runtime": "Same Node/V8 and flags for both. test/run use official inputs/iterations/warmups. bounded retains production problem sizes with reduced counts recorded per case. Same state retained after warmup. Preparation, startup, engine compilation and output outside clock; no per-element host calls. Two Squid clock packet crossings versus two Goose scalar imports are part of their ABI costs. Common process wall includes parsing the Squid TypeScript guest host for both backends; it is not Goose's standalone runner startup score.",
+            "representation": "Goose byte buffers use U8; Squid stores identical values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed backing capacities retained. Sort U32 values are nonnegative and preserve I32 ordering; ports restrict sizes to100000/400000, where exact integer RNG conversion matches every Goose F64 RNG state. Mandelbrot uses explicit ordered F32 in BOTH sources; original F64 remains unavailable. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is not cryptographic SHA-256.",
             "ordering": "Build phase sequential, then runtime phase; seeded paired shuffling, no deliberate concurrent measurement work.",
         },
         "cases": cases,
@@ -483,11 +483,11 @@ def main():
     report["environment"]["staged_sources_sha256"] = fingerprint_tree(
         output / "sources"
     )
-    report["environment"]["blot_checkout_head"] = subprocess.check_output(
+    report["environment"]["squid_checkout_head"] = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
-    report["environment"]["blot_compiler_identity_sha256"] = sha(
-        blot_copy.parent.parent / "compiler-identity.bin"
+    report["environment"]["squid_compiler_identity_sha256"] = sha(
+        squid_copy.parent.parent / "compiler-identity.bin"
     )
     report["environment"]["goose_runner_sha256"] = sha(goose_runner)
 
@@ -543,7 +543,7 @@ def main():
                 (i, c, b)
                 for i in range(args.compile_samples)
                 for c in cases
-                for b in ["blot", "goose"]
+                for b in ["squid", "goose"]
             ]
             rng.shuffle(jobs)
             for sample, short, backend in jobs:
@@ -560,15 +560,15 @@ def main():
                 directory.mkdir(parents=True)
                 artifact = directory / "program.wasm"
                 stats = directory / "stats.json"
-                if backend == "blot":
+                if backend == "squid":
                     command = [
                         args.deno,
                         "run",
                         "--no-config",
                         "--no-lock",
                         "-A",
-                        HERE / "build_blot.ts",
-                        blot_copy,
+                        HERE / "build_squid.ts",
+                        squid_copy,
                         source,
                         artifact,
                         stats,
@@ -647,7 +647,7 @@ def main():
                     source.write_bytes(original)
         qualified = set()
         for short in cases:
-            for backend in ["blot", "goose"]:
+            for backend in ["squid", "goose"]:
                 if any(
                     (short, backend, phase) not in artifacts
                     for phase in ["cold", "marker_edit"]
@@ -691,7 +691,7 @@ def main():
                 if passed:
                     qualified.add((short, backend))
         report["coverage"]["qualified_pairs"] = [
-            s for s in cases if all((s, b) in qualified for b in ["blot", "goose"])
+            s for s in cases if all((s, b) in qualified for b in ["squid", "goose"])
         ]
         report["coverage"]["qualified_original_pairs"] = [
             s for s in report["coverage"]["qualified_pairs"] if s not in CONTROLS
@@ -702,7 +702,7 @@ def main():
                 order = list(cases)
                 rng.shuffle(order)
                 for short in order:
-                    backends = ["blot", "goose"]
+                    backends = ["squid", "goose"]
                     rng.shuffle(backends)
                     for backend in backends:
                         cell = (short, backend, profile)
@@ -751,7 +751,7 @@ def main():
                             flush=True,
                         )
         for short in cases:
-            for backend in ["blot", "goose"]:
+            for backend in ["squid", "goose"]:
                 for phase in ["cold", "marker_edit"]:
                     rows = [
                         r
@@ -822,15 +822,15 @@ def main():
                 )
                 if failed:
                     reason = "failed cell; no ranking"
-                if not all((short, b) in qualified for b in ["blot", "goose"]):
+                if not all((short, b) in qualified for b in ["squid", "goose"]):
                     reason = "unavailable backend; no comparison"
                 if len(complete) >= 5 and not failed:
                     reason = "kernel below 10ms"
                     if all(
                         statistics.median(p[b] for p in complete) >= 10_000_000
-                        for b in ["blot", "goose"]
+                        for b in ["squid", "goose"]
                     ):
-                        ratio = summary([p["blot"] / p["goose"] for p in complete])
+                        ratio = summary([p["squid"] / p["goose"] for p in complete])
                         reason = ""
                 report["paired_runtime"].append(
                     {
@@ -858,7 +858,7 @@ def main():
                 "harness,host,std or reference inputs changed during run"
             )
         if (
-            sha(blot_copy) != report["environment"]["compiler_sha256"]["blot"]
+            sha(squid_copy) != report["environment"]["compiler_sha256"]["squid"]
             or sha(goose_copy) != report["environment"]["compiler_sha256"]["goose"]
         ):
             raise RuntimeError("frozen compiler changed")
@@ -875,10 +875,10 @@ def main():
         if sha(goose_runner) != report["environment"]["goose_runner_sha256"]:
             raise RuntimeError("frozen Goose runner changed")
         if (
-            sha(blot_copy.parent.parent / "compiler-identity.bin")
-            != report["environment"]["blot_compiler_identity_sha256"]
+            sha(squid_copy.parent.parent / "compiler-identity.bin")
+            != report["environment"]["squid_compiler_identity_sha256"]
         ):
-            raise RuntimeError("frozen Blot identity changed")
+            raise RuntimeError("frozen Squid identity changed")
         report["status"] = "passed"
         if report["failures"]:
             report["status"] = "partial"

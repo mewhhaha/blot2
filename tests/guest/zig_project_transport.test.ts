@@ -17,7 +17,7 @@ function quote(value: string): string {
 async function fixture(mode: string) {
   const peer = await projectPeerExecutable();
   const directory = await Deno.makeTempDir({
-    prefix: "blot-zig-project-peer-",
+    prefix: "squid-zig-project-peer-",
   });
   const executable = directory + "/compiler", log = directory + "/log.jsonl";
   await Deno.writeTextFile(
@@ -27,7 +27,7 @@ async function fixture(mode: string) {
   await Deno.chmod(executable, 0o755);
   const options: ZigProjectCompilerOptions = {
     executable,
-    entry: directory + "/entry.blot",
+    entry: directory + "/entry.sq",
     prelude: null,
     expectedCompilerIdentity: "a".repeat(64),
     startupTimeoutMs: 2000,
@@ -287,23 +287,23 @@ for (const mode of ["fragmented", "coalesced", "reject-first"]) {
 Deno.test("constructor copies paths and imports before awaiting hello and launches with clearEnv", async () => {
   const item = await fixture("delayed");
   let compiler: ZigProjectCompiler | undefined;
-  const previous = Deno.env.get("BLOT_CLIENT_TEST_AMBIENT");
-  Deno.env.set("BLOT_CLIENT_TEST_AMBIENT", "must-not-inherit");
+  const previous = Deno.env.get("SQUID_CLIENT_TEST_AMBIENT");
+  Deno.env.set("SQUID_CLIENT_TEST_AMBIENT", "must-not-inherit");
   try {
-    const entry = new URL("entry.blot", "file://" + item.directory + "/"),
+    const entry = new URL("entry.sq", "file://" + item.directory + "/"),
       producer = new URL("library/", entry);
     const imports: Record<string, URL> = { "lib/": producer };
     const options = { ...item.options, entry, imports };
     const pending = createZigProjectCompiler(options);
-    entry.pathname = "/changed.blot";
+    entry.pathname = "/changed.sq";
     producer.pathname = "/changed-library/";
     imports["other/"] = producer;
-    options.prelude = "/changed-prelude.blot";
+    options.prelude = "/changed-prelude.sq";
     compiler = await pending;
     await compiler.close();
     const records = await logs(item.log);
     equal(records[0].ambient, null);
-    equal(records[1].entry, item.directory + "/entry.blot");
+    equal(records[1].entry, item.directory + "/entry.sq");
     equal(records[1].prelude, null);
     equal(records[1].imports, [{
       prefix: "lib/",
@@ -311,8 +311,8 @@ Deno.test("constructor copies paths and imports before awaiting hello and launch
     }]);
   } finally {
     await compiler?.dispose();
-    if (previous === undefined) Deno.env.delete("BLOT_CLIENT_TEST_AMBIENT");
-    else Deno.env.set("BLOT_CLIENT_TEST_AMBIENT", previous);
+    if (previous === undefined) Deno.env.delete("SQUID_CLIENT_TEST_AMBIENT");
+    else Deno.env.set("SQUID_CLIENT_TEST_AMBIENT", previous);
     await item.cleanup();
   }
 });
@@ -572,7 +572,7 @@ Deno.test("client copies only valid related source coordinates", async () => {
     const result = await compiler.build();
     ok(!result.success);
     equal(result.diagnostics[0].related, {
-      filename: "/library.blot",
+      filename: "/library.sq",
       start: 3,
       end: 7,
       offset_encoding: "utf8_bytes",

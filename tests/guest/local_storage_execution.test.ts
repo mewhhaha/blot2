@@ -12,10 +12,10 @@ const get = func ($Box mapper) => return mapper
 {
   Deno.test(`closed local initializers preserve loop and branch versions`, async () => {
     const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0] ??
-        new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+        new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
       entry,
       prelude: null,
     });
@@ -222,12 +222,12 @@ io const run = func (host: Unit -> U32 ! {Foreign}) => return do:
 
 // Direct backend gap: a generalized local value used at two types is rejected ("a local value is used at different types") (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("closed local wrapper body edits retain fresh failure recovery", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-local-wrapper-" });
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/wrapper.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-local-wrapper-" });
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/wrapper.sq`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+      new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
     entry,
     prelude: null,
   };

@@ -1,7 +1,7 @@
 import { instantiateGuest } from "../../host/guest.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const buildDir = new URL("../../build", import.meta.url).pathname;
 const decode = new TextDecoder();
 
@@ -31,7 +31,7 @@ async function withCompilation(
     prefix: "zig-native-e2e-",
   });
   try {
-    const input = `${dir}/program.blot`;
+    const input = `${dir}/program.sq`;
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(compiler, {
@@ -137,7 +137,7 @@ io const disjunction = func (left: Bool) : Bool => return
         guest.dispose();
       }
     },
-    { prelude: new URL("../../std/prelude.blot", import.meta.url).pathname },
+    { prelude: new URL("../../std/prelude.sq", import.meta.url).pathname },
   );
 });
 

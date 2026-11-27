@@ -1,10 +1,10 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 
 Deno.test("export signatures are available before body checking and private helpers may infer", async () => {
-  const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
   const dir = await Deno.makeTempDir();
   try {
-    const path = dir + "/module.blot";
+    const path = dir + "/module.sq";
     const source = `type Box is data = $Box { value: U32 }
 private func read box => return box.value
 func get (box: Box): U32 => return missing_implementation box

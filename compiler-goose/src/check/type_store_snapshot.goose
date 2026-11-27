@@ -1,5 +1,5 @@
 // A suspension moves the exact logical store into typed reusable backing.
-namespace blot_check_type_store_snapshot;
+namespace squid_check_type_store_snapshot;
 import check.effects;
 import check.types;
 import reuse.composite_resolution_cache;
@@ -10,14 +10,14 @@ import work_counters;
 
 import std;
 import dictionary;
-type Error = blot_error::Error;
+type Error = squid_error::Error;
 struct Range { start: i64 = 0, len: i64 = 0 }
 struct State {
     store_owner_id: u64,
     store_use_closed_rows: bool = true,
-    store_closed_rows: blot_check_types::ClosedRow[4] = [blot_check_types::ClosedRow {..}; 4],
+    store_closed_rows: squid_check_types::ClosedRow[4] = [squid_check_types::ClosedRow {..}; 4],
     store_use_operation_rows: bool = true,
-    store_operation_rows: blot_check_types::OperationRow[64] = [blot_check_types::OperationRow {..}; 64],
+    store_operation_rows: squid_check_types::OperationRow[64] = [squid_check_types::OperationRow {..}; 64],
     store_has_usage_types: bool = false,
     store_has_rank_types: bool = false,
     store_next_rigid_scope: u32 = 1,
@@ -35,7 +35,7 @@ struct State {
     store_closed_effect_physical_epoch: u64 = 0,
     store_mutation_epoch: u64 = 0,
     store_occurs_steps: u64 = 0,
-    store_normalization: blot_work_counters::Normalization = blot_work_counters::Normalization {..},
+    store_normalization: squid_work_counters::Normalization = squid_work_counters::Normalization {..},
     store_resolution_steps: u64 = 0,
     store_occurs_generation: u32 = 0,
     store_use_resolution_cache: bool = true,
@@ -64,26 +64,26 @@ struct State {
     effects_resolved_count: i64,
 }
 struct Snapshot { state: State, lease_index: u32 = 0, generation: u64 = 0,
-    store_nodes: const blot_check_types::Node[:] = default<const blot_check_types::Node[:]>(),
+    store_nodes: const squid_check_types::Node[:] = default<const squid_check_types::Node[:]>(),
     store_extra: const u32[:] = default<const u32[:]>(),
-    store_variables: const blot_check_types::Variable[:] = default<const blot_check_types::Variable[:]>(),
-    store_versions: const blot_check_types::Version[:] = default<const blot_check_types::Version[:]>(),
-    store_operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
-    store_operation_links: const blot_check_types::OperationLink[:] = default<const blot_check_types::OperationLink[:]>(),
+    store_variables: const squid_check_types::Variable[:] = default<const squid_check_types::Variable[:]>(),
+    store_versions: const squid_check_types::Version[:] = default<const squid_check_types::Version[:]>(),
+    store_operations: const squid_check_types::Operation[:] = default<const squid_check_types::Operation[:]>(),
+    store_operation_links: const squid_check_types::OperationLink[:] = default<const squid_check_types::OperationLink[:]>(),
     store_occurs_seen: const u32[:] = default<const u32[:]>(),
-    store_closed_row_index: const blot_check_types::RowCertificate[:] = default<const blot_check_types::RowCertificate[:]>(),
-    store_closed_operation_index: const blot_check_types::RowCertificate[:] = default<const blot_check_types::RowCertificate[:]>(),
+    store_closed_row_index: const squid_check_types::RowCertificate[:] = default<const squid_check_types::RowCertificate[:]>(),
+    store_closed_operation_index: const squid_check_types::RowCertificate[:] = default<const squid_check_types::RowCertificate[:]>(),
     store_variable_views: const dictionary_slot<u64, u32>[:] = default<const dictionary_slot<u64, u32>[:]>(),
     store_associated_equations: const dictionary_slot<u32, u32>[:] = default<const dictionary_slot<u32, u32>[:]>(),
-    store_projection_resolutions: const dictionary_slot<blot_check_types::ProjectionResolution, u32>[:] = default<const dictionary_slot<blot_check_types::ProjectionResolution, u32>[:]>(),
-    store_operation_chains: const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>[:] = default<const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>[:]>(),
-    effects_rows: const blot_check_effects::Row[:] = default<const blot_check_effects::Row[:]>(),
+    store_projection_resolutions: const dictionary_slot<squid_check_types::ProjectionResolution, u32>[:] = default<const dictionary_slot<squid_check_types::ProjectionResolution, u32>[:]>(),
+    store_operation_chains: const dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>[:] = default<const dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>[:]>(),
+    effects_rows: const squid_check_effects::Row[:] = default<const squid_check_effects::Row[:]>(),
     effects_labels: const u32[:] = default<const u32[:]>(),
-    effects_variables: const blot_check_effects::Variable[:] = default<const blot_check_effects::Variable[:]>(),
-    effects_versions: const blot_check_effects::Version[:] = default<const blot_check_effects::Version[:]>(),
+    effects_variables: const squid_check_effects::Variable[:] = default<const squid_check_effects::Variable[:]>(),
+    effects_versions: const squid_check_effects::Version[:] = default<const squid_check_effects::Version[:]>(),
     effects_resolved: const dictionary_slot<u32, u32>[:] = default<const dictionary_slot<u32, u32>[:]>(),
-    resolved_entries: const blot_reuse_epoch_resolution_cache::Entry[:] = default<const blot_reuse_epoch_resolution_cache::Entry[:]>(),
-    composites_entries: const blot_reuse_composite_resolution_cache::Entry[:] = default<const blot_reuse_composite_resolution_cache::Entry[:]>(),
+    resolved_entries: const squid_reuse_epoch_resolution_cache::Entry[:] = default<const squid_reuse_epoch_resolution_cache::Entry[:]>(),
+    composites_entries: const squid_reuse_composite_resolution_cache::Entry[:] = default<const squid_reuse_composite_resolution_cache::Entry[:]>(),
 }
 struct Lease { live: bool = false, generation: u64 = 0,
     store_nodes: Range = Range {..},
@@ -109,26 +109,26 @@ struct Lease { live: bool = false, generation: u64 = 0,
 }
 reusable var leases: Lease[>..] = [];
 var next_generation: u64 = 1;
-reusable[] var pool_store_nodes: blot_check_types::Node[>..] = [];
+reusable[] var pool_store_nodes: squid_check_types::Node[>..] = [];
 reusable[] var pool_store_extra: u32[>..] = [];
-reusable[] var pool_store_variables: blot_check_types::Variable[>..] = [];
-reusable[] var pool_store_versions: blot_check_types::Version[>..] = [];
-reusable[] var pool_store_operations: blot_check_types::Operation[>..] = [];
-reusable[] var pool_store_operation_links: blot_check_types::OperationLink[>..] = [];
+reusable[] var pool_store_variables: squid_check_types::Variable[>..] = [];
+reusable[] var pool_store_versions: squid_check_types::Version[>..] = [];
+reusable[] var pool_store_operations: squid_check_types::Operation[>..] = [];
+reusable[] var pool_store_operation_links: squid_check_types::OperationLink[>..] = [];
 reusable[] var pool_store_occurs_seen: u32[>..] = [];
-reusable[] var pool_store_closed_row_index: blot_check_types::RowCertificate[>..] = [];
-reusable[] var pool_store_closed_operation_index: blot_check_types::RowCertificate[>..] = [];
+reusable[] var pool_store_closed_row_index: squid_check_types::RowCertificate[>..] = [];
+reusable[] var pool_store_closed_operation_index: squid_check_types::RowCertificate[>..] = [];
 reusable[] var pool_store_variable_views: dictionary_slot<u64, u32>[>..] = [];
 reusable[] var pool_store_associated_equations: dictionary_slot<u32, u32>[>..] = [];
-reusable[] var pool_store_projection_resolutions: dictionary_slot<blot_check_types::ProjectionResolution, u32>[>..] = [];
-reusable[] var pool_store_operation_chains: dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>[>..] = [];
-reusable[] var pool_effects_rows: blot_check_effects::Row[>..] = [];
+reusable[] var pool_store_projection_resolutions: dictionary_slot<squid_check_types::ProjectionResolution, u32>[>..] = [];
+reusable[] var pool_store_operation_chains: dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>[>..] = [];
+reusable[] var pool_effects_rows: squid_check_effects::Row[>..] = [];
 reusable[] var pool_effects_labels: u32[>..] = [];
-reusable[] var pool_effects_variables: blot_check_effects::Variable[>..] = [];
-reusable[] var pool_effects_versions: blot_check_effects::Version[>..] = [];
+reusable[] var pool_effects_variables: squid_check_effects::Variable[>..] = [];
+reusable[] var pool_effects_versions: squid_check_effects::Version[>..] = [];
 reusable[] var pool_effects_resolved: dictionary_slot<u32, u32>[>..] = [];
-reusable[] var pool_resolved_entries: blot_reuse_epoch_resolution_cache::Entry[>..] = [];
-reusable[] var pool_composites_entries: blot_reuse_composite_resolution_cache::Entry[>..] = [];
+reusable[] var pool_resolved_entries: squid_reuse_epoch_resolution_cache::Entry[>..] = [];
+reusable[] var pool_composites_entries: squid_reuse_composite_resolution_cache::Entry[>..] = [];
 // Reborrow the live lease's exact runs; this does not acquire another owner.
 fn canonicalSnapshot(source: Snapshot) -> Snapshot {
     assert(source.lease_index != 0 && source.lease_index <= leases.len);
@@ -144,7 +144,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_nodes.len == 0);
         } else {
             let owned = pool_store_nodes[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_nodes, owned));
+            assert(squid_support::same_slice_identity(source.store_nodes, owned));
             result.store_nodes = owned;
         }
     }
@@ -156,7 +156,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_extra.len == 0);
         } else {
             let owned = pool_store_extra[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_extra, owned));
+            assert(squid_support::same_slice_identity(source.store_extra, owned));
             result.store_extra = owned;
         }
     }
@@ -168,7 +168,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_variables.len == 0);
         } else {
             let owned = pool_store_variables[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_variables, owned));
+            assert(squid_support::same_slice_identity(source.store_variables, owned));
             result.store_variables = owned;
         }
     }
@@ -180,7 +180,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_versions.len == 0);
         } else {
             let owned = pool_store_versions[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_versions, owned));
+            assert(squid_support::same_slice_identity(source.store_versions, owned));
             result.store_versions = owned;
         }
     }
@@ -192,7 +192,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_operations.len == 0);
         } else {
             let owned = pool_store_operations[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_operations, owned));
+            assert(squid_support::same_slice_identity(source.store_operations, owned));
             result.store_operations = owned;
         }
     }
@@ -204,7 +204,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_operation_links.len == 0);
         } else {
             let owned = pool_store_operation_links[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_operation_links, owned));
+            assert(squid_support::same_slice_identity(source.store_operation_links, owned));
             result.store_operation_links = owned;
         }
     }
@@ -216,7 +216,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_occurs_seen.len == 0);
         } else {
             let owned = pool_store_occurs_seen[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_occurs_seen, owned));
+            assert(squid_support::same_slice_identity(source.store_occurs_seen, owned));
             result.store_occurs_seen = owned;
         }
     }
@@ -228,7 +228,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_closed_row_index.len == 0);
         } else {
             let owned = pool_store_closed_row_index[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_closed_row_index, owned));
+            assert(squid_support::same_slice_identity(source.store_closed_row_index, owned));
             result.store_closed_row_index = owned;
         }
     }
@@ -240,7 +240,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_closed_operation_index.len == 0);
         } else {
             let owned = pool_store_closed_operation_index[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_closed_operation_index, owned));
+            assert(squid_support::same_slice_identity(source.store_closed_operation_index, owned));
             result.store_closed_operation_index = owned;
         }
     }
@@ -252,7 +252,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_variable_views.len == 0);
         } else {
             let owned = pool_store_variable_views[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_variable_views, owned));
+            assert(squid_support::same_slice_identity(source.store_variable_views, owned));
             result.store_variable_views = owned;
         }
     }
@@ -264,7 +264,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_associated_equations.len == 0);
         } else {
             let owned = pool_store_associated_equations[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_associated_equations, owned));
+            assert(squid_support::same_slice_identity(source.store_associated_equations, owned));
             result.store_associated_equations = owned;
         }
     }
@@ -276,7 +276,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_projection_resolutions.len == 0);
         } else {
             let owned = pool_store_projection_resolutions[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_projection_resolutions, owned));
+            assert(squid_support::same_slice_identity(source.store_projection_resolutions, owned));
             result.store_projection_resolutions = owned;
         }
     }
@@ -288,7 +288,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.store_operation_chains.len == 0);
         } else {
             let owned = pool_store_operation_chains[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_operation_chains, owned));
+            assert(squid_support::same_slice_identity(source.store_operation_chains, owned));
             result.store_operation_chains = owned;
         }
     }
@@ -300,7 +300,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.effects_rows.len == 0);
         } else {
             let owned = pool_effects_rows[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.effects_rows, owned));
+            assert(squid_support::same_slice_identity(source.effects_rows, owned));
             result.effects_rows = owned;
         }
     }
@@ -312,7 +312,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.effects_labels.len == 0);
         } else {
             let owned = pool_effects_labels[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.effects_labels, owned));
+            assert(squid_support::same_slice_identity(source.effects_labels, owned));
             result.effects_labels = owned;
         }
     }
@@ -324,7 +324,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.effects_variables.len == 0);
         } else {
             let owned = pool_effects_variables[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.effects_variables, owned));
+            assert(squid_support::same_slice_identity(source.effects_variables, owned));
             result.effects_variables = owned;
         }
     }
@@ -336,7 +336,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.effects_versions.len == 0);
         } else {
             let owned = pool_effects_versions[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.effects_versions, owned));
+            assert(squid_support::same_slice_identity(source.effects_versions, owned));
             result.effects_versions = owned;
         }
     }
@@ -348,7 +348,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.effects_resolved.len == 0);
         } else {
             let owned = pool_effects_resolved[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.effects_resolved, owned));
+            assert(squid_support::same_slice_identity(source.effects_resolved, owned));
             result.effects_resolved = owned;
         }
     }
@@ -360,7 +360,7 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.resolved_entries.len == 0);
         } else {
             let owned = pool_resolved_entries[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.resolved_entries, owned));
+            assert(squid_support::same_slice_identity(source.resolved_entries, owned));
             result.resolved_entries = owned;
         }
     }
@@ -372,16 +372,16 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             assert(source.composites_entries.len == 0);
         } else {
             let owned = pool_composites_entries[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.composites_entries, owned));
+            assert(squid_support::same_slice_identity(source.composites_entries, owned));
             result.composites_entries = owned;
         }
     }
     return result;
 }
 
-fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
-    if !blot_check_types::valid(store) || store.owner_id == 0 { return Snapshot {..}, blot_error::Error.invalid_artifact; }
-    if store.owner_id == 0 || next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), blot_error::Error.type_limit; }
+fn suspendStore(store: squid_check_types::Store&) -> Snapshot, Error {
+    if !squid_check_types::valid(store) || store.owner_id == 0 { return Snapshot {..}, squid_error::Error.invalid_artifact; }
+    if store.owner_id == 0 || next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), squid_error::Error.type_limit; }
     var result = Snapshot { state: State {
         store_owner_id: store.owner_id,
         store_use_closed_rows: store.use_closed_rows,
@@ -436,7 +436,7 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.nodes.len != 0 {
         let run = pool_store_nodes.alloc_slice(store.nodes.len);
         for value, index in store.nodes.items { run[index] = value; }
-        let first: const blot_check_types::Node&  = run[0];
+        let first: const squid_check_types::Node&  = run[0];
         lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len , ..}; result.store_nodes = run;
     }
     if store.extra.len != 0 {
@@ -448,25 +448,25 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.variables.len != 0 {
         let run = pool_store_variables.alloc_slice(store.variables.len);
         for value, index in store.variables.items { run[index] = value; }
-        let first: const blot_check_types::Variable&  = run[0];
+        let first: const squid_check_types::Variable&  = run[0];
         lease.store_variables = Range { pool_store_variables.index_of(first), run.len , ..}; result.store_variables = run;
     }
     if store.versions.len != 0 {
         let run = pool_store_versions.alloc_slice(store.versions.len);
         for value, index in store.versions.items { run[index] = value; }
-        let first: const blot_check_types::Version&  = run[0];
+        let first: const squid_check_types::Version&  = run[0];
         lease.store_versions = Range { pool_store_versions.index_of(first), run.len , ..}; result.store_versions = run;
     }
     if store.operations.len != 0 {
         let run = pool_store_operations.alloc_slice(store.operations.len);
         for value, index in store.operations.items { run[index] = value; }
-        let first: const blot_check_types::Operation&  = run[0];
+        let first: const squid_check_types::Operation&  = run[0];
         lease.store_operations = Range { pool_store_operations.index_of(first), run.len , ..}; result.store_operations = run;
     }
     if store.operation_links.len != 0 {
         let run = pool_store_operation_links.alloc_slice(store.operation_links.len);
         for value, index in store.operation_links.items { run[index] = value; }
-        let first: const blot_check_types::OperationLink&  = run[0];
+        let first: const squid_check_types::OperationLink&  = run[0];
         lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
     }
     if store.occurs_seen.len != 0 {
@@ -478,13 +478,13 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.closed_row_index.len != 0 {
         let run = pool_store_closed_row_index.alloc_slice(store.closed_row_index.len);
         for value, index in store.closed_row_index.items { run[index] = value; }
-        let first: const blot_check_types::RowCertificate&  = run[0];
+        let first: const squid_check_types::RowCertificate&  = run[0];
         lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len , ..}; result.store_closed_row_index = run;
     }
     if store.closed_operation_index.len != 0 {
         let run = pool_store_closed_operation_index.alloc_slice(store.closed_operation_index.len);
         for value, index in store.closed_operation_index.items { run[index] = value; }
-        let first: const blot_check_types::RowCertificate&  = run[0];
+        let first: const squid_check_types::RowCertificate&  = run[0];
         lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len , ..}; result.store_closed_operation_index = run;
     }
     if store.variable_views.slots.len != 0 {
@@ -502,19 +502,19 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.projection_resolutions.slots.len != 0 {
         let run = pool_store_projection_resolutions.alloc_slice(store.projection_resolutions.slots.len);
         for value, index in store.projection_resolutions.slots { run[index] = value; }
-        let first: const dictionary_slot<blot_check_types::ProjectionResolution, u32>&  = run[0];
+        let first: const dictionary_slot<squid_check_types::ProjectionResolution, u32>&  = run[0];
         lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len , ..}; result.store_projection_resolutions = run;
     }
     if store.operation_chains.slots.len != 0 {
         let run = pool_store_operation_chains.alloc_slice(store.operation_chains.slots.len);
         for value, index in store.operation_chains.slots { run[index] = value; }
-        let first: const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>&  = run[0];
+        let first: const dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>&  = run[0];
         lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len , ..}; result.store_operation_chains = run;
     }
     if store.effects.rows.len != 0 {
         let run = pool_effects_rows.alloc_slice(store.effects.rows.len);
         for value, index in store.effects.rows.items { run[index] = value; }
-        let first: const blot_check_effects::Row&  = run[0];
+        let first: const squid_check_effects::Row&  = run[0];
         lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len , ..}; result.effects_rows = run;
     }
     if store.effects.labels.len != 0 {
@@ -526,13 +526,13 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.effects.variables.len != 0 {
         let run = pool_effects_variables.alloc_slice(store.effects.variables.len);
         for value, index in store.effects.variables.items { run[index] = value; }
-        let first: const blot_check_effects::Variable&  = run[0];
+        let first: const squid_check_effects::Variable&  = run[0];
         lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len , ..}; result.effects_variables = run;
     }
     if store.effects.versions.len != 0 {
         let run = pool_effects_versions.alloc_slice(store.effects.versions.len);
         for value, index in store.effects.versions.items { run[index] = value; }
-        let first: const blot_check_effects::Version&  = run[0];
+        let first: const squid_check_effects::Version&  = run[0];
         lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len , ..}; result.effects_versions = run;
     }
     if store.effects.resolved.slots.len != 0 {
@@ -544,13 +544,13 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if store.resolved.entries.len != 0 {
         let run = pool_resolved_entries.alloc_slice(store.resolved.entries.len);
         for value, index in store.resolved.entries.items { run[index] = value; }
-        let first: const blot_reuse_epoch_resolution_cache::Entry&  = run[0];
+        let first: const squid_reuse_epoch_resolution_cache::Entry&  = run[0];
         lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len , ..}; result.resolved_entries = run;
     }
     if store.composites.entries.len != 0 {
         let run = pool_composites_entries.alloc_slice(store.composites.entries.len);
         for value, index in store.composites.entries.items { run[index] = value; }
-        let first: const blot_reuse_composite_resolution_cache::Entry&  = run[0];
+        let first: const squid_reuse_composite_resolution_cache::Entry&  = run[0];
         lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len , ..}; result.composites_entries = run;
     }
     let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation;
@@ -579,30 +579,30 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     store.effects.resolved.count = 0;
     store.resolved.entries.clear();
     store.composites.entries.clear();
-    store.owner_id = 0; return result, blot_error::Error.none;
+    store.owner_id = 0; return result, squid_error::Error.none;
 }
-fn restoreStore(snapshot: Snapshot&, store: blot_check_types::Store&) -> Error {
-    if !blot_check_types::valid(store) { return blot_error::Error.invalid_artifact; }
-    if snapshot.lease_index == 0 || snapshot.lease_index > leases.len { return blot_error::Error.invalid_artifact; }
-    let lease = leases[snapshot.lease_index - 1]; if !lease.live || lease.generation != snapshot.generation { return blot_error::Error.invalid_artifact; }
-    let error = store.nodes.restore(snapshot.store_nodes); if error != blot_error::Error.none { return error; }
-    let error = store.extra.restore(snapshot.store_extra); if error != blot_error::Error.none { return error; }
-    let error = store.variables.restore(snapshot.store_variables); if error != blot_error::Error.none { return error; }
-    let error = store.versions.restore(snapshot.store_versions); if error != blot_error::Error.none { return error; }
-    let error = store.operations.restore(snapshot.store_operations); if error != blot_error::Error.none { return error; }
-    let error = store.operation_links.restore(snapshot.store_operation_links); if error != blot_error::Error.none { return error; }
-    let error = store.occurs_seen.restore(snapshot.store_occurs_seen); if error != blot_error::Error.none { return error; }
-    let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != blot_error::Error.none { return error; }
-    let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != blot_error::Error.none { return error; }
-    let error = store.variable_views.restore(snapshot.store_variable_views, snapshot.state.store_variable_views_count); if error != blot_error::Error.none { return error; }
-    let error = store.associated_equations.restore(snapshot.store_associated_equations, snapshot.state.store_associated_equations_count); if error != blot_error::Error.none { return error; }
-    let error = store.projection_resolutions.restore(snapshot.store_projection_resolutions, snapshot.state.store_projection_resolutions_count); if error != blot_error::Error.none { return error; }
-    let error = store.operation_chains.restore(snapshot.store_operation_chains, snapshot.state.store_operation_chains_count); if error != blot_error::Error.none { return error; }
-    let error = store.effects.rows.restore(snapshot.effects_rows); if error != blot_error::Error.none { return error; }
-    let error = store.effects.labels.restore(snapshot.effects_labels); if error != blot_error::Error.none { return error; }
-    let error = store.effects.variables.restore(snapshot.effects_variables); if error != blot_error::Error.none { return error; }
-    let error = store.effects.versions.restore(snapshot.effects_versions); if error != blot_error::Error.none { return error; }
-    let error = store.effects.resolved.restore(snapshot.effects_resolved, snapshot.state.effects_resolved_count); if error != blot_error::Error.none { return error; }
+fn restoreStore(snapshot: Snapshot&, store: squid_check_types::Store&) -> Error {
+    if !squid_check_types::valid(store) { return squid_error::Error.invalid_artifact; }
+    if snapshot.lease_index == 0 || snapshot.lease_index > leases.len { return squid_error::Error.invalid_artifact; }
+    let lease = leases[snapshot.lease_index - 1]; if !lease.live || lease.generation != snapshot.generation { return squid_error::Error.invalid_artifact; }
+    let error = store.nodes.restore(snapshot.store_nodes); if error != squid_error::Error.none { return error; }
+    let error = store.extra.restore(snapshot.store_extra); if error != squid_error::Error.none { return error; }
+    let error = store.variables.restore(snapshot.store_variables); if error != squid_error::Error.none { return error; }
+    let error = store.versions.restore(snapshot.store_versions); if error != squid_error::Error.none { return error; }
+    let error = store.operations.restore(snapshot.store_operations); if error != squid_error::Error.none { return error; }
+    let error = store.operation_links.restore(snapshot.store_operation_links); if error != squid_error::Error.none { return error; }
+    let error = store.occurs_seen.restore(snapshot.store_occurs_seen); if error != squid_error::Error.none { return error; }
+    let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != squid_error::Error.none { return error; }
+    let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != squid_error::Error.none { return error; }
+    let error = store.variable_views.restore(snapshot.store_variable_views, snapshot.state.store_variable_views_count); if error != squid_error::Error.none { return error; }
+    let error = store.associated_equations.restore(snapshot.store_associated_equations, snapshot.state.store_associated_equations_count); if error != squid_error::Error.none { return error; }
+    let error = store.projection_resolutions.restore(snapshot.store_projection_resolutions, snapshot.state.store_projection_resolutions_count); if error != squid_error::Error.none { return error; }
+    let error = store.operation_chains.restore(snapshot.store_operation_chains, snapshot.state.store_operation_chains_count); if error != squid_error::Error.none { return error; }
+    let error = store.effects.rows.restore(snapshot.effects_rows); if error != squid_error::Error.none { return error; }
+    let error = store.effects.labels.restore(snapshot.effects_labels); if error != squid_error::Error.none { return error; }
+    let error = store.effects.variables.restore(snapshot.effects_variables); if error != squid_error::Error.none { return error; }
+    let error = store.effects.versions.restore(snapshot.effects_versions); if error != squid_error::Error.none { return error; }
+    let error = store.effects.resolved.restore(snapshot.effects_resolved, snapshot.state.effects_resolved_count); if error != squid_error::Error.none { return error; }
     store.resolved.entries.restore(snapshot.resolved_entries);
     store.composites.entries.restore(snapshot.composites_entries);
     store.owner_id = snapshot.state.store_owner_id;
@@ -652,9 +652,9 @@ fn restoreStore(snapshot: Snapshot&, store: blot_check_types::Store&) -> Error {
     return deinit(snapshot);
 }
 fn deinit(snapshot: Snapshot&) -> Error {
-    if snapshot.lease_index == 0 { return blot_error::Error.none; }
-    if snapshot.lease_index > leases.len { return blot_error::Error.invalid_artifact; } let index = snapshot.lease_index - 1; let lease = leases[index];
-    if !lease.live || lease.generation != snapshot.generation { return blot_error::Error.invalid_artifact; } leases[index].live = false;
+    if snapshot.lease_index == 0 { return squid_error::Error.none; }
+    if snapshot.lease_index > leases.len { return squid_error::Error.invalid_artifact; } let index = snapshot.lease_index - 1; let lease = leases[index];
+    if !lease.live || lease.generation != snapshot.generation { return squid_error::Error.invalid_artifact; } leases[index].live = false;
     if lease.store_nodes.len != 0 { pool_store_nodes.free_slice(pool_store_nodes[lease.store_nodes.start..lease.store_nodes.start + lease.store_nodes.len]); }
     if lease.store_extra.len != 0 { pool_store_extra.free_slice(pool_store_extra[lease.store_extra.start..lease.store_extra.start + lease.store_extra.len]); }
     if lease.store_variables.len != 0 { pool_store_variables.free_slice(pool_store_variables[lease.store_variables.start..lease.store_variables.start + lease.store_variables.len]); }
@@ -676,37 +676,37 @@ fn deinit(snapshot: Snapshot&) -> Error {
     if lease.resolved_entries.len != 0 { pool_resolved_entries.free_slice(pool_resolved_entries[lease.resolved_entries.start..lease.resolved_entries.start + lease.resolved_entries.len]); }
     if lease.composites_entries.len != 0 { pool_composites_entries.free_slice(pool_composites_entries[lease.composites_entries.start..lease.composites_entries.start + lease.composites_entries.len]); }
     leases.free(index); snapshot.lease_index = 0; snapshot.generation = 0;
-    snapshot.store_nodes = default<const blot_check_types::Node[:]>();
+    snapshot.store_nodes = default<const squid_check_types::Node[:]>();
     snapshot.store_extra = default<const u32[:]>();
-    snapshot.store_variables = default<const blot_check_types::Variable[:]>();
-    snapshot.store_versions = default<const blot_check_types::Version[:]>();
-    snapshot.store_operations = default<const blot_check_types::Operation[:]>();
-    snapshot.store_operation_links = default<const blot_check_types::OperationLink[:]>();
+    snapshot.store_variables = default<const squid_check_types::Variable[:]>();
+    snapshot.store_versions = default<const squid_check_types::Version[:]>();
+    snapshot.store_operations = default<const squid_check_types::Operation[:]>();
+    snapshot.store_operation_links = default<const squid_check_types::OperationLink[:]>();
     snapshot.store_occurs_seen = default<const u32[:]>();
-    snapshot.store_closed_row_index = default<const blot_check_types::RowCertificate[:]>();
-    snapshot.store_closed_operation_index = default<const blot_check_types::RowCertificate[:]>();
+    snapshot.store_closed_row_index = default<const squid_check_types::RowCertificate[:]>();
+    snapshot.store_closed_operation_index = default<const squid_check_types::RowCertificate[:]>();
     snapshot.store_variable_views = default<const dictionary_slot<u64, u32>[:]>();
     snapshot.store_associated_equations = default<const dictionary_slot<u32, u32>[:]>();
-    snapshot.store_projection_resolutions = default<const dictionary_slot<blot_check_types::ProjectionResolution, u32>[:]>();
-    snapshot.store_operation_chains = default<const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>[:]>();
-    snapshot.effects_rows = default<const blot_check_effects::Row[:]>();
+    snapshot.store_projection_resolutions = default<const dictionary_slot<squid_check_types::ProjectionResolution, u32>[:]>();
+    snapshot.store_operation_chains = default<const dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>[:]>();
+    snapshot.effects_rows = default<const squid_check_effects::Row[:]>();
     snapshot.effects_labels = default<const u32[:]>();
-    snapshot.effects_variables = default<const blot_check_effects::Variable[:]>();
-    snapshot.effects_versions = default<const blot_check_effects::Version[:]>();
+    snapshot.effects_variables = default<const squid_check_effects::Variable[:]>();
+    snapshot.effects_versions = default<const squid_check_effects::Version[:]>();
     snapshot.effects_resolved = default<const dictionary_slot<u32, u32>[:]>();
-    snapshot.resolved_entries = default<const blot_reuse_epoch_resolution_cache::Entry[:]>();
-    snapshot.composites_entries = default<const blot_reuse_composite_resolution_cache::Entry[:]>();
-    return blot_error::Error.none;
+    snapshot.resolved_entries = default<const squid_reuse_epoch_resolution_cache::Entry[:]>();
+    snapshot.composites_entries = default<const squid_reuse_composite_resolution_cache::Entry[:]>();
+    return squid_error::Error.none;
 }
 fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
-    if source.lease_index == 0 || source.lease_index > leases.len { return default<Snapshot>(), blot_error::Error.invalid_artifact; }
-    let owned = leases[source.lease_index - 1]; if !owned.live || owned.generation != source.generation { return default<Snapshot>(), blot_error::Error.invalid_artifact; }
-    if next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), blot_error::Error.type_limit; }
+    if source.lease_index == 0 || source.lease_index > leases.len { return default<Snapshot>(), squid_error::Error.invalid_artifact; }
+    let owned = leases[source.lease_index - 1]; if !owned.live || owned.generation != source.generation { return default<Snapshot>(), squid_error::Error.invalid_artifact; }
+    if next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), squid_error::Error.type_limit; }
     let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..}; var result = Snapshot { state: source.state , ..};
     if source.store_nodes.len != 0 {
         let run = pool_store_nodes.alloc_slice(source.store_nodes.len);
         for value, index in source.store_nodes { run[index] = value; }
-        let first: const blot_check_types::Node&  = run[0];
+        let first: const squid_check_types::Node&  = run[0];
         lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len , ..}; result.store_nodes = run;
     }
     if source.store_extra.len != 0 {
@@ -718,25 +718,25 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.store_variables.len != 0 {
         let run = pool_store_variables.alloc_slice(source.store_variables.len);
         for value, index in source.store_variables { run[index] = value; }
-        let first: const blot_check_types::Variable&  = run[0];
+        let first: const squid_check_types::Variable&  = run[0];
         lease.store_variables = Range { pool_store_variables.index_of(first), run.len , ..}; result.store_variables = run;
     }
     if source.store_versions.len != 0 {
         let run = pool_store_versions.alloc_slice(source.store_versions.len);
         for value, index in source.store_versions { run[index] = value; }
-        let first: const blot_check_types::Version&  = run[0];
+        let first: const squid_check_types::Version&  = run[0];
         lease.store_versions = Range { pool_store_versions.index_of(first), run.len , ..}; result.store_versions = run;
     }
     if source.store_operations.len != 0 {
         let run = pool_store_operations.alloc_slice(source.store_operations.len);
         for value, index in source.store_operations { run[index] = value; }
-        let first: const blot_check_types::Operation&  = run[0];
+        let first: const squid_check_types::Operation&  = run[0];
         lease.store_operations = Range { pool_store_operations.index_of(first), run.len , ..}; result.store_operations = run;
     }
     if source.store_operation_links.len != 0 {
         let run = pool_store_operation_links.alloc_slice(source.store_operation_links.len);
         for value, index in source.store_operation_links { run[index] = value; }
-        let first: const blot_check_types::OperationLink&  = run[0];
+        let first: const squid_check_types::OperationLink&  = run[0];
         lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
     }
     if source.store_occurs_seen.len != 0 {
@@ -748,13 +748,13 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.store_closed_row_index.len != 0 {
         let run = pool_store_closed_row_index.alloc_slice(source.store_closed_row_index.len);
         for value, index in source.store_closed_row_index { run[index] = value; }
-        let first: const blot_check_types::RowCertificate&  = run[0];
+        let first: const squid_check_types::RowCertificate&  = run[0];
         lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len , ..}; result.store_closed_row_index = run;
     }
     if source.store_closed_operation_index.len != 0 {
         let run = pool_store_closed_operation_index.alloc_slice(source.store_closed_operation_index.len);
         for value, index in source.store_closed_operation_index { run[index] = value; }
-        let first: const blot_check_types::RowCertificate&  = run[0];
+        let first: const squid_check_types::RowCertificate&  = run[0];
         lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len , ..}; result.store_closed_operation_index = run;
     }
     if source.store_variable_views.len != 0 {
@@ -772,19 +772,19 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.store_projection_resolutions.len != 0 {
         let run = pool_store_projection_resolutions.alloc_slice(source.store_projection_resolutions.len);
         for value, index in source.store_projection_resolutions { run[index] = value; }
-        let first: const dictionary_slot<blot_check_types::ProjectionResolution, u32>&  = run[0];
+        let first: const dictionary_slot<squid_check_types::ProjectionResolution, u32>&  = run[0];
         lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len , ..}; result.store_projection_resolutions = run;
     }
     if source.store_operation_chains.len != 0 {
         let run = pool_store_operation_chains.alloc_slice(source.store_operation_chains.len);
         for value, index in source.store_operation_chains { run[index] = value; }
-        let first: const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>&  = run[0];
+        let first: const dictionary_slot<squid_check_types::OperationKey, squid_check_types::OperationChain>&  = run[0];
         lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len , ..}; result.store_operation_chains = run;
     }
     if source.effects_rows.len != 0 {
         let run = pool_effects_rows.alloc_slice(source.effects_rows.len);
         for value, index in source.effects_rows { run[index] = value; }
-        let first: const blot_check_effects::Row&  = run[0];
+        let first: const squid_check_effects::Row&  = run[0];
         lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len , ..}; result.effects_rows = run;
     }
     if source.effects_labels.len != 0 {
@@ -796,13 +796,13 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.effects_variables.len != 0 {
         let run = pool_effects_variables.alloc_slice(source.effects_variables.len);
         for value, index in source.effects_variables { run[index] = value; }
-        let first: const blot_check_effects::Variable&  = run[0];
+        let first: const squid_check_effects::Variable&  = run[0];
         lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len , ..}; result.effects_variables = run;
     }
     if source.effects_versions.len != 0 {
         let run = pool_effects_versions.alloc_slice(source.effects_versions.len);
         for value, index in source.effects_versions { run[index] = value; }
-        let first: const blot_check_effects::Version&  = run[0];
+        let first: const squid_check_effects::Version&  = run[0];
         lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len , ..}; result.effects_versions = run;
     }
     if source.effects_resolved.len != 0 {
@@ -814,16 +814,16 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.resolved_entries.len != 0 {
         let run = pool_resolved_entries.alloc_slice(source.resolved_entries.len);
         for value, index in source.resolved_entries { run[index] = value; }
-        let first: const blot_reuse_epoch_resolution_cache::Entry&  = run[0];
+        let first: const squid_reuse_epoch_resolution_cache::Entry&  = run[0];
         lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len , ..}; result.resolved_entries = run;
     }
     if source.composites_entries.len != 0 {
         let run = pool_composites_entries.alloc_slice(source.composites_entries.len);
         for value, index in source.composites_entries { run[index] = value; }
-        let first: const blot_reuse_composite_resolution_cache::Entry&  = run[0];
+        let first: const squid_reuse_composite_resolution_cache::Entry&  = run[0];
         lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len , ..}; result.composites_entries = run;
     }
-    let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation; return result, blot_error::Error.none;
+    let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation; return result, squid_error::Error.none;
 }
 // Packed C.2 typed-run footprints; state and lease metadata are separate.
 fn snapshotOwnedBytes(snapshot: const Snapshot&) -> i64 {

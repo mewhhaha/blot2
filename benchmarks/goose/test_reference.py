@@ -47,7 +47,7 @@ class ReferenceTests(unittest.TestCase):
                     )
 
     def test_binary32_pbm_padding_and_retained_warmups(self):
-        # Cross-checked against the explicit F32 Goose control and executed Blot.
+        # Cross-checked against the explicit F32 Goose control and executed Squid.
         rows = [
             ((1, 1), 1, 0, 234277983),
             ((7, 5), 2, 1, 1948218797),

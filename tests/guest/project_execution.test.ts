@@ -1,7 +1,7 @@
 import { instantiateGuest } from "../../host/guest.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const buildDir = new URL("../../build", import.meta.url).pathname;
 function equal(actual: unknown, expected: unknown): void {
   if (!Object.is(actual, expected)) {
@@ -19,11 +19,11 @@ async function project(
   });
   try {
     for (const [name, text] of Object.entries(files)) {
-      await Deno.writeTextFile(`${dir}/${name}.blot`, text);
+      await Deno.writeTextFile(`${dir}/${name}.sq`, text);
     }
     const output = `${dir}/program.wasm`;
     const built = await new Deno.Command(compiler, {
-      args: ["build-project", `${dir}/main.blot`, output, ...(options.prelude ? ["--prelude", options.prelude] : [])],
+      args: ["build-project", `${dir}/main.sq`, output, ...(options.prelude ? ["--prelude", options.prelude] : [])],
       stdout: "piped",
       stderr: "piped",
     }).output();
@@ -150,7 +150,7 @@ const answer = 42
     } finally {
       guest.dispose();
     }
-  }, { prelude: new URL("../../std/prelude.blot", import.meta.url).pathname });
+  }, { prelude: new URL("../../std/prelude.sq", import.meta.url).pathname });
 });
 
 Deno.test("project aliases preserve producer identities", async () => {

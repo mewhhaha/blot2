@@ -8,13 +8,13 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const executable = resolve(
-  Deno.args[0] ?? `${root}/compiler-goose/build/blotc-goose`,
+  Deno.args[0] ?? `${root}/compiler-goose/build/squidc-goose`,
 );
 const ink = resolve(Deno.args[1] ?? `${root}/../ink`);
 const output = resolve(Deno.args[2] ?? `${root}/build/bench/ink-acceptance`);
 assert(Deno.args.length <= 3);
 await Deno.mkdir(output, { recursive: true });
-const entry = `${ink}/tests/app-hooks.blot`;
+const entry = `${ink}/tests/app-hooks.sq`;
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) =>
     x.toString(16).padStart(2, "0")
@@ -26,7 +26,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
     entry,
     imports: { "ink/": `${ink}/lib/` },
     stdRoot: `${root}/std/`,
-    prelude: `${root}/std/prelude.blot`,
+    prelude: `${root}/std/prelude.sq`,
   });
   try {
     const built = await compiler.build();

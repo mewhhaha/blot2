@@ -1,7 +1,7 @@
 // An image and its scalar relocations belong to the same committed Core revision.
 // Fixed-width constant edits patch bytes in place; single-unit body edits replay
 // only the changed bodies against the retained direct-backend state when sound.
-namespace blot_reuse_body_image;
+namespace squid_reuse_body_image;
 import check.core;
 import check.types;
 import check.wire_schema;
@@ -20,21 +20,21 @@ import support.error;
 import support.option;
 import compile;
 
-type Core=blot_check_core::Module;
-type Prepared=blot_reuse_partial_dependency::Prepared;
-type Emission=blot_reuse_partial_dependency::Result;
+type Core=squid_check_core::Module;
+type Prepared=squid_reuse_partial_dependency::Prepared;
+type Emission=squid_reuse_partial_dependency::Result;
 
 struct LayoutReceipt {
     valid:bool=false,
-    non_staged:blot_check_wire_schema::NonStagedReceipt=blot_check_wire_schema::NonStagedReceipt{},
+    non_staged:squid_check_wire_schema::NonStagedReceipt=squid_check_wire_schema::NonStagedReceipt{},
     staged_dep_units_valid:bool=false,
     staged_dep_units:u32[:]=default<u32[:]>(),
     staged_value_digest:u64=0,
     kernel_dep_units:u32[:]=default<u32[:]>(),
 }
 fn deinitLayoutReceipt(receipt:LayoutReceipt&) {
-    blot_reuse_dependency_consumer::freeU32s(receipt.staged_dep_units);
-    blot_reuse_dependency_consumer::freeU32s(receipt.kernel_dep_units);
+    squid_reuse_dependency_consumer::freeU32s(receipt.staged_dep_units);
+    squid_reuse_dependency_consumer::freeU32s(receipt.kernel_dep_units);
     receipt=LayoutReceipt{};
 }
 fn canSkipWireSchema(prev_receipt:const LayoutReceipt&,prev_core:const Prepared&,next:const Prepared&)->bool {
@@ -64,9 +64,9 @@ fn canSkipWireSchema(prev_receipt:const LayoutReceipt&,prev_core:const Prepared&
     }
     return true;
 }
-fn canReuseReceipt(prev:const LayoutReceipt&,cur:blot_check_wire_schema::NonStagedReceipt,next:const Prepared&)->bool {
+fn canReuseReceipt(prev:const LayoutReceipt&,cur:squid_check_wire_schema::NonStagedReceipt,next:const Prepared&)->bool {
     if !prev.valid { return false; }
-    if !blot_check_wire_schema::sameNonStagedReceipt(prev.non_staged,cur) { return false; }
+    if !squid_check_wire_schema::sameNonStagedReceipt(prev.non_staged,cur) { return false; }
     if cur.kernel_staging_sites_count!=0 {
         if !prev.staged_dep_units_valid { return false; }
         for u in prev.staged_dep_units {
@@ -77,7 +77,7 @@ fn canReuseReceipt(prev:const LayoutReceipt&,cur:blot_check_wire_schema::NonStag
 }
 
 struct Image {
-    layout:blot_direct_relocations::Snapshot=blot_direct_relocations::Snapshot{},
+    layout:squid_direct_relocations::Snapshot=squid_direct_relocations::Snapshot{},
     bytes:u8[:]=default<u8[:]>(),
     functions:i64=0,
     sparks_vectorized:i64=0,
@@ -86,7 +86,7 @@ struct Image {
 }
 fn deinit(image:Image&) {
     image.layout.deinit();
-    blot_reuse_dependency_consumer::freeBytes(image.bytes);
+    squid_reuse_dependency_consumer::freeBytes(image.bytes);
     deinitLayoutReceipt(image.receipt);
     image=Image{};
 }
@@ -95,14 +95,14 @@ struct Replay {
     valid:bool=false,
     used:bool=false,
     needs_reset:bool=false,
-    types:blot_direct_types::Types&,
-    module:blot_direct_writer::Module&,
-    state:blot_direct_emit::State&
+    types:squid_direct_types::Types&,
+    module:squid_direct_writer::Module&,
+    state:squid_direct_emit::State&
 }
 
 fn encode(out:u8[>..<]&,opcode:u8,value:u32)->bool {
-    if opcode==blot_direct_writer::OP_i32_const { blot_direct_writer::sleb(out,value as! i32); return true; }
-    if opcode==blot_direct_writer::OP_f32_const { blot_direct_writer::word(out,value); return true; }
+    if opcode==squid_direct_writer::OP_i32_const { squid_direct_writer::sleb(out,value as! i32); return true; }
+    if opcode==squid_direct_writer::OP_f32_const { squid_direct_writer::word(out,value); return true; }
     return false;
 }
 
@@ -120,19 +120,19 @@ fn isSafeF32Relocation(old_bits:u32,new_bits:u32)->bool {
 
 fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&)->u8[:],i64 {
     if image.bytes.len==0 || previous.entry!=next.entry || previous.units.len!=next.units.len { return default<u8[:]>(),-1; }
-    var changed=blot_direct_map::U64Map{};
+    var changed=squid_direct_map::U64Map{};
     for unit,i in next.units {
         if next.borrowed[i] { continue; }
         let old .= previous.units[i];
-        if previous.paths[i]!=next.paths[i] || !blot_reuse_body_shape::same_check_core_Module(old,unit) { return default<u8[:]>(),-1; }
+        if previous.paths[i]!=next.paths[i] || !squid_reuse_body_shape::same_check_core_Module(old,unit) { return default<u8[:]>(),-1; }
         for node,id in unit.nodes {
-            if node.tag==blot_check_core::Tag.constant && node.a!=old.nodes[id].a {
-                if node.ty==blot_check_types::f32_type && !isSafeF32Relocation(old.nodes[id].a,node.a) { return default<u8[:]>(),-1; }
+            if node.tag==squid_check_core::Tag.constant && node.a!=old.nodes[id].a {
+                if node.ty==squid_check_types::f32_type && !isSafeF32Relocation(old.nodes[id].a,node.a) { return default<u8[:]>(),-1; }
                 changed.put(((unit.unit as u64)<<32) | id as u32,0);
             }
         }
     }
-    if changed.count==0 { return blot_reuse_dependency_consumer::ownBytes(image.bytes),0; }
+    if changed.count==0 { return squid_reuse_dependency_consumer::ownBytes(image.bytes),0; }
     var edits:u32[>..<]=[];
     var old_bytes:u8[>..<]=[];
     var new_bytes:u8[>..<]=[];
@@ -145,7 +145,7 @@ fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,rep
         let opcode=image.bytes[site.offset];
         let old_val=previous.units[site.unit-1].nodes[site.node].a;
         let new_val=next.units[site.unit-1].nodes[site.node].a;
-        if opcode==blot_direct_writer::OP_f32_const && !isSafeF32Relocation(old_val,new_val) { return default<u8[:]>(),-1; }
+        if opcode==squid_direct_writer::OP_f32_const && !isSafeF32Relocation(old_val,new_val) { return default<u8[:]>(),-1; }
         old_bytes.clear();new_bytes.clear();
         if !encode(old_bytes,opcode,old_val) { return default<u8[:]>(),-1; }
         let encoded=encode(new_bytes,opcode,new_val);
@@ -155,7 +155,7 @@ fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,rep
         if count==0 { covered++;changed.put(key,1); }
     }
     if covered!=changed.count { return default<u8[:]>(),-1; }
-    let out=blot_reuse_dependency_consumer::ownBytes(image.bytes);
+    let out=squid_reuse_dependency_consumer::ownBytes(image.bytes);
     for i in edits {
         let site=image.layout.sites[i];
         new_bytes.clear();
@@ -183,25 +183,25 @@ fn relocate(image:const Image&,previous:const Prepared&,next:const Prepared&,rep
 // --- Structural per-body replay -----------------------------------------
 
 fn sameUnit(a:const Core&,b:const Core&)->bool {
-    if !blot_reuse_body_shape::same_check_core_Module(a,b) { return false; }
+    if !squid_reuse_body_shape::same_check_core_Module(a,b) { return false; }
     for n,i in a.nodes {
-        if n.tag==blot_check_core::Tag.constant && n.a!=b.nodes[i].a { return false; }
+        if n.tag==squid_check_core::Tag.constant && n.a!=b.nodes[i].a { return false; }
     }
     return true;
 }
 
-fn resolveRef(units:const Core[:],m:const Core&,target:blot_check_core::BindingRef)->blot_check_core::BindingRef {
-    var current=blot_check_core::BindingRef{target.unit,target.binding};
+fn resolveRef(units:const Core[:],m:const Core&,target:squid_check_core::BindingRef)->squid_check_core::BindingRef {
+    var current=squid_check_core::BindingRef{target.unit,target.binding};
     if current.unit==0 { current.unit=m.unit; }
     for step in 0..64 {
         if current.unit==0 || current.unit>units.len { return current; }
         let u .= units[current.unit-1];
         if current.binding>=u.bindings.len { return current; }
         let b=u.bindings[current.binding];
-        if b.kind!=blot_reuse_principal_interface::Kind.external { return current; }
+        if b.kind!=squid_reuse_principal_interface::Kind.external { return current; }
         var nu=b.target.unit;
         if nu==0 { nu=current.unit; }
-        current=blot_check_core::BindingRef{nu,b.target.binding};
+        current=squid_check_core::BindingRef{nu,b.target.binding};
     }
     return current;
 }
@@ -213,13 +213,13 @@ fn sameImporter(old:const Core[:],updated:const Core[:],i:i64,edit:u32)->bool {
     for x,at in a.bindings {
         var y=b.bindings[at];
         if x.target!=y.target {
-            if x.kind!=blot_reuse_principal_interface::Kind.external || y.kind!=x.kind { return false; }
+            if x.kind!=squid_reuse_principal_interface::Kind.external || y.kind!=x.kind { return false; }
             let left=resolveRef(old,a,x.target);
             let right=resolveRef(updated,b,y.target);
             if left!=right || left.unit==edit || left.unit==a.unit || left.unit==0 { return false; }
             y.target=x.target;
         }
-        if !blot_reuse_body_shape::same_check_core_Binding(x,y) { return false; }
+        if !squid_reuse_body_shape::same_check_core_Binding(x,y) { return false; }
     }
     b.bindings=a.bindings;
     return sameUnit(a,b);
@@ -268,15 +268,15 @@ fn sameProjection(a:const Core&,pa_id:u32,b:const Core&,pb_id:u32)->bool {
     let pa=a.projection(pa_id);
     let pb=b.projection(pb_id);
     if pa.nominal!=pb.nominal || pa.variants.len!=pb.variants.len { return false; }
-    if !blot_check_core::sameCoreType(a,pa.source_type,b,pb.source_type,0) || !blot_check_core::sameCoreType(a,pa.result_type,b,pb.result_type,0) { return false; }
+    if !squid_check_core::sameCoreType(a,pa.source_type,b,pb.source_type,0) || !squid_check_core::sameCoreType(a,pa.result_type,b,pb.result_type,0) { return false; }
     if pa.field!=0 || pb.field!=0 {
-        if !blot_check_core::sameFieldSymbol(a,pa.field,b,pb.field) { return false; }
+        if !squid_check_core::sameFieldSymbol(a,pa.field,b,pb.field) { return false; }
     }
     let va=a.projectionVariants(pa_id);
     let vb=b.projectionVariants(pb_id);
     if va.len!=vb.len { return false; }
     for i in 0..va.len {
-        if va[i].tag!=vb[i].tag || !blot_check_core::sameFieldSymbol(a,va[i].field,b,vb[i].field) { return false; }
+        if va[i].tag!=vb[i].tag || !squid_check_core::sameFieldSymbol(a,va[i].field,b,vb[i].field) { return false; }
     }
     return true;
 }
@@ -287,14 +287,14 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
     let na=a.node(ia);
     let nb=b.node(ib);
     if na.tag!=nb.tag || na.op!=nb.op { return false; }
-    if !blot_check_core::sameCoreType(a,na.ty,b,nb.ty,0) { return false; }
+    if !squid_check_core::sameCoreType(a,na.ty,b,nb.ty,0) { return false; }
     match na.tag {
         constant=>{ return na.a==nb.a && na.b==nb.b && na.c==nb.c; },
         reference=>{
             let ra=a.references[na.a];
             let rb=b.references[nb.a];
-            let local_a=(ra.unit==0 || ra.unit==a.unit) && a.bindings[ra.binding].kind!=blot_reuse_principal_interface::Kind.global && a.bindings[ra.binding].kind!=blot_reuse_principal_interface::Kind.external;
-            let local_b=(rb.unit==0 || rb.unit==b.unit) && b.bindings[rb.binding].kind!=blot_reuse_principal_interface::Kind.global && b.bindings[rb.binding].kind!=blot_reuse_principal_interface::Kind.external;
+            let local_a=(ra.unit==0 || ra.unit==a.unit) && a.bindings[ra.binding].kind!=squid_reuse_principal_interface::Kind.global && a.bindings[ra.binding].kind!=squid_reuse_principal_interface::Kind.external;
+            let local_b=(rb.unit==0 || rb.unit==b.unit) && b.bindings[rb.binding].kind!=squid_reuse_principal_interface::Kind.global && b.bindings[rb.binding].kind!=squid_reuse_principal_interface::Kind.external;
             if local_a!=local_b { return false; }
             if local_a {
                 let mapped,ok=lookupLocal(locals,ra.binding);
@@ -303,7 +303,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             return resolveRef(old_units,a,ra)==resolveRef(new_units,b,rb);
         },
         scalar,logical,apply=>{
-            if na.tag==blot_check_core::Tag.scalar && na.c!=nb.c { return false; }
+            if na.tag==squid_check_core::Tag.scalar && na.c!=nb.c { return false; }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
                    sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
         },
@@ -346,7 +346,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         block_,suite=>{
             let bmark=blocks.items.len;
-            if na.tag==blot_check_core::Tag.block_ { mapBind(blocks,ia,ib); }
+            if na.tag==squid_check_core::Tag.block_ { mapBind(blocks,ia,ib); }
             let ca=a.children(ia);
             let cb=b.children(ib);
             if ca.len!=cb.len { blocks.items.resize(bmark); return false; }
@@ -368,7 +368,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
                 if !ok || mapped!=nb.c-2 { return false; }
             } else if na.c!=nb.c { return false; }
             if !sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1) { return false; }
-            if !blot_check_core::sameCoreType(a,a.binding(na.a).ty,b,b.binding(nb.a).ty,0) { return false; }
+            if !squid_check_core::sameCoreType(a,a.binding(na.a).ty,b,b.binding(nb.a).ty,0) { return false; }
             mapBind(locals,na.a,nb.a);
             return true;
         },
@@ -390,7 +390,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             return ok && mapped==nb.b;
         },
         product,array,construct=>{
-            if na.tag==blot_check_core::Tag.construct {
+            if na.tag==squid_check_core::Tag.construct {
                 if na.a!=nb.a || na.c!=nb.c { return false; }
                 return sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
             }
@@ -435,10 +435,10 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             if sa.len!=sb.len { return false; }
             for i in 0..sa.len {
                 if sa[i].kind!=sb[i].kind { return false; }
-                if !blot_check_core::sameCoreType(a,sa[i].source_type,b,sb[i].source_type,0) || !blot_check_core::sameCoreType(a,sa[i].result_type,b,sb[i].result_type,0) { return false; }
-                if sa[i].kind==blot_check_core::UpdateKind.index {
+                if !squid_check_core::sameCoreType(a,sa[i].source_type,b,sb[i].source_type,0) || !squid_check_core::sameCoreType(a,sa[i].result_type,b,sb[i].result_type,0) { return false; }
+                if sa[i].kind==squid_check_core::UpdateKind.index {
                     if !sameCoreExpr(old_units,a,sa[i].index,new_units,b,sb[i].index,locals,blocks,depth+1) { return false; }
-                } else if sa[i].kind==blot_check_core::UpdateKind.comptime_field {
+                } else if sa[i].kind==squid_check_core::UpdateKind.comptime_field {
                     let binder,found=lookupLocal(locals,sa[i].projection);
                     if !found || binder!=sb[i].projection { return false; }
                 } else {
@@ -455,7 +455,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             let ca=a.call(ia);
             let cb=b.call(ib);
             if resolveRef(old_units,a,ca.target)!=resolveRef(new_units,b,cb.target) { return false; }
-            if ca.own!=cb.own || !blot_check_core::sameCoreType(a,ca.callee_type,b,cb.callee_type,0) { return false; }
+            if ca.own!=cb.own || !squid_check_core::sameCoreType(a,ca.callee_type,b,cb.callee_type,0) { return false; }
             if ca.arguments.len!=cb.arguments.len { return false; }
             for i in 0..ca.arguments.len {
                 if !sameCoreExpr(old_units,a,ca.arguments[i],new_units,b,cb.arguments[i],locals,blocks,depth+1) { return false; }
@@ -489,14 +489,14 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         constructor_function,primitive_function=>{ return na.a==nb.a; },
         result_associated=>{
-            if !blot_check_core::sameFieldSymbol(a,na.b,b,nb.b) { return false; }
+            if !squid_check_core::sameFieldSymbol(a,na.b,b,nb.b) { return false; }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
         },
         closure=>{
             let ca=a.closure(ia);
             let cb=b.closure(ib);
             if ca.parameter.inferred!=cb.parameter.inferred { return false; }
-            if !blot_check_core::sameCoreType(a,ca.function_type,b,cb.function_type,0) || !blot_check_core::sameCoreType(a,ca.parameter.ty,b,cb.parameter.ty,0) { return false; }
+            if !squid_check_core::sameCoreType(a,ca.function_type,b,cb.function_type,0) || !squid_check_core::sameCoreType(a,ca.parameter.ty,b,cb.parameter.ty,0) { return false; }
             let caps_a=a.closureCaptures(ia);
             let caps_b=b.closureCaptures(ib);
             if caps_a.len!=caps_b.len { return false; }
@@ -603,7 +603,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
         },
         associated=>{
             if na.c!=0 || nb.c!=0 {
-                if !blot_check_core::sameFieldSymbol(a,na.c,b,nb.c) { return false; }
+                if !squid_check_core::sameFieldSymbol(a,na.c,b,nb.c) { return false; }
             }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
                    sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
@@ -617,25 +617,25 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             let oa=a.operationValue(ia);
             let ob=b.operationValue(ib);
             if oa.identity!=ob.identity || oa.instance!=ob.instance || oa.arguments.len!=ob.arguments.len { return false; }
-            if !blot_check_core::sameCoreType(a,oa.signature,b,ob.signature,0) || !blot_check_core::sameCoreType(a,oa.witness_result,b,ob.witness_result,0) { return false; }
+            if !squid_check_core::sameCoreType(a,oa.signature,b,ob.signature,0) || !squid_check_core::sameCoreType(a,oa.witness_result,b,ob.witness_result,0) { return false; }
             if !sameCoreExpr(old_units,a,oa.witness,new_units,b,ob.witness,locals,blocks,depth+1) { return false; }
             if !sameCoreExpr(old_units,a,oa.capability,new_units,b,ob.capability,locals,blocks,depth+1) { return false; }
             let aa=a.operationValueArguments(ia);
             let bb=b.operationValueArguments(ib);
-            for i in 0..aa.len { if !blot_check_core::sameCoreType(a,aa[i],b,bb[i],0) { return false; } }
+            for i in 0..aa.len { if !squid_check_core::sameCoreType(a,aa[i],b,bb[i],0) { return false; } }
             return true;
         },
         flat_op=>{
             if na.c!=nb.c { return false; }
-            if na.c==blot_check_core::flat_op_kernel_handle || na.c==blot_check_core::flat_op_process_handle { return na.a==nb.a; }
-            return blot_check_core::sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
+            if na.c==squid_check_core::flat_op_kernel_handle || na.c==squid_check_core::flat_op_process_handle { return na.a==nb.a; }
+            return squid_check_core::sameCoreType(a,na.b,b,nb.b,0) && sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
         },
         // Any complex or uncommon form conservatively marks the body as changed.
         _=>{ return false; },
     }
 }
 
-fn sameBodyShape(old_units:const Core[:],a:const Core&,ob:blot_check_core::Body,new_units:const Core[:],b:const Core&,nb:blot_check_core::Body)->bool {
+fn sameBodyShape(old_units:const Core[:],a:const Core&,ob:squid_check_core::Body,new_units:const Core[:],b:const Core&,nb:squid_check_core::Body)->bool {
     if ob.scheme.variables.len!=nb.scheme.variables.len || ob.scheme.obligations.len!=nb.scheme.obligations.len { return false; }
     var locals=LocalMap{};
     var blocks=LocalMap{};
@@ -664,31 +664,31 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     }
     for i in 0..a.constructors.len {
         let ca=a.constructors[i]; let cb=b.constructors[i];
-        if ca.tag!=cb.tag || ca.nominal!=cb.nominal || !blot_check_core::sameFieldSymbol(a,ca.name,b,cb.name) { return false; }
-        if !blot_check_core::sameCoreType(a,ca.payload,b,cb.payload,0) || !blot_check_core::sameCoreType(a,ca.scheme.root,b,cb.scheme.root,0) { return false; }
+        if ca.tag!=cb.tag || ca.nominal!=cb.nominal || !squid_check_core::sameFieldSymbol(a,ca.name,b,cb.name) { return false; }
+        if !squid_check_core::sameCoreType(a,ca.payload,b,cb.payload,0) || !squid_check_core::sameCoreType(a,ca.scheme.root,b,cb.scheme.root,0) { return false; }
     }
     for i in 0..a.associated.len {
         let aa=a.associated[i]; let ab=b.associated[i];
         if aa.identity!=ab.identity || aa.operator!=ab.operator || resolveRef(old_units,a,aa.target)!=resolveRef(new_units,b,ab.target) { return false; }
-        if (aa.member!=0 || ab.member!=0) && !blot_check_core::sameFieldSymbol(a,aa.member,b,ab.member) { return false; }
+        if (aa.member!=0 || ab.member!=0) && !squid_check_core::sameFieldSymbol(a,aa.member,b,ab.member) { return false; }
     }
     if a.primitives!=b.primitives || a.operation_names!=b.operation_names || a.type_tags!=b.type_tags || a.tag_calls!=b.tag_calls { return false; }
     if a.contracts.len!=0 && (a.contracts!=b.contracts || a.contract_members!=b.contract_members) { return false; }
-    if a.implementations.len!=0 && (!blot_reuse_body_shape::same___reuse_principal_interface_Implementation(a.implementations,b.implementations) || a.implementation_members!=b.implementation_members || a.member_templates!=b.member_templates) { return false; }
+    if a.implementations.len!=0 && (!squid_reuse_body_shape::same___reuse_principal_interface_Implementation(a.implementations,b.implementations) || a.implementation_members!=b.implementation_members || a.member_templates!=b.member_templates) { return false; }
 
     // Check every global binding keeps its ID, metadata and structural type.
     // External bindings can shift indices when an edited function adds/removes
     // locals before a lazily-imported callee; sameCoreExpr resolves through them.
     for ob,bi in a.bindings {
-        if ob.kind!=blot_reuse_principal_interface::Kind.global { continue; }
+        if ob.kind!=squid_reuse_principal_interface::Kind.global { continue; }
         if bi>=b.bindings.len { return false; }
         let nb=b.bindings[bi];
         if ob.kind!=nb.kind || ob.private!=nb.private || ob.body_id!=nb.body_id ||
            ob.capability_parameters!=nb.capability_parameters || ob.has_explicit!=nb.has_explicit { return false; }
-        if !(spliced && ob.ty==nb.ty) && !blot_check_core::sameCoreType(a,ob.ty,b,nb.ty,0) { return false; }
+        if !(spliced && ob.ty==nb.ty) && !squid_check_core::sameCoreType(a,ob.ty,b,nb.ty,0) { return false; }
     }
     for nb,bi in b.bindings {
-        if nb.kind!=blot_reuse_principal_interface::Kind.global { continue; }
+        if nb.kind!=squid_reuse_principal_interface::Kind.global { continue; }
         if bi>=a.bindings.len || a.bindings[bi].kind!=nb.kind { return false; }
     }
 
@@ -704,7 +704,7 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
         let pb=b.bodyParameters(nb);
         if pa.len!=pb.len { return false; }
         for pi in 0..pa.len {
-            if pa[pi].inferred!=pb[pi].inferred || !blot_check_core::sameCoreType(a,pa[pi].ty,b,pb[pi].ty,0) { return false; }
+            if pa[pi].inferred!=pb[pi].inferred || !squid_check_core::sameCoreType(a,pa[pi].ty,b,pb[pi].ty,0) { return false; }
         }
         if !sameBodyShape(old_units,a,ob,new_units,b,nb) {
             if ob.exported && !ob.is_function { return false; }
@@ -720,14 +720,14 @@ fn containsU32(list:const u32[:],value:u32)->bool {
     return false;
 }
 
-fn hasStagedUnit(sites:const blot_direct_relocations::Site[:],unit:u32)->bool {
+fn hasStagedUnit(sites:const squid_direct_relocations::Site[:],unit:u32)->bool {
     for site in sites {
         if site.offset==-1 && site.unit==unit { return true; }
     }
     return false;
 }
 
-fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&,out_bytes:u8[:]&,pending:blot_direct_relocations::Snapshot&)->bool {
+fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,replay:Replay&,out_bytes:u8[:]&,pending:squid_direct_relocations::Snapshot&)->bool {
     if !replay.valid || image.bytes.len==0 { return false; }
     if previous.entry!=next.entry || previous.units.len!=next.units.len { return false; }
     var differing:u32[>..<]=[];
@@ -763,7 +763,7 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     let instances=s.instances.len;
     let functions=w.functions.len;
     for eb in edited {
-        let _,was_inlined=s.inlined_callees.get(blot_direct_emit::key64(changed_unit,eb));
+        let _,was_inlined=s.inlined_callees.get(squid_direct_emit::key64(changed_unit,eb));
         if was_inlined { return false; }
     }
 
@@ -773,16 +773,16 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     for i in 0..functions { skip_fn.push(0); }
     for index in 0..instances {
         let item=s.instances[index];
-        if item.key.kind==blot_direct_emit::InstanceKind.named && item.key.unit==changed_unit && containsU32(edited[..],item.key.id) {
+        if item.key.kind==squid_direct_emit::InstanceKind.named && item.key.unit==changed_unit && containsU32(edited[..],item.key.id) {
             to_replay.push(index as u32);
             skip_fn[item.function-w.imports.len]=1;
         }
     }
     for index in 0..instances {
         let item=s.instances[index];
-        if item.key.kind==blot_direct_emit::InstanceKind.named { continue; }
+        if item.key.kind==squid_direct_emit::InstanceKind.named { continue; }
         if item.key.unit==changed_unit {
-            if item.key.kind==blot_direct_emit::InstanceKind.lambda && containsU32(to_replay[..],item.key.parent) { return false; }
+            if item.key.kind==squid_direct_emit::InstanceKind.lambda && containsU32(to_replay[..],item.key.parent) { return false; }
             if containsU32(edited[..],item.key.id) { return false; }
         }
     }
@@ -795,10 +795,10 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
         var drop_unit:u32=0;
         if old_m.nodes.len!=m.nodes.len { drop_unit=changed_unit; }
         var bytes:u8[>..<]=[];
-        blot_direct_relocations::beginReplay(image.layout.body_sites,skip_fn[..],drop_unit);
-        blot_direct_writer::assemble(w,bytes);
-        pending=blot_direct_relocations::finish();
-        out_bytes=blot_reuse_dependency_consumer::ownBytes(bytes[..]);
+        squid_direct_relocations::beginReplay(image.layout.body_sites,skip_fn[..],drop_unit);
+        squid_direct_writer::assemble(w,bytes);
+        pending=squid_direct_relocations::finish();
+        out_bytes=squid_reuse_dependency_consumer::ownBytes(bytes[..]);
         return true;
     }
 
@@ -814,83 +814,83 @@ fn replayEdits(image:const Image&,previous:const Prepared&,next:const Prepared&,
     let sections=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len];
     var drop_unit:u32=0;
     if old_m.nodes.len!=m.nodes.len { drop_unit=changed_unit; }
-    blot_direct_relocations::beginReplay(image.layout.body_sites,skip_fn[..],drop_unit);
+    squid_direct_relocations::beginReplay(image.layout.body_sites,skip_fn[..],drop_unit);
 
-    var g=blot_direct_emit::Generator{types:replay.types,module:w,s:s,units:next.units};
+    var g=squid_direct_emit::Generator{types:replay.types,module:w,s:s,units:next.units};
     for id in to_replay {
         let item=s.instances[id];
         let body .= m.body(item.key.id);
-        if !body { s.replaying=false; blot_direct_relocations::abortReplay(); return false; }
-        var env=blot_direct_types::Env{};
+        if !body { s.replaying=false; squid_direct_relocations::abortReplay(); return false; }
+        var env=squid_direct_types::Env{};
         g.types.match_(m,m.binding(item.key.id).ty,item.key.ty,env);
-        if blot_direct_emit::solveObligationsPublic(g,m,body.scheme.obligations,env)!=blot_direct_types::Error.none {
-            s.replaying=false; blot_direct_relocations::abortReplay(); return false;
+        if squid_direct_emit::solveObligationsPublic(g,m,body.scheme.obligations,env)!=squid_direct_types::Error.none {
+            s.replaying=false; squid_direct_relocations::abortReplay(); return false;
         }
         s.instances[id].env=env;
         s.instances[id].inferring=item.was_inferred;
-        let err=blot_direct_function::emitInstance(g,id);
+        let err=squid_direct_function::emitInstance(g,id);
         s.instances[id].inferring=false;
-        if err!=blot_direct_types::Error.none || s.instances[id].result!=item.result {
-            s.replaying=false; blot_direct_relocations::abortReplay(); return false;
+        if err!=squid_direct_types::Error.none || s.instances[id].result!=item.result {
+            s.replaying=false; squid_direct_relocations::abortReplay(); return false;
         }
     }
     s.replaying=false;
     if s.has_failure || s.failures.len!=0 || !s.dep_match {
-        blot_direct_relocations::abortReplay();
+        squid_direct_relocations::abortReplay();
         return false;
     }
     if instances!=s.instances.len || functions!=w.functions.len ||
        sections!=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len] {
-        blot_direct_relocations::abortReplay();
+        squid_direct_relocations::abortReplay();
         return false;
     }
     var bytes:u8[>..<]=[];
-    blot_direct_writer::assemble(w,bytes);
-    pending=blot_direct_relocations::finish();
+    squid_direct_writer::assemble(w,bytes);
+    pending=squid_direct_relocations::finish();
     if hasStagedUnit(pending.sites,changed_unit) {
         pending.deinit();
         return false;
     }
-    out_bytes=blot_reuse_dependency_consumer::ownBytes(bytes[..]);
+    out_bytes=squid_reuse_dependency_consumer::ownBytes(bytes[..]);
     replay.valid=true;
     return true;
 }
 
-fn finishTracked(prepared:const Prepared&,replay:Replay&,built:blot_direct::Result,bytes:const u8[:],message:const u8[:])->Emission,blot_error::Error {
-    var compiled=blot_reuse_dependency_consumer::Compiled{};
+fn finishTracked(prepared:const Prepared&,replay:Replay&,built:squid_direct::Result,bytes:const u8[:],message:const u8[:])->Emission,squid_error::Error {
+    var compiled=squid_reuse_dependency_consumer::Compiled{};
     if built.failed {
-        compiled=blot_reuse_dependency_consumer::Compiled{
+        compiled=squid_reuse_dependency_consumer::Compiled{
             failed:true,
-            diagnostic:blot_compile::Diagnostic{unit:built.unit,span:built.span,code:built.code},
-            message:blot_reuse_dependency_consumer::ownBytes(message),
+            diagnostic:squid_compile::Diagnostic{unit:built.unit,span:built.span,code:built.code},
+            message:squid_reuse_dependency_consumer::ownBytes(message),
             emitted_functions:built.emitted_functions,..
         };
     } else {
-        compiled=blot_reuse_dependency_consumer::Compiled{
-            bytes:blot_reuse_dependency_consumer::ownBytes(bytes),
+        compiled=squid_reuse_dependency_consumer::Compiled{
+            bytes:squid_reuse_dependency_consumer::ownBytes(bytes),
             emitted_functions:built.emitted_functions,
             sparks_vectorized:built.sparks_vectorized,
             sparks_scalar_fallback:built.sparks_scalar_fallback,
             staged_dep_units_valid:built.staged_dep_units_valid,
-            staged_dep_units:blot_reuse_dependency_consumer::ownU32s(replay.state.staged_dep_units[..]),
+            staged_dep_units:squid_reuse_dependency_consumer::ownU32s(replay.state.staged_dep_units[..]),
             staged_value_digest:built.staged_value_digest,..
         };
         replay.valid=true;
     }
     var result=Emission{
-        result:blot_reuse_dependency_consumer::Result{compiled:compiled,stats:prepared.stats,..},
+        result:squid_reuse_dependency_consumer::Result{compiled:compiled,stats:prepared.stats,..},
         source_bytes:prepared.source_bytes,
         fresh_modules:prepared.units.len-prepared.cachedCount(),
         cached_modules:prepared.cachedCount()
     };
     if compiled.failed {
         let unit=compiled.diagnostic.unit;
-        if unit==0 || unit>prepared.paths.len { result.deinit(); return Emission{},blot_error::Error.invalid_unit; }
-        result.diagnostic_filename=blot_support::some(blot_reuse_partial_dependency::copyResultBytes(prepared.paths[unit-1]));
+        if unit==0 || unit>prepared.paths.len { result.deinit(); return Emission{},squid_error::Error.invalid_unit; }
+        result.diagnostic_filename=squid_support::some(squid_reuse_partial_dependency::copyResultBytes(prepared.paths[unit-1]));
     }
-    return result,blot_error::Error.none;
+    return result,squid_error::Error.none;
 }
-fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emission,blot_error::Error {
+fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emission,squid_error::Error {
     assert(!replay.used);
     replay.used=true;
     replay.valid=false;
@@ -898,10 +898,10 @@ fn emitTracked(prepared:const Prepared&,replay:Replay&,build_inputs:i64)->Emissi
     replay.types.units=rooted_units;
     var bytes:u8[>..<]=[];
     var message:u8[>..<]=[];
-    let built=blot_direct::compileTracked(rooted_units,prepared.entry,replay.types,replay.module,replay.state,bytes,message,build_inputs);
+    let built=squid_direct::compileTracked(rooted_units,prepared.entry,replay.types,replay.module,replay.state,bytes,message,build_inputs);
     return finishTracked(prepared,replay,built,bytes[..],message[..]);
 }
-fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const blot_check_wire_schema::ProgramInfo&,build_inputs:i64)->Emission,blot_error::Error {
+fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const squid_check_wire_schema::ProgramInfo&,build_inputs:i64)->Emission,squid_error::Error {
     assert(!replay.used);
     replay.used=true;
     replay.valid=false;
@@ -909,6 +909,6 @@ fn emitTrackedWithAnalysis(prepared:const Prepared&,replay:Replay&,pinfo:const b
     replay.types.units=rooted_units;
     var bytes:u8[>..<]=[];
     var message:u8[>..<]=[];
-    let built=blot_direct::compileTrackedWithAnalysis(rooted_units,prepared.entry,replay.types,replay.module,replay.state,pinfo,bytes,message,build_inputs);
+    let built=squid_direct::compileTrackedWithAnalysis(rooted_units,prepared.entry,replay.types,replay.module,replay.state,pinfo,bytes,message,build_inputs);
     return finishTracked(prepared,replay,built,bytes[..],message[..]);
 }

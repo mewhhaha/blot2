@@ -1,4 +1,4 @@
-name: Publish Blot compiler
+name: Publish Squid compiler
 
 on:
   push:
@@ -30,13 +30,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p bundle
-          install -m 755 compiler-goose/build/blotc-goose bundle/blotc
+          install -m 755 compiler-goose/build/squidc-goose bundle/squidc
           cp -R std LICENSE bundle/
           printf '%s\n' "$GITHUB_SHA" > bundle/source-commit
-          archive="blot-${GITHUB_REF_NAME#v}-ubuntu-24.04-x86_64.tar.gz"
+          archive="squid-${GITHUB_REF_NAME#v}-ubuntu-24.04-x86_64.tar.gz"
           tar -czf "$archive" -C bundle .
           sha256sum "$archive" > "$archive.sha256"
           gh release create "$GITHUB_REF_NAME" --verify-tag \
-            --title "Blot ${GITHUB_REF_NAME#v}" \
-            --notes 'Native compiler and matching standard library for Ubuntu 24.04 x86_64. Extract the archive and run `./blotc --help`.' \
+            --title "Squid ${GITHUB_REF_NAME#v}" \
+            --notes 'Native compiler and matching standard library for Ubuntu 24.04 x86_64. Extract the archive and run `./squidc --help`.' \
             "$archive" "$archive.sha256"

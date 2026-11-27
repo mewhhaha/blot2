@@ -111,7 +111,7 @@ async function sourceFiles(root: string): Promise<string[]> {
       "--others",
       "--exclude-standard",
       "--",
-      "*.blot",
+      "*.sq",
     ],
     cwd: root,
     stdout: "piped",
@@ -124,7 +124,7 @@ async function sourceFiles(root: string): Promise<string[]> {
   for (
     const path of new Set(new TextDecoder().decode(command.stdout).split("\0"))
   ) {
-    if (!path.endsWith(".blot")) continue;
+    if (!path.endsWith(".sq")) continue;
     try {
       if ((await Deno.stat(resolve(root, path))).isFile) files.push(path);
     } catch (error) {
@@ -161,7 +161,7 @@ export async function auditProject(options: Options) {
     return name === "" || name === "." ? "" : name;
   });
   const selected = paths.includes("") ? files : selectPaths(files, paths);
-  if (!selected.length) throw new Error("No Blot sources selected");
+  if (!selected.length) throw new Error("No Squid sources selected");
   const expectations = options.expectations ?? {};
   for (const [file, expected] of Object.entries(expectations)) {
     if (!expected.reason?.trim() || !expected.code) {
@@ -187,7 +187,7 @@ export async function auditProject(options: Options) {
     dirname(fileURLToPath(import.meta.url)),
     "../..",
   );
-  const entry = resolve(project, ".migration-frontend-audit.blot");
+  const entry = resolve(project, ".migration-frontend-audit.sq");
   const imports = Object.fromEntries(
     Object.entries(settings.imports ?? {}).map((
       [prefix, path],
@@ -203,9 +203,9 @@ export async function auditProject(options: Options) {
   );
   const compiler = await createZigProjectCompiler({
     executable: options.compiler ??
-      resolve(compilerRoot, "compiler-goose/build/blotc-goose-dev"),
+      resolve(compilerRoot, "compiler-goose/build/squidc-goose-dev"),
     entry,
-    prelude: resolve(stdRoot, "prelude.blot"),
+    prelude: resolve(stdRoot, "prelude.sq"),
     stdRoot,
     imports,
     nativeAssets: settings.nativeAssets

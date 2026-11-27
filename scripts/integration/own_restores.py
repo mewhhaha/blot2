@@ -3,7 +3,7 @@
 Usage: python3 scripts/integration/own_restores.py FILE...   (paths under ../gdev)
 
 Each restore helper now takes what it restores with `own` and returns it
-(ink/lib/persist.blot). A call that stood as a statement on fields of the
+(ink/lib/persist.sq). A call that stood as a statement on fields of the
 world becomes a call whose results are put back:
 
   persist.restore_resource C I access.x S V O

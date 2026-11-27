@@ -14,18 +14,18 @@ ROOT = Path(__file__).resolve().parents[1] / 'src'
 
 def repair_payload_identity(source):
     return re.subn(r'\brun\.values\s*\.==\s*values\b',
-                   'blot_support::same_slice_identity(run.values,values)', source)
+                   'squid_support::same_slice_identity(run.values,values)', source)
 
 
 # A shallow Named copy may only publish proof-header leaves already registered
 # to this exact unique owner. Recover their globally rooted canonical runs;
 # copying them again would duplicate the preceding proof-header snapshot.
 PROOF_HEADER_RECEIPT = """// Proof headers already copied into this owner retain their exact registered runs.
-fn canonicalProofHeader(self_:const Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned {
- return blot_check_numeric_proof_headers::Owned{arity:value.arity,value_slots:self_.mutable(value.value_slots),proof_slots:self_.mutable(value.proof_slots),values:self_.mutable(value.values),operands:self_.mutable(value.operands),requirements:self_.mutable(value.requirements),result:value.result};
+fn canonicalProofHeader(self_:const Owner&,value:squid_check_numeric_proof_headers::Owned)->squid_check_numeric_proof_headers::Owned {
+ return squid_check_numeric_proof_headers::Owned{arity:value.arity,value_slots:self_.mutable(value.value_slots),proof_slots:self_.mutable(value.proof_slots),values:self_.mutable(value.values),operands:self_.mutable(value.operands),requirements:self_.mutable(value.requirements),result:value.result};
 }
 fn copyElement<T>(self_:Owner&,value:T)->T {return value;}
-fn copyElement(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named {return blot_check_numeric_proof_headers::Named{value.binding,self_.canonicalProofHeader(value.header)};}
+fn copyElement(self_:Owner&,value:squid_check_numeric_proof_headers::Named)->squid_check_numeric_proof_headers::Named {return squid_check_numeric_proof_headers::Named{value.binding,self_.canonicalProofHeader(value.header)};}
 
 """
 
@@ -34,7 +34,7 @@ def repair_payload_copy_receipt(source):
         return source,0
     if 'fn canonicalProofHeader(' in source:
         raise ValueError('proof header receipt diverged; review before regeneration')
-    source=source.replace('for value,index in values {result[index]=value;}return result,blot_error::Error.none;', 'for value,index in values {result[index]=copyElement(self_,value);}return result,blot_error::Error.none;',1)
+    source=source.replace('for value,index in values {result[index]=value;}return result,squid_error::Error.none;', 'for value,index in values {result[index]=copyElement(self_,value);}return result,squid_error::Error.none;',1)
     return source+'\n'+PROOF_HEADER_RECEIPT,1
 
 
@@ -83,15 +83,15 @@ def repair_codec_const_options(source):
     lines = []
     for line in source.splitlines(keepends=True):
         if re.match(r'fn (?:describe|write|read|release)____const_', line):
-            match = re.search(r'blot_support::Option<(?!const )([^<>]+\[:\])>', line)
+            match = re.search(r'squid_support::Option<(?!const )([^<>]+\[:\])>', line)
             if match:
                 child = match[1]
-                line = line.replace('blot_support::Option<' + child + '>',
-                                    'blot_support::Option<const ' + child + '>')
-                line = line.replace('blot_support::none<' + child + '>',
-                                    'blot_support::none<const ' + child + '>')
-                line = line.replace('blot_support::some(value)',
-                                    'blot_support::some<const ' + child + '>(value)')
+                line = line.replace('squid_support::Option<' + child + '>',
+                                    'squid_support::Option<const ' + child + '>')
+                line = line.replace('squid_support::none<' + child + '>',
+                                    'squid_support::none<const ' + child + '>')
+                line = line.replace('squid_support::some(value)',
+                                    'squid_support::some<const ' + child + '>(value)')
                 count += 1
         lines.append(line)
     source=''.join(lines)
@@ -102,7 +102,7 @@ def repair_codec_const_options(source):
         nonlocal count
         wanted=samples.get(match[1])
         old=match[2]
-        if wanted and wanted.startswith('blot_support::Option<const ') and old==wanted.replace('<const ','<',1):
+        if wanted and wanted.startswith('squid_support::Option<const ') and old==wanted.replace('<const ','<',1):
             count+=1
             return match[1]+'(hasher,default<'+wanted+'>())'
         return match[0]
@@ -111,10 +111,10 @@ def repair_codec_const_options(source):
     # The wire flag, native child schema and rollback order are unchanged.
     typed = []
     for line in source.splitlines(keepends=True):
-        result = re.match(r'fn read_\w+<O>\(reader:Decoder<O>&,level:i64\)->(blot_support::Option<.+>),Error \{', line)
+        result = re.match(r'fn read_\w+<O>\(reader:Decoder<O>&,level:i64\)->(squid_support::Option<.+>),Error \{', line)
         if result:
-            line, changed = re.subn(r'return blot_support::some(?:<[^;\n]+>)?\(value\),blot_error::Error.none;',
-                                   lambda match: 'return ' + result[1] + '{true,value},blot_error::Error.none;', line)
+            line, changed = re.subn(r'return squid_support::some(?:<[^;\n]+>)?\(value\),squid_error::Error.none;',
+                                   lambda match: 'return ' + result[1] + '{true,value},squid_error::Error.none;', line)
             count += changed
         typed.append(line)
     return ''.join(typed),count

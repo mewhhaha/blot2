@@ -1,6 +1,6 @@
-# `bddicken/languages` Suite: Blot vs Goose, C, C++ & Rust
+# `bddicken/languages` Suite: Squid vs Goose, C, C++ & Rust
 
-Side-by-side results on all four workloads from [`bddicken/languages`](https://github.com/bddicken/languages), running Blot (`blotc-goose` + `wtime-aot 0.1.7`, x64-v4) against the unmodified official upstream C (`clang -O3`), C++ (`clang++ -O3 -march=native`), Rust (`cargo build --release`), and Goose (`clang -O3`) implementations on the same AMD Ryzen 7 7800X3D host.
+Side-by-side results on all four workloads from [`bddicken/languages`](https://github.com/bddicken/languages), running Squid (`squidc-goose` + `wtime-aot 0.1.7`, x64-v4) against the unmodified official upstream C (`clang -O3`), C++ (`clang++ -O3 -march=native`), Rust (`cargo build --release`), and Goose (`clang -O3`) implementations on the same AMD Ryzen 7 7800X3D host.
 
 ![bddicken/languages benchmark results](../evidence/measurements/2026-11-26-bddicken/bddicken_chart.svg)
 

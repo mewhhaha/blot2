@@ -8,7 +8,7 @@
   session developing gdev against the `b822ccf` compiler; PLAN: Hill 5 / solver
   hot paths. Sources: that session's report, [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -34,7 +34,7 @@ the inference cost on gdev literal edits.
 A public shape reproduces the growth: a module whose global record holds N
 closures performing an unhandled effect operation, with N helpers each binding
 that record and invoking one closure, checks in 22 ms at N = 40, 272 ms at 120
-and 3.8 s at 300 (`blotc check` on 11 October 2026, after `86db5b1`).
+and 3.8 s at 300 (`squidc check` on 11 October 2026, after `86db5b1`).
 
 ## Implementation checklist
 

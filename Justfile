@@ -13,13 +13,13 @@ test:
   deno task test
 
 guide:
-  deno task blot guide
+  deno task squid guide
 
-compile source="examples/prelude.blot" output="build/example.wasm":
-  deno task blot build {{quote(source)}} {{quote(output)}}
+compile source="examples/prelude.sq" output="build/example.wasm":
+  deno task squid build {{quote(source)}} {{quote(output)}}
 
 fmt source:
-  deno task blot fmt {{quote(source)}}
+  deno task squid fmt {{quote(source)}}
 
 install:
   deno task helix:install

@@ -19,9 +19,9 @@
 
 Own new files under `compiler/src/backend/`: `storage_layout.zig`,
 `storage_control.zig`, `storage_patterns.zig`, `storage_collections.zig`, and
-`storage_data_tests.zig`. Own affected flat APIs in `std/array.blot` and
-`std/list.blot`; coordinate prelude changes with the integrator instead of
-editing `std/prelude.blot` independently. Own new executed witnesses in
+`storage_data_tests.zig`. Own affected flat APIs in `std/array.sq` and
+`std/list.sq`; coordinate prelude changes with the integrator instead of
+editing `std/prelude.sq` independently. Own new executed witnesses in
 `tests/guest/storage_flat_data_execution.test.ts`.
 Do not edit `scoped_backend.zig`, runtime modules or shared test registration;
 send the integration owner the small adapter changes those files need.

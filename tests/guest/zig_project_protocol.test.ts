@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const executable = resolve(
   Deno.args[0] ??
-    fileURLToPath(new URL("../../compiler-goose/build/blotc-goose", import.meta.url)),
+    fileURLToPath(new URL("../../compiler-goose/build/squidc-goose", import.meta.url)),
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -43,8 +43,8 @@ function fields(value: Metadata, names: string[]) {
   equal(Object.keys(value).sort(), names.sort());
 }
 async function host() {
-  const directory = await Deno.makeTempDir({ prefix: "blot-protocol-" });
-  const entry = directory + "/main.blot";
+  const directory = await Deno.makeTempDir({ prefix: "squid-protocol-" });
+  const entry = directory + "/main.sq";
   await Deno.writeTextFile(entry, "io const answer = 42\n");
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
@@ -102,7 +102,7 @@ async function host() {
   ]);
   equal(hello.payload.length, 0);
   equal(hello.metadata.kind, "hello");
-  equal(hello.metadata.protocol, "blot-zig-project");
+  equal(hello.metadata.protocol, "squid-zig-project");
   equal(hello.metadata.version, 1);
   ok(/^[0-9a-f]{64}$/.test(hello.metadata.compilerIdentity));
   equal(hello.metadata.maxFrameBytes, 67108864);
@@ -140,7 +140,7 @@ async function host() {
       );
       equal((await child.status).code, code);
       const text = await stderr;
-      if (error) ok(text.endsWith(`blotc: ${error}\n`), text);
+      if (error) ok(text.endsWith(`squidc: ${error}\n`), text);
       else equal(text, "");
     },
     async cleanup() {

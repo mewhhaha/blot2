@@ -49,14 +49,14 @@ for (const declaration of grammar.declarations) {
   if (declaration.kind === "rule") collectFields(declaration.expression);
 }
 const bundle = generate(grammar, {
-  name: "blot",
+  name: "squid",
   rootRule: "program",
   metadata,
   targets: ["wasm"],
 });
 const parserBundle = {
   ...bundle,
-  // Editor queries come from editor/tree-sitter-blot2.
+  // Editor queries come from editor/tree-sitter-squid.
   files: bundle.files.filter((file) => file.kind !== "query"),
 };
 await applyBundle(parserBundle, { root: "generated/parser" });

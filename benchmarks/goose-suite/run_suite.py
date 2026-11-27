@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Cross-language benchmark harness mirroring Goose's 16-benchmark suite with Blot added.
+"""Cross-language benchmark harness mirroring Goose's 16-benchmark suite with Squid added.
 
 Compiles and runs Goose (clang -O2), C++ idiomatic & expert (clang++ -O2),
-Rust (rustc -O -C codegen-units=1), and Blot (blotc-goose + wtime-aot x64-v3
-via standalone native blot_runner) on the same machine, verifying byte-for-byte
+Rust (rustc -O -C codegen-units=1), and Squid (squidc-goose + wtime-aot x64-v3
+via standalone native squid_runner) on the same machine, verifying byte-for-byte
 identical checksum output across every implementation and measuring:
   - whole-process wall time (best of `--reps` after 2 discarded warmups)
   - exact per-process peak RSS via `os.wait4` (`ru_maxrss`, NOT cumulative)
@@ -31,12 +31,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE_DIR = Path(__file__).resolve().parent
-BLOT_SRC_DIR = SUITE_DIR / "blot"
+SQUID_SRC_DIR = SUITE_DIR / "squid"
 GOOSE_BENCH_DIR = ROOT / "build/goose-port/upstream-d5ae5bb/source/bench"
 GOOSE_EXE_DEFAULT = ROOT / "build/goose-port/upstream-d5ae5bb/build-precision/goose"
-BLOTC_DEFAULT = ROOT / "compiler-goose/build/blotc-goose"
+SQUIDC_DEFAULT = ROOT / "compiler-goose/build/squidc-goose"
 STD_ROOT = ROOT / "std"
-PRELUDE_PATH = STD_ROOT / "prelude.blot"
+PRELUDE_PATH = STD_ROOT / "prelude.sq"
 WORK_DIR = ROOT / "build/goose-suite-work"
 OUT_JSON_DEFAULT = ROOT / "benchmarks/evidence/measurements/2026-11-27-goose-suite/results.json"
 
@@ -45,7 +45,7 @@ SIZE_NAMES = ["small", "medium", "large"]
 
 GOOSE_N_RE = re.compile(r"^(\s*let\s+\w+\s*=\s*)(\d+)(\s*;.*//\s*BENCH_N.*)$")
 RUST_N_RE = re.compile(r"^(\s*const\s+\w+\s*:\s*\w+\s*=\s*)(\d+)(\s*;.*//\s*BENCH_N.*)$")
-BLOT_N_RE = re.compile(r"^(\s*const\s+BENCH_N\s*:\s*U32\s*=\s*)(\d+)(\s*//\s*BENCH_N.*)$")
+SQUID_N_RE = re.compile(r"^(\s*const\s+BENCH_N\s*:\s*U32\s*=\s*)(\d+)(\s*//\s*BENCH_N.*)$")
 
 BENCHMARKS = [
     dict(
@@ -53,7 +53,7 @@ BENCHMARKS = [
         what="Build a flat 32-bit array, then scan it 8 times.",
         param="N",
         sizes=[1_000_000, 16_000_000, 128_000_000],
-        blot=[dict(label="blot grow array", file="sum.blot")],
+        squid=[dict(label="squid grow array", file="sum.sq")],
         goose=[dict(label="goose grow-only array", file="sum.goose")],
         cpp=[
             dict(label="cpp vector", file="sum.cpp", variant=0, tier="idiomatic"),
@@ -66,7 +66,7 @@ BENCHMARKS = [
         what="Push N records while keeping links/indices to every 64th one.",
         param="N",
         sizes=[1_000_000, 16_000_000, 64_000_000],
-        blot=[dict(label="blot array+reserve, indices", file="push.blot")],
+        squid=[dict(label="squid array+reserve, indices", file="push.sq")],
         goose=[dict(label="goose array, typed references", file="push.goose")],
         cpp=[
             dict(label="cpp vector, indices", file="push.cpp", variant=0, tier="idiomatic"),
@@ -79,7 +79,7 @@ BENCHMARKS = [
         what="Split a text into N words, store them, scan 4 times.",
         param="N",
         sizes=[200_000, 2_000_000, 8_000_000],
-        blot=[dict(label="blot packed bytes + offsets", file="strlist.blot")],
+        squid=[dict(label="squid packed bytes + offsets", file="strlist.sq")],
         goose=[dict(label="goose inline strings, owned", file="strlist.goose")],
         cpp=[
             dict(label="cpp vector<string>", file="strlist.cpp", variant=0, tier="idiomatic"),
@@ -95,7 +95,7 @@ BENCHMARKS = [
         what="Build a log of N variant records, aggregate 4 times.",
         param="N",
         sizes=[500_000, 4_000_000, 16_000_000],
-        blot=[dict(label="blot packed records + text pool", file="records.blot")],
+        squid=[dict(label="squid packed records + text pool", file="records.sq")],
         goose=[dict(label="goose variable enum", file="records_var.goose")],
         cpp=[
             dict(label="cpp variant + string", file="records.cpp", variant=1, tier="idiomatic"),
@@ -108,7 +108,7 @@ BENCHMARKS = [
         what="Build a complete binary tree of depth D, sum it 8 times.",
         param="depth",
         sizes=[16, 20, 24],
-        blot=[dict(label="blot arena + indices", file="tree.blot")],
+        squid=[dict(label="squid arena + indices", file="tree.sq")],
         goose=[dict(label="goose pool + typed relative refs", file="tree.goose")],
         cpp=[
             dict(label="cpp unique_ptr", file="tree.cpp", variant=0, tier="idiomatic"),
@@ -124,7 +124,7 @@ BENCHMARKS = [
         what="Build an expression tree of depth D, evaluate it 8 times.",
         param="depth",
         sizes=[16, 20, 24],
-        blot=[dict(label="blot arena + tag dispatch", file="interp.blot")],
+        squid=[dict(label="squid arena + tag dispatch", file="interp.sq")],
         goose=[dict(label="goose case functions + relative refs", file="interp.goose")],
         cpp=[
             dict(label="cpp virtual + unique_ptr", file="interp.cpp", variant=0, tier="idiomatic"),
@@ -140,7 +140,7 @@ BENCHMARKS = [
         what="Build CSR adjacency for V vertices / 8V edges, BFS from 4 sources.",
         param="V",
         sizes=[100_000, 500_000, 2_000_000],
-        blot=[dict(label="blot CSR two-pass", file="graph.blot")],
+        squid=[dict(label="squid CSR two-pass", file="graph.sq")],
         goose=[dict(label="goose CSR two-pass", file="graph_csr.goose")],
         cpp=[
             dict(label="cpp vector<vector>", file="graph.cpp", variant=0, tier="idiomatic"),
@@ -156,7 +156,7 @@ BENCHMARKS = [
         what="Count word frequencies over a text of N words.",
         param="N",
         sizes=[500_000, 4_000_000, 16_000_000],
-        blot=[dict(label="blot packed bytes + open addressing", file="words.blot")],
+        squid=[dict(label="squid packed bytes + open addressing", file="words.sq")],
         goose=[dict(label="goose slices + open addressing", file="words.goose")],
         cpp=[
             dict(label="cpp unordered_map<string>", file="words.cpp", variant=0, tier="idiomatic"),
@@ -172,7 +172,7 @@ BENCHMARKS = [
         what="Integrate N particles for 200 steps of exact binary32 vector math.",
         param="N",
         sizes=[100_000, 1_000_000, 4_000_000],
-        blot=[dict(label="blot SoA, 4-wide SIMD", file="particles.blot")],
+        squid=[dict(label="squid SoA, 4-wide SIMD", file="particles.sq")],
         goose=[dict(label="goose AoS, per component", file="particles_scalar.goose")],
         cpp=[
             dict(label="cpp AoS, elementwise", file="particles.cpp", variant=2, tier="idiomatic"),
@@ -185,7 +185,7 @@ BENCHMARKS = [
         what="Generate N s-expression forms, parse into a tree, walk 4 times.",
         param="N",
         sizes=[20_000, 100_000, 300_000],
-        blot=[dict(label="blot 8B arena + packed text", file="sexp.blot")],
+        squid=[dict(label="squid 8B arena + packed text", file="sexp.sq")],
         goose=[dict(label="goose pool + refs, inline text", file="sexp.goose")],
         cpp=[
             dict(label="cpp unique_ptr + string", file="sexp.cpp", variant=0, tier="idiomatic"),
@@ -201,7 +201,7 @@ BENCHMARKS = [
         what="LRU cache of capacity N/8 under N skewed lookups & invalidations.",
         param="N",
         sizes=[2_000_000, 8_000_000, 32_000_000],
-        blot=[dict(label="blot open addressing + arena", file="lru.blot")],
+        squid=[dict(label="squid open addressing + arena", file="lru.sq")],
         goose=[dict(label="goose reusable pool + pool-relative refs", file="lru.goose")],
         cpp=[
             dict(label="cpp list + unordered_map", file="lru.cpp", variant=0, tier="idiomatic"),
@@ -217,7 +217,7 @@ BENCHMARKS = [
         what="Build a depth-D scene graph, animate & update transforms for 16 frames.",
         param="depth",
         sizes=[12, 14, 16],
-        blot=[dict(label="blot arena + inline transforms", file="scene.blot")],
+        squid=[dict(label="squid arena + inline transforms", file="scene.sq")],
         goose=[dict(label="goose pool + inline child refs", file="scene.goose")],
         cpp=[
             dict(label="cpp unique_ptr children", file="scene.cpp", variant=0, tier="idiomatic"),
@@ -233,7 +233,7 @@ BENCHMARKS = [
         what="Generate, parse and evaluate N arithmetic expressions (1/3 malformed).",
         param="N",
         sizes=[100_000, 400_000, 1_600_000],
-        blot=[dict(label="blot arena + error codes", file="calc.blot")],
+        squid=[dict(label="squid arena + error codes", file="calc.sq")],
         goose=[dict(label="goose local pool + return from", file="calc.goose")],
         cpp=[
             dict(label="cpp unique_ptr + exceptions", file="calc.cpp", variant=0, tier="idiomatic"),
@@ -249,7 +249,7 @@ BENCHMARKS = [
         what="Benchmarks Game binary-trees: build, check & discard trees up to depth D.",
         param="depth",
         sizes=[15, 17, 19],
-        blot=[dict(label="blot arena per tree", file="bintrees.blot")],
+        squid=[dict(label="squid arena per tree", file="bintrees.sq")],
         goose=[dict(label="goose local pool per tree", file="bintrees.goose")],
         cpp=[
             dict(label="cpp new/delete", file="bintrees.cpp", variant=0, tier="idiomatic"),
@@ -265,7 +265,7 @@ BENCHMARKS = [
         what="Build & render N JSON responses with FNV-1a checksum.",
         param="N",
         sizes=[100_000, 400_000, 1_600_000],
-        blot=[dict(label="blot streaming", file="respond.blot")],
+        squid=[dict(label="squid streaming", file="respond.sq")],
         goose=[
             dict(label="goose inline DTO", file="respond.goose"),
             dict(label="goose streaming", file="respond_stream.goose"),
@@ -284,7 +284,7 @@ BENCHMARKS = [
         what="16 passes of a 3x3 blur over a WxW 8-bit image.",
         param="W",
         sizes=[1024, 2048, 8192],
-        blot=[dict(label="blot 16-wide U8x16 SIMD", file="blur.blot")],
+        squid=[dict(label="squid 16-wide U8x16 SIMD", file="blur.sq")],
         goose=[dict(label="goose flat indexing", file="blur.goose")],
         cpp=[
             dict(label="cpp flat indexing", file="blur.cpp", variant=0, tier="idiomatic"),
@@ -415,17 +415,17 @@ def measure_cmd(argv: list[str], reps: int, warmups: int = 2) -> dict:
     }
 
 
-def build_blot_runner(work_dir: Path) -> Path:
-    runner = work_dir / "blot_runner"
-    cmd = ["clang", "-O2", str(SUITE_DIR / "blot_runner.c"), "-ldl", "-o", str(runner)]
+def build_squid_runner(work_dir: Path) -> Path:
+    runner = work_dir / "squid_runner"
+    cmd = ["clang", "-O2", str(SUITE_DIR / "squid_runner.c"), "-ldl", "-o", str(runner)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"failed building blot_runner:\n{r.stderr}")
+        raise RuntimeError(f"failed building squid_runner:\n{r.stderr}")
     return runner
 
 
-def build_blot(
-    blotc: Path,
+def build_squid(
+    squidc: Path,
     wtime_aot: Path,
     work_dir: Path,
     file: str,
@@ -433,17 +433,17 @@ def build_blot(
     tag: str,
     wasm3: bool = False,
 ) -> dict:
-    bdir = work_dir / "blot"
+    bdir = work_dir / "squid"
     bdir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(BLOT_SRC_DIR / "rng.blot", bdir / "rng.blot")
-    src = bdir / f"{tag}.blot"
+    shutil.copy2(SQUID_SRC_DIR / "rng.sq", bdir / "rng.sq")
+    src = bdir / f"{tag}.sq"
     wasm = bdir / f"{tag}.wasm"
     so = bdir / f"{tag}.so"
-    write_sized(BLOT_SRC_DIR / file, src, n, BLOT_N_RE)
+    write_sized(SQUID_SRC_DIR / file, src, n, SQUID_N_RE)
 
     t0 = time.perf_counter()
     cmd = [
-        str(blotc),
+        str(squidc),
         "build",
         str(src),
         str(wasm),
@@ -455,9 +455,9 @@ def build_blot(
     if wasm3:
         cmd.append("--wasm3")
     r = run_measured(cmd)
-    blotc_ms = r["ms"]
+    squidc_ms = r["ms"]
     if r["code"] != 0:
-        return {"ok": False, "error": f"blotc failed:\n{r['out']}\n{r['err']}"}
+        return {"ok": False, "error": f"squidc failed:\n{r['out']}\n{r['err']}"}
 
     r2 = run_measured(
         [
@@ -482,9 +482,9 @@ def build_blot(
         "so": so,
         "wasm_bytes": wasm.stat().st_size,
         "so_bytes": so.stat().st_size,
-        "blotc_ms": round(blotc_ms, 2),
+        "squidc_ms": round(squidc_ms, 2),
         "aot_ms": round(aot_ms, 2),
-        "compile_ms": round(blotc_ms + aot_ms, 2),
+        "compile_ms": round(squidc_ms + aot_ms, 2),
     }
 
 
@@ -571,7 +571,7 @@ def main() -> None:
     ap.add_argument("--sizes", default="medium", help="comma-separated: small,medium,large")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--warmups", type=int, default=2)
-    ap.add_argument("--langs", default="blot,goose,cpp,rust", help="comma-separated subset of languages")
+    ap.add_argument("--langs", default="squid,goose,cpp,rust", help="comma-separated subset of languages")
     ap.add_argument("--out", default=str(OUT_JSON_DEFAULT))
     ap.add_argument("--merge", action="store_true", help="merge into existing output JSON")
     ap.add_argument("--wasm3", action="store_true")
@@ -586,7 +586,7 @@ def main() -> None:
     rustc = resolve_rustc()
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     _MEASURE_BIN = build_measure_proc(WORK_DIR)
-    blot_runner = build_blot_runner(WORK_DIR) if "blot" in langs else None
+    squid_runner = build_squid_runner(WORK_DIR) if "squid" in langs else None
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -604,7 +604,7 @@ def main() -> None:
         "clang": clang_ver,
         "rust": rust_ver,
         "wtime_aot": str(wtime_aot),
-        "blotc": str(BLOTC_DEFAULT),
+        "squidc": str(SQUIDC_DEFAULT),
         "goose": str(GOOSE_EXE_DEFAULT),
         "reps": args.reps,
         "warmups": args.warmups,
@@ -632,9 +632,9 @@ def main() -> None:
             print(f"\n=== {bname} ({sname}: {b['param']}={n:,}) ===", flush=True)
 
             impls = []
-            if "blot" in langs:
-                for it in b["blot"]:
-                    impls.append(("blot", it))
+            if "squid" in langs:
+                for it in b["squid"]:
+                    impls.append(("squid", it))
             if "goose" in langs:
                 for it in b["goose"]:
                     impls.append(("goose", it))
@@ -648,13 +648,13 @@ def main() -> None:
             for kind, it in impls:
                 label = it["label"]
                 slug = re.sub(r"[^A-Za-z0-9]+", "_", f"{bname}_{sname}_{label}").strip("_")
-                if kind == "blot":
-                    bsrc = BLOT_SRC_DIR / it["file"]
+                if kind == "squid":
+                    bsrc = SQUID_SRC_DIR / it["file"]
                     if not bsrc.exists():
                         print(f"  [SKIP] {label:38s} (missing {it['file']})", flush=True)
                         continue
-                    built = build_blot(BLOTC_DEFAULT, wtime_aot, WORK_DIR, it["file"], n, slug, wasm3=args.wasm3)
-                    argv = [str(blot_runner), str(built["so"])] if built["ok"] else []
+                    built = build_squid(SQUIDC_DEFAULT, wtime_aot, WORK_DIR, it["file"], n, slug, wasm3=args.wasm3)
+                    argv = [str(squid_runner), str(built["so"])] if built["ok"] else []
                 elif kind == "goose":
                     built = build_goose(GOOSE_EXE_DEFAULT, WORK_DIR, it["file"], n, slug)
                     argv = [str(built["exe"])] if built["ok"] else []
@@ -689,8 +689,8 @@ def main() -> None:
 
                 status = "OK" if checksum_ok else "CHECKSUM MISMATCH"
                 extra = f"compile={built['compile_ms']:.0f}ms"
-                if kind == "blot":
-                    extra = f"blotc={built['blotc_ms']:.0f}ms aot={built['aot_ms']:.0f}ms wasm={built['wasm_bytes']//1024}KiB"
+                if kind == "squid":
+                    extra = f"squidc={built['squidc_ms']:.0f}ms aot={built['aot_ms']:.0f}ms wasm={built['wasm_bytes']//1024}KiB"
                 print(
                     f"  [{status:^6s}] {label:38s} {res['ms']:8.2f} ms  {res['peak_mb']:6.1f} MiB  ({extra})",
                     flush=True,
@@ -709,8 +709,8 @@ def main() -> None:
                     "compile_ms": built["compile_ms"],
                     "stdout": res["out"].splitlines(),
                 }
-                if kind == "blot":
-                    row_data["blotc_ms"] = built["blotc_ms"]
+                if kind == "squid":
+                    row_data["squidc_ms"] = built["squidc_ms"]
                     row_data["aot_ms"] = built["aot_ms"]
                     row_data["wasm_bytes"] = built["wasm_bytes"]
                 sentry["rows"][label] = row_data

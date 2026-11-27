@@ -1,5 +1,5 @@
 // The same byte stream and Wyhash variant as the pinned Zig oracle.
-namespace blot_support_wyhash;
+namespace squid_support_wyhash;
 import support.bytes;
 
 let secret: u64[4] = [0xa0761d6478bd642f, 0xe7037ed1a0b428db,
@@ -27,8 +27,8 @@ fn init(seed: u64) -> Wyhash {
 }
 fn round(hash: Wyhash&, bytes: const u8[:]) {
     for index in 3 {
-        let left = blot_bytes::get_u64(bytes, 16 * index);
-        let right = blot_bytes::get_u64(bytes, 16 * index + 8);
+        let left = squid_bytes::get_u64(bytes, 16 * index);
+        let right = squid_bytes::get_u64(bytes, 16 * index + 8);
         hash.state[index] = mix(left ^ secret[index + 1], right ^ hash.state[index]);
     }
 }
@@ -59,10 +59,10 @@ fn smallKey(hash: Wyhash&, bytes: const u8[:]) {
     if bytes.len >= 4 {
         let end = bytes.len - 4;
         let quarter = (bytes.len >> 3) << 2;
-        hash.a = (blot_bytes::get_u32(bytes, 0) as u64 << 32) |
-            blot_bytes::get_u32(bytes, quarter) as u64;
-        hash.b = (blot_bytes::get_u32(bytes, end) as u64 << 32) |
-            blot_bytes::get_u32(bytes, end - quarter) as u64;
+        hash.a = (squid_bytes::get_u32(bytes, 0) as u64 << 32) |
+            squid_bytes::get_u32(bytes, quarter) as u64;
+        hash.b = (squid_bytes::get_u32(bytes, end) as u64 << 32) |
+            squid_bytes::get_u32(bytes, end - quarter) as u64;
     } else if bytes.len > 0 {
         hash.a = (bytes[0] as u64 << 16) | (bytes[bytes.len >> 1] as u64 << 8) |
             bytes[bytes.len - 1] as u64;
@@ -72,12 +72,12 @@ fn smallKey(hash: Wyhash&, bytes: const u8[:]) {
 fn final1(hash: Wyhash&, bytes: const u8[:], start: i64) {
     var at = start;
     while at + 16 < bytes.len {
-        hash.state[0] = mix(blot_bytes::get_u64(bytes, at) ^ secret[1],
-            blot_bytes::get_u64(bytes, at + 8) ^ hash.state[0]);
+        hash.state[0] = mix(squid_bytes::get_u64(bytes, at) ^ secret[1],
+            squid_bytes::get_u64(bytes, at + 8) ^ hash.state[0]);
         at += 16;
     }
-    hash.a = blot_bytes::get_u64(bytes, bytes.len - 16);
-    hash.b = blot_bytes::get_u64(bytes, bytes.len - 8);
+    hash.a = squid_bytes::get_u64(bytes, bytes.len - 16);
+    hash.b = squid_bytes::get_u64(bytes, bytes.len - 8);
 }
 fn final2(hash: Wyhash&) -> u64 {
     let low, high = multiply(hash.a ^ secret[1], hash.b ^ hash.state[0]);
@@ -120,9 +120,9 @@ fn value(state: Wyhash&, value: u16) {
 }
 fn value(state: Wyhash&, value: u32) {
     var bytes: u8[4] = default<u8[4]>();
-    blot_bytes::put_u32(bytes, 0, value); update(state, bytes);
+    squid_bytes::put_u32(bytes, 0, value); update(state, bytes);
 }
 fn value(state: Wyhash&, value: u64) {
     var bytes: u8[8] = default<u8[8]>();
-    blot_bytes::put_u64(bytes, 0, value); update(state, bytes);
+    squid_bytes::put_u64(bytes, 0, value); update(state, bytes);
 }

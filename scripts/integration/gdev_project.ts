@@ -21,11 +21,11 @@ export async function gdevProject(
   return {
     executable: resolve(
       executable ??
-        resolve(root, project.plugins[project.compiler.plugin].run.blotc),
+        resolve(root, project.plugins[project.compiler.plugin].run.squidc),
     ),
     entry: resolve(root, entry),
     stdRoot,
-    prelude: resolve(stdRoot, "prelude.blot"),
+    prelude: resolve(stdRoot, "prelude.sq"),
     imports: Object.fromEntries(
       Object.entries(settings.imports).map((
         [name, path],

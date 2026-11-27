@@ -6,7 +6,7 @@ import {
   unexpectedBuildFailures,
 } from "../../benchmarks/tools/verification.ts";
 
-const entry = "tests/rejected.blot";
+const entry = "tests/rejected.sq";
 const phases = ["fresh", "shared", "restart"];
 const failures: BuildFailure[] = phases.flatMap((phase) =>
   ["baseline", "candidate"].map((variant) => ({
@@ -206,12 +206,12 @@ Deno.test("bench: frozen pen settings preserve budget, standard library and expl
         compiler: {
           settings: {
             imports: { "ink/": "../ink/lib/" },
-            std: "../blot2/std",
+            std: "../squid-lang/std",
             inferenceBudget: 200000000,
             nativeAssets: {
               roots: ["src"],
               imports: [{
-                module: "src/names.json.blot",
+                module: "src/names.json.sq",
                 path: "src/names.json",
                 kind: "text",
               }],
@@ -223,9 +223,9 @@ Deno.test("bench: frozen pen settings preserve budget, standard library and expl
     const [game] = await gdevWorkloads("/unused-live-repository", root);
     const options = sessionOptions("/compiler", game);
     assert.equal(options.inferenceBudget, 200000000);
-    assert.equal(options.prelude, `${root}/std/prelude.blot`);
+    assert.equal(options.prelude, `${root}/std/prelude.sq`);
     assert.deepEqual(options.nativeAssets?.imports, [{
-      module: `${root}/src/names.json.blot`,
+      module: `${root}/src/names.json.sq`,
       path: `${root}/src/names.json`,
       kind: "text",
     }]);

@@ -1,4 +1,4 @@
-"""Count the stores `place = value` and the `lent` functions left in Blot
+"""Count the stores `place = value` and the `lent` functions left in Squid
 sources, by line shape.
 
 Usage: python3 scripts/integration/count_stores.py DIR...
@@ -12,7 +12,7 @@ function is one that still returns or keeps what it was lent.
 import re,glob,sys,collections
 def stores(root):
     n=0; files=0; lent=0; per=collections.Counter()
-    for f in glob.glob(root+'/**/*.blot',recursive=True):
+    for f in glob.glob(root+'/**/*.sq',recursive=True):
         if '/output/' in f or '/build/' in f: continue
         k=0
         for line in open(f,errors='replace'):

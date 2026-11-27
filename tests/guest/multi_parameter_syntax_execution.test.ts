@@ -71,10 +71,10 @@ Deno.test("record-style named calls reject duplicate and unknown argument names 
 });
 
 Deno.test("parameter-list sugar and explicit currying have the same generated size and results", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-curried-parity-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-curried-parity-" });
+  const entry = `${directory}/main.sq`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   try {
     {
       const outputs: Uint8Array<ArrayBuffer>[] = [];
@@ -111,10 +111,10 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
 });
 
 Deno.test("named record calls and positional calls agree in both tiers", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-named-call-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-named-call-" });
+  const entry = `${directory}/main.sq`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   const declarations = [
     `const calculate = func (a: U32) -> (b: U32) -> (c: U32) -> (d: U32) => return @u32.add (@u32.mul a b) (@u32.mul c d)
 io const answer = func (input: U32) => return calculate input 2 3 4

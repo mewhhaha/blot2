@@ -6,7 +6,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const repo = resolve(new URL("../../", import.meta.url).pathname);
 const out = resolve(repo, "build/bench/aggregate-producer");
 await Deno.mkdir(out, { recursive: true });
-let executable = resolve(repo, "compiler-goose/build/blotc-goose-dev");
+let executable = resolve(repo, "compiler-goose/build/squidc-goose-dev");
 let codegenTier: "development" | "optimized" = "optimized";
 let codegenWorkers = 1;
 for (let at = 0; at < Deno.args.length; at += 2) {
@@ -29,10 +29,10 @@ const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
 const compiler_sha256 = await hash(await Deno.readFile(executable));
 const source_files = Object.fromEntries(
   await Promise.all([
-    resolve(repo, "../ink/lib/transform.blot"),
-    resolve(repo, "../ink/lib/math.blot"),
-    resolve(repo, "../ink/lib/render.blot"),
-    resolve(repo, "std/prelude.blot"),
+    resolve(repo, "../ink/lib/transform.sq"),
+    resolve(repo, "../ink/lib/math.sq"),
+    resolve(repo, "../ink/lib/render.sq"),
+    resolve(repo, "std/prelude.sq"),
   ].map(async (path) => [path, await hash(await Deno.readFile(path))])),
 );
 const names = "xx xy xz xw yx yy yz yw zx zy zz zw wx wy wz ww".split(" ");
@@ -40,7 +40,7 @@ for (const kind of ["matrix", "settings"]) {
   let sizes = [1, 4, 8];
   if (kind === "matrix") sizes = [2, 4, 6];
   for (const size of sizes) {
-    const entry = `${out}/${kind}-${size}.blot`;
+    const entry = `${out}/${kind}-${size}.sq`;
     const lines: string[] = [];
     if (kind === "matrix") {
       lines.push(
@@ -91,7 +91,7 @@ for (const kind of ["matrix", "settings"]) {
         executable,
         entry,
         stdRoot: `${repo}/std`,
-        prelude: `${repo}/std/prelude.blot`,
+        prelude: `${repo}/std/prelude.sq`,
         imports: { "ink/": resolve(repo, "../ink/lib") },
         profileBackend: true,
         startupTimeoutMs: 5000,

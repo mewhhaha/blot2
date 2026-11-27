@@ -3,11 +3,11 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 Deno.test("runtime inference configuration binds identity and preserves the production default", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-budget-config-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-budget-config-" });
+  const entry = `${directory}/main.sq`;
   const options = { executable, entry, prelude: null };
   const sources = { [entry]: "io const answer = func () => return 42\n" };
   const production = await createZigProjectCompiler(options);

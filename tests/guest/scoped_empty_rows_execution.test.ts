@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const source = `
 type Row is data = $Row {text: &[U32]}
 type Plain is data = $Plain {amount: U32}
@@ -103,13 +103,13 @@ io const plain = func (count: U32): U32 => return do:
 `;
 
 Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds traps`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-empty-rows-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-empty-rows-" });
+  const entry = `${directory}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
   });
   try {
     const result = await compiler.build();

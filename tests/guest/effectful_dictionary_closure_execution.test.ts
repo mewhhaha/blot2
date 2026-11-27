@@ -17,15 +17,15 @@ io const answer: Unit -> U32 ! {Read} = func unit => return consume Read
 
 Deno.test("effectful callback mismatch names the expected and actual argument in both tiers", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const invalid = `effect Read: Unit -> U32
 const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()
 io const answer: Unit -> U32 = func unit => return consume Read
 `;
   const corrected = invalid.replace("consume Read", "consume (func () => return 42)");
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-  const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+  const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
   try {
     {
       const compiler = await createZigProjectCompiler({

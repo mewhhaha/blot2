@@ -1,9 +1,9 @@
 // Which scalar operations have a machine instruction, and U32 constant
 // folding, for the checker's numeric and package proofs.
-namespace blot_check_scalar_ops;
+namespace squid_check_scalar_ops;
 import .core;
 import support.native;
-type Op=blot_check_core::Op;
+type Op=squid_check_core::Op;
 
 // Whether `op` is one scalar instruction on F32 operands (`floating`) or on
 // U32 and Bool operands.
@@ -38,7 +38,7 @@ fn foldU32(op:Op,a:u32,b:u32)->Fold,u32 {
   bit_xor=>{return Fold.value,a^b;},
   shift_left=>{return Fold.value,a<<(b&31);},
   shift_right=>{return Fold.value,a>>(b&31);},
-  convert_f32_u32=>{return Fold.value,truncate(blot_native::f32_from_bits(a));},
+  convert_f32_u32=>{return Fold.value,truncate(squid_native::f32_from_bits(a));},
   _=>{return Fold.none,0;},
  }
 }

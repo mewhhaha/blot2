@@ -3,12 +3,12 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 {
   Deno.test(`generic identities preserve concrete aliases`, async () => {
     const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const compiler = await createZigProjectCompiler({
       executable,
       entry,
@@ -87,7 +87,7 @@ io const captured = func (seed: U32) => return do:
 // Direct backend gap: a type variable that no use constrains is an unresolved type variable (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("unobserved generic identities compile without a concrete type", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

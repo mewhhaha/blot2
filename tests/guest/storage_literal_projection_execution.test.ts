@@ -5,17 +5,17 @@ import { instantiateGuest } from "../../host/guest.ts";
 {
   Deno.test(`literal record projections preserve imported names F32 bits source traps and retained edits`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-literal-projection-",
+      prefix: "squid-literal-projection-",
     });
-    const entry = `${directory}/main.blot`;
-    const producer = `${directory}/palette.blot`;
-    const other = `${directory}/other.blot`;
+    const entry = `${directory}/main.sq`;
+    const producer = `${directory}/palette.sq`;
+    const other = `${directory}/other.sq`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     const options = {
       executable: Deno.args[0],
       entry,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     };
     const caller = `import * as left from "./palette"
 import * as right from "./other"

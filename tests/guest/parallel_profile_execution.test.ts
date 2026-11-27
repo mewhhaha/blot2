@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 for (const profileBackend of [false, true]) {
   Deno.test(`profiled sessions preserve executed output and failed-edit recovery (backend profile ${profileBackend})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-heap-profile-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-heap-profile-" });
+    const entry = `${directory}/main.sq`;
     const source = "io const answer = func (value: U32): U32 => return @u32.add value 1\n";
     const options = {
       executable: Deno.args[0],

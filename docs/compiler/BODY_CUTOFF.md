@@ -726,7 +726,7 @@ bytes.
 
 Exact basis tree `344769cece12fdeb4484b63187cfab123a3abe85` and immutable
 Safe/noLLVM binaries are recorded in ignored `build/bench/task024-dotted/` in
-`/tmp/blot2-task024-completion`. Five alternating pairs on CPU 5, with two
+`/tmp/squid-task024-completion`. Five alternating pairs on CPU 5, with two
 warmups and 20 edited/reverted preparations per sample, measure dotted128/512
 edit child CPU 123.5→90 /477.5→350.5 ms (paired median ratios .7317/.7267), body
 elaborations 130.5/514.5→2.5 and exact Wasm hashes. Dotted population CPU rises
@@ -775,7 +775,7 @@ median ratios .8141/.8040, elaborations 69.5/133.5→5.5. Plain controls are nea
 parity. Local population CPU rises 22–25%; 128 steady RSS rises 372 KiB. Root's
 full gate was running during these development measurements. Immutable binaries,
 prior unbounded prototype, samples, exact pins and logs remain in ignored
-`build/bench/task024-local-requirements/` in `/tmp/blot2-task024-completion`.
+`build/bench/task024-local-requirements/` in `/tmp/squid-task024-completion`.
 
 Task 024 and dependent 053 remain open. Root owns combined full-gate and
 LLVM/Fast acceptance. This does not complete general local requirements,
@@ -825,7 +825,7 @@ two warmups and 16 hot edits/reverts measure declared64/128 CPU 94.375→81.875 
 37–44%; steady RSS rises roughly 1.1/1.7 MiB. Root's combined gate ran
 concurrently, so these Safe/noLLVM numbers are development measurements.
 Immutable binaries, 48 samples, exact pins and logs live in ignored
-`build/bench/task024-declared-local/` in `/tmp/blot2-task024-completion`.
+`build/bench/task024-declared-local/` in `/tmp/squid-task024-completion`.
 
 Task 024 and 053 remain open for shared local callee edges,
 field/receiver/update/ effect residuals, imported annotation heads, producer
@@ -870,7 +870,7 @@ pairs with two warmups and 16 hot edits/reverts measure producer64/128 CPU
 66/130→2. Plain controls stay near parity. Producer population CPU rises 11%;
 steady RSS falls roughly 1.0/1.4 MiB in these samples. 48 samples, immutable
 binaries, exact source/binary pins and logs remain in ignored
-`build/bench/task024-ordinals/` in `/tmp/blot2-task024-completion`. These are
+`build/bench/task024-ordinals/` in `/tmp/squid-task024-completion`. These are
 development measurements with other qualification work concurrent, not
 captured-project or release acceptance.
 
@@ -919,7 +919,7 @@ ms; paired median ratios.9243/.9354. Elaborations 66/130→2. Plain controls sta
 near parity. Head population CPU rises 15–17%; steady RSS rises 540/1,748 KiB.
 Immutable binaries, the un-memoized regression, quick comparison, final 48
 samples, exact pins and logs remain in ignored
-`build/bench/task024-imported-heads/` in `/tmp/blot2-task024-completion`. These
+`build/bench/task024-imported-heads/` in `/tmp/squid-task024-completion`. These
 concurrent Safe/noLLVM measurements diagnose development costs; release,
 captured-project and combined full-gate acceptance belong to the parent.
 
@@ -951,7 +951,7 @@ Safe/noLLVM pairs with two warmups and 16 edits/reverts measure local64/128 CPU
 plain64+7% paired result does not repeat in five further plain pairs: 64/128 CPU
 70.625/133.75 ms is identical across variants. Both distributions remain in
 ignored `build/bench/task024-shared-locals/`, alongside immutable binaries,
-exact pins, 88 samples and logs in `/tmp/blot2-task024-completion`.
+exact pins, 88 samples and logs in `/tmp/squid-task024-completion`.
 
 This covers local requirements forwarded through completed shared summaries.
 Other residual predicates, explicit effect/control syntax, broader forms and the

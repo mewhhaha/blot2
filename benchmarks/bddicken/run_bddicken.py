@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build, verify, and run the bddicken/languages suite across Blot, Goose, C, C++, and Rust.
+"""Build, verify, and run the bddicken/languages suite across Squid, Goose, C, C++, and Rust.
 
 Reads official C, C++, Rust sources and levenshtein-words.txt from
 `build/upstream-benches/bddicken-languages` (or $BDDICKEN), Goose sources from
-`build/goose-port/upstream-d5ae5bb/source/bench/bddicken`, and Blot sources
-from `benchmarks/bddicken/blot/`.
+`build/goose-port/upstream-d5ae5bb/source/bench/bddicken`, and Squid sources
+from `benchmarks/bddicken/squid/`.
 
 Outputs `benchmarks/evidence/measurements/2026-11-26-bddicken/results.json`
 and generates `bddicken_chart.svg`.
@@ -27,17 +27,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
-BLOT_DIR = HERE / "blot"
+SQUID_DIR = HERE / "squid"
 GOOSE_BDD = ROOT / "build/goose-port/upstream-d5ae5bb/source/bench/bddicken"
 GOOSE_EXE = ROOT / "build/goose-port/upstream-d5ae5bb/build-precision/goose"
-BLOTC = ROOT / "compiler-goose/build/blotc-goose"
+SQUIDC = ROOT / "compiler-goose/build/squidc-goose"
 STD_ROOT = ROOT / "std"
-PRELUDE = STD_ROOT / "prelude.blot"
+PRELUDE = STD_ROOT / "prelude.sq"
 WORK_DIR = ROOT / "build/bddicken-work"
 OUT_DIR = ROOT / "benchmarks/evidence/measurements/2026-11-26-bddicken"
 
 BENCHES = ["fibonacci", "loops", "levenshtein", "hello-world"]
-LANGS = ["blot", "goose", "c", "cpp", "rust"]
+LANGS = ["squid", "goose", "c", "cpp", "rust"]
 
 
 def resolve_bddicken() -> Path:
@@ -89,42 +89,42 @@ def check_result(bench: str, out: str) -> bool:
     return False
 
 
-def build_blot_runner() -> Path:
-    runner = WORK_DIR / "blot_bddicken_runner"
-    run_cmd(["clang", "-O2", str(HERE / "blot_bddicken_runner.c"), "-ldl", "-lm", "-o", str(runner)])
+def build_squid_runner() -> Path:
+    runner = WORK_DIR / "squid_bddicken_runner"
+    run_cmd(["clang", "-O2", str(HERE / "squid_bddicken_runner.c"), "-ldl", "-lm", "-o", str(runner)])
     return runner
 
 
 def build_all(bdd: Path, wtime: Path) -> dict[str, dict[str, dict]]:
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    runner = build_blot_runner()
+    runner = build_squid_runner()
     bins: dict[str, dict[str, dict]] = {}
 
-    blot_map = {
-        "fibonacci": "fibonacci.blot",
-        "loops": "loops.blot",
-        "levenshtein": "levenshtein.blot",
-        "hello-world": "hello_world.blot",
+    squid_map = {
+        "fibonacci": "fibonacci.sq",
+        "loops": "loops.sq",
+        "levenshtein": "levenshtein.sq",
+        "hello-world": "hello_world.sq",
     }
 
     for bench in BENCHES:
         bins[bench] = {}
 
-        # Blot
-        bdir = WORK_DIR / "blot"
+        # Squid
+        bdir = WORK_DIR / "squid"
         bdir.mkdir(parents=True, exist_ok=True)
         wasm = bdir / f"{bench}.wasm"
         so = bdir / f"{bench}.so"
         t0 = time.perf_counter()
-        run_cmd([str(BLOTC), "build", str(BLOT_DIR / blot_map[bench]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT)])
-        blotc_ms = (time.perf_counter() - t0) * 1000.0
+        run_cmd([str(SQUIDC), "build", str(SQUID_DIR / squid_map[bench]), str(wasm), "--prelude", str(PRELUDE), "--std-root", str(STD_ROOT)])
+        squidc_ms = (time.perf_counter() - t0) * 1000.0
         t1 = time.perf_counter()
         run_cmd([str(wtime), "--backend", "x64", "--target-cpu", "native", "--blot-cdylib", str(wasm), "-o", str(so)])
         aot_ms = (time.perf_counter() - t1) * 1000.0
-        bins[bench]["blot"] = {
+        bins[bench]["squid"] = {
             "argv": [str(runner), bench, str(so)],
-            "compile_ms": round(blotc_ms + aot_ms, 2),
-            "blotc_ms": round(blotc_ms, 2),
+            "compile_ms": round(squidc_ms + aot_ms, 2),
+            "squidc_ms": round(squidc_ms, 2),
             "aot_ms": round(aot_ms, 2),
             "wasm_bytes": wasm.stat().st_size,
         }
@@ -168,7 +168,7 @@ def build_all(bdd: Path, wtime: Path) -> dict[str, dict[str, dict]]:
         shutil.copy2(rtarget / "release/run", rexe)
         bins[bench]["rust"] = {"argv": [str(rexe)], "compile_ms": round((time.perf_counter() - t0) * 1000.0, 2)}
 
-        print(f"built {bench:12s}: blot={bins[bench]['blot']['compile_ms']:.0f}ms goose={bins[bench]['goose']['compile_ms']:.0f}ms c={bins[bench]['c']['compile_ms']:.0f}ms cpp={bins[bench]['cpp']['compile_ms']:.0f}ms rust={bins[bench]['rust']['compile_ms']:.0f}ms", flush=True)
+        print(f"built {bench:12s}: squid={bins[bench]['squid']['compile_ms']:.0f}ms goose={bins[bench]['goose']['compile_ms']:.0f}ms c={bins[bench]['c']['compile_ms']:.0f}ms cpp={bins[bench]['cpp']['compile_ms']:.0f}ms rust={bins[bench]['rust']['compile_ms']:.0f}ms", flush=True)
     return bins
 
 
@@ -187,14 +187,14 @@ def render_svg(data: dict, out_path: Path) -> None:
     BG_CANVAS, BG_CARD, BORDER = "#fafaf8", "#ffffff", "#e2e8f0"
     TEXT_MAIN, TEXT_SUB, TEXT_MUTED, GRID = "#0f172a", "#475569", "#64748b", "#f1f5f9"
     COLORS = {
-        "blot": "#0f766e",
+        "squid": "#0f766e",
         "goose": "#2563eb",
         "c": "#64748b",
         "cpp": "#334155",
         "rust": "#c2592b",
     }
     NAMES = {
-        "blot": "Blot (wtime-aot)",
+        "squid": "Squid (wtime-aot)",
         "goose": "Goose (clang -O3)",
         "c": "C (clang -O3)",
         "cpp": "C++ (-O3 native)",
@@ -209,10 +209,10 @@ def render_svg(data: dict, out_path: Path) -> None:
 
     w, h = 960, 520
     els = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="bddicken/languages benchmarks: Blot vs Goose, C, C++, and Rust">',
-        "  <title>bddicken/languages benchmarks: Blot vs Goose, C, C++, and Rust</title>",
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="bddicken/languages benchmarks: Squid vs Goose, C, C++, and Rust">',
+        "  <title>bddicken/languages benchmarks: Squid vs Goose, C, C++, and Rust</title>",
         f'  <rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="12" fill="{BG_CANVAS}" stroke="{BORDER}"/>',
-        f'  <text x="28" y="36" font-family="{FONT}" font-size="20" font-weight="700" fill="{TEXT_MAIN}">bddicken/languages Suite: Blot vs Goose, C, C++ &amp; Rust</text>',
+        f'  <text x="28" y="36" font-family="{FONT}" font-size="20" font-weight="700" fill="{TEXT_MAIN}">bddicken/languages Suite: Squid vs Goose, C, C++ &amp; Rust</text>',
         f'  <text x="28" y="57" font-family="{FONT}" font-size="11.8" fill="{TEXT_SUB}">Exact official C/C++/Rust sources &amp; inputs · verified outputs · {html.escape(data["meta"]["cpu"])} · lower is better</text>',
     ]
 
@@ -238,14 +238,14 @@ def render_svg(data: dict, out_path: Path) -> None:
         entries.sort(key=lambda kv: kv[1])
         vmax = max(v for _, v in entries)
 
-        # Pill comparing Blot vs C
-        blot_v = brows["blot"]["best_mean_ms"]
+        # Pill comparing Squid vs C
+        squid_v = brows["squid"]["best_mean_ms"]
         c_v = brows["c"]["best_mean_ms"]
-        if blot_v <= c_v:
-            pill_lbl = f"Blot {c_v / blot_v:.2f}× vs C"
+        if squid_v <= c_v:
+            pill_lbl = f"Squid {c_v / squid_v:.2f}× vs C"
             pbg, pfg = "#dcfce7", "#166534"
         else:
-            pill_lbl = f"Blot {blot_v / c_v:.2f}× C"
+            pill_lbl = f"Squid {squid_v / c_v:.2f}× C"
             pbg, pfg = "#f1f5f9", "#334155"
         pw = len(pill_lbl) * 6.2 + 16
         px = cx + cw - 10 - pw
@@ -256,13 +256,13 @@ def render_svg(data: dict, out_path: Path) -> None:
         for bi, (lang, val) in enumerate(entries):
             by = cy + 52 + bi * 25
             bw = max(3.5, (val / vmax) * bmax)
-            is_b = lang == "blot"
-            short = {"blot": "Blot", "goose": "Goose", "c": "C (-O3)", "cpp": "C++ (-O3)", "rust": "Rust"}[lang]
-            els.append(f'  <text x="{cx + 14}" y="{by + 13.5:.1f}" font-family="{FONT}" font-size="10.6" font-weight="{"700" if is_b else "500"}" fill="{COLORS["blot"] if is_b else TEXT_MAIN}">{html.escape(short)}</text>')
+            is_b = lang == "squid"
+            short = {"squid": "Squid", "goose": "Goose", "c": "C (-O3)", "cpp": "C++ (-O3)", "rust": "Rust"}[lang]
+            els.append(f'  <text x="{cx + 14}" y="{by + 13.5:.1f}" font-family="{FONT}" font-size="10.6" font-weight="{"700" if is_b else "500"}" fill="{COLORS["squid"] if is_b else TEXT_MAIN}">{html.escape(short)}</text>')
             els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bmax:.1f}" height="17" rx="3.5" fill="{GRID}"/>')
             els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bw:.1f}" height="17" rx="3.5" fill="{COLORS[lang]}"/>')
             vtxt = f"{val:.2f} ms" if val < 10 else f"{val:.1f} ms"
-            els.append(f'  <text x="{bx + bw + 7:.1f}" y="{by + 13.5:.1f}" font-family="{FONT}" font-size="10.5" font-weight="{"700" if is_b else "600"}" fill="{COLORS["blot"] if is_b else TEXT_MAIN}">{html.escape(vtxt)}</text>')
+            els.append(f'  <text x="{bx + bw + 7:.1f}" y="{by + 13.5:.1f}" font-family="{FONT}" font-size="10.5" font-weight="{"700" if is_b else "600"}" fill="{COLORS["squid"] if is_b else TEXT_MAIN}">{html.escape(vtxt)}</text>')
 
     els.append(
         f'  <text x="28" y="{h - 14}" font-family="{FONT}" font-size="10.2" fill="{TEXT_MUTED}">'
@@ -352,10 +352,10 @@ def main() -> None:
                 "compile_ms": bins[bench][lang]["compile_ms"],
                 "reps": recs,
             }
-            if lang == "blot":
-                entry["blotc_ms"] = bins[bench]["blot"]["blotc_ms"]
-                entry["aot_ms"] = bins[bench]["blot"]["aot_ms"]
-                entry["wasm_bytes"] = bins[bench]["blot"]["wasm_bytes"]
+            if lang == "squid":
+                entry["squidc_ms"] = bins[bench]["squid"]["squidc_ms"]
+                entry["aot_ms"] = bins[bench]["squid"]["aot_ms"]
+                entry["wasm_bytes"] = bins[bench]["squid"]["wasm_bytes"]
             summary[bench][lang] = entry
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)

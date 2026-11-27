@@ -10,7 +10,7 @@
 
 static void packet_path(char *path, size_t size, uint32_t version,
                         uint32_t unit) {
-  const char *dir = getenv(version == 0 ? "BLOT_BASE" : "BLOT_EDIT");
+  const char *dir = getenv(version == 0 ? "SQUID_BASE" : "SQUID_EDIT");
   if (!dir || snprintf(path, size, "%s/%u-2.bin", dir, unit) >= (int)size)
     abort();
 }
@@ -35,7 +35,7 @@ void body_stat(uint32_t key, uint64_t value) {
 }
 void body_save(uint32_t kind, const uint8_t *data, int64_t n) {
   char path[4096];
-  if (snprintf(path, sizeof path, "%s/%u.wasm", getenv("BLOT_SAVE"), kind) >=
+  if (snprintf(path, sizeof path, "%s/%u.wasm", getenv("SQUID_SAVE"), kind) >=
       (int)sizeof path)
     abort();
   FILE *f = fopen(path, "wb");
@@ -43,11 +43,11 @@ void body_save(uint32_t kind, const uint8_t *data, int64_t n) {
     abort();
 }
 bool body_reference_first(void) {
-  return getenv("BLOT_REFERENCE_FIRST") != NULL;
+  return getenv("SQUID_REFERENCE_FIRST") != NULL;
 }
-uint32_t edit_unit(void) { return strtoul(getenv("BLOT_EDIT_UNIT"), NULL, 10); }
+uint32_t edit_unit(void) { return strtoul(getenv("SQUID_EDIT_UNIT"), NULL, 10); }
 uint32_t edit_point(void) {
-  return strtoul(getenv("BLOT_EDIT_POINT"), NULL, 10);
+  return strtoul(getenv("SQUID_EDIT_POINT"), NULL, 10);
 }
 void body_diag(const uint8_t *text, int64_t n) {
   fprintf(stderr, "%.*s\n", (int)n, text);
@@ -74,7 +74,7 @@ struct staged_bindings {
 };
 static struct staged_bindings stages[294];
 
-bool body_recording(void) { return getenv("BLOT_CONTROL") == NULL; }
+bool body_recording(void) { return getenv("SQUID_CONTROL") == NULL; }
 void body_enable(bool value) { enabled = value; }
 
 void body_stage_read(uint32_t unit, uint32_t binding) {
@@ -169,9 +169,9 @@ static bool job_line(char **line, size_t *cap) {
   return true;
 }
 
-extern uint64_t blot_clock_ns(void);
+extern uint64_t squid_clock_ns(void);
 static uint64_t job_start;
-uint64_t body_job_elapsed(void) { return blot_clock_ns() - job_start; }
+uint64_t body_job_elapsed(void) { return squid_clock_ns() - job_start; }
 
 bool body_next_edit(void) {
   body_stat(23, named_count);
@@ -179,7 +179,7 @@ bool body_next_edit(void) {
   body_stat(25, event_bytes + staged_bytes + sizeof traces + sizeof inferred +
                     sizeof stages);
   fflush(stdout);
-  int ready_fd = atoi(getenv("BLOT_READY_FD"));
+  int ready_fd = atoi(getenv("SQUID_READY_FD"));
   if (write(ready_fd, "!", 1) != 1 || close(ready_fd)) abort();
   char *fields[5] = {0};
   size_t caps[5] = {0};
@@ -190,17 +190,17 @@ bool body_next_edit(void) {
         abort();
     printf("JOB %u\n", job++);
     fflush(stdout);
-    job_start = blot_clock_ns();
+    job_start = squid_clock_ns();
     pid_t child = fork();
     if (child < 0)
       abort();
     if (!child) {
-      if (setenv("BLOT_EDIT", fields[0], 1) ||
-          setenv("BLOT_SAVE", fields[1], 1) ||
-          setenv("BLOT_EDIT_UNIT", fields[2], 1) ||
-          setenv("BLOT_EDIT_POINT", fields[3], 1))
+      if (setenv("SQUID_EDIT", fields[0], 1) ||
+          setenv("SQUID_SAVE", fields[1], 1) ||
+          setenv("SQUID_EDIT_UNIT", fields[2], 1) ||
+          setenv("SQUID_EDIT_POINT", fields[3], 1))
         abort();
-      if (strcmp(fields[4], "1") == 0 && setenv("BLOT_REFERENCE_FIRST", "1", 1))
+      if (strcmp(fields[4], "1") == 0 && setenv("SQUID_REFERENCE_FIRST", "1", 1))
         abort();
       return true;
     }

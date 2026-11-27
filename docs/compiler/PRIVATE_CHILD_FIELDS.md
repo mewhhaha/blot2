@@ -45,7 +45,7 @@ identity: `6eacf189e2f18303e84182188c90b0262a0502876769f4fd99d8b316cb1e9f3b`.
 Pinned incoming binary:
 `75724f53dfbec6c0b25464151ad80ab849c724e8fded14dd4cffbfb60133314e`. Evidence,
 rejected candidates, harnesses and exact source pins live in
-`/var/tmp/blot2-adapter-children-047/build/bench/adapter-children/`.
+`/var/tmp/squid-adapter-children-047/build/bench/adapter-children/`.
 
 At 4096 rows, profiling copies measure physical allocations/payload separately
 from ordinary-module CPU. Thirty-one alternating CPU 7 pairs follow 20 warmups,

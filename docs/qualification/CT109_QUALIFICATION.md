@@ -4,11 +4,11 @@ The complete compiler gate passes on Candidate 10. Seven final release pairs
 and held-out execution controls also pass.
 The final 200-distinct-edit memory series and local installation checks pass.
 
-The [86-proposal ledger](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_LEDGER.md) records the outcome of
+The [86-proposal ledger](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_LEDGER.md) records the outcome of
 every proposal. All eight previously marked “Remaining” have implementations or
 measured trials. Partial and conditional architectures remain explicit; this
 is not a claim that a shared IR, unified query graph or resumable inference has
-been implemented. [The work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_WORK.md) preserves each
+been implemented. [The work record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_WORK.md) preserves each
 candidate, rejected experiment and failed qualification run.
 
 ## Candidate and comparison controls
@@ -215,7 +215,7 @@ physical allocator/copy attribution remains open in the ledger.
 ## Installation and archived evidence
 
 The exact qualified native compiler is packaged and installed without another
-Zig build. Both `~/.local/bin/blot` and `blotc` pass external-directory format,
+Zig build. Both `~/.local/bin/squid` and `squidc` pass external-directory format,
 check and build; CLI/native/staged Wasm match and execute with answer 29. The
 bundled guide matches the source. The installed CLI SHA-256 is
 `5e7b9ca4b6bb1c3fac1a45a0d69035a3af59584f475b493d7ab7900b35b44d58`;

@@ -8,13 +8,13 @@
   37 MB (CT56, deferred). Getting under 100 MB needs solver stores that outlive
   a region's arena. CT60 and CT61 raised requested allocation to 266 MB (solver)
   and 132 MB (scratch). See
-  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [084](084-qualify-the-complete-program.md)
 - **Originating requirements:** PLAN: Hill 7 / under-100-MB cumulative requested
   allocation. Sources: [PLAN.md](../PLAN.md),
-  [README final gates](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#final-qualification-gates).
+  [README final gates](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#final-qualification-gates).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

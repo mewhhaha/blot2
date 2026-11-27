@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const std = new URL("../../std", import.meta.url).pathname;
 
 const tree = `
@@ -29,7 +29,7 @@ function inspect(bytes: Uint8Array<ArrayBuffer>) {
   const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
   const run = raw.run as CallableFunction;
   assert.equal(run(8192), 8192 + 8191 * 2);
-  const memory = raw["blot:memory"] as WebAssembly.Memory;
+  const memory = raw["squid:memory"] as WebAssembly.Memory;
   const warm = memory.buffer.byteLength;
   for (let iteration = 0; iteration < 8; iteration++) {
     assert.equal(run(4096), 8192 + 4095 * 2);
@@ -37,14 +37,14 @@ function inspect(bytes: Uint8Array<ArrayBuffer>) {
   }
 }
 
-/** Builds a multi-module project; `main.blot` is the entry. */
+/** Builds a multi-module project; `main.sq` is the entry. */
 async function buildProject(
   files: Record<string, string>,
   options: { std?: boolean } = {},
 ): Promise<Uint8Array<ArrayBuffer>> {
   const directory = await Deno.makeTempDir({
     dir: new URL("../../build", import.meta.url).pathname,
-    prefix: "blot-acyclic-owner-",
+    prefix: "squid-acyclic-owner-",
   });
   try {
     for (const [name, text] of Object.entries(files)) {
@@ -54,10 +54,10 @@ async function buildProject(
     const result = await new Deno.Command(compiler, {
       args: [
         "build-project",
-        `${directory}/main.blot`,
+        `${directory}/main.sq`,
         output,
         ...(options.std
-          ? ["--std-root", std, "--prelude", `${std}/prelude.blot`]
+          ? ["--std-root", std, "--prelude", `${std}/prelude.sq`]
           : []),
       ],
       stdout: "piped",
@@ -76,8 +76,8 @@ async function buildProject(
 
 const foreignTree = (link: string) =>
   buildProject({
-    "link.blot": link,
-    "main.blot": 'import * as link from "./link"\n' +
+    "link.sq": link,
+    "main.sq": 'import * as link from "./link"\n' +
       tree.replaceAll("Link", "link.Link").replaceAll("$End", "$link.End")
         .replaceAll("$Next", "$link.Next"),
   });
@@ -195,7 +195,7 @@ io const memory = func () : Array U32 => return #[]
 // Direct backend gap: a loop that calls an allocating function is not reclaimed per iteration, so 100 frames exhaust memory (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("frame draws with foreign math, Maybe and Array fields keep their results", async () => {
   const bytes = await buildProject(
-    { "gmath.blot": gmath, "main.blot": frames },
+    { "gmath.sq": gmath, "main.sq": frames },
     {
       std: true,
     },
@@ -204,7 +204,7 @@ Deno.test.ignore("frame draws with foreign math, Maybe and Array fields keep the
   const run = raw.run as CallableFunction;
   // Each stack draws materials 0 and 1; the head draw has material 0.
   assert.equal(run(200), 64 * 200);
-  const memory = raw["blot:memory"] as WebAssembly.Memory;
+  const memory = raw["squid:memory"] as WebAssembly.Memory;
   const warm = memory.buffer.byteLength;
   for (let round = 0; round < 4; round++) {
     assert.equal(run(200), 64 * 200);

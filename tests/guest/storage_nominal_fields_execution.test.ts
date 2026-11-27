@@ -51,19 +51,19 @@ io const floats = func (input: F32) => return do:
 `;
 Deno.test(`loaded nominal fields retain checked dispatch across generic contexts`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-nominal-fields-",
+    prefix: "squid-nominal-fields-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
     startupTimeoutMs: 5_000,
   });
   try {
-    await Deno.writeTextFile(`${directory}/shapes.blot`, shapes);
+    await Deno.writeTextFile(`${directory}/shapes.sq`, shapes);
     const result = await compiler.build({
       sources: { [entry]: source },
       signal: AbortSignal.timeout(5_000),

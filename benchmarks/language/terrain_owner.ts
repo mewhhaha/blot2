@@ -8,8 +8,8 @@ const root = resolve("../gdev");
 const project = await gdevProject(
   root,
   resolve("std"),
-  "src/terrain_owner_probe.blot",
-  resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+  "src/terrain_owner_probe.sq",
+  resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
 );
 const source = `import * as trails from "game/world/trails"
 import * as derived from "ink/derived/keyed"
@@ -64,16 +64,16 @@ try {
   let instance: WebAssembly.Instance;
   const observations: { marker: number; owners: TileOwner[] }[] = [];
   const observe = (_handle: number, marker: number) => {
-    const memory = instance.exports["blot:memory"];
+    const memory = instance.exports["squid:memory"];
     assert(memory instanceof WebAssembly.Memory);
     observations.push({ marker, owners: tiles(memory) });
     return 0;
   };
   assert.deepEqual(WebAssembly.Module.imports(module), [
-    { module: "blot:host/1", name: "call_u32_u32", kind: "function" },
+    { module: "squid:host/1", name: "call_u32_u32", kind: "function" },
   ]);
   instance = await WebAssembly.instantiate(module, {
-    "blot:host/1": { call_u32_u32: observe },
+    "squid:host/1": { call_u32_u32: observe },
   });
   const probe = instance.exports.probe as (callback: number) => number;
   const checksum = probe(1);

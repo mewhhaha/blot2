@@ -25,8 +25,8 @@ import {
 } from "../../host/zig_project_client.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 const scratchRoot = new URL("../../build/tmp/", import.meta.url).pathname;
 
@@ -49,7 +49,7 @@ async function measure(program: SyntheticProgram): Promise<Measurement> {
     prefix: `budget-${program.name}-`,
   });
   try {
-    const input = `${directory}/main.blot`;
+    const input = `${directory}/main.sq`;
     const output = `${directory}/main.wasm`;
     await Deno.writeTextFile(input, program.source);
     const result = await new Deno.Command(compiler, {
@@ -181,8 +181,8 @@ Deno.test("inference shares repeated aggregate shapes across generic calls", asy
     dir: scratchRoot,
     prefix: "signatures-",
   });
-  const entry = directory + "/main.blot";
-  const library = directory + "/library.blot";
+  const entry = directory + "/main.sq";
+  const library = directory + "/library.sq";
   const layers = ["func layer0 x => return x"];
   for (let i = 1; i <= 12; i++) {
     const call = `layer${i - 1} x`;
@@ -325,19 +325,19 @@ const rejectedEdits: readonly {
 }[] = [
   {
     name: "dependency_unknown_value",
-    file: "robots.blot",
+    file: "robots.sq",
     search: "floor phase + 1.0",
     replace: "floor phase + missing_value",
   },
   {
     name: "dependency_type_mismatch",
-    file: "robots.blot",
+    file: "robots.sq",
     search: "width: carry.width }",
     replace: "width: carry }",
   },
   {
     name: "entry_unknown_value",
-    file: "main.blot",
+    file: "main.sq",
     search: "robots.walk x",
     replace: "robots.walk missing_value",
   },

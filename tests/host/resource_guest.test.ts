@@ -25,7 +25,7 @@ function section(id: number, bytes: number[]): number[] {
 function fixture(change = "valid"): WebAssembly.Module {
   const imports = ["reserve", "register", "release"];
   if (change === "missing_import") imports.splice(1, 1);
-  const hooks = ["blot:ownership_enter", "blot:ownership_leave"];
+  const hooks = ["squid:ownership_enter", "squid:ownership_leave"];
   if (change === "missing_hook") hooks.pop();
   const globals = ["roots", "leases", "retains", "releases", "destroyed"];
   let reserveType = 0;
@@ -72,7 +72,7 @@ function fixture(change = "valid"): WebAssembly.Module {
     let type = 2;
     if (value === "reserve") type = reserveType;
     if (value === "register") type = 1;
-    return [...name("blot:resource/1"), ...name(value), 0, type];
+    return [...name("squid:resource/1"), ...name(value), 0, type];
   });
   const exported = [
     ...hooks.flatMap((
@@ -82,10 +82,10 @@ function fixture(change = "valid"): WebAssembly.Module {
     ...globals.flatMap((
       value,
       index,
-    ) => [...name(`blot:rc_${value}`), 3, index]),
+    ) => [...name(`squid:rc_${value}`), 3, index]),
     ...["cleanup", "drop"].flatMap((
       value,
-    ) => [...name(`blot:resource_${value}/0`), 0, imports.length + 2]),
+    ) => [...name(`squid:resource_${value}/0`), 0, imports.length + 2]),
   ];
   return new WebAssembly.Module(
     new Uint8Array([
@@ -103,8 +103,8 @@ function fixture(change = "valid"): WebAssembly.Module {
       ...section(6, [5, ...globals.flatMap(() => [127, 1, 65, 0, 11])]),
       ...section(7, [hooks.length + globals.length + 2, ...exported]),
       ...section(10, [3, 2, 0, 11, 2, 0, 11, 2, 0, 11]),
-      ...section(0, [...name("blot:abi"), 4, ...u32(count), 0, 0]),
-      ...section(0, [...name("blot:ownership"), 2, 2, 0]),
+      ...section(0, [...name("squid:abi"), 4, ...u32(count), 0, 0]),
+      ...section(0, [...name("squid:ownership"), 2, 2, 0]),
     ]),
   );
 }
@@ -158,12 +158,12 @@ function ownerFixture(change: string): WebAssembly.Module {
     type(1, true),
   ];
   const imports = [
-    ["blot:resource/1", "reserve", 0],
-    ["blot:resource/1", "register", 1],
-    ["blot:resource/1", "release", 2],
-    ["blot:resource/2", "register_owned", 5],
-    ["blot:resource/2", "retire", 2],
-    ["blot:resource/2", "drain", 3],
+    ["squid:resource/1", "reserve", 0],
+    ["squid:resource/1", "register", 1],
+    ["squid:resource/1", "release", 2],
+    ["squid:resource/2", "register_owned", 5],
+    ["squid:resource/2", "retire", 2],
+    ["squid:resource/2", "drain", 3],
   ] as const;
   const counters = ["roots", "leases", "retains", "releases", "destroyed"];
   let address = 64;
@@ -237,16 +237,16 @@ function ownerFixture(change: string): WebAssembly.Module {
     run,
   ];
   const exports = [
-    [...name("blot:ownership_enter"), 0, 6],
-    [...name("blot:ownership_leave"), 0, 7],
-    [...name("blot:allocate"), 0, 10],
-    [...name("blot:reset"), 0, 11],
+    [...name("squid:ownership_enter"), 0, 6],
+    [...name("squid:ownership_leave"), 0, 7],
+    [...name("squid:allocate"), 0, 10],
+    [...name("squid:reset"), 0, 11],
     [...name("run"), 0, 12],
-    [...name("blot:memory"), 2, 0],
-    ...counters.map((value, index) => [...name(`blot:rc_${value}`), 3, index]),
+    [...name("squid:memory"), 2, 0],
+    ...counters.map((value, index) => [...name(`squid:rc_${value}`), 3, index]),
     ...[0, 1, 2].flatMap((index) => [
-      [...name(`blot:resource_cleanup/${index}`), 0, 8],
-      [...name(`blot:resource_drop/${index}`), 0, 9],
+      [...name(`squid:resource_cleanup/${index}`), 0, 8],
+      [...name(`squid:resource_drop/${index}`), 0, 9],
     ]),
     [...name("attempts"), 3, 4],
     [...name("drops"), 3, 3],
@@ -280,7 +280,7 @@ function ownerFixture(change: string): WebAssembly.Module {
         ]),
       ]),
       ...section(0, [
-        ...name("blot:abi"),
+        ...name("squid:abi"),
         5,
         3,
         1,
@@ -293,7 +293,7 @@ function ownerFixture(change: string): WebAssembly.Module {
         ...name("drops"),
         1,
       ]),
-      ...section(0, [...name("blot:ownership"), 2, 2, 0]),
+      ...section(0, [...name("squid:ownership"), 2, 2, 0]),
     ]),
   );
 }

@@ -112,8 +112,8 @@ entry status after successful export publication.
 
 Admitted modules declare ownership revision 2, mode 2 and guest ABI 3. The value
 ABI remains Unit, U32, F32, Bool, Array U32 and Array F32. ABI 2 remains
-supported. ABI 3 adds private `blot:ownership_enter` and
-`blot:ownership_leave(i32)` hooks; the guest validates their exact Wasm
+supported. ABI 3 adds private `squid:ownership_enter` and
+`squid:ownership_leave(i32)` hooks; the guest validates their exact Wasm
 signatures before calling either.
 
 Leave outcome 0 closes a successful invocation; 1 closes failed frames; 2
@@ -125,7 +125,7 @@ it afterwards.
 
 Raw scalar entries recover an earlier trapped raw scalar call before starting
 the next invocation. Raw Array inputs/outputs retain their existing allocation
-group until explicit `blot:reset`; a raw host must reset that group. The guest
+group until explicit `squid:reset`; a raw host must reset that group. The guest
 client closes its own invocation before reset, while module owners survive.
 
 Examples:
@@ -273,7 +273,7 @@ below.
 
 ## Integrated qualification (12 October 2026)
 
-Local implementation `2798ff9` combines 029, 032 and 037 with the bpm client.
+Local implementation `2798ff9` combines 029, 032 and 037 with the spm client.
 The frozen incoming revision is `1ad8f15f0cfaba16ec06482fd03f7f8f4f53525f`; its
 qualified staged tree is `6064c8e2d114bfb39ab3c78d5c0b295f51f1be15`. The Fast /
 LLVM release uses Zig 0.17.0 and `deno task build:compiler`. Its executable
@@ -321,13 +321,13 @@ timing change. These combined measurements do not attribute a cost to one
 isolated task.
 
 Raw pins, harnesses, distributions, failed attempts and gate logs are retained
-in ignored `build/bench/joint-029-032-037-bpm/`. Public reproduction uses its
+in ignored `build/bench/joint-029-032-037-spm/`. Public reproduction uses its
 `compare_public.py`; synthetic reproduction uses
 `deno task bench:compile
 --workload synthetic --runs 7 --restart-cache --allow-wasm-diff`.
-Baseline is `build/bench/symbolic-body-reuse/blotc-baseline` (SHA-256
+Baseline is `build/bench/symbolic-body-reuse/squidc-baseline` (SHA-256
 `272f028932b0cc563049fe7e5f6f51139304f0ae4cf7213351fd55f5f5f7a127`); qualified
-candidate is `corrected/blotc-candidate` in the joint evidence directory. The
+candidate is `corrected/squidc-candidate` in the joint evidence directory. The
 corrected public and synthetic samples are under `corrected/`.
 
 The isolated runtime measurements above remain tied to their original pins. In
@@ -337,7 +337,7 @@ JSPI roots (033), cycles (034), tracing removal and its final CPU/memory gates
 
 ## Array loop throughput (17 October 2026)
 
-Task 109 answers [issue #9](https://github.com/mewhhaha/blot2/issues/9). On main
+Task 109 answers [issue #9](https://github.com/mewhhaha/squid-lang/issues/9). On main
 `48eda0a`, in-place Array loops paid journal work in every iteration: a frame
 open and close, a publication per reference carry, and a slot store per carry
 assignment. Numeric element writes also went through `store_word`. The changes
@@ -370,7 +370,7 @@ stays fixed. Backend emit time on Ink's library bench is unchanged at about 258
 ms per build.
 
 The executed law in `tests/persistent_roots_execution.test.ts` is the throughput
-guard. It counts journal retains per call with the exported `blot:rc_retains`
+guard. It counts journal retains per call with the exported `squid:rc_retains`
 counter. For counts of 2, 64 and 512 the task build retains the same number on
 every call; main retains 8, 2,416 and 133,298. The source law in
 `src/backend/persistent_roots_tests.zig` checks the prepared bodies directly:
@@ -453,5 +453,5 @@ own `compiler/zig-out/bin/`):
 
 ```sh
 deno run --allow-all benchmarks/tools/bench_array_throughput.ts \
-  PINNED_BLOTC PRE_FIX_BLOTC CURRENT_BLOTC INK_ROOT OUTPUT ISSUE_REPRO
+  PINNED_SQUIDC PRE_FIX_SQUIDC CURRENT_SQUIDC INK_ROOT OUTPUT ISSUE_REPRO
 ```

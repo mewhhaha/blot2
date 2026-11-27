@@ -49,7 +49,7 @@ function nanoseconds(value: bigint): number {
   return Number(value);
 }
 
-async function blot(bytes: Uint8Array<ArrayBuffer>, input: Input) {
+async function squid(bytes: Uint8Array<ArrayBuffer>, input: Input) {
   const start = process.hrtime.bigint();
   const guest = await instantiateGuest(bytes);
   const compileInstantiate = process.hrtime.bigint() - start;
@@ -139,14 +139,14 @@ async function goose(
 }
 
 const [backend, artifact, json, ...options] = process.argv.slice(2);
-assert(backend === "blot" || backend === "goose", "backend must be blot/goose");
+assert(backend === "squid" || backend === "goose", "backend must be squid/goose");
 assert(artifact && json, "usage: runtime.ts backend artifact input-json");
 const input = parseInput(json);
 const bytes = readFileSync(artifact);
 let record;
-if (backend === "blot") {
-  assert.equal(options.length, 0, "unexpected Blot runtime options");
-  record = await blot(bytes, input);
+if (backend === "squid") {
+  assert.equal(options.length, 0, "unexpected Squid runtime options");
+  record = await squid(bytes, input);
 } else {
   assert(options.length === 2 && options[0] === "--goose-runner");
   record = await goose(bytes, input, options[1]);

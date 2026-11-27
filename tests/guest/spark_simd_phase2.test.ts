@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -281,8 +281,8 @@ io nested_spark (unused: U32) : #[U32] => return do:
 });
 
 Deno.test("Phase 2: work counters, unpatchableOperand (-2) & recordInlined replay soundness", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-spark-replay-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-spark-replay-" });
+  const entry = `${dir}/main.sq`;
   const v1 = `func scale_helper (x: F32) : F32 => return x * 2.0 + 3.0
 func unrelated (n: U32) : U32 => return n + 10
 io simd_map (xs: #[F32]) : #[F32] => return spark #[scale_helper x + 1.0 | x <- xs]

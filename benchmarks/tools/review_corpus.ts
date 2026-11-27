@@ -80,24 +80,24 @@ io const main = func (x: U32) => return @u32.add x seed
 }
 function modules(count: number): SyntheticProject {
   const files: Record<string, string> = {
-    "m0.blot": "const step = func (x: U32) => return @u32.add x 1\n",
+    "m0.sq": "const step = func (x: U32) => return @u32.add x 1\n",
   };
   for (let i = 1; i < count; i++) {
-    files[`m${i}.blot`] = `import * as previous from "./m${
+    files[`m${i}.sq`] = `import * as previous from "./m${
       i - 1
     }"\nconst step = func (x: U32) => return @u32.add (previous.step x) 1\n`;
   }
-  files["main.blot"] = `import * as last from "./m${
+  files["main.sq"] = `import * as last from "./m${
     count - 1
   }"\nentry const main = func (x: U32) => return last.step x\n`;
   return {
     name: `review_modules_${count}`,
     files,
-    entry: "main.blot",
+    entry: "main.sq",
     scenarios: [{
       name: "producer_body",
       replacements: [{
-        file: "m0.blot",
+        file: "m0.sq",
         search: "@u32.add x 1",
         replace: "@u32.add x 2",
       }],

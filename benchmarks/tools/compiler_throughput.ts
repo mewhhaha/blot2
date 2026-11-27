@@ -148,8 +148,8 @@ try {
     `  return @storage.freeze output`,
   );
   const files = moduleLines.map((text, index) => {
-    let path = `leaves_${index}.blot`;
-    if (index === 0) path = "main.blot";
+    let path = `leaves_${index}.sq`;
+    if (index === 0) path = "main.sq";
     const source = text.join("\n") + "\n";
     return { path, source, lines: text.length, bytes: encoder.encode(source) };
   });
@@ -195,8 +195,8 @@ try {
   };
   report.compilerSha256 = await sha256(await Deno.readFile(compilerPath));
   report.generationMs = generationMs;
-  directory = await Deno.makeTempDir({ prefix: "blot-throughput-" });
-  const entryPath = `${directory}/main.blot`;
+  directory = await Deno.makeTempDir({ prefix: "squid-throughput-" });
+  const entryPath = `${directory}/main.sq`;
   const coldStart = performance.now();
   timer = setTimeout(() => signal.abort(), timeoutMs);
   compiler = await createZigProjectCompiler({

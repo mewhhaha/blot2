@@ -35,7 +35,7 @@ the field it is made of, about fields of a function's own local that leave
 in its result, and about an arm of a `case` or an `if` that names a local at
 its last read, which moves it.
 
-Batch 1C (22 November 2026) retired `lent` functions and `BLOT_REPORT_STORES`,
+Batch 1C (22 November 2026) retired `lent` functions and `SQUID_REPORT_STORES`,
 removing the 10 `lent`-only programs (h01..h06, n09..n12) and leaving 202
 programs with unchanged diagnostics. Phase 3 (23 November 2026) removed the
 `=` borrowed-mutator store statement, retiring the 3 remaining store-only
@@ -68,7 +68,7 @@ MODES = [("", False, EXPECTED)]
 
 def diagnostics(compiler, source, output, rules=False):
     environment = dict(os.environ)
-    environment.pop("BLOT_REPORT_STORES", None)
+    environment.pop("SQUID_REPORT_STORES", None)
     result = subprocess.run([str(compiler), "build", str(source), str(output)], capture_output=True, text=True,
                             stdin=subprocess.DEVNULL, timeout=120, env=environment)
     frontend, lowering = [], []
@@ -92,17 +92,17 @@ def diagnostics(compiler, source, output, rules=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*")
-    parser.add_argument("--compiler", type=Path, default=ROOT / "build/blotc-goose")
+    parser.add_argument("--compiler", type=Path, default=ROOT / "build/squidc-goose")
     parser.add_argument("--record", type=Path, help="write expected.json from this compiler")
     args = parser.parse_args()
-    every = sorted(path.stem for path in LAWS.glob("*.blot"))
+    every = sorted(path.stem for path in LAWS.glob("*.sq"))
     failed = False
-    with tempfile.TemporaryDirectory(prefix="blot-uniqueness-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="squid-uniqueness-") as scratch:
         for label, rules, path in MODES:
             if args.record:
                 record = {}
                 for name in every:
-                    frontend, lowering = diagnostics(args.record, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm", rules)
+                    frontend, lowering = diagnostics(args.record, LAWS / f"{name}.sq", Path(scratch) / f"{name}.wasm", rules)
                     if frontend:
                         raise SystemExit(f"{name}{label}: frontend diagnostics {[item[0] for item in frontend]}")
                     record[name] = lowering
@@ -113,7 +113,7 @@ def main():
             names = args.names or every
             wrong = rejected = accepted = 0
             for name in names:
-                frontend, lowering = diagnostics(args.compiler, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm", rules)
+                frontend, lowering = diagnostics(args.compiler, LAWS / f"{name}.sq", Path(scratch) / f"{name}.wasm", rules)
                 problems = []
                 if name not in expected:
                     problems.append("no record")

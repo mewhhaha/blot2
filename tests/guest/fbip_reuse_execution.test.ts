@@ -137,7 +137,7 @@ Deno.test("FBIP reuses boxed blocks across statement matches, return tails, and 
     assert.equal(guest.call("alias_soundness", 7), sa * 1000 + (sa + 100));
     // Warm steady-state: repeated 50k-iteration statement-match FBIP loops must not grow linear memory.
     const raw = (guest as unknown as { exports?: Record<string, unknown> }).exports;
-    const mem = raw?.["blot:memory"] as WebAssembly.Memory | undefined;
+    const mem = raw?.["squid:memory"] as WebAssembly.Memory | undefined;
     if (mem) {
       const before = mem.buffer.byteLength;
       for (let r = 0; r < 5; r++) {

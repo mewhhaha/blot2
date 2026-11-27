@@ -5,7 +5,7 @@ Use the [language guide](../docs/language/guide.md) and
 The rewrite is unfinished: ordinary pure modules can still select ABI 3. Check
 the actual guest manifest before attributing measurements to owned storage.
 Earlier counted-runtime/List-layout measurements and optimizer details remain in
-[the pinned historical document](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/std/PERFORMANCE.md).
+[the pinned historical document](https://github.com/mewhhaha/squid-lang/blob/4b594a129df6683c900021f355dd771a3de4a311/std/PERFORMANCE.md).
 
 ## Collections and ownership
 

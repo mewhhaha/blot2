@@ -10,7 +10,7 @@
   and invocation. Sources:
   [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -38,7 +38,7 @@ remain insufficient as source-level proofs.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Test valid exclusive transfer, sharing, scoped borrowing and specified
@@ -131,7 +131,7 @@ native test names and guest JUnit report is recorded in
   remain an intentional rejection under the normative design. Forms outside the
   rows are excluded scope under the owner decision of 15 October 2026 (closed
   acceptance above;
-  [README owner decisions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
+  [README owner decisions](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
   not open work. Usage evidence for unannotated unknown generic or higher-order
   callees and nominal/package affinity beyond the checked contracts reject
   conservatively. An existing unrestricted or shared binding cannot become

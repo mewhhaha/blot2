@@ -6,7 +6,7 @@ cycles; trial deletion and tracing removal remain tasks 034 and 035.
 
 ## Admission and owners
 
-Only exact generated `blot:host/1` imports are admitted: canonical callback
+Only exact generated `squid:host/1` imports are admitted: canonical callback
 name, externref argument, checked numeric/Array argument and checked result
 signature. Unknown imports retain whole-module tracing fallback. Externrefs
 belong to a separate host table; they are never guest heap edges.

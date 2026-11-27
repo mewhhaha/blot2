@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const library = `type Probe is data = $Probe U32
 const copy = func (value: U32) => return value
 const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)
@@ -94,9 +94,9 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
 }
 Deno.test(`numeric finite nested selected closures preserve exact operands unknown effects and imports`, async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/logic.blot`;
-  const archive = `${directory}/logic.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/logic.sq`;
+  const archive = `${directory}/logic.sqdep`;
   try {
     await Deno.writeTextFile(entry, source);
     await Deno.writeTextFile(dependency, library);

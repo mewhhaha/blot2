@@ -101,7 +101,7 @@ function span(node: Cst): [number, number] {
   ];
 }
 
-/** Format Blot while checking that application and evaluation order stay intact. */
+/** Format Squid while checking that application and evaluation order stay intact. */
 export async function formatSource(source: string): Promise<string> {
   const frontend = await createFrontend();
   try {

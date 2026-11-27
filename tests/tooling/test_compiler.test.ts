@@ -116,8 +116,8 @@ Deno.test("development mode builds the debug compiler and runs the named files o
 
 Deno.test("the test command passes the compiler after the files", () => {
   assert.deepEqual(
-    testCommand(["a.test.ts"], "blotc", 2, undefined, undefined).slice(-4),
-    ["--parallel", "a.test.ts", "--", "blotc"],
+    testCommand(["a.test.ts"], "squidc", 2, undefined, undefined).slice(-4),
+    ["--parallel", "a.test.ts", "--", "squidc"],
   );
 });
 

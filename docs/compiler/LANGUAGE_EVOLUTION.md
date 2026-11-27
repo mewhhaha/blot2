@@ -63,7 +63,7 @@ overlays, parser dependencies, deterministic reference assignment, and source
 limits are part of correctness. Parser callbacks must be deterministic and
 perform file reads through their supplied context.
 
-The initial host parser boundary does not pretend that Blot already has runtime
+The initial host parser boundary does not pretend that Squid already has runtime
 text or general type-valued computation. Those remain separately specified
 language work. No regex-based WGSL parser should claim to validate shader types;
 shader integration should use a real parser or explicit checked metadata.

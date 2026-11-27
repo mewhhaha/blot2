@@ -262,9 +262,9 @@ io const lanes = func (x: F32) : Array F32 => return do:
 Deno.test("four-lane workers match fresh builds across retained edits", async () => {
   const { createZigProjectCompiler } = await import("../../host/zig_project_client.ts");
   const { instantiateGuest } = await import("../../host/guest.ts");
-  const directory = await Deno.makeTempDir({ prefix: "blot-simd-workers-" });
-  const entry = `${directory}/main.blot`;
-  const helper = `${directory}/helper.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-simd-workers-" });
+  const entry = `${directory}/main.sq`;
+  const helper = `${directory}/helper.sq`;
   const program = `import * as simd from "std/simd"
 import * as helper from "./helper"
 io const run = func (n: U32) : F32 => return do:
@@ -292,8 +292,8 @@ const extra = func (n: U32) : F32 => return simd.f32_sum (${bias === 5 ? "twice"
   });
   try {
     const options = {
-      executable: Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname, entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname, stdRoot,
+      executable: Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname, entry,
+      prelude: new URL("../../std/prelude.sq", import.meta.url).pathname, stdRoot,
     };
     const retained = await createZigProjectCompiler(options);
     const results = new Map<number, unknown>();

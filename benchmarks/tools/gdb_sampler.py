@@ -1,10 +1,10 @@
-# Poor man's sampling profiler for blotc, run inside gdb:
+# Poor man's sampling profiler for squidc, run inside gdb:
 #
 #   gdb -batch -q -x benchmarks/tools/gdb_sampler.py
 #
 # benchmarks/tools/profile_compile.ts drives it; run that instead. Environment:
 #   SAMPLE_CONTROL  directory for the handshake files below
-#   SAMPLE_BINARY   the blotc whose symbols gdb loads (must have DWARF)
+#   SAMPLE_BINARY   the squidc whose symbols gdb loads (must have DWARF)
 #   SAMPLE_OUT      JSON-lines output, one record per stop
 #   SAMPLE_MIN_MS / SAMPLE_MAX_MS  random interval between stops (default 3-10)
 #   SAMPLE_LIMIT    stop after this many samples (default unlimited)

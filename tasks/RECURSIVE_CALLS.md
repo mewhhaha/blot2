@@ -10,8 +10,8 @@ complete that task or the owned-storage rewrite.
 ## Outcome and first boundary
 
 Compile and execute the unchanged Goose comparison ports
-[`sort_merge.blot`](../benchmarks/goose/ports/sort_merge.blot) and
-[`sort_quick.blot`](../benchmarks/goose/ports/sort_quick.blot), then replace
+[`sort_merge.sq`](../benchmarks/goose/ports/sort_merge.sq) and
+[`sort_quick.sq`](../benchmarks/goose/ports/sort_quick.sq), then replace
 their unsupported chart cells with checked measurements.
 
 First admit direct self-recursion in closed, fully applied named functions: U32

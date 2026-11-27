@@ -70,9 +70,9 @@ io const view_bound = func (at: U32): U32 => return do:
 
 Deno.test(`selected stored fields preserve update order and bounds`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-selected-fields-",
+    prefix: "squid-selected-fields-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   let compiler:
     | Awaited<ReturnType<typeof createZigProjectCompiler>>
@@ -82,7 +82,7 @@ Deno.test(`selected stored fields preserve update order and bounds`, async () =>
       executable: Deno.args[0],
       entry,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
       startupTimeoutMs: 5_000,
     });
     const result = await compiler.build({

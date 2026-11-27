@@ -37,7 +37,7 @@ io const floats = func (input: Array F32): Array F32 => return do:
       const module = new WebAssembly.Module(bytes);
       assert.equal(readGuestAbi(module).version, 8);
       assert.equal(
-        WebAssembly.Module.customSections(module, "blot:ownership").length,
+        WebAssembly.Module.customSections(module, "squid:ownership").length,
         0,
       );
       assert.deepEqual(WebAssembly.Module.imports(module), []);
@@ -47,7 +47,7 @@ io const floats = func (input: Array F32): Array F32 => return do:
         ),
       );
       const exports = new WebAssembly.Instance(module).exports;
-      const memory = exports["blot:memory"] as WebAssembly.Memory;
+      const memory = exports["squid:memory"] as WebAssembly.Memory;
       assert.equal(memory.buffer.byteLength, 65536);
       assert.throws(
         () => memory.grow(8192),
@@ -57,11 +57,11 @@ io const floats = func (input: Array F32): Array F32 => return do:
         () => (exports.exchange as CallableFunction)(0),
         WebAssembly.RuntimeError,
       );
-      const allocate = exports["blot:allocate"] as CallableFunction;
-      const reset = exports["blot:reset"] as CallableFunction;
+      const allocate = exports["squid:allocate"] as CallableFunction;
+      const reset = exports["squid:reset"] as CallableFunction;
       reset(0);
       const pointer = allocate(4);
-      new DataView((exports["blot:memory"] as WebAssembly.Memory).buffer)
+      new DataView((exports["squid:memory"] as WebAssembly.Memory).buffer)
         .setUint32(pointer, 0xffffffff, true);
       assert.throws(
         () => (exports.exchange as CallableFunction)(pointer),
@@ -211,20 +211,20 @@ io const next = func (delta: U32) => return @u32.add state[0] delta
       const module = new WebAssembly.Module(bytes);
       assert.equal(readGuestAbi(module).version, 8);
       assert.equal(
-        WebAssembly.Module.customSections(module, "blot:ownership").length,
+        WebAssembly.Module.customSections(module, "squid:ownership").length,
         0,
       );
       assert.deepEqual(
         WebAssembly.Module.exports(module).map(({ name }) => name),
-        ["next", "blot:finish_invocation"],
+        ["next", "squid:finish_invocation"],
       );
       assert.equal(guest.call("next", 1), 42);
       assert.equal(guest.call("next", 2), 43);
       // An ABI version cannot disguise either legacy runtime contract.
       for (
         const [name, payload] of [
-          ["blot:ownership", [1, 0, 1]],
-          ["blot:tasks", [2, 0]],
+          ["squid:ownership", [1, 0, 1]],
+          ["squid:tasks", [2, 0]],
         ] as const
       ) {
         const title = new TextEncoder().encode(name);

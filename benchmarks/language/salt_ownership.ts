@@ -9,8 +9,8 @@ const compiler = await createZigProjectCompiler({
   ...await gdevProject(
     root,
     resolve("std"),
-    "tests/salt_capacity_probe.blot",
-    resolve("compiler-goose/build/blotc-goose"),
+    "tests/salt_capacity_probe.sq",
+    resolve("compiler-goose/build/squidc-goose"),
   ),
   frontendWorkers: 8,
 });
@@ -37,7 +37,7 @@ io measure (observe: U32 -> U32): U32 => return fixture.with_salt (func access =
 `;
 try {
   const result = await compiler.build({
-    sources: { [resolve(root, "tests/salt_capacity_probe.blot")]: source },
+    sources: { [resolve(root, "tests/salt_capacity_probe.sq")]: source },
   });
   if (!result.success) throw Error(JSON.stringify(result.diagnostics));
   const module = new WebAssembly.Module(
@@ -45,7 +45,7 @@ try {
   );
   const observations: number[][][] = [];
   const instance = new WebAssembly.Instance(module, {
-    "blot:host/1": {
+    "squid:host/1": {
       call_u32_u32(_callback: number, marker: number) {
         assert.equal(marker, observations.length + 1);
         const exports = instance.exports;
@@ -69,7 +69,7 @@ try {
   try {
     assert.equal(guest.measure(1), 9);
   } finally {
-    guest["blot:finish_invocation"]();
+    guest["squid:finish_invocation"]();
   }
   assert.equal(observations.length, 3);
   const [before, shortened, appended] = observations;

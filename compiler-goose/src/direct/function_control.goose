@@ -1,12 +1,12 @@
 // Conditionals, blocks, matches and loops of the direct backend's function
 // emitter (compiler/src/direct/function.zig).
-namespace blot_direct_function;
+namespace squid_direct_function;
 import .function;
 
 // `count` empty result slots; the first one's index.
 fn newSlots(g: Generator&, count: i64) -> u32 {
     let first = g.s.slots.len as u32;
-    for at in 0..count { g.s.slots.push(blot_direct_emit::Slot {}); }
+    for at in 0..count { g.s.slots.push(squid_direct_emit::Slot {}); }
     return first;
 }
 fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32) -> u32, bool {
@@ -15,14 +15,14 @@ fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32
         let _, is_cell = withCellType(g, f, b);
         if !is_cell {
             let v, ok = bindGet(g, f, b);
-            if ok && tagOf(g, v.ty) == blot_direct_types::Tag.u32_ {
+            if ok && tagOf(g, v.ty) == squid_direct_types::Tag.u32_ {
                 return w(g, v, 0), true;
             }
         }
     }
     let n = m.node(node_id);
     var owner: u32 = 0;
-    if n.tag == blot_check_core::Tag.project {
+    if n.tag == squid_check_core::Tag.project {
         let spelling = m.fieldSpelling(m.projection(n.b).field);
         if spelling.present && spelling.value == "length" {
             owner = localRef(m, n.a);
@@ -34,7 +34,7 @@ fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32
         let _, is_cell = withCellType(g, f, owner);
         if !is_cell {
             let hv, hok = bindGet(g, f, owner);
-            if hok && tagOf(g, hv.ty) == blot_direct_types::Tag.array {
+            if hok && tagOf(g, hv.ty) == squid_direct_types::Tag.array {
                 let ca = findCheckedArray(f, w(g, hv, 0), w(g, hv, 1));
                 if ca >= 0 {
                     return f.checked_arrays[ca].length, true;
@@ -46,7 +46,7 @@ fn resolveBoundLocal(g: Generator&, f: const Fn&, m: const Module&, node_id: u32
 }
 fn resolveBoundSizedLength(m: const Module&, node_id: u32) -> TId {
     let n = m.node(node_id);
-    if n.tag == blot_check_core::Tag.project {
+    if n.tag == squid_check_core::Tag.project {
         let spelling = m.fieldSpelling(m.projection(n.b).field);
         if spelling.present && spelling.value == "length" {
             return coreSizedLength(m, m.typeOf(n.a));
@@ -61,26 +61,26 @@ fn resolveBoundSizedLength(m: const Module&, node_id: u32) -> TId {
 recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: u32, invert: bool, depth: i64 = 0) {
     if cond_id == 0 || depth > 8 { return; }
     let cond = m.node(cond_id);
-    if cond.tag == blot_check_core::Tag.logical {
-        if !invert && cond.op == blot_check_core::Op.and_ {
+    if cond.tag == squid_check_core::Tag.logical {
+        if !invert && cond.op == squid_check_core::Op.and_ {
             recordCondBounds(g, f, m, cond.a, false, depth + 1);
             recordCondBounds(g, f, m, cond.b, false, depth + 1);
-        } else if invert && cond.op == blot_check_core::Op.or_ {
+        } else if invert && cond.op == squid_check_core::Op.or_ {
             recordCondBounds(g, f, m, cond.a, true, depth + 1);
             recordCondBounds(g, f, m, cond.b, true, depth + 1);
         }
         return;
     }
-    if cond.tag == blot_check_core::Tag.scalar {
+    if cond.tag == squid_check_core::Tag.scalar {
         var idx_node: u32 = 0;
         var bnd_node: u32 = 0;
-        if !invert && cond.op == blot_check_core::Op.less {
+        if !invert && cond.op == squid_check_core::Op.less {
             idx_node = cond.a; bnd_node = cond.b;
-        } else if !invert && cond.op == blot_check_core::Op.greater {
+        } else if !invert && cond.op == squid_check_core::Op.greater {
             idx_node = cond.b; bnd_node = cond.a;
-        } else if invert && cond.op == blot_check_core::Op.greater_equal {
+        } else if invert && cond.op == squid_check_core::Op.greater_equal {
             idx_node = cond.a; bnd_node = cond.b;
-        } else if invert && cond.op == blot_check_core::Op.less_equal {
+        } else if invert && cond.op == squid_check_core::Op.less_equal {
             idx_node = cond.b; bnd_node = cond.a;
         } else {
             return;
@@ -90,7 +90,7 @@ recursive fn recordCondBounds(g: Generator&, f: Fn&, m: const Module&, cond_id: 
         let _, ic = withCellType(g, f, idx_b);
         if ic { return; }
         let iv, iok = bindGet(g, f, idx_b);
-        if !iok || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return; }
+        if !iok || tagOf(g, iv.ty) != squid_direct_types::Tag.u32_ { return; }
         let bnd_loc, bok = resolveBoundLocal(g, f, m, bnd_node);
         let sized_len_ty = resolveBoundSizedLength(m, bnd_node);
         if bok {
@@ -117,22 +117,22 @@ fn isPureSelectOp(op_: Op) -> bool {
 // allocate, never mutate memory, and never resize storage.
 fn isPureScalarProject(g: const Generator&, m: const Module&, id: u32) -> bool {
     let n = m.node(id);
-    if n.tag != blot_check_core::Tag.project { return false; }
+    if n.tag != squid_check_core::Tag.project { return false; }
     let proj = m.projection(n.b);
     if m.projectionVariants(n.b).len != 0 { return false; }
     let receiver_node = m.types.node(m.typeOf(n.a));
-    if !blot_check_types::isNumeric(receiver_node.tag) && receiver_node.tag != blot_check_types::Tag.boolean {
+    if !squid_check_types::isNumeric(receiver_node.tag) && receiver_node.tag != squid_check_types::Tag.boolean {
         return false;
     }
-    let ident = blot_check_types::receiverIdentity(receiver_node);
+    let ident = squid_check_types::receiverIdentity(receiver_node);
     if !ident.present { return false; }
-    let target, has_target = g.dispatchTarget(m, ident.value, proj.field, blot_check_types::Operator.none);
+    let target, has_target = g.dispatchTarget(m, ident.value, proj.field, squid_check_types::Operator.none);
     if !has_target || !g.hasUnit(target.unit) { return false; }
     let tm .= g.units[target.unit - 1];
     let alias, is_prim = primitiveAlias(tm, target.binding);
     if !is_prim { return false; }
     let p = tm.primitive(alias);
-    return p.kind == blot_check_core::PrimitiveKind.scalar && p.arity == 1;
+    return p.kind == squid_check_core::PrimitiveKind.scalar && p.arity == 1;
 }
 recursive fn isPureSelectExpr(g: const Generator&, f: const Fn&, m: const Module&, id: u32, budget: i64&) -> bool {
     if id == 0 { return true; }
@@ -184,7 +184,7 @@ fn tryIfSelectConvert(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
         cond_id = n.a;
         then_id = n.b;
         else_id = n.c;
-        is_stmt = n.tag == blot_check_core::Tag.if_stmt;
+        is_stmt = n.tag == squid_check_core::Tag.if_stmt;
         let merges = m.branchMerges(id);
         if is_stmt && else_id == 0 && merges.len >= 1 && merges.len <= 4 {
             var budget: i64 = 24;
@@ -210,20 +210,20 @@ fn tryIfSelectConvert(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
             var b2: i64 = 12;
             if isPureSelectExpr(g, f, m, then_id, b1) && isPureSelectExpr(g, f, m, else_id, b2) {
                 let rty, rerr = g.types.lower(m, m.typeOf(id), f.env);
-                if rerr == blot_direct_types::Error.none && isScalarTag(tagOf(g, rty)) {
+                if rerr == squid_direct_types::Error.none && isScalarTag(tagOf(g, rty)) {
                     eligible = true;
-                } else if rerr != blot_direct_types::Error.none {
+                } else if rerr != squid_direct_types::Error.none {
                     g.dropFailure();
                 }
             }
         }
     }
-    if !eligible { return neverVal(), false, blot_direct_types::Error.none; }
+    if !eligible { return neverVal(), false, squid_direct_types::Error.none; }
     let condition, cerr = expr(g, f, cond_id);
-    if cerr != blot_direct_types::Error.none { return condition, true, cerr; }
+    if cerr != squid_direct_types::Error.none { return condition, true, cerr; }
     if is_stmt {
         let then_val, terr = stmt(g, f, then_id);
-        if terr != blot_direct_types::Error.none { return then_val, true, terr; }
+        if terr != squid_direct_types::Error.none { return then_val, true, terr; }
         for at in 0..merge_count {
             let tv, tok = bindGet(g, f, m_then[at]);
             let ev, eok = bindGet(g, f, m_else[at]);
@@ -236,19 +236,19 @@ fn tryIfSelectConvert(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
             lset(g, out_loc);
             bindPut(g, f, m_res[at], valOf1(g, ev.ty, out_loc));
         }
-        return unitVal(), true, blot_direct_types::Error.none;
+        return unitVal(), true, squid_direct_types::Error.none;
     }
     let tv, terr = expr(g, f, then_id);
-    if terr != blot_direct_types::Error.none { return tv, true, terr; }
+    if terr != squid_direct_types::Error.none { return tv, true, terr; }
     let ev, eerr = expr(g, f, else_id);
-    if eerr != blot_direct_types::Error.none { return ev, true, eerr; }
+    if eerr != squid_direct_types::Error.none { return ev, true, eerr; }
     let out_loc = local(g, f, localKindForScalar(g, tv.ty));
     lget(g, w(g, tv, 0));
     lget(g, w(g, ev, 0));
     lget(g, w(g, condition, 0));
     op(g, OP_select);
     lset(g, out_loc);
-    return valOf1(g, tv.ty, out_loc), true, blot_direct_types::Error.none;
+    return valOf1(g, tv.ty, out_loc), true, squid_direct_types::Error.none;
 }
 // 5A: Short-circuit `if (a or b): break` without materializing a temporary Bool local.
 fn tryIfShortCircuitBreak(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
@@ -259,13 +259,13 @@ fn tryIfShortCircuitBreak(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     {
         let m .= g.units[f.unit - 1];
         let n = m.node(id);
-        if n.tag != blot_check_core::Tag.if_stmt || n.c != 0 || m.branchMerges(id).len != 0 {
-            return neverVal(), false, blot_direct_types::Error.none;
+        if n.tag != squid_check_core::Tag.if_stmt || n.c != 0 || m.branchMerges(id).len != 0 {
+            return neverVal(), false, squid_direct_types::Error.none;
         }
-        if !isBreakBody(m, n.b) { return neverVal(), false, blot_direct_types::Error.none; }
+        if !isBreakBody(m, n.b) { return neverVal(), false, squid_direct_types::Error.none; }
         let cn = m.node(n.a);
-        if cn.tag != blot_check_core::Tag.logical || cn.op != blot_check_core::Op.or_ {
-            return neverVal(), false, blot_direct_types::Error.none;
+        if cn.tag != squid_check_core::Tag.logical || cn.op != squid_check_core::Op.or_ {
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         cond_id = n.a;
         lhs_id = cn.a;
@@ -277,11 +277,11 @@ fn tryIfShortCircuitBreak(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     for ci in 0..saved_ce_len { saved_ce[ci] = f.checked_elems[ci]; }
 
     let lv, lerr = expr(g, f, lhs_id);
-    if lerr != blot_direct_types::Error.none { return lv, true, lerr; }
+    if lerr != squid_direct_types::Error.none { return lv, true, lerr; }
     push(g, lv);
     let if1 = open(g, f, OP_if_);
     let _, b1err = stmt(g, f, body_id);
-    if b1err != blot_direct_types::Error.none { return neverVal(), true, b1err; }
+    if b1err != squid_direct_types::Error.none { return neverVal(), true, b1err; }
     popCheckedArraysAt(f, if1);
     close(g, f);
     f.checked_elems_len = saved_ce_len;
@@ -289,17 +289,17 @@ fn tryIfShortCircuitBreak(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     recordCondBounds(g, f, g.units[f.unit - 1], lhs_id, true);
 
     let rv, rerr = expr(g, f, rhs_id);
-    if rerr != blot_direct_types::Error.none { return rv, true, rerr; }
+    if rerr != squid_direct_types::Error.none { return rv, true, rerr; }
     push(g, rv);
     let if2 = open(g, f, OP_if_);
     let _, b2err = stmt(g, f, body_id);
-    if b2err != blot_direct_types::Error.none { return neverVal(), true, b2err; }
+    if b2err != squid_direct_types::Error.none { return neverVal(), true, b2err; }
     popCheckedArraysAt(f, if2);
     close(g, f);
     f.checked_elems_len = saved_ce_len;
     for ci in 0..saved_ce_len { f.checked_elems[ci] = saved_ce[ci]; }
     recordCondBounds(g, f, g.units[f.unit - 1], cond_id, true);
-    return unitVal(), true, blot_direct_types::Error.none;
+    return unitVal(), true, squid_direct_types::Error.none;
 }
 
 // 5A: Collect unconditional `arr[idx]` reads inside a pure comparison condition.
@@ -324,7 +324,7 @@ recursive fn collectUncondCondReads(
         return;
     }
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
+    if n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none) {
         collectUncondCondReads(m, n.a, arr_out, idx_out, len, depth + 1);
         collectUncondCondReads(m, n.b, arr_out, idx_out, len, depth + 1);
     }
@@ -355,7 +355,7 @@ fn matchBranchIndexedStore(
     var stmts: u32[5] = [0; 5];
     var slen: i64 = 0;
     let bn = m.node(body_id);
-    if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+    if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
         let ch = m.children(body_id);
         if ch.len == 0 || ch.len > 5 { return false, 0, 0, 0, 0, 0; }
         for i in 0..ch.len { stmts[i] = ch[i]; }
@@ -367,9 +367,9 @@ fn matchBranchIndexedStore(
     var upd_id: u32 = 0;
     var upd_bind_b: u32 = 0;
     let s0 = m.node(stmts[0]);
-    if s0.tag == blot_check_core::Tag.update {
+    if s0.tag == squid_check_core::Tag.update {
         upd_id = stmts[0];
-    } else if s0.tag == blot_check_core::Tag.bind && s0.c < 2 && m.node(s0.b).tag == blot_check_core::Tag.update {
+    } else if s0.tag == squid_check_core::Tag.bind && s0.c < 2 && m.node(s0.b).tag == squid_check_core::Tag.update {
         upd_id = s0.b;
         upd_bind_b = s0.a;
     } else {
@@ -377,7 +377,7 @@ fn matchBranchIndexedStore(
     }
     let uinfo = m.updateInfo(upd_id);
     let sels = m.updateSelectors(upd_id);
-    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false, 0, 0, 0, 0, 0; }
+    if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { return false, 0, 0, 0, 0, 0; }
     if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, 0, 0, 0, 0, 0; }
     let dst_b = localRef(m, uinfo.root);
     let idx_b = localRef(m, sels[0].index);
@@ -400,7 +400,7 @@ fn matchBranchIndexedStore(
 // 5A: Branchless `select` (`cmov`) conversion for same-target scalar indexed updates:
 //   if cond: dst[k] := a; i += 1  else:  dst[k] := b; j += 1
 fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
-    if g.runtime_().has_fork { return neverVal(), false, blot_direct_types::Error.none; }
+    if g.runtime_().has_fork { return neverVal(), false, squid_direct_types::Error.none; }
     var cond_id: u32 = 0;
     var dst_b: u32 = 0;
     var dst_root_node: u32 = 0;
@@ -420,28 +420,28 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     {
         let m .= g.units[f.unit - 1];
         let n = m.node(id);
-        if n.tag != blot_check_core::Tag.if_stmt || n.c == 0 {
-            return neverVal(), false, blot_direct_types::Error.none;
+        if n.tag != squid_check_core::Tag.if_stmt || n.c == 0 {
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         let merges = m.branchMerges(id);
         if merges.len == 0 || merges.len > 6 {
-            return neverVal(), false, blot_direct_types::Error.none;
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         var cond_arrs: u32[4] = [0; 4];
         var cond_idxs: u32[4] = [0; 4];
         var cond_len: i64 = 0;
         collectUncondCondReads(m, n.a, cond_arrs, cond_idxs, cond_len, 0);
         let tok, t_dst, t_idx, t_val, t_ub, t_root = matchBranchIndexedStore(g, f, m, n.b, cond_arrs, cond_idxs, cond_len, t_rest, t_rest_len);
-        if !tok { return neverVal(), false, blot_direct_types::Error.none; }
+        if !tok { return neverVal(), false, squid_direct_types::Error.none; }
         let eok, e_dst, e_idx, e_val, e_ub, _ = matchBranchIndexedStore(g, f, m, n.c, cond_arrs, cond_idxs, cond_len, e_rest, e_rest_len);
-        if !eok || t_dst != e_dst || t_idx != e_idx { return neverVal(), false, blot_direct_types::Error.none; }
+        if !eok || t_dst != e_dst || t_idx != e_idx { return neverVal(), false, squid_direct_types::Error.none; }
         let dv, dok = bindGet(g, f, t_dst);
         let iv, iok = bindGet(g, f, t_idx);
-        if !dok || !iok || tagOf(g, dv.ty) != blot_direct_types::Tag.array || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ {
-            return neverVal(), false, blot_direct_types::Error.none;
+        if !dok || !iok || tagOf(g, dv.ty) != squid_direct_types::Tag.array || tagOf(g, iv.ty) != squid_direct_types::Tag.u32_ {
+            return neverVal(), false, squid_direct_types::Error.none;
         }
         let elem_tag = tagOf(g, g.types.node(dv.ty).a);
-        if !isScalarTag(elem_tag) { return neverVal(), false, blot_direct_types::Error.none; }
+        if !isScalarTag(elem_tag) { return neverVal(), false, squid_direct_types::Error.none; }
         var all_ok = true;
         for merge, at in merges {
             let _, ct = withCellType(g, f, merge.then_binding);
@@ -453,7 +453,7 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
                 m_is_dst[at] = true;
             } else {
                 let mty = m.types.node(m.binding(merge.result).ty).tag;
-                if mty != blot_check_types::Tag.unsigned32 && mty != blot_check_types::Tag.floating32 && mty != blot_check_types::Tag.boolean {
+                if mty != squid_check_types::Tag.unsigned32 && mty != squid_check_types::Tag.floating32 && mty != squid_check_types::Tag.boolean {
                     all_ok = false;
                     break;
                 }
@@ -463,7 +463,7 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
             m_else[at] = merge.else_binding;
             m_res[at] = merge.result;
         }
-        if !all_ok { return neverVal(), false, blot_direct_types::Error.none; }
+        if !all_ok { return neverVal(), false, squid_direct_types::Error.none; }
         cond_id = n.a;
         dst_b = t_dst;
         dst_root_node = t_root;
@@ -473,14 +473,14 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
         merge_count = merges.len;
         eligible = true;
     }
-    if !eligible { return neverVal(), false, blot_direct_types::Error.none; }
+    if !eligible { return neverVal(), false, squid_direct_types::Error.none; }
 
     let condition, cerr = expr(g, f, cond_id);
-    if cerr != blot_direct_types::Error.none { return condition, true, cerr; }
+    if cerr != squid_direct_types::Error.none { return condition, true, cerr; }
     let vt, vterr = expr(g, f, t_val_node);
-    if vterr != blot_direct_types::Error.none { return vt, true, vterr; }
+    if vterr != squid_direct_types::Error.none { return vt, true, vterr; }
     let ve, veerr = expr(g, f, e_val_node);
-    if veerr != blot_direct_types::Error.none { return ve, true, veerr; }
+    if veerr != squid_direct_types::Error.none { return ve, true, veerr; }
 
     let dst_val, _ = bindGet(g, f, dst_b);
     let idx_val, _ = bindGet(g, f, idx_b);
@@ -493,18 +493,18 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     lset(g, sel_loc);
 
     let addr, aerr = elementAddress(g, f, dst_val, w(g, idx_val, 0), id, g.units[f.unit - 1].typeOf(dst_root_node));
-    if aerr != blot_direct_types::Error.none { return neverVal(), true, aerr; }
+    if aerr != squid_direct_types::Error.none { return neverVal(), true, aerr; }
     let werr = writeElement(g, f, addr, 0, valOf1(g, elem_ty, sel_loc), id);
-    if werr != blot_direct_types::Error.none { return neverVal(), true, werr; }
+    if werr != squid_direct_types::Error.none { return neverVal(), true, werr; }
     f.checked_elems_len = 0;
 
     for i in 0..t_rest_len {
         let _, serr = stmt(g, f, t_rest[i]);
-        if serr != blot_direct_types::Error.none { return neverVal(), true, serr; }
+        if serr != squid_direct_types::Error.none { return neverVal(), true, serr; }
     }
     for i in 0..e_rest_len {
         let _, serr = stmt(g, f, e_rest[i]);
-        if serr != blot_direct_types::Error.none { return neverVal(), true, serr; }
+        if serr != squid_direct_types::Error.none { return neverVal(), true, serr; }
     }
     for at in 0..merge_count {
         if m_is_dst[at] {
@@ -522,38 +522,38 @@ fn tryIfBranchlessStore(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
             bindPut(g, f, m_res[at], valOf1(g, ev.ty, out_loc));
         }
     }
-    return unitVal(), true, blot_direct_types::Error.none;
+    return unitVal(), true, squid_direct_types::Error.none;
 }
 
 recursive fn pushCondition(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.scalar && isComparisonOp(n.op) &&
+    if n.tag == squid_check_core::Tag.scalar && isComparisonOp(n.op) &&
         isCoreScalar(m, n.a) && isCoreScalar(m, n.b) {
         return scalar(g, f, id, false, true);
     }
     let value, error = expr(g, f, id);
-    if error == blot_direct_types::Error.none { push(g, value); }
+    if error == squid_direct_types::Error.none { push(g, value); }
     return value, error;
 }
 
 recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let sc_val, sc_done, sc_err = tryIfShortCircuitBreak(g, f, id);
-    if sc_err != blot_direct_types::Error.none { return sc_val, sc_err; }
-    if sc_done { return sc_val, blot_direct_types::Error.none; }
+    if sc_err != squid_direct_types::Error.none { return sc_val, sc_err; }
+    if sc_done { return sc_val, squid_direct_types::Error.none; }
     let sel_val, converted, sel_err = tryIfSelectConvert(g, f, id);
-    if sel_err != blot_direct_types::Error.none { return sel_val, sel_err; }
-    if converted { return sel_val, blot_direct_types::Error.none; }
+    if sel_err != squid_direct_types::Error.none { return sel_val, sel_err; }
+    if converted { return sel_val, squid_direct_types::Error.none; }
     let bs_val, bs_done, bs_err = tryIfBranchlessStore(g, f, id);
-    if bs_err != blot_direct_types::Error.none { return bs_val, bs_err; }
-    if bs_done { return bs_val, blot_direct_types::Error.none; }
+    if bs_err != squid_direct_types::Error.none { return bs_val, bs_err; }
+    if bs_done { return bs_val, squid_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     let result = g.newSlot();
     let merges = m.branchMerges(id);
     let merged = newSlots(g, merges.len);
     let condition, error = pushCondition(g, f, n.a);
-    if error != blot_direct_types::Error.none { return condition, error; }
+    if error != squid_direct_types::Error.none { return condition, error; }
     let incoming_arrays = f.checked_arrays;
     let incoming_arrays_len = f.checked_arrays_len;
     var saved_ce: CheckedElem[8] = [CheckedElem {}; 8];
@@ -583,20 +583,20 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let opened = open(g, f, OP_if_);
     recordCondBounds(g, f, g.units[f.unit - 1], n.a, false);
     let then, error = stmt(g, f, n.b);
-    if error != blot_direct_types::Error.none { return then, error; }
-    let then_diverges = then.ty == blot_direct_types::never;
+    if error != squid_direct_types::Error.none { return then, error; }
+    let then_diverges = then.ty == squid_direct_types::never;
     var falls = !then_diverges;
     if falls {
-        if n.tag == blot_check_core::Tag.if_value {
+        if n.tag == squid_check_core::Tag.if_value {
             let delivered = deliver(g, f, then, result, id);
-            if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+            if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
         }
         for merge, at in merges {
             let value, present = bindGet(g, f, merge.then_binding);
             if present {
                 let delivered = deliver(g, f, value, merged + (at as u32), id);
-                if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
-                if at < 16 && tagOf(g, value.ty) == blot_direct_types::Tag.array {
+                if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
+                if at < 16 && isMutableOwnerTag(tagOf(g, value.ty)) {
                     let s0 = w(g, value, 0);
                     let s1 = w(g, value, 1);
                     let ca = findCheckedArray(f, s0, s1);
@@ -626,21 +626,21 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if n.c != 0 {
         recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
         let otherwise, error = stmt(g, f, n.c);
-        if error != blot_direct_types::Error.none { return otherwise, error; }
-        if otherwise.ty != blot_direct_types::never {
+        if error != squid_direct_types::Error.none { return otherwise, error; }
+        if otherwise.ty != squid_direct_types::never {
             else_falls = true;
             else_mutable = knownMutable(g, f, otherwise);
             falls = true;
-            if n.tag == blot_check_core::Tag.if_value {
+            if n.tag == squid_check_core::Tag.if_value {
                 let delivered = deliver(g, f, otherwise, result, id);
-                if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
             }
             for merge, at in merges {
                 let value, present = bindGet(g, f, merge.else_binding);
                 if present {
                     let delivered = deliver(g, f, value, merged + (at as u32), id);
-                    if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
-                    if at < 16 && tagOf(g, value.ty) == blot_direct_types::Tag.array {
+                    if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
+                    if at < 16 && isMutableOwnerTag(tagOf(g, value.ty)) {
                         let s0 = w(g, value, 0);
                         let s1 = w(g, value, 1);
                         let ca = findCheckedArray(f, s0, s1);
@@ -662,8 +662,8 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let value, present = bindGet(g, f, merge.else_binding);
             if present {
                 let delivered = deliver(g, f, value, merged + (at as u32), id);
-                if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
-                if at < 16 && tagOf(g, value.ty) == blot_direct_types::Tag.array {
+                if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
+                if at < 16 && isMutableOwnerTag(tagOf(g, value.ty)) {
                     let s0 = w(g, value, 0);
                     let s1 = w(g, value, 1);
                     let ca = findCheckedArray(f, s0, s1);
@@ -708,7 +708,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     } else {
         f.checked_elems_len = 0;
     }
-    if n.tag == blot_check_core::Tag.if_stmt && n.c == 0 && then_diverges {
+    if n.tag == squid_check_core::Tag.if_stmt && n.c == 0 && then_diverges {
         recordCondBounds(g, f, g.units[f.unit - 1], n.a, true);
     }
     for merge, at in merges {
@@ -716,7 +716,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if slot.present {
             var bound_val = slot.value;
             var reused_same = false;
-            if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array && !then_diverges && else_falls && at < 16 {
+            if isMutableOwnerTag(tagOf(g, slot.value.ty)) && !then_diverges && else_falls && at < 16 {
                 let tv, tok = bindGet(g, f, merge.then_binding);
                 let ev, eok = bindGet(g, f, merge.else_binding);
                 if tok && eok && sameWords(g, tv, ev) && tv.ty == slot.value.ty &&
@@ -727,7 +727,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             bindPut(g, f, merge.result, bound_val);
             propagateSlotMask(g, f, merged + (at as u32), if_locals_mark);
-            if tagOf(g, bound_val.ty) == blot_direct_types::Tag.array {
+            if isMutableOwnerTag(tagOf(g, bound_val.ty)) {
                 var mutable_merge = true;
                 if !then_diverges {
                     let tv, tok = bindGet(g, f, merge.then_binding);
@@ -780,21 +780,21 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     }
                 }
                 if uo_ok && (!then_diverges || else_falls) {
-                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, merge.result, f.loop_depth + 1);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_owned, merge.result, f.loop_depth + 1);
                 }
             }
             let ct1, ok1 = withCellType(g, f, merge.then_binding);
-            if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+            if ok1 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
             else {
                 let ct2, ok2 = withCellType(g, f, merge.else_binding);
-                if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+                if ok2 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
             }
         }
     }
-    if !falls { return neverVal(), blot_direct_types::Error.none; }
-    if n.tag == blot_check_core::Tag.if_stmt { return unitVal(), blot_direct_types::Error.none; }
-    if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
-    return neverVal(), blot_direct_types::Error.none;
+    if !falls { return neverVal(), squid_direct_types::Error.none; }
+    if n.tag == squid_check_core::Tag.if_stmt { return unitVal(), squid_direct_types::Error.none; }
+    if g.s.slots[result].present { return g.s.slots[result].value, squid_direct_types::Error.none; }
+    return neverVal(), squid_direct_types::Error.none;
 }
 
 // Only visit a block whose value is returned by the function itself. Once a
@@ -803,11 +803,11 @@ fn scratchBody(m: const Module&, root: u32) -> u32 {
     var current = root;
     for step in 0..8 {
         let node = m.node(current);
-        if node.tag == blot_check_core::Tag.return_ { current = node.a; continue; }
-        if node.tag != blot_check_core::Tag.block_ { return 0; }
+        if node.tag == squid_check_core::Tag.return_ { current = node.a; continue; }
+        if node.tag != squid_check_core::Tag.block_ { return 0; }
         if node.b != 1 { return current; }
         let only = m.children(current)[0];
-        if m.node(only).tag != blot_check_core::Tag.return_ { return 0; }
+        if m.node(only).tag != squid_check_core::Tag.return_ { return 0; }
         current = only;
     }
     return 0;
@@ -818,19 +818,19 @@ fn scratchBody(m: const Module&, root: u32) -> u32 {
 fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
     let m .= g.units[f.unit - 1];
     let producer = m.node(tail[0]);
-    if producer.tag != blot_check_core::Tag.bind || producer.c != 0 { return 0; }
+    if producer.tag != squid_check_core::Tag.bind || producer.c != 0 { return 0; }
     let init = m.node(producer.b);
-    if init.tag != blot_check_core::Tag.array_op { return 0; }
+    if init.tag != squid_check_core::Tag.array_op { return 0; }
     let operation = m.arrayOperation(producer.b);
-    if operation != blot_backend_collection_ops::Op.generate && operation != blot_backend_collection_ops::Op.fill { return 0; }
+    if operation != squid_backend_collection_ops::Op.generate && operation != squid_backend_collection_ops::Op.fill { return 0; }
     let shape = m.types.node(init.ty);
-    if shape.tag != blot_check_types::Tag.array || !scratchScalarType(m, shape.a) { return 0; }
+    if shape.tag != squid_check_types::Tag.array || !scratchScalarType(m, shape.a) { return 0; }
     let next = m.node(tail[1]);
     var literal: u32 = 0;
-    if tail.len == 2 && next.tag == blot_check_core::Tag.return_ { literal = next.a; }
-    else if tail.len == 3 && next.tag == blot_check_core::Tag.bind && m.node(next.b).tag == blot_check_core::Tag.update {
+    if tail.len == 2 && next.tag == squid_check_core::Tag.return_ { literal = next.a; }
+    else if tail.len == 3 && next.tag == squid_check_core::Tag.bind && m.node(next.b).tag == squid_check_core::Tag.update {
         let returned = m.node(tail[2]);
-        if returned.tag != blot_check_core::Tag.return_ || localRef(m, returned.a) != next.a { return 0; }
+        if returned.tag != squid_check_core::Tag.return_ || localRef(m, returned.a) != next.a { return 0; }
         let update = m.updateInfo(next.b);
         if !scratchFieldUpdate(m, update, next.b) { return 0; }
         let root = localRef(m, update.root);
@@ -838,10 +838,10 @@ fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
         let value, found = bindGet(g, f, root);
         // A structural record reaches the replacement once. A sum can
         // emit the replacement separately in several branches.
-        if !found || tagOf(g, value.ty) != blot_direct_types::Tag.record { return 0; }
+        if !found || tagOf(g, value.ty) != squid_direct_types::Tag.record { return 0; }
         literal = update.value;
     } else { return 0; }
-    if m.node(literal).tag != blot_check_core::Tag.array { return 0; }
+    if m.node(literal).tag != squid_check_core::Tag.array { return 0; }
     var reads = false;
     for element in m.children(literal) {
         if !scratchScalar(g, f, m, element, producer.a, 0, reads, 0) { return 0; }
@@ -850,11 +850,11 @@ fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
     let arguments = m.children(producer.b);
     var ignored = false;
     if arguments.len != 2 || !scratchScalar(g, f, m, arguments[0], 0, 0, ignored, 0) { return 0; }
-    if operation == blot_backend_collection_ops::Op.fill {
+    if operation == squid_backend_collection_ops::Op.fill {
         if !scratchScalar(g, f, m, arguments[1], 0, 0, ignored, 0) { return 0; }
     } else {
         let mapper = arguments[1];
-        if m.node(mapper).tag != blot_check_core::Tag.closure { return 0; }
+        if m.node(mapper).tag != squid_check_core::Tag.closure { return 0; }
         let info = m.closure(mapper);
         if !scratchScalarType(m, info.parameter.ty) { return 0; }
         for capture in m.closureCaptures(mapper) {
@@ -868,16 +868,16 @@ fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
 }
 
 fn localRef(m: const Module&, id: u32) -> u32 {
-    if m.node(id).tag != blot_check_core::Tag.reference { return 0; }
+    if m.node(id).tag != squid_check_core::Tag.reference { return 0; }
     let ref = m.reference(id);
     if ref.unit != 0 && ref.unit != m.unit { return 0; }
     return ref.binding;
 }
 
-fn scratchFieldUpdate(m: const Module&, update: blot_check_core::UpdateInfo, id: u32) -> bool {
+fn scratchFieldUpdate(m: const Module&, update: squid_check_core::UpdateInfo, id: u32) -> bool {
     let selectors = m.updateSelectors(id);
     if selectors.len == 0 { return update.path.len == 1; }
-    return selectors.len == 1 && selectors[0].kind == blot_check_core::UpdateKind.field;
+    return selectors.len == 1 && selectors[0].kind == squid_check_core::UpdateKind.field;
 }
 
 // A block-local binding cannot outlive its terminal return. Reject synthetic
@@ -899,15 +899,15 @@ fn scratchEscapes(m: const Module&, binding: u32) -> bool {
 
 fn scratchScalarType(m: const Module&, ty: u32) -> bool {
     let tag = m.types.node(ty).tag;
-    return tag == blot_check_types::Tag.unsigned32 || tag == blot_check_types::Tag.floating32 || tag == blot_check_types::Tag.boolean;
+    return tag == squid_check_types::Tag.unsigned32 || tag == squid_check_types::Tag.floating32 || tag == squid_check_types::Tag.boolean;
 }
 
 fn scratchReturned(m: const Module&, id: u32) -> u32 {
     var current = id;
     for step in 0..8 {
         let n = m.node(current);
-        if n.tag == blot_check_core::Tag.return_ { current = n.a; }
-        else if n.tag == blot_check_core::Tag.block_ && n.b == 1 { current = m.children(current)[0]; }
+        if n.tag == squid_check_core::Tag.return_ { current = n.a; }
+        else if n.tag == squid_check_core::Tag.block_ && n.b == 1 { current = m.children(current)[0]; }
         else { break; }
     }
     return current;
@@ -915,24 +915,24 @@ fn scratchReturned(m: const Module&, id: u32) -> u32 {
 
 // Use the same scalar forwarding shape as call emission. Such a call
 // reads only its proved scalar operands and has no storage operation.
-fn scratchScalarCallee(g: const Generator&, m: const Module&, call: blot_check_core::Call) -> bool {
+fn scratchScalarCallee(g: const Generator&, m: const Module&, call: squid_check_core::Call) -> bool {
     let target = g.resolve(m, call.target);
     if !g.hasUnit(target.unit) { return false; }
     let owner .= g.units[target.unit - 1];
     let alias, present = primitiveAlias(owner, target.binding);
     if present {
         let primitive = owner.primitive(alias);
-        return primitive.kind == blot_check_core::PrimitiveKind.scalar && primitive.arity == call.arguments.len;
+        return primitive.kind == squid_check_core::PrimitiveKind.scalar && primitive.arity == call.arguments.len;
     }
     let body .= owner.body(target.binding);
     if !body || !body.is_function { return false; }
     let parameters = owner.bodyParameters(body);
     if parameters.len != call.arguments.len { return false; }
     let node = owner.node(scratchReturned(owner, body.root));
-    if node.tag != blot_check_core::Tag.associated || node.op == blot_check_core::Op.none { return false; }
+    if node.tag != squid_check_core::Tag.associated || node.op == squid_check_core::Op.none { return false; }
     for operand in [node.a, node.b] {
         if operand == 0 { continue; }
-        if owner.node(operand).tag != blot_check_core::Tag.reference { return false; }
+        if owner.node(operand).tag != squid_check_core::Tag.reference { return false; }
         let ref = owner.reference(operand);
         if ref.unit != 0 && ref.unit != owner.unit { return false; }
         var found = false;
@@ -956,7 +956,7 @@ recursive fn scratchScalar(g: Generator&, f: Fn&, m: const Module&, id: u32, bin
             return found && isScalarTag(tagOf(g, value.ty));
         },
         scalar, associated, logical => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return scratchScalar(g, f, m, n.a, binding, parameter, reads, depth + 1) &&
                 (n.b == 0 || scratchScalar(g, f, m, n.b, binding, parameter, reads, depth + 1));
         },
@@ -971,7 +971,7 @@ recursive fn scratchScalar(g: Generator&, f: Fn&, m: const Module&, id: u32, bin
         array_op => {
             if binding == 0 { return false; }
             let op = m.arrayOperation(id);
-            if op != blot_backend_collection_ops::Op.get && op != blot_backend_collection_ops::Op.length { return false; }
+            if op != squid_backend_collection_ops::Op.get && op != squid_backend_collection_ops::Op.length { return false; }
             let args = m.children(id);
             if args.len == 0 || localRef(m, args[0]) != binding { return false; }
             reads = true;
@@ -1032,7 +1032,7 @@ recursive fn deadFillExprUsesOrCalls(g: Generator&, m: const Module&, id: u32, b
             return false;
         },
         array_op => {
-            if m.arrayOperation(id) != blot_backend_collection_ops::Op.fill { return true; }
+            if m.arrayOperation(id) != squid_backend_collection_ops::Op.fill { return true; }
             for ch in m.children(id) {
                 if deadFillExprUsesOrCalls(g, m, ch, b1, b2, b3, budget) { return true; }
             }
@@ -1048,7 +1048,7 @@ fn sameCountExpr(m: const Module&, a: u32, b: u32) -> bool {
     if la != 0 && la == lb { return true; }
     let na = m.node(a);
     let nb = m.node(b);
-    return na.tag == blot_check_core::Tag.constant && nb.tag == blot_check_core::Tag.constant && na.a == nb.a;
+    return na.tag == squid_check_core::Tag.constant && nb.tag == squid_check_core::Tag.constant && na.a == nb.a;
 }
 recursive fn collectDirectArrayAliases(
     g: const Generator&,
@@ -1074,12 +1074,12 @@ recursive fn collectDirectArrayAliases(
             if n.c < 2 && n.b != 0 {
                 let rn = m.node(n.b);
                 var from_b: u32 = 0;
-                if rn.tag == blot_check_core::Tag.reference {
+                if rn.tag == squid_check_core::Tag.reference {
                     from_b = localRef(m, n.b);
-                } else if rn.tag == blot_check_core::Tag.update {
+                } else if rn.tag == squid_check_core::Tag.update {
                     let uinfo = m.updateInfo(n.b);
                     let sels = m.updateSelectors(n.b);
-                    if sels.len == 1 && sels[0].kind == blot_check_core::UpdateKind.index {
+                    if sels.len == 1 && sels[0].kind == squid_check_core::UpdateKind.index {
                         from_b = localRef(m, uinfo.root);
                     }
                 }
@@ -1143,7 +1143,7 @@ recursive fn collectDirectArrayAliases(
             let uinfo = m.updateInfo(id);
             collectDirectArrayAliases(g, m, uinfo.root, b_set, b_len, changed, ok, budget);
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     collectDirectArrayAliases(g, m, sel.index, b_set, b_len, changed, ok, budget);
                 }
             }
@@ -1201,7 +1201,7 @@ recursive fn checkDirectArrayUses(
         array_op => {
             let op = m.arrayOperation(id);
             let ch = m.children(id);
-            if (op == blot_backend_collection_ops::Op.length || op == blot_backend_collection_ops::Op.get) &&
+            if (op == squid_backend_collection_ops::Op.length || op == squid_backend_collection_ops::Op.get) &&
                 ch.len >= 1 && inDirectSet(b_set, b_len, localRef(m, ch[0])) {
                 for ci in 1..ch.len {
                     if !checkDirectArrayUses(m, ch[ci], b_set, b_len, budget, saw_decl, needs_addr) { return false; }
@@ -1214,10 +1214,10 @@ recursive fn checkDirectArrayUses(
             return true;
         },
         storage => {
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
             let ch = m.children(id);
-            if ok == blot_error::Error.none &&
-                (op_k == blot_check_storage_ops::Op.length || op_k == blot_check_storage_ops::Op.read) &&
+            if ok == squid_error::Error.none &&
+                (op_k == squid_check_storage_ops::Op.length || op_k == squid_check_storage_ops::Op.read) &&
                 ch.len >= 1 && inDirectSet(b_set, b_len, localRef(m, ch[0])) {
                 for ci in 1..ch.len {
                     if !checkDirectArrayUses(m, ch[ci], b_set, b_len, budget, saw_decl, needs_addr) { return false; }
@@ -1237,13 +1237,13 @@ recursive fn checkDirectArrayUses(
             if n.a == b_set[0] { saw_decl = true; }
             if n.b != 0 && inDirectSet(b_set, b_len, n.a) {
                 let rn = m.node(n.b);
-                if rn.tag == blot_check_core::Tag.reference && inDirectSet(b_set, b_len, localRef(m, n.b)) {
+                if rn.tag == squid_check_core::Tag.reference && inDirectSet(b_set, b_len, localRef(m, n.b)) {
                     return true;
                 }
-                if rn.tag == blot_check_core::Tag.update {
+                if rn.tag == squid_check_core::Tag.update {
                     let uinfo = m.updateInfo(n.b);
                     let sels = m.updateSelectors(n.b);
-                    if sels.len == 1 && sels[0].kind == blot_check_core::UpdateKind.index &&
+                    if sels.len == 1 && sels[0].kind == squid_check_core::UpdateKind.index &&
                         inDirectSet(b_set, b_len, localRef(m, uinfo.root)) {
                         return checkDirectArrayUses(m, sels[0].index, b_set, b_len, budget, saw_decl, needs_addr) &&
                             checkDirectArrayUses(m, uinfo.value, b_set, b_len, budget, saw_decl, needs_addr);
@@ -1299,7 +1299,7 @@ recursive fn checkDirectArrayUses(
         },
         break_ => {
             let vals = m.breakValues(id);
-            if n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.loop_ {
+            if n.a != 0 && m.node(n.a).tag == squid_check_core::Tag.loop_ {
                 let carries = m.loopCarries(n.a);
                 for ch, ci in vals {
                     let vb = localRef(m, ch);
@@ -1320,7 +1320,7 @@ recursive fn checkDirectArrayUses(
             let uinfo = m.updateInfo(id);
             if !checkDirectArrayUses(m, uinfo.root, b_set, b_len, budget, saw_decl, needs_addr) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !checkDirectArrayUses(m, sel.index, b_set, b_len, budget, saw_decl, needs_addr) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !checkDirectArrayUses(m, sel.index, b_set, b_len, budget, saw_decl, needs_addr) { return false; }
             }
             return checkDirectArrayUses(m, uinfo.value, b_set, b_len, budget, saw_decl, needs_addr);
         },
@@ -1389,10 +1389,10 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
     for k in 0..(children.len - 1) {
         if f.skip_fill_len >= 8 { return; }
         let cn = m.node(children[k]);
-        if cn.tag != blot_check_core::Tag.bind || cn.c >= 2 { continue; }
+        if cn.tag != squid_check_core::Tag.bind || cn.c >= 2 { continue; }
         let fill_id = cn.b;
         let fn_ = m.node(fill_id);
-        if fn_.tag != blot_check_core::Tag.array_op || m.arrayOperation(fill_id) != blot_backend_collection_ops::Op.fill {
+        if fn_.tag != squid_check_core::Tag.array_op || m.arrayOperation(fill_id) != squid_backend_collection_ops::Op.fill {
             continue;
         }
         let fch = m.children(fill_id);
@@ -1401,21 +1401,21 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
         let count_node = fch[0];
         let count_b = localRef(m, count_node);
         let fill_ty = m.types.node(m.binding(fill_b).ty);
-        if fill_ty.tag != blot_check_types::Tag.array { continue; }
+        if fill_ty.tag != squid_check_types::Tag.array { continue; }
         let etag = m.types.node(fill_ty.a).tag;
-        if !blot_check_types::isNumeric(etag) && etag != blot_check_types::Tag.boolean {
+        if !squid_check_types::isNumeric(etag) && etag != squid_check_types::Tag.boolean {
             continue;
         }
         for j in (k + 1)..children.len {
             let jn = m.node(children[j]);
-            if jn.tag == blot_check_core::Tag.loop_ {
+            if jn.tag == squid_check_core::Tag.loop_ {
                 let linfo = m.loopInfo(children[j]);
-                if linfo.kind != blot_check_core::LoopKind.range || linfo.pattern == 0 || linfo.body == 0 { break; }
+                if linfo.kind != squid_check_core::LoopKind.range || linfo.pattern == 0 || linfo.body == 0 { break; }
                 let first_n = m.node(linfo.first);
-                if first_n.tag != blot_check_core::Tag.constant || first_n.a != 0 { break; }
+                if first_n.tag != squid_check_core::Tag.constant || first_n.a != 0 { break; }
                 if !sameCountExpr(m, count_node, linfo.end) { break; }
                 let pat = m.pattern(linfo.pattern);
-                if pat.tag != blot_check_core::PatternTag.bind { break; }
+                if pat.tag != squid_check_core::PatternTag.bind { break; }
                 let iter_b = pat.a;
                 var iter_arr_b: u32 = 0;
                 for carry in m.loopCarries(children[j]) {
@@ -1425,7 +1425,7 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
                 var stmts: u32[16] = [0; 16];
                 var stmts_len: i64 = 0;
                 let lbn = m.node(linfo.body);
-                if lbn.tag == blot_check_core::Tag.suite || lbn.tag == blot_check_core::Tag.block_ {
+                if lbn.tag == squid_check_core::Tag.suite || lbn.tag == squid_check_core::Tag.block_ {
                     let bch = m.children(linfo.body);
                     if bch.len == 0 || bch.len > 16 { break; }
                     for si in 0..bch.len { stmts[si] = bch[si]; }
@@ -1442,16 +1442,16 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
                     let sn = m.node(stmts[si]);
                     var upd_id: u32 = 0;
                     var bind_out: u32 = 0;
-                    if sn.tag == blot_check_core::Tag.update {
+                    if sn.tag == squid_check_core::Tag.update {
                         upd_id = stmts[si];
-                    } else if sn.tag == blot_check_core::Tag.bind && sn.c < 2 && m.node(sn.b).tag == blot_check_core::Tag.update {
+                    } else if sn.tag == squid_check_core::Tag.bind && sn.c < 2 && m.node(sn.b).tag == squid_check_core::Tag.update {
                         upd_id = sn.b;
                         bind_out = sn.a;
                     }
                     if upd_id != 0 {
                         let uinfo = m.updateInfo(upd_id);
                         let sels = m.updateSelectors(upd_id);
-                        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { safe = false; break; }
+                        if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { safe = false; break; }
                         let root_b = localRef(m, uinfo.root);
                         if root_b == iter_arr_b || root_b == fill_b || (upd_res_b != 0 && root_b == upd_res_b) {
                             if localRef(m, sels[0].index) != iter_b { safe = false; break; }
@@ -1465,7 +1465,7 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
                                 safe = false; break;
                             }
                         }
-                    } else if sn.tag == blot_check_core::Tag.bind && sn.c < 2 {
+                    } else if sn.tag == squid_check_core::Tag.bind && sn.c < 2 {
                         if deadFillExprUsesOrCalls(g, m, sn.b, fill_b, iter_arr_b, upd_res_b, budget) { safe = false; break; }
                     } else {
                         safe = false; break;
@@ -1476,7 +1476,7 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
                 }
                 break;
             }
-            if jn.tag == blot_check_core::Tag.bind && jn.c < 2 {
+            if jn.tag == squid_check_core::Tag.bind && jn.c < 2 {
                 if count_b != 0 && jn.a == count_b { break; }
                 var budget: i64 = 64;
                 if deadFillExprUsesOrCalls(g, m, jn.b, fill_b, 0, 0, budget) { break; }
@@ -1493,7 +1493,7 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let depth = open(g, f, OP_block);
     let s .= g.s;
     let mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: id, depth: depth, result: result });
+    s.labels.push(squid_direct_emit::Label { target: id, depth: depth, result: result });
     var last = unitVal();
     let children = m.children(id);
     let saved = f.scratch_cut;
@@ -1501,18 +1501,18 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     scanDeadFills(g, f, m, children);
     for child, at in children {
         // Statements after one that always diverges are unreachable.
-        if last.ty == blot_direct_types::never { break; }
+        if last.ty == squid_direct_types::never { break; }
         if id == f.scratch_body { markScratchPair(g, f, children, at); }
         let value, error = stmt(g, f, child);
-        if error != blot_direct_types::Error.none { f.skip_fill_len = saved_skip; f.scratch_cut = saved; s.labels.resize(mark); return value, error; }
+        if error != squid_direct_types::Error.none { f.skip_fill_len = saved_skip; f.scratch_cut = saved; s.labels.resize(mark); return value, error; }
         last = value;
     }
     f.skip_fill_len = saved_skip;
     f.scratch_cut = saved;
     let builder = findComptimeBlock(f, id);
-    if builder >= 0 && last.ty != blot_direct_types::never {
+    if builder >= 0 && last.ty != squid_direct_types::never {
         let frame = f.comptime_frames[builder];
-        if frame.field_ty != blot_direct_types::unit {
+        if frame.field_ty != squid_direct_types::unit {
             return neverVal(), g.fail(m, id, "#fields builder falls through for a non-Unit field");
         }
         let carry_node = m.node(frame.loop_node);
@@ -1520,20 +1520,20 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let len = m.extra[carry_node.c + 1];
         for carry, at in m.loop_carries[start..start + len] {
             let error = deliverComptimeCarry(g, f, carry.backedge, frame.carry_slots.start + at, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
         }
         let error = deliver(g, f, unitVal(), result, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
     }
     s.labels.resize(mark);
     close(g, f);
     if g.s.slots[result].present {
         propagateSlotMask(g, f, result, block_locals_mark);
-        return g.s.slots[result].value, blot_direct_types::Error.none;
+        return g.s.slots[result].value, squid_direct_types::Error.none;
     }
     // A Unit block may fall through its end.
-    if last.ty != blot_direct_types::never && m.typeOf(id) == blot_check_types::unit { return unitVal(), blot_direct_types::Error.none; }
-    return neverVal(), blot_direct_types::Error.none;
+    if last.ty != squid_direct_types::never && m.typeOf(id) == squid_check_types::unit { return unitVal(), squid_direct_types::Error.none; }
+    return neverVal(), squid_direct_types::Error.none;
 }
 recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
@@ -1552,11 +1552,11 @@ recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     op(g, OP_i32_add);
     gset(g, rt.fork_depth);
     let sb_err = emitSeqForkBump(g);
-    if sb_err != blot_direct_types::Error.none { return neverVal(), sb_err; }
+    if sb_err != squid_direct_types::Error.none { return neverVal(), sb_err; }
     f.tco_inhibit += 1;
     let result, error = block_(g, f, n.a);
     f.tco_inhibit -= 1;
-    if error != blot_direct_types::Error.none { return result, error; }
+    if error != squid_direct_types::Error.none { return result, error; }
     gget(g, rt.fork_depth);
     i32Const(g, 1);
     op(g, OP_i32_sub);
@@ -1565,7 +1565,7 @@ recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     callf(g, rt.undo_rewind);
     lget(g, saved_mark);
     gset(g, rt.fork_owner_mark);
-    return result, blot_direct_types::Error.none;
+    return result, squid_direct_types::Error.none;
 }
 
 fn findComptimeBlock(f: const Fn&, block_: u32) -> i64 {
@@ -1601,11 +1601,11 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
     match n.tag {
         comptime_meta => {
             if n.c == 0 {
-                if n.b == binder && m.types.node(n.ty).tag == blot_check_types::Tag.variable {
+                if n.b == binder && m.types.node(n.ty).tag == squid_check_types::Tag.variable {
                     recordProjVar(vars, count, n.ty);
                 }
                 collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
-            } else if n.c == 10 && n.a == binder && m.types.node(n.ty).tag == blot_check_types::Tag.variable {
+            } else if n.c == 10 && n.a == binder && m.types.node(n.ty).tag == squid_check_types::Tag.variable {
                 recordProjVar(vars, count, n.ty);
             } else if n.c == 8 || n.c == 9 {
                 collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
@@ -1645,10 +1645,10 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
             let u = m.updateInfo(id);
             collectComptimeProjectVars(m, u.root, binder, vars, count, depth + 1);
             for step in m.updateSelectors(id) {
-                if step.kind == blot_check_core::UpdateKind.comptime_field && step.projection == binder &&
-                    m.types.node(step.result_type).tag == blot_check_types::Tag.variable {
+                if step.kind == squid_check_core::UpdateKind.comptime_field && step.projection == binder &&
+                    m.types.node(step.result_type).tag == squid_check_types::Tag.variable {
                     recordProjVar(vars, count, step.result_type);
-                } else if step.kind == blot_check_core::UpdateKind.index {
+                } else if step.kind == squid_check_core::UpdateKind.index {
                     collectComptimeProjectVars(m, step.index, binder, vars, count, depth + 1);
                 }
             }
@@ -1681,12 +1681,12 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
 fn comptimeFieldPos(g: Generator&, record_ty: Ty, nom_unit: u32, nom_decl: u32, fi: i64, field_count: i64) -> i64 {
     if nom_unit != 0 && g.hasUnit(nom_unit) {
         let owner .= g.units[nom_unit - 1];
-        let ordinal, oerr = g.types.nominalOrdinal(owner, blot_check_types::NominalIdentity { nom_unit, nom_decl });
-        if oerr == blot_direct_types::Error.none {
+        let ordinal, oerr = g.types.nominalOrdinal(owner, squid_check_types::NominalIdentity { nom_unit, nom_decl });
+        if oerr == squid_direct_types::Error.none {
             let ctors = owner.nominalConstructors(ordinal);
             if ctors.len == 1 {
                 let declared_payload = owner.constructor(ctors[0]).payload;
-                if declared_payload != 0 && owner.types.node(declared_payload).tag == blot_check_types::Tag.record {
+                if declared_payload != 0 && owner.types.node(declared_payload).tag == squid_check_types::Tag.record {
                     let dshape = owner.types.node(declared_payload);
                     if (dshape.b as i64) == field_count {
                         let dfield = owner.types.recordField(dshape, fi);
@@ -1710,11 +1710,11 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let mode = m.extra[n.c + 2];
     let carries = m.loop_carries[cstart..cstart + clen];
     let target_ty, terr = lower(g, f, m.binding(n.a).ty, id);
-    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+    if terr != squid_direct_types::Error.none { return neverVal(), terr; }
     let current = g.reserveVals(carries.len);
     for carry, at in carries {
         let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
-        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
         if !present { return neverVal(), g.fail(m, id, "#for carry without an incoming value"); }
         g.s.vals[current.start + at] = value;
     }
@@ -1722,7 +1722,7 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var proj_var_len: i64 = 0;
     let builder = mode == 2;
     if mode != 1 {
-        if builder && m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.variable {
+        if builder && m.types.node(m.typeOf(n.b)).tag == squid_check_types::Tag.variable {
             recordProjVar(proj_vars, proj_var_len, m.typeOf(n.b));
         }
         collectComptimeProjectVars(m, n.b, n.a, proj_vars, proj_var_len, 0);
@@ -1733,22 +1733,22 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         var nom_unit: u32 = 0;
         var nom_decl: u32 = 0;
         var ctor_tag: u32 = 0;
-        if tagOf(g, target_ty) == blot_direct_types::Tag.record {
+        if tagOf(g, target_ty) == squid_direct_types::Tag.record {
             record_ty = target_ty;
-        } else if tagOf(g, target_ty) == blot_direct_types::Tag.nominal {
+        } else if tagOf(g, target_ty) == squid_direct_types::Tag.nominal {
             if isOpaqueOutsideUnit(g, m, target_ty) {
-                return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
+                return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
             }
             let nom_id = g.types.nominalIdentity(target_ty);
             nom_unit = nom_id.unit;
             nom_decl = nom_id.decl;
             let cases, verr = g.types.variants(target_ty);
-            if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            if verr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
             if cases.len != 1 { return neverVal(), g.fail(m, id, "#fields requires a single-constructor data type"); }
             ctor_tag = g.types.variant_tags[cases.tags];
             let payload = g.types.variant_payloads[cases.payloads];
-            if payload != blot_direct_types::unit {
-                if tagOf(g, payload) != blot_direct_types::Tag.record { return neverVal(), g.fail(m, id, "#fields requires a record payload"); }
+            if payload != squid_direct_types::unit {
+                if tagOf(g, payload) != squid_direct_types::Tag.record { return neverVal(), g.fail(m, id, "#fields requires a record payload"); }
                 record_ty = payload;
             }
         } else {
@@ -1773,7 +1773,7 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 carry_slots = g.reserveVals(carries.len);
                 for carry, at in carries {
                     let slot, error = fresh(g, f, g.s.vals[current.start + at].ty, id);
-                    if error != blot_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return slot, error; }
+                    if error != squid_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return slot, error; }
                     g.s.vals[carry_slots.start + at] = slot;
                 }
             }
@@ -1786,8 +1786,8 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.comptime_len += 1;
             let iter_val, ierr = stmt(g, f, n.b);
             f.comptime_len -= 1;
-            if ierr != blot_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return iter_val, ierr; }
-            if iter_val.ty == blot_direct_types::never { f.loop_depth -= 1; f.env = saved_env; return neverVal(), blot_direct_types::Error.none; }
+            if ierr != squid_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return iter_val, ierr; }
+            if iter_val.ty == squid_direct_types::never { f.loop_depth -= 1; f.env = saved_env; return neverVal(), squid_direct_types::Error.none; }
             if builder {
                 g.s.vals[field_vals.start + pos] = iter_val;
                 for at in 0..carries.len { g.s.vals[current.start + at] = g.s.vals[carry_slots.start + at]; }
@@ -1795,7 +1795,7 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             for carry, at in carries {
                 let bv, ok, berr = readBindingVal(g, f, carry.backedge, id);
-                if berr != blot_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return neverVal(), berr; }
+                if berr != squid_direct_types::Error.none { f.loop_depth -= 1; f.env = saved_env; return neverVal(), berr; }
                 if ok { g.s.vals[current.start + at] = bv; }
             }
         }
@@ -1806,22 +1806,22 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             var payload = unitVal();
             if record_ty != 0 {
                 let value, error = packProduct(g, f, id, record_ty, field_vals);
-                if error != blot_direct_types::Error.none { return value, error; }
+                if error != squid_direct_types::Error.none { return value, error; }
                 payload = value;
             }
             if nom_unit != 0 { return wrapVariant(g, f, target_ty, ctor_tag, payload, id); }
-            return payload, blot_direct_types::Error.none;
+            return payload, squid_direct_types::Error.none;
         }
     } else {
-        if tagOf(g, target_ty) != blot_direct_types::Tag.nominal { return neverVal(), g.fail(m, id, "#variants requires a nominal data type"); }
+        if tagOf(g, target_ty) != squid_direct_types::Tag.nominal { return neverVal(), g.fail(m, id, "#variants requires a nominal data type"); }
         if isOpaqueOutsideUnit(g, m, target_ty) {
-            return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
+            return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
         }
         let nom_id = g.types.nominalIdentity(target_ty);
         if !g.hasUnit(nom_id.unit) { return neverVal(), g.fail(m, id, "#variants defining unit missing"); }
         let owner .= g.units[nom_id.unit - 1];
         let ordinal, oerr = g.types.nominalOrdinal(owner, nom_id);
-        if oerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+        if oerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
         let ctors = owner.nominalConstructors(ordinal);
         f.loop_depth += 1;
         for ctor_idx, ci in ctors {
@@ -1839,18 +1839,18 @@ recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.comptime_len += 1;
             let iter_val, ierr = stmt(g, f, n.b);
             f.comptime_len -= 1;
-            if ierr != blot_direct_types::Error.none { f.loop_depth -= 1; return iter_val, ierr; }
-            if iter_val.ty == blot_direct_types::never { f.loop_depth -= 1; return neverVal(), blot_direct_types::Error.none; }
+            if ierr != squid_direct_types::Error.none { f.loop_depth -= 1; return iter_val, ierr; }
+            if iter_val.ty == squid_direct_types::never { f.loop_depth -= 1; return neverVal(), squid_direct_types::Error.none; }
             for carry, at in carries {
                 let bv, ok, berr = readBindingVal(g, f, carry.backedge, id);
-                if berr != blot_direct_types::Error.none { f.loop_depth -= 1; return neverVal(), berr; }
+                if berr != squid_direct_types::Error.none { f.loop_depth -= 1; return neverVal(), berr; }
                 if ok { g.s.vals[current.start + at] = bv; }
             }
         }
         f.loop_depth -= 1;
     }
     for carry, at in carries { bindPut(g, f, carry.outgoing, g.s.vals[current.start + at]); }
-    return unitVal(), blot_direct_types::Error.none;
+    return unitVal(), squid_direct_types::Error.none;
 }
 
 recursive fn comptimeIfNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -1859,18 +1859,18 @@ recursive fn comptimeIfNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var s = Stage {..};
     let cond = evaluateStage(g, f, s, m, n.a, 0, 0);
     let failed = stageFailureText(s);
-    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
-    blot_support_pooled_buffer::deinit(s.parts, part_runs);
-    blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
-    blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
+    squid_support_pooled_buffer::deinit(s.functions, stage_function_runs);
+    squid_support_pooled_buffer::deinit(s.parts, part_runs);
+    squid_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
+    squid_support_pooled_buffer::deinit(s.bindings, binding_runs);
     if failed.len != 0 { return neverVal(), g.fail(m, n.a, failed); }
     let taken = cond.bits != 0;
     var branch = n.c;
     if taken { branch = n.b; }
     if branch != 0 {
         let res, err = stmt(g, f, branch);
-        if err != blot_direct_types::Error.none { return res, err; }
-        if res.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+        if err != squid_direct_types::Error.none { return res, err; }
+        if res.ty == squid_direct_types::never { return neverVal(), squid_direct_types::Error.none; }
     }
     for merge in m.branchMerges(id) {
         var from_b = merge.else_binding;
@@ -1878,7 +1878,7 @@ recursive fn comptimeIfNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let val, present = bindGet(g, f, from_b);
         if present { bindPut(g, f, merge.result, val); }
     }
-    return unitVal(), blot_direct_types::Error.none;
+    return unitVal(), squid_direct_types::Error.none;
 }
 
 recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -1889,17 +1889,17 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if fidx < 0 { return neverVal(), g.fail(m, id, "comptime field projection outside #for"); }
         let cf = f.comptime_frames[fidx];
         let val, err = expr(g, f, n.a);
-        if err != blot_direct_types::Error.none { return val, err; }
+        if err != squid_direct_types::Error.none { return val, err; }
         var rec = val;
-        if tagOf(g, val.ty) == blot_direct_types::Tag.nominal {
+        if tagOf(g, val.ty) == squid_direct_types::Tag.nominal {
             if isOpaqueOutsideUnit(g, m, val.ty) {
-                return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
+                return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.type_mismatch, "opaque type representation cannot be reflected outside its defining module");
             }
             let cases, verr = g.types.variants(val.ty);
-            if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            if verr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
             if cases.len != 1 { return neverVal(), g.fail(m, id, "val.(field) requires a single-constructor data type"); }
             let unwrapped, uerr = unwrapVariant(g, f, val, g.types.variant_tags[cases.tags], id);
-            if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
+            if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
             rec = unwrapped;
         }
         let pos = g.types.findField(rec.ty, cf.name_id);
@@ -1913,7 +1913,7 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let fidx = findComptimeFrame(f, n.a);
         if fidx < 0 { return neverVal(), g.fail(m, id, "comptime .name outside #for"); }
         let arr_ty, terr = typeOf(g, f, id);
-        if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+        if terr != squid_direct_types::Error.none { return neverVal(), terr; }
         let text = g.types.spelling(f.comptime_frames[fidx].name_id);
         var cp_count: i64 = 0;
         var p: i64 = 0;
@@ -1923,7 +1923,7 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         var idx: i64 = 0;
         while p < text.len {
             let cp, next = utf8Next(text, p);
-            g.s.vals[vals.start + idx] = valOf1(g, blot_direct_types::u32_, constLocal(g, f, cp));
+            g.s.vals[vals.start + idx] = valOf1(g, squid_direct_types::u32_, constLocal(g, f, cp));
             idx += 1;
             p = next;
         }
@@ -1933,32 +1933,32 @@ recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var s = Stage {..};
     let v = evalComptimeMetaStage(g, f, s, m, id, 0, 0);
     var result = neverVal();
-    var error = blot_direct_types::Error.none;
+    var error = squid_direct_types::Error.none;
     let failed = stageFailureText(s);
     if failed.len != 0 { error = g.fail(m, id, failed); }
     else {
         let ty, lerr = typeOf(g, f, id);
         error = lerr;
-        if error == blot_direct_types::Error.none {
+        if error == squid_direct_types::Error.none {
             var remaining: i64 = 65536;
             result, error = emitStageValue(g, f, s, v, ty, id, remaining, 0);
         }
     }
-    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
-    blot_support_pooled_buffer::deinit(s.parts, part_runs);
-    blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
-    blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
+    squid_support_pooled_buffer::deinit(s.functions, stage_function_runs);
+    squid_support_pooled_buffer::deinit(s.parts, part_runs);
+    squid_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
+    squid_support_pooled_buffer::deinit(s.bindings, binding_runs);
     return result, error;
 }
 // Any concrete constraints inferred for a reflection site must agree with
 // the type of the field selected by this iteration.
 fn matchesComptimeFieldType(g: Generator&, f: const Fn&, m: const Module&, expected: TId, actual: Ty) -> bool {
     let ty, error = g.types.lower(m, expected, f.env);
-    return error != blot_direct_types::Error.none || ty == actual;
+    return error != squid_direct_types::Error.none || ty == actual;
 }
 
 recursive fn bindRigidInType(g: Generator&, f: Fn&, owner_unit: u32, tid: TId, nom_args: const Ty[:], depth: i64) {
-    if tid <= blot_check_types::never || depth > 64 { return; }
+    if tid <= squid_check_types::never || depth > 64 { return; }
     let tn = g.units[owner_unit - 1].types.node(tid);
     match tn.tag {
         rigid => {
@@ -2065,7 +2065,7 @@ recursive fn bindRigidInNode(g: Generator&, f: Fn&, owner_unit: u32, id: u32, no
             let sc = g.units[owner_unit - 1].updateSelectors(id).len;
             for si in 0..sc {
                 let sel = g.units[owner_unit - 1].updateSelectors(id)[si];
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     bindRigidInNode(g, f, owner_unit, sel.index, nom_args, depth + 1);
                 }
             }
@@ -2096,10 +2096,10 @@ recursive fn comptimeDefaultNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let with_cells = f.with_cells;
             g.s.serial += 1;
             f.serial = g.s.serial;
-            f.bindings = blot_support_zigmap::Map {};
-            f.with_cells = blot_support_zigmap::Map {};
+            f.bindings = squid_support_zigmap::Map {};
+            f.with_cells = squid_support_zigmap::Map {};
             f.unit = owner_unit;
-            if tagOf(g, frame.target_ty) == blot_direct_types::Tag.nominal {
+            if tagOf(g, frame.target_ty) == squid_direct_types::Tag.nominal {
                 var arg_buf: Ty[32] = [0; 32];
                 var arg_len: i64 = 0;
                 {
@@ -2107,8 +2107,8 @@ recursive fn comptimeDefaultNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     for ai in 0..min(raw_args.len, 32) { arg_buf[ai] = raw_args[ai]; arg_len += 1; }
                 }
                 if arg_len > 0 {
-                    let ordinal, oerr = g.types.nominalOrdinal(owner, blot_check_types::NominalIdentity { owner_unit, frame.nominal_decl });
-                    if oerr == blot_direct_types::Error.none {
+                    let ordinal, oerr = g.types.nominalOrdinal(owner, squid_check_types::NominalIdentity { owner_unit, frame.nominal_decl });
+                    if oerr == squid_direct_types::Error.none {
                         let nvars = owner.types.list(owner.nominal(ordinal).variables);
                         for vi in 0..min(nvars.len, arg_len) {
                             g.types.envPut(f.env, owner_unit, nvars[vi], arg_buf[vi]);
@@ -2124,9 +2124,9 @@ recursive fn comptimeDefaultNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.bindings = bindings;
             f.with_cells = with_cells;
             f.env = env;
-            if error != blot_direct_types::Error.none || value.ty == blot_direct_types::never { return value, error; }
+            if error != squid_direct_types::Error.none || value.ty == squid_direct_types::never { return value, error; }
             if value.ty != frame.field_ty { return neverVal(), g.fail(m, id, "comptime default has the wrong field type"); }
-            return value, blot_direct_types::Error.none;
+            return value, squid_direct_types::Error.none;
         }
     }
     return neverVal(), g.fail(m, id, "comptime field has no default value");
@@ -2134,7 +2134,7 @@ recursive fn comptimeDefaultNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 
 fn deliverComptimeCarry(g: Generator&, f: Fn&, binding: u32, slot: i64, id: u32) -> Error {
     let value, present, error = readBindingVal(g, f, binding, id);
-    if error != blot_direct_types::Error.none { return error; }
+    if error != squid_direct_types::Error.none { return error; }
     if !present { return g.fail(g.units[f.unit - 1], id, "#for carry without a value at field exit"); }
     let dest = g.s.vals[slot];
     if value.ty != dest.ty { return g.fail(g.units[f.unit - 1], id, "#for carry changes type at field exit"); }
@@ -2143,17 +2143,17 @@ fn deliverComptimeCarry(g: Generator&, f: Fn&, binding: u32, slot: i64, id: u32)
 
 // Copies `value` into a lazily allocated result slot.
 fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error {
-    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    if value.ty == squid_direct_types::never { return squid_direct_types::Error.none; }
     if !g.s.slots[slot].present {
         let made, error = fresh(g, f, value.ty, id);
-        if error != blot_direct_types::Error.none { return error; }
-        g.s.slots[slot] = blot_direct_emit::Slot { true, made, 0, Val {} };
+        if error != squid_direct_types::Error.none { return error; }
+        g.s.slots[slot] = squid_direct_emit::Slot { true, made, 0, Val {} };
     }
     let sl .= g.s.slots[slot];
     let first_delivery = sl.deliver_count == 0;
     sl.deliver_count += 1;
     sl.last_src = value;
-    if value.len == 1 && value.ty == blot_direct_types::u32_ {
+    if value.len == 1 && value.ty == squid_direct_types::u32_ {
         let cm = findCheckedMask(f, w(g, value, 0));
         if first_delivery {
             if cm >= 0 {
@@ -2199,7 +2199,7 @@ fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error
 
 fn propagateSlotMask(g: const Generator&, f: Fn&, slot: u32, locals_mark: u32) {
     let sl = g.s.slots[slot];
-    if !sl.present || !sl.mask_valid || sl.value.len != 1 || sl.value.ty != blot_direct_types::u32_ { return; }
+    if !sl.present || !sl.mask_valid || sl.value.len != 1 || sl.value.ty != squid_direct_types::u32_ { return; }
     let loc_ok = sl.mask_local != 0xffffffff && sl.mask_local < locals_mark;
     if !loc_ok && !sl.mask_has_const { return; }
     let mloc = if loc_ok { sl.mask_local } else { 0xffffffff };
@@ -2216,9 +2216,9 @@ fn returnTarget(g: const Generator&, f: const Fn&, target: u32) -> i64, bool {
     while at > f.labels_base {
         at -= 1;
         let label = g.s.labels[at];
-        if label.kind == blot_direct_emit::LabelKind.loop_ {
+        if label.kind == squid_direct_emit::LabelKind.loop_ {
             releases = releases || label.has_release;
-        } else if label.target == target || label.kind == blot_direct_emit::LabelKind.function {
+        } else if label.target == target || label.kind == squid_direct_emit::LabelKind.function {
             return at, releases;
         }
     }
@@ -2229,25 +2229,25 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     let at, releases = returnTarget(g, f, n.b);
-    let fn_exit = at >= 0 && (g.s.labels[at].kind == blot_direct_emit::LabelKind.function ||
+    let fn_exit = at >= 0 && (g.s.labels[at].kind == squid_direct_emit::LabelKind.function ||
         (at == f.labels_base + 1 && f.fn_return_block != 0 && n.b == f.fn_return_block));
     let clean = fn_exit && !releases && f.tco_inhibit == 0 && f.handles_len == 0 && f.scratch_cut.target == 0;
     let prev_tail = f.tail_call_node;
     var value_node = n.a;
     if clean && n.a != 0 {
         let value = m.node(n.a);
-        if f.assoc_tco_local != 0xffffffff && value.tag == blot_check_core::Tag.scalar &&
+        if f.assoc_tco_local != 0xffffffff && value.tag == squid_check_core::Tag.scalar &&
             associativeIntOpcode(value.op, f.assoc_tco_ty) == f.assoc_tco_opcode &&
             isExactSelfCall(g, m, value.b, BindingRef { f.unit, g.s.instances[f.instance_id].key.id }, f.self_tco_inputs.len as i64) {
             var machine = value.op;
             if value.c == 1 {
                 let resolved, error = scalarMember(g, f, m, f.assoc_tco_ty, 0, value.op, n.a);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                if error != squid_direct_types::Error.none { return neverVal(), error; }
                 machine = resolved;
             }
             if associativeIntOpcode(machine, f.assoc_tco_ty) == f.assoc_tco_opcode {
                 let left, error = stmt(g, f, value.a);
-                if error != blot_direct_types::Error.none || left.ty == blot_direct_types::never { return left, error; }
+                if error != squid_direct_types::Error.none || left.ty == squid_direct_types::never { return left, error; }
                 lget(g, f.assoc_tco_local);
                 push(g, left);
                 op(g, f.assoc_tco_opcode);
@@ -2256,15 +2256,15 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
         let value_tag = m.node(value_node).tag;
-        if (f.self_tco_loop != 0xffffffff || blot_direct_writer::tailCallsEnabled()) &&
-            (value_tag == blot_check_core::Tag.call || (value_tag == blot_check_core::Tag.apply && blot_direct_writer::tailCallsEnabled())) {
+        if (f.self_tco_loop != 0xffffffff || squid_direct_writer::tailCallsEnabled()) &&
+            (value_tag == squid_check_core::Tag.call || (value_tag == squid_check_core::Tag.apply && squid_direct_writer::tailCallsEnabled())) {
             f.tail_call_node = value_node;
         }
     }
     let value, error = stmt(g, f, value_node);
     f.tail_call_node = prev_tail;
-    if error != blot_direct_types::Error.none { return value, error; }
-    if value.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return value, error; }
+    if value.ty == squid_direct_types::never { return neverVal(), squid_direct_types::Error.none; }
     if clean && f.direct_returns && !f.allocates && value.ty == g.s.instances[f.instance_id].result &&
         (f.self_tco_loop == 0xffffffff || f.assoc_tco_local != 0xffffffff) {
         if f.assoc_tco_local != 0xffffffff {
@@ -2275,7 +2275,7 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             pushWorkerResult(g, f, value);
         } else { push(g, value); }
         op(g, OP_return_);
-        return neverVal(), blot_direct_types::Error.none;
+        return neverVal(), squid_direct_types::Error.none;
     }
     let builder = findComptimeBlock(f, n.b);
     if builder >= 0 {
@@ -2283,26 +2283,26 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if value.ty != frame.field_ty { return neverVal(), g.fail(m, id, "#fields builder value has the wrong field type"); }
         for merge, at in m.branchMerges(id) {
             let error = deliverComptimeCarry(g, f, merge.then_binding, frame.carry_slots.start + at, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
         }
     }
     if at >= 0 {
         let label = g.s.labels[at];
         let delivered = deliver(g, f, value, label.result, id);
-        if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+        if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
         // Merge saved escape marks for every enclosing releasing loop left by this return.
         var lk = g.s.labels.len;
         while lk > at + 1 {
             lk -= 1;
-            if g.s.labels[lk].kind == blot_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
+            if g.s.labels[lk].kind == squid_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
                 g.s.labels[lk].used = true;
                 emitMergeEscapeMinCurrent(g, f, g.s.labels[lk].saved_esc);
             }
         }
         let left = leaveHandles(g, f, label.depth);
-        if left != blot_direct_types::Error.none { return neverVal(), left; }
+        if left != squid_direct_types::Error.none { return neverVal(), left; }
         br(g, f, OP_br, label.depth);
-        return neverVal(), blot_direct_types::Error.none;
+        return neverVal(), squid_direct_types::Error.none;
     }
     return neverVal(), g.fail(g.units[f.unit - 1], id, "return outside its block");
 }
@@ -2314,27 +2314,27 @@ fn sameWords(g: const Generator&, left: Val, right: Val) -> bool {
 }
 fn resolveLazyVariantArrayRead(g: Generator&, f: const Fn&, m: const Module&, input_id: u32) -> u32, u32, BindingRef, bool {
     let n = m.node(input_id);
-    if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(input_id) == blot_backend_collection_ops::Op.get {
+    if n.tag == squid_check_core::Tag.array_op && m.arrayOperation(input_id) == squid_backend_collection_ops::Op.get {
         let ch = m.children(input_id);
-        if ch.len == 2 && m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+        if ch.len == 2 && m.types.node(m.typeOf(ch[0])).tag == squid_check_types::Tag.array {
             return ch[0], ch[1], BindingRef { 0, 0 }, true;
         }
-    } else if n.tag == blot_check_core::Tag.storage {
-        let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+    } else if n.tag == squid_check_core::Tag.storage {
+        let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
         let ch = m.children(input_id);
-        if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 &&
-            m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+        if ok == squid_error::Error.none && op_kind == squid_check_storage_ops::Op.read && ch.len == 2 &&
+            m.types.node(m.typeOf(ch[0])).tag == squid_check_types::Tag.array {
             return ch[0], ch[1], BindingRef { 0, 0 }, true;
         }
-    } else if n.tag == blot_check_core::Tag.apply && m.node(n.a).tag == blot_check_core::Tag.project {
+    } else if n.tag == squid_check_core::Tag.apply && m.node(n.a).tag == squid_check_core::Tag.project {
         let proj_n = m.node(n.a);
         let sp = m.fieldSpelling(m.projection(proj_n.b).field);
-        if sp.present && sp.value == "at" && m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+        if sp.present && sp.value == "at" && m.types.node(m.typeOf(proj_n.a)).tag == squid_check_types::Tag.array {
             let recv_ty, rerr = g.types.lower(m, m.typeOf(proj_n.a), f.env);
-            if rerr == blot_direct_types::Error.none && tagOf(g, recv_ty) == blot_direct_types::Tag.array {
+            if rerr == squid_direct_types::Error.none && tagOf(g, recv_ty) == squid_direct_types::Tag.array {
                 let identity, has_id = g.receiverIdentity(recv_ty);
                 if has_id {
-                    let target, has_t = g.dispatchTarget(m, identity, m.projection(proj_n.b).field, blot_check_types::Operator.none);
+                    let target, has_t = g.dispatchTarget(m, identity, m.projection(proj_n.b).field, squid_check_types::Operator.none);
                     if has_t && g.hasUnit(target.unit) {
                         let tm .= g.units[target.unit - 1];
                         let body .= tm.body(target.binding);
@@ -2343,15 +2343,15 @@ fn resolveLazyVariantArrayRead(g: Generator&, f: const Fn&, m: const Module&, in
                             let inner = scratchReturned(tm, unwrapSingleBody(tm, body.root));
                             if params.len == 2 && inner != 0 {
                                 let in_n = tm.node(inner);
-                                if in_n.tag == blot_check_core::Tag.array_op && tm.arrayOperation(inner) == blot_backend_collection_ops::Op.get {
+                                if in_n.tag == squid_check_core::Tag.array_op && tm.arrayOperation(inner) == squid_backend_collection_ops::Op.get {
                                     let ich = tm.children(inner);
                                     if ich.len == 2 && localRef(tm, ich[0]) == params[0].binding && localRef(tm, ich[1]) == params[1].binding {
                                         return proj_n.a, n.b, target, true;
                                     }
-                                } else if in_n.tag == blot_check_core::Tag.storage {
-                                    let op_k, ok = blot_check_storage_ops::opFromCode(in_n.c);
+                                } else if in_n.tag == squid_check_core::Tag.storage {
+                                    let op_k, ok = squid_check_storage_ops::opFromCode(in_n.c);
                                     let ich = tm.children(inner);
-                                    if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read &&
+                                    if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read &&
                                         ich.len == 2 && localRef(tm, ich[0]) == params[0].binding && localRef(tm, ich[1]) == params[1].binding {
                                         return proj_n.a, n.b, target, true;
                                     }
@@ -2360,7 +2360,7 @@ fn resolveLazyVariantArrayRead(g: Generator&, f: const Fn&, m: const Module&, in
                         }
                     }
                 }
-            } else if rerr != blot_direct_types::Error.none {
+            } else if rerr != squid_direct_types::Error.none {
                 g.dropFailure();
             }
         }
@@ -2379,37 +2379,37 @@ fn extract3F32PayloadPat(
     if subpat == 0 { return false; }
     var rec_ty = payload_ty;
     var pat_id = subpat;
-    if tagOf(g, payload_ty) == blot_direct_types::Tag.nominal {
+    if tagOf(g, payload_ty) == squid_direct_types::Tag.nominal {
         let cases, cerr = g.types.variants(payload_ty);
-        if cerr != blot_direct_types::Error.none || cases.len != 1 { return false; }
+        if cerr != squid_direct_types::Error.none || cases.len != 1 { return false; }
         let p = m.pattern(pat_id);
-        if p.tag != blot_check_core::PatternTag.constructor { return false; }
+        if p.tag != squid_check_core::PatternTag.constructor { return false; }
         if m.constructor(p.a).tag != g.types.variant_tags[cases.tags] { return false; }
         rec_ty = g.types.variant_payloads[cases.payloads];
         pat_id = p.b;
     }
-    if tagOf(g, rec_ty) != blot_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false; }
+    if tagOf(g, rec_ty) != squid_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false; }
     let layout, lerr = g.types.layout(rec_ty);
-    if lerr != blot_direct_types::Error.none || layout.len != 3 { return false; }
+    if lerr != squid_direct_types::Error.none || layout.len != 3 { return false; }
     if layout[0] != VT_f32 || layout[1] != VT_f32 || layout[2] != VT_f32 { return false; }
     let rp = m.pattern(pat_id);
     var prod_id: u32 = 0;
-    if rp.tag == blot_check_core::PatternTag.record_payload {
-        if m.pattern(rp.b).tag != blot_check_core::PatternTag.product { return false; }
+    if rp.tag == squid_check_core::PatternTag.record_payload {
+        if m.pattern(rp.b).tag != squid_check_core::PatternTag.product { return false; }
         prod_id = rp.b;
-    } else if rp.tag == blot_check_core::PatternTag.product {
+    } else if rp.tag == squid_check_core::PatternTag.product {
         prod_id = pat_id;
     } else {
         return false;
     }
     let storage = m.types.node(rp.ty);
-    if storage.tag != blot_check_types::Tag.record || storage.b != 3 { return false; }
+    if storage.tag != squid_check_types::Tag.record || storage.b != 3 { return false; }
     let ch = m.patternChildren(prod_id);
     if ch.len != 3 { return false; }
     var seen: bool[3] = [false; 3];
     for idx in 0..3 {
         let cp = m.pattern(ch[idx]);
-        if cp.tag != blot_check_core::PatternTag.bind { return false; }
+        if cp.tag != squid_check_core::PatternTag.bind { return false; }
         let fsp = m.fieldSpelling(m.types.recordField(storage, idx).name);
         if !fsp.present { return false; }
         let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
@@ -2419,16 +2419,16 @@ fn extract3F32PayloadPat(
     }
     return seen[0] && seen[1] && seen[2];
 }
-fn isNoopWildcardArm(m: const Module&, arm: blot_check_core::MatchArm) -> bool {
+fn isNoopWildcardArm(m: const Module&, arm: squid_check_core::MatchArm) -> bool {
     if arm.guard_ != 0 { return false; }
     let rows = m.armRows(arm);
     if rows.len != 1 { return false; }
     let pats = m.rowPatterns(rows[0]);
-    if pats.len != 1 || m.pattern(pats[0]).tag != blot_check_core::PatternTag.wildcard { return false; }
+    if pats.len != 1 || m.pattern(pats[0]).tag != squid_check_core::PatternTag.wildcard { return false; }
     if arm.body == 0 { return true; }
     let bn = m.node(arm.body);
-    return bn.tag == blot_check_core::Tag.constant ||
-        ((bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ || bn.tag == blot_check_core::Tag.product) && bn.b == 0);
+    return bn.tag == squid_check_core::Tag.constant ||
+        ((bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ || bn.tag == squid_check_core::Tag.product) && bn.b == 0);
 }
 fn match3F32CtorExpr(
     g: Generator&,
@@ -2440,38 +2440,38 @@ fn match3F32CtorExpr(
     v_bs: const u32[3]&,
 ) -> bool, Op {
     let vn = m.node(val_id);
-    if vn.tag != blot_check_core::Tag.construct || m.constructor(vn.a).tag != 0 { return false, blot_check_core::Op.none; }
+    if vn.tag != squid_check_core::Tag.construct || m.constructor(vn.a).tag != 0 { return false, squid_check_core::Op.none; }
     var inner_id = vn.b;
     var rec_ty = payload_ty;
     var decl_storage_tid: TId = 0;
-    if tagOf(g, payload_ty) == blot_direct_types::Tag.nominal {
+    if tagOf(g, payload_ty) == squid_direct_types::Tag.nominal {
         let cases, cerr = g.types.variants(payload_ty);
-        if cerr != blot_direct_types::Error.none || cases.len != 1 { return false, blot_check_core::Op.none; }
+        if cerr != squid_direct_types::Error.none || cases.len != 1 { return false, squid_check_core::Op.none; }
         let in_n = m.node(inner_id);
-        if in_n.tag != blot_check_core::Tag.construct { return false, blot_check_core::Op.none; }
+        if in_n.tag != squid_check_core::Tag.construct { return false, squid_check_core::Op.none; }
         let ctor = m.constructor(in_n.a);
-        if ctor.tag != g.types.variant_tags[cases.tags] { return false, blot_check_core::Op.none; }
+        if ctor.tag != g.types.variant_tags[cases.tags] { return false, squid_check_core::Op.none; }
         rec_ty = g.types.variant_payloads[cases.payloads];
         if ctor.payload != 0 {
             let dn = m.types.node(ctor.payload);
-            if dn.tag == blot_check_types::Tag.record && dn.b == 3 {
+            if dn.tag == squid_check_types::Tag.record && dn.b == 3 {
                 decl_storage_tid = ctor.payload;
             }
         }
         inner_id = in_n.b;
     }
-    if tagOf(g, rec_ty) != blot_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false, blot_check_core::Op.none; }
+    if tagOf(g, rec_ty) != squid_direct_types::Tag.record || g.types.node(rec_ty).b != 3 { return false, squid_check_core::Op.none; }
     let rn = m.node(inner_id);
-    if rn.tag != blot_check_core::Tag.record && rn.tag != blot_check_core::Tag.product { return false, blot_check_core::Op.none; }
+    if rn.tag != squid_check_core::Tag.record && rn.tag != squid_check_core::Tag.product { return false, squid_check_core::Op.none; }
     let ch = m.children(inner_id);
-    if ch.len != 3 { return false, blot_check_core::Op.none; }
+    if ch.len != 3 { return false, squid_check_core::Op.none; }
     var storage_tid: TId = 0;
-    if rn.tag == blot_check_core::Tag.record {
+    if rn.tag == squid_check_core::Tag.record {
         storage_tid = m.typeOf(inner_id);
         let sn = m.types.node(storage_tid);
-        if sn.tag != blot_check_types::Tag.record || sn.b != 3 { return false, blot_check_core::Op.none; }
+        if sn.tag != squid_check_types::Tag.record || sn.b != 3 { return false, squid_check_core::Op.none; }
     } else {
-        if decl_storage_tid == 0 { return false, blot_check_core::Op.none; }
+        if decl_storage_tid == 0 { return false, squid_check_core::Op.none; }
         storage_tid = decl_storage_tid;
     }
     let storage = m.types.node(storage_tid);
@@ -2479,34 +2479,34 @@ fn match3F32CtorExpr(
     var seen: bool[3] = [false; 3];
     for idx in 0..3 {
         var dest = idx;
-        if rn.tag == blot_check_core::Tag.record {
+        if rn.tag == squid_check_core::Tag.record {
             dest = m.recordDestinations(inner_id)[idx] as i64;
-            if dest < 0 || dest >= 3 { return false, blot_check_core::Op.none; }
+            if dest < 0 || dest >= 3 { return false, squid_check_core::Op.none; }
         }
         let fsp = m.fieldSpelling(m.types.recordField(storage, dest).name);
-        if !fsp.present { return false, blot_check_core::Op.none; }
+        if !fsp.present { return false, squid_check_core::Op.none; }
         let slot = g.types.findField(rec_ty, g.types.fieldName(fsp.value));
-        if slot < 0 || slot >= 3 || seen[slot] { return false, blot_check_core::Op.none; }
+        if slot < 0 || slot >= 3 || seen[slot] { return false, squid_check_core::Op.none; }
         seen[slot] = true;
         lane_exprs[slot] = ch[idx];
     }
-    if !seen[0] || !seen[1] || !seen[2] { return false, blot_check_core::Op.none; }
-    var want_op = blot_check_core::Op.none;
+    if !seen[0] || !seen[1] || !seen[2] { return false, squid_check_core::Op.none; }
+    var want_op = squid_check_core::Op.none;
     for slot in 0..3 {
         let en = m.node(lane_exprs[slot]);
-        if en.tag != blot_check_core::Tag.scalar && !(en.tag == blot_check_core::Tag.associated && en.op != blot_check_core::Op.none) {
-            return false, blot_check_core::Op.none;
+        if en.tag != squid_check_core::Tag.scalar && !(en.tag == squid_check_core::Tag.associated && en.op != squid_check_core::Op.none) {
+            return false, squid_check_core::Op.none;
         }
-        if en.op != blot_check_core::Op.add && en.op != blot_check_core::Op.sub { return false, blot_check_core::Op.none; }
-        if want_op == blot_check_core::Op.none { want_op = en.op; }
-        else if en.op != want_op { return false, blot_check_core::Op.none; }
+        if en.op != squid_check_core::Op.add && en.op != squid_check_core::Op.sub { return false, squid_check_core::Op.none; }
+        if want_op == squid_check_core::Op.none { want_op = en.op; }
+        else if en.op != want_op { return false, squid_check_core::Op.none; }
         let la = localRef(m, en.a);
         let lb = localRef(m, en.b);
         let exact = la == p_bs[slot] && lb == v_bs[slot];
-        let comm = want_op == blot_check_core::Op.add && la == v_bs[slot] && lb == p_bs[slot];
-        if !exact && !comm { return false, blot_check_core::Op.none; }
+        let comm = want_op == squid_check_core::Op.add && la == v_bs[slot] && lb == p_bs[slot];
+        if !exact && !comm { return false, squid_check_core::Op.none; }
     }
-    return want_op != blot_check_core::Op.none, want_op;
+    return want_op != squid_check_core::Op.none, want_op;
 }
 struct Vec3MaybeMatch {
     pos_b: u32 = 0,
@@ -2520,7 +2520,7 @@ struct Vec3MaybeMatch {
     vel_idx_node: u32 = 0,
     vel_input_id: u32 = 0,
     vel_inlined: BindingRef = BindingRef { 0, 0 },
-    vec_op: blot_check_core::Op = blot_check_core::Op.none,
+    vec_op: squid_check_core::Op = squid_check_core::Op.none,
     merge_count: i64 = 0,
     merge_res: u32[2] = [0; 2],
 }
@@ -2544,21 +2544,21 @@ fn matchVec3MaybeSimdUpdate(
     let idx_b = localRef(m, pos_idx_node);
     if pos_b == 0 || idx_b == 0 { return false; }
     let pos_step, pserr = stride(g, f, pos_elem_ty, id);
-    if pserr != blot_direct_types::Error.none || pos_step != 16 { return false; }
+    if pserr != squid_direct_types::Error.none || pos_step != 16 { return false; }
     let p_cases, pcerr = g.types.variants(pos_elem_ty);
-    if pcerr != blot_direct_types::Error.none || p_cases.len <= 1 { return false; }
+    if pcerr != squid_direct_types::Error.none || p_cases.len <= 1 { return false; }
     let p_vpos, pvperr = variantPosition(g, f, p_cases, 0, id);
-    if pvperr != blot_direct_types::Error.none { return false; }
+    if pvperr != squid_direct_types::Error.none { return false; }
     let p_payload_ty = g.types.variant_payloads[p_cases.payloads + p_vpos];
     let p_rows = m.armRows(arms[0]);
     if p_rows.len != 1 || m.rowPatterns(p_rows[0]).len != 1 { return false; }
     let p_pat = m.pattern(m.rowPatterns(p_rows[0])[0]);
-    if p_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 { return false; }
+    if p_pat.tag != squid_check_core::PatternTag.constructor || m.constructor(p_pat.a).tag != 0 { return false; }
     var p_bs: u32[3] = [0; 3];
     if !extract3F32PayloadPat(g, m, p_pat.b, p_payload_ty, p_bs) { return false; }
 
     let inner_id = unwrapSingleBody(m, arms[0].body);
-    if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.match_ { return false; }
+    if inner_id == 0 || m.node(inner_id).tag != squid_check_core::Tag.match_ { return false; }
     let inner_info = m.matchInfo(inner_id);
     let inner_inputs = m.matchInputs(inner_id);
     let inner_arms = m.matchArms(inner_id);
@@ -2569,22 +2569,22 @@ fn matchVec3MaybeSimdUpdate(
     let vel_b = localRef(m, v_arr_n);
     if vel_b == 0 { return false; }
     let vel_elem_ty, vierr = g.types.lower(m, m.typeOf(inner_inputs[0]), f.env);
-    if vierr != blot_direct_types::Error.none { g.dropFailure(); return false; }
-    if tagOf(g, vel_elem_ty) != blot_direct_types::Tag.nominal { return false; }
+    if vierr != squid_direct_types::Error.none { g.dropFailure(); return false; }
+    if tagOf(g, vel_elem_ty) != squid_direct_types::Tag.nominal { return false; }
     let v_boxed, vberr = isBoxed(g, f, vel_elem_ty, inner_id);
     let v_step, vserr = stride(g, f, vel_elem_ty, inner_id);
-    if vberr != blot_direct_types::Error.none || v_boxed || vserr != blot_direct_types::Error.none || v_step != 16 {
+    if vberr != squid_direct_types::Error.none || v_boxed || vserr != squid_direct_types::Error.none || v_step != 16 {
         return false;
     }
     let v_cases, vcerr = g.types.variants(vel_elem_ty);
-    if vcerr != blot_direct_types::Error.none || v_cases.len <= 1 { return false; }
+    if vcerr != squid_direct_types::Error.none || v_cases.len <= 1 { return false; }
     let v_vpos, vvperr = variantPosition(g, f, v_cases, 0, inner_id);
-    if vvperr != blot_direct_types::Error.none { return false; }
+    if vvperr != squid_direct_types::Error.none { return false; }
     let v_payload_ty = g.types.variant_payloads[v_cases.payloads + v_vpos];
     let v_rows = m.armRows(inner_arms[0]);
     if v_rows.len != 1 || m.rowPatterns(v_rows[0]).len != 1 { return false; }
     let v_pat = m.pattern(m.rowPatterns(v_rows[0])[0]);
-    if v_pat.tag != blot_check_core::PatternTag.constructor || m.constructor(v_pat.a).tag != 0 { return false; }
+    if v_pat.tag != squid_check_core::PatternTag.constructor || m.constructor(v_pat.a).tag != 0 { return false; }
     var v_bs: u32[3] = [0; 3];
     if !extract3F32PayloadPat(g, m, v_pat.b, v_payload_ty, v_bs) { return false; }
 
@@ -2593,14 +2593,14 @@ fn matchVec3MaybeSimdUpdate(
     var upd_id: u32 = 0;
     var upd_bind_b: u32 = 0;
     let bsn = m.node(body_stmt);
-    if bsn.tag == blot_check_core::Tag.update { upd_id = body_stmt; }
-    else if bsn.tag == blot_check_core::Tag.bind && bsn.c < 2 && m.node(bsn.b).tag == blot_check_core::Tag.update {
+    if bsn.tag == squid_check_core::Tag.update { upd_id = body_stmt; }
+    else if bsn.tag == squid_check_core::Tag.bind && bsn.c < 2 && m.node(bsn.b).tag == squid_check_core::Tag.update {
         upd_id = bsn.b;
         upd_bind_b = bsn.a;
     } else { return false; }
     let uinfo = m.updateInfo(upd_id);
     let sels = m.updateSelectors(upd_id);
-    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+    if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { return false; }
     if localRef(m, uinfo.root) != pos_b || localRef(m, sels[0].index) != idx_b { return false; }
     if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false; }
     let op_ok, found_op = match3F32CtorExpr(g, m, uinfo.value, pos_elem_ty, p_payload_ty, p_bs, v_bs);
@@ -2652,27 +2652,27 @@ fn tryEmitVec3MaybeSimdUpdate(
     pos_inlined: BindingRef,
     pos_elem_ty: Ty,
 ) -> Val, bool, Error {
-    if g.runtime_().has_fork { return neverVal(), false, blot_direct_types::Error.none; }
+    if g.runtime_().has_fork { return neverVal(), false, squid_direct_types::Error.none; }
     var vm = Vec3MaybeMatch {};
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
         matched = matchVec3MaybeSimdUpdate(g, f, m, id, pos_arr_node, pos_idx_node, pos_input_id, pos_inlined, pos_elem_ty, vm);
     }
-    if !matched { return neverVal(), false, blot_direct_types::Error.none; }
+    if !matched { return neverVal(), false, squid_direct_types::Error.none; }
 
     if vm.pos_inlined.binding != 0 { g.recordInlined(vm.pos_inlined.unit, vm.pos_inlined.binding); }
     if vm.vel_inlined.binding != 0 { g.recordInlined(vm.vel_inlined.unit, vm.vel_inlined.binding); }
 
     let pos_val, perr = expr(g, f, vm.pos_arr_node);
-    if perr != blot_direct_types::Error.none { return pos_val, true, perr; }
+    if perr != squid_direct_types::Error.none { return pos_val, true, perr; }
     let idx_val, ierr = expr(g, f, vm.pos_idx_node);
-    if ierr != blot_direct_types::Error.none { return idx_val, true, ierr; }
+    if ierr != squid_direct_types::Error.none { return idx_val, true, ierr; }
     let idx_loc, slerr = scalarLocal(g, f, idx_val, vm.pos_input_id);
-    if slerr != blot_direct_types::Error.none { return neverVal(), true, slerr; }
+    if slerr != squid_direct_types::Error.none { return neverVal(), true, slerr; }
 
     let pos_addr, paerr = elementAddress(g, f, pos_val, idx_loc, vm.pos_input_id, g.units[f.unit - 1].typeOf(vm.pos_arr_node), true);
-    if paerr != blot_direct_types::Error.none { return neverVal(), true, paerr; }
+    if paerr != squid_direct_types::Error.none { return neverVal(), true, paerr; }
 
     let pv = local(g, f, VT_v128);
     lget(g, pos_addr);
@@ -2683,9 +2683,9 @@ fn tryEmitVec3MaybeSimdUpdate(
     let p_if = open(g, f, OP_if_);
 
     let vel_val, verr = expr(g, f, vm.vel_arr_node);
-    if verr != blot_direct_types::Error.none { return vel_val, true, verr; }
+    if verr != squid_direct_types::Error.none { return vel_val, true, verr; }
     let vel_addr, vaerr = elementAddress(g, f, vel_val, idx_loc, vm.vel_input_id, g.units[f.unit - 1].typeOf(vm.vel_arr_node), true);
-    if vaerr != blot_direct_types::Error.none { return neverVal(), true, vaerr; }
+    if vaerr != squid_direct_types::Error.none { return neverVal(), true, vaerr; }
 
     let vv = local(g, f, VT_v128);
     lget(g, vel_addr);
@@ -2698,7 +2698,7 @@ fn tryEmitVec3MaybeSimdUpdate(
     lget(g, pos_addr);
     lget(g, pv);
     lget(g, vv);
-    if vm.vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+    if vm.vec_op == squid_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
     else { simdOp(g, SIMD_f32x4_sub); }
     if !f.defer_f32_nan { canonicalizeF32x4(g, f, 0xffffffff); }
     simdMemOp(g, SIMD_v128_store, 2, 0);
@@ -2710,7 +2710,7 @@ fn tryEmitVec3MaybeSimdUpdate(
     f.checked_elems_len = 0;
 
     for mi in 0..vm.merge_count { bindPut(g, f, vm.merge_res[mi], pos_val); }
-    return unitVal(), true, blot_direct_types::Error.none;
+    return unitVal(), true, squid_direct_types::Error.none;
 }
 
 // 6A: 4x unrolled coalesced `v128` loop for 16-byte `Maybe Vec3` updates:
@@ -2719,8 +2719,8 @@ fn tryEmitVec3MaybeSimdUpdate(
 //   Shape 2 (indirect `let id = ids[k]`): 4x descending `ids` loads (`12,8,4,0`) +
 //   single combined `(pv|vv)` tag check per entity (or 4-way coalesced when pre-scanned
 //   `indirect_bound_distinct_local` proves all target IDs are strictly increasing & pos != vel).
-fn emitVec3SimdAddSub(g: Generator&, f: Fn&, vec_op: blot_check_core::Op, nan_v: u32) {
-    if vec_op == blot_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
+fn emitVec3SimdAddSub(g: Generator&, f: Fn&, vec_op: squid_check_core::Op, nan_v: u32) {
+    if vec_op == squid_check_core::Op.add { simdOp(g, SIMD_f32x4_add); }
     else { simdOp(g, SIMD_f32x4_sub); }
     if !f.defer_f32_nan { canonicalizeF32x4(g, f, nan_v); }
 }
@@ -2728,13 +2728,13 @@ fn tryEmitVec3MaybeLoop4x(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     carry_in_place: const bool[64]&,
     index: u32,
     end_local: u32,
 ) -> Error {
-    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
-        return blot_direct_types::Error.none;
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return squid_direct_types::Error.none;
     }
     var vm = Vec3MaybeMatch {};
     var is_indirect = false;
@@ -2744,32 +2744,32 @@ fn tryEmitVec3MaybeLoop4x(
     {
         let m .= g.units[f.unit - 1];
         let pat = m.pattern(info.pattern);
-        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        if pat.tag != squid_check_core::PatternTag.bind { return squid_direct_types::Error.none; }
         let iter_b = pat.a;
 
         let carries = m.loopCarries(loop_id);
-        if carries.len > 64 { return blot_direct_types::Error.none; }
-        for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
+        if carries.len > 64 { return squid_direct_types::Error.none; }
+        for ci in 0..carries.len { if !carry_in_place[ci] { return squid_direct_types::Error.none; } }
 
         var match_id: u32 = 0;
         var target_idx_b: u32 = iter_b;
         let single = unwrapSingleBody(m, info.body);
-        if single != 0 && m.node(single).tag == blot_check_core::Tag.match_ {
+        if single != 0 && m.node(single).tag == squid_check_core::Tag.match_ {
             match_id = single;
         } else {
             let bn = m.node(info.body);
-            if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+            if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
                 let ch = m.children(info.body);
                 if ch.len == 2 {
                     let s0 = m.node(ch[0]);
-                    if s0.tag == blot_check_core::Tag.bind && s0.c < 2 && m.node(ch[1]).tag == blot_check_core::Tag.match_ {
+                    if s0.tag == squid_check_core::Tag.bind && s0.c < 2 && m.node(ch[1]).tag == squid_check_core::Tag.match_ {
                         let gok, ia_n, ip_n = matchArrayGet(m, s0.b);
                         if gok && localRef(m, ip_n) == iter_b {
                             let iab = localRef(m, ia_n);
                             if iab != 0 {
                                 let iav, iaok = bindGet(g, f, iab);
-                                if iaok && tagOf(g, iav.ty) == blot_direct_types::Tag.array &&
-                                    tagOf(g, g.types.node(iav.ty).a) == blot_direct_types::Tag.u32_ {
+                                if iaok && tagOf(g, iav.ty) == squid_direct_types::Tag.array &&
+                                    tagOf(g, g.types.node(iav.ty).a) == squid_direct_types::Tag.u32_ {
                                     is_indirect = true;
                                     ids_arr_b = iab;
                                     ind_id_b = s0.a;
@@ -2782,28 +2782,28 @@ fn tryEmitVec3MaybeLoop4x(
                 }
             }
         }
-        if match_id == 0 { return blot_direct_types::Error.none; }
+        if match_id == 0 { return squid_direct_types::Error.none; }
         let inputs = m.matchInputs(match_id);
-        if inputs.len != 1 { return blot_direct_types::Error.none; }
+        if inputs.len != 1 { return squid_direct_types::Error.none; }
         let p_arr_n, p_idx_n, p_inl, p_ok = resolveLazyVariantArrayRead(g, f, m, inputs[0]);
-        if !p_ok || localRef(m, p_idx_n) != target_idx_b { return blot_direct_types::Error.none; }
+        if !p_ok || localRef(m, p_idx_n) != target_idx_b { return squid_direct_types::Error.none; }
         let p_elem_ty, pierr = g.types.lower(m, m.typeOf(inputs[0]), f.env);
-        if pierr != blot_direct_types::Error.none { g.dropFailure(); return blot_direct_types::Error.none; }
-        if tagOf(g, p_elem_ty) != blot_direct_types::Tag.nominal { return blot_direct_types::Error.none; }
+        if pierr != squid_direct_types::Error.none { g.dropFailure(); return squid_direct_types::Error.none; }
+        if tagOf(g, p_elem_ty) != squid_direct_types::Tag.nominal { return squid_direct_types::Error.none; }
         let p_boxed, pberr = isBoxed(g, f, p_elem_ty, match_id);
-        if pberr != blot_direct_types::Error.none || p_boxed { return blot_direct_types::Error.none; }
+        if pberr != squid_direct_types::Error.none || p_boxed { return squid_direct_types::Error.none; }
         if !matchVec3MaybeSimdUpdate(g, f, m, match_id, p_arr_n, p_idx_n, inputs[0], p_inl, p_elem_ty, vm) {
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         }
         // Ensure `pos` and `vel` are bound in `f` as arrays (resolving outer loop carries).
         let pv, pok = bindGet(g, f, vm.pos_b);
         let vv, vok = bindGet(g, f, vm.vel_b);
-        if !pok || !vok || tagOf(g, pv.ty) != blot_direct_types::Tag.array || tagOf(g, vv.ty) != blot_direct_types::Tag.array {
-            return blot_direct_types::Error.none;
+        if !pok || !vok || tagOf(g, pv.ty) != squid_direct_types::Tag.array || tagOf(g, vv.ty) != squid_direct_types::Tag.array {
+            return squid_direct_types::Error.none;
         }
         matched = true;
     }
-    if !matched { return blot_direct_types::Error.none; }
+    if !matched { return squid_direct_types::Error.none; }
 
     if vm.pos_inlined.binding != 0 { g.recordInlined(vm.pos_inlined.unit, vm.pos_inlined.binding); }
     if vm.vel_inlined.binding != 0 { g.recordInlined(vm.vel_inlined.unit, vm.vel_inlined.binding); }
@@ -2912,17 +2912,17 @@ fn tryEmitVec3MaybeLoop4x(
         popCheckedArraysAt(f, run_if);
         close(g, f);
         f.checked_elems_len = 0;
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
 
     // Shape 2: Indirect `let id = ids[k]` 4x coalesced `Maybe Vec3` loop!
     // Only fires when pre-scanned `5B-2` already proved every `ids[k] < min(pos_len, vel_len)`!
     if f.indirect_bound_binding != ind_id_b || f.indirect_bound_len == 0 {
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
     if !(f.indirect_bound_len == pos_len || findCheckedLe(f, f.indirect_bound_len, pos_len) >= 0) ||
         !(f.indirect_bound_len == vel_len || findCheckedLe(f, f.indirect_bound_len, vel_len) >= 0) {
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
 
     let ids_val, _ = bindGet(g, f, ids_arr_b);
@@ -3127,7 +3127,7 @@ fn tryEmitVec3MaybeLoop4x(
     popCheckedArraysAt(f, run_if);
     close(g, f);
     f.checked_elems_len = 0;
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 recursive fn isIrrefutableSubpat(m: const Module&, pat_id: u32, depth: i64 = 0) -> bool {
@@ -3149,8 +3149,8 @@ recursive fn isIrrefutableSubpat(m: const Module&, pat_id: u32, depth: i64 = 0) 
 
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let split_val, did_split, split_err = tryEmitSplitSumMatch(g, f, id);
-    if split_err != blot_direct_types::Error.none { return split_val, split_err; }
-    if did_split { return split_val, blot_direct_types::Error.none; }
+    if split_err != squid_direct_types::Error.none { return split_val, split_err; }
+    if did_split { return split_val, squid_direct_types::Error.none; }
     // Lazy variant payload fast path: when matching an unboxed multi-constructor
     // nominal directly from a `Tag.array` element read (`pos[i]`, `pool.at id`),
     // load ONLY the 4-byte tag before branching and load payload words only inside
@@ -3168,11 +3168,11 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let arr_n, idx_n, inl_t, ok = resolveLazyVariantArrayRead(g, f, m, inputs[0]);
             if ok {
                 let in_ty, ierr = g.types.lower(m, m.typeOf(inputs[0]), f.env);
-                if ierr == blot_direct_types::Error.none && tagOf(g, in_ty) == blot_direct_types::Tag.nominal {
+                if ierr == squid_direct_types::Error.none && tagOf(g, in_ty) == squid_direct_types::Tag.nominal {
                     let boxed, berr = isBoxed(g, f, in_ty, id);
                     let is_niche, _, _, _, nerr = g.types.nullableNiche(in_ty);
                     let cases, cerr = g.types.variants(in_ty);
-                    if berr == blot_direct_types::Error.none && !boxed && nerr == blot_direct_types::Error.none && !is_niche && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                    if berr == squid_direct_types::Error.none && !boxed && nerr == squid_direct_types::Error.none && !is_niche && cerr == squid_direct_types::Error.none && cases.len > 1 {
                         var arms_ok = true;
                         for arm in m.matchArms(id) {
                             let rows = m.armRows(arm);
@@ -3180,7 +3180,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                             let pats = m.rowPatterns(rows[0]);
                             if pats.len != 1 { arms_ok = false; break; }
                             let ptag = m.pattern(pats[0]).tag;
-                            if ptag != blot_check_core::PatternTag.wildcard && ptag != blot_check_core::PatternTag.constructor {
+                            if ptag != squid_check_core::PatternTag.wildcard && ptag != squid_check_core::PatternTag.constructor {
                                 arms_ok = false;
                                 break;
                             }
@@ -3194,7 +3194,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                             use_lazy_variant = true;
                         }
                     }
-                } else if ierr != blot_direct_types::Error.none {
+                } else if ierr != squid_direct_types::Error.none {
                     g.dropFailure();
                 }
             }
@@ -3202,23 +3202,23 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     if use_lazy_variant {
         let v3_val, v3_done, v3_err = tryEmitVec3MaybeSimdUpdate(g, f, id, lazy_arr_node, lazy_idx_node, lazy_input_id, lazy_inlined, lazy_input_ty);
-        if v3_err != blot_direct_types::Error.none { return v3_val, v3_err; }
-        if v3_done { return v3_val, blot_direct_types::Error.none; }
+        if v3_err != squid_direct_types::Error.none { return v3_val, v3_err; }
+        if v3_done { return v3_val, squid_direct_types::Error.none; }
         if lazy_inlined.binding != 0 { g.recordInlined(lazy_inlined.unit, lazy_inlined.binding); }
         let arr_val, aerr = expr(g, f, lazy_arr_node);
-        if aerr != blot_direct_types::Error.none { return arr_val, aerr; }
+        if aerr != squid_direct_types::Error.none { return arr_val, aerr; }
         let pos_val, perr = expr(g, f, lazy_idx_node);
-        if perr != blot_direct_types::Error.none { return pos_val, perr; }
+        if perr != squid_direct_types::Error.none { return pos_val, perr; }
         let idx_local, serr = scalarLocal(g, f, pos_val, lazy_input_id);
-        if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+        if serr != squid_direct_types::Error.none { return neverVal(), serr; }
         let elem_addr, eerr = elementAddress(g, f, arr_val, idx_local, lazy_input_id, g.units[f.unit - 1].typeOf(lazy_arr_node), true);
-        if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+        if eerr != squid_direct_types::Error.none { return neverVal(), eerr; }
         let _, lazy_payload_off, lp_err = g.types.sumTagInfo(lazy_input_ty);
-        if lp_err != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        if lp_err != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
         let tag_local = local32(g, f);
         lget(g, elem_addr);
         let tlerr = emitTagLoad(g, lazy_input_ty, 0);
-        if tlerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        if tlerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
         lset(g, tag_local);
 
         let info = g.units[f.unit - 1].matchInfo(id);
@@ -3229,7 +3229,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let done = open(g, f, OP_block);
         let arms_len = g.units[f.unit - 1].matchArms(id).len;
         let cases, verr = g.types.variants(lazy_input_ty);
-        if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        if verr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
         // Dense constructor tag jump table (`br_table`) when >= 3 unguarded arms have irrefutable subpatterns.
         var use_br_table = arms_len >= 3 && arms_len <= 64 && merges_len == 0;
         var tbl_arm: i64[64] = [-1; 64];
@@ -3241,10 +3241,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 let arm = pm.matchArms(id)[ai];
                 if arm.guard_ != 0 { use_br_table = false; break; }
                 let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
-                if pat.tag == blot_check_core::PatternTag.wildcard {
+                if pat.tag == squid_check_core::PatternTag.wildcard {
                     if tbl_wild < 0 && ai == arms_len - 1 { tbl_wild = ai; }
                     else { use_br_table = false; break; }
-                } else if pat.tag == blot_check_core::PatternTag.constructor {
+                } else if pat.tag == squid_check_core::PatternTag.constructor {
                     if !isIrrefutableSubpat(pm, pat.b) { use_br_table = false; break; }
                     let ctag = pm.constructor(pat.a).tag;
                     if ctag >= 64 { use_br_table = false; break; }
@@ -3278,7 +3278,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             uleb(g, default_depth);
             for arm_index in 0..arms_len {
                 close(g, f);
-                var pat_tag = blot_check_core::PatternTag.wildcard;
+                var pat_tag = squid_check_core::PatternTag.wildcard;
                 var ctor_tag: u32 = 0;
                 var subpat: u32 = 0;
                 var subpat_is_wild = true;
@@ -3289,20 +3289,20 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     body_id = arm.body;
                     let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
                     pat_tag = pat.tag;
-                    if pat_tag == blot_check_core::PatternTag.constructor {
+                    if pat_tag == squid_check_core::PatternTag.constructor {
                         ctor_tag = pm.constructor(pat.a).tag;
                         subpat = pat.b;
-                        if subpat != 0 && pm.pattern(subpat).tag != blot_check_core::PatternTag.wildcard {
+                        if subpat != 0 && pm.pattern(subpat).tag != squid_check_core::PatternTag.wildcard {
                             subpat_is_wild = false;
                         }
                     }
                 }
                 var saved_tag_idx: i64 = -1;
                 var saved_tag_prev: u32 = 0xffffffff;
-                if pat_tag == blot_check_core::PatternTag.constructor {
-                    if tagOf(g, arr_val.ty) == blot_direct_types::Tag.array {
+                if pat_tag == squid_check_core::PatternTag.constructor {
+                    if tagOf(g, arr_val.ty) == squid_direct_types::Tag.array {
                         let elem_step, sterr = stride(g, f, lazy_input_ty, id);
-                        if sterr == blot_direct_types::Error.none {
+                        if sterr == squid_direct_types::Error.none {
                             let tidx, tprev = recordCheckedElemTag(f, w(g, arr_val, 0), w(g, arr_val, 1), idx_local, elem_step, ctor_tag);
                             saved_tag_idx = tidx;
                             saved_tag_prev = tprev;
@@ -3310,10 +3310,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     }
                     if !subpat_is_wild {
                         let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
-                        if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
+                        if vperr != squid_direct_types::Error.none { return neverVal(), vperr; }
                         let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
                         let is_out, voerr = g.types.variantOutlined(lazy_input_ty, vpos);
-                        if voerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                        if voerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
                         var payload_val = neverVal();
                         if is_out {
                             let ptr = local32(g, f);
@@ -3321,27 +3321,27 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                             op(g, OP_i32_load); uleb(g, 2); uleb(g, lazy_payload_off);
                             lset(g, ptr);
                             let loaded, lerr = readOutlinedPayload(g, f, ptr, payload_ty, id);
-                            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                            if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
                             payload_val = loaded;
                         } else {
                             let loaded, lerr = loadAt(g, f, elem_addr, lazy_payload_off, payload_ty, id);
-                            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                            if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
                             payload_val = loaded;
                         }
                         let tested = test_(g, f, subpat, payload_val, false, 0, id);
-                        if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                        if tested != squid_direct_types::Error.none { return neverVal(), tested; }
                     }
                 }
                 let body, berr = stmt(g, f, body_id);
                 if saved_tag_idx >= 0 && saved_tag_idx < f.checked_elems_len {
                     f.checked_elems[saved_tag_idx].known_tag = saved_tag_prev;
                 }
-                if berr != blot_direct_types::Error.none { return body, berr; }
-                if body.ty != blot_direct_types::never {
+                if berr != squid_direct_types::Error.none { return body, berr; }
+                if body.ty != squid_direct_types::never {
                     falls = true;
                     if !info.statement {
                         let delivered = deliver(g, f, body, result, id);
-                        if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                        if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
                     }
                 }
                 br(g, f, OP_br, done);
@@ -3351,14 +3351,14 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 op(g, OP_unreachable_);
             }
             close(g, f);
-            if !falls { return neverVal(), blot_direct_types::Error.none; }
-            if info.statement { return unitVal(), blot_direct_types::Error.none; }
-            if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
-            return neverVal(), blot_direct_types::Error.none;
+            if !falls { return neverVal(), squid_direct_types::Error.none; }
+            if info.statement { return unitVal(), squid_direct_types::Error.none; }
+            if g.s.slots[result].present { return g.s.slots[result].value, squid_direct_types::Error.none; }
+            return neverVal(), squid_direct_types::Error.none;
         }
         for arm_index in 0..arms_len {
             let next = open(g, f, OP_block);
-            var pat_tag = blot_check_core::PatternTag.wildcard;
+            var pat_tag = squid_check_core::PatternTag.wildcard;
             var ctor_tag: u32 = 0;
             var subpat: u32 = 0;
             var subpat_is_wild = true;
@@ -3371,24 +3371,24 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 body_id = arm.body;
                 let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
                 pat_tag = pat.tag;
-                if pat_tag == blot_check_core::PatternTag.constructor {
+                if pat_tag == squid_check_core::PatternTag.constructor {
                     ctor_tag = pm.constructor(pat.a).tag;
                     subpat = pat.b;
-                    if subpat != 0 && pm.pattern(subpat).tag != blot_check_core::PatternTag.wildcard {
+                    if subpat != 0 && pm.pattern(subpat).tag != squid_check_core::PatternTag.wildcard {
                         subpat_is_wild = false;
                     }
                 }
             }
             var saved_tag_idx: i64 = -1;
             var saved_tag_prev: u32 = 0xffffffff;
-            if pat_tag == blot_check_core::PatternTag.constructor {
+            if pat_tag == squid_check_core::PatternTag.constructor {
                 lget(g, tag_local);
                 i32Const(g, ctor_tag);
                 op(g, OP_i32_ne);
                 failIf(g, f, true, next);
-                if tagOf(g, arr_val.ty) == blot_direct_types::Tag.array {
+                if tagOf(g, arr_val.ty) == squid_direct_types::Tag.array {
                     let elem_step, sterr = stride(g, f, lazy_input_ty, id);
-                    if sterr == blot_direct_types::Error.none {
+                    if sterr == squid_direct_types::Error.none {
                         let tidx, tprev = recordCheckedElemTag(f, w(g, arr_val, 0), w(g, arr_val, 1), idx_local, elem_step, ctor_tag);
                         saved_tag_idx = tidx;
                         saved_tag_prev = tprev;
@@ -3396,10 +3396,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 }
                 if !subpat_is_wild {
                     let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
-                    if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
+                    if vperr != squid_direct_types::Error.none { return neverVal(), vperr; }
                     let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
                     let is_out, voerr = g.types.variantOutlined(lazy_input_ty, vpos);
-                    if voerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                    if voerr != squid_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
                     var payload_val = neverVal();
                     if is_out {
                         let ptr = local32(g, f);
@@ -3407,20 +3407,20 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         op(g, OP_i32_load); uleb(g, 2); uleb(g, lazy_payload_off);
                         lset(g, ptr);
                         let loaded, lerr = readOutlinedPayload(g, f, ptr, payload_ty, id);
-                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
                         payload_val = loaded;
                     } else {
                         let loaded, lerr = loadAt(g, f, elem_addr, lazy_payload_off, payload_ty, id);
-                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
                         payload_val = loaded;
                     }
                     let tested = test_(g, f, subpat, payload_val, true, next, id);
-                    if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                    if tested != squid_direct_types::Error.none { return neverVal(), tested; }
                 }
             }
             if guard_id != 0 {
                 let guard_value, gerr = expr(g, f, guard_id);
-                if gerr != blot_direct_types::Error.none { return guard_value, gerr; }
+                if gerr != squid_direct_types::Error.none { return guard_value, gerr; }
                 push(g, guard_value);
                 op(g, OP_i32_eqz);
                 br(g, f, OP_br_if, next);
@@ -3429,12 +3429,12 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if saved_tag_idx >= 0 && saved_tag_idx < f.checked_elems_len {
                 f.checked_elems[saved_tag_idx].known_tag = saved_tag_prev;
             }
-            if berr != blot_direct_types::Error.none { return body, berr; }
-            if body.ty != blot_direct_types::never {
+            if berr != squid_direct_types::Error.none { return body, berr; }
+            if body.ty != squid_direct_types::never {
                 falls = true;
                 if !info.statement {
                     let delivered = deliver(g, f, body, result, id);
-                    if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                    if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
                 }
                 if merges_len != 0 && arm_index < 2 {
                     for at in 0..merges_len {
@@ -3444,7 +3444,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         let value, present = bindGet(g, f, binding);
                         if present {
                             let delivered = deliver(g, f, value, merged + (at as u32), id);
-                            if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                            if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
                         }
                     }
                 }
@@ -3460,17 +3460,17 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if slot.present {
                 bindPut(g, f, merge.result, slot.value);
                 let ct1, ok1 = withCellType(g, f, merge.then_binding);
-                if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+                if ok1 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
                 else {
                     let ct2, ok2 = withCellType(g, f, merge.else_binding);
-                    if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+                    if ok2 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
                 }
             }
         }
-        if !falls { return neverVal(), blot_direct_types::Error.none; }
-        if info.statement { return unitVal(), blot_direct_types::Error.none; }
-        if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
-        return neverVal(), blot_direct_types::Error.none;
+        if !falls { return neverVal(), squid_direct_types::Error.none; }
+        if info.statement { return unitVal(), squid_direct_types::Error.none; }
+        if g.s.slots[result].present { return g.s.slots[result].value, squid_direct_types::Error.none; }
+        return neverVal(), squid_direct_types::Error.none;
     }
     let m .= g.units[f.unit - 1];
     let info = m.matchInfo(id);
@@ -3478,19 +3478,19 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let values = g.reserveVals(inputs.len);
     for input, at in inputs {
         let value, error = expr(g, f, input);
-        if error != blot_direct_types::Error.none { return value, error; }
+        if error != squid_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;
     }
     let merges = m.branchMerges(id);
     if inputs.len == 1 && merges.len == 0 {
         let input_val = g.s.vals[values.start];
-        if input_val.len == 1 && tagOf(g, input_val.ty) == blot_direct_types::Tag.nominal {
+        if input_val.len == 1 && tagOf(g, input_val.ty) == squid_direct_types::Tag.nominal {
             let known_tag, has_known = findConstTag(f, w(g, input_val, 0));
             if has_known {
                 let boxed, berr = isBoxed(g, f, input_val.ty, id);
                 let is_niche, _, _, _, nerr = g.types.nullableNiche(input_val.ty);
                 let cases, cerr = g.types.variants(input_val.ty);
-                if berr == blot_direct_types::Error.none && !boxed && nerr == blot_direct_types::Error.none && !is_niche && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                if berr == squid_direct_types::Error.none && !boxed && nerr == squid_direct_types::Error.none && !is_niche && cerr == squid_direct_types::Error.none && cases.len > 1 {
                     let arms = m.matchArms(id);
                     var matched_arm: i64 = -1;
                     var matched_bind: u32 = 0;
@@ -3523,10 +3523,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         }
                         let arm_body = arms[matched_arm].body;
                         let body_val, berr2 = stmt(g, f, arm_body);
-                        if berr2 != blot_direct_types::Error.none { return body_val, berr2; }
-                        if body_val.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
-                        if info.statement { return unitVal(), blot_direct_types::Error.none; }
-                        return body_val, blot_direct_types::Error.none;
+                        if berr2 != squid_direct_types::Error.none { return body_val, berr2; }
+                        if body_val.ty == squid_direct_types::never { return neverVal(), squid_direct_types::Error.none; }
+                        if info.statement { return unitVal(), squid_direct_types::Error.none; }
+                        return body_val, squid_direct_types::Error.none;
                     }
                 }
             }
@@ -3544,7 +3544,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(g, f, matched_binding) {
             let input_val = g.s.vals[values.start];
             let boxed, berr = isBoxed(g, f, input_val.ty, id);
-            if berr == blot_direct_types::Error.none && boxed && input_val.len == 1 {
+            if berr == squid_direct_types::Error.none && boxed && input_val.len == 1 {
                 fbip_block = w(g, input_val, 0);
                 fbip_ty = input_val.ty;
             }
@@ -3555,13 +3555,13 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if inputs.len == 1 && merges.len == 0 && arms.len >= 3 && arms.len <= 64 && fbip_block == 0 {
         let in_val = g.s.vals[values.start];
         let in_tag = tagOf(g, in_val.ty);
-        let is_int_switch = in_tag == blot_direct_types::Tag.u32_ || in_tag == blot_direct_types::Tag.u8_ || in_tag == blot_direct_types::Tag.i32_;
+        let is_int_switch = in_tag == squid_direct_types::Tag.u32_ || in_tag == squid_direct_types::Tag.u8_ || in_tag == squid_direct_types::Tag.i32_;
         var is_nom_switch = false;
         var nom_boxed = false;
-        if in_tag == blot_direct_types::Tag.nominal {
+        if in_tag == squid_direct_types::Tag.nominal {
             let nb, nberr = isBoxed(g, f, in_val.ty, id);
             let nc, ncerr = g.types.variants(in_val.ty);
-            if nberr == blot_direct_types::Error.none && ncerr == blot_direct_types::Error.none && nc.len > 1 {
+            if nberr == squid_direct_types::Error.none && ncerr == squid_direct_types::Error.none && nc.len > 1 {
                 is_nom_switch = true;
                 nom_boxed = nb;
             }
@@ -3579,14 +3579,14 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let pats = m.rowPatterns(row);
                     if pats.len != 1 { sw_ok = false; break; }
                     let pat = m.pattern(pats[0]);
-                    if pat.tag == blot_check_core::PatternTag.wildcard || pat.tag == blot_check_core::PatternTag.bind {
+                    if pat.tag == squid_check_core::PatternTag.wildcard || pat.tag == squid_check_core::PatternTag.bind {
                         if rows.len != 1 || sw_wild >= 0 || ai != arms.len - 1 { sw_ok = false; break; }
                         sw_wild = ai;
-                        if pat.tag == blot_check_core::PatternTag.bind { sw_wild_bind = pat.a; }
-                    } else if is_int_switch && pat.tag == blot_check_core::PatternTag.constant {
+                        if pat.tag == squid_check_core::PatternTag.bind { sw_wild_bind = pat.a; }
+                    } else if is_int_switch && pat.tag == squid_check_core::PatternTag.constant {
                         if pat.a < sw_min { sw_min = pat.a; }
                         if pat.a > sw_max { sw_max = pat.a; }
-                    } else if is_nom_switch && pat.tag == blot_check_core::PatternTag.constructor {
+                    } else if is_nom_switch && pat.tag == squid_check_core::PatternTag.constructor {
                         if rows.len != 1 || !isIrrefutableSubpat(m, pat.b) { sw_ok = false; break; }
                         let ctag = m.constructor(pat.a).tag;
                         if ctag < sw_min { sw_min = ctag; }
@@ -3604,10 +3604,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 for arm, ai in arms {
                     for row in m.armRows(arm) {
                         let pat = m.pattern(m.rowPatterns(row)[0]);
-                        if is_int_switch && pat.tag == blot_check_core::PatternTag.constant {
+                        if is_int_switch && pat.tag == squid_check_core::PatternTag.constant {
                             let idx = (pat.a - sw_min) as i64;
                             if tbl_arm[idx] < 0 { tbl_arm[idx] = ai; }
-                        } else if is_nom_switch && pat.tag == blot_check_core::PatternTag.constructor {
+                        } else if is_nom_switch && pat.tag == squid_check_core::PatternTag.constructor {
                             let idx = (m.constructor(pat.a).tag - sw_min) as i64;
                             if tbl_arm[idx] < 0 { tbl_arm[idx] = ai; }
                         }
@@ -3623,7 +3623,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 }
                 if is_nom_switch {
                     let terr = emitValueTag(g, f, in_val, id);
-                    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+                    if terr != squid_direct_types::Error.none { return neverVal(), terr; }
                 } else {
                     lget(g, w(g, in_val, 0));
                 }
@@ -3642,7 +3642,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 uleb(g, default_depth);
                 for arm, ai in arms {
                     close(g, f);
-                    let saved_b = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
+                    let saved_b = squid_support_zigmap::clone(g.s.map_pool, f.bindings);
                     if ai == sw_wild {
                         if sw_wild_bind != 0 {
                             refine(g, f, m.binding(sw_wild_bind).ty, in_val.ty);
@@ -3650,22 +3650,22 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         }
                     } else if is_nom_switch {
                         let pat = m.pattern(m.rowPatterns(m.armRows(arm)[0])[0]);
-                        if pat.b != 0 && m.pattern(pat.b).tag != blot_check_core::PatternTag.wildcard {
+                        if pat.b != 0 && m.pattern(pat.b).tag != squid_check_core::PatternTag.wildcard {
                             let ctag = m.constructor(pat.a).tag;
                             let payload, uerr = unwrapVariant(g, f, in_val, ctag, id);
-                            if uerr != blot_direct_types::Error.none { f.bindings = saved_b; return neverVal(), uerr; }
+                            if uerr != squid_direct_types::Error.none { f.bindings = saved_b; return neverVal(), uerr; }
                             let tested = test_(g, f, pat.b, payload, false, 0, id);
-                            if tested != blot_direct_types::Error.none { f.bindings = saved_b; return neverVal(), tested; }
+                            if tested != squid_direct_types::Error.none { f.bindings = saved_b; return neverVal(), tested; }
                         }
                     }
                     let body, berr = stmt(g, f, arm.body);
                     f.bindings = saved_b;
-                    if berr != blot_direct_types::Error.none { return body, berr; }
-                    if body.ty != blot_direct_types::never {
+                    if berr != squid_direct_types::Error.none { return body, berr; }
+                    if body.ty != squid_direct_types::never {
                         falls = true;
                         if !info.statement {
                             let delivered = deliver(g, f, body, result, id);
-                            if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                            if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
                         }
                     }
                     br(g, f, OP_br, done);
@@ -3675,10 +3675,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     op(g, OP_unreachable_);
                 }
                 close(g, f);
-                if !falls { return neverVal(), blot_direct_types::Error.none; }
-                if info.statement { return unitVal(), blot_direct_types::Error.none; }
-                if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
-                return neverVal(), blot_direct_types::Error.none;
+                if !falls { return neverVal(), squid_direct_types::Error.none; }
+                if info.statement { return unitVal(), squid_direct_types::Error.none; }
+                if g.s.slots[result].present { return g.s.slots[result].value, squid_direct_types::Error.none; }
+                return neverVal(), squid_direct_types::Error.none;
             }
         }
     }
@@ -3689,47 +3689,47 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let patterns = m.rowPatterns(rows[0]);
             for pattern, at in patterns {
                 let tested = test_(g, f, pattern, g.s.vals[values.start + at], true, next, id);
-                if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                if tested != squid_direct_types::Error.none { return neverVal(), tested; }
             }
         } else {
             // Alternatives bind the same names; later rows copy into the first row's locals.
             let matched = open(g, f, OP_block);
-            var first = blot_support_zigmap::Map {};
+            var first = squid_support_zigmap::Map {};
             for row, row_index in rows {
                 let row_fail = open(g, f, OP_block);
-                let before = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
+                let before = squid_support_zigmap::clone(g.s.map_pool, f.bindings);
                 let patterns = m.rowPatterns(row);
                 for pattern, at in patterns {
                     let tested = test_(g, f, pattern, g.s.vals[values.start + at], true, row_fail, id);
-                    if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                    if tested != squid_direct_types::Error.none { return neverVal(), tested; }
                 }
                 if row_index == 0 {
                     // Zig walks its hash map here; the table keeps its order.
                     let table = f.bindings;
                     for slot in 0..(table.capacity as i64) {
-                        if !blot_support_zigmap::used(g.s.map_pool, table, slot as u32) { continue; }
-                        let key = blot_support_zigmap::keyAt(g.s.map_pool, table, slot as u32);
-                        let entry = g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, table, slot as u32)];
-                        let prior_at, has_prior = blot_support_zigmap::get(g.s.map_pool, before, key);
+                        if !squid_support_zigmap::used(g.s.map_pool, table, slot as u32) { continue; }
+                        let key = squid_support_zigmap::keyAt(g.s.map_pool, table, slot as u32);
+                        let entry = g.s.vals[squid_support_zigmap::valueAt(g.s.map_pool, table, slot as u32)];
+                        let prior_at, has_prior = squid_support_zigmap::get(g.s.map_pool, before, key);
                         if has_prior && sameWords(g, g.s.vals[prior_at], entry) { continue; }
                         let owned, error = fresh(g, f, entry.ty, id);
-                        if error != blot_direct_types::Error.none { return neverVal(), error; }
+                        if error != squid_direct_types::Error.none { return neverVal(), error; }
                         let copied = copy(g, f, entry, owned, id);
-                        if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                        if copied != squid_direct_types::Error.none { return neverVal(), copied; }
                         g.s.vals.push(owned);
-                        blot_support_zigmap::put(g.s.map_pool, first, key, (g.s.vals.len - 1) as u32);
+                        squid_support_zigmap::put(g.s.map_pool, first, key, (g.s.vals.len - 1) as u32);
                     }
                 } else {
                     // Every name the first row binds: a later row's payload
                     // may sit in the same locals as the first row's.
                     for slot in 0..(first.capacity as i64) {
-                        if !blot_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
-                        let key = blot_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
-                        let target = g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)];
+                        if !squid_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
+                        let key = squid_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
+                        let target = g.s.vals[squid_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)];
                         let value, present = bindGet(g, f, key);
                         if present {
                             let copied = copy(g, f, value, target, id);
-                            if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                            if copied != squid_direct_types::Error.none { return neverVal(), copied; }
                             invalidateCheckedArrayVal(g, f, target);
                         }
                     }
@@ -3740,14 +3740,14 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             br(g, f, OP_br, next);
             close(g, f);
             for slot in 0..(first.capacity as i64) {
-                if !blot_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
-                let key = blot_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
-                bindPut(g, f, key, g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)]);
+                if !squid_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
+                let key = squid_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
+                bindPut(g, f, key, g.s.vals[squid_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)]);
             }
         }
         if arm.guard_ != 0 {
             let guard_value, error = expr(g, f, arm.guard_);
-            if error != blot_direct_types::Error.none { return guard_value, error; }
+            if error != squid_direct_types::Error.none { return guard_value, error; }
             push(g, guard_value);
             op(g, OP_i32_eqz);
             br(g, f, OP_br_if, next);
@@ -3775,7 +3775,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let pval, pok = bindGet(g, f, pb);
                     if !pok { continue; }
                     let is_cb, cberr = copiedBox(g, f, pval.ty, id);
-                    if cberr != blot_direct_types::Error.none || is_cb {
+                    if cberr != squid_direct_types::Error.none || is_cb {
                         if bindingCaptured(g, f, pb) ||
                             (arm.guard_ != 0 && nodeReadsBinding(m, arm.guard_, pb, 0)) ||
                             hasPreTailBindingUse(m, arm.body, info.statement, pb, 0) {
@@ -3799,12 +3799,12 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         f.reuse_nodes_len = prev_reuse_nodes_len;
         f.reuse_block = prev_reuse_block;
         f.reuse_ty = prev_reuse_ty;
-        if error != blot_direct_types::Error.none { return body, error; }
-        if body.ty != blot_direct_types::never {
+        if error != squid_direct_types::Error.none { return body, error; }
+        if body.ty != squid_direct_types::never {
             falls = true;
             if !info.statement {
                 let delivered = deliver(g, f, body, result, id);
-                if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
             }
             // A two-arm statement match carries rebindings like an if.
             if merges.len != 0 && arm_index < 2 {
@@ -3814,7 +3814,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let value, present = bindGet(g, f, binding);
                     if present {
                         let delivered = deliver(g, f, value, merged + (at as u32), id);
-                        if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                        if delivered != squid_direct_types::Error.none { return neverVal(), delivered; }
                     }
                 }
             }
@@ -3828,13 +3828,13 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let slot = g.s.slots[merged + at];
         if slot.present {
             bindPut(g, f, merge.result, slot.value);
-            if tagOf(g, slot.value.ty) == blot_direct_types::Tag.array {
+            if tagOf(g, slot.value.ty) == squid_direct_types::Tag.array {
                 let tv, tok = bindGet(g, f, merge.then_binding);
                 let ev, eok = bindGet(g, f, merge.else_binding);
                 if tok && eok && knownMutable(g, f, tv) && knownMutable(g, f, ev) {
                     recordMutable(g, f, slot.value);
                 }
-                if tok && eok && tagOf(g, tv.ty) == blot_direct_types::Tag.array && tagOf(g, ev.ty) == blot_direct_types::Tag.array {
+                if tok && eok && tagOf(g, tv.ty) == squid_direct_types::Tag.array && tagOf(g, ev.ty) == squid_direct_types::Tag.array {
                     let s0 = w(g, slot.value, 0);
                     let s1 = w(g, slot.value, 1);
                     let wr_t = findWorkerR(f, w(g, tv, 0), w(g, tv, 1));
@@ -3853,21 +3853,21 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if tb != 0 && eb != 0 &&
                     isUniqueOwned(g, f, tb) && ownedRefUses(g, f, tb) == 0 && ownedFlowUses(g, f, tb) == 1 && !bindingCaptured(g, f, tb) &&
                     isUniqueOwned(g, f, eb) && ownedRefUses(g, f, eb) == 0 && ownedFlowUses(g, f, eb) == 1 && !bindingCaptured(g, f, eb) {
-                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, merge.result, f.loop_depth + 1);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_owned, merge.result, f.loop_depth + 1);
                 }
             }
             let ct1, ok1 = withCellType(g, f, merge.then_binding);
-            if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+            if ok1 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
             else {
                 let ct2, ok2 = withCellType(g, f, merge.else_binding);
-                if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+                if ok2 { squid_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
             }
         }
     }
-    if !falls { return neverVal(), blot_direct_types::Error.none; }
-    if info.statement { return unitVal(), blot_direct_types::Error.none; }
-    if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
-    return neverVal(), blot_direct_types::Error.none;
+    if !falls { return neverVal(), squid_direct_types::Error.none; }
+    if info.statement { return unitVal(), squid_direct_types::Error.none; }
+    if g.s.slots[result].present { return g.s.slots[result].value, squid_direct_types::Error.none; }
+    return neverVal(), squid_direct_types::Error.none;
 }
 
 // Tests `pattern` against `value`, branching to `fail` (a Wasm depth) on
@@ -3875,7 +3875,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail: bool, fail: u32, id: u32) -> Error {
     let m .= g.units[f.unit - 1];
     let pattern = m.pattern(pattern_id);
-    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    if value.ty == squid_direct_types::never { return squid_direct_types::Error.none; }
     match pattern.tag {
         wildcard => {},
         bind => {
@@ -3885,19 +3885,19 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
         constant, value => {
             let tag = g.types.node(value.ty).tag;
             // Unit has one value: its pattern always matches.
-            if tag == blot_direct_types::Tag.unit {
-                if pattern.tag == blot_check_core::PatternTag.value {
+            if tag == squid_direct_types::Tag.unit {
+                if pattern.tag == squid_check_core::PatternTag.value {
                     let ignored, error = expr(g, f, pattern.a);
-                    if error != blot_direct_types::Error.none { return error; }
+                    if error != squid_direct_types::Error.none { return error; }
                 }
-                return blot_direct_types::Error.none;
+                return squid_direct_types::Error.none;
             }
             push(g, value);
-            if pattern.tag == blot_check_core::PatternTag.constant {
+            if pattern.tag == squid_check_core::PatternTag.constant {
                 pushConstant(g, value.ty, pattern.a, pattern.b);
             } else {
                 let expected, error = expr(g, f, pattern.a);
-                if error != blot_direct_types::Error.none { return error; }
+                if error != squid_direct_types::Error.none { return error; }
                 push(g, expected);
             }
             match tag {
@@ -3915,9 +3915,9 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
                 tuple => {
                     for child, index in children {
                         let item, error = tupleItem(g, f, value, index, id);
-                        if error != blot_direct_types::Error.none { return error; }
+                        if error != squid_direct_types::Error.none { return error; }
                         let tested = test_(g, f, child, item, has_fail, fail, id);
-                        if tested != blot_direct_types::Error.none { return tested; }
+                        if tested != squid_direct_types::Error.none { return tested; }
                     }
                 },
                 unit => {},
@@ -3926,7 +3926,7 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
                 _ => {
                     g.failOpen(m, id);
                     g.put("product pattern on a ");
-                    g.put(blot_direct_types::tagName(shape.tag));
+                    g.put(squid_direct_types::tagName(shape.tag));
                     return g.failClose();
                 },
             }
@@ -3934,10 +3934,10 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
         constructor => {
             let constructor = m.constructor(pattern.a);
             let cases, error = g.types.variants(value.ty);
-            if error != blot_direct_types::Error.none { return g.typeFailure(m, id); }
+            if error != squid_direct_types::Error.none { return g.typeFailure(m, id); }
             if cases.len > 1 {
                 let is_niche, null_tag, some_tag, _, nerr = g.types.nullableNiche(value.ty);
-                if nerr != blot_direct_types::Error.none { return g.typeFailure(m, id); }
+                if nerr != squid_direct_types::Error.none { return g.typeFailure(m, id); }
                 if is_niche {
                     lget(g, w(g, value, 0));
                     if constructor.tag == some_tag {
@@ -3948,10 +3948,10 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
                     lget(g, w(g, value, 0));
                     // A boxed value's tag is the first word of its block.
                     let boxed, error = isBoxed(g, f, value.ty, id);
-                    if error != blot_direct_types::Error.none { return error; }
+                    if error != squid_direct_types::Error.none { return error; }
                     if boxed {
                         let tlerr = emitTagLoad(g, value.ty, 0);
-                        if tlerr != blot_direct_types::Error.none { return g.typeFailure(m, id); }
+                        if tlerr != squid_direct_types::Error.none { return g.typeFailure(m, id); }
                     }
                     i32Const(g, constructor.tag);
                     op(g, OP_i32_ne);
@@ -3960,35 +3960,35 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
             }
             if pattern.b != 0 {
                 let payload, error = unwrapVariant(g, f, value, constructor.tag, id);
-                if error != blot_direct_types::Error.none { return error; }
+                if error != squid_direct_types::Error.none { return error; }
                 return test_(g, f, pattern.b, payload, has_fail, fail, id);
             }
         },
         record_payload => {
-            if g.types.node(value.ty).tag != blot_direct_types::Tag.record { return g.fail(m, id, "record pattern on a non-record"); }
+            if g.types.node(value.ty).tag != squid_direct_types::Tag.record { return g.fail(m, id, "record pattern on a non-record"); }
             // One pattern for a wider record binds the whole payload as a
             // tuple in declared field order.
             let storage = m.types.node(pattern.ty);
-            if m.pattern(pattern.b).tag != blot_check_core::PatternTag.product && storage.tag == blot_check_types::Tag.record && storage.b > 1 {
+            if m.pattern(pattern.b).tag != squid_check_core::PatternTag.product && storage.tag == squid_check_types::Tag.record && storage.b > 1 {
                 let declared, error = declaredTuple(g, f, storage, value, id);
-                if error != blot_direct_types::Error.none { return error; }
+                if error != squid_direct_types::Error.none { return error; }
                 return test_(g, f, pattern.b, declared, has_fail, fail, id);
             }
             // A one-field record's child is always that field's own pattern
             // (even when that pattern is a tuple product pattern).
-            if storage.tag == blot_check_types::Tag.record && storage.b == 1 {
+            if storage.tag == squid_check_types::Tag.record && storage.b == 1 {
                 return recordPattern(g, f, pattern.b, true, storage, value, has_fail, fail, id);
             }
-            if m.pattern(pattern.b).tag == blot_check_core::PatternTag.product { return recordPattern(g, f, pattern.b, false, storage, value, has_fail, fail, id); }
+            if m.pattern(pattern.b).tag == squid_check_core::PatternTag.product { return recordPattern(g, f, pattern.b, false, storage, value, has_fail, fail, id); }
             return recordPattern(g, f, pattern.b, true, storage, value, has_fail, fail, id);
         },
         invalid => { return g.fail(m, id, "invalid pattern"); },
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // The fields of record `value` as a tuple in the declared order of the Core
 // record type `storage`.
-fn declaredTuple(g: Generator&, f: Fn&, storage: blot_check_types::Node, value: Val, id: u32) -> Val, Error {
+fn declaredTuple(g: Generator&, f: Fn&, storage: squid_check_types::Node, value: Val, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     var items: Ty[>..<] = [];
     var collected: u32[>..<] = [];
@@ -3999,22 +3999,22 @@ fn declaredTuple(g: Generator&, f: Fn&, storage: blot_check_types::Node, value: 
         let position = g.types.findField(value.ty, fname);
         if position < 0 { return neverVal(), g.fail(m, id, "record pattern field missing"); }
         let part, error = recordField(g, f, value, position, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         items.push(part.ty);
         for at in 0..(part.len as i64) { collected.push(g.s.words[part.start + at]); }
     }
     let ty, error = g.types.tuple(items[..]);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     let words = g.saveWords(collected[..]);
-    return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+    return Val { ty, words.start, words.len }, squid_direct_types::Error.none;
 }
 // Child `i` matches field `i` of the Core record type `storage`. The children
 // are those of product pattern `pattern_id`, or that pattern alone (`single`).
-recursive fn recordPattern(g: Generator&, f: Fn&, pattern_id: u32, single: bool, storage: blot_check_types::Node, value: Val, has_fail: bool, fail: u32, id: u32) -> Error {
+recursive fn recordPattern(g: Generator&, f: Fn&, pattern_id: u32, single: bool, storage: squid_check_types::Node, value: Val, has_fail: bool, fail: u32, id: u32) -> Error {
     let m .= g.units[f.unit - 1];
     var count: i64 = 1;
     if !single { count = m.patternChildren(pattern_id).len; }
-    if storage.tag != blot_check_types::Tag.record || storage.b < count { return g.fail(m, id, "record pattern without a record type"); }
+    if storage.tag != squid_check_types::Tag.record || storage.b < count { return g.fail(m, id, "record pattern without a record type"); }
     for index in 0..count {
         var child = pattern_id;
         if !single { child = m.patternChildren(pattern_id)[index]; }
@@ -4024,11 +4024,11 @@ recursive fn recordPattern(g: Generator&, f: Fn&, pattern_id: u32, single: bool,
         let position = g.types.findField(value.ty, fname);
         if position < 0 { return g.fail(m, id, "record pattern field missing"); }
         let part, error = recordField(g, f, value, position, id);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != squid_direct_types::Error.none { return error; }
         let tested = test_(g, f, child, part, has_fail, fail, id);
-        if tested != blot_direct_types::Error.none { return tested; }
+        if tested != squid_direct_types::Error.none { return tested; }
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 fn failIf(g: Generator&, f: Fn&, has_fail: bool, fail: u32) {
     if has_fail { br(g, f, OP_br_if, fail); return; }
@@ -4049,17 +4049,17 @@ fn assign(g: Generator&, f: Fn&, values: Vals, targets: Vals, id: u32) -> Error 
         let value = g.s.vals[values.start + at];
         let target = g.s.vals[targets.start + at];
         g.s.vals[staged.start + at] = value;
-        if value.ty == blot_direct_types::never || sameWords(g, value, target) { continue; }
+        if value.ty == squid_direct_types::never || sameWords(g, value, target) { continue; }
         for other_at in 0..(targets.len as i64) {
             let other = g.s.vals[targets.start + other_at];
             // Zig's `break` leaves only the scan of this target's words.
             for word_at in 0..(other.len as i64) {
                 if hasWord(g, value, g.s.words[other.start + word_at]) {
                     let made, error = fresh(g, f, target.ty, id);
-                    if error != blot_direct_types::Error.none { return error; }
+                    if error != squid_direct_types::Error.none { return error; }
                     g.s.vals[staged.start + at] = made;
                     let copied = copy(g, f, value, made, id);
-                    if copied != blot_direct_types::Error.none { return copied; }
+                    if copied != squid_direct_types::Error.none { return copied; }
                     break;
                 }
             }
@@ -4071,11 +4071,11 @@ fn assign(g: Generator&, f: Fn&, values: Vals, targets: Vals, id: u32) -> Error 
         if sameWords(g, staged_val, target) { continue; }
         let src_mutable = knownMutable(g, f, staged_val);
         let copied = copy(g, f, staged_val, target, id);
-        if copied != blot_direct_types::Error.none { return copied; }
+        if copied != squid_direct_types::Error.none { return copied; }
         invalidateCheckedArrayVal(g, f, target);
         if src_mutable { recordMutable(g, f, target); }
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // assign, but a boxed carry's new value is copied into its slot.
 // `unchanged` is a local to leave 1 in when every boxed carry has the words
@@ -4100,9 +4100,9 @@ fn assignCarries(g: Generator&, f: Fn&, values: Vals, targets: Vals, slots: Word
             plain += 1;
             continue;
         }
-        if value.ty == blot_direct_types::never || w(g, value, 0) == w(g, target, 0) { continue; }
+        if value.ty == squid_direct_types::never || w(g, value, 0) == w(g, target, 0) { continue; }
         let bytes, error = blockBytes(g, f, value.ty, id);
-        if error != blot_direct_types::Error.none { return error; }
+        if error != squid_direct_types::Error.none { return error; }
         if unchanged == 0xffffffff {
             memoryCopy(g, w(g, target, 0), 0, w(g, value, 0), bytes);
             continue;
@@ -4197,7 +4197,7 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
     op(g, OP_i32_shl);
     op(g, OP_i32_add);
     ltee(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_generation);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_generation);
     lget(g, vgen);
     op(g, OP_i32_eq);
     let gen_ok = open(g, f, OP_if_);
@@ -4210,13 +4210,13 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
     op(g, OP_i32_ge_u);
     lget(g, end_pos);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     op(g, OP_i32_le_u);
     op(g, OP_i32_and);
     if require_immutable {
         lget(g, entry);
-        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
-        i32Const(g, blot_direct_runtime::static_pool_flag);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
+        i32Const(g, squid_direct_runtime::static_pool_flag);
         op(g, OP_i32_and);
         i32Const(g, 0);
         op(g, OP_i32_ne);
@@ -4225,7 +4225,7 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
     let bounds_ok = open(g, f, OP_if_);
     let elem_base = local32(g, f);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, elem_base);
     let shifted = emitOffsetAddress(g, f, elem_base, vstart, step);
     lget(g, shifted);
@@ -4241,9 +4241,9 @@ fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, v
 // instead of assuming a member spelled "length" has the standard semantics.
 fn lengthReceiver(m: const Module&, id: u32) -> u32 {
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.array_op {
-        if m.arrayOperation(id) != blot_backend_collection_ops::Op.length { return 0; }
-    } else if n.tag != blot_check_core::Tag.storage || n.c != blot_check_storage_ops::opCode(blot_check_storage_ops::Op.length) {
+    if n.tag == squid_check_core::Tag.array_op {
+        if m.arrayOperation(id) != squid_backend_collection_ops::Op.length { return 0; }
+    } else if n.tag != squid_check_core::Tag.storage || n.c != squid_check_storage_ops::opCode(squid_check_storage_ops::Op.length) {
         return 0;
     }
     let args = m.children(id);
@@ -4256,14 +4256,14 @@ fn coreSizedLength(m: const Module&, ty: TId) -> TId {
     var cursor = ty;
     for step in 0..8 {
         let n = m.types.node(cursor);
-        if n.tag == blot_check_types::Tag.usage { cursor = n.a; continue; }
-        let inner = blot_check_storage_types::sharedInner(m.types, cursor);
+        if n.tag == squid_check_types::Tag.usage { cursor = n.a; continue; }
+        let inner = squid_check_storage_types::sharedInner(m.types, cursor);
         if inner.present { cursor = inner.value; continue; }
         break;
     }
-    let info = blot_check_storage_types::info(m.types, cursor);
-    if !info.present || info.value.kind != blot_check_storage_types::sized_array { return 0; }
-    let len = blot_check_storage_types::lengthOf(m.types, cursor);
+    let info = squid_check_storage_types::info(m.types, cursor);
+    if !info.present || info.value.kind != squid_check_storage_types::sized_array { return 0; }
+    let len = squid_check_storage_types::lengthOf(m.types, cursor);
     if !len.present { return 0; }
     return len.value;
 }
@@ -4272,29 +4272,29 @@ fn sameSizedLength(m: const Module&, a: TId, b: TId) -> bool {
     if a == b { return true; }
     let na = m.types.node(a);
     let nb = m.types.node(b);
-    if na.tag == blot_check_types::Tag.nominal && nb.tag == blot_check_types::Tag.nominal &&
-        blot_check_storage_types::isLengthLiteral(na.a, na.b) &&
-        blot_check_storage_types::isLengthLiteral(nb.a, nb.b) {
+    if na.tag == squid_check_types::Tag.nominal && nb.tag == squid_check_types::Tag.nominal &&
+        squid_check_storage_types::isLengthLiteral(na.a, na.b) &&
+        squid_check_storage_types::isLengthLiteral(nb.a, nb.b) {
         return na.b == nb.b;
     }
     return false;
 }
-fn rangeSizedLength(g: Generator&, f: Fn&, info: blot_check_core::LoopInfo) -> TId {
+fn rangeSizedLength(g: Generator&, f: Fn&, info: squid_check_core::LoopInfo) -> TId {
     let m .= g.units[f.unit - 1];
     if info.first == 0 || info.end == 0 { return 0; }
     let first_node = m.node(info.first);
-    if first_node.tag != blot_check_core::Tag.constant || first_node.a != 0 { return 0; }
+    if first_node.tag != squid_check_core::Tag.constant || first_node.a != 0 { return 0; }
     let n = m.node(info.end);
     var receiver: u32 = 0;
-    if n.tag == blot_check_core::Tag.project {
+    if n.tag == squid_check_core::Tag.project {
         receiver = n.a;
         let owner = localRef(m, receiver);
         if owner == 0 { return 0; }
         let handle, found = bindGet(g, f, owner);
-        if !found || tagOf(g, handle.ty) != blot_direct_types::Tag.array { return 0; }
+        if !found || tagOf(g, handle.ty) != squid_direct_types::Tag.array { return 0; }
         let identity, present = g.receiverIdentity(handle.ty);
         if !present { return 0; }
-        let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, blot_check_types::Operator.none);
+        let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, squid_check_types::Operator.none);
         if !exists || !g.hasUnit(target.unit) { return 0; }
         let unit .= g.units[target.unit - 1];
         let body .= unit.body(target.binding);
@@ -4362,7 +4362,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
             let change = m.updateInfo(id);
             if !noStorageResize(g, m, change.root, left) || !noStorageResize(g, m, change.value, left) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !noStorageResize(g, m, sel.index, left) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !noStorageResize(g, m, sel.index, left) { return false; }
             }
             return true;
         },
@@ -4373,7 +4373,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return noStorageResize(g, m, n.a, left); }
             let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
-            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+            if receiver_ty == squid_check_types::Tag.record || receiver_ty == squid_check_types::Tag.product {
                 return noStorageResize(g, m, n.a, left);
             }
             // Allow standard `.length` / `.view` projection checks conservatively by
@@ -4386,7 +4386,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
             return false;
         },
         scalar, associated, logical => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return noStorageResize(g, m, n.a, left) && noStorageResize(g, m, n.b, left);
         },
         call => {
@@ -4405,7 +4405,7 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
         },
         apply => {
             // Allow `arr.at idx` (method call forwarding to array get/storage read).
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
                 if sp.present && sp.value == "at" {
                     return noStorageResize(g, m, m.node(n.a).a, left) && noStorageResize(g, m, n.b, left);
@@ -4425,8 +4425,8 @@ recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, lef
             }
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
             match op_kind {
                 length, read, view => {
                     for child in m.children(id) {
@@ -4502,18 +4502,18 @@ fn resizedRhsOrigin(g: const Generator&, m: const Module&, id: u32) -> u32, bool
             },
             array => { return 0, true; },
             storage => {
-                let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-                if ok != blot_error::Error.none { return 0, false; }
-                if op_kind == blot_check_storage_ops::Op.with_capacity || op_kind == blot_check_storage_ops::Op.copy { return 0, true; }
+                let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+                if ok != squid_error::Error.none { return 0, false; }
+                if op_kind == squid_check_storage_ops::Op.with_capacity || op_kind == squid_check_storage_ops::Op.copy { return 0, true; }
                 let ch = m.children(cur);
-                if ch.len > 0 && (op_kind == blot_check_storage_ops::Op.push || op_kind == blot_check_storage_ops::Op.reserve || op_kind == blot_check_storage_ops::Op.extend) {
+                if ch.len > 0 && (op_kind == squid_check_storage_ops::Op.push || op_kind == squid_check_storage_ops::Op.reserve || op_kind == squid_check_storage_ops::Op.extend) {
                     let rb = localRef(m, ch[0]);
                     return rb, rb != 0;
                 }
                 return 0, false;
             },
             apply => {
-                if m.node(n.a).tag == blot_check_core::Tag.project {
+                if m.node(n.a).tag == squid_check_core::Tag.project {
                     let proj_n = m.node(n.a);
                     let sp = m.fieldSpelling(m.projection(proj_n.b).field);
                     if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend") {
@@ -4555,7 +4555,7 @@ fn resizedRhsOrigin(g: const Generator&, m: const Module&, id: u32) -> u32, bool
                 let ch = m.children(cur);
                 if ch.len == 0 { return 0, false; }
                 for ci in 0..(ch.len - 1) {
-                    if m.node(ch[ci]).tag != blot_check_core::Tag.bind { return 0, false; }
+                    if m.node(ch[ci]).tag != squid_check_core::Tag.bind { return 0, false; }
                 }
                 cur = ch[ch.len - 1];
             },
@@ -4704,7 +4704,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             if !scanLoopResize(g, m, change.root, resized, resized_len, left) ||
                 !scanLoopResize(g, m, change.value, resized, resized_len, left) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !scanLoopResize(g, m, sel.index, resized, resized_len, left) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !scanLoopResize(g, m, sel.index, resized, resized_len, left) { return false; }
             }
             return true;
         },
@@ -4714,7 +4714,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return scanLoopResize(g, m, n.a, resized, resized_len, left); }
             let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
-            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+            if receiver_ty == squid_check_types::Tag.record || receiver_ty == squid_check_types::Tag.product {
                 return scanLoopResize(g, m, n.a, resized, resized_len, left);
             }
             let receiver_local = localRef(m, n.a);
@@ -4725,7 +4725,7 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             return false;
         },
         scalar, associated, logical => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return scanLoopResize(g, m, n.a, resized, resized_len, left) &&
                 scanLoopResize(g, m, n.b, resized, resized_len, left);
         },
@@ -4741,8 +4741,8 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
             }
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
             let ch = m.children(id);
             match op_kind {
                 length, read, view => {
@@ -4751,10 +4751,11 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                     }
                     return true;
                 },
-                push, pop, truncate, reserve, extend => {
+                push, pop, truncate, reserve, extend, push_front, pop_front, insert, remove => {
                     if ch.len == 0 { return false; }
                     let target_b = localRef(m, ch[0]);
-                    if target_b == 0 || m.types.node(m.typeOf(ch[0])).tag != blot_check_types::Tag.array { return false; }
+                    let ttag = m.types.node(m.typeOf(ch[0])).tag;
+                    if target_b == 0 || (ttag != squid_check_types::Tag.array && ttag != squid_check_types::Tag.packed && ttag != squid_check_types::Tag.seq) { return false; }
                     if !addResizedSet(resized, resized_len, target_b) { return false; }
                     for child in ch {
                         if !scanLoopResize(g, m, child, resized, resized_len, left) { return false; }
@@ -4794,14 +4795,15 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                 if (own_mask & ((1 as u64) << (pi as u64))) != 0 {
                     let arg_id = call.arguments[pi];
                     let arg_b = localRef(m, arg_id);
-                    if arg_b == 0 || m.types.node(m.typeOf(arg_id)).tag != blot_check_types::Tag.array { return false; }
+                    let atag = m.types.node(m.typeOf(arg_id)).tag;
+                    if arg_b == 0 || (atag != squid_check_types::Tag.array && atag != squid_check_types::Tag.packed && atag != squid_check_types::Tag.seq) { return false; }
                     if !addResizedSet(resized, resized_len, arg_b) { return false; }
                 }
             }
             return true;
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let proj_n = m.node(n.a);
                 let sp = m.fieldSpelling(m.projection(proj_n.b).field);
                 if sp.present {
@@ -4809,8 +4811,9 @@ recursive fn scanLoopResize(g: const Generator&, m: const Module&, id: u32, resi
                         return scanLoopResize(g, m, proj_n.a, resized, resized_len, left) &&
                             scanLoopResize(g, m, n.b, resized, resized_len, left);
                     }
-                    if (sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend") &&
-                        m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                    let ptag = m.types.node(m.typeOf(proj_n.a)).tag;
+                    if (sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "pop_front" || sp.value == "insert" || sp.value == "remove") &&
+                        (ptag == squid_check_types::Tag.array || ptag == squid_check_types::Tag.packed || ptag == squid_check_types::Tag.seq) {
                         let target_b = localRef(m, proj_n.a);
                         if target_b == 0 { return false; }
                         if !addResizedSet(resized, resized_len, target_b) { return false; }
@@ -4832,9 +4835,10 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
         array_op => {
             let op = m.arrayOperation(id);
             let ch = m.children(id);
-            if (op == blot_backend_collection_ops::Op.get || op == blot_backend_collection_ops::Op.length) && ch.len > 0 {
+            if (op == squid_backend_collection_ops::Op.get || op == squid_backend_collection_ops::Op.length) && ch.len > 0 {
                 let b = localRef(m, ch[0]);
-                if b != 0 && m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+                let ctag = m.types.node(m.typeOf(ch[0])).tag;
+                if b != 0 && (ctag == squid_check_types::Tag.array || ctag == squid_check_types::Tag.seq) {
                     var seen = false;
                     for i in 0..out_len { if out[i] == b { seen = true; break; } }
                     if !seen && out_len < 4 { out[out_len] = b; out_len += 1; }
@@ -4843,13 +4847,14 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
             for c in ch { collectLoopReadArrays(m, c, out, out_len, budget); }
         },
         storage => {
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
             let ch = m.children(id);
-            if ok == blot_error::Error.none &&
-                (op_k == blot_check_storage_ops::Op.read || op_k == blot_check_storage_ops::Op.length || op_k == blot_check_storage_ops::Op.view) &&
+            if ok == squid_error::Error.none &&
+                (op_k == squid_check_storage_ops::Op.read || op_k == squid_check_storage_ops::Op.length || op_k == squid_check_storage_ops::Op.view) &&
                 ch.len > 0 {
                 let b = localRef(m, ch[0]);
-                if b != 0 && m.types.node(m.typeOf(ch[0])).tag == blot_check_types::Tag.array {
+                let ctag = m.types.node(m.typeOf(ch[0])).tag;
+                if b != 0 && (ctag == squid_check_types::Tag.array || ctag == squid_check_types::Tag.seq) {
                     var seen = false;
                     for i in 0..out_len { if out[i] == b { seen = true; break; } }
                     if !seen && out_len < 4 { out[out_len] = b; out_len += 1; }
@@ -4890,7 +4895,7 @@ recursive fn collectLoopReadArrays(m: const Module&, id: u32, out: u32[4]&, out_
             collectLoopReadArrays(m, u.root, out, out_len, budget);
             collectLoopReadArrays(m, u.value, out, out_len, budget);
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index { collectLoopReadArrays(m, sel.index, out, out_len, budget); }
+                if sel.kind == squid_check_core::UpdateKind.index { collectLoopReadArrays(m, sel.index, out, out_len, budget); }
             }
         },
         loop_ => {
@@ -4917,14 +4922,14 @@ fn bindingResizedInLoop(m: const Module&, loop_id: u32, b: u32, resized: const u
     }
     return false;
 }
-fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, selective_resize: bool, resized: const u32[16]&, resized_len: i64) -> Val, bool {
+fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: squid_check_core::LoopInfo, selective_resize: bool, resized: const u32[16]&, resized_len: i64) -> Val, bool {
     let m .= g.units[f.unit - 1];
     if info.pattern == 0 { return neverVal(), false; }
     let pattern = m.pattern(info.pattern);
-    if pattern.tag != blot_check_core::PatternTag.bind { return neverVal(), false; }
+    if pattern.tag != squid_check_core::PatternTag.bind { return neverVal(), false; }
     let n = m.node(info.end);
     var owner: u32 = 0;
-    if n.tag == blot_check_core::Tag.project { owner = localRef(m, n.a); }
+    if n.tag == squid_check_core::Tag.project { owner = localRef(m, n.a); }
     else { owner = lengthReceiver(m, info.end); }
     if owner == 0 { return neverVal(), false; }
     let da_owner = findDirectArray(f, owner);
@@ -4932,11 +4937,11 @@ fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, s
     let handle, found = bindGet(g, f, owner);
     if !found { return neverVal(), false; }
     let tag = tagOf(g, handle.ty);
-    if tag != blot_direct_types::Tag.array && tag != blot_direct_types::Tag.view { return neverVal(), false; }
-    if n.tag == blot_check_core::Tag.project {
+    if tag != squid_direct_types::Tag.array && tag != squid_direct_types::Tag.view { return neverVal(), false; }
+    if n.tag == squid_check_core::Tag.project {
         let identity, present = g.receiverIdentity(handle.ty);
         if !present { return neverVal(), false; }
-        let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, blot_check_types::Operator.none);
+        let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, squid_check_types::Operator.none);
         if !exists || !g.hasUnit(target.unit) { return neverVal(), false; }
         let unit .= g.units[target.unit - 1];
         let body .= unit.body(target.binding);
@@ -4945,13 +4950,13 @@ fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, s
         if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return neverVal(), false; }
         g.recordInlined(target.unit, target.binding);
     }
-    if tag == blot_direct_types::Tag.view {
+    if tag == squid_direct_types::Tag.view {
         var budget: i64 = 256;
         if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
         return handle, true;
     }
     var receiver_node: u32 = info.end;
-    if n.tag == blot_check_core::Tag.project { receiver_node = n.a; }
+    if n.tag == squid_check_core::Tag.project { receiver_node = n.a; }
     else { receiver_node = m.children(info.end)[0]; }
     if coreSizedLength(m, m.typeOf(receiver_node)) == 0 {
         if !selective_resize {
@@ -5044,7 +5049,7 @@ recursive fn scanCalleePreserves(
         return_ => {
             if n.a != 0 {
                 let rn = m.node(n.a);
-                if rn.tag == blot_check_core::Tag.suite || rn.tag == blot_check_core::Tag.block_ {
+                if rn.tag == squid_check_core::Tag.suite || rn.tag == squid_check_core::Tag.block_ {
                     return scanCalleePreserves(g, m, n.a, same, same_len, budget, call_depth, saw_return, ret_pos);
                 }
             }
@@ -5078,7 +5083,7 @@ fn exprPreservesAt(
         return exprPreservesHandle(g, m, id, same, same_len, depth, allow_calls, call_depth);
     }
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.product {
+    if n.tag == squid_check_core::Tag.product {
         let ch = m.children(id);
         return ret_pos < ch.len && exprPreservesHandle(g, m, ch[ret_pos], same, same_len, depth + 1, allow_calls, call_depth);
     }
@@ -5095,9 +5100,9 @@ fn propagatePatternTuplePreserve(
 ) {
     if pat_id == 0 || rhs_id == 0 || call_depth >= 2 { return; }
     let pat = m.pattern(pat_id);
-    if pat.tag != blot_check_core::PatternTag.product { return; }
+    if pat.tag != squid_check_core::PatternTag.product { return; }
     let rhs_n = m.node(rhs_id);
-    if rhs_n.tag != blot_check_core::Tag.call { return; }
+    if rhs_n.tag != squid_check_core::Tag.call { return; }
     let info = m.call(rhs_id);
     let target = g.resolve(m, info.target);
     if !g.hasUnit(target.unit) { return; }
@@ -5110,7 +5115,7 @@ fn propagatePatternTuplePreserve(
     for arg, ai in info.arguments {
         if exprPreservesHandle(g, m, arg, same, same_len, 0, false, call_depth) {
             for pc, pi in pchildren {
-                if m.pattern(pc).tag == blot_check_core::PatternTag.bind {
+                if m.pattern(pc).tag == squid_check_core::PatternTag.bind {
                     if calleeReturnsParamAt(g, tm, body.root, params[ai].binding, pi, call_depth + 1) {
                         addBindingSet(same, same_len, m.pattern(pc).a);
                     }
@@ -5171,18 +5176,18 @@ recursive fn exprPreservesHandle(
         update => {
             let info = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            return sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index &&
+            return sels.len > 0 && sels[0].kind == squid_check_core::UpdateKind.index &&
                 exprPreservesHandle(g, m, info.root, same, same_len, depth + 1, allow_calls, call_depth);
         },
         array_op => {
             let aop = m.arrayOperation(id);
-            if aop != blot_backend_collection_ops::Op.simd_store && aop != blot_backend_collection_ops::Op.simd_store_u8x16 && aop != blot_backend_collection_ops::Op.simd_store_f64x2 { return false; }
+            if aop != squid_backend_collection_ops::Op.simd_store && aop != squid_backend_collection_ops::Op.simd_store_u8x16 && aop != squid_backend_collection_ops::Op.simd_store_f64x2 { return false; }
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none || (op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend) { return false; }
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none || (op_kind != squid_check_storage_ops::Op.push && op_kind != squid_check_storage_ops::Op.reserve && op_kind != squid_check_storage_ops::Op.extend && op_kind != squid_check_storage_ops::Op.push_front && op_kind != squid_check_storage_ops::Op.insert) { return false; }
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
@@ -5193,7 +5198,7 @@ recursive fn exprPreservesHandle(
             let ch = m.children(id);
             if ch.len == 0 { return false; }
             for ci in 0..(ch.len - 1) {
-                if m.node(ch[ci]).tag != blot_check_core::Tag.bind { return false; }
+                if m.node(ch[ci]).tag != squid_check_core::Tag.bind { return false; }
             }
             return exprPreservesHandle(g, m, ch[ch.len - 1], same, same_len, depth + 1, allow_calls, call_depth);
         },
@@ -5217,11 +5222,12 @@ recursive fn exprPreservesHandle(
             return false;
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let proj_n = m.node(n.a);
                 let sp = m.fieldSpelling(m.projection(proj_n.b).field);
-                if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend") &&
-                    m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                let ptag = m.types.node(m.typeOf(proj_n.a)).tag;
+                if sp.present && (sp.value == "push" || sp.value == "reserve" || sp.value == "extend" || sp.value == "push_front" || sp.value == "insert") &&
+                    (ptag == squid_check_types::Tag.array || ptag == squid_check_types::Tag.packed || ptag == squid_check_types::Tag.seq) {
                     return exprPreservesHandle(g, m, proj_n.a, same, same_len, depth + 1, allow_calls, call_depth);
                 }
             }
@@ -5333,7 +5339,7 @@ recursive fn scanCarryInPlace(
             if !scanCarryInPlace(g, m, loop_id, carry_at, info.root, same, same_len, budget, call_depth) ||
                 !scanCarryInPlace(g, m, loop_id, carry_at, info.value, same, same_len, budget, call_depth) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !scanCarryInPlace(g, m, loop_id, carry_at, sel.index, same, same_len, budget, call_depth) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !scanCarryInPlace(g, m, loop_id, carry_at, sel.index, same, same_len, budget, call_depth) { return false; }
             }
             return true;
         },
@@ -5364,23 +5370,23 @@ fn unwrapSingleBody(m: const Module&, id: u32) -> u32 {
     for step in 0..8 {
         if cur == 0 { return 0; }
         let n = m.node(cur);
-        if (n.tag == blot_check_core::Tag.suite || n.tag == blot_check_core::Tag.block_) && n.b == 1 {
+        if (n.tag == squid_check_core::Tag.suite || n.tag == squid_check_core::Tag.block_) && n.b == 1 {
             cur = m.children(cur)[0];
         } else { break; }
     }
     return cur;
 }
 
-fn isTwoParamPushForwarder(tm: const Module&, body: const blot_check_core::Body&) -> bool {
+fn isTwoParamPushForwarder(tm: const Module&, body: const squid_check_core::Body&) -> bool {
     if !body.is_function { return false; }
     let params = tm.bodyParameters(body);
     if params.len != 2 { return false; }
     let inner = scratchReturned(tm, unwrapSingleBody(tm, body.root));
     if inner == 0 { return false; }
     let n = tm.node(inner);
-    if n.tag != blot_check_core::Tag.storage { return false; }
-    let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-    if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push { return false; }
+    if n.tag != squid_check_core::Tag.storage { return false; }
+    let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+    if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push { return false; }
     let ch = tm.children(inner);
     return ch.len == 2 && localRef(tm, ch[0]) == params[0].binding && localRef(tm, ch[1]) == params[1].binding;
 }
@@ -5388,30 +5394,30 @@ fn isTwoParamPushForwarder(tm: const Module&, body: const blot_check_core::Body&
 // Recognize `for item in src: dest := self.push item` (or `dest := @storage.push self item`
 // or bare `@storage.push dest item` / `dest.push item`) with plain non-boxed elements,
 // emitting a single ensure + `memory.copy`.
-recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> bool, Error {
-    if g.runtime_().has_fork { return false, blot_direct_types::Error.none; }
-    if info.kind != blot_check_core::LoopKind.array || info.carries.len > 1 || info.pattern == 0 {
-        return false, blot_direct_types::Error.none;
+recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: squid_check_core::LoopInfo) -> bool, Error {
+    if g.runtime_().has_fork { return false, squid_direct_types::Error.none; }
+    if info.kind != squid_check_core::LoopKind.array || info.carries.len > 1 || info.pattern == 0 {
+        return false, squid_direct_types::Error.none;
     }
     var dest = neverVal();
     var method_target = BindingRef { 0, 0 };
     var step: u32 = 0;
-    var stag = blot_direct_types::Tag.unit;
+    var stag = squid_direct_types::Tag.unit;
     var carry_incoming: u32 = 0;
     var carry_outgoing: u32 = 0;
     {
         let m .= g.units[f.unit - 1];
         let pat = m.pattern(info.pattern);
-        if pat.tag != blot_check_core::PatternTag.bind { return false, blot_direct_types::Error.none; }
+        if pat.tag != squid_check_core::PatternTag.bind { return false, squid_direct_types::Error.none; }
         let item_binding = pat.a;
         var body_node = unwrapSingleBody(m, info.body);
-        if body_node == 0 { return false, blot_direct_types::Error.none; }
+        if body_node == 0 { return false, squid_direct_types::Error.none; }
         var carry_iter: u32 = 0;
         if info.carries.len == 1 {
             let carry = m.loopCarries(id)[0];
             let bnode = m.node(body_node);
-            if bnode.tag != blot_check_core::Tag.bind || bnode.c >= 2 || bnode.a != carry.backedge {
-                return false, blot_direct_types::Error.none;
+            if bnode.tag != squid_check_core::Tag.bind || bnode.c >= 2 || bnode.a != carry.backedge {
+                return false, squid_direct_types::Error.none;
             }
             carry_incoming = carry.incoming;
             carry_iter = carry.iteration;
@@ -5420,90 +5426,90 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
         }
         let bn = m.node(body_node);
         var dest_binding: u32 = 0;
-        if bn.tag == blot_check_core::Tag.storage {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(bn.c);
-            if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push {
-                return false, blot_direct_types::Error.none;
+        if bn.tag == squid_check_core::Tag.storage {
+            let op_kind, ok = squid_check_storage_ops::opFromCode(bn.c);
+            if ok != squid_error::Error.none || op_kind != squid_check_storage_ops::Op.push {
+                return false, squid_direct_types::Error.none;
             }
             let ch = m.children(body_node);
-            if ch.len != 2 || localRef(m, ch[1]) != item_binding { return false, blot_direct_types::Error.none; }
+            if ch.len != 2 || localRef(m, ch[1]) != item_binding { return false, squid_direct_types::Error.none; }
             dest_binding = localRef(m, ch[0]);
-        } else if bn.tag == blot_check_core::Tag.apply {
-            if localRef(m, bn.b) != item_binding || m.node(bn.a).tag != blot_check_core::Tag.project {
-                return false, blot_direct_types::Error.none;
+        } else if bn.tag == squid_check_core::Tag.apply {
+            if localRef(m, bn.b) != item_binding || m.node(bn.a).tag != squid_check_core::Tag.project {
+                return false, squid_direct_types::Error.none;
             }
             let proj = m.node(bn.a);
             dest_binding = localRef(m, proj.a);
-            if dest_binding == 0 { return false, blot_direct_types::Error.none; }
+            if dest_binding == 0 { return false, squid_direct_types::Error.none; }
             var lookup_binding = dest_binding;
             if carry_iter != 0 {
-                if dest_binding != carry_iter { return false, blot_direct_types::Error.none; }
+                if dest_binding != carry_iter { return false, squid_direct_types::Error.none; }
                 lookup_binding = carry_incoming;
             }
             let dest_check, has_dest = bindGet(g, f, lookup_binding);
-            if !has_dest || tagOf(g, dest_check.ty) != blot_direct_types::Tag.array {
-                return false, blot_direct_types::Error.none;
+            if !has_dest || tagOf(g, dest_check.ty) != squid_direct_types::Tag.array {
+                return false, squid_direct_types::Error.none;
             }
             let identity, has_id = g.receiverIdentity(dest_check.ty);
-            if !has_id { return false, blot_direct_types::Error.none; }
-            let target, has_target = g.dispatchTarget(m, identity, m.projection(proj.b).field, blot_check_types::Operator.none);
-            if !has_target || !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+            if !has_id { return false, squid_direct_types::Error.none; }
+            let target, has_target = g.dispatchTarget(m, identity, m.projection(proj.b).field, squid_check_types::Operator.none);
+            if !has_target || !g.hasUnit(target.unit) { return false, squid_direct_types::Error.none; }
             let tm .= g.units[target.unit - 1];
             let tbody .= tm.body(target.binding);
-            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, blot_direct_types::Error.none; }
+            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, squid_direct_types::Error.none; }
             method_target = target;
-        } else if bn.tag == blot_check_core::Tag.call {
+        } else if bn.tag == squid_check_core::Tag.call {
             let cinfo = m.call(body_node);
             if cinfo.arguments.len != 2 || localRef(m, cinfo.arguments[1]) != item_binding {
-                return false, blot_direct_types::Error.none;
+                return false, squid_direct_types::Error.none;
             }
             let target = g.resolve(m, cinfo.target);
-            if !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+            if !g.hasUnit(target.unit) { return false, squid_direct_types::Error.none; }
             let tm .= g.units[target.unit - 1];
             let tbody .= tm.body(target.binding);
-            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, blot_direct_types::Error.none; }
+            if !tbody || !isTwoParamPushForwarder(tm, tbody) { return false, squid_direct_types::Error.none; }
             dest_binding = localRef(m, cinfo.arguments[0]);
             method_target = target;
         } else {
-            return false, blot_direct_types::Error.none;
+            return false, squid_direct_types::Error.none;
         }
         if carry_iter != 0 {
-            if dest_binding != carry_iter { return false, blot_direct_types::Error.none; }
+            if dest_binding != carry_iter { return false, squid_direct_types::Error.none; }
             dest_binding = carry_incoming;
         }
-        if dest_binding == 0 || dest_binding == item_binding || dest_binding == localRef(m, info.first) { return false, blot_direct_types::Error.none; }
+        if dest_binding == 0 || dest_binding == item_binding || dest_binding == localRef(m, info.first) { return false, squid_direct_types::Error.none; }
         let found_dest, has_dest = bindGet(g, f, dest_binding);
-        if !has_dest { return false, blot_direct_types::Error.none; }
+        if !has_dest { return false, squid_direct_types::Error.none; }
         dest = found_dest;
         let dtag = tagOf(g, dest.ty);
-        if dtag != blot_direct_types::Tag.array {
-            return false, blot_direct_types::Error.none;
+        if dtag != squid_direct_types::Tag.array {
+            return false, squid_direct_types::Error.none;
         }
         let elem, elem_err = elementOf(g, f, dest.ty, id);
-        if elem_err != blot_direct_types::Error.none { return false, blot_direct_types::Error.none; }
+        if elem_err != squid_direct_types::Error.none { return false, squid_direct_types::Error.none; }
         let holds, herr = g.contentsHoldMemory(elem);
-        if herr != blot_direct_types::Error.none || holds { return false, blot_direct_types::Error.none; }
+        if herr != squid_direct_types::Error.none || holds { return false, squid_direct_types::Error.none; }
         let boxed, berr = isBoxed(g, f, elem, id);
-        if berr != blot_direct_types::Error.none || boxed { return false, blot_direct_types::Error.none; }
+        if berr != squid_direct_types::Error.none || boxed { return false, squid_direct_types::Error.none; }
         let got_step, serr = stride(g, f, elem, id);
-        if serr != blot_direct_types::Error.none || got_step == 0 || got_step > 65536 { return false, blot_direct_types::Error.none; }
+        if serr != squid_direct_types::Error.none || got_step == 0 || got_step > 65536 { return false, squid_direct_types::Error.none; }
         step = got_step;
 
         // Verify source Core type lowers to a contiguous container of the exact same element type.
         let src_ty, sty_err = g.types.lower(m, m.typeOf(info.first), f.env);
-        if sty_err != blot_direct_types::Error.none { return false, blot_direct_types::Error.none; }
+        if sty_err != squid_direct_types::Error.none { return false, squid_direct_types::Error.none; }
         stag = tagOf(g, src_ty);
-        if stag != blot_direct_types::Tag.array && stag != blot_direct_types::Tag.view {
-            return false, blot_direct_types::Error.none;
+        if stag != squid_direct_types::Tag.array && stag != squid_direct_types::Tag.view {
+            return false, squid_direct_types::Error.none;
         }
-        if g.types.node(src_ty).a != elem { return false, blot_direct_types::Error.none; }
+        if g.types.node(src_ty).a != elem { return false, squid_direct_types::Error.none; }
     }
 
     if method_target.unit != 0 { g.recordInlined(method_target.unit, method_target.binding); }
     let source, eval_err = expr(g, f, info.first);
-    if eval_err != blot_direct_types::Error.none { return false, eval_err; }
+    if eval_err != squid_direct_types::Error.none { return false, eval_err; }
     let count, lerr = lengthOf(g, f, source, id);
-    if lerr != blot_direct_types::Error.none { return false, lerr; }
+    if lerr != squid_direct_types::Error.none { return false, lerr; }
 
     let rt = g.runtime_();
     lget(g, count);
@@ -5511,15 +5517,15 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     let entry = ensureCheckedGrow(g, f, dest);
     let cap = local32(g, f);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
     ltee(g, cap);
-    i32Const(g, blot_direct_runtime::static_pool_flag);
+    i32Const(g, squid_direct_runtime::static_pool_flag);
     op(g, OP_i32_and);
     trap(g, f);
     let old_len = local32(g, f);
     let new_len = local32(g, f);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     ltee(g, old_len);
     lget(g, count);
     op(g, OP_i32_add);
@@ -5535,7 +5541,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     let need = emitScaledBytes(g, f, new_len, step);
     let cap_bytes = local32(g, f);
     lget(g, cap);
-    i32Const(g, blot_direct_runtime::capacity_mask);
+    i32Const(g, squid_direct_runtime::capacity_mask);
     op(g, OP_i32_and);
     lset(g, cap_bytes);
     lget(g, need);
@@ -5560,7 +5566,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lset(g, fresh_base);
     let old_base = local32(g, f);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, old_base);
     let old_bytes = emitScaledBytes(g, f, old_len, step);
     lget(g, fresh_base);
@@ -5568,7 +5574,7 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     lget(g, old_bytes);
     memoryCopyOp(g);
     lget(g, cap);
-    i32Const(g, blot_direct_runtime::heap_flag);
+    i32Const(g, squid_direct_runtime::heap_flag);
     op(g, OP_i32_and);
     i32Const(g, 0);
     op(g, OP_i32_ne);
@@ -5583,21 +5589,21 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     close(g, f);
     lget(g, entry);
     lget(g, fresh_base);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lget(g, entry);
     lget(g, fresh_size);
-    i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::live_flag);
+    i32Const(g, squid_direct_runtime::heap_flag | squid_direct_runtime::live_flag);
     op(g, OP_i32_or);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_capacity);
     close(g, f);
 
     // Resolve source base address after any growth of `dest`.
     invalidateCheckedContainers(f);
     var src_base: u32 = 0;
-    if stag == blot_direct_types::Tag.array {
+    if stag == squid_direct_types::Tag.array {
         let base, _ = ensureCheckedArray(g, f, source);
         src_base = base;
-    } else if stag == blot_direct_types::Tag.view {
+    } else if stag == squid_direct_types::Tag.view {
         let vslot = w(g, source, 0);
         let vgen = w(g, source, 1);
         let vstart = w(g, source, 2);
@@ -5620,13 +5626,13 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
             op(g, OP_i32_lt_u);
             lget(g, vend);
             lget(g, src_entry);
-            op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
             op(g, OP_i32_gt_u);
             op(g, OP_i32_or);
             trap(g, f);
             let raw_base = local32(g, f);
             lget(g, src_entry);
-            op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
             lset(g, raw_base);
             src_base = emitOffsetAddress(g, f, raw_base, vstart, step);
         }
@@ -5634,13 +5640,13 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
         let src_entry = ensureCheckedGrow(g, f, source);
         src_base = local32(g, f);
         lget(g, src_entry);
-        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
         lset(g, src_base);
     }
 
     let dst_base = local32(g, f);
     lget(g, entry);
-    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, squid_direct_runtime::entry_base);
     lset(g, dst_base);
     let dst_addr = emitOffsetAddress(g, f, dst_base, old_len, step);
     let copy_bytes = emitScaledBytes(g, f, count, step);
@@ -5650,15 +5656,15 @@ recursive fn tryBulkPushLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_co
     memoryCopyOp(g);
     lget(g, entry);
     lget(g, new_len);
-    op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    op(g, OP_i32_store); uleb(g, 2); uleb(g, squid_direct_runtime::entry_length);
     close(g, f);
     if carry_outgoing != 0 {
         bindPut(g, f, carry_outgoing, dest);
         if isUniqueOwned(g, f, carry_incoming) {
-            blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry_outgoing, f.loop_depth + 1);
+            squid_support_zigmap::put(g.s.map_pool, f.unique_owned, carry_outgoing, f.loop_depth + 1);
         }
     }
-    return true, blot_direct_types::Error.none;
+    return true, squid_direct_types::Error.none;
 }
 
 recursive fn countBodyNodes(m: const Module&, id: u32, budget: i64&) -> bool {
@@ -5683,7 +5689,7 @@ recursive fn countBodyNodes(m: const Module&, id: u32, budget: i64&) -> bool {
         update => {
             let u = m.updateInfo(id);
             if !countBodyNodes(m, u.root, budget) || !countBodyNodes(m, u.value, budget) { return false; }
-            for s in m.updateSelectors(id) { if s.kind == blot_check_core::UpdateKind.index && !countBodyNodes(m, s.index, budget) { return false; } }
+            for s in m.updateSelectors(id) { if s.kind == squid_check_core::UpdateKind.index && !countBodyNodes(m, s.index, budget) { return false; } }
             return true;
         },
         match_ => {
@@ -5699,9 +5705,9 @@ recursive fn countBodyNodes(m: const Module&, id: u32, budget: i64&) -> bool {
 // Unroll `for x in const_array:` over small (1..4) compile-time scalar/enum
 // constant arrays so `pool()` + `rt.check()` disappear and Cranelift can
 // constant-fold match dispatch on the iteration element.
-recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo, iteration: Vals, outgoing: Vals, slots: Words) -> bool, Error {
-    if g.runtime_().has_fork { return false, blot_direct_types::Error.none; }
-    if info.kind != blot_check_core::LoopKind.array { return false, blot_direct_types::Error.none; }
+recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: squid_check_core::LoopInfo, iteration: Vals, outgoing: Vals, slots: Words) -> bool, Error {
+    if g.runtime_().has_fork { return false, squid_direct_types::Error.none; }
+    if info.kind != squid_check_core::LoopKind.array { return false, squid_direct_types::Error.none; }
     var target = BindingRef { 0, 0 };
     var elem_count: i64 = 0;
     var elem_is_const: bool[4] = [false; 4];
@@ -5710,46 +5716,46 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
     var elem_ty: Ty = 0;
     {
         let m .= g.units[f.unit - 1];
-        if m.node(info.first).tag != blot_check_core::Tag.reference { return false, blot_direct_types::Error.none; }
+        if m.node(info.first).tag != squid_check_core::Tag.reference { return false, squid_direct_types::Error.none; }
         target = g.resolve(m, m.reference(info.first));
-        if !g.hasUnit(target.unit) { return false, blot_direct_types::Error.none; }
+        if !g.hasUnit(target.unit) { return false, squid_direct_types::Error.none; }
         let tm .= g.units[target.unit - 1];
         let cbody .= tm.body(target.binding);
-        if !cbody || cbody.is_function || tm.node(cbody.root).tag != blot_check_core::Tag.array {
-            return false, blot_direct_types::Error.none;
+        if !cbody || cbody.is_function || tm.node(cbody.root).tag != squid_check_core::Tag.array {
+            return false, squid_direct_types::Error.none;
         }
         let elems = tm.children(cbody.root);
-        if elems.len == 0 || elems.len > 4 { return false, blot_direct_types::Error.none; }
+        if elems.len == 0 || elems.len > 4 { return false, squid_direct_types::Error.none; }
         for el, ei in elems {
             let en = tm.node(el);
-            if en.tag == blot_check_core::Tag.constant {
+            if en.tag == squid_check_core::Tag.constant {
                 elem_is_const[ei] = true;
                 elem_nodes[ei] = el;
                 elem_vals[ei] = en.a;
-            } else if en.tag == blot_check_core::Tag.construct && en.b == 0 {
+            } else if en.tag == squid_check_core::Tag.construct && en.b == 0 {
                 elem_is_const[ei] = false;
                 elem_nodes[ei] = el;
                 elem_vals[ei] = tm.constructor(en.a).tag;
             } else {
-                return false, blot_direct_types::Error.none;
+                return false, squid_direct_types::Error.none;
             }
         }
         elem_count = elems.len;
         let arr_ty, ty_err = g.types.lower(m, m.typeOf(info.first), f.env);
-        if ty_err != blot_direct_types::Error.none || tagOf(g, arr_ty) != blot_direct_types::Tag.array {
-            return false, blot_direct_types::Error.none;
+        if ty_err != squid_direct_types::Error.none || tagOf(g, arr_ty) != squid_direct_types::Tag.array {
+            return false, squid_direct_types::Error.none;
         }
         elem_ty = g.types.node(arr_ty).a;
         let boxed, berr = isBoxed(g, f, elem_ty, id);
-        if berr != blot_direct_types::Error.none || boxed { return false, blot_direct_types::Error.none; }
+        if berr != squid_direct_types::Error.none || boxed { return false, squid_direct_types::Error.none; }
         let width, werr = layoutLen(g, f, elem_ty, id);
-        if werr != blot_direct_types::Error.none || width != 1 { return false, blot_direct_types::Error.none; }
+        if werr != squid_direct_types::Error.none || width != 1 { return false, squid_direct_types::Error.none; }
         let carries = m.loopCarries(id);
         for at in 0..carries.len {
-            if g.s.words[slots.start + at] != 0 { return false, blot_direct_types::Error.none; }
+            if g.s.words[slots.start + at] != 0 { return false, squid_direct_types::Error.none; }
         }
         var budget: i64 = 64;
-        if !countBodyNodes(m, info.body, budget) { return false, blot_direct_types::Error.none; }
+        if !countBodyNodes(m, info.body, budget) { return false, squid_direct_types::Error.none; }
     }
 
     g.recordInlined(target.unit, target.binding);
@@ -5760,11 +5766,11 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
         var item = neverVal();
         if elem_is_const[ei] {
             let loc = local(g, f, localKindForScalar(g, elem_ty));
-            if tagOf(g, elem_ty) == blot_direct_types::Tag.f32_ {
-                blot_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
+            if tagOf(g, elem_ty) == squid_direct_types::Tag.f32_ {
+                squid_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
                 f32Const(g, elem_vals[ei]);
             } else {
-                blot_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
+                squid_direct_relocations::operand(target.unit, elem_nodes[ei], g.s.code.len);
                 i32Const(g, elem_vals[ei]);
             }
             lset(g, loc);
@@ -5776,38 +5782,38 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
         }
         if info.pattern != 0 {
             let tested = test_(g, f, info.pattern, item, false, 0, id);
-            if tested != blot_direct_types::Error.none { return false, tested; }
+            if tested != squid_direct_types::Error.none { return false, tested; }
         }
         let s .= g.s;
         let labels_mark = s.labels.len;
-        s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: iter_done, iteration: iteration, outgoing: outgoing, unchanged: 0xffffffff, has_release: false, release_owner: 0, release_stack: 0, allocations: f.allocations, slots: slots, saved_esc: 0, guards: Words {} });
+        s.labels.push(squid_direct_emit::Label { target: id, depth: exit, result: unused, kind: squid_direct_emit::LabelKind.loop_, top: iter_done, iteration: iteration, outgoing: outgoing, unchanged: 0xffffffff, has_release: false, release_owner: 0, release_stack: 0, allocations: f.allocations, slots: slots, saved_esc: 0, guards: Words {} });
         let body_val, body_err = stmt(g, f, info.body);
         s.labels.resize(labels_mark);
-        if body_err != blot_direct_types::Error.none { return false, body_err; }
-        if body_val.ty != blot_direct_types::never {
+        if body_err != squid_direct_types::Error.none { return false, body_err; }
+        if body_val.ty != squid_direct_types::never {
             let carry_len = g.units[f.unit - 1].loopCarries(id).len;
             let backedge = g.reserveVals(carry_len);
             for at in 0..carry_len {
                 let carry_be = g.units[f.unit - 1].loopCarries(id)[at].backedge;
                 let value, present, rerr = readBindingVal(g, f, carry_be, id);
-                if rerr != blot_direct_types::Error.none { return false, rerr; }
+                if rerr != squid_direct_types::Error.none { return false, rerr; }
                 if !present { return false, g.fail(g.units[f.unit - 1], id, "loop carry without a backedge value"); }
                 g.s.vals[backedge.start + at] = value;
             }
             let assigned = assignCarries(g, f, backedge, iteration, slots, 0xffffffff, 0, 0, id);
-            if assigned != blot_direct_types::Error.none { return false, assigned; }
+            if assigned != squid_direct_types::Error.none { return false, assigned; }
         }
         close(g, f);
     }
     let final_assign = assign(g, f, iteration, outgoing, id);
-    if final_assign != blot_direct_types::Error.none { return false, final_assign; }
+    if final_assign != squid_direct_types::Error.none { return false, final_assign; }
     close(g, f);
     let carry_len = g.units[f.unit - 1].loopCarries(id).len;
     for at in 0..carry_len {
         let carry_out = g.units[f.unit - 1].loopCarries(id)[at].outgoing;
         bindPut(g, f, carry_out, g.s.vals[outgoing.start + at]);
     }
-    return true, blot_direct_types::Error.none;
+    return true, squid_direct_types::Error.none;
 }
 
 // Conservative pre-check: true only when `ty_id` lowers to an unboxed type
@@ -5815,9 +5821,9 @@ recursive fn tryUnrollConstArrayLoop(g: Generator&, f: Fn&, id: u32, info: blot_
 fn coreTypeUnboxed(g: Generator&, f: const Fn&, m: const Module&, tid: TId) -> bool {
     if tid == 0 { return false; }
     let ty, err = g.types.lower(m, tid, f.env);
-    if err != blot_direct_types::Error.none { return false; }
+    if err != squid_direct_types::Error.none { return false; }
     let boxed, berr = g.types.boxed(ty);
-    if berr != blot_direct_types::Error.none || boxed { return false; }
+    if berr != squid_direct_types::Error.none || boxed { return false; }
     return true;
 }
 
@@ -5836,7 +5842,7 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
             let ref = m.reference(id);
             if ref.unit == 0 || ref.unit == m.unit {
                 let kind = m.binding(ref.binding).kind;
-                if kind == blot_reuse_principal_interface::Kind.local || kind == blot_reuse_principal_interface::Kind.parameter { return true; }
+                if kind == squid_reuse_principal_interface::Kind.local || kind == squid_reuse_principal_interface::Kind.parameter { return true; }
             }
             return isCoreScalar(m, id);
         },
@@ -5873,16 +5879,16 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
         },
         loop_ => {
             let linfo = m.loopInfo(id);
-            if linfo.kind == blot_check_core::LoopKind.array {
+            if linfo.kind == squid_check_core::LoopKind.array {
                 // Element loads of a copiedBox array allocate a fresh block.
                 let src_ty_id = m.typeOf(linfo.first);
                 if src_ty_id == 0 { return false; }
                 let src_ty, serr = g.types.lower(m, src_ty_id, f.env);
-                if serr != blot_direct_types::Error.none { return false; }
+                if serr != squid_direct_types::Error.none { return false; }
                 match tagOf(g, src_ty) {
                     array, view => {
                         let elem_boxed, eberr = g.types.boxed(g.types.node(src_ty).a);
-                        if eberr != blot_direct_types::Error.none || elem_boxed { return false; }
+                        if eberr != squid_direct_types::Error.none || elem_boxed { return false; }
                     },
                     _ => { return false; },
                 }
@@ -5908,11 +5914,11 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
         update => {
             let change = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            if sels.len == 0 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+            if sels.len == 0 || sels[0].kind != squid_check_core::UpdateKind.index { return false; }
             if !coreTypeUnboxed(g, f, m, m.typeOf(change.value)) { return false; }
             if !bodyNoAlloc(g, f, m, change.root, left, call_depth) || !bodyNoAlloc(g, f, m, change.value, left, call_depth) { return false; }
             for sel in sels {
-                if sel.kind == blot_check_core::UpdateKind.index && !bodyNoAlloc(g, f, m, sel.index, left, call_depth) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !bodyNoAlloc(g, f, m, sel.index, left, call_depth) { return false; }
             }
             return true;
         },
@@ -5922,7 +5928,7 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
             let variants = m.projectionVariants(n.b);
             if variants.len != 0 { return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.a, left, call_depth); }
             let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
-            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+            if receiver_ty == squid_check_types::Tag.record || receiver_ty == squid_check_types::Tag.product {
                 return coreTypeUnboxed(g, f, m, m.typeOf(id)) && bodyNoAlloc(g, f, m, n.a, left, call_depth);
             }
             let receiver_local = localRef(m, n.a);
@@ -5933,7 +5939,7 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
             return false;
         },
         scalar, associated, logical => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return bodyNoAlloc(g, f, m, n.a, left, call_depth) && bodyNoAlloc(g, f, m, n.b, left, call_depth);
         },
         call => {
@@ -5975,8 +5981,8 @@ recursive fn bodyNoAlloc(g: Generator&, f: const Fn&, m: const Module&, id: u32,
             }
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
             match op_kind {
                 length => {
                     for child in m.children(id) {
@@ -6049,13 +6055,13 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[16]&, len:
         update => {
             let change = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index {
+            if sels.len > 0 && sels[0].kind == squid_check_core::UpdateKind.index {
                 addLoopArrayCandidate(out, len, localRef(m, change.root));
             }
             collectLoopArrayUses(m, change.root, out, len, left);
             collectLoopArrayUses(m, change.value, out, len, left);
             for sel in sels {
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     collectLoopArrayUses(m, sel.index, out, len, left);
                 }
             }
@@ -6072,10 +6078,10 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[16]&, len:
         },
         storage => {
             let ch = m.children(id);
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok == blot_error::Error.none {
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok == squid_error::Error.none {
                 match op_kind {
-                    read, length, push, pop, truncate, reserve, extend => {
+                    read, length, push, pop, truncate, reserve, extend, push_front, pop_front, insert, remove => {
                         if ch.len > 0 { addLoopArrayCandidate(out, len, localRef(m, ch[0])); }
                     },
                     _ => {},
@@ -6090,18 +6096,18 @@ recursive fn collectLoopArrayUses(m: const Module&, id: u32, out: u32[16]&, len:
         call => {
             for arg in m.call(id).arguments {
                 let atag = m.types.node(m.typeOf(arg)).tag;
-                if atag == blot_check_types::Tag.array || atag == blot_check_types::Tag.usage {
+                if atag == squid_check_types::Tag.array || atag == squid_check_types::Tag.usage {
                     addLoopArrayCandidate(out, len, localRef(m, arg));
                 }
                 collectLoopArrayUses(m, arg, out, len, left);
             }
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let proj_n = m.node(n.a);
                 let sp = m.fieldSpelling(m.projection(proj_n.b).field);
                 if sp.present && (sp.value == "at" || sp.value == "push" || sp.value == "pop" || sp.value == "truncate" || sp.value == "reserve" || sp.value == "extend") &&
-                    m.types.node(m.typeOf(proj_n.a)).tag == blot_check_types::Tag.array {
+                    m.types.node(m.typeOf(proj_n.a)).tag == squid_check_types::Tag.array {
                     addLoopArrayCandidate(out, len, localRef(m, proj_n.a));
                 }
             }
@@ -6132,13 +6138,13 @@ fn returnedFreshArrayExpr(m: const Module&, id: u32) -> u32 {
     for step in 0..8 {
         if cur == 0 { return 0; }
         let n = m.node(cur);
-        if n.tag == blot_check_core::Tag.return_ {
+        if n.tag == squid_check_core::Tag.return_ {
             cur = n.a;
-        } else if (n.tag == blot_check_core::Tag.block_ || n.tag == blot_check_core::Tag.suite) && n.b > 0 {
+        } else if (n.tag == squid_check_core::Tag.block_ || n.tag == squid_check_core::Tag.suite) && n.b > 0 {
             let ch = m.children(cur);
             for i in 0..(ch.len - 1) {
                 let cn = m.node(ch[i]);
-                if cn.tag != blot_check_core::Tag.bind || cn.c >= 2 { return 0; }
+                if cn.tag != squid_check_core::Tag.bind || cn.c >= 2 { return 0; }
             }
             cur = ch[ch.len - 1];
         } else {
@@ -6159,10 +6165,10 @@ recursive fn isFreshOwnedArrayNode(g: const Generator&, m: const Module&, id: u3
             }
         },
         storage => {
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
-            if op_kind == blot_check_storage_ops::Op.copy { return true; }
-            if op_kind == blot_check_storage_ops::Op.push {
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
+            if op_kind == squid_check_storage_ops::Op.copy { return true; }
+            if op_kind == squid_check_storage_ops::Op.push {
                 let ch = m.children(id);
                 return ch.len == 2 && isFreshOwnedArrayNode(g, m, ch[0], depth + 1);
             }
@@ -6362,7 +6368,7 @@ recursive fn hasPreTailBindingUse(
                 if nodeReadsBinding(m, items[i], binding, 0) { return true; }
             }
             let ln = m.node(items[items.len - 1]);
-            if ln.tag == blot_check_core::Tag.return_ && ln.b == id && ln.a != 0 {
+            if ln.tag == squid_check_core::Tag.return_ && ln.b == id && ln.a != 0 {
                 return hasPreTailBindingUse(m, ln.a, false, binding, depth + 1);
             }
             return nodeReadsBinding(m, items[items.len - 1], binding, 0);
@@ -6471,7 +6477,7 @@ recursive fn scanCarryUniqueBoxed(
             for child in vals {
                 if !scanCarryUniqueBoxed(g, f, m, loop_id, carry_at, iter_binding, child, boxed_set, boxed_len, budget) { return false; }
             }
-            if n.a == loop_id && n.op == blot_check_core::Op.continue_ {
+            if n.a == loop_id && n.op == squid_check_core::Op.continue_ {
                 if carry_at >= vals.len { return false; }
                 let cv = vals[carry_at];
                 if !isFreshBoxedNode(m, cv, 0) {
@@ -6524,7 +6530,7 @@ recursive fn markUnpatchableExprConstants(m: const Module&, id: u32, depth: i64)
     if id == 0 || depth >= 64 { return; }
     let n = m.node(id);
     match n.tag {
-        constant => { blot_direct_relocations::unpatchableOperand(m.unit, id); },
+        constant => { squid_direct_relocations::unpatchableOperand(m.unit, id); },
         scalar, associated, logical, apply => {
             markUnpatchableExprConstants(m, n.a, depth + 1);
             markUnpatchableExprConstants(m, n.b, depth + 1);
@@ -6547,7 +6553,7 @@ recursive fn markUnpatchableExprConstants(m: const Module&, id: u32, depth: i64)
             markUnpatchableExprConstants(m, uinfo.root, depth + 1);
             markUnpatchableExprConstants(m, uinfo.value, depth + 1);
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     markUnpatchableExprConstants(m, sel.index, depth + 1);
                 }
             }
@@ -6574,15 +6580,15 @@ recursive fn isPureU32Expr(g: const Generator&, f: const Fn&, m: const Module&, 
     budget -= 1;
     let n = m.node(id);
     match n.tag {
-        constant => { return m.types.node(m.typeOf(id)).tag == blot_check_types::Tag.unsigned32; },
+        constant => { return m.types.node(m.typeOf(id)).tag == squid_check_types::Tag.unsigned32; },
         reference => {
             let b = localRef(m, id);
             if b == 0 || b == forbid_binding { return false; }
             let _, is_cell = withCellType(g, f, b);
-            return !is_cell && m.types.node(m.typeOf(id)).tag == blot_check_types::Tag.unsigned32;
+            return !is_cell && m.types.node(m.typeOf(id)).tag == squid_check_types::Tag.unsigned32;
         },
         scalar => {
-            if !isPureU32Op(n.op) || m.types.node(m.typeOf(id)).tag != blot_check_types::Tag.unsigned32 { return false; }
+            if !isPureU32Op(n.op) || m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.unsigned32 { return false; }
             return isPureU32Expr(g, f, m, n.a, forbid_binding, budget) &&
                 isPureU32Expr(g, f, m, n.b, forbid_binding, budget);
         },
@@ -6592,27 +6598,27 @@ recursive fn isPureU32Expr(g: const Generator&, f: const Fn&, m: const Module&, 
 recursive fn matchAffineU32Step(m: const Module&, expr_id: u32, target_iter: u32) -> bool, u32, u32 {
     if expr_id == 0 { return false, 0, 0; }
     let n = m.node(expr_id);
-    if n.tag != blot_check_core::Tag.scalar { return false, 0, 0; }
-    if n.op == blot_check_core::Op.add {
+    if n.tag != squid_check_core::Tag.scalar { return false, 0, 0; }
+    if n.op == squid_check_core::Op.add {
         let an = m.node(n.a);
         let bn = m.node(n.b);
-        if bn.tag == blot_check_core::Tag.constant {
+        if bn.tag == squid_check_core::Tag.constant {
             let ok, a_mul, _ = matchAffineU32Step(m, n.a, target_iter);
             if ok { return true, a_mul, bn.a; }
         }
-        if an.tag == blot_check_core::Tag.constant {
+        if an.tag == squid_check_core::Tag.constant {
             let ok, a_mul, _ = matchAffineU32Step(m, n.b, target_iter);
             if ok { return true, a_mul, an.a; }
         }
         return false, 0, 0;
     }
-    if n.op == blot_check_core::Op.mul {
+    if n.op == squid_check_core::Op.mul {
         let an = m.node(n.a);
         let bn = m.node(n.b);
-        if localRef(m, n.a) == target_iter && bn.tag == blot_check_core::Tag.constant {
+        if localRef(m, n.a) == target_iter && bn.tag == squid_check_core::Tag.constant {
             return true, bn.a, 0;
         }
-        if localRef(m, n.b) == target_iter && an.tag == blot_check_core::Tag.constant {
+        if localRef(m, n.b) == target_iter && an.tag == squid_check_core::Tag.constant {
             return true, an.a, 0;
         }
     }
@@ -6621,33 +6627,33 @@ recursive fn matchAffineU32Step(m: const Module&, expr_id: u32, target_iter: u32
 // 5F: Algebraically vectorize (16-wide 4x v128 SIMD for associative single-accumulator
 // LCG recurrences like `s := s * A + C; acc := acc ^ (s >> 16)`) or 8x unroll pure
 // counted U32 loops containing an affine LCG recurrence `s := s * A + C` (exact mod 2^32).
-fn matchAffineTermOp(m: const Module&, id: u32, s_back: u32) -> bool, blot_check_core::Op, u32 {
-    if id == 0 { return false, blot_check_core::Op.none, 0; }
-    if localRef(m, id) == s_back { return true, blot_check_core::Op.none, 0; }
+fn matchAffineTermOp(m: const Module&, id: u32, s_back: u32) -> bool, squid_check_core::Op, u32 {
+    if id == 0 { return false, squid_check_core::Op.none, 0; }
+    if localRef(m, id) == s_back { return true, squid_check_core::Op.none, 0; }
     let n = m.node(id);
-    if n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none) {
-        return false, blot_check_core::Op.none, 0;
+    if n.tag != squid_check_core::Tag.scalar && !(n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none) {
+        return false, squid_check_core::Op.none, 0;
     }
     match n.op {
         shift_right, shift_right_signed, shift_left => {
-            if localRef(m, n.a) == s_back && m.node(n.b).tag == blot_check_core::Tag.constant {
+            if localRef(m, n.a) == s_back && m.node(n.b).tag == squid_check_core::Tag.constant {
                 return true, n.op, m.node(n.b).a;
             }
-            return false, blot_check_core::Op.none, 0;
+            return false, squid_check_core::Op.none, 0;
         },
         bit_and, bit_or, bit_xor => {
-            if localRef(m, n.a) == s_back && m.node(n.b).tag == blot_check_core::Tag.constant {
+            if localRef(m, n.a) == s_back && m.node(n.b).tag == squid_check_core::Tag.constant {
                 return true, n.op, m.node(n.b).a;
             }
-            if localRef(m, n.b) == s_back && m.node(n.a).tag == blot_check_core::Tag.constant {
+            if localRef(m, n.b) == s_back && m.node(n.a).tag == squid_check_core::Tag.constant {
                 return true, n.op, m.node(n.a).a;
             }
-            return false, blot_check_core::Op.none, 0;
+            return false, squid_check_core::Op.none, 0;
         },
-        _ => { return false, blot_check_core::Op.none, 0; },
+        _ => { return false, squid_check_core::Op.none, 0; },
     }
 }
-fn emitAffineVecTerm(g: Generator&, vs: u32, term_op: blot_check_core::Op, term_const: u32, v_mask: u32) {
+fn emitAffineVecTerm(g: Generator&, vs: u32, term_op: squid_check_core::Op, term_const: u32, v_mask: u32) {
     lget(g, vs);
     match term_op {
         none => {},
@@ -6664,7 +6670,7 @@ fn tryEmitAffineUnrollLoop(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     index: u32,
     end_local: u32,
@@ -6682,34 +6688,34 @@ fn tryEmitAffineUnrollLoop(
     var simd_acc_ok = false;
     var acc_carry: i64 = -1;
     var acc_is_xor = false;
-    var term_op = blot_check_core::Op.none;
+    var term_op = squid_check_core::Op.none;
     var term_const: u32 = 0;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
-        if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return blot_direct_types::Error.none; }
+        if info.kind != squid_check_core::LoopKind.range || info.body == 0 { return squid_direct_types::Error.none; }
         if info.pattern != 0 {
             let pat = m.pattern(info.pattern);
-            if pat.tag == blot_check_core::PatternTag.bind {
-                if uses(g, f, pat.a) != 0 { return blot_direct_types::Error.none; }
-            } else if pat.tag != blot_check_core::PatternTag.wildcard {
-                return blot_direct_types::Error.none;
+            if pat.tag == squid_check_core::PatternTag.bind {
+                if uses(g, f, pat.a) != 0 { return squid_direct_types::Error.none; }
+            } else if pat.tag != squid_check_core::PatternTag.wildcard {
+                return squid_direct_types::Error.none;
             }
         }
         let carries = m.loopCarries(loop_id);
-        if carries.len == 0 || carries.len > 4 { return blot_direct_types::Error.none; }
+        if carries.len == 0 || carries.len > 4 { return squid_direct_types::Error.none; }
         for carry, ci in carries {
-            if carry.backedge == 0 { return blot_direct_types::Error.none; }
+            if carry.backedge == 0 { return squid_direct_types::Error.none; }
             let iv = g.s.vals[iteration.start + ci];
-            if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return blot_direct_types::Error.none; }
+            if iv.len != 1 || tagOf(g, iv.ty) != squid_direct_types::Tag.u32_ { return squid_direct_types::Error.none; }
             carry_iter[ci] = carry.iteration;
             carry_back[ci] = carry.backedge;
         }
         carry_count = carries.len;
         let bn = m.node(info.body);
-        if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+        if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
             let ch = m.children(info.body);
-            if ch.len == 0 || ch.len > 8 { return blot_direct_types::Error.none; }
+            if ch.len == 0 || ch.len > 8 { return squid_direct_types::Error.none; }
             for si in 0..ch.len { stmts[si] = ch[si]; }
             stmts_len = ch.len;
         } else {
@@ -6720,8 +6726,8 @@ fn tryEmitAffineUnrollLoop(
         var acc_term_node: u32 = 0;
         for si in 0..stmts_len {
             let sn = m.node(stmts[si]);
-            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 || m.binding(sn.a).scheme.variables.len != 0 {
-                return blot_direct_types::Error.none;
+            if sn.tag != squid_check_core::Tag.bind || sn.c >= 2 || m.binding(sn.a).scheme.variables.len != 0 {
+                return squid_direct_types::Error.none;
             }
             if affine_carry < 0 {
                 for ci in 0..carry_count {
@@ -6739,14 +6745,14 @@ fn tryEmitAffineUnrollLoop(
                 }
             }
         }
-        if affine_carry < 0 { return blot_direct_types::Error.none; }
+        if affine_carry < 0 { return squid_direct_types::Error.none; }
         // Verify every other statement is pure U32 and does not read the old affine carry.
         for si in 0..stmts_len {
             if si == affine_stmt { continue; }
             let sn = m.node(stmts[si]);
             var b: i64 = 32;
             if !isPureU32Expr(g, f, m, sn.b, carry_iter[affine_carry], b) {
-                return blot_direct_types::Error.none;
+                return squid_direct_types::Error.none;
             }
         }
         // Detect single associative accumulator `acc := acc (^|+) term(s_new)` for 16-wide v128 SIMD!
@@ -6756,8 +6762,8 @@ fn tryEmitAffineUnrollLoop(
             let osn = m.node(stmts[os]);
             if osn.a == carry_back[oc] {
                 let r = m.node(osn.b);
-                let is_op = r.tag == blot_check_core::Tag.scalar || (r.tag == blot_check_core::Tag.associated && r.op != blot_check_core::Op.none);
-                if is_op && (r.op == blot_check_core::Op.bit_xor || r.op == blot_check_core::Op.add) {
+                let is_op = r.tag == squid_check_core::Tag.scalar || (r.tag == squid_check_core::Tag.associated && r.op != squid_check_core::Op.none);
+                if is_op && (r.op == squid_check_core::Op.bit_xor || r.op == squid_check_core::Op.add) {
                     var term_node: u32 = 0;
                     if localRef(m, r.a) == carry_iter[oc] { term_node = r.b; }
                     else if localRef(m, r.b) == carry_iter[oc] { term_node = r.a; }
@@ -6765,7 +6771,7 @@ fn tryEmitAffineUnrollLoop(
                     if tok {
                         simd_acc_ok = true;
                         acc_carry = oc;
-                        acc_is_xor = r.op == blot_check_core::Op.bit_xor;
+                        acc_is_xor = r.op == squid_check_core::Op.bit_xor;
                         acc_term_node = term_node;
                         term_op = top;
                         term_const = tconst;
@@ -6773,15 +6779,15 @@ fn tryEmitAffineUnrollLoop(
                 }
             }
         }
-        start_is_zero = m.node(info.first).tag == blot_check_core::Tag.constant && m.node(info.first).a == 0;
+        start_is_zero = m.node(info.first).tag == squid_check_core::Tag.constant && m.node(info.first).a == 0;
         matched = true;
         markUnpatchableExprConstants(m, affine_rhs_id, 0);
         if simd_acc_ok {
             markUnpatchableExprConstants(m, acc_term_node, 0);
-            if start_is_zero { blot_direct_relocations::unpatchableOperand(m.unit, info.first); }
+            if start_is_zero { squid_direct_relocations::unpatchableOperand(m.unit, info.first); }
         }
     }
-    if !matched { return blot_direct_types::Error.none; }
+    if !matched { return squid_direct_types::Error.none; }
 
     let affine_loc = w(g, g.s.vals[iteration.start + affine_carry], 0);
 
@@ -6835,7 +6841,7 @@ fn tryEmitAffineUnrollLoop(
         let vacc0 = local(g, f, VT_v128);
         let vacc1 = local(g, f, VT_v128);
         var v_mask: u32 = 0;
-        if term_op == blot_check_core::Op.bit_and || term_op == blot_check_core::Op.bit_or || term_op == blot_check_core::Op.bit_xor {
+        if term_op == squid_check_core::Op.bit_and || term_op == squid_check_core::Op.bit_or || term_op == squid_check_core::Op.bit_xor {
             v_mask = local(g, f, VT_v128);
             v128Const4(g, term_const);
             lset(g, v_mask);
@@ -6925,7 +6931,7 @@ fn tryEmitAffineUnrollLoop(
 
         popCheckedArraysAt(f, run_if);
         close(g, f);
-        return blot_direct_types::Error.none;
+        return squid_direct_types::Error.none;
     }
 
     // General path: 8x scalar parallel-power affine unrolling.
@@ -6991,11 +6997,11 @@ fn tryEmitAffineUnrollLoop(
             op(g, OP_i32_add);
         }
         lset(g, s_cur);
-        bindPut(g, f, carry_back[affine_carry], valOf1(g, blot_direct_types::u32_, s_cur));
+        bindPut(g, f, carry_back[affine_carry], valOf1(g, squid_direct_types::u32_, s_cur));
         for si in 0..stmts_len {
             if si == affine_stmt { continue; }
             let _, serr = stmt(g, f, stmts[si]);
-            if serr != blot_direct_types::Error.none { return serr; }
+            if serr != squid_direct_types::Error.none { return serr; }
         }
         for ci in 0..carry_count {
             if ci == affine_carry { continue; }
@@ -7017,7 +7023,7 @@ fn tryEmitAffineUnrollLoop(
     close(g, f);
     close(g, f);
 
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // 4A: Deferred NaN canonicalization check for pure-FP counted outer loops.
 recursive fn tyHasF32(m: const Module&, tid: TId, depth: i64 = 0) -> bool {
@@ -7027,7 +7033,7 @@ recursive fn tyHasF32(m: const Module&, tid: TId, depth: i64 = 0) -> bool {
         floating32 => { return true; },
         array => { return tyHasF32(m, tn.a, depth + 1); },
         product => {
-            for item in m.types.list(blot_check_types::List { tn.a, tn.b }) {
+            for item in m.types.list(squid_check_types::List { tn.a, tn.b }) {
                 if tyHasF32(m, item, depth + 1) { return true; }
             }
             return false;
@@ -7051,7 +7057,7 @@ recursive fn tyHasU32(m: const Module&, tid: TId, depth: i64) -> bool {
         usage, forall => { return tyHasU32(m, tn.a, depth + 1); },
         array => { return tyHasU32(m, tn.a, depth + 1); },
         product => {
-            for child in m.types.list(blot_check_types::List { tn.a, tn.b }) {
+            for child in m.types.list(squid_check_types::List { tn.a, tn.b }) {
                 if tyHasU32(m, child, depth + 1) { return true; }
             }
             return false;
@@ -7134,20 +7140,20 @@ recursive fn scanDeferLoopDefs(m: const Module&, id: u32, ctx: DeferLoopContext&
             if tyHasU32(m, m.typeOf(uinfo.value), 0) { ctx.mutates_u32 = true; }
             if !scanDeferLoopDefs(m, uinfo.root, ctx, budget) || !scanDeferLoopDefs(m, uinfo.value, ctx, budget) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !scanDeferLoopDefs(m, sel.index, ctx, budget) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !scanDeferLoopDefs(m, sel.index, ctx, budget) { return false; }
             }
             return true;
         },
         loop_ => {
             let linfo = m.loopInfo(id);
-            if linfo.kind != blot_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
+            if linfo.kind != squid_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
             if linfo.pattern != 0 {
                 let pat = m.pattern(linfo.pattern);
-                if pat.tag == blot_check_core::PatternTag.bind && pat.a != 0 {
+                if pat.tag == squid_check_core::PatternTag.bind && pat.a != 0 {
                     if ctx.inner_len >= 8 { return false; }
                     ctx.inner_vars[ctx.inner_len] = pat.a;
                     ctx.inner_len += 1;
-                } else if pat.tag != blot_check_core::PatternTag.wildcard {
+                } else if pat.tag != squid_check_core::PatternTag.wildcard {
                     return false;
                 }
             }
@@ -7184,55 +7190,55 @@ recursive fn isDeferInvariantIndex(m: const Module&, ctx: const DeferLoopContext
             return true;
         },
         scalar, associated => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             match n.op {
                 add, sub, mul, div, rem, bit_and, bit_or, bit_xor, shift_left, shift_right => {},
                 _ => { return false; },
             }
-            if m.types.node(m.typeOf(id)).tag != blot_check_types::Tag.unsigned32 { return false; }
-            if n.a != 0 && m.types.node(m.typeOf(n.a)).tag != blot_check_types::Tag.unsigned32 { return false; }
-            if n.b != 0 && m.types.node(m.typeOf(n.b)).tag != blot_check_types::Tag.unsigned32 { return false; }
+            if m.types.node(m.typeOf(id)).tag != squid_check_types::Tag.unsigned32 { return false; }
+            if n.a != 0 && m.types.node(m.typeOf(n.a)).tag != squid_check_types::Tag.unsigned32 { return false; }
+            if n.b != 0 && m.types.node(m.typeOf(n.b)).tag != squid_check_types::Tag.unsigned32 { return false; }
             return isDeferInvariantIndex(m, ctx, n.a, depth + 1) &&
                 (n.b == 0 || isDeferInvariantIndex(m, ctx, n.b, depth + 1));
         },
         array_op => {
             let op_k = m.arrayOperation(id);
             let ch = m.children(id);
-            if op_k == blot_backend_collection_ops::Op.length && ch.len == 1 {
+            if op_k == squid_backend_collection_ops::Op.length && ch.len == 1 {
                 let b = localRef(m, ch[0]);
-                return m.node(ch[0]).tag == blot_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
+                return m.node(ch[0]).tag == squid_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
             }
-            if op_k == blot_backend_collection_ops::Op.get && ch.len == 2 && !ctx.mutates_u32 {
+            if op_k == squid_backend_collection_ops::Op.get && ch.len == 2 && !ctx.mutates_u32 {
                 let b = localRef(m, ch[0]);
-                return m.node(ch[0]).tag == blot_check_core::Tag.reference &&
+                return m.node(ch[0]).tag == squid_check_core::Tag.reference &&
                     deferIsOuterImmutableBinding(ctx, b) &&
                     isDeferInvariantIndex(m, ctx, ch[1], depth + 1);
             }
             return false;
         },
         storage => {
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
             let ch = m.children(id);
-            if op_k == blot_check_storage_ops::Op.length && ch.len == 1 {
+            if op_k == squid_check_storage_ops::Op.length && ch.len == 1 {
                 let b = localRef(m, ch[0]);
-                return m.node(ch[0]).tag == blot_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
+                return m.node(ch[0]).tag == squid_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
             }
-            if op_k == blot_check_storage_ops::Op.read && ch.len == 2 && !ctx.mutates_u32 {
+            if op_k == squid_check_storage_ops::Op.read && ch.len == 2 && !ctx.mutates_u32 {
                 let b = localRef(m, ch[0]);
-                return m.node(ch[0]).tag == blot_check_core::Tag.reference &&
+                return m.node(ch[0]).tag == squid_check_core::Tag.reference &&
                     deferIsOuterImmutableBinding(ctx, b) &&
                     isDeferInvariantIndex(m, ctx, ch[1], depth + 1);
             }
             return false;
         },
         apply => {
-            if !ctx.mutates_u32 && m.node(n.a).tag == blot_check_core::Tag.project {
+            if !ctx.mutates_u32 && m.node(n.a).tag == squid_check_core::Tag.project {
                 let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
                 if sp.present && sp.value == "at" {
                     let arr_node = m.node(n.a).a;
                     let b = localRef(m, arr_node);
-                    return m.node(arr_node).tag == blot_check_core::Tag.reference &&
+                    return m.node(arr_node).tag == squid_check_core::Tag.reference &&
                         deferIsOuterImmutableBinding(ctx, b) &&
                         isDeferInvariantIndex(m, ctx, n.b, depth + 1);
                 }
@@ -7243,7 +7249,7 @@ recursive fn isDeferInvariantIndex(m: const Module&, ctx: const DeferLoopContext
             let sp = m.fieldSpelling(m.projection(n.b).field);
             if sp.present && sp.value == "length" {
                 let b = localRef(m, n.a);
-                return m.node(n.a).tag == blot_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
+                return m.node(n.a).tag == squid_check_core::Tag.reference && deferIsOuterImmutableBinding(ctx, b);
             }
             return !ctx.mutates_u32 && isDeferInvariantIndex(m, ctx, n.a, depth + 1);
         },
@@ -7263,28 +7269,28 @@ recursive fn isDeferInvariantRead(m: const Module&, ctx: const DeferLoopContext&
         },
         array_op => {
             let ch = m.children(id);
-            if m.arrayOperation(id) != blot_backend_collection_ops::Op.get || ch.len != 2 { return false; }
+            if m.arrayOperation(id) != squid_backend_collection_ops::Op.get || ch.len != 2 { return false; }
             let b = localRef(m, ch[0]);
-            return m.node(ch[0]).tag == blot_check_core::Tag.reference &&
+            return m.node(ch[0]).tag == squid_check_core::Tag.reference &&
                 (deferIsOuterImmutableBinding(ctx, b) || deferIsOuterCarry(ctx, b)) &&
                 isDeferInvariantIndex(m, ctx, ch[1], 0);
         },
         storage => {
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
             let ch = m.children(id);
-            if ok != blot_error::Error.none || op_k != blot_check_storage_ops::Op.read || ch.len != 2 { return false; }
+            if ok != squid_error::Error.none || op_k != squid_check_storage_ops::Op.read || ch.len != 2 { return false; }
             let b = localRef(m, ch[0]);
-            return m.node(ch[0]).tag == blot_check_core::Tag.reference &&
+            return m.node(ch[0]).tag == squid_check_core::Tag.reference &&
                 (deferIsOuterImmutableBinding(ctx, b) || deferIsOuterCarry(ctx, b)) &&
                 isDeferInvariantIndex(m, ctx, ch[1], 0);
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
                 if sp.present && sp.value == "at" {
                     let arr_node = m.node(n.a).a;
                     let b = localRef(m, arr_node);
-                    return m.node(arr_node).tag == blot_check_core::Tag.reference &&
+                    return m.node(arr_node).tag == squid_check_core::Tag.reference &&
                         (deferIsOuterImmutableBinding(ctx, b) || deferIsOuterCarry(ctx, b)) &&
                         isDeferInvariantIndex(m, ctx, n.b, 0);
                 }
@@ -7314,7 +7320,7 @@ recursive fn bodyValidDeferF32Nan(
         constant, reference => { return true; },
         suite, block_ => {
             for ch in m.children(id) {
-                if !bodyValidDeferF32Nan(g, m, ctx, ch, required_ctor, false, top_level && n.tag == blot_check_core::Tag.suite, has_f32_write, budget, inline_depth) { return false; }
+                if !bodyValidDeferF32Nan(g, m, ctx, ch, required_ctor, false, top_level && n.tag == squid_check_core::Tag.suite, has_f32_write, budget, inline_depth) { return false; }
             }
             return true;
         },
@@ -7338,30 +7344,30 @@ recursive fn bodyValidDeferF32Nan(
             return bodyValidDeferF32Nan(g, m, ctx, n.a, required_ctor, false, false, has_f32_write, budget, inline_depth);
         },
         scalar, associated => {
-            if n.op == blot_check_core::Op.bits || n.op == blot_check_core::Op.from_bits { return false; }
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.op == squid_check_core::Op.bits || n.op == squid_check_core::Op.from_bits { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return bodyValidDeferF32Nan(g, m, ctx, n.a, required_ctor, false, false, has_f32_write, budget, inline_depth) &&
                 bodyValidDeferF32Nan(g, m, ctx, n.b, required_ctor, false, false, has_f32_write, budget, inline_depth);
         },
         array_op => {
             let op_k = m.arrayOperation(id);
-            if op_k != blot_backend_collection_ops::Op.length && op_k != blot_backend_collection_ops::Op.get { return false; }
+            if op_k != squid_backend_collection_ops::Op.length && op_k != squid_backend_collection_ops::Op.get { return false; }
             for ch in m.children(id) {
                 if !bodyValidDeferF32Nan(g, m, ctx, ch, required_ctor, false, false, has_f32_write, budget, inline_depth) { return false; }
             }
             return true;
         },
         storage => {
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none { return false; }
-            if op_k != blot_check_storage_ops::Op.length && op_k != blot_check_storage_ops::Op.read { return false; }
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok != squid_error::Error.none { return false; }
+            if op_k != squid_check_storage_ops::Op.length && op_k != squid_check_storage_ops::Op.read { return false; }
             for ch in m.children(id) {
                 if !bodyValidDeferF32Nan(g, m, ctx, ch, required_ctor, false, false, has_f32_write, budget, inline_depth) { return false; }
             }
             return true;
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
                 if sp.present && sp.value == "at" {
                     return bodyValidDeferF32Nan(g, m, ctx, m.node(n.a).a, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
@@ -7381,13 +7387,13 @@ recursive fn bodyValidDeferF32Nan(
                 }
             } else {
                 let sb = localRef(m, sinfo.source);
-                if m.node(sinfo.source).tag != blot_check_core::Tag.reference ||
+                if m.node(sinfo.source).tag != squid_check_core::Tag.reference ||
                     !(deferIsOuterImmutableBinding(ctx, sb) || deferIsOuterCarry(ctx, sb)) {
                     return false;
                 }
             }
             let res_tn = m.types.node(m.typeOf(id));
-            if res_tn.tag == blot_check_types::Tag.array && m.types.node(res_tn.a).tag == blot_check_types::Tag.floating32 {
+            if res_tn.tag == squid_check_types::Tag.array && m.types.node(res_tn.a).tag == squid_check_types::Tag.floating32 {
                 has_f32_write = true;
             }
             return bodyValidDeferF32Nan(g, m, ctx, sinfo.source, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
@@ -7397,10 +7403,10 @@ recursive fn bodyValidDeferF32Nan(
         update => {
             let uinfo = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            if sels.len == 0 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+            if sels.len == 0 || sels[0].kind != squid_check_core::UpdateKind.index { return false; }
             // Root must be an outer-scope binding or outer loop carry (never a loop-local array).
             let root_b = localRef(m, uinfo.root);
-            if m.node(uinfo.root).tag != blot_check_core::Tag.reference ||
+            if m.node(uinfo.root).tag != squid_check_core::Tag.reference ||
                 !(deferIsOuterImmutableBinding(ctx, root_b) || deferIsOuterCarry(ctx, root_b)) {
                 return false;
             }
@@ -7409,7 +7415,7 @@ recursive fn bodyValidDeferF32Nan(
                 // must construct the exact same nominal+constructor tag so the set of updated slots
                 // is strictly monotone across every iteration.
                 let vn = m.node(uinfo.value);
-                if vn.tag != blot_check_core::Tag.construct { return false; }
+                if vn.tag != squid_check_core::Tag.construct { return false; }
                 let rc = m.constructor(required_ctor);
                 let vc = m.constructor(vn.a);
                 if vc.nominal != rc.nominal || vc.tag != rc.tag { return false; }
@@ -7418,7 +7424,7 @@ recursive fn bodyValidDeferF32Nan(
             if !bodyValidDeferF32Nan(g, m, ctx, uinfo.root, required_ctor, false, false, has_f32_write, budget, inline_depth) ||
                 !bodyValidDeferF32Nan(g, m, ctx, uinfo.value, required_ctor, false, false, has_f32_write, budget, inline_depth) { return false; }
             for sel in sels {
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     if !isDeferInvariantIndex(m, ctx, sel.index, 0) { return false; }
                     if !bodyValidDeferF32Nan(g, m, ctx, sel.index, 0xffffffff, false, false, has_f32_write, budget, inline_depth) { return false; }
                 }
@@ -7427,7 +7433,7 @@ recursive fn bodyValidDeferF32Nan(
         },
         loop_ => {
             let linfo = m.loopInfo(id);
-            if linfo.kind != blot_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
+            if linfo.kind != squid_check_core::LoopKind.range || linfo.carries.len != 0 { return false; }
             if !isDeferInvariantIndex(m, ctx, linfo.first, 0) || !isDeferInvariantIndex(m, ctx, linfo.end, 0) { return false; }
             return bodyValidDeferF32Nan(g, m, ctx, linfo.first, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
                 bodyValidDeferF32Nan(g, m, ctx, linfo.end, 0xffffffff, false, false, has_f32_write, budget, inline_depth) &&
@@ -7447,16 +7453,16 @@ recursive fn bodyValidDeferF32Nan(
                 let pats = m.rowPatterns(rows[0]);
                 if pats.len != 1 { return false; }
                 let pat = m.pattern(pats[0]);
-                if pat.tag == blot_check_core::PatternTag.wildcard {
+                if pat.tag == squid_check_core::PatternTag.wildcard {
                     // Wildcard arm must be a no-op (absent, unit constant, or empty suite/block) so nothing diverges.
                     if arm.body != 0 {
                         let bn = m.node(arm.body);
-                        if bn.tag != blot_check_core::Tag.constant &&
-                            !((bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_) && bn.b == 0) {
+                        if bn.tag != squid_check_core::Tag.constant &&
+                            !((bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_) && bn.b == 0) {
                             return false;
                         }
                     }
-                } else if pat.tag == blot_check_core::PatternTag.constructor {
+                } else if pat.tag == squid_check_core::PatternTag.constructor {
                     ctor_arms += 1;
                     if ctor_arms > 1 { return false; }
                     var arm_req = required_ctor;
@@ -7502,10 +7508,10 @@ recursive fn bodyValidDeferF32Nan(
 fn isCanonicalFloatRhs(m: const Module&, id: u32) -> bool {
     if id == 0 { return false; }
     let n = m.node(id);
-    if n.tag != blot_check_core::Tag.scalar && n.tag != blot_check_core::Tag.associated { return false; }
-    if n.op == blot_check_core::Op.none || !isCanonicalF32Op(n.op) { return false; }
+    if n.tag != squid_check_core::Tag.scalar && n.tag != squid_check_core::Tag.associated { return false; }
+    if n.op == squid_check_core::Op.none || !isCanonicalF32Op(n.op) { return false; }
     let t = m.types.node(m.typeOf(n.a)).tag;
-    return t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+    return t == squid_check_types::Tag.floating32 || t == squid_check_types::Tag.floating64;
 }
 recursive fn scanScalarFloatDeferBody(
     g: const Generator&,
@@ -7554,7 +7560,7 @@ recursive fn scanScalarFloatDeferBody(
         },
         scalar => {
             let t = m.types.node(m.typeOf(n.a)).tag;
-            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
+            let is_f = t == squid_check_types::Tag.floating32 || t == squid_check_types::Tag.floating64;
             let is_v = isF32x4CoreExpr(m, n.a) || isF64x2CoreExpr(m, n.a);
             let ok = (is_f && isCanonicalF32Consumer(n.op)) || (is_v && (isCanonicalF32Consumer(n.op) || canonicalV128Producer(n.op)));
             if !ok { return false; }
@@ -7563,8 +7569,8 @@ recursive fn scanScalarFloatDeferBody(
         },
         associated => {
             let t = m.types.node(m.typeOf(n.a)).tag;
-            let is_f = t == blot_check_types::Tag.floating32 || t == blot_check_types::Tag.floating64;
-            if n.op == blot_check_core::Op.none || !is_f || !isCanonicalF32Consumer(n.op) { return false; }
+            let is_f = t == squid_check_types::Tag.floating32 || t == squid_check_types::Tag.floating64;
+            if n.op == squid_check_core::Op.none || !is_f || !isCanonicalF32Consumer(n.op) { return false; }
             return scanScalarFloatDeferBody(g, m, n.a, false, carry_backs, carry_seen, carry_len, budget) &&
                 (n.b == 0 || scanScalarFloatDeferBody(g, m, n.b, false, carry_backs, carry_seen, carry_len, budget));
         },
@@ -7578,9 +7584,9 @@ recursive fn scanScalarFloatDeferBody(
         _ => { return false; },
     }
 }
-fn canDeferScalarFloatLoop(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: blot_check_core::LoopInfo) -> bool {
-    if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return false; }
-    if info.pattern != 0 && m.pattern(info.pattern).tag != blot_check_core::PatternTag.wildcard { return false; }
+fn canDeferScalarFloatLoop(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: squid_check_core::LoopInfo) -> bool {
+    if info.kind != squid_check_core::LoopKind.range || info.body == 0 { return false; }
+    if info.pattern != 0 && m.pattern(info.pattern).tag != squid_check_core::PatternTag.wildcard { return false; }
     let carries = m.loopCarries(loop_id);
     if carries.len == 0 || carries.len > 48 { return false; }
     var carry_backs: u32[48] = [0; 48];
@@ -7589,7 +7595,7 @@ fn canDeferScalarFloatLoop(g: const Generator&, f: const Fn&, m: const Module&, 
         let cv, cok = bindGet(g, f, carry.iteration);
         if !cok { return false; }
         let tag = tagOf(g, cv.ty);
-        if tag != blot_direct_types::Tag.f32_ && tag != blot_direct_types::Tag.f64_ { return false; }
+        if tag != squid_direct_types::Tag.f32_ && tag != squid_direct_types::Tag.f64_ { return false; }
         carry_backs[ci] = carry.backedge;
     }
     var budget: i64 = 2048;
@@ -7599,16 +7605,16 @@ fn canDeferScalarFloatLoop(g: const Generator&, f: const Fn&, m: const Module&, 
     }
     return true;
 }
-fn canDeferLoopF32Nan(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: blot_check_core::LoopInfo) -> bool {
+fn canDeferLoopF32Nan(g: const Generator&, f: const Fn&, m: const Module&, loop_id: u32, info: squid_check_core::LoopInfo) -> bool {
     if canDeferScalarFloatLoop(g, f, m, loop_id, info) { return true; }
-    if info.kind != blot_check_core::LoopKind.range || info.body == 0 { return false; }
-    if info.pattern != 0 && m.pattern(info.pattern).tag != blot_check_core::PatternTag.wildcard { return false; }
+    if info.kind != squid_check_core::LoopKind.range || info.body == 0 { return false; }
+    if info.pattern != 0 && m.pattern(info.pattern).tag != squid_check_core::PatternTag.wildcard { return false; }
     let carries = m.loopCarries(loop_id);
     if carries.len > 16 { return false; }
     var ctx = DeferLoopContext {};
     for carry, ci in carries {
         let cv, cok = bindGet(g, f, carry.iteration);
-        if !cok || tagOf(g, cv.ty) != blot_direct_types::Tag.array { return false; }
+        if !cok || tagOf(g, cv.ty) != squid_direct_types::Tag.array { return false; }
         ctx.outer_carries[ci] = carry.iteration;
         ctx.outer_carry_backs[ci] = carry.backedge;
         ctx.outer_carries_len += 1;
@@ -7651,7 +7657,7 @@ recursive fn countLoopBodyNodes(m: const Module&, id: u32, count: i64&, limit: i
             let uinfo = m.updateInfo(id);
             if !countLoopBodyNodes(m, uinfo.root, count, limit) || !countLoopBodyNodes(m, uinfo.value, count, limit) { return false; }
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index && !countLoopBodyNodes(m, sel.index, count, limit) { return false; }
+                if sel.kind == squid_check_core::UpdateKind.index && !countLoopBodyNodes(m, sel.index, count, limit) { return false; }
             }
             return true;
         },
@@ -7670,21 +7676,21 @@ recursive fn collectIndexedByVar(m: const Module&, id: u32, idx_b: u32, out: u32
     match n.tag {
         array_op => {
             let ch = m.children(id);
-            if m.arrayOperation(id) == blot_backend_collection_ops::Op.get && ch.len == 2 && localRef(m, ch[1]) == idx_b {
+            if m.arrayOperation(id) == squid_backend_collection_ops::Op.get && ch.len == 2 && localRef(m, ch[1]) == idx_b {
                 addHoistCandidate(out, len, localRef(m, ch[0]));
             }
             for child in ch { collectIndexedByVar(m, child, idx_b, out, len, left); }
         },
         storage => {
             let ch = m.children(id);
-            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ch.len == 2 && localRef(m, ch[1]) == idx_b {
+            let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read && ch.len == 2 && localRef(m, ch[1]) == idx_b {
                 addHoistCandidate(out, len, localRef(m, ch[0]));
             }
             for child in ch { collectIndexedByVar(m, child, idx_b, out, len, left); }
         },
         apply => {
-            if m.node(n.a).tag == blot_check_core::Tag.project {
+            if m.node(n.a).tag == squid_check_core::Tag.project {
                 let sp = m.fieldSpelling(m.projection(m.node(n.a).b).field);
                 if sp.present && sp.value == "at" && localRef(m, n.b) == idx_b {
                     addHoistCandidate(out, len, localRef(m, m.node(n.a).a));
@@ -7696,13 +7702,13 @@ recursive fn collectIndexedByVar(m: const Module&, id: u32, idx_b: u32, out: u32
         update => {
             let uinfo = m.updateInfo(id);
             let sels = m.updateSelectors(id);
-            if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index && localRef(m, sels[0].index) == idx_b {
+            if sels.len > 0 && sels[0].kind == squid_check_core::UpdateKind.index && localRef(m, sels[0].index) == idx_b {
                 addHoistCandidate(out, len, localRef(m, uinfo.root));
             }
             collectIndexedByVar(m, uinfo.root, idx_b, out, len, left);
             collectIndexedByVar(m, uinfo.value, idx_b, out, len, left);
             for sel in sels {
-                if sel.kind == blot_check_core::UpdateKind.index { collectIndexedByVar(m, sel.index, idx_b, out, len, left); }
+                if sel.kind == squid_check_core::UpdateKind.index { collectIndexedByVar(m, sel.index, idx_b, out, len, left); }
             }
         },
         suite, block_, product, record, array => {
@@ -7743,8 +7749,8 @@ fn isBreakBody(m: const Module&, id: u32) -> bool {
     var cur = id;
     for step in 0..4 {
         let n = m.node(cur);
-        if n.tag == blot_check_core::Tag.break_ { return true; }
-        if (n.tag == blot_check_core::Tag.suite || n.tag == blot_check_core::Tag.block_) && n.b == 1 {
+        if n.tag == squid_check_core::Tag.break_ { return true; }
+        if (n.tag == squid_check_core::Tag.suite || n.tag == squid_check_core::Tag.block_) && n.b == 1 {
             cur = m.children(cur)[0];
         } else { break; }
     }
@@ -7763,18 +7769,18 @@ recursive fn extractOrExitUpperBounds(
 ) {
     if cond_id == 0 || depth > 4 || out_len >= 4 { return; }
     let cn = m.node(cond_id);
-    if cn.tag == blot_check_core::Tag.logical && cn.op == blot_check_core::Op.or_ {
+    if cn.tag == squid_check_core::Tag.logical && cn.op == squid_check_core::Op.or_ {
         extractOrExitUpperBounds(g, f, m, loop_id, cn.a, idx_out, lim_out, out_len, depth + 1);
         extractOrExitUpperBounds(g, f, m, loop_id, cn.b, idx_out, lim_out, out_len, depth + 1);
         return;
     }
-    if cn.tag == blot_check_core::Tag.scalar || (cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none) {
+    if cn.tag == squid_check_core::Tag.scalar || (cn.tag == squid_check_core::Tag.associated && cn.op != squid_check_core::Op.none) {
         var ib: u32 = 0;
         var lb: u32 = 0;
-        if cn.op == blot_check_core::Op.greater_equal {
+        if cn.op == squid_check_core::Op.greater_equal {
             ib = localRef(m, cn.a);
             lb = localRef(m, cn.b);
-        } else if cn.op == blot_check_core::Op.less_equal {
+        } else if cn.op == squid_check_core::Op.less_equal {
             ib = localRef(m, cn.b);
             lb = localRef(m, cn.a);
         }
@@ -7784,7 +7790,7 @@ recursive fn extractOrExitUpperBounds(
             if carry.iteration == lb || carry.backedge == lb { return; }
         }
         let lv, lok = bindGet(g, f, lb);
-        if !lok || tagOf(g, lv.ty) != blot_direct_types::Tag.u32_ { return; }
+        if !lok || tagOf(g, lv.ty) != squid_direct_types::Tag.u32_ { return; }
         idx_out[out_len] = ib;
         lim_out[out_len] = w(g, lv, 0);
         out_len += 1;
@@ -7793,20 +7799,20 @@ recursive fn extractOrExitUpperBounds(
 recursive fn matchAffineIndexExpr(g: const Generator&, f: const Fn&, m: const Module&, idx_node: u32, idx_b: u32) -> bool, u32, u32 {
     if idx_node == 0 { return false, 0xffffffff, 0; }
     let n = m.node(idx_node);
-    if n.tag != blot_check_core::Tag.scalar || n.op != blot_check_core::Op.add ||
-        m.types.node(m.typeOf(idx_node)).tag != blot_check_types::Tag.unsigned32 {
+    if n.tag != squid_check_core::Tag.scalar || n.op != squid_check_core::Op.add ||
+        m.types.node(m.typeOf(idx_node)).tag != squid_check_types::Tag.unsigned32 {
         return false, 0xffffffff, 0;
     }
     // Check `idx + c` or `c + idx` (1 <= c <= 4)
     let an = m.node(n.a);
     let bn = m.node(n.b);
-    if bn.tag == blot_check_core::Tag.constant && bn.a >= 1 && bn.a <= 4 {
+    if bn.tag == squid_check_core::Tag.constant && bn.a >= 1 && bn.a <= 4 {
         if localRef(m, n.a) == idx_b { return true, 0xffffffff, bn.a; }
         // `(base + idx) + c`
         let ok2, base2, c2 = matchAffineIndexExpr(g, f, m, n.a, idx_b);
         if ok2 && c2 + bn.a <= 4 { return true, base2, c2 + bn.a; }
     }
-    if an.tag == blot_check_core::Tag.constant && an.a >= 1 && an.a <= 4 {
+    if an.tag == squid_check_core::Tag.constant && an.a >= 1 && an.a <= 4 {
         if localRef(m, n.b) == idx_b { return true, 0xffffffff, an.a; }
         let ok2, base2, c2 = matchAffineIndexExpr(g, f, m, n.b, idx_b);
         if ok2 && c2 + an.a <= 4 { return true, base2, c2 + an.a; }
@@ -7818,7 +7824,7 @@ recursive fn matchAffineIndexExpr(g: const Generator&, f: const Fn&, m: const Mo
     if base_b != 0 && base_b != idx_b {
         let _, ic = withCellType(g, f, base_b);
         let bv, bok = bindGet(g, f, base_b);
-        if !ic && bok && bv.ty == blot_direct_types::u32_ {
+        if !ic && bok && bv.ty == squid_direct_types::u32_ {
             return true, w(g, bv, 0), 0;
         }
     }
@@ -7828,26 +7834,26 @@ recursive fn matchAffineIndexExpr(g: const Generator&, f: const Fn&, m: const Mo
 fn matchMaskLocal(g: const Generator&, f: const Fn&, m: const Module&, idx_node: u32) -> u32 {
     if idx_node == 0 { return 0xffffffff; }
     let n = m.node(idx_node);
-    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
-        n.op == blot_check_core::Op.bit_and &&
-        m.types.node(m.typeOf(idx_node)).tag == blot_check_types::Tag.unsigned32 {
+    if (n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) &&
+        n.op == squid_check_core::Op.bit_and &&
+        m.types.node(m.typeOf(idx_node)).tag == squid_check_types::Tag.unsigned32 {
         let rb = localRef(m, n.b);
         if rb != 0 {
             let _, ic = withCellType(g, f, rb);
             let rv, rok = bindGet(g, f, rb);
-            if !ic && rok && rv.ty == blot_direct_types::u32_ { return w(g, rv, 0); }
+            if !ic && rok && rv.ty == squid_direct_types::u32_ { return w(g, rv, 0); }
         }
         let lb = localRef(m, n.a);
         if lb != 0 {
             let _, ic = withCellType(g, f, lb);
             let lv, lok = bindGet(g, f, lb);
-            if !ic && lok && lv.ty == blot_direct_types::u32_ { return w(g, lv, 0); }
+            if !ic && lok && lv.ty == squid_direct_types::u32_ { return w(g, lv, 0); }
         }
     }
     let ib = localRef(m, idx_node);
     if ib != 0 {
         let iv, iok = bindGet(g, f, ib);
-        if iok && iv.len == 1 && iv.ty == blot_direct_types::u32_ {
+        if iok && iv.len == 1 && iv.ty == squid_direct_types::u32_ {
             let cm = findCheckedMask(f, w(g, iv, 0));
             if cm >= 0 && f.checked_masks[cm].max_local != 0xffffffff {
                 return f.checked_masks[cm].max_local;
@@ -7861,18 +7867,18 @@ fn matchMaskLocal(g: const Generator&, f: const Fn&, m: const Module&, idx_node:
 fn exprMaskedByLocal(g: const Generator&, f: const Fn&, m: const Module&, expr_id: u32, mask_loc: u32) -> bool {
     if expr_id == 0 { return false; }
     let n = m.node(expr_id);
-    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
-        n.op == blot_check_core::Op.bit_and &&
-        m.types.node(m.typeOf(expr_id)).tag == blot_check_types::Tag.unsigned32 {
+    if (n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) &&
+        n.op == squid_check_core::Op.bit_and &&
+        m.types.node(m.typeOf(expr_id)).tag == squid_check_types::Tag.unsigned32 {
         let rb = localRef(m, n.b);
         if rb != 0 {
             let rv, rok = bindGet(g, f, rb);
-            if rok && rv.len == 1 && rv.ty == blot_direct_types::u32_ && w(g, rv, 0) == mask_loc { return true; }
+            if rok && rv.len == 1 && rv.ty == squid_direct_types::u32_ && w(g, rv, 0) == mask_loc { return true; }
         }
         let lb = localRef(m, n.a);
         if lb != 0 {
             let lv, lok = bindGet(g, f, lb);
-            if lok && lv.len == 1 && lv.ty == blot_direct_types::u32_ && w(g, lv, 0) == mask_loc { return true; }
+            if lok && lv.len == 1 && lv.ty == squid_direct_types::u32_ && w(g, lv, 0) == mask_loc { return true; }
         }
     }
     return false;
@@ -7911,7 +7917,7 @@ recursive fn scanBindingMaskProof(
                 if rb != 0 {
                     for oi in 0..ok_len { if ok_bs[oi] == rb { return; } }
                     let rv, rok = bindGet(g, f, rb);
-                    if rok && rv.len == 1 && rv.ty == blot_direct_types::u32_ {
+                    if rok && rv.len == 1 && rv.ty == squid_direct_types::u32_ {
                         let cm = findCheckedMask(f, w(g, rv, 0));
                         if cm >= 0 && f.checked_masks[cm].max_local == mask_loc { return; }
                     }
@@ -7962,9 +7968,9 @@ recursive fn scanBindingMaskProof(
 
 fn matchVarMinusConstOne(m: const Module&, expr_id: u32, var_b: u32) -> bool {
     let n = m.node(expr_id);
-    if (n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) ||
-        n.op != blot_check_core::Op.sub { return false; }
-    return localRef(m, n.a) == var_b && m.node(n.b).tag == blot_check_core::Tag.constant && m.node(n.b).a == 1;
+    if (n.tag != squid_check_core::Tag.scalar && !(n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) ||
+        n.op != squid_check_core::Op.sub { return false; }
+    return localRef(m, n.a) == var_b && m.node(n.b).tag == squid_check_core::Tag.constant && m.node(n.b).a == 1;
 }
 
 recursive fn findSingleBindRhs(m: const Module&, id: u32, target_b: u32, depth: i64) -> u32 {
@@ -7990,35 +7996,35 @@ recursive fn findSingleBindRhs(m: const Module&, id: u32, target_b: u32, depth: 
 // `if`, `break`, `return`, or loop (e.g. `let s = slots[idx]` or `j := ...; let s = slots[j]`).
 fn loopUnconditionallyIndexesArr(m: const Module&, body_id: u32, arr_b: u32) -> bool {
     let bn = m.node(body_id);
-    if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false; }
+    if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return false; }
     let ch = m.children(body_id);
     let limit = if ch.len < 3 { ch.len } else { 3 };
     for i in 0..limit {
         let sn = m.node(ch[i]);
-        if sn.tag == blot_check_core::Tag.bind && sn.c < 2 {
+        if sn.tag == squid_check_core::Tag.bind && sn.c < 2 {
             let rn = m.node(sn.b);
-            if rn.tag == blot_check_core::Tag.array_op && m.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+            if rn.tag == squid_check_core::Tag.array_op && m.arrayOperation(sn.b) == squid_backend_collection_ops::Op.get {
                 let ach = m.children(sn.b);
                 if ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
-            } else if rn.tag == blot_check_core::Tag.storage {
-                let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+            } else if rn.tag == squid_check_core::Tag.storage {
+                let op_k, ok = squid_check_storage_ops::opFromCode(rn.c);
                 let ach = m.children(sn.b);
-                if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
-            } else if rn.tag == blot_check_core::Tag.scalar || (rn.tag == blot_check_core::Tag.associated && rn.op != blot_check_core::Op.none) ||
-                rn.tag == blot_check_core::Tag.constant || rn.tag == blot_check_core::Tag.reference {
+                if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+            } else if rn.tag == squid_check_core::Tag.scalar || (rn.tag == squid_check_core::Tag.associated && rn.op != squid_check_core::Op.none) ||
+                rn.tag == squid_check_core::Tag.constant || rn.tag == squid_check_core::Tag.reference {
                 continue;
             } else {
                 return false;
             }
-        } else if sn.tag == blot_check_core::Tag.pattern_bind {
+        } else if sn.tag == squid_check_core::Tag.pattern_bind {
             let rn = m.node(sn.b);
-            if rn.tag == blot_check_core::Tag.array_op && m.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+            if rn.tag == squid_check_core::Tag.array_op && m.arrayOperation(sn.b) == squid_backend_collection_ops::Op.get {
                 let ach = m.children(sn.b);
                 if ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
-            } else if rn.tag == blot_check_core::Tag.storage {
-                let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+            } else if rn.tag == squid_check_core::Tag.storage {
+                let op_k, ok = squid_check_storage_ops::opFromCode(rn.c);
                 let ach = m.children(sn.b);
-                if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
+                if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read && ach.len == 2 && localRef(m, ach[0]) == arr_b { return true; }
             }
             return false;
         } else {
@@ -8071,26 +8077,26 @@ recursive fn collectAffineAndMaskBounds(
     let n = m.node(id);
     var arr_b: u32 = 0;
     var idx_n: u32 = 0;
-    if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(id) == blot_backend_collection_ops::Op.get {
+    if n.tag == squid_check_core::Tag.array_op && m.arrayOperation(id) == squid_backend_collection_ops::Op.get {
         let ch = m.children(id);
         if ch.len == 2 { arr_b = localRef(m, ch[0]); idx_n = ch[1]; }
-    } else if n.tag == blot_check_core::Tag.storage {
-        let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
-        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read {
+    } else if n.tag == squid_check_core::Tag.storage {
+        let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+        if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read {
             let ch = m.children(id);
             if ch.len == 2 { arr_b = localRef(m, ch[0]); idx_n = ch[1]; }
         }
-    } else if n.tag == blot_check_core::Tag.update {
+    } else if n.tag == squid_check_core::Tag.update {
         let uinfo = m.updateInfo(id);
         let sels = m.updateSelectors(id);
-        if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index {
+        if sels.len > 0 && sels[0].kind == squid_check_core::UpdateKind.index {
             arr_b = localRef(m, uinfo.root);
             idx_n = sels[0].index;
         }
     }
     if arr_b != 0 && idx_n != 0 {
         let av, aok = bindGet(g, f, arr_b);
-        if aok && tagOf(g, av.ty) == blot_direct_types::Tag.array {
+        if aok && tagOf(g, av.ty) == squid_direct_types::Tag.array {
             let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
             if ca >= 0 {
                 let clen = f.checked_arrays[ca].length;
@@ -8136,7 +8142,7 @@ recursive fn collectAffineAndMaskBounds(
             let uinfo = m.updateInfo(id);
             collectAffineAndMaskBounds(g, f, m, uinfo.value, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
             for sel in m.updateSelectors(id) {
-                if sel.kind == blot_check_core::UpdateKind.index {
+                if sel.kind == squid_check_core::UpdateKind.index {
                     collectAffineAndMaskBounds(g, f, m, sel.index, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
                 }
             }
@@ -8160,7 +8166,7 @@ fn collectLoopPreBounds(
     f: const Fn&,
     m: const Module&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     range: CheckedRange,
     le_a: u32[4]&,
     le_b: u32[4]&,
@@ -8179,16 +8185,16 @@ fn collectLoopPreBounds(
 ) {
     var nodes: i64 = 0;
     if !countLoopBodyNodes(m, info.body, nodes, max_nodes) { return; }
-    if info.kind == blot_check_core::LoopKind.range && range.end_local != 0xffffffff && info.pattern != 0 {
+    if info.kind == squid_check_core::LoopKind.range && range.end_local != 0xffffffff && info.pattern != 0 {
         let pat = m.pattern(info.pattern);
-        if pat.tag != blot_check_core::PatternTag.bind { return; }
+        if pat.tag != squid_check_core::PatternTag.bind { return; }
         var arr_bs: u32[8] = [0; 8];
         var arr_len: i64 = 0;
         var bud: i64 = 128;
         collectIndexedByVar(m, info.body, pat.a, arr_bs, arr_len, bud);
         for ai in 0..arr_len {
             let av, aok = bindGet(g, f, arr_bs[ai]);
-            if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+            if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
             let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
             if ca < 0 { continue; }
             let clen = f.checked_arrays[ca].length;
@@ -8199,15 +8205,15 @@ fn collectLoopPreBounds(
         collectAffineAndMaskBounds(g, f, m, info.body, pat.a, range.end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, abud);
         return;
     }
-    if info.kind == blot_check_core::LoopKind.forever {
+    if info.kind == squid_check_core::LoopKind.forever {
         var abud: i64 = 160;
         collectAffineAndMaskBounds(g, f, m, info.body, 0, 0xffffffff, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, abud);
         let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return; }
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return; }
         let ch = m.children(info.body);
         if ch.len == 0 { return; }
         let first_n = m.node(ch[0]);
-        if first_n.tag != blot_check_core::Tag.if_stmt || first_n.c != 0 || !isBreakBody(m, first_n.b) { return; }
+        if first_n.tag != squid_check_core::Tag.if_stmt || first_n.c != 0 || !isBreakBody(m, first_n.b) { return; }
         var idx_bs: u32[4] = [0; 4];
         var lim_locs: u32[4] = [0; 4];
         var gb_len: i64 = 0;
@@ -8219,7 +8225,7 @@ fn collectLoopPreBounds(
             collectIndexedByVar(m, info.body, idx_bs[gi], arr_bs, arr_len, bud);
             for ai in 0..arr_len {
                 let av, aok = bindGet(g, f, arr_bs[ai]);
-                if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+                if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
                 let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
                 if ca < 0 { continue; }
                 let clen = f.checked_arrays[ca].length;
@@ -8231,11 +8237,11 @@ fn collectLoopPreBounds(
         // Inside the loop `0 <= lo < hi <= hi_init`, so checking `hi_init < arr.length`
         // once before the loop proves both `arr[lo]` and `arr[hi]` in-bounds.
         let cn = m.node(first_n.a);
-        if (cn.tag == blot_check_core::Tag.scalar || (cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none)) &&
-            (cn.op == blot_check_core::Op.greater_equal || cn.op == blot_check_core::Op.less_equal) {
+        if (cn.tag == squid_check_core::Tag.scalar || (cn.tag == squid_check_core::Tag.associated && cn.op != squid_check_core::Op.none)) &&
+            (cn.op == squid_check_core::Op.greater_equal || cn.op == squid_check_core::Op.less_equal) {
             var lo_b: u32 = 0;
             var hi_b: u32 = 0;
-            if cn.op == blot_check_core::Op.greater_equal { lo_b = localRef(m, cn.a); hi_b = localRef(m, cn.b); }
+            if cn.op == squid_check_core::Op.greater_equal { lo_b = localRef(m, cn.a); hi_b = localRef(m, cn.b); }
             else { lo_b = localRef(m, cn.b); hi_b = localRef(m, cn.a); }
             if lo_b != 0 && hi_b != 0 && lo_b != hi_b {
                 let carries = m.loopCarries(loop_id);
@@ -8251,7 +8257,7 @@ fn collectLoopPreBounds(
                     if lo_rhs != 0 && hi_rhs != 0 && matchVarPlusConstOne(m, lo_rhs, lo_b) && matchVarMinusConstOne(m, hi_rhs, hi_b) {
                         let lo_v, lo_ok = bindGet(g, f, lo_b);
                         let hi_v, hi_ok = bindGet(g, f, hi_b);
-                        if lo_ok && hi_ok && lo_v.ty == blot_direct_types::u32_ && hi_v.ty == blot_direct_types::u32_ {
+                        if lo_ok && hi_ok && lo_v.ty == squid_direct_types::u32_ && hi_v.ty == squid_direct_types::u32_ {
                             var arr_bs: u32[8] = [0; 8];
                             var arr_len: i64 = 0;
                             var bud1: i64 = 128;
@@ -8262,7 +8268,7 @@ fn collectLoopPreBounds(
                             let hi_loc = w(g, hi_v, 0);
                             for ai in 0..arr_len {
                                 let av, aok = bindGet(g, f, arr_bs[ai]);
-                                if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+                                if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
                                 let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
                                 if ca < 0 { continue; }
                                 let clen = f.checked_arrays[ca].length;
@@ -8304,7 +8310,7 @@ recursive fn scanPureScalarForever(g: const Generator&, m: const Module&, id: u3
             return scanPureScalarForever(g, m, n.b, has_break, budget);
         },
         scalar, associated, logical => {
-            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.none { return false; }
             return scanPureScalarForever(g, m, n.a, has_break, budget) &&
                 scanPureScalarForever(g, m, n.b, has_break, budget);
         },
@@ -8338,68 +8344,68 @@ fn isPureScalarForeverBody(g: const Generator&, m: const Module&, body: u32) -> 
 //     k := k + 1
 fn matchVarPlusConstOne(m: const Module&, expr_id: u32, var_b: u32) -> bool {
     let n = m.node(expr_id);
-    if (n.tag != blot_check_core::Tag.scalar && !(n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) ||
-        n.op != blot_check_core::Op.add { return false; }
-    if localRef(m, n.a) == var_b && m.node(n.b).tag == blot_check_core::Tag.constant && m.node(n.b).a == 1 { return true; }
-    if localRef(m, n.b) == var_b && m.node(n.a).tag == blot_check_core::Tag.constant && m.node(n.a).a == 1 { return true; }
+    if (n.tag != squid_check_core::Tag.scalar && !(n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) ||
+        n.op != squid_check_core::Op.add { return false; }
+    if localRef(m, n.a) == var_b && m.node(n.b).tag == squid_check_core::Tag.constant && m.node(n.b).a == 1 { return true; }
+    if localRef(m, n.b) == var_b && m.node(n.a).tag == squid_check_core::Tag.constant && m.node(n.a).a == 1 { return true; }
     return false;
 }
 fn tryEmitCopyTailLoop(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     carry_in_place: const bool[64]&,
 ) -> bool, Error {
-    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.forever || info.body == 0 {
-        return false, blot_direct_types::Error.none;
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.forever || info.body == 0 {
+        return false, squid_direct_types::Error.none;
     }
     var i_ci: i64 = -1;
     var k_ci: i64 = -1;
     var lim_id: u32 = 0;
     var src_b: u32 = 0;
     var dst_b: u32 = 0;
-    var elem_tag = blot_direct_types::Tag.unit;
+    var elem_tag = squid_direct_types::Tag.unit;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
         let carries = m.loopCarries(loop_id);
-        if carries.len < 2 || carries.len > 64 { return false, blot_direct_types::Error.none; }
+        if carries.len < 2 || carries.len > 64 { return false, squid_direct_types::Error.none; }
         var u32_cis: i64[2] = [-1; 2];
         var u32_count: i64 = 0;
         for carry, ci in carries {
             if !carry_in_place[ci] {
-                if u32_count >= 2 { return false, blot_direct_types::Error.none; }
+                if u32_count >= 2 { return false, squid_direct_types::Error.none; }
                 let iv = g.s.vals[iteration.start + ci];
-                if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return false, blot_direct_types::Error.none; }
+                if iv.len != 1 || tagOf(g, iv.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
                 u32_cis[u32_count] = ci;
                 u32_count += 1;
             }
         }
-        if u32_count != 2 { return false, blot_direct_types::Error.none; }
+        if u32_count != 2 { return false, squid_direct_types::Error.none; }
 
         let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false, blot_direct_types::Error.none; }
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return false, squid_direct_types::Error.none; }
         let ch = m.children(info.body);
-        if ch.len != 4 { return false, blot_direct_types::Error.none; }
+        if ch.len != 4 { return false, squid_direct_types::Error.none; }
 
         // Stmt 0: `if i >= lim: break`
         let s0 = m.node(ch[0]);
-        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, blot_direct_types::Error.none; }
+        if s0.tag != squid_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, squid_direct_types::Error.none; }
         let cn = m.node(s0.a);
-        if cn.tag != blot_check_core::Tag.scalar && !(cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none) {
-            return false, blot_direct_types::Error.none;
+        if cn.tag != squid_check_core::Tag.scalar && !(cn.tag == squid_check_core::Tag.associated && cn.op != squid_check_core::Op.none) {
+            return false, squid_direct_types::Error.none;
         }
         var guard_var_b: u32 = 0;
-        if cn.op == blot_check_core::Op.greater_equal {
+        if cn.op == squid_check_core::Op.greater_equal {
             guard_var_b = localRef(m, cn.a);
             lim_id = cn.b;
-        } else if cn.op == blot_check_core::Op.less_equal {
+        } else if cn.op == squid_check_core::Op.less_equal {
             guard_var_b = localRef(m, cn.b);
             lim_id = cn.a;
         } else {
-            return false, blot_direct_types::Error.none;
+            return false, squid_direct_types::Error.none;
         }
         if guard_var_b == carries[u32_cis[0]].iteration {
             i_ci = u32_cis[0];
@@ -8408,31 +8414,31 @@ fn tryEmitCopyTailLoop(
             i_ci = u32_cis[1];
             k_ci = u32_cis[0];
         } else {
-            return false, blot_direct_types::Error.none;
+            return false, squid_direct_types::Error.none;
         }
         let i_iter = carries[i_ci].iteration;
         let k_iter = carries[k_ci].iteration;
         let lim_ref = localRef(m, lim_id);
-        if lim_ref == 0 && m.node(lim_id).tag != blot_check_core::Tag.constant { return false, blot_direct_types::Error.none; }
-        if lim_ref == i_iter || lim_ref == k_iter { return false, blot_direct_types::Error.none; }
+        if lim_ref == 0 && m.node(lim_id).tag != squid_check_core::Tag.constant { return false, squid_direct_types::Error.none; }
+        if lim_ref == i_iter || lim_ref == k_iter { return false, squid_direct_types::Error.none; }
 
         // Stmt 1: `dst[k] := src[i]`
         var upd_id: u32 = 0;
         let s1 = m.node(ch[1]);
-        if s1.tag == blot_check_core::Tag.update { upd_id = ch[1]; }
-        else if s1.tag == blot_check_core::Tag.bind && s1.c < 2 && m.node(s1.b).tag == blot_check_core::Tag.update { upd_id = s1.b; }
-        else { return false, blot_direct_types::Error.none; }
+        if s1.tag == squid_check_core::Tag.update { upd_id = ch[1]; }
+        else if s1.tag == squid_check_core::Tag.bind && s1.c < 2 && m.node(s1.b).tag == squid_check_core::Tag.update { upd_id = s1.b; }
+        else { return false, squid_direct_types::Error.none; }
         let uinfo = m.updateInfo(upd_id);
         let sels = m.updateSelectors(upd_id);
-        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index || localRef(m, sels[0].index) != k_iter {
-            return false, blot_direct_types::Error.none;
+        if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index || localRef(m, sels[0].index) != k_iter {
+            return false, squid_direct_types::Error.none;
         }
-        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, blot_direct_types::Error.none; }
+        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return false, squid_direct_types::Error.none; }
         dst_b = localRef(m, uinfo.root);
         let gok, src_n, src_idx_n = matchArrayGet(m, uinfo.value);
-        if !gok || localRef(m, src_idx_n) != i_iter { return false, blot_direct_types::Error.none; }
+        if !gok || localRef(m, src_idx_n) != i_iter { return false, squid_direct_types::Error.none; }
         src_b = localRef(m, src_n);
-        if src_b == 0 || dst_b == 0 { return false, blot_direct_types::Error.none; }
+        if src_b == 0 || dst_b == 0 { return false, squid_direct_types::Error.none; }
 
         // Stmts 2 & 3: `i_back := i + 1` and `k_back := k + 1` in either order.
         let i_back = carries[i_ci].backedge;
@@ -8441,37 +8447,37 @@ fn tryEmitCopyTailLoop(
         var saw_k = false;
         for si in 2..4 {
             let sn = m.node(ch[si]);
-            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 { return false, blot_direct_types::Error.none; }
+            if sn.tag != squid_check_core::Tag.bind || sn.c >= 2 { return false, squid_direct_types::Error.none; }
             if sn.a == i_back && matchVarPlusConstOne(m, sn.b, i_iter) { saw_i = true; }
             else if sn.a == k_back && matchVarPlusConstOne(m, sn.b, k_iter) { saw_k = true; }
-            else { return false, blot_direct_types::Error.none; }
+            else { return false, squid_direct_types::Error.none; }
         }
-        if !saw_i || !saw_k { return false, blot_direct_types::Error.none; }
+        if !saw_i || !saw_k { return false, squid_direct_types::Error.none; }
 
         let sv, sok = bindGet(g, f, src_b);
         let dv, dok = bindGet(g, f, dst_b);
-        if !sok || !dok || tagOf(g, sv.ty) != blot_direct_types::Tag.array || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
-            return false, blot_direct_types::Error.none;
+        if !sok || !dok || tagOf(g, sv.ty) != squid_direct_types::Tag.array || tagOf(g, dv.ty) != squid_direct_types::Tag.array {
+            return false, squid_direct_types::Error.none;
         }
         let sda = findDirectArrayBySlot(f, w(g, sv, 0));
         let dda = findDirectArrayBySlot(f, w(g, dv, 0));
         if (sda >= 0 && f.direct_arrays[sda].scalar_packed) || (dda >= 0 && f.direct_arrays[dda].scalar_packed) {
-            return false, blot_direct_types::Error.none;
+            return false, squid_direct_types::Error.none;
         }
         let s_et = tagOf(g, g.types.node(sv.ty).a);
         let d_et = tagOf(g, g.types.node(dv.ty).a);
-        if s_et != d_et || !isScalarTag(s_et) { return false, blot_direct_types::Error.none; }
+        if s_et != d_et || !isScalarTag(s_et) { return false, squid_direct_types::Error.none; }
         elem_tag = s_et;
         matched = true;
     }
-    if !matched { return false, blot_direct_types::Error.none; }
+    if !matched { return false, squid_direct_types::Error.none; }
 
     let sv, _ = bindGet(g, f, src_b);
     let dv, _ = bindGet(g, f, dst_b);
     let src_base, src_len = ensureCheckedArray(g, f, sv);
     let dst_base, dst_len = ensureCheckedArray(g, f, dv);
     let lim_v, lerr = expr(g, f, lim_id);
-    if lerr != blot_direct_types::Error.none { return false, lerr; }
+    if lerr != squid_direct_types::Error.none { return false, lerr; }
     let lim_loc = w(g, lim_v, 0);
     let i_loc = w(g, g.s.vals[iteration.start + i_ci], 0);
     let k_loc = w(g, g.s.vals[iteration.start + k_ci], 0);
@@ -8488,7 +8494,7 @@ fn tryEmitCopyTailLoop(
 
     let bytes = local32(g, f);
     let elem_kind = localKindForScalar(g, g.types.node(sv.ty).a);
-    let shift = if blot_direct_writer::wordBytes(elem_kind) == 8 { 3 as u32 } else { 2 as u32 };
+    let shift = if squid_direct_writer::wordBytes(elem_kind) == 8 { 3 as u32 } else { 2 as u32 };
     lget(g, count);
     if !byteElement(elem_tag) { i32Const(g, shift); op(g, OP_i32_shl); }
     lset(g, bytes);
@@ -8530,20 +8536,20 @@ fn tryEmitCopyTailLoop(
     popCheckedArraysAt(f, g1);
     close(g, f);
     f.checked_elems_len = 0;
-    return true, blot_direct_types::Error.none;
+    return true, squid_direct_types::Error.none;
 }
 
 // 5A: Prove `k < dst_len` across a 2-way merge loop via invariant `k + (mid - i) + (hi - j) <= dst_len`.
 fn matchBindPlusOneInBody(m: const Module&, body_id: u32, target_b: u32, src_b: u32) -> bool {
     if body_id == 0 { return false; }
     let bn = m.node(body_id);
-    if bn.tag == blot_check_core::Tag.bind && bn.c < 2 && bn.a == target_b {
+    if bn.tag == squid_check_core::Tag.bind && bn.c < 2 && bn.a == target_b {
         return matchVarPlusConstOne(m, bn.b, src_b);
     }
-    if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+    if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
         for ch in m.children(body_id) {
             let cn = m.node(ch);
-            if cn.tag == blot_check_core::Tag.bind && cn.c < 2 && cn.a == target_b {
+            if cn.tag == squid_check_core::Tag.bind && cn.c < 2 && cn.a == target_b {
                 return matchVarPlusConstOne(m, cn.b, src_b);
             }
         }
@@ -8554,15 +8560,15 @@ fn tryEmitFastMergeLoop(
     g: Generator&,
     f: Fn&,
     id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     outgoing: Vals,
     slots: Words,
     range: CheckedRange,
     carry_in_place: const bool[64]&,
 ) -> bool, Error {
-    if g.runtime_().has_fork || f.in_specialized_loop || info.kind != blot_check_core::LoopKind.forever || info.body == 0 {
-        return false, blot_direct_types::Error.none;
+    if g.runtime_().has_fork || f.in_specialized_loop || info.kind != squid_check_core::LoopKind.forever || info.body == 0 {
+        return false, squid_direct_types::Error.none;
     }
     var i_ci: i64 = -1;
     var j_ci: i64 = -1;
@@ -8575,35 +8581,35 @@ fn tryEmitFastMergeLoop(
     var dst_base: u32 = 0;
     var fast_ptr_merge = false;
     var fast_merge_signed = false;
-    var fast_merge_op = blot_check_core::Op.less_equal;
+    var fast_merge_op = squid_check_core::Op.less_equal;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
         let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false, blot_direct_types::Error.none; }
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return false, squid_direct_types::Error.none; }
         let ch = m.children(info.body);
-        if ch.len != 3 { return false, blot_direct_types::Error.none; }
+        if ch.len != 3 { return false, squid_direct_types::Error.none; }
         let s0 = m.node(ch[0]);
-        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, blot_direct_types::Error.none; }
+        if s0.tag != squid_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return false, squid_direct_types::Error.none; }
         var idx_bs: u32[4] = [0; 4];
         var lim_locs: u32[4] = [0; 4];
         var gb_len: i64 = 0;
         extractOrExitUpperBounds(g, f, m, id, s0.a, idx_bs, lim_locs, gb_len, 0);
-        if gb_len != 2 || idx_bs[0] == idx_bs[1] { return false, blot_direct_types::Error.none; }
+        if gb_len != 2 || idx_bs[0] == idx_bs[1] { return false, squid_direct_types::Error.none; }
 
         let carries = m.loopCarries(id);
-        if carries.len < 3 || carries.len > 64 { return false, blot_direct_types::Error.none; }
+        if carries.len < 3 || carries.len > 64 { return false, squid_direct_types::Error.none; }
         for carry, ci in carries {
             if carry.iteration == idx_bs[0] { i_ci = ci; }
             else if carry.iteration == idx_bs[1] { j_ci = ci; }
             else if !carry_in_place[ci] {
-                if k_ci >= 0 { return false, blot_direct_types::Error.none; }
+                if k_ci >= 0 { return false, squid_direct_types::Error.none; }
                 let iv = g.s.vals[iteration.start + ci];
-                if iv.len != 1 || tagOf(g, iv.ty) != blot_direct_types::Tag.u32_ { return false, blot_direct_types::Error.none; }
+                if iv.len != 1 || tagOf(g, iv.ty) != squid_direct_types::Tag.u32_ { return false, squid_direct_types::Error.none; }
                 k_ci = ci;
             }
         }
-        if i_ci < 0 || j_ci < 0 || k_ci < 0 { return false, blot_direct_types::Error.none; }
+        if i_ci < 0 || j_ci < 0 || k_ci < 0 { return false, squid_direct_types::Error.none; }
         let i_iter = carries[i_ci].iteration;
         let j_iter = carries[j_ci].iteration;
         let k_iter = carries[k_ci].iteration;
@@ -8611,33 +8617,33 @@ fn tryEmitFastMergeLoop(
 
         // Stmt 2: `k_back := k + 1`
         let s2 = m.node(ch[2]);
-        if s2.tag != blot_check_core::Tag.bind || s2.c >= 2 || s2.a != k_back || !matchVarPlusConstOne(m, s2.b, k_iter) {
-            return false, blot_direct_types::Error.none;
+        if s2.tag != squid_check_core::Tag.bind || s2.c >= 2 || s2.a != k_back || !matchVarPlusConstOne(m, s2.b, k_iter) {
+            return false, squid_direct_types::Error.none;
         }
 
         // Stmt 1: `if cond: ... i += 1 else: ... j += 1` (not touching k)
         let s1 = m.node(ch[1]);
-        if s1.tag != blot_check_core::Tag.if_stmt || s1.c == 0 { return false, blot_direct_types::Error.none; }
+        if s1.tag != squid_check_core::Tag.if_stmt || s1.c == 0 { return false, squid_direct_types::Error.none; }
         var i_adv_t = false;
         var j_adv_e = false;
         var i_adv_e = false;
         var j_adv_t = false;
         for merge in m.branchMerges(ch[1]) {
             if merge.result == k_back || merge.then_binding == k_iter || merge.else_binding == k_iter {
-                return false, blot_direct_types::Error.none;
+                return false, squid_direct_types::Error.none;
             }
             if merge.result == carries[i_ci].backedge {
                 if matchBindPlusOneInBody(m, s1.b, merge.then_binding, i_iter) && merge.else_binding == i_iter { i_adv_t = true; }
                 else if merge.then_binding == i_iter && matchBindPlusOneInBody(m, s1.c, merge.else_binding, i_iter) { i_adv_e = true; }
-                else { return false, blot_direct_types::Error.none; }
+                else { return false, squid_direct_types::Error.none; }
             }
             if merge.result == carries[j_ci].backedge {
                 if merge.then_binding == j_iter && matchBindPlusOneInBody(m, s1.c, merge.else_binding, j_iter) { j_adv_e = true; }
                 else if matchBindPlusOneInBody(m, s1.b, merge.then_binding, j_iter) && merge.else_binding == j_iter { j_adv_t = true; }
-                else { return false, blot_direct_types::Error.none; }
+                else { return false, squid_direct_types::Error.none; }
             }
         }
-        if !((i_adv_t && j_adv_e) || (i_adv_e && j_adv_t)) { return false, blot_direct_types::Error.none; }
+        if !((i_adv_t && j_adv_e) || (i_adv_e && j_adv_t)) { return false, squid_direct_types::Error.none; }
 
         // Resolve CheckedArray lengths for arrays indexed by i/j (src) and k (dst).
         var src_arrs: u32[8] = [0; 8];
@@ -8649,15 +8655,15 @@ fn tryEmitFastMergeLoop(
         var dst_len_c: i64 = 0;
         var b2: i64 = 128;
         collectIndexedByVar(m, ch[1], k_iter, dst_arrs, dst_len_c, b2);
-        if src_len_c != 1 || dst_len_c != 1 { return false, blot_direct_types::Error.none; }
+        if src_len_c != 1 || dst_len_c != 1 { return false, squid_direct_types::Error.none; }
         let sv, sok = bindGet(g, f, src_arrs[0]);
         let dv, dok = bindGet(g, f, dst_arrs[0]);
-        if !sok || !dok || tagOf(g, sv.ty) != blot_direct_types::Tag.array || tagOf(g, dv.ty) != blot_direct_types::Tag.array {
-            return false, blot_direct_types::Error.none;
+        if !sok || !dok || tagOf(g, sv.ty) != squid_direct_types::Tag.array || tagOf(g, dv.ty) != squid_direct_types::Tag.array {
+            return false, squid_direct_types::Error.none;
         }
         let sca = findCheckedArray(f, w(g, sv, 0), w(g, sv, 1));
         let dca = findCheckedArray(f, w(g, dv, 0), w(g, dv, 1));
-        if sca < 0 || dca < 0 { return false, blot_direct_types::Error.none; }
+        if sca < 0 || dca < 0 { return false, squid_direct_types::Error.none; }
         mid_loc = lim_locs[0];
         hi_loc = lim_locs[1];
         src_len = f.checked_arrays[sca].length;
@@ -8668,14 +8674,14 @@ fn tryEmitFastMergeLoop(
         // (`if src[i] (<=|<|>=|>) src[j]: dst[k] := src[i]; i += 1 else: dst[k] := src[j]; j += 1`)
         // so we can emit a zero-shift 2x-unrolled byte-pointer branchless loop!
         if i_adv_t && j_adv_e &&
-            tagOf(g, g.types.node(sv.ty).a) == blot_direct_types::Tag.u32_ &&
-            tagOf(g, g.types.node(dv.ty).a) == blot_direct_types::Tag.u32_ {
+            tagOf(g, g.types.node(sv.ty).a) == squid_direct_types::Tag.u32_ &&
+            tagOf(g, g.types.node(dv.ty).a) == squid_direct_types::Tag.u32_ {
             let cond = m.node(s1.a);
-            let is_cmp = (cond.tag == blot_check_core::Tag.scalar || (cond.tag == blot_check_core::Tag.associated && cond.op != blot_check_core::Op.none)) &&
-                (cond.op == blot_check_core::Op.less || cond.op == blot_check_core::Op.less_equal ||
-                 cond.op == blot_check_core::Op.greater || cond.op == blot_check_core::Op.greater_equal);
+            let is_cmp = (cond.tag == squid_check_core::Tag.scalar || (cond.tag == squid_check_core::Tag.associated && cond.op != squid_check_core::Op.none)) &&
+                (cond.op == squid_check_core::Op.less || cond.op == squid_check_core::Op.less_equal ||
+                 cond.op == squid_check_core::Op.greater || cond.op == squid_check_core::Op.greater_equal);
             let cmp_ty = m.types.node(m.typeOf(cond.a)).tag;
-            if is_cmp && cmp_ty == blot_check_types::Tag.unsigned32 {
+            if is_cmp && cmp_ty == squid_check_types::Tag.unsigned32 {
                 let la_ok, la_a, la_i = matchArrayGet(m, cond.a);
                 let lb_ok, lb_a, lb_i = matchArrayGet(m, cond.b);
                 var cmp_valid = false;
@@ -8685,10 +8691,10 @@ fn tryEmitFastMergeLoop(
                         cmp_valid = true;
                     } else if localRef(m, la_i) == j_iter && localRef(m, lb_i) == i_iter {
                         cmp_valid = true;
-                        if raw_op == blot_check_core::Op.less { raw_op = blot_check_core::Op.greater; }
-                        else if raw_op == blot_check_core::Op.less_equal { raw_op = blot_check_core::Op.greater_equal; }
-                        else if raw_op == blot_check_core::Op.greater { raw_op = blot_check_core::Op.less; }
-                        else { raw_op = blot_check_core::Op.less_equal; }
+                        if raw_op == squid_check_core::Op.less { raw_op = squid_check_core::Op.greater; }
+                        else if raw_op == squid_check_core::Op.less_equal { raw_op = squid_check_core::Op.greater_equal; }
+                        else if raw_op == squid_check_core::Op.greater { raw_op = squid_check_core::Op.less; }
+                        else { raw_op = squid_check_core::Op.less_equal; }
                     }
                 }
                 if cmp_valid {
@@ -8697,8 +8703,8 @@ fn tryEmitFastMergeLoop(
                     var e_ok = false;
                     let tbn = m.node(s1.b);
                     let ebn = m.node(s1.c);
-                    if (tbn.tag == blot_check_core::Tag.suite || tbn.tag == blot_check_core::Tag.block_) &&
-                        (ebn.tag == blot_check_core::Tag.suite || ebn.tag == blot_check_core::Tag.block_) {
+                    if (tbn.tag == squid_check_core::Tag.suite || tbn.tag == squid_check_core::Tag.block_) &&
+                        (ebn.tag == squid_check_core::Tag.suite || ebn.tag == squid_check_core::Tag.block_) {
                         let tch = m.children(s1.b);
                         let ech = m.children(s1.c);
                         if tch.len == 2 && ech.len == 2 {
@@ -8706,19 +8712,19 @@ fn tryEmitFastMergeLoop(
                             for ts in tch {
                                 let tsn = m.node(ts);
                                 var uid: u32 = 0;
-                                if tsn.tag == blot_check_core::Tag.update { uid = ts; }
-                                else if tsn.tag == blot_check_core::Tag.bind && tsn.c < 2 && m.node(tsn.b).tag == blot_check_core::Tag.update { uid = tsn.b; }
+                                if tsn.tag == squid_check_core::Tag.update { uid = ts; }
+                                else if tsn.tag == squid_check_core::Tag.bind && tsn.c < 2 && m.node(tsn.b).tag == squid_check_core::Tag.update { uid = tsn.b; }
                                 if uid != 0 {
                                     let ui = m.updateInfo(uid);
                                     let ss = m.updateSelectors(uid);
                                     let vok, va, vi = matchArrayGet(m, ui.value);
-                                    if ss.len == 1 && ss[0].kind == blot_check_core::UpdateKind.index &&
+                                    if ss.len == 1 && ss[0].kind == squid_check_core::UpdateKind.index &&
                                         localRef(m, ui.root) == dst_arrs[0] && localRef(m, ss[0].index) == k_iter &&
                                         (ui.self_binding == 0 || uses(g, f, ui.self_binding) == 0) &&
                                         vok && localRef(m, va) == src_arrs[0] && localRef(m, vi) == i_iter {
                                         t_wrote = true;
                                     }
-                                } else if tsn.tag == blot_check_core::Tag.bind && tsn.c < 2 && matchVarPlusConstOne(m, tsn.b, i_iter) {
+                                } else if tsn.tag == squid_check_core::Tag.bind && tsn.c < 2 && matchVarPlusConstOne(m, tsn.b, i_iter) {
                                     t_inc = true;
                                 }
                             }
@@ -8726,19 +8732,19 @@ fn tryEmitFastMergeLoop(
                             for es in ech {
                                 let esn = m.node(es);
                                 var uid: u32 = 0;
-                                if esn.tag == blot_check_core::Tag.update { uid = es; }
-                                else if esn.tag == blot_check_core::Tag.bind && esn.c < 2 && m.node(esn.b).tag == blot_check_core::Tag.update { uid = esn.b; }
+                                if esn.tag == squid_check_core::Tag.update { uid = es; }
+                                else if esn.tag == squid_check_core::Tag.bind && esn.c < 2 && m.node(esn.b).tag == squid_check_core::Tag.update { uid = esn.b; }
                                 if uid != 0 {
                                     let ui = m.updateInfo(uid);
                                     let ss = m.updateSelectors(uid);
                                     let vok, va, vi = matchArrayGet(m, ui.value);
-                                    if ss.len == 1 && ss[0].kind == blot_check_core::UpdateKind.index &&
+                                    if ss.len == 1 && ss[0].kind == squid_check_core::UpdateKind.index &&
                                         localRef(m, ui.root) == dst_arrs[0] && localRef(m, ss[0].index) == k_iter &&
                                         (ui.self_binding == 0 || uses(g, f, ui.self_binding) == 0) &&
                                         vok && localRef(m, va) == src_arrs[0] && localRef(m, vi) == j_iter {
                                         e_wrote = true;
                                     }
-                                } else if esn.tag == blot_check_core::Tag.bind && esn.c < 2 && matchVarPlusConstOne(m, esn.b, j_iter) {
+                                } else if esn.tag == squid_check_core::Tag.bind && esn.c < 2 && matchVarPlusConstOne(m, esn.b, j_iter) {
                                     e_inc = true;
                                 }
                             }
@@ -8756,7 +8762,7 @@ fn tryEmitFastMergeLoop(
         }
         matched = true;
     }
-    if !matched { return false, blot_direct_types::Error.none; }
+    if !matched { return false, squid_direct_types::Error.none; }
 
     let i_loc = w(g, g.s.vals[iteration.start + i_ci], 0);
     let j_loc = w(g, g.s.vals[iteration.start + j_ci], 0);
@@ -8810,14 +8816,14 @@ fn tryEmitFastMergeLoop(
         lget(g, src_base); lget(g, hi_loc); i32Const(g, 2); op(g, OP_i32_shl); op(g, OP_i32_add); lset(g, p_hi);
         var cmp_wop: u8 = OP_i32_le_u;
         if fast_merge_signed {
-            if fast_merge_op == blot_check_core::Op.less { cmp_wop = OP_i32_lt_s; }
-            else if fast_merge_op == blot_check_core::Op.less_equal { cmp_wop = OP_i32_le_s; }
-            else if fast_merge_op == blot_check_core::Op.greater { cmp_wop = OP_i32_gt_s; }
+            if fast_merge_op == squid_check_core::Op.less { cmp_wop = OP_i32_lt_s; }
+            else if fast_merge_op == squid_check_core::Op.less_equal { cmp_wop = OP_i32_le_s; }
+            else if fast_merge_op == squid_check_core::Op.greater { cmp_wop = OP_i32_gt_s; }
             else { cmp_wop = OP_i32_ge_s; }
         } else {
-            if fast_merge_op == blot_check_core::Op.less { cmp_wop = OP_i32_lt_u; }
-            else if fast_merge_op == blot_check_core::Op.less_equal { cmp_wop = OP_i32_le_u; }
-            else if fast_merge_op == blot_check_core::Op.greater { cmp_wop = OP_i32_gt_u; }
+            if fast_merge_op == squid_check_core::Op.less { cmp_wop = OP_i32_lt_u; }
+            else if fast_merge_op == squid_check_core::Op.less_equal { cmp_wop = OP_i32_le_u; }
+            else if fast_merge_op == squid_check_core::Op.greater { cmp_wop = OP_i32_gt_u; }
             else { cmp_wop = OP_i32_ge_u; }
         }
         // 2x unrolled byte-pointer branchless loop (descending pk+4, pk+0 stores => 1 wtime store check / 2 elems!)
@@ -8869,29 +8875,29 @@ fn tryEmitFastMergeLoop(
         lget(g, pj); lget(g, src_base); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shr_u); lset(g, j_loc);
         lget(g, pk); lget(g, dst_base); op(g, OP_i32_sub); i32Const(g, 2); op(g, OP_i32_shr_u); lset(g, k_loc);
         let aerr = assign(g, f, iteration, outgoing, id);
-        if aerr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, aerr; }
+        if aerr != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, aerr; }
         popCheckedArraysAt(f, disj_if);
         op(g, OP_else_);
         recordCheckedLe(f, mid_loc, src_len);
         recordCheckedLe(f, hi_loc, src_len);
         recordCheckedBound(f, k_loc, dst_len);
         let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
-        if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+        if ferr != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
         close(g, f);
     } else {
         recordCheckedLe(f, mid_loc, src_len);
         recordCheckedLe(f, hi_loc, src_len);
         recordCheckedBound(f, k_loc, dst_len);
         let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
-        if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
+        if ferr != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; return false, ferr; }
     }
     popCheckedArraysAt(f, spec_if);
     op(g, OP_else_);
     let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, false, 0, 0, false, neverVal(), 0xffffffff, range, false);
     f.in_specialized_loop = prev_spec;
-    if serr != blot_direct_types::Error.none { return false, serr; }
+    if serr != squid_direct_types::Error.none { return false, serr; }
     close(g, f);
-    return true, blot_direct_types::Error.none;
+    return true, squid_direct_types::Error.none;
 }
 
 // 5B-2: Pre-loop indirect-index bounds validation for outer counted loops
@@ -8906,20 +8912,20 @@ fn tryMatchIndirectIndexScan(
     target_len_count: i64&,
 ) -> bool, u32, u32, u32 {
     let inner_id = unwrapSingleBody(m, outer_body);
-    if inner_id == 0 || m.node(inner_id).tag != blot_check_core::Tag.loop_ { return false, 0, 0, 0; }
+    if inner_id == 0 || m.node(inner_id).tag != squid_check_core::Tag.loop_ { return false, 0, 0, 0; }
     let inner = m.loopInfo(inner_id);
-    if inner.kind != blot_check_core::LoopKind.range || inner.pattern == 0 || inner.body == 0 { return false, 0, 0, 0; }
-    if m.node(inner.first).tag != blot_check_core::Tag.constant || m.node(inner.first).a != 0 { return false, 0, 0, 0; }
+    if inner.kind != squid_check_core::LoopKind.range || inner.pattern == 0 || inner.body == 0 { return false, 0, 0, 0; }
+    if m.node(inner.first).tag != squid_check_core::Tag.constant || m.node(inner.first).a != 0 { return false, 0, 0, 0; }
     let pat = m.pattern(inner.pattern);
-    if pat.tag != blot_check_core::PatternTag.bind { return false, 0, 0, 0; }
+    if pat.tag != squid_check_core::PatternTag.bind { return false, 0, 0, 0; }
     let k_b = pat.a;
 
     let ibn = m.node(inner.body);
-    if ibn.tag != blot_check_core::Tag.suite && ibn.tag != blot_check_core::Tag.block_ { return false, 0, 0, 0; }
+    if ibn.tag != squid_check_core::Tag.suite && ibn.tag != squid_check_core::Tag.block_ { return false, 0, 0, 0; }
     let ich = m.children(inner.body);
     if ich.len < 2 { return false, 0, 0, 0; }
     let s0 = m.node(ich[0]);
-    if s0.tag != blot_check_core::Tag.bind || s0.c >= 2 { return false, 0, 0, 0; }
+    if s0.tag != squid_check_core::Tag.bind || s0.c >= 2 { return false, 0, 0, 0; }
     let id_b = s0.a;
     let gok, idx_arr_n, idx_pos_n = matchArrayGet(m, s0.b);
     if !gok || localRef(m, idx_pos_n) != k_b { return false, 0, 0, 0; }
@@ -8930,11 +8936,11 @@ fn tryMatchIndirectIndexScan(
         if ic.incoming == idx_arr_b || ic.iteration == idx_arr_b { return false, 0, 0, 0; }
     }
     let idx_v, idx_ok = bindGet(g, f, idx_arr_b);
-    if !idx_ok || tagOf(g, idx_v.ty) != blot_direct_types::Tag.array || tagOf(g, g.types.node(idx_v.ty).a) != blot_direct_types::Tag.u32_ {
+    if !idx_ok || tagOf(g, idx_v.ty) != squid_direct_types::Tag.array || tagOf(g, g.types.node(idx_v.ty).a) != squid_direct_types::Tag.u32_ {
         return false, 0, 0, 0;
     }
     if findCheckedArray(f, w(g, idx_v, 0), w(g, idx_v, 1)) < 0 { return false, 0, 0, 0; }
-    if localRef(m, inner.end) == 0 && m.node(inner.end).tag != blot_check_core::Tag.constant { return false, 0, 0, 0; }
+    if localRef(m, inner.end) == 0 && m.node(inner.end).tag != squid_check_core::Tag.constant { return false, 0, 0, 0; }
 
     var arr_bs: u32[8] = [0; 8];
     var arr_len: i64 = 0;
@@ -8946,7 +8952,7 @@ fn tryMatchIndirectIndexScan(
     for ai in 0..arr_len {
         let ab = resolveInnerCarry(m, inner_id, arr_bs[ai]);
         let av, aok = bindGet(g, f, ab);
-        if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { continue; }
+        if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { continue; }
         let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
         if ca < 0 { continue; }
         let clen = f.checked_arrays[ca].length;
@@ -8970,12 +8976,12 @@ fn tryEmitStridedFillLoop(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     carry_in_place: const bool[64]&,
 ) -> Error {
-    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.forever || info.body == 0 {
-        return blot_direct_types::Error.none;
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.forever || info.body == 0 {
+        return squid_direct_types::Error.none;
     }
     var m_carry_idx: i64 = -1;
     var m_iter_b: u32 = 0;
@@ -8983,102 +8989,102 @@ fn tryEmitStridedFillLoop(
     var arr_b: u32 = 0;
     var fill_val_id: u32 = 0;
     var stride_id: u32 = 0;
-    var elem_tag = blot_direct_types::Tag.unit;
+    var elem_tag = squid_direct_types::Tag.unit;
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
         let carries = m.loopCarries(loop_id);
-        if carries.len == 0 || carries.len > 64 { return blot_direct_types::Error.none; }
+        if carries.len == 0 || carries.len > 64 { return squid_direct_types::Error.none; }
         for carry, ci in carries {
             if !carry_in_place[ci] {
-                if m_carry_idx >= 0 { return blot_direct_types::Error.none; }
-                if m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.unsigned32 {
-                    return blot_direct_types::Error.none;
+                if m_carry_idx >= 0 { return squid_direct_types::Error.none; }
+                if m.types.node(m.binding(carry.iteration).ty).tag != squid_check_types::Tag.unsigned32 {
+                    return squid_direct_types::Error.none;
                 }
                 m_carry_idx = ci;
                 m_iter_b = carry.iteration;
             }
         }
-        if m_carry_idx < 0 { return blot_direct_types::Error.none; }
+        if m_carry_idx < 0 { return squid_direct_types::Error.none; }
         let m_back_b = carries[m_carry_idx].backedge;
 
         let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return blot_direct_types::Error.none; }
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return squid_direct_types::Error.none; }
         let ch = m.children(info.body);
-        if ch.len != 3 { return blot_direct_types::Error.none; }
+        if ch.len != 3 { return squid_direct_types::Error.none; }
 
         // Stmt 0: `if m >= limit: break`
         let s0 = m.node(ch[0]);
-        if s0.tag != blot_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return blot_direct_types::Error.none; }
+        if s0.tag != squid_check_core::Tag.if_stmt || s0.c != 0 || !isBreakBody(m, s0.b) { return squid_direct_types::Error.none; }
         let cn = m.node(s0.a);
-        if cn.tag != blot_check_core::Tag.scalar && !(cn.tag == blot_check_core::Tag.associated && cn.op != blot_check_core::Op.none) {
-            return blot_direct_types::Error.none;
+        if cn.tag != squid_check_core::Tag.scalar && !(cn.tag == squid_check_core::Tag.associated && cn.op != squid_check_core::Op.none) {
+            return squid_direct_types::Error.none;
         }
-        if cn.op == blot_check_core::Op.greater_equal && localRef(m, cn.a) == m_iter_b {
+        if cn.op == squid_check_core::Op.greater_equal && localRef(m, cn.a) == m_iter_b {
             limit_id = cn.b;
-        } else if cn.op == blot_check_core::Op.less_equal && localRef(m, cn.b) == m_iter_b {
+        } else if cn.op == squid_check_core::Op.less_equal && localRef(m, cn.b) == m_iter_b {
             limit_id = cn.a;
         } else {
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         }
         let lim_ref = localRef(m, limit_id);
-        if lim_ref == 0 && m.node(limit_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-        if lim_ref == m_iter_b { return blot_direct_types::Error.none; }
+        if lim_ref == 0 && m.node(limit_id).tag != squid_check_core::Tag.constant { return squid_direct_types::Error.none; }
+        if lim_ref == m_iter_b { return squid_direct_types::Error.none; }
 
         // Stmt 1: `arr[m] := inv_scalar`
         var upd_id: u32 = 0;
         let s1 = m.node(ch[1]);
-        if s1.tag == blot_check_core::Tag.update { upd_id = ch[1]; }
-        else if s1.tag == blot_check_core::Tag.bind && s1.c < 2 && m.node(s1.b).tag == blot_check_core::Tag.update { upd_id = s1.b; }
-        else { return blot_direct_types::Error.none; }
+        if s1.tag == squid_check_core::Tag.update { upd_id = ch[1]; }
+        else if s1.tag == squid_check_core::Tag.bind && s1.c < 2 && m.node(s1.b).tag == squid_check_core::Tag.update { upd_id = s1.b; }
+        else { return squid_direct_types::Error.none; }
         let uinfo = m.updateInfo(upd_id);
         let sels = m.updateSelectors(upd_id);
-        if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index || localRef(m, sels[0].index) != m_iter_b {
-            return blot_direct_types::Error.none;
+        if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index || localRef(m, sels[0].index) != m_iter_b {
+            return squid_direct_types::Error.none;
         }
-        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return blot_direct_types::Error.none; }
+        if uinfo.self_binding != 0 && uses(g, f, uinfo.self_binding) != 0 { return squid_direct_types::Error.none; }
         arr_b = localRef(m, uinfo.root);
-        if arr_b == 0 { return blot_direct_types::Error.none; }
+        if arr_b == 0 { return squid_direct_types::Error.none; }
         let vn = m.node(uinfo.value);
         let vref = localRef(m, uinfo.value);
-        if vn.tag != blot_check_core::Tag.constant && (vref == 0 || vref == m_iter_b) { return blot_direct_types::Error.none; }
+        if vn.tag != squid_check_core::Tag.constant && (vref == 0 || vref == m_iter_b) { return squid_direct_types::Error.none; }
         fill_val_id = uinfo.value;
 
         // Stmt 2: `m_back := m + stride`
         let s2 = m.node(ch[2]);
-        if s2.tag != blot_check_core::Tag.bind || s2.a != m_back_b || s2.c >= 2 { return blot_direct_types::Error.none; }
+        if s2.tag != squid_check_core::Tag.bind || s2.a != m_back_b || s2.c >= 2 { return squid_direct_types::Error.none; }
         let sn = m.node(s2.b);
-        if sn.tag != blot_check_core::Tag.scalar && !(sn.tag == blot_check_core::Tag.associated && sn.op != blot_check_core::Op.none) {
-            return blot_direct_types::Error.none;
+        if sn.tag != squid_check_core::Tag.scalar && !(sn.tag == squid_check_core::Tag.associated && sn.op != squid_check_core::Op.none) {
+            return squid_direct_types::Error.none;
         }
-        if sn.op != blot_check_core::Op.add { return blot_direct_types::Error.none; }
+        if sn.op != squid_check_core::Op.add { return squid_direct_types::Error.none; }
         if localRef(m, sn.a) == m_iter_b { stride_id = sn.b; }
         else if localRef(m, sn.b) == m_iter_b { stride_id = sn.a; }
-        else { return blot_direct_types::Error.none; }
+        else { return squid_direct_types::Error.none; }
         let sref = localRef(m, stride_id);
-        if sref == 0 && m.node(stride_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-        if sref == m_iter_b { return blot_direct_types::Error.none; }
+        if sref == 0 && m.node(stride_id).tag != squid_check_core::Tag.constant { return squid_direct_types::Error.none; }
+        if sref == m_iter_b { return squid_direct_types::Error.none; }
 
         let av, aok = bindGet(g, f, arr_b);
-        if !aok || tagOf(g, av.ty) != blot_direct_types::Tag.array { return blot_direct_types::Error.none; }
+        if !aok || tagOf(g, av.ty) != squid_direct_types::Tag.array { return squid_direct_types::Error.none; }
         let ada = findDirectArrayBySlot(f, w(g, av, 0));
-        if ada >= 0 && f.direct_arrays[ada].scalar_packed { return blot_direct_types::Error.none; }
+        if ada >= 0 && f.direct_arrays[ada].scalar_packed { return squid_direct_types::Error.none; }
         elem_tag = tagOf(g, g.types.node(av.ty).a);
-        if elem_tag != blot_direct_types::Tag.boolean && elem_tag != blot_direct_types::Tag.u32_ && elem_tag != blot_direct_types::Tag.f32_ {
-            return blot_direct_types::Error.none;
+        if elem_tag != squid_direct_types::Tag.boolean && elem_tag != squid_direct_types::Tag.u32_ && elem_tag != squid_direct_types::Tag.f32_ {
+            return squid_direct_types::Error.none;
         }
         matched = true;
     }
-    if !matched { return blot_direct_types::Error.none; }
+    if !matched { return squid_direct_types::Error.none; }
 
     let av, _ = bindGet(g, f, arr_b);
     let arr_base, arr_len = ensureCheckedArray(g, f, av);
     let lim_v, lerr = expr(g, f, limit_id);
-    if lerr != blot_direct_types::Error.none { return lerr; }
+    if lerr != squid_direct_types::Error.none { return lerr; }
     let stride_v, serr = expr(g, f, stride_id);
-    if serr != blot_direct_types::Error.none { return serr; }
+    if serr != squid_direct_types::Error.none { return serr; }
     let fill_v, ferr = expr(g, f, fill_val_id);
-    if ferr != blot_direct_types::Error.none { return ferr; }
+    if ferr != squid_direct_types::Error.none { return ferr; }
 
     let m_loc = w(g, g.s.vals[iteration.start + m_carry_idx], 0);
     let lim_loc = w(g, lim_v, 0);
@@ -9111,7 +9117,7 @@ fn tryEmitStridedFillLoop(
 
     let step_bytes = local32(g, f);
     lget(g, stride_loc);
-    if elem_tag != blot_direct_types::Tag.boolean {
+    if elem_tag != squid_direct_types::Tag.boolean {
         i32Const(g, 2);
         op(g, OP_i32_shl);
     }
@@ -9126,7 +9132,7 @@ fn tryEmitStridedFillLoop(
     let ptr = local32(g, f);
     lget(g, arr_base);
     lget(g, m_loc);
-    if elem_tag != blot_direct_types::Tag.boolean {
+    if elem_tag != squid_direct_types::Tag.boolean {
         i32Const(g, 2);
         op(g, OP_i32_shl);
     }
@@ -9143,9 +9149,9 @@ fn tryEmitStridedFillLoop(
     for step in 0..4 {
         lget(g, ptr);
         lget(g, val_loc);
-        if elem_tag == blot_direct_types::Tag.boolean {
+        if elem_tag == squid_direct_types::Tag.boolean {
             op(g, OP_i32_store8); uleb(g, 0); uleb(g, 0);
-        } else if elem_tag == blot_direct_types::Tag.f32_ {
+        } else if elem_tag == squid_direct_types::Tag.f32_ {
             op(g, OP_f32_store); uleb(g, 2); uleb(g, 0);
         } else {
             op(g, OP_i32_store); uleb(g, 2); uleb(g, 0);
@@ -9164,7 +9170,7 @@ fn tryEmitStridedFillLoop(
     close(g, f);
     close(g, f);
     f.checked_elems_len = 0;
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 // 4C: Register-blocked 4x v128 (16-float) outer-k accumulation for matrix-multiply loops:
@@ -9180,8 +9186,8 @@ fn tryEmitStridedFillLoop(
 fn matchSumWithVar(m: const Module&, id: u32, var_b: u32) -> bool, u32 {
     if localRef(m, id) == var_b { return true, 0; }
     let n = m.node(id);
-    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
-        n.op == blot_check_core::Op.add {
+    if (n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) &&
+        n.op == squid_check_core::Op.add {
         if localRef(m, n.a) == var_b { return true, n.b; }
         if localRef(m, n.b) == var_b { return true, n.a; }
     }
@@ -9189,8 +9195,8 @@ fn matchSumWithVar(m: const Module&, id: u32, var_b: u32) -> bool, u32 {
 }
 fn matchMulWithVar(m: const Module&, id: u32, var_b: u32) -> bool, u32 {
     let n = m.node(id);
-    if (n.tag == blot_check_core::Tag.scalar || (n.tag == blot_check_core::Tag.associated && n.op != blot_check_core::Op.none)) &&
-        n.op == blot_check_core::Op.mul {
+    if (n.tag == squid_check_core::Tag.scalar || (n.tag == squid_check_core::Tag.associated && n.op != squid_check_core::Op.none)) &&
+        n.op == squid_check_core::Op.mul {
         if localRef(m, n.a) == var_b { return true, n.b; }
         if localRef(m, n.b) == var_b { return true, n.a; }
     }
@@ -9198,12 +9204,12 @@ fn matchMulWithVar(m: const Module&, id: u32, var_b: u32) -> bool, u32 {
 }
 fn matchArrayGet(m: const Module&, id: u32) -> bool, u32, u32 {
     let n = m.node(id);
-    if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(id) == blot_backend_collection_ops::Op.get {
+    if n.tag == squid_check_core::Tag.array_op && m.arrayOperation(id) == squid_backend_collection_ops::Op.get {
         let ch = m.children(id);
         if ch.len == 2 { return true, ch[0], ch[1]; }
-    } else if n.tag == blot_check_core::Tag.storage {
-        let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
-        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read {
+    } else if n.tag == squid_check_core::Tag.storage {
+        let op_k, ok = squid_check_storage_ops::opFromCode(n.c);
+        if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read {
             let ch = m.children(id);
             if ch.len == 2 { return true, ch[0], ch[1]; }
         }
@@ -9230,14 +9236,14 @@ fn matchMatmulKLoop(
     f: const Fn&,
     m: const Module&,
     k_loop_id: u32,
-    k_info: blot_check_core::LoopInfo,
+    k_info: squid_check_core::LoopInfo,
     resolve_k_carries: bool,
     out: MatmulKMatch&,
 ) -> bool {
-    if k_info.kind != blot_check_core::LoopKind.range || k_info.pattern == 0 || k_info.body == 0 { return false; }
-    if m.node(k_info.first).tag != blot_check_core::Tag.constant || m.node(k_info.first).a != 0 { return false; }
+    if k_info.kind != squid_check_core::LoopKind.range || k_info.pattern == 0 || k_info.body == 0 { return false; }
+    if m.node(k_info.first).tag != squid_check_core::Tag.constant || m.node(k_info.first).a != 0 { return false; }
     let pat = m.pattern(k_info.pattern);
-    if pat.tag != blot_check_core::PatternTag.bind { return false; }
+    if pat.tag != squid_check_core::PatternTag.bind { return false; }
     let k_b = pat.a;
 
     if resolve_k_carries {
@@ -9245,20 +9251,20 @@ fn matchMatmulKLoop(
         if kcarries.len > 64 { return false; }
         for kc, kci in kcarries {
             let kv, kok = bindGet(g, f, kc.incoming);
-            if !kok || tagOf(g, kv.ty) != blot_direct_types::Tag.array { return false; }
+            if !kok || tagOf(g, kv.ty) != squid_direct_types::Tag.array { return false; }
             var cb: i64 = 256;
             if !carryStaysInPlace(g, m, k_loop_id, kci, kc.iteration, kc.backedge, cb) { return false; }
         }
     }
 
     let bn = m.node(k_info.body);
-    if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return false; }
+    if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ { return false; }
     let ch = m.children(k_info.body);
     if ch.len != 3 { return false; }
 
     // Stmt 0: `let aik = a[a_off + k]`
     let s0 = m.node(ch[0]);
-    if s0.tag != blot_check_core::Tag.bind || s0.c >= 2 { return false; }
+    if s0.tag != squid_check_core::Tag.bind || s0.c >= 2 { return false; }
     let aik_b = s0.a;
     let g0_ok, a_node, a_idx = matchArrayGet(m, s0.b);
     if !g0_ok { return false; }
@@ -9266,33 +9272,33 @@ fn matchMatmulKLoop(
     if resolve_k_carries { a_b = resolveInnerCarry(m, k_loop_id, a_b); }
     let a_ok, a_off = matchSumWithVar(m, a_idx, k_b);
     if a_b == 0 || !a_ok { return false; }
-    if a_off != 0 && localRef(m, a_off) == 0 && m.node(a_off).tag != blot_check_core::Tag.constant { return false; }
+    if a_off != 0 && localRef(m, a_off) == 0 && m.node(a_off).tag != squid_check_core::Tag.constant { return false; }
 
     // Stmt 1: `let k_off = k * b_stride`
     let s1 = m.node(ch[1]);
-    if s1.tag != blot_check_core::Tag.bind || s1.c >= 2 { return false; }
+    if s1.tag != squid_check_core::Tag.bind || s1.c >= 2 { return false; }
     let k_off_b = s1.a;
     let mul_ok, b_str = matchMulWithVar(m, s1.b, k_b);
     if !mul_ok || b_str == 0 { return false; }
-    if localRef(m, b_str) == 0 && m.node(b_str).tag != blot_check_core::Tag.constant { return false; }
+    if localRef(m, b_str) == 0 && m.node(b_str).tag != squid_check_core::Tag.constant { return false; }
 
     // Stmt 2: `for col in 0 .. m:`
     let col_loop = ch[2];
-    if m.node(col_loop).tag != blot_check_core::Tag.loop_ { return false; }
+    if m.node(col_loop).tag != squid_check_core::Tag.loop_ { return false; }
     let col_info = m.loopInfo(col_loop);
-    if col_info.kind != blot_check_core::LoopKind.range || col_info.pattern == 0 || col_info.body == 0 { return false; }
-    if m.node(col_info.first).tag != blot_check_core::Tag.constant || m.node(col_info.first).a != 0 { return false; }
+    if col_info.kind != squid_check_core::LoopKind.range || col_info.pattern == 0 || col_info.body == 0 { return false; }
+    if m.node(col_info.first).tag != squid_check_core::Tag.constant || m.node(col_info.first).a != 0 { return false; }
     let col_pat = m.pattern(col_info.pattern);
-    if col_pat.tag != blot_check_core::PatternTag.bind { return false; }
+    if col_pat.tag != squid_check_core::PatternTag.bind { return false; }
     let col_b = col_pat.a;
     let m_end_id = col_info.end;
-    if localRef(m, m_end_id) == 0 && m.node(m_end_id).tag != blot_check_core::Tag.constant { return false; }
+    if localRef(m, m_end_id) == 0 && m.node(m_end_id).tag != squid_check_core::Tag.constant { return false; }
 
     // Inner body: `[let dst = c_off + col] ; c[dst] := c[dst] + aik * b[k_off + col]`
     var inner_stmts: u32[2] = [0; 2];
     var inner_len: i64 = 0;
     let ibn = m.node(col_info.body);
-    if ibn.tag == blot_check_core::Tag.suite || ibn.tag == blot_check_core::Tag.block_ {
+    if ibn.tag == squid_check_core::Tag.suite || ibn.tag == squid_check_core::Tag.block_ {
         let ich = m.children(col_info.body);
         if ich.len == 0 || ich.len > 2 { return false; }
         for ii in 0..ich.len { inner_stmts[ii] = ich[ii]; }
@@ -9305,7 +9311,7 @@ fn matchMatmulKLoop(
     var dst_alias_off: u32 = 0;
     if inner_len == 2 {
         let d0 = m.node(inner_stmts[0]);
-        if d0.tag != blot_check_core::Tag.bind || d0.c >= 2 { return false; }
+        if d0.tag != squid_check_core::Tag.bind || d0.c >= 2 { return false; }
         let dok, doff = matchSumWithVar(m, d0.b, col_b);
         if !dok { return false; }
         dst_alias_b = d0.a;
@@ -9314,13 +9320,13 @@ fn matchMatmulKLoop(
     let last_id = inner_stmts[inner_len - 1];
     let last_n = m.node(last_id);
     var upd_id: u32 = 0;
-    if last_n.tag == blot_check_core::Tag.update { upd_id = last_id; }
-    else if last_n.tag == blot_check_core::Tag.bind && last_n.c < 2 && m.node(last_n.b).tag == blot_check_core::Tag.update { upd_id = last_n.b; }
+    if last_n.tag == squid_check_core::Tag.update { upd_id = last_id; }
+    else if last_n.tag == squid_check_core::Tag.bind && last_n.c < 2 && m.node(last_n.b).tag == squid_check_core::Tag.update { upd_id = last_n.b; }
     else { return false; }
 
     let uinfo = m.updateInfo(upd_id);
     let sels = m.updateSelectors(upd_id);
-    if sels.len != 1 || sels[0].kind != blot_check_core::UpdateKind.index { return false; }
+    if sels.len != 1 || sels[0].kind != squid_check_core::UpdateKind.index { return false; }
     let raw_c_b = localRef(m, uinfo.root);
     if raw_c_b == 0 { return false; }
     var c_b = resolveInnerCarry(m, col_loop, raw_c_b);
@@ -9337,11 +9343,11 @@ fn matchMatmulKLoop(
         c_off_id = coff;
     }
     if !c_idx_ok { return false; }
-    if c_off_id != 0 && localRef(m, c_off_id) == 0 && m.node(c_off_id).tag != blot_check_core::Tag.constant { return false; }
+    if c_off_id != 0 && localRef(m, c_off_id) == 0 && m.node(c_off_id).tag != squid_check_core::Tag.constant { return false; }
 
     let rn = m.node(uinfo.value);
-    if (rn.tag != blot_check_core::Tag.scalar && !(rn.tag == blot_check_core::Tag.associated && rn.op != blot_check_core::Op.none)) ||
-        rn.op != blot_check_core::Op.add {
+    if (rn.tag != squid_check_core::Tag.scalar && !(rn.tag == squid_check_core::Tag.associated && rn.op != squid_check_core::Op.none)) ||
+        rn.op != squid_check_core::Op.add {
         return false;
     }
     var mul_node: u32 = 0;
@@ -9371,8 +9377,8 @@ fn matchMatmulKLoop(
     }
 
     let mn = m.node(mul_node);
-    if (mn.tag != blot_check_core::Tag.scalar && !(mn.tag == blot_check_core::Tag.associated && mn.op != blot_check_core::Op.none)) ||
-        mn.op != blot_check_core::Op.mul {
+    if (mn.tag != squid_check_core::Tag.scalar && !(mn.tag == squid_check_core::Tag.associated && mn.op != squid_check_core::Op.none)) ||
+        mn.op != squid_check_core::Op.mul {
         return false;
     }
     var b_read_node: u32 = 0;
@@ -9392,12 +9398,12 @@ fn matchMatmulKLoop(
     let bv, bok2 = bindGet(g, f, b_b);
     let cv, cok2 = bindGet(g, f, c_b);
     if !aok2 || !bok2 || !cok2 { return false; }
-    if tagOf(g, av.ty) != blot_direct_types::Tag.array || tagOf(g, bv.ty) != blot_direct_types::Tag.array || tagOf(g, cv.ty) != blot_direct_types::Tag.array {
+    if tagOf(g, av.ty) != squid_direct_types::Tag.array || tagOf(g, bv.ty) != squid_direct_types::Tag.array || tagOf(g, cv.ty) != squid_direct_types::Tag.array {
         return false;
     }
-    if tagOf(g, g.types.node(av.ty).a) != blot_direct_types::Tag.f32_ ||
-        tagOf(g, g.types.node(bv.ty).a) != blot_direct_types::Tag.f32_ ||
-        tagOf(g, g.types.node(cv.ty).a) != blot_direct_types::Tag.f32_ {
+    if tagOf(g, g.types.node(av.ty).a) != squid_direct_types::Tag.f32_ ||
+        tagOf(g, g.types.node(bv.ty).a) != squid_direct_types::Tag.f32_ ||
+        tagOf(g, g.types.node(cv.ty).a) != squid_direct_types::Tag.f32_ {
         return false;
     }
     out.a_b = a_b;
@@ -9412,7 +9418,7 @@ fn matchMatmulKLoop(
 // Accumulates `acc += va * vb` using Wasm 3.0 `f32x4.relaxed_madd` under `--relaxed-simd`
 // or deterministic `f32x4.mul` + `f32x4.add` by default.
 fn emitMatmulMulAdd(g: Generator&, va_loc: u32, vb_loc: u32, acc_loc: u32) {
-    if blot_direct_writer::relaxedSimdEnabled() {
+    if squid_direct_writer::relaxedSimdEnabled() {
         lget(g, va_loc);
         lget(g, vb_loc);
         lget(g, acc_loc);
@@ -9428,7 +9434,7 @@ fn emitMatmulMulAdd(g: Generator&, va_loc: u32, vb_loc: u32, acc_loc: u32) {
 }
 
 fn emitMatmulLoadMulAdd(g: Generator&, va_loc: u32, b_ptr: u32, b_off: u32, acc_loc: u32) {
-    if blot_direct_writer::relaxedSimdEnabled() {
+    if squid_direct_writer::relaxedSimdEnabled() {
         lget(g, va_loc);
         lget(g, b_ptr);
         simdMemOp(g, SIMD_v128_load, 2, b_off);
@@ -9449,24 +9455,24 @@ fn tryEmitBlockedMatmulKLoop(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     carry_in_place: const bool[64]&,
     index: u32,
     end_local: u32,
 ) -> Error {
-    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
-        return blot_direct_types::Error.none;
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return squid_direct_types::Error.none;
     }
     var km = MatmulKMatch {};
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
         let carries = m.loopCarries(loop_id);
-        if carries.len > 64 { return blot_direct_types::Error.none; }
-        for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
+        if carries.len > 64 { return squid_direct_types::Error.none; }
+        for ci in 0..carries.len { if !carry_in_place[ci] { return squid_direct_types::Error.none; } }
         matched = matchMatmulKLoop(g, f, m, loop_id, info, false, km);
     }
-    if !matched { return blot_direct_types::Error.none; }
+    if !matched { return squid_direct_types::Error.none; }
     let a_b = km.a_b;
     let b_b = km.b_b;
     let c_b = km.c_b;
@@ -9483,16 +9489,16 @@ fn tryEmitBlockedMatmulKLoop(
     let c_base, c_len = ensureCheckedArray(g, f, cv);
 
     let m_val, merr = expr(g, f, m_end_id);
-    if merr != blot_direct_types::Error.none { return merr; }
+    if merr != squid_direct_types::Error.none { return merr; }
     let b_str_val, bserr = expr(g, f, b_stride_id);
-    if bserr != blot_direct_types::Error.none { return bserr; }
+    if bserr != squid_direct_types::Error.none { return bserr; }
     let m_loc = w(g, m_val, 0);
     let b_str_loc = w(g, b_str_val, 0);
 
     var a_off_loc: u32 = 0;
     if a_off_id != 0 {
         let v, e = expr(g, f, a_off_id);
-        if e != blot_direct_types::Error.none { return e; }
+        if e != squid_direct_types::Error.none { return e; }
         a_off_loc = w(g, v, 0);
     } else {
         a_off_loc = constLocal(g, f, 0);
@@ -9500,7 +9506,7 @@ fn tryEmitBlockedMatmulKLoop(
     var c_off_loc: u32 = 0;
     if c_off_id != 0 {
         let v, e = expr(g, f, c_off_id);
-        if e != blot_direct_types::Error.none { return e; }
+        if e != squid_direct_types::Error.none { return e; }
         c_off_loc = w(g, v, 0);
     } else {
         c_off_loc = constLocal(g, f, 0);
@@ -9669,7 +9675,7 @@ fn tryEmitBlockedMatmulKLoop(
     lset(g, index);
     close(g, f);
     f.checked_elems_len = 0;
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 // 5C: 2-row x 16-col (8 x v128 accumulators) register-blocked outer-`row` matmul loop:
@@ -9686,13 +9692,13 @@ fn tryEmitBlockedMatmulRowLoop(
     g: Generator&,
     f: Fn&,
     loop_id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     carry_in_place: const bool[64]&,
     index: u32,
     end_local: u32,
 ) -> Error {
-    if g.runtime_().has_fork || info.kind != blot_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
-        return blot_direct_types::Error.none;
+    if g.runtime_().has_fork || info.kind != squid_check_core::LoopKind.range || info.pattern == 0 || info.body == 0 {
+        return squid_direct_types::Error.none;
     }
     var km = MatmulKMatch {};
     var a_stride_id: u32 = 0;
@@ -9701,48 +9707,48 @@ fn tryEmitBlockedMatmulRowLoop(
     var matched = false;
     {
         let m .= g.units[f.unit - 1];
-        if m.node(info.first).tag != blot_check_core::Tag.constant || m.node(info.first).a != 0 {
-            return blot_direct_types::Error.none;
+        if m.node(info.first).tag != squid_check_core::Tag.constant || m.node(info.first).a != 0 {
+            return squid_direct_types::Error.none;
         }
         let pat = m.pattern(info.pattern);
-        if pat.tag != blot_check_core::PatternTag.bind { return blot_direct_types::Error.none; }
+        if pat.tag != squid_check_core::PatternTag.bind { return squid_direct_types::Error.none; }
         let row_b = pat.a;
 
         let carries = m.loopCarries(loop_id);
-        if carries.len > 64 { return blot_direct_types::Error.none; }
-        for ci in 0..carries.len { if !carry_in_place[ci] { return blot_direct_types::Error.none; } }
+        if carries.len > 64 { return squid_direct_types::Error.none; }
+        for ci in 0..carries.len { if !carry_in_place[ci] { return squid_direct_types::Error.none; } }
 
         let bn = m.node(info.body);
-        if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ {
-            return blot_direct_types::Error.none;
+        if bn.tag != squid_check_core::Tag.suite && bn.tag != squid_check_core::Tag.block_ {
+            return squid_direct_types::Error.none;
         }
         let ch = m.children(info.body);
-        if ch.len != 2 && ch.len != 3 { return blot_direct_types::Error.none; }
+        if ch.len != 2 && ch.len != 3 { return squid_direct_types::Error.none; }
 
         var off_bs: u32[2] = [0; 2];
         var off_strides: u32[2] = [0; 2];
         let off_count = ch.len - 1;
         for oi in 0..off_count {
             let sn = m.node(ch[oi]);
-            if sn.tag != blot_check_core::Tag.bind || sn.c >= 2 { return blot_direct_types::Error.none; }
+            if sn.tag != squid_check_core::Tag.bind || sn.c >= 2 { return squid_direct_types::Error.none; }
             let mok, str_id = matchMulWithVar(m, sn.b, row_b);
-            if !mok || str_id == 0 { return blot_direct_types::Error.none; }
+            if !mok || str_id == 0 { return squid_direct_types::Error.none; }
             let sref = localRef(m, str_id);
-            if sref == 0 && m.node(str_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-            if sref == row_b { return blot_direct_types::Error.none; }
+            if sref == 0 && m.node(str_id).tag != squid_check_core::Tag.constant { return squid_direct_types::Error.none; }
+            if sref == row_b { return squid_direct_types::Error.none; }
             off_bs[oi] = sn.a;
             off_strides[oi] = str_id;
         }
 
         let k_loop_id = ch[off_count];
-        if m.node(k_loop_id).tag != blot_check_core::Tag.loop_ { return blot_direct_types::Error.none; }
+        if m.node(k_loop_id).tag != squid_check_core::Tag.loop_ { return squid_direct_types::Error.none; }
         let k_info = m.loopInfo(k_loop_id);
-        if !matchMatmulKLoop(g, f, m, k_loop_id, k_info, true, km) { return blot_direct_types::Error.none; }
+        if !matchMatmulKLoop(g, f, m, k_loop_id, k_info, true, km) { return squid_direct_types::Error.none; }
 
         n_end_id = k_info.end;
         let nref = localRef(m, n_end_id);
-        if nref == 0 && m.node(n_end_id).tag != blot_check_core::Tag.constant { return blot_direct_types::Error.none; }
-        if nref == row_b { return blot_direct_types::Error.none; }
+        if nref == 0 && m.node(n_end_id).tag != squid_check_core::Tag.constant { return squid_direct_types::Error.none; }
+        if nref == row_b { return squid_direct_types::Error.none; }
 
         let a_off_ref = localRef(m, km.a_off_id);
         let c_off_ref = localRef(m, km.c_off_id);
@@ -9750,16 +9756,16 @@ fn tryEmitBlockedMatmulRowLoop(
             if a_off_ref != 0 && a_off_ref == off_bs[oi] { a_stride_id = off_strides[oi]; }
             if c_off_ref != 0 && c_off_ref == off_bs[oi] { c_stride_id = off_strides[oi]; }
             if nref == off_bs[oi] || localRef(m, km.b_stride_id) == off_bs[oi] || localRef(m, km.m_end_id) == off_bs[oi] {
-                return blot_direct_types::Error.none;
+                return squid_direct_types::Error.none;
             }
         }
-        if a_stride_id == 0 || c_stride_id == 0 { return blot_direct_types::Error.none; }
+        if a_stride_id == 0 || c_stride_id == 0 { return squid_direct_types::Error.none; }
         if localRef(m, km.b_stride_id) == row_b || localRef(m, km.m_end_id) == row_b {
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         }
         matched = true;
     }
-    if !matched { return blot_direct_types::Error.none; }
+    if !matched { return squid_direct_types::Error.none; }
 
     let av, _ = bindGet(g, f, km.a_b);
     let bv, _ = bindGet(g, f, km.b_b);
@@ -9769,15 +9775,15 @@ fn tryEmitBlockedMatmulRowLoop(
     let c_base, c_len = ensureCheckedArray(g, f, cv);
 
     let n_val, nerr = expr(g, f, n_end_id);
-    if nerr != blot_direct_types::Error.none { return nerr; }
+    if nerr != squid_direct_types::Error.none { return nerr; }
     let m_val, merr = expr(g, f, km.m_end_id);
-    if merr != blot_direct_types::Error.none { return merr; }
+    if merr != squid_direct_types::Error.none { return merr; }
     let a_str_val, aserr = expr(g, f, a_stride_id);
-    if aserr != blot_direct_types::Error.none { return aserr; }
+    if aserr != squid_direct_types::Error.none { return aserr; }
     let b_str_val, bserr = expr(g, f, km.b_stride_id);
-    if bserr != blot_direct_types::Error.none { return bserr; }
+    if bserr != squid_direct_types::Error.none { return bserr; }
     let c_str_val, cserr = expr(g, f, c_stride_id);
-    if cserr != blot_direct_types::Error.none { return cserr; }
+    if cserr != squid_direct_types::Error.none { return cserr; }
 
     let rows_loc = end_local;
     let n_loc = w(g, n_val, 0);
@@ -10228,19 +10234,19 @@ fn tryEmitBlockedMatmulRowLoop(
     close(g, f);
     close(g, f);
     f.checked_elems_len = 0;
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 
 fn invariantDivisor(g: const Generator&, f: const Fn&, m: const Module&, id: u32, input_locals: u32) -> u32 {
     let n = m.node(id);
-    if n.tag != blot_check_core::Tag.scalar || (n.op != blot_check_core::Op.div && n.op != blot_check_core::Op.rem) ||
-        m.types.node(m.typeOf(n.b)).tag != blot_check_types::Tag.unsigned32 {
+    if n.tag != squid_check_core::Tag.scalar || (n.op != squid_check_core::Op.div && n.op != squid_check_core::Op.rem) ||
+        m.types.node(m.typeOf(n.b)).tag != squid_check_types::Tag.unsigned32 {
         return 0xffffffff;
     }
     let binding = localRef(m, n.b);
     let value, found = bindGet(g, f, binding);
     let _, is_cell = withCellType(g, f, binding);
-    if !found || is_cell || value.ty != blot_direct_types::u32_ { return 0xffffffff; }
+    if !found || is_cell || value.ty != squid_direct_types::u32_ { return 0xffffffff; }
     let divisor = w(g, value, 0);
     let _, constant = constU32(f, divisor);
     if divisor >= input_locals || constant { return 0xffffffff; }
@@ -10262,8 +10268,8 @@ recursive fn firstLoopDivision(g: Generator&, f: const Fn&, m: const Module&, id
             if binding == 0 { return 0, false; }
             let kind = m.binding(binding).kind;
             let _, is_cell = withCellType(g, f, binding);
-            return 0, !is_cell && (kind == blot_reuse_principal_interface::Kind.local ||
-                kind == blot_reuse_principal_interface::Kind.parameter);
+            return 0, !is_cell && (kind == squid_reuse_principal_interface::Kind.local ||
+                kind == squid_reuse_principal_interface::Kind.parameter);
         },
         scalar => {
             if !isCoreScalar(m, n.a) || (n.b != 0 && !isCoreScalar(m, n.b)) { return 0, false; }
@@ -10275,12 +10281,12 @@ recursive fn firstLoopDivision(g: Generator&, f: const Fn&, m: const Module&, id
             var machine = n.op;
             if n.c == 1 {
                 // Only U32 scalar operators have a known trap classification here.
-                if m.types.node(m.typeOf(n.a)).tag != blot_check_types::Tag.unsigned32 { return 0, false; }
-                let resolved, error = scalarMember(g, f, m, blot_direct_types::u32_, 0, n.op, id);
-                if error != blot_direct_types::Error.none { return 0, false; }
+                if m.types.node(m.typeOf(n.a)).tag != squid_check_types::Tag.unsigned32 { return 0, false; }
+                let resolved, error = scalarMember(g, f, m, squid_direct_types::u32_, 0, n.op, id);
+                if error != squid_direct_types::Error.none { return 0, false; }
                 machine = resolved;
             }
-            if machine == blot_check_core::Op.div || machine == blot_check_core::Op.rem {
+            if machine == squid_check_core::Op.div || machine == squid_check_core::Op.rem {
                 if divisor != 0xffffffff { return id, false; }
                 return 0, false;
             }
@@ -10481,7 +10487,7 @@ fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, 
     if b != 0 {
         let value, found = bindGet(g, f, b);
         let _, is_cell = withCellType(g, f, b);
-        if found && !is_cell && value.ty == blot_direct_types::u64_ {
+        if found && !is_cell && value.ty == squid_direct_types::u64_ {
             let loc = w(g, value, 0);
             let _, is_c = constU64(f, loc);
             if loc < input_locals && !is_c { return loc, false; }
@@ -10491,14 +10497,14 @@ fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, 
     let n = m.node(node_id);
     // Match `u32_var.to_u64` (project/call/associated/scalar convert).
     var src_u32: u32 = 0;
-    if n.tag == blot_check_core::Tag.scalar && n.op == blot_check_core::Op.numeric_convert {
+    if n.tag == squid_check_core::Tag.scalar && n.op == squid_check_core::Op.numeric_convert {
         src_u32 = n.a;
-    } else if n.tag == blot_check_core::Tag.project {
+    } else if n.tag == squid_check_core::Tag.project {
         let sp = m.fieldSpelling(m.projection(n.b).field);
         if sp.present && sp.value == "to_u64" { src_u32 = n.a; }
-    } else if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.numeric_convert {
+    } else if n.tag == squid_check_core::Tag.associated && n.op == squid_check_core::Op.numeric_convert {
         src_u32 = n.a;
-    } else if n.tag == blot_check_core::Tag.call {
+    } else if n.tag == squid_check_core::Tag.call {
         let ci = m.call(node_id);
         if ci.arguments.len == 1 { src_u32 = ci.arguments[0]; }
     }
@@ -10507,7 +10513,7 @@ fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, 
         if sb != 0 {
             let value, found = bindGet(g, f, sb);
             let _, is_cell = withCellType(g, f, sb);
-            if found && !is_cell && value.ty == blot_direct_types::u32_ {
+            if found && !is_cell && value.ty == squid_direct_types::u32_ {
                 let loc = w(g, value, 0);
                 let _, is_c = constU32(f, loc);
                 if loc < input_locals && !is_c { return loc, true; }
@@ -10522,15 +10528,15 @@ recursive fn calleeUsesParamAsU64Divisor(m: const Module&, id: u32, param_b: u32
     let n = m.node(id);
     match n.tag {
         scalar => {
-            if (n.op == blot_check_core::Op.div || n.op == blot_check_core::Op.rem) &&
-                m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.unsigned64 {
+            if (n.op == squid_check_core::Op.div || n.op == squid_check_core::Op.rem) &&
+                m.types.node(m.typeOf(n.b)).tag == squid_check_types::Tag.unsigned64 {
                 if localRef(m, n.b) == param_b { return true; }
                 let bn = m.node(n.b);
-                if bn.tag == blot_check_core::Tag.project && localRef(m, bn.a) == param_b {
+                if bn.tag == squid_check_core::Tag.project && localRef(m, bn.a) == param_b {
                     let sp = m.fieldSpelling(m.projection(bn.b).field);
                     if sp.present && sp.value == "to_u64" { return true; }
-                } else if (bn.tag == blot_check_core::Tag.scalar || bn.tag == blot_check_core::Tag.associated) &&
-                    bn.op == blot_check_core::Op.numeric_convert && localRef(m, bn.a) == param_b {
+                } else if (bn.tag == squid_check_core::Tag.scalar || bn.tag == squid_check_core::Tag.associated) &&
+                    bn.op == squid_check_core::Op.numeric_convert && localRef(m, bn.a) == param_b {
                     return true;
                 }
             }
@@ -10571,7 +10577,7 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         bind, construct => { collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget); },
         return_, project => { collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget); },
         if_stmt, if_value, pattern_bind => {
-            if n.tag != blot_check_core::Tag.pattern_bind { collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget); }
+            if n.tag != squid_check_core::Tag.pattern_bind { collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget); }
             collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
             collectLoopReciprocals(g, f, n.c, input_locals, mandatory, index, end, budget);
         },
@@ -10590,7 +10596,7 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
             let info = m.updateInfo(id);
             collectLoopReciprocals(g, f, info.root, input_locals, mandatory, index, end, budget);
             for selector in m.updateSelectors(id) {
-                if selector.kind == blot_check_core::UpdateKind.index {
+                if selector.kind == squid_check_core::UpdateKind.index {
                     collectLoopReciprocals(g, f, selector.index, input_locals, mandatory, index, end, budget);
                 }
             }
@@ -10604,7 +10610,7 @@ recursive fn emitLoopCore(
     g: Generator&,
     f: Fn&,
     id: u32,
-    info: blot_check_core::LoopInfo,
+    info: squid_check_core::LoopInfo,
     iteration: Vals,
     outgoing: Vals,
     slots: Words,
@@ -10619,10 +10625,10 @@ recursive fn emitLoopCore(
     input_locals: u32 = 0,
 ) -> Error {
     let m .= g.units[f.unit - 1];
-    if has_source && tagOf(g, source.ty) == blot_direct_types::Tag.packed {
+    if has_source && tagOf(g, source.ty) == squid_direct_types::Tag.packed {
         return emitPackedLoopCore(g, f, id, info, iteration, outgoing, slots, index, end_loc, source);
     }
-    if has_source && tagOf(g, source.ty) == blot_direct_types::Tag.seq {
+    if has_source && tagOf(g, source.ty) == squid_direct_types::Tag.seq {
         return emitSeqLoopCore(g, f, id, info, iteration, outgoing, slots, index, end_loc, source);
     }
     let carries = m.loopCarries(id);
@@ -10633,7 +10639,7 @@ recursive fn emitLoopCore(
     if input_locals != 0 && !has_source {
         var prefix_budget: i64 = 32;
         var mandatory: u32 = 0xffffffff;
-        if info.pattern == 0 || m.pattern(info.pattern).tag == blot_check_core::PatternTag.bind {
+        if info.pattern == 0 || m.pattern(info.pattern).tag == squid_check_core::PatternTag.bind {
             let first, _ = firstLoopDivision(g, f, m, info.body, input_locals, prefix_budget);
             var allocation_budget: i64 = 256;
             if first != 0 && bodyNoAlloc(g, f, m, info.body, allocation_budget) {
@@ -10652,7 +10658,7 @@ recursive fn emitLoopCore(
         op(g, OP_i32_ge_u);
         let opened = open(g, f, OP_if_);
         let assigned = assign(g, f, iteration, outgoing, id);
-        if assigned != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
+        if assigned != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
         br(g, f, OP_br, exit);
         close(g, f);
         let current = local32(g, f);
@@ -10667,9 +10673,9 @@ recursive fn emitLoopCore(
         if has_source {
             if source_view_base != 0xffffffff {
                 let element, elem_err = elementOf(g, f, source.ty, id);
-                if elem_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return elem_err; }
+                if elem_err != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return elem_err; }
                 let step, step_err = stride(g, f, element, id);
-                if step_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return step_err; }
+                if step_err != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return step_err; }
                 let addr = local32(g, f);
                 lget(g, source_view_base);
                 let fast = open(g, f, OP_if_);
@@ -10679,25 +10685,25 @@ recursive fn emitLoopCore(
                 popCheckedArraysAt(f, fast);
                 op(g, OP_else_);
                 let slow_addr, slow_err = elementAddress(g, f, source, current, id);
-                if slow_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return slow_err; }
+                if slow_err != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return slow_err; }
                 lget(g, slow_addr);
                 lset(g, addr);
                 close(g, f);
                 let loaded, lerr = loadElement(g, f, addr, 0, element, id);
-                if lerr != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return lerr; }
+                if lerr != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return lerr; }
                 item = loaded;
             } else {
                 let previous_range = f.checked_range;
                 f.checked_range = range;
                 let element, error = readElement(g, f, source, current, id);
                 f.checked_range = previous_range;
-                if error != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
+                if error != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
                 item = element;
             }
-        } else { item = valOf1(g, blot_direct_types::u32_, current); }
+        } else { item = valOf1(g, squid_direct_types::u32_, current); }
         if info.pattern != 0 {
             let tested = test_(g, f, info.pattern, item, false, 0, id);
-            if tested != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return tested; }
+            if tested != squid_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return tested; }
         }
     }
     var release = true;
@@ -10708,7 +10714,7 @@ recursive fn emitLoopCore(
         if g.s.words[slots.start + at] != 0 { boxed_carries = true; continue; }
         let value = g.s.vals[iteration.start + at];
         let safe, error = ownerSlots(g, value.ty, value.start);
-        if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
+        if error != squid_direct_types::Error.none { s.scratch.resize(scratch_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
         if !safe { release = false; }
     }
     if release {
@@ -10734,43 +10740,43 @@ recursive fn emitLoopCore(
     let stores = f.memory_stores;
     let unused = g.newSlot();
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, allocations: allocations, slots: slots, saved_esc: saved_esc, guards: guards });
+    s.labels.push(squid_direct_emit::Label { target: id, depth: exit, result: unused, kind: squid_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, allocations: allocations, slots: slots, saved_esc: saved_esc, guards: guards });
     let previous_range = f.checked_range;
     f.checked_range = range;
     f.loop_depth += 1;
     let body, error = stmt(g, f, info.body);
     f.checked_range = previous_range;
-    if error != blot_direct_types::Error.none {
+    if error != squid_direct_types::Error.none {
         f.loop_depth -= 1;
         s.labels.resize(labels_mark);
         f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error;
     }
-    let do_unroll2 = unroll2 && !release && !has_index && body.ty != blot_direct_types::never;
-    if body.ty != blot_direct_types::never {
+    let do_unroll2 = unroll2 && !release && !has_index && body.ty != squid_direct_types::never;
+    if body.ty != squid_direct_types::never {
         let backedge = g.reserveVals(carries.len);
         for carry, at in carries {
             let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
+            if rerr != squid_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
             if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
         let assigned = assignCarries(g, f, backedge, iteration, slots, unchanged, owner_mark, stack_mark, id);
-        if assigned != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
+        if assigned != squid_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
         if do_unroll2 {
             f.checked_elems_len = 0;
             f.checked_bounds_len = 0;
             let body2, err2 = stmt(g, f, info.body);
-            if err2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return err2; }
-            if body2.ty != blot_direct_types::never {
+            if err2 != squid_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return err2; }
+            if body2.ty != squid_direct_types::never {
                 let backedge2 = g.reserveVals(carries.len);
                 for carry, at in carries {
                     let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-                    if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
+                    if rerr != squid_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
                     if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return g.fail(m, id, "loop carry without a backedge value"); }
                     g.s.vals[backedge2.start + at] = value;
                 }
                 let assigned2 = assignCarries(g, f, backedge2, iteration, slots, unchanged, owner_mark, stack_mark, id);
-                if assigned2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned2; }
+                if assigned2 != squid_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned2; }
                 br(g, f, OP_br, top);
             }
         } else {
@@ -10796,15 +10802,15 @@ recursive fn emitLoopCore(
         markInto(g, prefix, owner_mark, stack_mark);
         let esc_global = g.runtime_().escape_min_slot;
         prefix.push(OP_global_get);
-        blot_direct_writer::uleb(prefix, esc_global);
+        squid_direct_writer::uleb(prefix, esc_global);
         prefix.push(OP_local_set);
-        blot_direct_writer::uleb(prefix, saved_esc);
+        squid_direct_writer::uleb(prefix, saved_esc);
         prefix.push(OP_i32_const);
-        blot_direct_writer::sleb(prefix, -1);
+        squid_direct_writer::sleb(prefix, -1);
         prefix.push(OP_global_set);
-        blot_direct_writer::uleb(prefix, esc_global);
-        blot_direct_relocations::insert(f.sites_base,mark_at,prefix.len);
-        if g.s.parallel_readonly { blot_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
+        squid_direct_writer::uleb(prefix, esc_global);
+        squid_direct_relocations::insert(f.sites_base,mark_at,prefix.len);
+        if g.s.parallel_readonly { squid_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
         let old_len = s.code.len;
         for byte in prefix { s.code.push(byte); }
         var at = old_len;
@@ -10816,14 +10822,14 @@ recursive fn emitLoopCore(
     }
     close(g, f);
     close(g, f);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let info = g.units[f.unit - 1].loopInfo(id);
-    if info.kind == blot_check_core::LoopKind.array && info.carries.len == 0 {
+    if info.kind == squid_check_core::LoopKind.array && info.carries.len == 0 {
         let bulk_done, bulk_err = tryBulkPushLoop(g, f, id, info);
-        if bulk_err != blot_direct_types::Error.none { return neverVal(), bulk_err; }
-        if bulk_done { return unitVal(), blot_direct_types::Error.none; }
+        if bulk_err != squid_direct_types::Error.none { return neverVal(), bulk_err; }
+        if bulk_done { return unitVal(), squid_direct_types::Error.none; }
     }
     let input_locals = localCount(g, f);
     var iteration = Vals {};
@@ -10838,7 +10844,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let incoming = g.reserveVals(carries.len);
         for carry, at in carries {
             let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
-            if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+            if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
             if !present { return neverVal(), g.fail(m, id, "loop carry without an incoming value"); }
             g.s.vals[incoming.start + at] = value;
         }
@@ -10851,10 +10857,10 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         for at in 0..carries.len {
             let value = g.s.vals[incoming.start + at];
             let held, error = copiedBox(g, f, value.ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             let ctag = tagOf(g, value.ty);
             var in_place = false;
-            if !held && ctag == blot_direct_types::Tag.array {
+            if !held && isMutableOwnerTag(ctag) {
                 if findWorkerR(f, w(g, value, 0), w(g, value, 1)) >= 0 ||
                     findWorkerM(f, w(g, value, 0), w(g, value, 1)) >= 0 {
                     in_place = true;
@@ -10872,19 +10878,19 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if held {
                 g.s.words[slots.start + at] = 1;
                 let reserved, error = newBlock(g, f, value.ty, id);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                if error != squid_direct_types::Error.none { return neverVal(), error; }
                 g.s.vals[iteration.start + at] = valOf1(g, value.ty, reserved);
             } else {
                 let current, error = fresh(g, f, value.ty, id);
-                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                if error != squid_direct_types::Error.none { return neverVal(), error; }
                 g.s.vals[iteration.start + at] = current;
             }
             let after, error = fresh(g, f, value.ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             g.s.vals[outgoing.start + at] = after;
         }
         let assigned = assignCarries(g, f, incoming, iteration, slots, 0xffffffff, 0, 0, id);
-        if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
+        if assigned != squid_direct_types::Error.none { return neverVal(), assigned; }
         for carry, at in carries {
             bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
             if at < 64 && carry_in_place[at] {
@@ -10898,21 +10904,21 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             // entry and backedge, so carry.iteration is always exclusively owned
             // for in-place FBIP when its sole read is a match/update.
             if g.s.words[slots.start + at] != 0 {
-                blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
+                squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
             } else if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 1 && !bindingCaptured(g, f, carry.incoming) {
                 var bbudget: i64 = 256;
                 if carryBackedgeIsUniqueBoxed(g, f, m, id, at, carry.iteration, carry.backedge, bbudget) {
-                    blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, f.loop_depth + 2);
                 }
             }
-            if tagOf(g, g.s.vals[iteration.start + at].ty) == blot_direct_types::Tag.array &&
+            if tagOf(g, g.s.vals[iteration.start + at].ty) == squid_direct_types::Tag.array &&
                 isUniqueOwned(g, f, carry.incoming) &&
                 ownedRefUses(g, f, carry.incoming) == 0 &&
                 ownedFlowUses(g, f, carry.incoming) == 1 &&
                 !bindingCaptured(g, f, carry.incoming) {
                 var ubudget: i64 = 256;
                 if carryBackedgeIsUniqueOwned(g, f, m, id, at, carry.iteration, carry.backedge, ubudget) {
-                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.iteration, f.loop_depth + 2);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.iteration, f.loop_depth + 2);
                 }
             }
         }
@@ -10924,7 +10930,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 if at >= 64 || carry_in_place[at] || carry_mask_ok[at] { continue; }
                 let inv = g.s.vals[incoming.start + at];
                 let itv = g.s.vals[iteration.start + at];
-                if inv.len != 1 || inv.ty != blot_direct_types::u32_ || itv.len != 1 { continue; }
+                if inv.len != 1 || inv.ty != squid_direct_types::u32_ || itv.len != 1 { continue; }
                 let cm = findCheckedMask(f, w(g, inv, 0));
                 if cm < 0 { continue; }
                 let mloc = f.checked_masks[cm].max_local;
@@ -10957,10 +10963,10 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
     }
-    if info.kind == blot_check_core::LoopKind.array {
+    if info.kind == squid_check_core::LoopKind.array {
         let unrolled, uerr = tryUnrollConstArrayLoop(g, f, id, info, iteration, outgoing, slots);
-        if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
-        if unrolled { return unitVal(), blot_direct_types::Error.none; }
+        if uerr != squid_direct_types::Error.none { return neverVal(), uerr; }
+        if unrolled { return unitVal(), squid_direct_types::Error.none; }
     }
     let m .= g.units[f.unit - 1];
     let carries = m.loopCarries(id);
@@ -11009,18 +11015,18 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if selective_resize {
             for ri in 0..resized_len {
                 let rv, rok = bindGet(g, f, resized_bindings[ri]);
-                if rok && (tagOf(g, rv.ty) == blot_direct_types::Tag.array || tagOf(g, rv.ty) == blot_direct_types::Tag.packed || tagOf(g, rv.ty) == blot_direct_types::Tag.seq) {
+                if rok && (tagOf(g, rv.ty) == squid_direct_types::Tag.array || tagOf(g, rv.ty) == squid_direct_types::Tag.packed || tagOf(g, rv.ty) == squid_direct_types::Tag.seq) {
                     invalidateCheckedOwner(g, f, rv);
                 }
             }
             for carry, ci in carries {
                 if bindingResizedInLoop(m, id, carry.iteration, resized_bindings, resized_len) {
                     let iv = g.s.vals[iteration.start + ci];
-                    if tagOf(g, iv.ty) == blot_direct_types::Tag.array || tagOf(g, iv.ty) == blot_direct_types::Tag.packed || tagOf(g, iv.ty) == blot_direct_types::Tag.seq {
+                    if tagOf(g, iv.ty) == squid_direct_types::Tag.array || tagOf(g, iv.ty) == squid_direct_types::Tag.packed || tagOf(g, iv.ty) == squid_direct_types::Tag.seq {
                         invalidateCheckedOwner(g, f, iv);
                     }
                     let inv, inok = bindGet(g, f, carry.incoming);
-                    if inok && (tagOf(g, inv.ty) == blot_direct_types::Tag.array || tagOf(g, inv.ty) == blot_direct_types::Tag.packed || tagOf(g, inv.ty) == blot_direct_types::Tag.seq) {
+                    if inok && (tagOf(g, inv.ty) == squid_direct_types::Tag.array || tagOf(g, inv.ty) == squid_direct_types::Tag.packed || tagOf(g, inv.ty) == squid_direct_types::Tag.seq) {
                         invalidateCheckedOwner(g, f, inv);
                     }
                 }
@@ -11073,7 +11079,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if ci >= 64 || !carry_in_place[ci] { continue; }
             if findDirectArray(f, carry.incoming) >= 0 { continue; }
             let iv = g.s.vals[iteration.start + ci];
-            if tagOf(g, iv.ty) != blot_direct_types::Tag.array || !knownMutable(g, f, iv) { continue; }
+            if !isMutableOwnerTag(tagOf(g, iv.ty)) || !knownMutable(g, f, iv) { continue; }
             let s0 = w(g, iv, 0);
             let s1 = w(g, iv, 1);
             if findWorkerM(f, s0, s1) >= 0 || findWorkerR(f, s0, s1) >= 0 { continue; }
@@ -11103,7 +11109,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 }
                 if is_mut_carry { continue; }
                 let rv, rok = bindGet(g, f, rb);
-                if !rok || tagOf(g, rv.ty) != blot_direct_types::Tag.array || !knownMutable(g, f, rv) { continue; }
+                if !rok || !(tagOf(g, rv.ty) == squid_direct_types::Tag.array || tagOf(g, rv.ty) == squid_direct_types::Tag.seq) || !knownMutable(g, f, rv) { continue; }
                 let s0 = w(g, rv, 0);
                 let s1 = w(g, rv, 1);
                 for ci in 0..carries.len {
@@ -11123,27 +11129,27 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             has_index = true;
             index = local32(g, f);
             let first, error = expr(g, f, info.first);
-            if error != blot_direct_types::Error.none { return first, error; }
-            let copied = copy(g, f, first, valOf1(g, blot_direct_types::u32_, index), id);
-            if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+            if error != squid_direct_types::Error.none { return first, error; }
+            let copied = copy(g, f, first, valOf1(g, squid_direct_types::u32_, index), id);
+            if copied != squid_direct_types::Error.none { return neverVal(), copied; }
             let handle, is_view = rangeOwner(g, f, id, info, selective_resize, resized_bindings, resized_len);
-            if handle.ty != blot_direct_types::never && !is_view {
+            if handle.ty != squid_direct_types::never && !is_view {
                 let base, len = ensureCheckedArray(g, f, handle);
-                end = valOf1(g, blot_direct_types::u32_, len);
+                end = valOf1(g, squid_direct_types::u32_, len);
                 range.slot = w(g, handle, 0);
                 range.generation = w(g, handle, 1);
                 range.base = base;
                 range.end_local = len;
-            } else if handle.ty != blot_direct_types::never && is_view {
+            } else if handle.ty != squid_direct_types::never && is_view {
                 let vslot = w(g, handle, 0);
                 let vgen = w(g, handle, 1);
                 let vstart = w(g, handle, 2);
                 let vlen = w(g, handle, 3);
-                end = valOf1(g, blot_direct_types::u32_, vlen);
+                end = valOf1(g, squid_direct_types::u32_, vlen);
                 let element, elem_err = elementOf(g, f, handle.ty, id);
-                if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+                if elem_err != squid_direct_types::Error.none { return neverVal(), elem_err; }
                 let step, step_err = stride(g, f, element, id);
-                if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+                if step_err != squid_direct_types::Error.none { return neverVal(), step_err; }
                 let cv = findCheckedView(f, vslot, vgen, vstart, vlen);
                 if cv >= 0 {
                     range.base = f.checked_views[cv].base;
@@ -11158,7 +11164,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 range.view_start = vstart;
             } else {
                 let last, error = expr(g, f, info.end);
-                if error != blot_direct_types::Error.none { return last, error; }
+                if error != squid_direct_types::Error.none { return last, error; }
                 let end_ref = localRef(m, info.end);
                 var reuse_end = false;
                 if end_ref != 0 {
@@ -11177,11 +11183,11 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     end = last;
                     range.end_local = w(g, last, 0);
                 } else {
-                    let limit, error = fresh(g, f, blot_direct_types::u32_, id);
-                    if error != blot_direct_types::Error.none { return neverVal(), error; }
+                    let limit, error = fresh(g, f, squid_direct_types::u32_, id);
+                    if error != squid_direct_types::Error.none { return neverVal(), error; }
                     end = limit;
                     let copied = copy(g, f, last, end, id);
-                    if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                    if copied != squid_direct_types::Error.none { return neverVal(), copied; }
                     let fact, known = constU32(f, w(g, last, 0));
                     if known { recordConstU32(f, w(g, end, 0), fact.value, fact.unit, fact.node); }
                 }
@@ -11190,29 +11196,29 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         },
         array => {
             let container, error = expr(g, f, info.first);
-            if error != blot_direct_types::Error.none { return container, error; }
+            if error != squid_direct_types::Error.none { return container, error; }
             has_source = true;
             source = container;
             has_index = true;
             index = constLocal(g, f, 0);
             let length, error = lengthOf(g, f, source, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            end = valOf1(g, blot_direct_types::u32_, length);
-            if tagOf(g, source.ty) == blot_direct_types::Tag.array {
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
+            end = valOf1(g, squid_direct_types::u32_, length);
+            if tagOf(g, source.ty) == squid_direct_types::Tag.array {
                 let base, len = ensureCheckedArray(g, f, source);
                 range.slot = w(g, source, 0);
                 range.generation = w(g, source, 1);
                 range.base = base;
                 range.end_local = len;
-            } else if tagOf(g, source.ty) == blot_direct_types::Tag.view {
+            } else if tagOf(g, source.ty) == squid_direct_types::Tag.view {
                 let vslot = w(g, source, 0);
                 let vgen = w(g, source, 1);
                 let vstart = w(g, source, 2);
                 let vlen = w(g, source, 3);
                 let element, elem_err = elementOf(g, f, source.ty, id);
-                if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+                if elem_err != squid_direct_types::Error.none { return neverVal(), elem_err; }
                 let step, step_err = stride(g, f, element, id);
-                if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+                if step_err != squid_direct_types::Error.none { return neverVal(), step_err; }
                 let cv = findCheckedView(f, vslot, vgen, vstart, vlen);
                 if cv >= 0 {
                     range.slot = vslot;
@@ -11247,7 +11253,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
             if mutating_carry { continue; }
             let val, found = bindGet(g, f, b);
-            if !found || tagOf(g, val.ty) != blot_direct_types::Tag.array { continue; }
+            if !found || !isMutableOwnerTag(tagOf(g, val.ty)) { continue; }
             if findDirectArray(f, b) >= 0 || findDirectArrayBySlot(f, w(g, val, 0)) >= 0 { continue; }
             if bindingResizedInLoop(m, id, b, resized_bindings, resized_len) {
                 if f.checked_grows_len < 8 {
@@ -11266,7 +11272,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         for carry, ci in carries {
             if ci >= 64 || !carry_in_place[ci] { continue; }
             let iv = g.s.vals[iteration.start + ci];
-            if tagOf(g, iv.ty) != blot_direct_types::Tag.array { continue; }
+            if !isMutableOwnerTag(tagOf(g, iv.ty)) { continue; }
             if findDirectArray(f, carry.incoming) >= 0 || findDirectArrayBySlot(f, w(g, iv, 0)) >= 0 { continue; }
             if bindingResizedInLoop(m, id, carry.iteration, resized_bindings, resized_len) {
                 if f.checked_grows_len < 8 {
@@ -11277,34 +11283,34 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
     }
-    if body_no_resize && info.kind == blot_check_core::LoopKind.range {
+    if body_no_resize && info.kind == squid_check_core::LoopKind.range {
         let matmul2_err = tryEmitBlockedMatmulRowLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if matmul2_err != blot_direct_types::Error.none { return neverVal(), matmul2_err; }
+        if matmul2_err != squid_direct_types::Error.none { return neverVal(), matmul2_err; }
         let matmul_err = tryEmitBlockedMatmulKLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if matmul_err != blot_direct_types::Error.none { return neverVal(), matmul_err; }
+        if matmul_err != squid_direct_types::Error.none { return neverVal(), matmul_err; }
         let v3_err = tryEmitVec3MaybeLoop4x(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if v3_err != blot_direct_types::Error.none { return neverVal(), v3_err; }
+        if v3_err != squid_direct_types::Error.none { return neverVal(), v3_err; }
         let aos_err = tryEmitAosF32RecordLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if aos_err != blot_direct_types::Error.none { return neverVal(), aos_err; }
+        if aos_err != squid_direct_types::Error.none { return neverVal(), aos_err; }
         let vec_err = tryEmitVectorForLoop(g, f, id, info, carry_in_place, index, w(g, end, 0));
-        if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+        if vec_err != squid_direct_types::Error.none { return neverVal(), vec_err; }
         let ainit_err = tryEmitAffineInitLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if ainit_err != blot_direct_types::Error.none { return neverVal(), ainit_err; }
+        if ainit_err != squid_direct_types::Error.none { return neverVal(), ainit_err; }
         let red_err = tryEmitVectorReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if red_err != blot_direct_types::Error.none { return neverVal(), red_err; }
+        if red_err != squid_direct_types::Error.none { return neverVal(), red_err; }
         let v3r_err = tryEmitVec3MaybeReductionLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if v3r_err != blot_direct_types::Error.none { return neverVal(), v3r_err; }
+        if v3r_err != squid_direct_types::Error.none { return neverVal(), v3r_err; }
         let esc_err = tryEmitVectorEscapeLoop(g, f, id, info, iteration, carry_in_place, index, w(g, end, 0));
-        if esc_err != blot_direct_types::Error.none { return neverVal(), esc_err; }
+        if esc_err != squid_direct_types::Error.none { return neverVal(), esc_err; }
         let aff_err = tryEmitAffineUnrollLoop(g, f, id, info, iteration, index, w(g, end, 0));
-        if aff_err != blot_direct_types::Error.none { return neverVal(), aff_err; }
+        if aff_err != squid_direct_types::Error.none { return neverVal(), aff_err; }
     }
     var copy_tail_done = false;
-    if body_no_resize && info.kind == blot_check_core::LoopKind.forever {
+    if body_no_resize && info.kind == squid_check_core::LoopKind.forever {
         let sf_err = tryEmitStridedFillLoop(g, f, id, info, iteration, carry_in_place);
-        if sf_err != blot_direct_types::Error.none { return neverVal(), sf_err; }
+        if sf_err != squid_direct_types::Error.none { return neverVal(), sf_err; }
         let ct_done, ct_err = tryEmitCopyTailLoop(g, f, id, info, iteration, carry_in_place);
-        if ct_err != blot_direct_types::Error.none { return neverVal(), ct_err; }
+        if ct_err != squid_direct_types::Error.none { return neverVal(), ct_err; }
         copy_tail_done = ct_done;
     }
     // Preserve CheckedArray entries for non-resizing in-place carries across OP_loop
@@ -11321,7 +11327,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if at >= 64 || !carry_in_place[at] || saved_ca_count >= 16 { continue; }
             if bindingResizedInLoop(m, id, carries[at].iteration, resized_bindings, resized_len) { continue; }
             let ov = g.s.vals[outgoing.start + at];
-            if tagOf(g, ov.ty) != blot_direct_types::Tag.array { continue; }
+            if !isMutableOwnerTag(tagOf(g, ov.ty)) { continue; }
             let ca = findCheckedArray(f, w(g, ov, 0), w(g, ov, 1));
             if ca >= 0 {
                 saved_ca_slot[saved_ca_count] = w(g, ov, 0);
@@ -11336,7 +11342,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 
     // 4A: Deferred NaN canonicalization on pure-FP counted loops (`0..end-1` fast, final iter canonical).
     var emitted_loop = false;
-    if body_no_resize && !f.defer_f32_nan && !g.runtime_().has_fork && info.kind == blot_check_core::LoopKind.range &&
+    if body_no_resize && !f.defer_f32_nan && !g.runtime_().has_fork && info.kind == squid_check_core::LoopKind.range &&
         canDeferLoopF32Nan(g, f, g.units[f.unit - 1], id, info) {
         let end_loc = w(g, end, 0);
         let fast_end = local32(g, f);
@@ -11364,7 +11370,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let ind_base = f.checked_arrays[ind_ca].base;
             let ind_arr_len = f.checked_arrays[ind_ca].length;
             let ind_mv, imerr = expr(g, f, ind_m_node);
-            if imerr != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), imerr; }
+            if imerr != squid_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), imerr; }
             let ind_m = w(g, ind_mv, 0);
             let min_len = local32(g, f);
             lget(g, ind_lens[0]);
@@ -11471,27 +11477,27 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             f.indirect_bound_binding = prev_ib;
             f.indirect_bound_len = prev_il;
             f.indirect_bound_distinct_local = prev_id_loc;
-            if err1a != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.defer_f32_nan = false; return neverVal(), err1a; }
+            if err1a != squid_direct_types::Error.none { f.in_specialized_loop = prev_spec; f.defer_f32_nan = false; return neverVal(), err1a; }
             popCheckedArraysAt(f, ind_if);
             op(g, OP_else_);
             let err1b = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false, reciprocal_inputs);
             f.in_specialized_loop = prev_spec;
-            if err1b != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1b; }
+            if err1b != squid_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1b; }
             close(g, f);
         } else {
             let err1 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, fast_end, has_source, source, source_view_base, range, false, reciprocal_inputs);
-            if err1 != blot_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1; }
+            if err1 != squid_direct_types::Error.none { f.defer_f32_nan = false; return neverVal(), err1; }
         }
         f.defer_f32_nan = false;
         let err2 = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
-        if err2 != blot_direct_types::Error.none { return neverVal(), err2; }
+        if err2 != squid_direct_types::Error.none { return neverVal(), err2; }
         emitted_loop = true;
     }
 
     // 5A: 2-way merge loop with invariant `k < dst_len` + `mid, hi <= src_len` bounds hoisting.
-    if !emitted_loop && body_no_resize && info.kind == blot_check_core::LoopKind.forever && !copy_tail_done {
+    if !emitted_loop && body_no_resize && info.kind == squid_check_core::LoopKind.forever && !copy_tail_done {
         let fm_done, fm_err = tryEmitFastMergeLoop(g, f, id, info, iteration, outgoing, slots, range, carry_in_place);
-        if fm_err != blot_direct_types::Error.none { return neverVal(), fm_err; }
+        if fm_err != squid_direct_types::Error.none { return neverVal(), fm_err; }
         if fm_done { emitted_loop = true; }
     }
 
@@ -11514,7 +11520,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         collectLoopPreBounds(g, f, g.units[f.unit - 1], id, info, range, le_a, le_b, le_count, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, extra_bnd_a, extra_bnd_b, extra_bnd_count, max_pre_nodes);
         // Zero-duplication proof for `mask == arr.len - 1` when `arr` is unconditionally
         // indexed at entry of a `for ever` loop: `if arr.len == 0 { trap }` proves `mask < arr.len`!
-        if info.kind == blot_check_core::LoopKind.forever && lt_count > 0 && extra_bnd_count == 0 {
+        if info.kind == squid_check_core::LoopKind.forever && lt_count > 0 && extra_bnd_count == 0 {
             var kept_lt: i64 = 0;
             for li in 0..lt_count {
                 let mloc = lt_a[li];
@@ -11528,26 +11534,26 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         let mm .= g.units[f.unit - 1];
                         // Check if any array indexed at loop entry maps to (cae.slot, cae.generation).
                         let bn = mm.node(info.body);
-                        if bn.tag == blot_check_core::Tag.suite || bn.tag == blot_check_core::Tag.block_ {
+                        if bn.tag == squid_check_core::Tag.suite || bn.tag == squid_check_core::Tag.block_ {
                             let ch = mm.children(info.body);
                             let lim = if ch.len < 3 { ch.len } else { 3 };
                             for si in 0..lim {
                                 let sn = mm.node(ch[si]);
                                 var ab: u32 = 0;
-                                if (sn.tag == blot_check_core::Tag.bind && sn.c < 2) || sn.tag == blot_check_core::Tag.pattern_bind {
+                                if (sn.tag == squid_check_core::Tag.bind && sn.c < 2) || sn.tag == squid_check_core::Tag.pattern_bind {
                                     let rn = mm.node(sn.b);
-                                    if rn.tag == blot_check_core::Tag.array_op && mm.arrayOperation(sn.b) == blot_backend_collection_ops::Op.get {
+                                    if rn.tag == squid_check_core::Tag.array_op && mm.arrayOperation(sn.b) == squid_backend_collection_ops::Op.get {
                                         let ach = mm.children(sn.b);
                                         if ach.len == 2 { ab = localRef(mm, ach[0]); }
-                                    } else if rn.tag == blot_check_core::Tag.storage {
-                                        let op_k, ok = blot_check_storage_ops::opFromCode(rn.c);
+                                    } else if rn.tag == squid_check_core::Tag.storage {
+                                        let op_k, ok = squid_check_storage_ops::opFromCode(rn.c);
                                         let ach = mm.children(sn.b);
-                                        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read && ach.len == 2 { ab = localRef(mm, ach[0]); }
+                                        if ok == squid_error::Error.none && op_k == squid_check_storage_ops::Op.read && ach.len == 2 { ab = localRef(mm, ach[0]); }
                                     }
                                 }
                                 if ab != 0 && loopUnconditionallyIndexesArr(mm, info.body, ab) {
                                     let av, aok = bindGet(g, f, ab);
-                                    if aok && tagOf(g, av.ty) == blot_direct_types::Tag.array &&
+                                    if aok && tagOf(g, av.ty) == squid_direct_types::Tag.array &&
                                         w(g, av, 0) == cae.slot && w(g, av, 1) == cae.generation {
                                         lget(g, clen);
                                         op(g, OP_i32_eqz);
@@ -11637,12 +11643,12 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             for ei in 0..extra_bnd_count { recordCheckedBound(f, extra_bnd_a[ei], extra_bnd_b[ei]); }
             for ai in 0..aff_count { recordCheckedAffine(f, aff_base[ai], range.end_local, aff_c[ai], aff_len[ai]); }
             let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
-            if ferr != blot_direct_types::Error.none { f.spec_loop_depth = prev_spec_depth; return neverVal(), ferr; }
+            if ferr != squid_direct_types::Error.none { f.spec_loop_depth = prev_spec_depth; return neverVal(), ferr; }
             popCheckedArraysAt(f, spec_if);
             op(g, OP_else_);
             let serr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
             f.spec_loop_depth = prev_spec_depth;
-            if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+            if serr != squid_direct_types::Error.none { return neverVal(), serr; }
             close(g, f);
             emitted_loop = true;
         }
@@ -11652,11 +11658,11 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         var end_loc: u32 = 0;
         if has_index { end_loc = w(g, end, 0); }
         var do_unroll2 = false;
-        if body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && info.kind == blot_check_core::LoopKind.forever && !has_index {
+        if body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && info.kind == squid_check_core::LoopKind.forever && !has_index {
             do_unroll2 = isPureScalarForeverBody(g, g.units[f.unit - 1], info.body);
         }
         let cerr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, do_unroll2, reciprocal_inputs);
-        if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+        if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
     }
     for sci in 0..saved_ca_count {
         recordCheckedArrayAtDepth(f, saved_ca_slot[sci], saved_ca_gen[sci], saved_ca_base[sci], saved_ca_len[sci], saved_ca_depth[sci]);
@@ -11664,7 +11670,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     for carry, at in carries {
         let ov = g.s.vals[outgoing.start + at];
         bindPut(g, f, carry.outgoing, ov);
-        if ov.len == 1 && ov.ty == blot_direct_types::u32_ {
+        if ov.len == 1 && ov.ty == squid_direct_types::u32_ {
             if at < 64 && carry_mask_ok[at] {
                 recordCheckedMask(f, w(g, ov, 0), carry_mask_loc[at], 0, false);
             } else {
@@ -11686,17 +11692,17 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if isUniqueOwnedAt(g, f, carry.iteration, f.loop_depth + 1) {
             var others_in_place = true;
             for oi in 0..carries.len {
-                if oi != at && tagOf(g, g.s.vals[outgoing.start + oi].ty) == blot_direct_types::Tag.array {
+                if oi != at && tagOf(g, g.s.vals[outgoing.start + oi].ty) == squid_direct_types::Tag.array {
                     if oi >= 64 || !carry_in_place[oi] { others_in_place = false; break; }
                 }
             }
             if others_in_place {
-                blot_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.outgoing, f.loop_depth + 1);
+                squid_support_zigmap::put(g.s.map_pool, f.unique_owned, carry.outgoing, f.loop_depth + 1);
             }
         }
     }
-    if info.kind == blot_check_core::LoopKind.forever && !info.can_exit { return neverVal(), blot_direct_types::Error.none; }
-    return unitVal(), blot_direct_types::Error.none;
+    if info.kind == squid_check_core::LoopKind.forever && !info.can_exit { return neverVal(), squid_direct_types::Error.none; }
+    return unitVal(), squid_direct_types::Error.none;
 }
 // Merges `min_u(cur_esc, saved_esc)` back into `rt.escape_min_slot`.
 fn emitMergeEscapeMin(g: Generator&, f: Fn&, cur_esc: u32, saved_esc: u32) {
@@ -11717,15 +11723,15 @@ fn emitMergeEscapeMinCurrent(g: Generator&, f: Fn&, saved_esc: u32) {
 }
 // Records a store into an untracked cell/effect, conservatively escaping to age 0.
 fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
-    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    if value.ty == squid_direct_types::never { return squid_direct_types::Error.none; }
     let holds, error = g.contentsHoldMemory(value.ty);
-    if error != blot_direct_types::Error.none { return error; }
+    if error != squid_direct_types::Error.none { return error; }
     if holds {
         f.memory_stores += 1;
         i32Const(g, 0);
         gset(g, g.runtime_().escape_min_slot);
     }
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // Collect byte offsets of plain-element owner/view handles inside the flat memory
 // layout of a non-recursive copied-box value (`copiedBox == true`). Returns `false`
@@ -11733,107 +11739,107 @@ fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
 // or exceeds the fixed 16-slot buffer.
 recursive fn collectFlatPlainOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, out: u32[16]&, out_len: i64&) -> bool, Error {
     let holds, error = g.contentsHoldMemory(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if !holds { return true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
     let rec, rerr = g.types.isRecursive(ty);
-    if rerr != blot_direct_types::Error.none { return false, rerr; }
-    if rec { return false, blot_direct_types::Error.none; }
+    if rerr != squid_direct_types::Error.none { return false, rerr; }
+    if rec { return false, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
         array, packed, seq, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
-            if herr != blot_direct_types::Error.none { return false, herr; }
-            if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
+            if herr != squid_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 16 { return false, squid_direct_types::Error.none; }
             out[out_len] = base_off;
             out_len += 1;
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         tuple => {
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
                 let ioff, ierr = g.types.tupleItemByteOffset(ty, index);
-                if ierr != blot_direct_types::Error.none { return false, ierr; }
+                if ierr != squid_direct_types::Error.none { return false, ierr; }
                 let ok, oerr = collectFlatPlainOwnerOffsets(g, item, base_off + ioff, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         record => {
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
                 let foff, ferr = g.types.recordFieldByteOffset(ty, index);
-                if ferr != blot_direct_types::Error.none { return false, ferr; }
+                if ferr != squid_direct_types::Error.none { return false, ferr; }
                 let ok, oerr = collectFlatPlainOwnerOffsets(g, field, base_off + foff, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         nominal => {
             let cases, verr = g.types.variants(ty);
-            if verr != blot_direct_types::Error.none { return false, verr; }
-            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
             let payload = g.types.variant_payloads[cases.payloads];
             return collectFlatPlainOwnerOffsets(g, payload, base_off, out, out_len);
         },
-        _ => { return false, blot_direct_types::Error.none; },
+        _ => { return false, squid_direct_types::Error.none; },
     }
 }
 // Collect owner-slot locals of plain-element owner/view handles inside an unboxed Val.
 recursive fn collectRegPlainOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u32[16]&, out_len: i64&) -> bool, Error {
     let holds, error = g.contentsHoldMemory(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if !holds { return true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
     let boxed, berr = g.types.boxed(ty);
-    if berr != blot_direct_types::Error.none { return false, berr; }
-    if boxed { return false, blot_direct_types::Error.none; }
+    if berr != squid_direct_types::Error.none { return false, berr; }
+    if boxed { return false, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
         array, packed, seq, view, ref, link => {
             let elem_holds, herr = g.contentsHoldMemory(n.a);
-            if herr != blot_direct_types::Error.none { return false, herr; }
-            if elem_holds || out_len >= 16 { return false, blot_direct_types::Error.none; }
+            if herr != squid_direct_types::Error.none { return false, herr; }
+            if elem_holds || out_len >= 16 { return false, squid_direct_types::Error.none; }
             out[out_len] = g.s.words[words];
             out_len += 1;
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         tuple => {
             var at: u32 = 0;
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
                 let layout, lerr = g.types.layout(item);
-                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
                 let width = layout.len as u32;
                 let ok, oerr = collectRegPlainOwnerSlots(g, item, words + at, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 at += width;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         record => {
             var at: u32 = 0;
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
                 let layout, lerr = g.types.layout(field);
-                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                if lerr != squid_direct_types::Error.none { return false, lerr; }
                 let width = layout.len as u32;
                 let ok, oerr = collectRegPlainOwnerSlots(g, field, words + at, out, out_len);
-                if oerr != blot_direct_types::Error.none { return false, oerr; }
-                if !ok { return false, blot_direct_types::Error.none; }
+                if oerr != squid_direct_types::Error.none { return false, oerr; }
+                if !ok { return false, squid_direct_types::Error.none; }
                 at += width;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         nominal => {
             let cases, verr = g.types.variants(ty);
-            if verr != blot_direct_types::Error.none { return false, verr; }
-            if cases.len != 1 { return false, blot_direct_types::Error.none; }
+            if verr != squid_direct_types::Error.none { return false, verr; }
+            if cases.len != 1 { return false, squid_direct_types::Error.none; }
             let payload = g.types.variant_payloads[cases.payloads];
             return collectRegPlainOwnerSlots(g, payload, words, out, out_len);
         },
-        _ => { return false, blot_direct_types::Error.none; },
+        _ => { return false, squid_direct_types::Error.none; },
     }
 }
 // Records a store into the owner at `dst_slot`, propagating normalized age into `rt.escape_min_slot`.
@@ -11842,10 +11848,10 @@ recursive fn collectRegPlainOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u
 // handle strictly newer than `dst_slot` (`src_slot < persistent_split && age < src_slot`) can
 // escape and disable enclosing scope releases.
 fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
-    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    if value.ty == squid_direct_types::never { return squid_direct_types::Error.none; }
     let holds, error = g.contentsHoldMemory(value.ty);
-    if error != blot_direct_types::Error.none { return error; }
-    if !holds { return blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return error; }
+    if !holds { return squid_direct_types::Error.none; }
     let rt = g.runtime_();
     let age = local32(g, f);
     i32Const(g, 0);
@@ -11856,14 +11862,14 @@ fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
     op(g, OP_select);
     lset(g, age);
     let boxed, berr = g.types.boxed(value.ty);
-    if berr != blot_direct_types::Error.none { return berr; }
+    if berr != squid_direct_types::Error.none { return berr; }
     let rec, rerr = g.types.isRecursive(value.ty);
-    if rerr != blot_direct_types::Error.none { return rerr; }
+    if rerr != squid_direct_types::Error.none { return rerr; }
     var items: u32[16] = [0; 16];
     var count: i64 = 0;
     if boxed && !rec {
         let ok, cerr = collectFlatPlainOwnerOffsets(g, value.ty, 0, items, count);
-        if cerr != blot_direct_types::Error.none { return cerr; }
+        if cerr != squid_direct_types::Error.none { return cerr; }
         if ok {
             if count > 0 {
                 let src_slot = local32(g, f);
@@ -11883,11 +11889,11 @@ fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
                     close(g, f);
                 }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         }
     } else if !boxed {
         let ok, cerr = collectRegPlainOwnerSlots(g, value.ty, value.start, items, count);
-        if cerr != blot_direct_types::Error.none { return cerr; }
+        if cerr != squid_direct_types::Error.none { return cerr; }
         if ok {
             if count > 0 {
                 for i in 0..count {
@@ -11904,15 +11910,15 @@ fn noteStoreToSlot(g: Generator&, f: Fn&, dst_slot: u32, value: Val) -> Error {
                     close(g, f);
                 }
             }
-            return blot_direct_types::Error.none;
+            return squid_direct_types::Error.none;
         }
     }
     emitMergeEscapeMinCurrent(g, f, age);
-    return blot_direct_types::Error.none;
+    return squid_direct_types::Error.none;
 }
 // Releases an iteration's allocations when no inter-procedural store escaped past
 // `label.release_owner` and every carried owner predates the iteration.
-fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label, iter_esc: u32) {
+fn releaseIteration(g: Generator&, f: Fn&, label: squid_direct_emit::Label, iter_esc: u32) {
     lget(g, iter_esc);
     lget(g, label.release_owner);
     op(g, OP_i32_ge_u);
@@ -11938,52 +11944,52 @@ fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label, iter_
 // elements qualify; closures and memory-holding sums do not.
 recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
     let holds, error = g.contentsHoldMemory(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if !holds { return true, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if !holds { return true, squid_direct_types::Error.none; }
     // A boxed carry is copied into its reserved slot; owners inside it are
     // not checked word by word.
     let boxed, error = g.types.boxed(ty);
-    if error != blot_direct_types::Error.none { return false, error; }
-    if boxed { return false, blot_direct_types::Error.none; }
+    if error != squid_direct_types::Error.none { return false, error; }
+    if boxed { return false, squid_direct_types::Error.none; }
     let n = g.types.node(ty);
     match n.tag {
         array, packed, seq, view, ref, link => {
             let element_holds, error = g.contentsHoldMemory(n.a);
-            if error != blot_direct_types::Error.none { return false, error; }
-            if element_holds { return false, blot_direct_types::Error.none; }
+            if error != squid_direct_types::Error.none { return false, error; }
+            if element_holds { return false, squid_direct_types::Error.none; }
             let slot = g.s.words[words];
             g.s.scratch.push(slot);
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         tuple => {
             var at: u32 = 0;
             for index in 0..(n.b as i64) {
                 let item = g.types.tupleItems(ty)[index];
                 let layout, error = g.types.layout(item);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 let width = layout.len as u32;
                 let safe, error = ownerSlots(g, item, words + at);
-                if error != blot_direct_types::Error.none { return false, error; }
-                if !safe { return false, blot_direct_types::Error.none; }
+                if error != squid_direct_types::Error.none { return false, error; }
+                if !safe { return false, squid_direct_types::Error.none; }
                 at += width;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
         record => {
             var at: u32 = 0;
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
                 let layout, error = g.types.layout(field);
-                if error != blot_direct_types::Error.none { return false, error; }
+                if error != squid_direct_types::Error.none { return false, error; }
                 let width = layout.len as u32;
                 let safe, error = ownerSlots(g, field, words + at);
-                if error != blot_direct_types::Error.none { return false, error; }
-                if !safe { return false, blot_direct_types::Error.none; }
+                if error != squid_direct_types::Error.none { return false, error; }
+                if !safe { return false, squid_direct_types::Error.none; }
                 at += width;
             }
-            return true, blot_direct_types::Error.none;
+            return true, squid_direct_types::Error.none;
         },
-        _ => { return false, blot_direct_types::Error.none; },
+        _ => { return false, squid_direct_types::Error.none; },
     }
 }
 recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
@@ -11993,30 +11999,30 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     while at != f.labels_base {
         at -= 1;
         let label = g.s.labels[at];
-        if label.target != n.a || label.kind != blot_direct_emit::LabelKind.loop_ { continue; }
+        if label.target != n.a || label.kind != squid_direct_emit::LabelKind.loop_ { continue; }
         let left = leaveHandles(g, f, label.depth);
-        if left != blot_direct_types::Error.none { return neverVal(), left; }
+        if left != squid_direct_types::Error.none { return neverVal(), left; }
         let count = g.units[f.unit - 1].breakValues(id).len;
         if count != (label.iteration.len as i64) { return neverVal(), g.fail(g.units[f.unit - 1], id, "break carries the wrong number of values"); }
         let values = g.reserveVals(count);
         for vi in 0..count {
             let child = g.units[f.unit - 1].breakValues(id)[vi];
             let value, error = expr(g, f, child);
-            if error != blot_direct_types::Error.none { return value, error; }
+            if error != squid_direct_types::Error.none { return value, error; }
             g.s.vals[values.start + vi] = value;
         }
         // Merge saved escape marks for every inner releasing loop strictly inside `at`.
         var lk = g.s.labels.len;
         while lk > at + 1 {
             lk -= 1;
-            if g.s.labels[lk].kind == blot_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
+            if g.s.labels[lk].kind == squid_direct_emit::LabelKind.loop_ && g.s.labels[lk].has_release {
                 g.s.labels[lk].used = true;
                 emitMergeEscapeMinCurrent(g, f, g.s.labels[lk].saved_esc);
             }
         }
-        if n.op == blot_check_core::Op.continue_ {
+        if n.op == squid_check_core::Op.continue_ {
             let assigned = assignCarries(g, f, values, label.iteration, label.slots, label.unchanged, label.release_owner, label.release_stack, id);
-            if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
+            if assigned != squid_direct_types::Error.none { return neverVal(), assigned; }
             if label.has_release {
                 g.s.labels[at].used = true;
                 let iter_esc = local32(g, f);
@@ -12030,14 +12036,14 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             br(g, f, OP_br, label.top);
         } else {
             let assigned = assign(g, f, values, label.outgoing, id);
-            if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
+            if assigned != squid_direct_types::Error.none { return neverVal(), assigned; }
             if label.has_release {
                 g.s.labels[at].used = true;
                 emitMergeEscapeMinCurrent(g, f, label.saved_esc);
             }
             br(g, f, OP_br, label.depth);
         }
-        return neverVal(), blot_direct_types::Error.none;
+        return neverVal(), squid_direct_types::Error.none;
     }
     return neverVal(), g.fail(m, id, "break outside its loop");
 }
@@ -12073,12 +12079,12 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let pm .= g.units[f.unit - 1];
         if isF64x2CoreExpr(pm, n.b) || isF32x4CoreExpr(pm, n.b) {
             let pat = pm.pattern(n.a);
-            if pat.tag == blot_check_core::PatternTag.product {
+            if pat.tag == squid_check_core::PatternTag.product {
                 var all_ignore = true;
                 for child in pm.patternChildren(n.a) {
                     let cp = pm.pattern(child);
-                    if cp.tag == blot_check_core::PatternTag.wildcard { continue; }
-                    if cp.tag != blot_check_core::PatternTag.bind || !bindingIgnoresNanPayload(g, f, cp.a) {
+                    if cp.tag == squid_check_core::PatternTag.wildcard { continue; }
+                    if cp.tag != squid_check_core::PatternTag.bind || !bindingIgnoresNanPayload(g, f, cp.a) {
                         all_ignore = false;
                         break;
                     }
@@ -12089,10 +12095,10 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     let value, error = expr(g, f, n.b);
     f.elide_f32_nan_node = 0;
-    if error != blot_direct_types::Error.none { return value, error; }
+    if error != squid_direct_types::Error.none { return value, error; }
     if n.c == 0 {
         let tested = test_(g, f, n.a, value, false, 0, id);
-        if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+        if tested != squid_direct_types::Error.none { return neverVal(), tested; }
         let pm .= g.units[f.unit - 1];
         let src_b = localRef(pm, n.b);
         if src_b != 0 && isUniqueOwned(g, f, src_b) && ownedTotalUses(g, f, src_b) == 1 && !bindingCaptured(g, f, src_b) {
@@ -12100,23 +12106,23 @@ recursive fn patternBind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             var bound_len: i64 = 0;
             if collectOwnedPatternBindings(pm, n.a, bound_ids, bound_len) {
                 for bi in 0..bound_len {
-                    blot_support_zigmap::put(g.s.map_pool, f.unique_owned, bound_ids[bi], f.loop_depth + 1);
+                    squid_support_zigmap::put(g.s.map_pool, f.unique_owned, bound_ids[bi], f.loop_depth + 1);
                 }
             }
         }
-        return unitVal(), blot_direct_types::Error.none;
+        return unitVal(), squid_direct_types::Error.none;
     }
     let ok = open(g, f, OP_block);
     let failed = open(g, f, OP_block);
     let tested = test_(g, f, n.a, value, true, failed, id);
-    if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+    if tested != squid_direct_types::Error.none { return neverVal(), tested; }
     br(g, f, OP_br, ok);
     close(g, f);
     let otherwise, error = stmt(g, f, n.c);
-    if error != blot_direct_types::Error.none { return otherwise, error; }
+    if error != squid_direct_types::Error.none { return otherwise, error; }
     op(g, OP_unreachable_);
     close(g, f);
-    return unitVal(), blot_direct_types::Error.none;
+    return unitVal(), squid_direct_types::Error.none;
 }
 
 recursive fn collectSparkCandReads(m: const Module&, id: u32, iter_b: u32, out: u32[8]&, len: i64&, left: i64&) {
@@ -12126,15 +12132,15 @@ recursive fn collectSparkCandReads(m: const Module&, id: u32, iter_b: u32, out: 
     match n.tag {
         array_op => {
             let ch = m.children(id);
-            if m.arrayOperation(id) == blot_backend_collection_ops::Op.get && ch.len == 2 {
+            if m.arrayOperation(id) == squid_backend_collection_ops::Op.get && ch.len == 2 {
                 if localRef(m, ch[1]) == iter_b { addHoistCandidate(out, len, localRef(m, ch[0])); }
             }
             for child in ch { collectSparkCandReads(m, child, iter_b, out, len, left); }
         },
         storage => {
             let ch = m.children(id);
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 {
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok == squid_error::Error.none && op_kind == squid_check_storage_ops::Op.read && ch.len == 2 {
                 if localRef(m, ch[1]) == iter_b { addHoistCandidate(out, len, localRef(m, ch[0])); }
             }
             for child in ch { collectSparkCandReads(m, child, iter_b, out, len, left); }
@@ -12181,12 +12187,12 @@ recursive fn countSparkCandRefs(
         array_op => {
             let ch = m.children(id);
             let op_k = m.arrayOperation(id);
-            if op_k == blot_backend_collection_ops::Op.get && ch.len == 2 &&
+            if op_k == squid_backend_collection_ops::Op.get && ch.len == 2 &&
                 localRef(m, ch[0]) == cand_b && localRef(m, ch[1]) == iter_b {
                 valid += 1;
                 return true;
             }
-            if op_k == blot_backend_collection_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
+            if op_k == squid_backend_collection_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
                 return true;
             }
             for child in ch { if !countSparkCandRefs(m, child, cand_b, iter_b, valid, other, left) { return false; } }
@@ -12194,13 +12200,13 @@ recursive fn countSparkCandRefs(
         },
         storage => {
             let ch = m.children(id);
-            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.read && ch.len == 2 &&
+            let op_kind, ok = squid_check_storage_ops::opFromCode(n.c);
+            if ok == squid_error::Error.none && op_kind == squid_check_storage_ops::Op.read && ch.len == 2 &&
                 localRef(m, ch[0]) == cand_b && localRef(m, ch[1]) == iter_b {
                 valid += 1;
                 return true;
             }
-            if ok == blot_error::Error.none && op_kind == blot_check_storage_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
+            if ok == squid_error::Error.none && op_kind == squid_check_storage_ops::Op.length && ch.len == 1 && localRef(m, ch[0]) == cand_b {
                 return true;
             }
             for child in ch { if !countSparkCandRefs(m, child, cand_b, iter_b, valid, other, left) { return false; } }
@@ -12242,9 +12248,9 @@ recursive fn countSparkCandRefs(
         _ => { return false; },
     }
 }
-fn findSparkReuseCandidate(g: Generator&, f: Fn&, m: const Module&, info: blot_check_core::SparkInfo, out_ty: Ty, elem_ty: Ty) -> u32 {
+fn findSparkReuseCandidate(g: Generator&, f: Fn&, m: const Module&, info: squid_check_core::SparkInfo, out_ty: Ty, elem_ty: Ty) -> u32 {
     if g.runtime_().has_fork { return 0; }
-    if tagOf(g, out_ty) != blot_direct_types::Tag.array || !isScalarTag(tagOf(g, elem_ty)) { return 0; }
+    if tagOf(g, out_ty) != squid_direct_types::Tag.array || !isScalarTag(tagOf(g, elem_ty)) { return 0; }
     if !info.is_range {
         let cand_b = localRef(m, info.source);
         if cand_b == 0 || !isUniqueOwned(g, f, cand_b) || bindingCaptured(g, f, cand_b) { return 0; }
@@ -12255,7 +12261,7 @@ fn findSparkReuseCandidate(g: Generator&, f: Fn&, m: const Module&, info: blot_c
         if ok && val.ty == out_ty { return cand_b; }
         return 0;
     }
-    if info.pattern == 0 || m.pattern(info.pattern).tag != blot_check_core::PatternTag.bind { return 0; }
+    if info.pattern == 0 || m.pattern(info.pattern).tag != squid_check_core::PatternTag.bind { return 0; }
     let iter_b = m.pattern(info.pattern).a;
     var cands: u32[8] = [0; 8];
     var cands_len: i64 = 0;
@@ -12295,7 +12301,7 @@ recursive fn inferSparkBodyTy(
 ) -> Ty, bool {
     if id == 0 || depth > 32 { return 0, false; }
     let direct, derr = g.types.lower(m, m.typeOf(id), f.env);
-    if derr == blot_direct_types::Error.none { return direct, true; }
+    if derr == squid_direct_types::Error.none { return direct, true; }
     let n = m.node(id);
     match n.tag {
         reference => {
@@ -12311,39 +12317,39 @@ recursive fn inferSparkBodyTy(
                 let fidx = findComptimeFrame(f, n.a);
                 if fidx >= 0 { return f.comptime_frames[fidx].field_ty, true; }
             } else if n.c == 2 || n.c == 4 || n.c == 7 {
-                return blot_direct_types::u32_, true;
+                return squid_direct_types::u32_, true;
             } else if n.c == 3 || n.c == 5 || n.c == 6 || n.c == 8 || n.c == 9 {
-                return blot_direct_types::boolean, true;
+                return squid_direct_types::boolean, true;
             }
             return 0, false;
         },
         scalar, associated => {
             let lty, lok = inferSparkBodyTy(g, f, m, n.a, pat_binding, pat_ty, depth + 1);
-            if lok && n.op != blot_check_core::Op.none && isScalarTag(tagOf(g, lty)) {
+            if lok && n.op != squid_check_core::Op.none && isScalarTag(tagOf(g, lty)) {
                 return scalarResult(n.op, lty), true;
             }
-            if lok && n.tag == blot_check_core::Tag.associated {
+            if lok && n.tag == squid_check_core::Tag.associated {
                 let id_opt, has_id = g.receiverIdentity(lty);
                 if has_id {
-                    let target, has_target = g.dispatchTarget(m, id_opt, n.c, blot_check_types::Operator.none);
+                    let target, has_target = g.dispatchTarget(m, id_opt, n.c, squid_check_types::Operator.none);
                     if has_target && g.hasUnit(target.unit) {
                         let tm .= g.units[target.unit - 1];
                         let tb = tm.binding(target.binding);
                         let tnode = tm.types.node(tb.ty);
-                        if tnode.tag == blot_check_types::Tag.function {
+                        if tnode.tag == squid_check_types::Tag.function {
                             var rtid = tnode.b;
-                            if n.b != 0 && tm.types.node(rtid).tag == blot_check_types::Tag.function {
+                            if n.b != 0 && tm.types.node(rtid).tag == squid_check_types::Tag.function {
                                 rtid = tm.types.node(rtid).b;
                             }
                             let rty, rerr = g.types.lower(tm, rtid, Env {});
-                            if rerr == blot_direct_types::Error.none { return rty, true; }
+                            if rerr == squid_direct_types::Error.none { return rty, true; }
                         }
                     }
                 }
             }
             return 0, false;
         },
-        logical => { return blot_direct_types::boolean, true; },
+        logical => { return squid_direct_types::boolean, true; },
         if_value => {
             let tty, tok = inferSparkBodyTy(g, f, m, n.b, pat_binding, pat_ty, depth + 1);
             if tok { return tty, true; }
@@ -12367,14 +12373,14 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var source_val = neverVal();
     if info.is_range {
         let s_val, s_err = expr(g, f, info.source);
-        if s_err != blot_direct_types::Error.none { return s_val, s_err; }
+        if s_err != squid_direct_types::Error.none { return s_val, s_err; }
         let s_loc, sl_err = scalarLocal(g, f, s_val, id);
-        if sl_err != blot_direct_types::Error.none { return neverVal(), sl_err; }
+        if sl_err != squid_direct_types::Error.none { return neverVal(), sl_err; }
         start_local = s_loc;
         let e_val, e_err = expr(g, f, info.end);
-        if e_err != blot_direct_types::Error.none { return e_val, e_err; }
+        if e_err != squid_direct_types::Error.none { return e_val, e_err; }
         let e_loc, el_err = scalarLocal(g, f, e_val, id);
-        if el_err != blot_direct_types::Error.none { return neverVal(), el_err; }
+        if el_err != squid_direct_types::Error.none { return neverVal(), el_err; }
         count = local32(g, f);
         lget(g, e_loc);
         lget(g, start_local);
@@ -12391,48 +12397,48 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         close(g, f);
     } else {
         let c_val, c_err = expr(g, f, info.source);
-        if c_err != blot_direct_types::Error.none { return c_val, c_err; }
+        if c_err != squid_direct_types::Error.none { return c_val, c_err; }
         source_val = c_val;
         let len_loc, len_err = lengthOf(g, f, source_val, id);
-        if len_err != blot_direct_types::Error.none { return neverVal(), len_err; }
+        if len_err != squid_direct_types::Error.none { return neverVal(), len_err; }
         count = len_loc;
     }
 
     var out_ty: Ty = 0;
     let strict_out, strict_err = g.types.lower(g.units[f.unit - 1], g.units[f.unit - 1].typeOf(id), f.env);
-    if strict_err == blot_direct_types::Error.none {
+    if strict_err == squid_direct_types::Error.none {
         out_ty = strict_out;
     } else {
         // Unresolved element type variable (e.g. deferred comptime `p.(f) + i` inside `#for`):
         // infer the concrete element type purely from the body without emitting or rewinding code.
-        var probe_item_ty = blot_direct_types::u32_;
+        var probe_item_ty = squid_direct_types::u32_;
         if !info.is_range {
             let pit, pierr = elementOf(g, f, source_val.ty, id);
-            if pierr != blot_direct_types::Error.none { return neverVal(), pierr; }
+            if pierr != squid_direct_types::Error.none { return neverVal(), pierr; }
             probe_item_ty = pit;
         }
         var pat_b: u32 = 0;
-        if info.pattern != 0 && g.units[f.unit - 1].pattern(info.pattern).tag == blot_check_core::PatternTag.bind {
+        if info.pattern != 0 && g.units[f.unit - 1].pattern(info.pattern).tag == squid_check_core::PatternTag.bind {
             pat_b = g.units[f.unit - 1].pattern(info.pattern).a;
         }
         let probed_ty, probed_ok = inferSparkBodyTy(g, f, g.units[f.unit - 1], info.body, pat_b, probe_item_ty, 0);
         if probed_ok && probed_ty != 0 {
-            let built, ierr = g.types.intern(blot_direct_types::Tag.array, [probed_ty]);
-            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            let built, ierr = g.types.intern(squid_direct_types::Tag.array, [probed_ty]);
+            if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
             refine(g, f, g.units[f.unit - 1].typeOf(id), built);
             out_ty = built;
         } else {
             let fallback_ty, ty_err = typeOf(g, f, id);
-            if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+            if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
             out_ty = fallback_ty;
         }
     }
     let elem_ty, elem_err = elementOf(g, f, out_ty, id);
-    if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+    if elem_err != squid_direct_types::Error.none { return neverVal(), elem_err; }
     let step, step_err = stride(g, f, elem_ty, id);
-    if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+    if step_err != squid_direct_types::Error.none { return neverVal(), step_err; }
     let elem_holds, hold_err = g.contentsHoldMemory(elem_ty);
-    if hold_err != blot_direct_types::Error.none { return neverVal(), hold_err; }
+    if hold_err != squid_direct_types::Error.none { return neverVal(), hold_err; }
 
     let reuse_cand = findSparkReuseCandidate(g, f, g.units[f.unit - 1], info, out_ty, elem_ty);
     var handle = neverVal();
@@ -12445,7 +12451,7 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let cand_val, _ = bindGet(g, f, reuse_cand);
         let cand_base, cand_len = ensureCheckedArray(g, f, cand_val);
         let made_handle, herr = fresh(g, f, out_ty, id);
-        if herr != blot_direct_types::Error.none { return neverVal(), herr; }
+        if herr != squid_direct_types::Error.none { return neverVal(), herr; }
         let made_base = local32(g, f);
         lget(g, start_local);
         op(g, OP_i32_eqz);
@@ -12455,15 +12461,15 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         op(g, OP_i32_and);
         let reuse_if = open(g, f, OP_if_);
         let cp1_err = copy(g, f, cand_val, made_handle, id);
-        if cp1_err != blot_direct_types::Error.none { return neverVal(), cp1_err; }
+        if cp1_err != squid_direct_types::Error.none { return neverVal(), cp1_err; }
         lget(g, cand_base);
         lset(g, made_base);
         popCheckedArraysAt(f, reuse_if);
         op(g, OP_else_);
         let alloc_handle, alloc_base, aerr = createUninit(g, f, out_ty, count, id);
-        if aerr != blot_direct_types::Error.none { return alloc_handle, aerr; }
+        if aerr != squid_direct_types::Error.none { return alloc_handle, aerr; }
         let cp2_err = copy(g, f, alloc_handle, made_handle, id);
-        if cp2_err != blot_direct_types::Error.none { return neverVal(), cp2_err; }
+        if cp2_err != squid_direct_types::Error.none { return neverVal(), cp2_err; }
         lget(g, alloc_base);
         lset(g, made_base);
         close(g, f);
@@ -12471,13 +12477,13 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         base = made_base;
     } else {
         let alloc_handle, alloc_base, alloc_err = createUninit(g, f, out_ty, count, id);
-        if alloc_err != blot_direct_types::Error.none { return alloc_handle, alloc_err; }
+        if alloc_err != squid_direct_types::Error.none { return alloc_handle, alloc_err; }
         handle = alloc_handle;
         base = alloc_base;
     }
 
     let vectorized, vec_index, vec_err = tryEmitVectorSpark(g, f, id, out_ty, elem_ty, start_local, source_val, count, base);
-    if vec_err != blot_direct_types::Error.none { return neverVal(), vec_err; }
+    if vec_err != squid_direct_types::Error.none { return neverVal(), vec_err; }
 
     var index: u32 = 0;
     if vectorized {
@@ -12508,16 +12514,16 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         lget(g, index);
         op(g, OP_i32_add);
         lset(g, cur);
-        item = valOf1(g, blot_direct_types::u32_, cur);
+        item = valOf1(g, squid_direct_types::u32_, cur);
     } else {
         let loaded, lerr = readElement(g, f, source_val, index, id, g.units[f.unit - 1].typeOf(info.source), false);
-        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+        if lerr != squid_direct_types::Error.none { return neverVal(), lerr; }
         item = loaded;
     }
 
-    let saved_bindings = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
+    let saved_bindings = squid_support_zigmap::clone(g.s.map_pool, f.bindings);
     let tested = test_(g, f, info.pattern, item, false, 0, id);
-    if tested != blot_direct_types::Error.none {
+    if tested != squid_direct_types::Error.none {
         f.bindings = saved_bindings;
         return neverVal(), tested;
     }
@@ -12525,12 +12531,12 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let val, verr = stmt(g, f, info.body);
     f.loop_depth -= 1;
     f.bindings = saved_bindings;
-    if verr != blot_direct_types::Error.none { return val, verr; }
+    if verr != squid_direct_types::Error.none { return val, verr; }
 
-    if val.ty != blot_direct_types::never {
+    if val.ty != squid_direct_types::never {
         let dst_addr = emitOffsetAddress(g, f, base, index, step);
         let written = writeElement(g, f, dst_addr, 0, val, id);
-        if written != blot_direct_types::Error.none { return neverVal(), written; }
+        if written != squid_direct_types::Error.none { return neverVal(), written; }
         // Escape-safe per-iteration scratch release: only release when output
         // elements cannot hold scope memory and no store escaped past owner_mark.
         let release_ok = !elem_holds && f.memory_stores == stores_before && f.allocations != allocs_before;
@@ -12548,15 +12554,15 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             markInto(g, prefix, owner_mark, stack_mark);
             let esc_global = g.runtime_().escape_min_slot;
             prefix.push(OP_global_get);
-            blot_direct_writer::uleb(prefix, esc_global);
+            squid_direct_writer::uleb(prefix, esc_global);
             prefix.push(OP_local_set);
-            blot_direct_writer::uleb(prefix, saved_esc);
+            squid_direct_writer::uleb(prefix, saved_esc);
             prefix.push(OP_i32_const);
-            blot_direct_writer::sleb(prefix, -1);
+            squid_direct_writer::sleb(prefix, -1);
             prefix.push(OP_global_set);
-            blot_direct_writer::uleb(prefix, esc_global);
-            blot_direct_relocations::insert(f.sites_base, mark_at, prefix.len);
-            if g.s.parallel_readonly { blot_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
+            squid_direct_writer::uleb(prefix, esc_global);
+            squid_direct_relocations::insert(f.sites_base, mark_at, prefix.len);
+            if g.s.parallel_readonly { squid_direct_emit::shiftParallelPatches(mark_at, prefix.len); }
             let old_len = g.s.code.len;
             for byte in prefix { g.s.code.push(byte); }
             var at = old_len;
@@ -12574,20 +12580,20 @@ recursive fn sparkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     close(g, f);
     close(g, f);
-    return handle, blot_direct_types::Error.none;
+    return handle, squid_direct_types::Error.none;
 }
 
 recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    if n.c == blot_check_core::flat_op_kernel_handle {
+    if n.c == squid_check_core::flat_op_kernel_handle {
         let kidx = n.a;
         if (kidx as i64) >= g.s.kernels.len {
             return neverVal(), g.fail(m, id, "unknown kernel declaration index");
         }
         let kinfo = g.s.kernels[kidx];
         let ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         let w0 = constLocal(g, f, kidx);
         let w1 = constLocal(g, f, (kinfo.binding_hash & 0xffffffff) as u32);
         let w2 = constLocal(g, f, (kinfo.binding_hash >> 32) as u32);
@@ -12596,10 +12602,10 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let w5 = constLocal(g, f, (kinfo.io_schema_hash & 0xffffffff) as u32);
         let w6 = constLocal(g, f, (kinfo.io_schema_hash >> 32) as u32);
         let boxed, berr = isBoxed(g, f, ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if berr != squid_direct_types::Error.none { return neverVal(), berr; }
         if boxed {
             let blk, merr = newBlock(g, f, ty, id);
-            if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+            if merr != squid_direct_types::Error.none { return neverVal(), merr; }
             let vals: u32[7] = [w0, w1, w2, w3, w4, w5, w6];
             for wi in 0..7 {
                 lget(g, blk);
@@ -12608,27 +12614,27 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 uleb(g, 2);
                 uleb(g, (wi * 4) as u32);
             }
-            return valOf1(g, ty, blk), blot_direct_types::Error.none;
+            return valOf1(g, ty, blk), squid_direct_types::Error.none;
         }
         let words = g.saveWords([w0, w1, w2, w3, w4, w5, w6]);
-        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+        return Val { ty, words.start, words.len }, squid_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_process_handle {
+    if n.c == squid_check_core::flat_op_process_handle {
         let pidx = n.a;
         if (pidx as i64) >= g.s.processes.len {
             return neverVal(), g.fail(m, id, "unknown process declaration index");
         }
         let pinfo = g.s.processes[pidx];
         let ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         let w0 = constLocal(g, f, pidx);
         let w1 = constLocal(g, f, (pinfo.binding_hash & 0xffffffff) as u32);
         let w2 = constLocal(g, f, (pinfo.binding_hash >> 32) as u32);
         let boxed, berr = isBoxed(g, f, ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if berr != squid_direct_types::Error.none { return neverVal(), berr; }
         if boxed {
             let blk, merr = newBlock(g, f, ty, id);
-            if merr != blot_direct_types::Error.none { return neverVal(), merr; }
+            if merr != squid_direct_types::Error.none { return neverVal(), merr; }
             let vals: u32[3] = [w0, w1, w2];
             for wi in 0..3 {
                 lget(g, blk);
@@ -12637,16 +12643,16 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 uleb(g, 2);
                 uleb(g, (wi * 4) as u32);
             }
-            return valOf1(g, ty, blk), blot_direct_types::Error.none;
+            return valOf1(g, ty, blk), squid_direct_types::Error.none;
         }
         let words = g.saveWords([w0, w1, w2]);
-        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+        return Val { ty, words.start, words.len }, squid_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_kernel_id || n.c == blot_check_core::flat_op_process_id {
+    if n.c == squid_check_core::flat_op_kernel_id || n.c == squid_check_core::flat_op_process_id {
         let kval, kerr = expr(g, f, n.a);
-        if kerr != blot_direct_types::Error.none { return kval, kerr; }
+        if kerr != squid_direct_types::Error.none { return kval, kerr; }
         let boxed, berr = isBoxed(g, f, kval.ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if berr != squid_direct_types::Error.none { return neverVal(), berr; }
         if boxed {
             let res = local32(g, f);
             lget(g, w(g, kval, 0));
@@ -12654,20 +12660,20 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             uleb(g, 2);
             uleb(g, 0);
             lset(g, res);
-            return valOf1(g, blot_direct_types::u32_, res), blot_direct_types::Error.none;
+            return valOf1(g, squid_direct_types::u32_, res), squid_direct_types::Error.none;
         }
-        return valOf1(g, blot_direct_types::u32_, w(g, kval, 0)), blot_direct_types::Error.none;
+        return valOf1(g, squid_direct_types::u32_, w(g, kval, 0)), squid_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_kernel_binding_hash || n.c == blot_check_core::flat_op_kernel_ctx_hash || n.c == blot_check_core::flat_op_kernel_io_hash || n.c == blot_check_core::flat_op_process_binding_hash {
+    if n.c == squid_check_core::flat_op_kernel_binding_hash || n.c == squid_check_core::flat_op_kernel_ctx_hash || n.c == squid_check_core::flat_op_kernel_io_hash || n.c == squid_check_core::flat_op_process_binding_hash {
         let kval, kerr = expr(g, f, n.a);
-        if kerr != blot_direct_types::Error.none { return kval, kerr; }
+        if kerr != squid_direct_types::Error.none { return kval, kerr; }
         let ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         var word_base: i64 = 1;
-        if n.c == blot_check_core::flat_op_kernel_ctx_hash { word_base = 3; }
-        else if n.c == blot_check_core::flat_op_kernel_io_hash { word_base = 5; }
+        if n.c == squid_check_core::flat_op_kernel_ctx_hash { word_base = 3; }
+        else if n.c == squid_check_core::flat_op_kernel_io_hash { word_base = 5; }
         let boxed, berr = isBoxed(g, f, kval.ty, id);
-        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        if berr != squid_direct_types::Error.none { return neverVal(), berr; }
         var lo: u32 = 0;
         var hi: u32 = 0;
         if boxed {
@@ -12688,62 +12694,62 @@ recursive fn flatOpNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             hi = w(g, kval, word_base + 1);
         }
         let words = g.saveWords([lo, hi]);
-        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+        return Val { ty, words.start, words.len }, squid_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_schema_hash {
+    if n.c == squid_check_core::flat_op_schema_hash {
         let ignored, aerr = expr(g, f, n.a);
-        if aerr != blot_direct_types::Error.none { return ignored, aerr; }
+        if aerr != squid_direct_types::Error.none { return ignored, aerr; }
         let ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
-        let h, ok = blot_check_wire_schema::computeSchemaHash(g.units, f.unit, n.b);
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
+        let h, ok = squid_check_wire_schema::computeSchemaHash(g.units, f.unit, n.b);
         if !ok {
-            return neverVal(), g.failCode(m, id, blot_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
+            return neverVal(), g.failCode(m, id, squid_check_diagnostic_code::Code.kernel_type, "@flat.schema_hash requires a closed FlatNumeric, Unit, #[U32], or #[F32] type");
         }
         let lo = constLocal(g, f, (h & 0xffffffff) as u32);
         let hi = constLocal(g, f, (h >> 32) as u32);
         let words = g.saveWords([lo, hi]);
-        return Val { ty, words.start, words.len }, blot_direct_types::Error.none;
+        return Val { ty, words.start, words.len }, squid_direct_types::Error.none;
     }
-    if n.c == blot_check_core::flat_op_encode {
+    if n.c == squid_check_core::flat_op_encode {
         let arg_val, aerr = expr(g, f, n.a);
-        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        if aerr != squid_direct_types::Error.none { return arg_val, aerr; }
         let out_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatEncodeVal(g, f, arg_val, n.b, out_ty, id);
     }
-    if n.c == blot_check_core::flat_op_decode {
+    if n.c == squid_check_core::flat_op_decode {
         let src_val, serr = expr(g, f, n.a);
-        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        if serr != squid_direct_types::Error.none { return src_val, serr; }
         let maybe_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatDecodeVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
     }
-    if n.c == blot_check_core::flat_op_encode_wire {
+    if n.c == squid_check_core::flat_op_encode_wire {
         let arg_val, aerr = expr(g, f, n.a);
-        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        if aerr != squid_direct_types::Error.none { return arg_val, aerr; }
         let out_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatEncodeWireVal(g, f, arg_val, n.b, out_ty, id);
     }
-    if n.c == blot_check_core::flat_op_decode_wire {
+    if n.c == squid_check_core::flat_op_decode_wire {
         let src_val, serr = expr(g, f, n.a);
-        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        if serr != squid_direct_types::Error.none { return src_val, serr; }
         let maybe_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatDecodeWireVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
     }
-    if n.c == blot_check_core::flat_op_encode_batch {
+    if n.c == squid_check_core::flat_op_encode_batch {
         let arg_val, aerr = expr(g, f, n.a);
-        if aerr != blot_direct_types::Error.none { return arg_val, aerr; }
+        if aerr != squid_direct_types::Error.none { return arg_val, aerr; }
         let out_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatEncodeBatchVal(g, f, arg_val, n.b, out_ty, id);
     }
-    if n.c == blot_check_core::flat_op_decode_batch {
+    if n.c == squid_check_core::flat_op_decode_batch {
         let src_val, serr = expr(g, f, n.a);
-        if serr != blot_direct_types::Error.none { return src_val, serr; }
+        if serr != squid_direct_types::Error.none { return src_val, serr; }
         let maybe_ty, ty_err = typeOf(g, f, id);
-        if ty_err != blot_direct_types::Error.none { return neverVal(), ty_err; }
+        if ty_err != squid_direct_types::Error.none { return neverVal(), ty_err; }
         return emitFlatDecodeBatchVal(g, f, src_val, m.typeOf(id), maybe_ty, id);
     }
     return neverVal(), g.fail(m, id, "unknown @flat intrinsic");

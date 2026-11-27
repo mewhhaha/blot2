@@ -1,13 +1,13 @@
-namespace blot_reuse_composite_resolution_cache;
+namespace squid_reuse_composite_resolution_cache;
 import support.error;
 import support.option;
 import support.native;
 
-type Error = blot_error::Error;
+type Error = squid_error::Error;
 struct Dependency { variable: u32=0, last: u32=0, effect: bool = false }
 struct Record {
     result: u32 = 0, dependencies: Dependency[8]=[Dependency {..};8], count: u8 = 0,
-    future_clock: blot_support::Option<u32>,
+    future_clock: squid_support::Option<u32>,
 }
 fn add(record: Record&, dependency: Dependency) -> bool {
     for index in record.count {
@@ -38,9 +38,9 @@ reusable var states:State[>..]=[];
 var inactive:State=State {..};
 struct Cache {entries:EntryBuffer& =inactive.entries,physical: u16& =inactive.physical, effects_physical: u64& =inactive.effects_physical,lease:u32=0,lease_generation:u64=0}
 fn initPooled()->Cache,Error {
- if states.len>=0xffffffff {return Cache {..},blot_error::Error.out_of_memory;}
- let generation=blot_native::fresh_owner_id();let at=states.alloc_index(State {live:true,owner:generation, ..});let state:State& =states[at];
- return Cache {entries:state.entries,physical:state.physical, effects_physical:state.effects_physical,lease:(at+1) as u32,lease_generation:generation, ..},blot_error::Error.none;
+ if states.len>=0xffffffff {return Cache {..},squid_error::Error.out_of_memory;}
+ let generation=squid_native::fresh_owner_id();let at=states.alloc_index(State {live:true,owner:generation, ..});let state:State& =states[at];
+ return Cache {entries:state.entries,physical:state.physical, effects_physical:state.effects_physical,lease:(at+1) as u32,lease_generation:generation, ..},squid_error::Error.none;
 }
 fn valid(cache:const Cache&)->bool {return cache.lease!=0&&cache.lease-1<states.len&&states[cache.lease-1].live&&states[cache.lease-1].owner==cache.lease_generation;}
 fn deinit(cache:Cache&) {if cache.lease==0 {return;}assert(valid(cache));let at=cache.lease-1;let state:State& =states[at];state.entries.clear();state.live=false;states.free(at);cache=Cache {..};}
@@ -67,17 +67,17 @@ fn setBase(root: u32, at: u32, sets_mask: i64) -> i64 {
     let h = (root * 2654435769) ^ (at * 2246822507);
     return ((((h ^ (h >> 16)) as i64) & sets_mask) << 2);
 }
-fn get(cache: const Cache&, root: u32, at: u32) -> blot_support::Option<Record> {
+fn get(cache: const Cache&, root: u32, at: u32) -> squid_support::Option<Record> {
     assert(valid(cache));
     let state:const State& =states[cache.lease-1];
-    if state.count == 0 || state.entries.len == 0 { return blot_support::none<Record>(); }
+    if state.count == 0 || state.entries.len == 0 { return squid_support::none<Record>(); }
     let gen = state.generation;
     let base = setBase(root, at, (state.entries.len >> 2) - 1);
     for w in 0..4 {
         let entry = state.entries.items[base + w];
-        if entry.stamp == gen && entry.root == root && entry.at == at { return blot_support::some(entry.record); }
+        if entry.stamp == gen && entry.root == root && entry.at == at { return squid_support::some(entry.record); }
     }
-    return blot_support::none<Record>();
+    return squid_support::none<Record>();
 }
 fn occupied(cache: const Cache&, root: u32, at: u32) -> bool {
     assert(valid(cache));
@@ -148,7 +148,7 @@ fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
         if entry.stamp == gen {
             if entry.root == root && entry.at == at {
                 state.entries.items[idx] = Entry { root, at, gen, record , ..};
-                return blot_error::Error.none;
+                return squid_error::Error.none;
             }
         } else if empty < 0 {
             empty = idx;
@@ -157,7 +157,7 @@ fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
     if empty >= 0 {
         state.entries.items[empty] = Entry { root, at, gen, record , ..};
         state.count += 1;
-        return blot_error::Error.none;
+        return squid_error::Error.none;
     }
     if state.entries.len < 2048 {
         growEntries(state.entries, state.entries.len * 2, gen);
@@ -166,13 +166,13 @@ fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
             if state.entries.items[base2 + w].stamp != gen {
                 state.entries.items[base2 + w] = Entry { root, at, gen, record , ..};
                 state.count += 1;
-                return blot_error::Error.none;
+                return squid_error::Error.none;
             }
         }
         state.entries.items[base2 + (((root ^ at) & 3) as i64)] = Entry { root, at, gen, record , ..};
         state.count += 1;
-        return blot_error::Error.none;
+        return squid_error::Error.none;
     }
     state.entries.items[base + (((root ^ at) & 3) as i64)] = Entry { root, at, gen, record , ..};
-    return blot_error::Error.none;
+    return squid_error::Error.none;
 }

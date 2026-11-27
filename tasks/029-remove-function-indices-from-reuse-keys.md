@@ -8,7 +8,7 @@
 - **Originating requirements:** PLAN: Earlier semantic compilation / stable
   optimized-body identities. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -38,7 +38,7 @@ existing relocation proofs.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Insert, remove and reorder unrelated functions and compare cache reuse plus
@@ -59,7 +59,7 @@ commands for focused development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: `2798ff9` (joint 029/032/037 compiler and bpm milestone).
+- Commit: `2798ff9` (joint 029/032/037 compiler and spm milestone).
 - Implementation: Normalized body/tier keys, exact bounded graph proofs and
   owned output relocation remove incidental positions from reuse identity.
   Portable v3 captures own complete reference, role and lifetime facts.

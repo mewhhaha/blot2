@@ -12,7 +12,7 @@ if (Deno.args.length !== 3) {
 }
 const [baseline, candidate, directory] = Deno.args.map((path) => resolve(path));
 await Deno.mkdir(directory);
-const input = `${directory}/main.blot`;
+const input = `${directory}/main.sq`;
 const source =
   `const calculate = func (args: { a: U32, b: U32, c: U32, d: U32 }) => return
   @u32.add (@u32.mul args.a args.b) (@u32.mul args.c args.d)

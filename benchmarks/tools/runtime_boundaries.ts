@@ -34,7 +34,7 @@ const libraries = {
   baseline: resolve(root, values["baseline-std"]!),
   candidate: resolve(root, "std"),
 };
-const entry = resolve(root, "benchmarks/runtime-boundaries/main.blot");
+const entry = resolve(root, "benchmarks/runtime-boundaries/main.sq");
 const sha = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) =>
     x.toString(16).padStart(2, "0")
@@ -110,7 +110,7 @@ for (let round = 0; round < 3; round++) {
     const compiler = await createZigProjectCompiler({
       executable: executable[side],
       entry,
-      prelude: resolve(libraries[side], "prelude.blot"),
+      prelude: resolve(libraries[side], "prelude.sq"),
       stdRoot: libraries[side],
     });
     try {
@@ -149,7 +149,7 @@ for (let round = 0; round < 3; round++) {
   }
 }
 const count = (guest: Guest, name: string) =>
-  Number((guest.exports[`blot:${name}`] as WebAssembly.Global).value) >>> 0;
+  Number((guest.exports[`squid:${name}`] as WebAssembly.Global).value) >>> 0;
 const counts = (guest: Guest) =>
   Object.fromEntries(names.map((name) => [name, count(guest, name)])) as Counts;
 function invoke(
@@ -158,7 +158,7 @@ function invoke(
   argument: number,
   expected: number,
 ) {
-  (guest.exports["blot:ownership_enter"] as CallableFunction)();
+  (guest.exports["squid:ownership_enter"] as CallableFunction)();
   let outcome = 1;
   try {
     assert.equal(
@@ -167,7 +167,7 @@ function invoke(
     );
     outcome = 0;
   } finally {
-    (guest.exports["blot:ownership_leave"] as CallableFunction)(outcome);
+    (guest.exports["squid:ownership_leave"] as CallableFunction)(outcome);
   }
   assert.equal(count(guest, "rc_roots"), 0);
   assert.equal(count(guest, "rc_leases"), 0);

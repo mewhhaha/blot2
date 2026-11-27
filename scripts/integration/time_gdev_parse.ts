@@ -27,7 +27,7 @@ if (values["frontend-workers"] !== undefined) {
 const rounds = Number(values.rounds);
 assert(Number.isSafeInteger(rounds) && rounds > 0);
 const gdev = resolve(values["gdev-root"]);
-const file = resolve(gdev, "src/effects/lighting_look.blot");
+const file = resolve(gdev, "src/effects/lighting_look.sq");
 const original = await Deno.readTextFile(file);
 const marker = "const proposed = $Look { sun: true,";
 assert.equal(original.split(marker).length, 2);
@@ -56,7 +56,7 @@ for (const mode of ["before", "after"] as const) {
     await gdevProject(
       gdev,
       resolve("std"),
-      "src/main.blot",
+      "src/main.sq",
       resolve(values[mode]!),
     ),
   );

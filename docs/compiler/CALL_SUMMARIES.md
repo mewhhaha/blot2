@@ -548,7 +548,7 @@ CPU, with a median paired ratio of 1.009. These observations are not a general
 speedup claim.
 
 Seven
-`deno task bench:compile --baseline build/bench/cloud-selected-schemes/baseline/blotc --candidate build/bench/cloud-selected-schemes/candidate/blotc --runs 7 --workload synthetic --out build/bench/cloud-selected-schemes/synthetic`
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/baseline/squidc --candidate build/bench/cloud-selected-schemes/candidate/squidc --runs 7 --workload synthetic --out build/bench/cloud-selected-schemes/synthetic`
 pairs preserve fresh/retained Wasm equality across population, first edit,
 subsequent edit/revert and no-op phases. Fresh CPU medians are 8/8, 7/7, 5/4 and
 15/15 ms for monomorphic chain 128, generic chain 64, diamond 8 and fan-out 128.
@@ -650,7 +650,7 @@ raw files are preserved separately and excluded from these medians.
 
 Seven official synthetic pairs compare fresh, retained population, first edit,
 edit/revert, no-op and restart phases:
-`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-guarded/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/guarded-synthetic`.
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-guarded/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/guarded-synthetic`.
 All byte comparisons pass. Ordinary monomorphic/generic chains, diamond 8 and
 fan-out 128 retain their deterministic work counters. CPU is mixed; retained
 samples frequently fall below the 10-ms accounting resolution. The frozen
@@ -659,7 +659,7 @@ general compiler or gdev speedup.
 
 The same seven-pair harness, extended with the factory source and its ordinary
 leaf edit, also passes all fresh/retained/restart comparisons:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-guarded/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/guarded-factory-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-guarded/squidc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/guarded-factory-retained`.
 Fresh CPU is 205/7 ms; retained population, first edit and subsequent edit are
 200/<10, 210/<10 and 190/<10 ms. Restart is 7/7 ms and no-op is below 10 ms for
 both. The retained factory improvement is above the accounting resolution; the
@@ -751,9 +751,9 @@ grow with transitive paths: open header keys use freshly allocated wrapper
 product IDs, preventing equivalent live inputs from sharing required work.
 
 Seven official synthetic pairs preserve fresh/retained/restart Wasm equality:
-`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-synthetic`.
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-synthetic`.
 The same harness extended with the factory also preserves all comparisons:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-factory-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/squidc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-factory-retained`.
 Retained timings use 10-ms process-accounting resolution; below-resolution
 samples are not precise latency measurements. Their raw records retain
 population, first edit, subsequent edit/revert, no-op and restart separately.
@@ -856,7 +856,7 @@ finish; the unbounded work is the ordinary Core source-interface inquiry. The
 earlier attribution to a frontend retry was incorrect. It is not a passing
 recursive qualification. Task 007 must bound that inquiry as well as independent
 late-edge frontend component publication. The probe is retained at
-`build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.blot`.
+`build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.sq`.
 Debug self-backend deep-chain failures likewise remain separate from the passing
 release LLVM gate. Callback invocation, lexical capture, recursive components
 and canonical cross-session keys remain tasks 005–008. The missing historical
@@ -900,7 +900,7 @@ overhead.
 
 Seven official synthetic pairs preserve fresh, retained and restart Wasm
 equality:
-`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/live-header-synthetic`.
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/live-header-synthetic`.
 Fresh median CPU for mono chain / generic chain / diamond / fan-out is 10/8/5/18
 ms in the baseline and 10/10/5/18 ms in the candidate. Restart medians are
 10/8/5/18 and 9/9/5/18 ms. Allocation adds approximately 1–5%. Retained phase
@@ -909,7 +909,7 @@ not establish precise edit latency or ratios.
 
 The same harness extended with the factory preserves all seven fresh, retained
 and restart pairs:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/live-header-factory-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/squidc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/squidc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/live-header-factory-retained`.
 Fresh CPU drops from 195 to 8 ms, allocation from 20.38 to 6.57 MB and peak
 requested memory from 15.63 to 1.14 MB. Restart CPU instead rises from 7 to 8 ms
 and allocation from 5.80 to 6.67 MB. Cache loading, retained population, first
@@ -1046,7 +1046,7 @@ program-wide latency gate. No private gdev comparison is available.
 
 The code milestone is `652f4d6ee67ecd1aa45096bdc57e089bd082a112`. Seven
 alternating pairs also pass the ordinary compile harness:
-`deno task bench:compile --baseline build/bench/cloud-principal-graphs/candidate-live-headers/blotc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-synthetic-v2`.
+`deno task bench:compile --baseline build/bench/cloud-principal-graphs/candidate-live-headers/squidc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-synthetic-v2`.
 Fresh CPU for monomorphic/generic chains and the ordinary diamond is 10/9/6 ms
 baseline versus 9/9/6 ms candidate; restart is 10/9/5 ms for both. Fan-out
 fresh/restart is 17/18 ms versus 19/19 ms. Its fresh allocation rises from 12.81
@@ -1055,7 +1055,7 @@ deterministic ordinary work counters agree; maximum scopes remain two.
 
 The same harness extended with 27 callback workloads at depths 4/8/12 passes
 seven pairs across 31 workloads:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-callbacks.ts --baseline build/bench/cloud-principal-graphs/candidate-live-headers/blotc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-retained-v2`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-callbacks.ts --baseline build/bench/cloud-principal-graphs/candidate-live-headers/squidc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-retained-v2`.
 Its baseline/candidate and fresh/restart/population/edit/no-op Wasm hashes
 agree, including independently rebuilt edited outputs. No unexpected problem
 occurs; both binary and compiler-identity pins remain unchanged. The private
@@ -1211,7 +1211,7 @@ small callback controls remain close to the baseline. This qualification makes
 no general captured-workload speedup claim.
 
 Seven alternating pairs pass 52 ordinary/callback/lexical workloads through
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-lexical.ts --baseline build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --candidate build/bench/cloud-principal-graphs/candidate-lexical/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/lexical-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-lexical.ts --baseline build/bench/cloud-principal-graphs/candidate-callbacks-v2/squidc --candidate build/bench/cloud-principal-graphs/candidate-lexical/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/lexical-retained`.
 Every variant's fresh/restart/population/edit/no-op hashes agree with the
 appropriate fresh source. Capture edits change executable output; alias edits
 preserve equal values while changing sharing. The 27 expected cross-compiler
@@ -1369,7 +1369,7 @@ speed ratio applies to these rejected baseline cases.
 Seven alternating pairs of `bench-compile-components.ts` cover **64 synthetic
 workloads / 5,376 phase samples**, using isolated cache population and restart,
 retained population, edits, reverts and no-ops. Command:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-components.ts --baseline build/bench/cloud-principal-graphs/candidate-lexical/blotc --candidate build/bench/cloud-principal-graphs/candidate-components/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/component-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-components.ts --baseline build/bench/cloud-principal-graphs/candidate-lexical/squidc --candidate build/bench/cloud-principal-graphs/candidate-components/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/component-retained`.
 Every fresh/restart/retained hash matches its corresponding fresh initial or
 edited source, and cross-compiler hashes match exactly; `unexpected_problems` is
 empty. Independently rebuilt edited outputs match the recorded hashes and
@@ -1529,7 +1529,7 @@ shared-host caches and load are uncontrolled.
 Seven alternating pairs of `bench-compile-canonical.ts` cover **73 workloads /
 6,132 phase samples**, separating fresh, isolated cache population/restart,
 retained population, first edit, subsequent edit/revert and no-op. Command:
-`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-canonical.ts --baseline build/bench/cloud-principal-graphs/candidate-components/blotc --candidate build/bench/cloud-principal-graphs/candidate-canonical/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/canonical-retained`.
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-canonical.ts --baseline build/bench/cloud-principal-graphs/candidate-components/squidc --candidate build/bench/cloud-principal-graphs/candidate-canonical/squidc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/canonical-retained`.
 Every fresh/restart/retained hash matches its fresh initial or edited source;
 cross-compiler hashes are identical and `unexpected_problems` is empty.
 Scalar128 fresh/restart CPU medians are 9→8 / 8→8 ms; Box128 is 10→9 ms in both

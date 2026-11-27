@@ -101,15 +101,15 @@ function mixedExpected(createdFirst: boolean) {
 for (const createdFirst of [true, false]) {
   Deno.test(`created scalar spans retain authority and bounds (created first ${createdFirst})`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-created-span-",
+      prefix: "squid-created-span-",
     });
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0],
       entry,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     try {
       const result = await compiler.build({

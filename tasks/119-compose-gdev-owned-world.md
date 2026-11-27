@@ -12,9 +12,9 @@ One instance owns the game's named pools. A small access bundle passes borrowed
 handles to static stage functions. No runtime array of system closures or chain
 of immutable world scopes remains.
 
-Own Gdev `src/{game,library,main}.blot`, new `src/world_storage.blot`,
+Own Gdev `src/{game,library,main}.sq`, new `src/world_storage.sq`,
 `devtools/**`, `pen.json`, root composition tests and
-`tests/codec_support/state.blot`. Own root documentation and coordinate generator
+`tests/codec_support/state.sq`. Own root documentation and coordinate generator
 inputs and generated bindings. Task 118 owns all listed game subsystem
 directories and their direct tests. Do not duplicate reusable Ink mechanisms.
 
@@ -53,7 +53,7 @@ directories and their direct tests. Do not duplicate reusable Ink mechanisms.
 - A real bounded headless scene renders; inspect the resulting GPU screenshot
   when visible behavior changes. GPU checks run sequentially, without desktop
   windows.
-- Run Gdev `pen check`, `pen codegen --check` and `pen test-blot` as one consumer
+- Run Gdev `pen check`, `pen codegen --check` and `pen test-squid` as one consumer
   batch, recording baseline failures and intentional expectation changes.
 
 ## Evidence
@@ -64,12 +64,12 @@ compiled runtime separately; this task makes no performance claim.
 
 ### Source batch notes (not qualification)
 
-- `src/world_storage.blot` declares separate named owners, static save/scene
+- `src/world_storage.sq` declares separate named owners, static save/scene
   calls, explicit restore epochs, synchronous editor stash/restore callbacks,
   bounded encoded-scene history, and invocation-only frame binding. Its known
   continuation encloses the complete `host.run` Foreign loop; owners are not
   recreated per frame. Compiler 110 must demonstrate this retained lifetime.
-- `src/game.blot` and `devtools/main.blot` compose direct stage calls. Core
+- `src/game.sq` and `devtools/main.sq` compose direct stage calls. Core
   devtools console/log/history/macros use flat rows and separate text pools;
   diagnostic panel storage remains an active source dependency.
 - Terrain initialization uses 37,249 samples per F32 lane: three terrain lanes
@@ -90,6 +90,6 @@ compiled runtime separately; this task makes no performance claim.
   previous registration chain is not claimed. Scenes contain entities/current
   component columns, seed interpolation copies explicitly, and leave resources
   live, matching the prior scene contract.
-- `tests/owned_devtools.blot` contains unrun exact macro-v1 roundtrip/compaction
-  and parser-span growth witnesses. No Blot compilation, execution, frame-time
+- `tests/owned_devtools.sq` contains unrun exact macro-v1 roundtrip/compaction
+  and parser-span growth witnesses. No Squid compilation, execution, frame-time
   measurement or GPU qualification is claimed by this source batch.

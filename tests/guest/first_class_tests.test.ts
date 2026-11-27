@@ -7,21 +7,21 @@ import {
   instantiateGuest,
   readGuestAbi,
   readTestMetadata,
-  runBlotTests,
+  runSquidTests,
 } from "../../mod.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const stdRoot = fileURLToPath(new URL("../../std/", import.meta.url));
 const prelude = fileURLToPath(
-  new URL("../../std/prelude.blot", import.meta.url),
+  new URL("../../std/prelude.sq", import.meta.url),
 );
 
-Deno.test("first-class test blocks are stripped in normal builds and emitted with blot:tests in --test mode", async () => {
+Deno.test("first-class test blocks are stripped in normal builds and emitted with squid:tests in --test mode", async () => {
   const dir = await Deno.makeTempDir();
   try {
-    const prodOnly = `${dir}/prod_only.blot`;
-    const withTests = `${dir}/with_tests.blot`;
+    const prodOnly = `${dir}/prod_only.sq`;
+    const withTests = `${dir}/with_tests.sq`;
     const prodSource = [
       "private func helper (x: U32): U32 => x * 2",
       "io prod (x: U32): U32 => helper x + 1",
@@ -91,28 +91,28 @@ Deno.test("first-class test blocks are stripped in normal builds and emitted wit
       equal(meta, [
         {
           kind: "check",
-          exportName: "__blot_test_0",
+          exportName: "__squid_test_0",
           displayName: "private helper suite",
           filename: "",
           line: 7,
         },
         {
           kind: "check",
-          exportName: "__blot_test_1",
+          exportName: "__squid_test_1",
           displayName: "bool shortcut",
           filename: "",
           line: 10,
         },
         {
           kind: "check",
-          exportName: "__blot_test_2",
+          exportName: "__squid_test_2",
           displayName: "unit fallthrough",
           filename: "",
           line: 12,
         },
         {
           kind: "trap",
-          exportName: "__blot_test_3",
+          exportName: "__squid_test_3",
           displayName: "bare panic",
           filename: "",
           line: 15,
@@ -122,16 +122,16 @@ Deno.test("first-class test blocks are stripped in normal builds and emitted wit
       const guest = await instantiateGuest(built.bytes);
       try {
         equal(guest.call("prod", 4), 9);
-        const packet = guest.call("__blot_test_0", null);
+        const packet = guest.call("__squid_test_0", null);
         ok(packet instanceof Uint32Array);
         equal(decodeTestReport(packet), { passed: 1, failed: 0, failures: [] });
-        equal(guest.call("__blot_test_1", null), true);
-        equal(guest.call("__blot_test_2", null), null);
+        equal(guest.call("__squid_test_1", null), true);
+        equal(guest.call("__squid_test_2", null), null);
       } finally {
         guest.dispose();
       }
 
-      // Retained session updates blot:tests metadata on edit.
+      // Retained session updates squid:tests metadata on edit.
       const edited = fullSource.replace(
         '"private helper suite"',
         '"renamed suite"',
@@ -147,8 +147,8 @@ Deno.test("first-class test blocks are stripped in normal builds and emitted wit
       await testSession.dispose();
     }
 
-    // End-to-end execution through runBlotTests (blot test).
-    const report = await runBlotTests({
+    // End-to-end execution through runSquidTests (squid test).
+    const report = await runSquidTests({
       executable,
       paths: [withTests],
       prelude,
@@ -174,8 +174,8 @@ Deno.test("first-class test blocks are stripped in normal builds and emitted wit
 Deno.test("imported modules keep first-class tests private and contextual test/expect_trap stay identifiers", async () => {
   const dir = await Deno.makeTempDir();
   try {
-    const lib = `${dir}/lib.blot`;
-    const main = `${dir}/main.blot`;
+    const lib = `${dir}/lib.sq`;
+    const main = `${dir}/main.sq`;
     await Deno.writeTextFile(
       lib,
       [

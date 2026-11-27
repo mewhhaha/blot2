@@ -2,7 +2,7 @@
 // absent catalogs or fixities explicitly request prelude: "none". The CLI
 // continues to default to none.
 import { instantiateGuest } from "../../host/guest.ts";
-const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 export async function compileAndRun(
   source: string,
@@ -13,11 +13,11 @@ export async function compileAndRun(
   await Deno.mkdir(parent, { recursive: true });
   const dir = await Deno.makeTempDir({ dir: parent, prefix: "zig-native-rich-" });
   try {
-    const input = `${dir}/program.blot`;
+    const input = `${dir}/program.sq`;
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(compiler, {
-      args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped",
+      args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.sq", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped",
     }).output();
     const text = new TextDecoder().decode(result.stdout);
     if (!result.success) throw new Error(`${text}\n${new TextDecoder().decode(result.stderr)}`);
@@ -39,10 +39,10 @@ export async function compileExpectedFailure(source: string, code: string, messa
   await Deno.mkdir(parent, { recursive: true });
   const dir = await Deno.makeTempDir({ dir: parent, prefix: "zig-native-failure-" });
   try {
-    const input = `${dir}/program.blot`;
+    const input = `${dir}/program.sq`;
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
-    const execution = await new Deno.Command(compiler, { args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped" }).output();
+    const execution = await new Deno.Command(compiler, { args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.sq", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped" }).output();
     const text = new TextDecoder().decode(execution.stdout);
     if (execution.success) throw new Error("Expected compilation to fail");
     const records = text.trim().split("\n").map(line => JSON.parse(line));

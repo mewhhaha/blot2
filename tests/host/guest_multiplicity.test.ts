@@ -13,7 +13,7 @@ function section(id: number, bytes: number[]): number[] {
   return [id, bytes.length, ...bytes];
 }
 function usage(bytes: number[]): number[] {
-  return section(0, [...name("blot:multiplicity"), ...bytes]);
+  return section(0, [...name("squid:multiplicity"), ...bytes]);
 }
 function module(...extra: number[][]): WebAssembly.Module {
   return new WebAssembly.Module(
@@ -30,7 +30,7 @@ function module(...extra: number[][]): WebAssembly.Module {
       ...section(3, [1, 0]),
       ...section(7, [1, ...name("f"), 0, 0]),
       ...section(10, [1, 4, 0, 32, 0, 11]),
-      ...section(0, [...name("blot:abi"), 2, 1, ...name("f"), 1, 1, 0]),
+      ...section(0, [...name("squid:abi"), 2, 1, ...name("f"), 1, 1, 0]),
       ...extra.flat(),
     ]),
   );

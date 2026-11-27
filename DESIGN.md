@@ -1,6 +1,6 @@
-# Blot Design Direction
+# Squid Design Direction
 
-Blot is a pure, value-semantic, data-oriented language that compiles directly to
+Squid is a pure, value-semantic, data-oriented language that compiles directly to
 WebAssembly through a single handwritten compiler in Goose
 ([compiler-goose/](compiler-goose/README.md)). Deno hosts the CLI, project
 client, formatter, and Wasm runtime adapter.

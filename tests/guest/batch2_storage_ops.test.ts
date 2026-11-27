@@ -3,12 +3,12 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url);
 
 async function buildGuest(source: string) {
-  const dir = await Deno.makeTempDir({ prefix: "blot-batch2-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-batch2-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -158,8 +158,8 @@ io test_oob (idx: U32): U32 =>
 });
 
 Deno.test("Batch 2: uniqueness rejects aliased @storage.reserve and @storage.extend", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-batch2-uniq-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-batch2-uniq-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

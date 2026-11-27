@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 const library = `type State a is effect = { get: Unit -> a, set: a -> Unit }
 const read: Unit -> a ! {State.get a} = func () => return State.get ()
@@ -36,10 +36,10 @@ Deno.test("symbolic written rows cannot become closed reflected descriptors", as
 });
 
 Deno.test("symbolic operation rows survive compiled dependencies and retained specialization edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-symbolic-effect-" });
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/state.blot`;
-  const archive = `${directory}/state.blotdep`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-symbolic-effect-" });
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/state.sq`;
+  const archive = `${directory}/state.sqdep`;
   const main = `import { State, read, apply, capture } from "./state"
 io const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
 io const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
@@ -99,11 +99,11 @@ io const floating = func () => return @product.get (@effect.run State.get State.
 
 Deno.test("abstract operation contracts preserve symbolic aliases through source and compiled consumers", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-symbolic-contract-",
+    prefix: "squid-symbolic-contract-",
   });
-  const entry = `${directory}/main.blot`;
-  const dependency = `${directory}/read.blot`;
-  const archive = `${directory}/read.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const dependency = `${directory}/read.sq`;
+  const archive = `${directory}/read.sqdep`;
   const declarations = `
 type Number = U32
 type Identity a = a

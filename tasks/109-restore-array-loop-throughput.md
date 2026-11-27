@@ -7,10 +7,10 @@
   witness and memory qualification on 19 October 2026.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink as
-  [issue #9](https://github.com/mewhhaha/blot2/issues/9): a guarded insertion
+  [issue #9](https://github.com/mewhhaha/squid-lang/issues/9): a guarded insertion
   sort ran about 21 times slower than on Ink's pinned compiler `86a527b`.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

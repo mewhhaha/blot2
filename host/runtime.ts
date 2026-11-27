@@ -1,9 +1,9 @@
 /**
- * Unified Deno host coordinator for Blot's in-language `std/runtime`,
+ * Unified Deno host coordinator for Squid's in-language `std/runtime`,
  * `std/kernel`, and `std/process` coordination API.
  *
- * Bridges versioned `BRT1` `#[U32] -> #[U32]` ABI 8 packets directly onto
- * Blot's real `KernelPool` and `Processes` runtimes while preserving ABI 8,
+ * Bridges versioned `SRT1` `#[U32] -> #[U32]` ABI 8 packets directly onto
+ * Squid's real `KernelPool` and `Processes` runtimes while preserving ABI 8,
  * schema/binding-hash verification, determinism, and isolation.
  */
 import {
@@ -30,7 +30,7 @@ import {
 } from "./processes.ts";
 import { encodeText } from "./text.ts";
 
-export const RUNTIME_MAGIC = 0x4252_5431;
+export const RUNTIME_MAGIC = 0x5352_5431;
 export const RUNTIME_VERSION = 1;
 
 const OP_KERNEL_RUN = 1;
@@ -203,7 +203,7 @@ function processValueToWords(
   }
 }
 
-export interface BlotRuntimeOptions {
+export interface SquidRuntimeOptions {
   /** Number of worker threads/subprocesses per KernelPool (default: 1; 0 runs direct). */
   workers?: number;
   /** Per-kernel pool config overrides. */
@@ -237,12 +237,12 @@ interface ManagedProcess {
   completedEvents: Map<number, ProcessEvent>;
 }
 
-export class BlotRuntime {
+export class SquidRuntime {
   readonly #wasmBytes: Uint8Array<ArrayBuffer>;
   readonly #receipt: CompiledModuleReceipt;
   readonly #kernels: readonly KernelManifest[];
   readonly #processesManifests: readonly ProcessManifest[];
-  readonly #options: BlotRuntimeOptions;
+  readonly #options: SquidRuntimeOptions;
   readonly #managedKernels = new Map<number, ManagedKernel>();
   readonly #jobs = new Map<number, KernelJobState>();
   readonly #managedProcesses = new Map<string, ManagedProcess>();
@@ -253,7 +253,7 @@ export class BlotRuntime {
 
   constructor(
     wasmBytes: Uint8Array,
-    options: BlotRuntimeOptions = {},
+    options: SquidRuntimeOptions = {},
   ) {
     this.#wasmBytes = copyPrivateBytes(wasmBytes);
     this.#receipt = compileKernelModule(this.#wasmBytes);
@@ -359,15 +359,15 @@ export class BlotRuntime {
     });
   }
 
-  /** Handle one `BRT1` `#[U32] -> #[U32]` coordination packet from Blot guest code. */
+  /** Handle one `SRT1` `#[U32] -> #[U32]` coordination packet from Squid guest code. */
   async handlePacket(req: Uint32Array): Promise<Uint32Array> {
     if (this.#disposed) {
-      return errResponse(ERR_HOST, "BlotRuntime is disposed");
+      return errResponse(ERR_HOST, "SquidRuntime is disposed");
     }
     if (
       req.length < 3 || req[0] !== RUNTIME_MAGIC || req[1] !== RUNTIME_VERSION
     ) {
-      return errResponse(ERR_HOST, "Invalid BRT1 runtime packet header");
+      return errResponse(ERR_HOST, "Invalid SRT1 runtime packet header");
     }
     const op = req[2] >>> 0;
 
@@ -779,7 +779,7 @@ export class BlotRuntime {
       }
 
       default:
-        return errResponse(ERR_HOST, `Unknown BRT1 runtime opcode ${op}`);
+        return errResponse(ERR_HOST, `Unknown SRT1 runtime opcode ${op}`);
     }
   }
 
@@ -792,7 +792,7 @@ export class BlotRuntime {
     });
   }
 
-  /** Run a Blot coordinator entrypoint (`entryName`) backed by this runtime. */
+  /** Run a Squid coordinator entrypoint (`entryName`) backed by this runtime. */
   async run(entryName = "main"): Promise<GuestValue | GuestOwner> {
     const guest = await instantiateGuest(this.#wasmBytes, {
       asynchronous: true,
@@ -829,10 +829,10 @@ export class BlotRuntime {
   }
 }
 
-/** Create a BlotRuntime coordinator over a compiled Blot `.wasm` module. */
+/** Create a SquidRuntime coordinator over a compiled Squid `.wasm` module. */
 export function createRuntime(
   wasmBytes: Uint8Array,
-  options: BlotRuntimeOptions = {},
-): BlotRuntime {
-  return new BlotRuntime(wasmBytes, options);
+  options: SquidRuntimeOptions = {},
+): SquidRuntime {
+  return new SquidRuntime(wasmBytes, options);
 }

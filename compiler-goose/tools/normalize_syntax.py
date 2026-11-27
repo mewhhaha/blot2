@@ -66,13 +66,13 @@ def finish_syntax(source):
         if word=='namespace' and i!=0:edits[start]=(end,'namespace_')
         if word=='varint' and (previous in ('.','fn') or following in ('(',':')):edits[start]=(end,'varint_')
         if word=='match' and (previous=='.' or following==':' or previous in ('let','var','fn')):edits[start]=(end,'match_')
-        if word=='Error' and following=='.' and previous!='::':edits[start]=(end,'blot_error::Error')
+        if word=='Error' and following=='.' and previous!='::':edits[start]=(end,'squid_error::Error')
     for start,(end,value) in sorted(edits.items(),reverse=True):source=source[:start]+value+source[end:]
     # Type defaults must not lex as assignment/comparison operators.
     def spaces(chunk):
         # A single annotation colon followed by a type. A namespace :: is
         # never an annotation, and a comparison is never a generic close.
-        annotation=r'(?<!:):(?!:)[ \t]*(?:const[ \t]+)?(?:[A-Z]\w*|(?:[iu](?:8|16|32|64)|f32|f64|bool)|blot_\w+::\w+)'
+        annotation=r'(?<!:):(?!:)[ \t]*(?:const[ \t]+)?(?:[A-Z]\w*|(?:[iu](?:8|16|32|64)|f32|f64|bool)|squid_\w+::\w+)'
         chunk=re.sub('('+annotation+r'[\w:<>,?\[\]. &]*)&=',r'\1& =',chunk)
         return re.sub('('+annotation+r'[^;={}\n]*<[^;={}\n]*)>=',r'\1> =',chunk)
     result=[];start=0

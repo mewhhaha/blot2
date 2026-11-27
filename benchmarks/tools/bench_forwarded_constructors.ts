@@ -13,17 +13,17 @@ if (
   );
 }
 const directory = await Deno.makeTempDir();
-const entry = join(directory, "main.blot");
+const entry = join(directory, "main.sq");
 try {
   await Deno.writeTextFile(
-    join(directory, "bridge.blot"),
+    join(directory, "bridge.sq"),
     'import { make } from "./types"\nfunc carry n => return make n\n',
   );
   const imports: string[] = [];
   let sum = "0";
   for (let i = 0; i < 16; i++) {
     await Deno.writeTextFile(
-      join(directory, `reader${i}.blot`),
+      join(directory, `reader${i}.sq`),
       'import { carry } from "./bridge"\nfunc read (n: U32): U32 => return (carry n).x\n',
     );
     imports.push(`import { read as read${i} } from "./reader${i}"`);
@@ -42,7 +42,7 @@ try {
     }
     types.push("func make (x: U32): Point => return $Point { x: x }");
     await Deno.writeTextFile(
-      join(directory, "types.blot"),
+      join(directory, "types.sq"),
       types.join("\n") + "\n",
     );
     const order = [{ mode: "before", executable: resolve(before) }, {

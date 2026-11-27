@@ -100,8 +100,8 @@ io const answer = func (input: U32) => return do:
 
 for (const kind of ["reader", "writer", "witnesses", "scratch"] as const) {
   Deno.test(`storage descriptor DAGs preserve ${kind} values and owner effects`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-storage-dag-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-storage-dag-" });
+    const entry = `${directory}/main.sq`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     let compiler:
       | Awaited<ReturnType<typeof createZigProjectCompiler>>
@@ -111,7 +111,7 @@ for (const kind of ["reader", "writer", "witnesses", "scratch"] as const) {
         executable: Deno.args[0],
         entry,
         stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
+        prelude: `${stdRoot}/prelude.sq`,
         startupTimeoutMs: 5_000,
       });
       let source = witnesses;

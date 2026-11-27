@@ -8,13 +8,13 @@ mod guest {
         static OUTPUT: RefCell<[u32; 3]> = const { RefCell::new([2, 0, 0]) };
     }
 
-    #[export_name = "blot:reset"]
+    #[export_name = "squid:reset"]
     pub extern "C" fn reset(_: u32) -> u32 {
         INPUT.with(|input| input.borrow_mut().clear());
         0
     }
 
-    #[export_name = "blot:allocate"]
+    #[export_name = "squid:allocate"]
     pub extern "C" fn allocate(bytes: u32) -> u32 {
         assert!(bytes >= 4 && bytes % 4 == 0);
         INPUT.with(|input| {
@@ -24,7 +24,7 @@ mod guest {
         })
     }
 
-    #[export_name = "blot:finish_invocation"]
+    #[export_name = "squid:finish_invocation"]
     pub extern "C" fn finish() -> u32 {
         0
     }

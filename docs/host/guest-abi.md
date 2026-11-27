@@ -3,7 +3,7 @@
 The data-stack backend emits ABI **8**, including modules with scalar-only
 exports. Its manifest uses the function/constant layout described below for ABI
 2, with the version byte changed to 8. Numeric arrays cross the boundary as
-copied packets through `blot:allocate`/`blot:reset`; those functions do not own
+copied packets through `squid:allocate`/`squid:reset`; those functions do not own
 application pools. Ordinary `Foreign` callbacks and JSPI remain supported. ABI 8
 has no counted ownership hooks, resource adapters, cleanup schemas or language
 tasks. Hosts reject a module that combines this version with those extensions.
@@ -11,8 +11,8 @@ Pen native metadata version 2 requires older packages to be rebuilt.
 
 ### ABI 8 invocation finish
 
-An ABI 8 module can declare a single `blot:invocation` custom section with
-the payload byte `1`. It then exports `blot:finish_invocation` with no
+An ABI 8 module can declare a single `squid:invocation` custom section with
+the payload byte `1`. It then exports `squid:finish_invocation` with no
 parameters and one WebAssembly `i32` result. Scalar-only modules can declare
 the hook without exporting a packet arena. Existing ABI 8 modules without the
 section or hook still load and reclaim a trapped invocation on the next entry.
@@ -31,9 +31,9 @@ shared scalar, packet and callback representation. Unconditional data-stack
 dispatch and removal of the earlier profiles remain task 120.
 
 This is the implemented host boundary. See
-[the executable host example](../../examples/host_io.blot).
+[the executable host example](../../examples/host_io.sq).
 
-```blot
+```squid
 io const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   return next
@@ -64,7 +64,7 @@ Providers can forward source operations into a supplied callback; their inferred
 residual row still contains `Foreign`.
 
 `Foreign` is one sealed compiler effect label, identified internally by the pair
-`("blot:compiler", "Foreign")`. It is not a callable operation and cannot be
+`("squid:compiler", "Foreign")`. It is not a callable operation and cannot be
 declared or discharged by a source provider. `! {Foreign}` annotates a
 function's latent effect; acquiring the function value is pure. Calling it
 requires `use` in a binding and is forbidden in const evaluation. Reflection is
@@ -89,7 +89,7 @@ arrays; exported constants remain scalars. Callback arguments/results use the
 same scalar and numeric-array types. Pure callbacks, unknown/open rows, callback
 results, algebraic values and bundles are not host ABI values.
 
-| Blot type     | Adapter value                             | Wasm boundary representation  |
+| Squid type     | Adapter value                             | Wasm boundary representation  |
 | ------------- | ----------------------------------------- | ----------------------------- |
 | Unit          | `null`                                    | `i32`, canonical zero         |
 | U8            | integer from 0 through 255                | `i32`, low 8 bits             |
@@ -123,7 +123,7 @@ numbers. Unit callbacks return `null`, not `undefined`. `guest.read(name)` reads
 a scalar constant. The adapter does not expose the instance, arena or raw
 callable refs.
 
-Capability modules import only signature-specific adapters from `blot:host/1`:
+Capability modules import only signature-specific adapters from `squid:host/1`:
 `call_<parameter>_<result>`, with lowercase `unit`, `u8`, `u32`, `i32`, `u64`,
 `i64`, `bool`, `f32`, `f64`, `array_u8`, `array_u32`, `array_i32`, `array_u64`,
 `array_i64`, `array_f32`, or `array_f64`. Each import takes `(externref, value)`
@@ -140,7 +140,7 @@ symbolic function bodies do not acquire hard-coded import indices.
 
 ## Copied numeric arrays
 
-```blot
+```squid
 const advance = func (positions: Array F32) => return @array.set positions 0 42.0
 const packet = func (count: U32) => return @array.fill count 0.0
 ```
@@ -159,21 +159,21 @@ returned packet and supply it to a replacement guest after reload. Its schema
 and compatibility are application responsibilities.
 
 Only modules with array arguments/results (including callback signatures) export
-`blot:memory`, `blot:allocate` and `blot:reset` for the adapter (`packets == true`).
+`squid:memory`, `squid:allocate` and `squid:reset` for the adapter (`packets == true`).
 Scalar-only `#process` modules still define internal linear memory without
-exporting `blot:memory`/`blot:allocate`/`blot:reset` so existing ABI 8 strict
+exporting `squid:memory`/`squid:allocate`/`squid:reset` so existing ABI 8 strict
 export checks continue to accept them. Allocation takes an i32 byte count and
 returns an aligned i32 pointer from the module's transport bank (for host-to-guest
 packets and callback replies without resetting the arena between callbacks).
 Reset takes an ignored i32 and releases the transport bank. For modules with
-`blot:kernels` or `blot:processes`, `numericPacketCapacity()` reports the exact
+`squid:kernels` or `squid:processes`, `numericPacketCapacity()` reports the exact
 declared `transport_budget`; for ABI 8 modules without those optional sections,
 it reports the compiler's nominal 2 MiB default (bounded at runtime by actual
 memory growth and host limits). Arrays use a little-endian
 U32 length followed by contiguous 32-bit words, with F32 values stored as
-IEEE-754 bits. Modules with an arena also export `blot:allocation`, the raw
+IEEE-754 bits. Modules with an arena also export `squid:allocation`, the raw
 `(i32 bytes) -> i32 pointer` allocator used internally, for development tools to
-instrument. This is not a host input allocation API: use `blot:allocate` to
+instrument. This is not a host input allocation API: use `squid:allocate` to
 publish ownership. The hook includes recycled arena requests and runtime
 metadata; grouped allocations count their physical backing allocation, not each
 logical object. Static data and allocations removed by optimization do not reach
@@ -188,7 +188,7 @@ including traps. Raw Wasm callers must implement the same lifetime.
 
 ## Versioned manifest
 
-Exactly one custom section named `blot:abi` is required by the adapter. Its
+Exactly one custom section named `squid:abi` is required by the adapter. Its
 payload is, in order:
 
 1. Version: canonical unsigned LEB128 U32, currently `2`.
@@ -221,7 +221,7 @@ Test vectors (payload only): an empty module is `02 00 00`; a single export
 `02 01 04 6d 61 69 6e 04 01 01 01 00`.
 
 The manifest describes types, not permissions. It is independent of compiler
-analysis/protocol metadata. This is a Blot ABI using Wasm reference types, not a
+analysis/protocol metadata. This is a Squid ABI using Wasm reference types, not a
 claim of WIT/Canonical ABI compatibility. The
 [WebAssembly JS interface](https://www.w3.org/TR/wasm-js-api-2/) specifies
 `externref`, imports, and custom-section access used by the adapter.
@@ -313,6 +313,6 @@ arrays with separate instances through its own worker channel.
 
 The still-existing earlier backend and its removal are tracked by task 120. Its
 former collector and task protocol details are preserved in
-[the exact historical ABI document](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension).
+[the exact historical ABI document](https://github.com/mewhhaha/squid-lang/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension).
 Those details are evidence for retirement and rejection tests, not a current
 application API or a direction to restore compatibility.

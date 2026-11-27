@@ -1,5 +1,5 @@
 // Exact error identities; ordinary stage failures remain explicit.
-namespace blot_error;
+namespace squid_error;
 
 enum Error {
     none,
@@ -683,4 +683,4 @@ fn error_name(code: Error) -> const u8[:] {
     }
 }
 
-fn failed(code: Error) -> bool { code != blot_error::Error.none }
+fn failed(code: Error) -> bool { code != squid_error::Error.none }

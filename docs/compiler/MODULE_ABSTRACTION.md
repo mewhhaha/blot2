@@ -14,7 +14,7 @@ data, contracts and effect families. Constructors and operations inherit their
 declaration's visibility. Imports introduce names in their importing module;
 they do not become re-exports automatically.
 
-```blot
+```squid
 private const offset = 7
 private type Internal = { value: U32 }
 const answer: U32 = offset
@@ -23,7 +23,7 @@ const answer: U32 = offset
 
 `#entry` controls guest exports from the project's entry module. It
 does not grant module visibility. `private #entry const main = answer` is legal:
-the host can invoke main, while another Blot module cannot import it. `private`
+the host can invoke main, while another Squid module cannot import it. `private`
 precedes `#entry`; repeated or misplaced modifiers reject at the modifier. No
 public modifier or export list is required for existing programs. Imported
 modules retain the existing prohibition on entry declarations. The new words
@@ -41,7 +41,7 @@ checkpoint.
 
 Add selective re-exports:
 
-```blot
+```squid
 export { answer as forwarded, Token } from "./producer"
 ```
 
@@ -72,7 +72,7 @@ producer locations.
 Add an opaque nominal declaration, with the existing type-parameter syntax and
 the `is` kind position used by `is data`, `is contract` and `is effect`:
 
-```blot
+```squid
 type Token is opaque = U32
 type Box a is opaque = { value: a }
 private type InternalToken is opaque = U32
@@ -88,7 +88,7 @@ effect.
 Each opaque declaration supplies one private constructor with its type's name.
 Use ordinary constructor application and matching inside the defining module:
 
-```blot
+```squid
 type Token is opaque = U32
 const make: U32 -> Token = func value => return $Token value
 const read: Token -> U32 = func ($Token value) => return value
@@ -111,7 +111,7 @@ relationships supply only the evidence they explicitly declare.
 
 Transparent aliases preserve opacity:
 
-```blot
+```squid
 import { Token } from "./tokens"
 type LocalToken = Token
 ```
@@ -201,20 +201,20 @@ interface equality never certifies private executable equality.
 The following proposed modules give direct, namespace and forwarding clients the
 same public identity:
 
-```blot
-// tokens.blot
+```squid
+// tokens.sq
 type Token is opaque = U32
 private const offset = 1
 const make: U32 -> Token = func value => return $Token (value + offset)
 const read: Token -> U32 = func ($Token value) => return value
 
-// facade.blot
+// facade.sq
 export { Token as Ticket, make, read } from "./tokens"
 
-// outward.blot
+// outward.sq
 export { Ticket, make, read } from "./facade"
 
-// main.blot
+// main.sq
 import { Token, make, read } from "./tokens"
 import * as facade from "./outward"
 const direct: Token = make 41

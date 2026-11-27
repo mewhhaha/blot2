@@ -100,7 +100,7 @@ record payloads, nominal wrappers and Array buffers could lose their proved
 acyclic-layout mark. The fix applies the existing whole-layout proof before
 publishing a copy. It changes neither the graph algorithm nor collection
 thresholds. The
-[standalone reduction](../../benchmarks/runtime-boundaries/acyclic-updates.blot)
+[standalone reduction](../../benchmarks/runtime-boundaries/acyclic-updates.sq)
 keeps old versions alive while updating 4,096 values four times. It checks both
 versions, bounded memory and zero remaining roots/leases. Both codegen tiers
 execute zero cycle passes after the fix.
@@ -111,7 +111,7 @@ collection. Fewer admitted vertices can change the existing scheduler's
 threshold and increase pass count while reducing total traversal work. Report
 passes, vertices, edges and CPU separately.
 
-Every module carries `blot:collector-contract` metadata. The first certificate,
+Every module carries `squid:collector-contract` metadata. The first certificate,
 `no_owning_user_heap_fields_v1`, checks all final emitted non-helper functions,
 including initialization and recursive direct-call components. It admits scalar
 allocation and literal zero-mask typed allocation, and relies on existing
@@ -279,10 +279,10 @@ runtime storage. Diagnostic reservations (about 10.3 MB) and total committed
 Wasm capacity are separate from these program live-byte counts. Requested bytes
 exclude allocator headers and fragmentation.
 
-`ink/spatial/point_grid.blot:32` accounts for 6,037,680 copied bytes in the
+`ink/spatial/point_grid.sq:32` accounts for 6,037,680 copied bytes in the
 colony and 880,384,952 in the piles scene. Remaining collection visits
-concentrate in `ink/map.blot:73` and `:62`. The largest allocation site is
-`ink/ecs.blot:264` (433,793 allocations): extracting a packed optional component
+concentrate in `ink/map.sq:73` and `:62`. The largest allocation site is
+`ink/ecs.sq:264` (433,793 allocations): extracting a packed optional component
 through an owned function result reconstructs its value. The new collection
 representation does not remove that ABI boundary. This is a concrete remaining
 cost, not evidence of a memory leak.
@@ -290,12 +290,12 @@ cost, not evidence of a memory leak.
 Disabling only the two acyclic-copy propagation steps yields identical
 allocation, copy and peak-live totals, but visits 411,317 rather than 40,076
 vertices in the colony and 1,948,430 rather than 56,140 in the piles scene.
-Before the fix, the largest visit sites include `game/salt.blot:1774`,
-`ink/render.blot:211`, `game/kites.blot:196` and `game/robots.blot:510`. The
+Before the fix, the largest visit sites include `game/salt.sq:1774`,
+`ink/render.sq:211`, `game/kites.sq:196` and `game/robots.sq:510`. The
 uninstrumented CPU comparison below separately tests this causal reduction.
 
 The public selected-reader (#29) profile attributes its single final allocation
-to `std/array.blot` generation. The reference-scratch (#34) profile identifies
+to `std/array.sq` generation. The reference-scratch (#34) profile identifies
 512 captured closures, their array and the constructing callback; it executes
 zero copy bytes. Optional generation and the fused pipeline likewise allocate
 one final program array. Each report separately records the administrative root

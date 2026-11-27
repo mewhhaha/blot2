@@ -115,7 +115,7 @@ formatting, and 344 analyzer files with zero findings. No standalone full gate
 or LLVM candidate build was run.
 
 A provisional guest-Wasm screen compares qualified incoming Fast compiler
-`build/bench/joint-002-034/blotc-candidate` with the Safe/noLLVM development
+`build/bench/joint-002-034/squidc-candidate` with the Safe/noLLVM development
 compiler SHA-256
 `cd314f11eefd67b01481bf8c002aa59afb71deeb3ff509be3cd56086d1ff0bbf`. This is not
 qualified native compiler CPU evidence. CPU 6 has 25 alternating pairs after
@@ -864,7 +864,7 @@ walks alone replaces their cost with per-member pins and group-list validation.
 
 Immutable source/patch/compiler pins, raw rounds, profiling samples and the
 rejection are preserved in
-`/var/tmp/blot2-closed-activation-cohort-evidence-20261015/`. Its production
+`/var/tmp/squid-closed-activation-cohort-evidence-20261015/`. Its production
 hook is absent from the root. Runtime prerequisites and tracing metadata remain;
 no ownership performance or full-program completion is claimed.
 
@@ -879,7 +879,7 @@ evidence. See `build/bench/complete-program-20261015/nested-callable-reuse/`.
 ## Current nested-array observation, 19 October 2026
 
 The exact permanent nested-array stress case runs in development and optimized
-codegen tiers with complete counted ownership (`blot:ownership = [2,2,0]`). Its
+codegen tiers with complete counted ownership (`squid:ownership = [2,2,0]`). Its
 90 live outer rows survive inner loops discarding 8,192-word Arrays at counts 8,
 8, 40, 200, 8 and 200. Every call commits **196,608 bytes (192 KiB)**, from
 first warmup through both 200-iteration calls. Each 200-iteration call retires

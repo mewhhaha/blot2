@@ -7,7 +7,7 @@ import {
 Deno.test("qualified pure associated calls compose with ambient handled effects", async () => {
   for (const name of ["associated", "associated-direct"]) {
     const raw = await Deno.readTextFile(
-      new URL(`../../compiler-goose/tests/fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../../compiler-goose/tests/fixtures/qualified-row-fixtures/${name}.sq`, import.meta.url),
     );
     const source = name === "associated"
       ? `func (+) left -> right => return @type.call "add" left right\n${raw}`
@@ -34,7 +34,7 @@ io const folded=answer ()
         equal(guest.read("folded"), 42);
         for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 42);
       }, {
-        prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+        prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
       });
     }
   }
@@ -44,7 +44,7 @@ io const folded=answer ()
 Deno.test.ignore("qualified clauses still enforce exact actual implementation rows", async () => {
   for (const name of ["reject-effectful", "reject-pure"]) {
     const source = await Deno.readTextFile(
-      new URL(`../../compiler-goose/tests/fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
+      new URL(`../../compiler-goose/tests/fixtures/qualified-row-fixtures/${name}.sq`, import.meta.url),
     );
     await compileExpectedFailure(source, "effect_mismatch", undefined, {
       prelude: "none",

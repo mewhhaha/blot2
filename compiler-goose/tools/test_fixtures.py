@@ -9,7 +9,7 @@ reviewed work-counter changes beside their original values. Reusing unchanged
 types during substitution reduces `type_nodes` and, for two programs,
 `effect_rows`. The recorded diagnostics and Wasm are unchanged.
 
-The record of `direct/boxed_records.blot` is this compiler's (16 November
+The record of `direct/boxed_records.sq` is this compiler's (16 November
 2026): an update that leaves a boxed record's words as they were keeps its
 block, and a loop that carries a boxed value releases an iteration's memory
 when the value came out as it went in. tests/guest runs the program.
@@ -19,7 +19,7 @@ bytes and function counts of exported programs. The audit compared the same
 sources before and after the change: it added the hook, its optional ABI
 section and any required signature without changing existing function bodies.
 
-Blot vNext Checkpoint 2 (21 November 2026) re-recorded `direct/boxed_records.blot`
+Squid vNext Checkpoint 2 (21 November 2026) re-recorded `direct/boxed_records.sq`
 (3764 -> 3728 Wasm bytes): provably unique boxed records/sums reuse their block
 in place on single-use updates (FBIP), eliminating one `newBlock` + `memoryCopy`
 in `nested` while preserving aliasing safety in `fields`.
@@ -53,7 +53,7 @@ Batch 1C (22 November 2026) retired `List` / `@cursor` / `std/list` /
 `@record.merge`, custom fixity declarations / backtick operators (replaced by
 the fixed 19-operator built-in table with direct dispatch), and `lent`. The 80
 fixtures exercising retired features were removed (109 fixtures remain) and
-expected.json was re-recorded against the slimmer `std/prelude.blot` and direct
+expected.json was re-recorded against the slimmer `std/prelude.sq` and direct
 operator lowering.
 
 Batch 1D (22 November 2026) collapsed `reuse/dependency_payload.goose` via
@@ -62,11 +62,11 @@ direct `Tag.scalar` / `Tag.associated` lowering for built-in scalar operators
 (`!=`, `<=`, `>`, `>=`, etc.), and taught `core_builder.goose::directArity` to
 recognize primitive intrinsic aliases (`const F32.add = @f32.add`, etc.). All
 109 fixtures kept identical exit codes and diagnostics while shedding 131
-`std/prelude.blot` Core nodes and eliminating closure allocations / indirect
+`std/prelude.sq` Core nodes and eliminating closure allocations / indirect
 calls in scalar comparison and prelude math helpers.
 
 Concurrency vNext Phase 1 (22 November 2026) added represented opaque `Kernel`
-and `Process` handle types to `std/prelude.blot` (+231 source bytes, +26 syntax
+and `Process` handle types to `std/prelude.sq` (+231 source bytes, +26 syntax
 nodes, +17 type nodes), reserved the `spark` keyword, added `entry kernel` /
 `entry process`, wire-schema / relational read-only purity analysis, and fixed
 `k == 1` record-payload constructor/pattern lowering. All 109 fixtures kept
@@ -102,13 +102,13 @@ fixed direct-backend polymorphic local capture instantiation
 (`direct/function_calls.goose::captureValue` now scans the capturing closure's
 body under `f.env` and instantiates in a temporary copy of `f.env` instead of
 caching into `f`'s monomorphic bindings). Re-recorded `expected.json`:
-`discard-fixtures/original.blot` now exits 1 (`unresolved type variable` on an
-unannotated unused tuple of generic constants), `discard-fixtures/deferred-anonymous.blot`
-and `deferred-body.blot` now report `missing_member` at check stage instead of
-`storage_unsupported` in emit, `discard-fixtures/deferred-alias.blot` exits 0
-on its dead unreferenced alias tuple, `result_selected_operand.blot` drops from
-45 to 43 emitted functions, `discard-fixtures/runtime-panic.blot` drops from 35
-to 34 functions, and `direct/closures.blot` keeps monomorphic `let wrap = $Some`.
+`discard-fixtures/original.sq` now exits 1 (`unresolved type variable` on an
+unannotated unused tuple of generic constants), `discard-fixtures/deferred-anonymous.sq`
+and `deferred-body.sq` now report `missing_member` at check stage instead of
+`storage_unsupported` in emit, `discard-fixtures/deferred-alias.sq` exits 0
+on its dead unreferenced alias tuple, `result_selected_operand.sq` drops from
+45 to 43 emitted functions, `discard-fixtures/runtime-panic.sq` drops from 35
+to 34 functions, and `direct/closures.sq` keeps monomorphic `let wrap = $Some`.
 
 Unified Dynamic Arrays Phase 5 (24 November 2026) removed `#[+T]`/`#[~T]`/
 `GrowArray`/`ResizeArray`/`seal`/`@storage.freeze`/`@storage.reserve`, unified
@@ -117,7 +117,7 @@ invariants (heap promotion, `fork` journaling, checked-array invalidation,
 `escape_min_slot` promotion), and enforced `ownedInPlacePath` on
 `@storage.push`/`@storage.pop`/`@storage.truncate`. Re-recorded `expected.json`
 for all 109 fixtures (migrating legacy grow/resize/freeze fixtures to `Array`
-and `own`-threaded helpers; `global_call_freeze.blot` now exits 1 with
+and `own`-threaded helpers; `global_call_freeze.sq` now exits 1 with
 `aliased_update` on mutating an aliased module `const` array).
 
 Unified Dynamic Arrays Phase 6 (24 November 2026) retired `check/purity.goose`
@@ -137,7 +137,7 @@ k-loop tiling + descending `48,32,16,0` BCE-coalesced SIMD lanes (4C),
 `unique_owned` forwarding (4D), and exact `2.0*x -> x+x`, 2× scalar `for ever`
 unrolling, and 4× strided fill (4E). Re-recorded `expected.json`: 8 of 109
 fixtures changed Wasm bytes/SHA (6 smaller via `CheckedGrow` reuse/`2.0*x`,
-2 same-size SHA changes, `scoped-loop-cleanup.blot` +81 B from `CheckedLe`);
+2 same-size SHA changes, `scoped-loop-cleanup.sq` +81 B from `CheckedLe`);
 all exit codes, diagnostics, and work counters are unchanged.
 
 Runtime performance Tier 5 (25 November 2026) added branchless `select` indexed
@@ -151,16 +151,16 @@ outer-loop escape-time SIMD with `v128.any_true` early exit and SIMD `2.0*x`
 strength reduction (5E); and 16-wide (`4 × v128`) SIMD affine LCG recurrence +
 8× scalar parallel-power unrolling (5F). Re-recorded `expected.json`: 107 of
 109 fixtures stayed byte-identical; 2 shrank from deeper inlining
-(`fixed_scalar_spans.blot` 48→47 funcs / 8764→8726 B;
-`scoped-loop-refinement.blot` 47→46 funcs / 10393→10286 B) with zero exit-code,
+(`fixed_scalar_spans.sq` 48→47 funcs / 8764→8726 B;
+`scoped-loop-refinement.sq` 47→46 funcs / 10393→10286 B) with zero exit-code,
 diagnostic, or frontend work-counter changes.
 
 Agent Diagnostics (25 November 2026) added secondary blame origin fields
 (`origin_kind`, `origin_start`, `origin_end`, `subject_start`, `subject_end`,
 `holder_start`, `holder_end`) to rejected lowering diagnostics via
-`blot_check_uniqueness::explain` on error paths. Re-recorded `expected.json`:
+`squid_check_uniqueness::explain` on error paths. Re-recorded `expected.json`:
 107 of 109 fixtures stayed byte-identical; only the 2 rejected lowering
-diagnostics (`global_call_freeze.blot` and `mutating_owner_return_truncate.blot`)
+diagnostics (`global_call_freeze.sq` and `mutating_owner_return_truncate.sq`)
 gained the new blame span fields with zero exit-code, Wasm, or counter changes.
 
 Track 2 & Track 4A/4B (25 November 2026) extended `--wasm3` with indirect
@@ -173,8 +173,8 @@ in `direct/function.goose`, `direct/function_control.goose`,
 record auto-SIMD (`tryEmitAosF32RecordLoop` in `direct/function_spark.goose`).
 Re-recorded `expected.json`: 106 of 109 fixtures stayed byte-identical; 3
 fixtures strictly shrank from redundant bounds-check removal
-(`fixed_scalar_spans.blot` 8726->8717 B, `primitive-aliases.blot`
-13165->13138 B, `scoped-loop-cleanup.blot` 9643->9634 B) with zero exit-code,
+(`fixed_scalar_spans.sq` 8726->8717 B, `primitive-aliases.sq`
+13165->13138 B, `scoped-loop-cleanup.sq` 9643->9634 B) with zero exit-code,
 diagnostic, function-count, or frontend work-counter changes.
 
 Language Audit Waves 1-3 & Trap Provenance (25 November 2026) fixed type,
@@ -184,7 +184,7 @@ record/cell/fork soundness), FBIP/linearAppend aliasing, SIMD incremental
 relocation (`unpatchableOperand`), `#run`/`#if` associated `eq`/`ne`,
 `defer_f32_nan`, `@simd.store` cache invalidation, `let ... else:`/`#for`
 carries, `std/text` exact `from_f32`, `r.create` overflow + `static_pool_flag`
-guards, `Code.no_entry` for entry-less builds, and `"blot:traps"` v1 / Page-0
+guards, `Code.no_entry` for entry-less builds, and `"squid:traps"` v1 / Page-0
 offset `772` trap metadata. Re-recorded `expected.json` (109 fixtures, zero
 exit-code changes; 9 library-only fixtures updated from `storage_unsupported`
 to `no_entry`; uniform `+4 effect_rows / +13 type_nodes` and `+29B` runtime
@@ -222,10 +222,10 @@ return the updated `#[T]` handle in place (matching `@simd.store` ownership
 and move semantics in `check/check.goose`, `check/storage_core.goose`,
 `check/uniqueness.goose`, and `direct/function*.goose`, including loop-carry
 handle preservation and single-carry bulk-push loops) and simplified
-`std/prelude.blot`'s `Array.push` to `return @storage.push values value`.
+`std/prelude.sq`'s `Array.push` to `return @storage.push values value`.
 Re-recorded `expected.json`: 108 of 109 fixtures keep 100% identical exit
-codes, diagnostics, and Wasm SHA-256 (only `std/prelude.blot` shrank by
-9 source bytes / 1 syntax node / 1 core node); `immutable_survivor.blot` was
+codes, diagnostics, and Wasm SHA-256 (only `std/prelude.sq` shrank by
+9 source bytes / 1 syntax node / 1 core node); `immutable_survivor.sq` was
 updated from an expression-position `$Left/$Right => @storage.push` arm
 opposite `$Empty => ()` to a suite arm `observations := @storage.push self
 value`.
@@ -245,7 +245,7 @@ and the `Tier 6B-1` `matchMatmulKLoop` `self`-update fix. Re-recorded
 
 Granular Numeric Types Wave 3 (26 November 2026) added built-in `U8`, `I32`,
 `U64`, `I64`, and `F64` scalar types across parser, typechecker, Core,
-dependency adapters, `#run` staging, `std/prelude.blot`, and the direct Wasm
+dependency adapters, `#run` staging, `std/prelude.sq`, and the direct Wasm
 backend: 1-byte packed `#[U8]` arrays (`i32.load8_u`/`i32.store8`/`memory.fill`),
 native 64-bit Wasm `i64`/`f64` lowering and 8-byte arrays, contextual literal
 typing with strict range checks (preserving `U32`/`F32` defaults and exact
@@ -255,7 +255,7 @@ decimal-to-binary32 rounding), full cross-type conversions, canonical
 Re-recorded `expected.json`: all 109 fixtures keep 100% identical exit codes,
 diagnostics, emitted function counts, and Wasm bytes/SHA-256 (`exit_diffs=0`,
 `diag_diffs=0`, `wasm_diffs=0`, `fn_diffs=0`); only JSON prelude/frontend work
-counters updated for the expanded `std/prelude.blot`.
+counters updated for the expanded `std/prelude.sq`.
 
 Benchmark Backend & Storage Checkpoint 1 (27 November 2026) added U64 constant
 and loop-invariant runtime reciprocal strength reduction (64-bit `mulhi64`),
@@ -264,7 +264,7 @@ function-exit local reclamation for returned caller-owned plain handles with
 best-fit `<= 4x` `stack_free_large` reuse, boxed-array direct field projection
 and lifted boxed-subfield `indexedUpdate` restriction, 16-field inline record
 budget, masked/affine loop BCE, `@storage.with_capacity`/`reserve`/`extend`
-(`Array.with_capacity`/`reserve`/`extend`/`extend_view` in `std/prelude.blot`),
+(`Array.with_capacity`/`reserve`/`extend`/`extend_view` in `std/prelude.sq`),
 and backend-only stack-backed small local fixed arrays (`DirectArray`, `1..32`
 non-escaping scalar elements). Re-recorded `expected.json`: all 109 fixtures
 keep 100% identical exit codes and diagnostics (`exit_diffs=0`, `diag_diffs=0`);
@@ -276,7 +276,7 @@ SIMD, Stdlib & Language Literals/ABI Checkpoint 2 (27 November 2026) added
 `F64x2`/`U64x2`/`U8x16`/`I16x8` SIMD intrinsics and `@simd.load_{u8x16,f64x2}` /
 `@simd.store_{u8x16,f64x2}`, `@u64.mul_wide` (`U64.mul_wide`, runtime and `#do:`
 staging), `F64` math helpers (`clamp`/`lerp`/`square`/`is_finite`/`sin`/`cos`/
-`sin_cos`/`tan`) in `std/prelude.blot`, `std/bytes.blot` and `std/map.blot`, a
+`sin_cos`/`tan`) in `std/prelude.sq`, `std/bytes.sq` and `std/map.sq`, a
 fix for 64-bit payload slot merging in multi-variant unboxed sums, char literals
 (`'a'`, escapes, Unicode) and byte-string literals (`b"..."`), numeric literal
 suffixes (`u8`/`u32`/`i32`/`u64`/`i64`/`f32`/`f64`), ABI 8 extended scalar and
@@ -292,7 +292,7 @@ November 2026) removed the `with` keyword and statement completely, added
 contextual `handler name: Effect => ...` local handler bindings, the 2-arg
 `@handle handler thunk` compiler intrinsic, `Function` builtin associated
 receiver dispatch (`0xfffffffc`), `Layer`/`Handled`/`layer`/`Layer.layer`/
-`Function.handle`/`Function.run`/`Handled.handle` in `std/prelude.blot`,
+`Function.handle`/`Function.run`/`Handled.handle` in `std/prelude.sq`,
 value-returning `Tag.with_handle` across checking, uniqueness, and direct
 Wasm emission, contextual effect-row propagation into inline handler thunks,
 and `tag_handler_stmt` symbol relocation in `reuse/parse_packet.goose`.
@@ -308,17 +308,17 @@ parenthesized operator names `(op)` across declarations, imports/exports,
 atoms, patterns, and module-qualified lookups (`mod.(op)`), the 2-arg `@pipe`
 intrinsic, `Parameters.direct_op` direct-forwarder propagation (wired through
 `dependency-wire-model.json` and regenerated adapters), `@u32.{ne,le,gt,ge}`
-primitives, and moving all 17 binary operators plus `<|` into `std/prelude.blot`
+primitives, and moving all 17 binary operators plus `<|` into `std/prelude.sq`
 via `@type.call` and `@pipe` (leaving only short-circuit `and`/`or` and `$`
 application as built-in binary syntax). Also fixed `exact_argument_types`
 covariant effect opening in associated/trait dispatch. Re-recorded
 `expected.json`: 0 exit-code diffs, 0 emitted-function diffs; 105 of 109
 fixtures stay bit-for-bit Wasm-identical while 4 polymorphic-dispatch fixtures
-change by a net -6 bytes (`direct/closures.blot` 6270->6263 B,
-`nominal/generic-fields-and-associated.blot` 4591->4584 B,
-`direct/generic_comprehensions.blot` 7249->7253 B,
-`result_selected_operand.blot` 5169->5173 B); 1 diagnostic updates
-(`nominal/ordered-right-fallback.blot`: `ambiguous_operator` ->
+change by a net -6 bytes (`direct/closures.sq` 6270->6263 B,
+`nominal/generic-fields-and-associated.sq` 4591->4584 B,
+`direct/generic_comprehensions.sq` 7249->7253 B,
+`result_selected_operand.sq` 5169->5173 B); 1 diagnostic updates
+(`nominal/ordered-right-fallback.sq`: `ambiguous_operator` ->
 `missing_associated` with `{"operation": "+", "member": "add"}`); and prelude
 work counters increase uniformly by `+18` body elaborations/lowerings.
 
@@ -331,7 +331,7 @@ move semantics), wire schema (`0x2d`), type display (`%[T]`), direct Wasm loweri
 `for`+`case` dispatch, SoA records/tuples with touched-column projection and
 destructuring, flat sequential cursors, `freeze`, `fork`, module `const`, and
 nested containers), `Packed.*` / `Array.{to_packed,from_packed,extend_packed}`
-prelude helpers in `std/prelude.blot`, Baba/formatter support, and Tree-sitter
+prelude helpers in `std/prelude.sq`, Baba/formatter support, and Tree-sitter
 highlighting. Re-recorded `expected.json`: all 109 fixtures keep 100% identical
 exit codes, diagnostics, and Wasm bytes/SHA-256 (`exit_diffs=0`, `diag_diffs=0`,
 `wasm_diffs=0`); only prelude work counters updated (`+16` prelude body
@@ -381,7 +381,7 @@ def build(compiler, name, scratch):
         output.unlink()
     result = subprocess.run(
         [str(compiler), "build-project", str(FIXTURES / name), str(output),
-         "--std-root", str(REPOSITORY / "std"), "--prelude", str(REPOSITORY / "std/prelude.blot")],
+         "--std-root", str(REPOSITORY / "std"), "--prelude", str(REPOSITORY / "std/prelude.sq")],
         capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=600)
     text = result.stdout.replace(str(FIXTURES) + "/", "").replace(str(REPOSITORY) + "/", "")
     records = []
@@ -402,16 +402,16 @@ def build(compiler, name, scratch):
 
 
 def names():
-    return sorted(str(path.relative_to(FIXTURES)) for path in FIXTURES.rglob("*.blot"))
+    return sorted(str(path.relative_to(FIXTURES)) for path in FIXTURES.rglob("*.sq"))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*")
-    parser.add_argument("--compiler", type=Path, default=ROOT / "build/blotc-goose")
+    parser.add_argument("--compiler", type=Path, default=ROOT / "build/squidc-goose")
     parser.add_argument("--record", type=Path, help="write expected.json from this compiler")
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix="blot-fixtures-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="squid-fixtures-") as scratch:
         if args.record:
             programs = {name: build(args.record.resolve(), name, scratch) for name in names()}
             EXPECTED.write_text(json.dumps({"programs": programs, "differences": {}}, indent=1, sort_keys=True) + "\n")

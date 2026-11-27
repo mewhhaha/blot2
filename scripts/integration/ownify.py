@@ -3,7 +3,7 @@
 Usage: python3 scripts/integration/ownify.py [--dry] MODULE.FUNCTION...
        python3 scripts/integration/ownify.py [--dry] --from-file LIST
 
-MODULE is a path under ../gdev without `.blot` (`src/world/salt`). For each
+MODULE is a path under ../gdev without `.sq` (`src/world/salt`). For each
 function it rewrites the parameter named `access` to `(own access)`, makes
 every way out of the body return `access`, and turns each call that stands
 as a statement, anywhere under ../gdev, into `X := call` where `X` is the
@@ -76,10 +76,10 @@ class File:
         while j>k+1 and self.lines[j-1]=='': j-=1
         return j
 def resolve(path,target):
-    if target.startswith('game/'): return os.path.join(ROOT,'src',target[5:]+'.blot')
-    if target.startswith('test/'): return os.path.join(ROOT,'tests',target[5:]+'.blot')
-    if target.startswith('ink/'): return os.path.join(INK,target[4:]+'.blot')
-    if target.startswith('.'): return os.path.normpath(os.path.join(os.path.dirname(path),target))+'.blot'
+    if target.startswith('game/'): return os.path.join(ROOT,'src',target[5:]+'.sq')
+    if target.startswith('test/'): return os.path.join(ROOT,'tests',target[5:]+'.sq')
+    if target.startswith('ink/'): return os.path.join(INK,target[4:]+'.sq')
+    if target.startswith('.'): return os.path.normpath(os.path.join(os.path.dirname(path),target))+'.sq'
     return target
 def header(line):
     """The parameter atoms of a definition line and where its body starts."""
@@ -114,7 +114,7 @@ def owned_param(atom,name):
     if m: return f'({name}: own {m.group(1)})'
     return None
 def convert(mod,fn,name='access',dry=False,report=print):
-    f=File.get(os.path.join(ROOT,mod+'.blot'))
+    f=File.get(os.path.join(ROOT,mod+'.sq'))
     k=f.find(fn)
     if k<0: report(f'DEF? {mod}.{fn}: no definition'); return None
     line=f.lines[k]
@@ -194,10 +194,10 @@ def convert(mod,fn,name='access',dry=False,report=print):
         f.lines[k:j]=[line]+out; f.dirty=True
     return position
 def call_sites(mod,fn,position,dry=False,report=print):
-    target=os.path.normpath(os.path.join(ROOT,mod+'.blot'))
+    target=os.path.normpath(os.path.join(ROOT,mod+'.sq'))
     changed=0
     for d in DIRS:
-        for path in glob.glob(os.path.join(ROOT,d,'**','*.blot'),recursive=True):
+        for path in glob.glob(os.path.join(ROOT,d,'**','*.sq'),recursive=True):
             f=File.get(path)
             names=[a+'.'+fn for a,p in f.imports.items() if os.path.normpath(p)==target]
             if os.path.normpath(path)==target: names.append(fn)
@@ -246,8 +246,8 @@ if __name__=='__main__':
     # A converted body may call a function converted earlier as a statement
     # now (the tail `return f access` it had became `f access`): rebind those.
     quiet=lambda text: None
-    for path in glob.glob(os.path.join(ROOT,'src','**','*.blot'),recursive=True):
-        f=File.get(path); mod=os.path.relpath(path,ROOT)[:-5]
+    for path in glob.glob(os.path.join(ROOT,'src','**','*.sq'),recursive=True):
+        f=File.get(path); mod=os.path.relpath(path,ROOT)[:-3]
         for k,l in enumerate(list(f.lines)):
             m=re.match(r'^(?:entry )?func ([\w.]+) ',l)
             if not m or not re.search(r'\(own access\)|\(access: own ',l): continue

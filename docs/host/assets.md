@@ -1,16 +1,16 @@
 # Typed external assets
 
 `createCompiler` and `createZigProjectCompiler` accept explicit parser functions
-in an `assets` map. The map keys are virtual Blot module paths, relative to the
+in an `assets` map. The map keys are virtual Squid module paths, relative to the
 entry file. Input paths are also relative to the entry, or absolute local paths.
 Normal source imports refer to those modules. No generated source file is
 written to disk, and the native compiler has no JSON or shader name checks.
 
 ```ts
-import { createCompiler, jsonAssetParser } from "@mewhhaha/blot";
+import { createCompiler, jsonAssetParser } from "@mewhhaha/squid";
 
 const compiler = await createCompiler({
-  entry: "./src/main.blot",
+  entry: "./src/main.sq",
   assets: {
     "./settings.json": {
       path: "../assets/settings.json",
@@ -29,7 +29,7 @@ try {
 
 For a JSON file containing `{"width":1280,"height":720}`, source can use:
 
-```blot
+```squid
 import { Data, value } from "./settings.json"
 const width = func (settings: Data) => return settings.width
 io const initial_width = func () => return width value
@@ -47,7 +47,7 @@ A parser receives `path`, a copy of the input `bytes`, an optional cancellation
 These paths resolve relative to the canonical input file. It returns:
 
 ```ts
-import type { AssetModule, AssetParser } from "@mewhhaha/blot";
+import type { AssetModule, AssetParser } from "@mewhhaha/squid";
 
 const parseSettings: AssetParser = (context): AssetModule => {
   const settings = JSON.parse(new TextDecoder().decode(context.bytes));
@@ -77,7 +77,7 @@ JavaScript's exact range are rejected. Homogeneous arrays become `Array`; empty
 and heterogeneous arrays become exact tuples. Custom parsers can specify the
 element type of an empty array or require a fixed schema instead.
 
-JSON field names must currently be Blot identifiers. Strings become a generated
+JSON field names must currently be Squid identifiers. Strings become a generated
 `Utf8 { bytes: Array U32 }` record containing UTF-8 bytes. This uses one U32 per
 byte and is not a compact runtime Text implementation. A parser for larger text
 or binary content should return a host reference. General compact Text remains
@@ -91,7 +91,7 @@ A shader adapter can use a real WGSL/SPIR-V/other parser or consume validated
 reflection metadata, then return just its input record types and a reference:
 
 ```ts
-import type { AssetParser, AssetRecordType } from "@mewhhaha/blot";
+import type { AssetParser, AssetRecordType } from "@mewhhaha/squid";
 
 // reflectInputs is supplied by the application or shader parser package.
 function shaderParser(
@@ -112,7 +112,7 @@ function shaderParser(
 If the parser describes `Inputs { scale: F32 }`, application code can use the
 type without embedding shader source or fabricating a runtime input value:
 
-```blot
+```squid
 import { Inputs, Shader, shader } from "./triangle.wgsl"
 const scale = func (inputs: Inputs) => return inputs.scale
 io const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader of
@@ -128,22 +128,22 @@ instance. IDs are deterministic for a complete build, but can change when the
 set of resources changes. Different nominal reference types distinguish APIs;
 the host still validates IDs against its manifest.
 
-## Stage-0 Blot generators
+## Stage-0 Squid generators
 
-Use `createBlotGenerator` as an asset parser to run a Blot function before the
+Use `createSquidGenerator` as an asset parser to run a Squid function before the
 project compiles. The generated source becomes a virtual module, so builds, type
-checking and completion see ordinary Blot types, constructors and values.
+checking and completion see ordinary Squid types, constructors and values.
 
 ```ts
-import { createBlotGenerator, createCompiler } from "@mewhhaha/blot";
+import { createSquidGenerator, createCompiler } from "@mewhhaha/squid";
 
 const compiler = await createCompiler({
-  entry: "./main.blot",
+  entry: "./main.sq",
   assets: {
     "./salt.wgsl": {
       path: "./assets/salt.wgsl",
-      parser: createBlotGenerator({
-        generator: "./tools/wgsl_gen.blot",
+      parser: createSquidGenerator({
+        generator: "./tools/wgsl_gen.sq",
         inputMode: "text",
         reference: { type: "Shader", export: "shader", mediaType: "text/wgsl" },
       }),
@@ -166,7 +166,7 @@ select another entry. Its single parameter accepts these shapes:
 - `{ path: Text, bytes: #[U32] }` or `{ path: Text, text: Text }` in the
   corresponding mode. `path` is the canonical input path.
 
-Return `Text` for Blot source or `Result [Text, Text]` to report an error.
+Return `Text` for Squid source or `Result [Text, Text]` to report an error.
 `$Ok source` supplies the virtual module, and `$Err message` produces an
 `asset_import` diagnostic at the input path. Generator compile failures and Wasm
 traps also produce asset diagnostics. Use `$Err` for a message about the input
@@ -174,31 +174,31 @@ format. Stage 0 runs synchronously in a fresh Wasm instance with no host
 imports. The ABI 8 numeric packet limit applies to inputs and outputs, and the
 host does not impose a guest execution deadline.
 
-Stage 0 tracks the generator and its transitive Blot imports. Changing those
+Stage 0 tracks the generator and its transitive Squid imports. Changing those
 sources recompiles the generator. Changing only the asset runs the existing
 compiled Wasm with the new bytes. Unchanged assets reuse their generated
 modules. Supply `assetSources` to `build` or `complete` to use unsaved input
-bytes. TypeScript parsers may also return raw Blot in `AssetModule.source`,
+bytes. TypeScript parsers may also return raw Squid in `AssetModule.source`,
 optionally alongside `types`, `aliases` or `values`.
 
-In a manifest project, `blot check`, `blot build`, `blot test` and the Blot
-language server read `generators` from `blot.json`. These rules use paths
+In a manifest project, `squid check`, `squid build`, `squid test` and the Squid
+language server read `generators` from `squid.json`. These rules use paths
 relative to the project root and use the project's imports and prelude:
 
 ```json
 {
-  "dependencies": { "std": { "path": "../blot" } },
+  "dependencies": { "std": { "path": "../squid" } },
   "prelude": "std",
   "generators": [
     {
       "module": "src/units.csv",
       "input": "data/units.csv",
-      "generator": "tools/csv_gen.blot",
+      "generator": "tools/csv_gen.sq",
       "inputMode": "text"
     },
     {
       "match": "src/assets/*.wgsl",
-      "generator": "tools/wgsl_gen.blot",
+      "generator": "tools/wgsl_gen.sq",
       "inputMode": "text",
       "reference": {
         "type": "Shader",
@@ -211,15 +211,15 @@ relative to the project root and use the project's imports and prelude:
 ```
 
 A single-star pattern selects files immediately inside its directory, in sorted
-order. From `src/main.blot`, import `"./units.csv"` and `"./assets/salt.wgsl"`.
+order. From `src/main.sq`, import `"./units.csv"` and `"./assets/salt.wgsl"`.
 For a custom host, use
 `expandGeneratorRules(projectRoot, rules, compilerOptions)` to build the
 `assets` map and share compiled generators across matching files.
 
-The [WGSL example](../../examples/generators/wgsl_gen.blot) reflects top-level
+The [WGSL example](../../examples/generators/wgsl_gen.sq) reflects top-level
 structs with scalar and vector fields and constants with Boolean, unsigned
 integer or decimal literals. It skips shader bodies. The
-[CSV example](../../examples/generators/csv_gen.blot) reads `name,hp,speed`
+[CSV example](../../examples/generators/csv_gen.sq) reads `name,hp,speed`
 rows, including quoted fields and escaped quotes on one line, and emits a
 `#[UnitSpec]` table.
 
@@ -247,9 +247,9 @@ manifest buffers cannot mutate cached data.
 
 Unsaved input bytes can be supplied using
 `build({ assetSources: { path: bytes } })`. Strings are UTF-8 encoded and `null`
-hides a file for that build. This is separate from the existing Blot `sources`
+hides a file for that build. This is separate from the existing Squid `sources`
 overlays. Both maps are complete per-build overrides; omitting a key reads disk
-again. Asset paths resolve relative to the entry; Blot source overlays retain
+again. Asset paths resolve relative to the entry; Squid source overlays retain
 the client's current-directory convention.
 
 Failed parsing or native compilation publishes no candidate manifest and retains
@@ -268,7 +268,7 @@ Grant an input by mapping a virtual module to its file when opening a project.
 
 ```ts
 const compiler = await createCompiler({
-  entry: "./main.blot",
+  entry: "./main.sq",
   nativeAssets: {
     imports: [{ module: "./icon", path: "./icon.png", kind: "input" }],
   },

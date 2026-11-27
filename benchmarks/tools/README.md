@@ -3,7 +3,7 @@
 For the owned backend, start with the bounded scalar call graph:
 
 ```sh
-deno run --no-config --no-lock -A benchmarks/tools/scoped_calls.ts --blotc compiler/zig-out-dev/bin/blotc --sizes 1,4,8 --depth 12
+deno run --no-config --no-lock -A benchmarks/tools/scoped_calls.ts --squidc compiler/zig-out-dev/bin/squidc --sizes 1,4,8 --depth 12
 ```
 
 Each fresh session has a five-second build deadline, executes its Wasm against
@@ -18,7 +18,7 @@ open.
 For nested generic field access on anonymous records:
 
 ```sh
-deno run --no-config --no-lock -A benchmarks/tools/scoped_calls.ts --blotc compiler/zig-out-native-dev/bin/blotc --fields 64 --sizes 4 --depth 5
+deno run --no-config --no-lock -A benchmarks/tools/scoped_calls.ts --squidc compiler/zig-out-native-dev/bin/squidc --fields 64 --sizes 4 --depth 5
 ```
 
 `--fields` selects the record workload; `--sizes` then counts repeated calls.
@@ -40,13 +40,13 @@ preserves that rejection and the completed proof-instance fix. Run its six-cell
 acceptance matrix with unchanged limits:
 
 ```sh
-deno run --no-config --no-lock -A benchmarks/tools/source_proof.ts --blotc compiler/zig-out-native-dev/bin/blotc
+deno run --no-config --no-lock -A benchmarks/tools/source_proof.ts --squidc compiler/zig-out-native-dev/bin/squidc
 ```
 
 For frontend type-graph copying, use unused generic pair helpers:
 
 ```sh
-deno run --no-config --no-lock -A benchmarks/tools/open_type_dag.ts --blotc compiler/zig-out-native-dev/bin/blotc --depths 8,12,16,20
+deno run --no-config --no-lock -A benchmarks/tools/open_type_dag.ts --squidc compiler/zig-out-native-dev/bin/squidc --depths 8,12,16,20
 ```
 
 This instrumented development-tier probe reports phase clocks, type-node counts,
@@ -57,7 +57,7 @@ deadline. Keep these profiled samples separate from unprofiled throughput.
 For nested storage readers and Unit writers:
 
 ```sh
-deno run --no-config --no-lock -A benchmarks/tools/storage_calls.ts --blotc compiler/zig-out-native-dev/bin/blotc --sizes 1,4,8 --depth 10
+deno run --no-config --no-lock -A benchmarks/tools/storage_calls.ts --squidc compiler/zig-out-native-dev/bin/squidc --sizes 1,4,8 --depth 10
 ```
 
 Both graphs call their predecessor twice per level. Each build executes seven
@@ -98,7 +98,7 @@ selected. Public generators live in `review_corpus.ts`.
 
 ```sh
 deno run -A benchmarks/tools/session_memory.ts \
-  --baseline /absolute/qualified-blotc --candidate /absolute/candidate-blotc \
+  --baseline /absolute/qualified-squidc --candidate /absolute/candidate-squidc \
   --snapshot /absolute/frozen-snapshot --manifest /absolute/manifest.json \
   --out build/bench/new-memory-run --edits 200 --control-every 20
 ```
@@ -164,7 +164,7 @@ module checks. The latter includes candidate scans, scheme imports and frontend
 normalization; `stats.frontend` alone describes the entry module. Sum every
 phase except `backend` for the whole frontend. Keep this instrumented total
 separate from unprofiled process CPU and end-to-end latency. See the
-[frontend architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
+[frontend architecture review](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
 for the CT114 findings and remaining representation changes.
 
 `deno run -A benchmarks/tools/render_producer.ts --compiler PATH` checks the actual
@@ -218,13 +218,13 @@ regressions alongside wins.
 
 `zig build demand-inventory -Doptimize=safe -Dllvm=false --prefix
 zig-out-native-dev`
-in `compiler/` installs `blot-demand-inventory`. Run that binary from the
+in `compiler/` installs `squid-demand-inventory`. Run that binary from the
 repository root, optionally with `--tiny-entry`, to inventory conservative AST
 declaration demand on real Gdev with its generated native assets. It stops
 before semantic checking. Counts and body-source bytes do not predict checker
 time or establish that unchecked interfaces can be published.
 
-## Idiomatic Blot/Rust programs
+## Idiomatic Squid/Rust programs
 
 `deno task bench:idiomatic` measures eighteen public source pairs with fresh
 optimized compiler processes and same-engine Wasm execution. Every output is
@@ -241,8 +241,8 @@ semantic workers and optimizer workers.
 
 ## Runtime representation boundaries
 
-`deno run -A benchmarks/tools/runtime_boundaries.ts --baseline OLD/blotc
---candidate NEW/blotc`
+`deno run -A benchmarks/tools/runtime_boundaries.ts --baseline OLD/squidc
+--candidate NEW/squidc`
 compares the 28 public numeric-row and reference-scratch cases. It checks
 runtime ownership budgets and records alternating samples, fresh compilation
 costs, output sizes and input hashes. See

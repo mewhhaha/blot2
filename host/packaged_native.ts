@@ -4,7 +4,7 @@ import { join } from "node:path";
 /** Prefer the already-built compiler in a source checkout. */
 export async function findCheckoutCompiler(): Promise<URL | undefined> {
   if (Deno.build.standalone) return;
-  const url = new URL("../compiler-goose/build/blotc-goose", import.meta.url);
+  const url = new URL("../compiler-goose/build/squidc-goose", import.meta.url);
   try {
     if ((await Deno.stat(url)).isFile) return url;
   } catch (error) {
@@ -20,16 +20,16 @@ export async function extractNativeCompiler(): Promise<{
 }> {
   if (Deno.build.os !== "linux" || Deno.build.arch !== "x86_64") {
     throw new Error(
-      "This @mewhhaha/blot package bundles a Zig compiler for Linux x86-64 only; provide an executable built for your platform",
+      "This @mewhhaha/squid package bundles a Zig compiler for Linux x86-64 only; provide an executable built for your platform",
     );
   }
-  const path = await Deno.makeTempFile({ prefix: "blotc-" });
+  const path = await Deno.makeTempFile({ prefix: "squidc-" });
   try {
     await Deno.writeFile(
       path,
       gunzipSync(
         await Deno.readFile(
-          new URL("../generated/compiler/blotc.gz", import.meta.url),
+          new URL("../generated/compiler/squidc.gz", import.meta.url),
         ),
       ),
     );
@@ -51,14 +51,14 @@ export async function extractStandardLibrary(): Promise<{
   readonly path: string;
   dispose(): Promise<void>;
 }> {
-  const path = await Deno.makeTempDir({ prefix: "blot-std-" });
+  const path = await Deno.makeTempDir({ prefix: "squid-std-" });
   async function copy(source: URL, target: string): Promise<void> {
     for await (const entry of Deno.readDir(source)) {
       const destination = join(target, entry.name);
       if (entry.isDirectory) {
         await Deno.mkdir(destination);
         await copy(new URL(`${entry.name}/`, source), destination);
-      } else if (entry.isFile && entry.name.endsWith(".blot")) {
+      } else if (entry.isFile && entry.name.endsWith(".sq")) {
         await Deno.writeFile(
           destination,
           await Deno.readFile(new URL(entry.name, source)),

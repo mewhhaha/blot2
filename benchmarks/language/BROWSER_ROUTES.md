@@ -15,10 +15,10 @@ The headless browser executed Gdev's original four ordered route queries on 20 N
 
 Four queries occupy at most four workers. An eight-worker pool still pays startup and linear memory for eight instances. Workers lost to the direct path at every median. These figures measure work within an animation frame. The raw samples also record the interval to the next animation callback, the first execution in each mode, the direct fixed-row control, shard dispatch, join, and application. Across modes headless Chrome scheduled frames at roughly 16.7–66.7 ms. This fixture runs routing and world-result selection without a game renderer. High percentiles summarize 101 frames per cell.
 
-The measured module is 43,704 bytes, SHA-256 `02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69`. It uses Gdev `54f299a` and Ink `77697fe`. Reproduce from the Blot root with a local Chrome executable.
+The measured module is 43,704 bytes, SHA-256 `02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69`. It uses Gdev `54f299a` and Ink `77697fe`. Reproduce from the Squid root with a local Chrome executable.
 
 ```sh
-BLOT_ROUTE_WASM=build/routes.wasm deno run -A benchmarks/language/spark_spawn.ts ../gdev compiler-goose/build/blotc-goose
+SQUID_ROUTE_WASM=build/routes.wasm deno run -A benchmarks/language/spark_spawn.ts ../gdev compiler-goose/build/squidc-goose
 python3 benchmarks/language/bench_browser_routes.py --chrome /path/to/chrome --wasm build/routes.wasm --output build/browser-routes.json.gz
 ```
 
@@ -26,7 +26,7 @@ python3 benchmarks/language/bench_browser_routes.py --chrome /path/to/chrome --w
 
 ## Compiling and editing the fixtures
 
-The native Blot compiler built the 23-module Gdev route fixture in **167.4 ms**
+The native Squid compiler built the 23-module Gdev route fixture in **167.4 ms**
 from a fresh session. Editing the spawned route planner's initializer took
 **20.2 ms** and rechecked one module. The two-module scalar fixture took
 **72.5 ms** fresh and **10.0 ms** after changing the multiplier inside

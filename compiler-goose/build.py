@@ -23,7 +23,7 @@ import time
 ROOT = Path(__file__).resolve().parent
 IDENTITY = ROOT / "src/source_identity.goose"
 MANIFEST = ROOT / "build/source-identity.json"
-DOMAIN = b"blot-goose-compiler-source-v1\0"
+DOMAIN = b"squid-goose-compiler-source-v1\0"
 
 
 def digest_file(path: Path) -> str:
@@ -83,7 +83,7 @@ def fingerprint(args: argparse.Namespace, goose: Path | None,
         runtime_sha = digest_file(runtime)
     configuration = {
         "schema": 1, "host": sys.platform, "machine": os.uname().machine,
-        "entry": "src/main.goose", "host_entry": "blot_goose_main",
+        "entry": "src/main.goose", "host_entry": "squid_goose_main",
         "goose_inline": args.inline, "c_flags": args.cflag,
         "stdlib": args.stdlib,
         "inference_budget": args.inference_budget,
@@ -120,7 +120,7 @@ def write_identity(record: dict) -> None:
         replay = "true"
     text = ("// Generated from actual Goose/host/build inputs by build.py.\n"
             "// Regenerated before every build; no Zig oracle digest is reused.\n"
-            "namespace blot_source_identity;\n"
+            "namespace squid_source_identity;\n"
             f"let digest:u8[32]=[{values}];\n"
             f"let inference_budget:u64={record['configuration']['inference_budget']};\n"
             f"let artifact_replay:bool={replay};\n")
@@ -221,7 +221,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", "goose"))
     parser.add_argument("--cc", default=os.environ.get("CC", "clang"))
-    parser.add_argument("--output", type=Path, default=ROOT / "build/blotc-goose")
+    parser.add_argument("--output", type=Path, default=ROOT / "build/squidc-goose")
     parser.add_argument("--inline", choices=["-O0", "-O1", "-O2"], default=None)
     parser.add_argument("--release", action="store_true",
                         help="select Goose -O2 and C -O2; development defaults to -O0")
@@ -278,8 +278,8 @@ def main() -> None:
          args.stage_timeout)
     record = fingerprint(args, goose, cc, runtime)
     write_identity(record)
-    program = build / "blot_goose.c"
-    header = build / "blot_goose.h"
+    program = build / "squid_goose.c"
+    header = build / "squid_goose.h"
     compiler = [str(cc)] + cc_words[1:]
     runtime_object = cached_object("compile runtime", runtime, build, compiler,
         args.cflag, record["configuration"]["cc_sha256"], args.stage_timeout)

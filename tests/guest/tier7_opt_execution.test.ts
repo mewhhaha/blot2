@@ -3,8 +3,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 async function withModule(
@@ -16,7 +16,7 @@ async function withModule(
   ) => void,
 ) {
   const dir = await Deno.makeTempDir({ prefix });
-  const entry = `${dir}/main.blot`;
+  const entry = `${dir}/main.sq`;
   try {
     await Deno.writeTextFile(entry, src);
     const compiler = await createZigProjectCompiler({
@@ -124,7 +124,7 @@ io oob_sum (n: U32): U32 =>
       sum := self + F32.to_u32 ((x + y + z) * 16.0)
   return sum
 `;
-  await withModule("blot_tier7a_", source, (guest, bytes) => {
+  await withModule("squid_tier7a_", source, (guest, bytes) => {
     ok(
       hasSubOpcode(bytes, 0xfd, 13),
       "expected i8x16.shuffle (0xfd 0x0d) in Maybe Vec3 SIMD reduction",
@@ -172,7 +172,7 @@ io self_read_must_keep_fill (n: U32): U32 =>
     sum := self + a[i]
   return sum
 `;
-  await withModule("blot_tier7b_", source, (guest) => {
+  await withModule("squid_tier7b_", source, (guest) => {
     for (const n of [0, 1, 4, 17]) {
       let expFull = 0;
       let expCond = 0;
@@ -291,7 +291,7 @@ io f32_sum_oob (n: U32): U32 =>
     s := self + xs[i]
   return f32_bits s
 `;
-  await withModule("blot_tier7c_", source, (guest) => {
+  await withModule("squid_tier7c_", source, (guest) => {
     for (const n of [0, 1, 3, 4, 7, 8, 9, 15, 16, 17, 35, 65]) {
       strictEqual(
         guest.call("multi_init", (n << 4) | 9),
@@ -384,7 +384,7 @@ io sort_u32_hash (packed: U32): U32 =>
     hash := (self * 31) ^ sorted[i]
   return hash
 `;
-  await withModule("blot_tier7d_", source, (guest) => {
+  await withModule("squid_tier7d_", source, (guest) => {
     for (const n of [0, 1, 2, 3, 4, 5, 7, 8, 9, 16, 17, 63, 64, 129]) {
       const res = guest.call("sort_u32_hash", (n << 8) | 42) as number;
       ok(res !== 0xdeadbeef, `Tier 7D merge sort unsorted for n=${n}`);
@@ -447,7 +447,7 @@ io check_matmul (packed: U32): U32 =>
       return 0xdeadbeef
   return 1
 `;
-  await withModule("blot_tier7e_", source, (guest, bytes) => {
+  await withModule("squid_tier7e_", source, (guest, bytes) => {
     ok(
       hasSubOpcode(bytes, 0xfd, 9),
       "expected v128.load32_splat (0xfd 0x09) in 4x-k matmul",

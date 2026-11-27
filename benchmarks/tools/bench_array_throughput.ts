@@ -1,7 +1,7 @@
 // Same-host release comparison for task 109. Private issue repros stay outside
 // the checkout; optionally supply one exporting guarded_sum(count: U32).
 // deno run --allow-all benchmarks/tools/bench_array_throughput.ts \
-//   PINNED_BLOTC PRE_FIX_BLOTC CURRENT_BLOTC INK_ROOT OUTPUT [ISSUE_REPRO]
+//   PINNED_SQUIDC PRE_FIX_SQUIDC CURRENT_SQUIDC INK_ROOT OUTPUT [ISSUE_REPRO]
 import { strict as assert } from "node:assert";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -38,7 +38,7 @@ async function pinTree(directory: string) {
   for await (const item of Deno.readDir(directory)) {
     const path = `${directory}/${item.name}`;
     if (item.isDirectory) await pinTree(path);
-    else if (item.isFile && /\.(blot|ts)$/.test(item.name)) {
+    else if (item.isFile && /\.(squid|ts)$/.test(item.name)) {
       pins[path] = await hash(path);
     }
   }
@@ -48,8 +48,8 @@ for (const variant of variants) {
   await pinTree(`${variant.root}/compiler`);
 }
 await pinTree(`${ink}/lib`);
-pins[`${ink}/tools/compiler-probe.blot`] = await hash(
-  `${ink}/tools/compiler-probe.blot`,
+pins[`${ink}/tools/compiler-probe.sq`] = await hash(
+  `${ink}/tools/compiler-probe.sq`,
 );
 pins[new URL(import.meta.url).pathname] = await hash(new URL(import.meta.url));
 for (const variant of variants) {
@@ -86,7 +86,7 @@ const save = () =>
 await save();
 const workloads = [{
   name: "ink",
-  entry: `${ink}/tools/compiler-probe.blot`,
+  entry: `${ink}/tools/compiler-probe.sq`,
   probes: ["inline_writes", "break_writes", "unsigned_sort", "pathfinding"],
   counts: [1000, 2000],
 }];
@@ -126,11 +126,11 @@ for (const workload of workloads) {
           "--std-root",
           std,
           "--prelude",
-          `${std}/prelude.blot`,
+          `${std}/prelude.sq`,
           "--alias",
           `ink/=${ink}/lib/`,
         ],
-        env: { BLOT_CACHE_DIR: "" },
+        env: { SQUID_CACHE_DIR: "" },
         stdout: "piped",
         stderr: "piped",
       }).output();
@@ -159,7 +159,7 @@ for (const workload of workloads) {
       const module = new WebAssembly.Module(bytes);
       const ownership = WebAssembly.Module.customSections(
         module,
-        "blot:ownership",
+        "squid:ownership",
       );
       assert(ownership.length <= 1);
       const admission = ownership.length

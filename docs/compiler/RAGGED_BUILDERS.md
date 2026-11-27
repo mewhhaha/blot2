@@ -243,7 +243,7 @@ semantics. For traces, `B` is bound evaluation, `G` a guard, `P` a payload, and
 repeated `B/G` events are unobservable. Effect and failure events are observable
 and must stay exact.
 
-```blot
+```squid
 #entry const triangle = func count => return do:
   let result: List U32 = []
   for x in 0..count:
@@ -273,7 +273,7 @@ same order and values with the existing List representation.
 
 These counterexamples must remain ordinary:
 
-```blot
+```squid
 #entry const trapping_guard = func (values: Array U32) => return
   #[10 / x | x <- values, 1 / (x - 1) == 0]
 

@@ -60,7 +60,7 @@ export function readDataSchemas(
 ): ReadonlyMap<number, DataNode> | undefined {
   const sections = WebAssembly.Module.customSections(
     module,
-    "blot:cleanup_data",
+    "squid:cleanup_data",
   );
   if (sections.length === 0) return undefined;
   if (sections.length !== 1 || sections[0].byteLength > 1_048_576) fail();

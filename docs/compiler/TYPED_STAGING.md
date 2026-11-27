@@ -3,7 +3,7 @@
 Normative design for 066–068, ahead of unfinished implementation dependencies.
 The [guide](../language/guide.md) still excludes general type-valued
 computation. [Host asset parsing](LANGUAGE_EVOLUTION.md#external-asset-boundary)
-remains its existing explicit tracked-input boundary. Blot generation uses only
+remains its existing explicit tracked-input boundary. Squid generation uses only
 the ordinary lexer/parser/checker/Core pipeline, never a string compiler or
 runtime interpreter.
 
@@ -33,7 +33,7 @@ Construction does not run quoted effects. Code may be built/imported by ordinary
 pure const functions; unknown runtime code values are rejected rather than
 interpreted.
 
-```blot
+```squid
 const left: code [U32, row {}] = @code.quote 40
 const right: code [U32, row {}] = @code.quote 2
 const answer_code = @code.quote (@u32.add (@code.splice left) (@code.splice right))

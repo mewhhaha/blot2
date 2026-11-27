@@ -274,7 +274,7 @@ static int read_frame(int reader, int *fd, uint64_t *total, struct envelope *out
     int status = read_all(reader, header, sizeof header, 1);
     if (status <= 0) return status;
     int error = lengths(header, total); if (error) return error;
-    int spool = memfd_create("blot-frame", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    int spool = memfd_create("squid-frame", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (spool < 0) return -errno;
     error = write_all(spool, header, 8);
     uint64_t remaining = *total - 8;
@@ -307,9 +307,9 @@ static int32_t validate_reply(int32_t fd, uint64_t length, uint64_t token) {
     } else if (accepted.revision != revision) return -EPROTO;
     return 0;
 }
-int32_t blot_request_transport_reply_open(void) {
+int32_t squid_request_transport_reply_open(void) {
     if (output >= 0) return -EBUSY;
-    output = memfd_create("blot-reply", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    output = memfd_create("squid-reply", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (output < 0) return -errno;
     /* Sparse capacity plus a grow seal bounds writes in the kernel, before a
      * candidate can consume unbounded spool space. Writer uses sequential I/O. */
@@ -318,11 +318,11 @@ int32_t blot_request_transport_reply_open(void) {
     }
     return output;
 }
-int32_t blot_request_transport_finish(uint64_t token) {
+int32_t squid_request_transport_finish(uint64_t token) {
     off_t length = -1;
     if (output >= 0) length = lseek(output, 0, SEEK_CUR);
-    if (length < 0 || (uint64_t)length > FRAME_LIMIT || ftruncate(output, length)) blot_request_fail(token);
-    int result = blot_request_finish(output, (uint64_t)length, token);
+    if (length < 0 || (uint64_t)length > FRAME_LIMIT || ftruncate(output, length)) squid_request_fail(token);
+    int result = squid_request_finish(output, (uint64_t)length, token);
     close(output); output = -1; return result;
 }
 static size_t decimal(uint64_t value, char out[20]) {
@@ -346,7 +346,7 @@ static int oom_reply(int writer, uint32_t id, int entry_fd, struct text entry) {
     static const char suffix[] = ",\"stage\":\"build-project\",\"code\":\"out_of_memory\",\"start\":0,\"end\":0,\"message\":\"Out of memory\",\"offset_encoding\":\"utf8_bytes\",\"utf16\":null,\"details\":null}],\"attemptStats\":null}";
     if (!entry.length || entry.length > META_LIMIT - 1024) { entry_fd = -1; entry.length = 2; }
     uint64_t metadata = (uint64_t)prefix_length + entry.length + sizeof suffix - 1;
-    int fd = memfd_create("blot-oom", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    int fd = memfd_create("squid-oom", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (fd < 0) return -errno;
     uint8_t header[8] = {0}; put32(header, (uint32_t)metadata);
     int error = write_all(fd, header, 8);
@@ -359,10 +359,10 @@ static int oom_reply(int writer, uint32_t id, int entry_fd, struct text entry) {
     if (!error) error = copy(fd, 0, 8 + metadata, writer);
     close(fd); return error;
 }
-int32_t blot_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
+int32_t squid_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
     int entry_fd = -1, result = 0;
     struct text entry = {0}; uint64_t last_id = 0; revision = 0;
-    blot_request_reply_validator(validate_reply);
+    squid_request_reply_validator(validate_reply);
     for (;;) {
         int request = -1; uint64_t total;
         int status = read_frame(reader_fd, &request, &total, &current);
@@ -372,13 +372,13 @@ int32_t blot_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
             close(request); result = -EPROTO; break;
         }
         last_id = current.id;
-        int outcome = blot_request_submit(request, total, current.id);
-        if (outcome == BLOT_REQUEST_ACCEPTED) {
+        int outcome = squid_request_submit(request, total, current.id);
+        if (outcome == SQUID_REQUEST_ACCEPTED) {
             revision = accepted.revision;
             if (equals(current.kind, "open") && current.entry.length) {
                 /* Keep only the encoded path, not a potentially 64 MiB opening
                  * checkpoint payload. This is bounded by metadata size. */
-                int saved = memfd_create("blot-entry", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+                int saved = memfd_create("squid-entry", MFD_CLOEXEC | MFD_ALLOW_SEALING);
                 if (saved < 0) result = -errno;
                 else {
                     result = copy(request, 8 + current.entry.start, current.entry.length, saved);
@@ -387,16 +387,16 @@ int32_t blot_request_transport_run(int32_t reader_fd, int32_t writer_fd) {
                     else { if (entry_fd >= 0) close(entry_fd); entry_fd = saved; entry = current.entry; entry.start = 0; }
                 }
             }
-            if (!result) result = copy(blot_request_reply_fd(), 0, blot_request_reply_length(), writer_fd);
-        } else if (outcome == BLOT_REQUEST_OOM) {
+            if (!result) result = copy(squid_request_reply_fd(), 0, squid_request_reply_length(), writer_fd);
+        } else if (outcome == SQUID_REQUEST_OOM) {
             int name_fd = entry_fd; struct text name = entry;
             if (name_fd < 0 && equals(current.kind, "open")) { name_fd = request; name = current.entry; name.start += 8; }
             result = oom_reply(writer_fd, (uint32_t)current.id, name_fd, name);
         } else { result = -EIO; }
         if (request >= 0) close(request);
-        if (result || (outcome == BLOT_REQUEST_ACCEPTED && equals(current.kind, "close"))) break;
+        if (result || (outcome == SQUID_REQUEST_ACCEPTED && equals(current.kind, "close"))) break;
     }
-    blot_request_reply_validator(NULL);
+    squid_request_reply_validator(NULL);
     if (entry_fd >= 0) close(entry_fd);
-    blot_request_stop(); return result;
+    squid_request_stop(); return result;
 }

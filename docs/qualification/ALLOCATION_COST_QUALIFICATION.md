@@ -1,6 +1,6 @@
 # Allocation-cost qualification for issue #17
 
-The source-level report is opt-in: `blotc build-project ENTRY OUTPUT.wasm
+The source-level report is opt-in: `squidc build-project ENTRY OUTPUT.wasm
 --explain-allocations` emits `allocation_sites` and `array_costs` JSON records
 after a successful build. `allocation_sites` maps allocator calls from source
 emission back to their responsible expressions; the nominal `#Box` fixture has
@@ -30,7 +30,7 @@ prelude SHA-256 `677ccf723198511a812a5d7539512253197df9842cd07d1da9749d137262006
 and `std/array` SHA-256 `1a11c8ef63fc18fec2515889efc8fdf0fa3030db59e061b43f38c8f0ea506be1`.
 Reproduce with `deno test --no-config --allow-read --allow-write --allow-run
 zig-native/tests/allocation_cost_matrix.test.ts --
-zig-native/zig-out-dev/bin/blotc`.
+zig-native/zig-out-dev/bin/squidc`.
 
 | Source form, 100 calls | Development bytes | Optimized bytes |
 | --- | ---: | ---: |

@@ -5,23 +5,23 @@
 - **Status:** Complete.
 - **Dependencies:** None.
 - **Originating requirements:** reported on 11 October 2026 by the gdev session
-  while porting gdev's tests to Blot. Sources: that session's report.
+  while porting gdev's tests to Squid. Sources: that session's report.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
-`blotc` reports a diagnostic or compiles, and never crashes, for modules with
+`squidc` reports a diagnostic or compiles, and never crashes, for modules with
 long chains of nested stage functions.
 
 ## Starting point
 
 A module with a chain of about 12–20 nested stage functions
 (`const b = func () => return run (a ()) …`) called from many entries makes
-`blotc serve-project` exit with signal 11 (exit 139); the client reports
+`squidc serve-project` exit with signal 11 (exit 139); the client reports
 "Unexpected EOF or truncated response frame". Some subsets of the entries
 compile, and adding links to the chain made a compiling module crash. The repro
-is a gdev game-mode test module (appended to gdev's `src/main.blot`), not yet
+is a gdev game-mode test module (appended to gdev's `src/main.sq`), not yet
 reduced without gdev. Task 091 moved compilation onto a 1 GiB reserved stack and
 bounded constant evaluation by call depth; this may be another unbounded
 recursion.

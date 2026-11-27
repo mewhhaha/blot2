@@ -29,7 +29,7 @@ const { values } = parseArgs({
     },
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     baseline: { type: "string" },
     output: { type: "string", default: "build/bench/engine-stages" },
@@ -55,7 +55,7 @@ let versions: Version[] = [
   {
     name: "baseline",
     executable: resolve(
-      values.baseline ?? "compiler/zig-out-engine-baseline/bin/blotc",
+      values.baseline ?? "compiler/zig-out-engine-baseline/bin/squidc",
     ),
     trace: false,
   },
@@ -179,11 +179,11 @@ if (values.world) {
   for (
     const [project, ref, paths] of [
       ["gdev", values["baseline-gdev"]!, [
-        "src/world_storage.blot",
-        "tests/minor_support/owned.blot",
-        "tests/minor_support/game.blot",
+        "src/world_storage.sq",
+        "tests/minor_support/owned.sq",
+        "tests/minor_support/game.sq",
       ]],
-      ["ink", values["baseline-ink"]!, ["lib/pen/host.blot"]],
+      ["ink", values["baseline-ink"]!, ["lib/pen/host.sq"]],
     ] as const
   ) {
     for (const path of paths) {
@@ -264,14 +264,14 @@ type RetainedSample = {
 const samples = [];
 for (let repetition = 0; repetition < repetitions; repetition++) {
   for (const probe of probes) {
-    const entry = resolve(output, `${probe.name}.blot`);
+    const entry = resolve(output, `${probe.name}.sq`);
     await Deno.writeTextFile(entry, probe.source);
     for (let at = 0; at < versions.length; at++) {
       const version = versions[(at + repetition) % versions.length];
       const options: ZigProjectCompilerOptions = {
         executable: version.executable,
         entry,
-        prelude: resolve(repo, "std/prelude.blot"),
+        prelude: resolve(repo, "std/prelude.sq"),
         stdRoot: resolve(repo, "std"),
         imports: { "ink/": resolve(repo, "../ink/lib") },
         profileBackend: !values["no-profile"],

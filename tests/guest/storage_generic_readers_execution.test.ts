@@ -152,15 +152,15 @@ io const floating = func () => return do:
 
 Deno.test(`selected generic readers retain nominal payloads and captured instantiations`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-generic-reader-",
+    prefix: "squid-generic-reader-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

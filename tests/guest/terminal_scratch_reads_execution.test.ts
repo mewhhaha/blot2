@@ -2,7 +2,7 @@ import { throws } from "node:assert/strict";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const fixture = new URL(
-  "../../compiler-goose/tests/fixtures/direct/terminal_scratch_reads.blot",
+  "../../compiler-goose/tests/fixtures/direct/terminal_scratch_reads.sq",
   import.meta.url,
 );
 

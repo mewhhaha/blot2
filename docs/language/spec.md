@@ -1,8 +1,8 @@
-# Blot Language Specification (vNext)
+# Squid Language Specification (vNext)
 
 Revision 4 — 21 November 2026.
 
-This document specifies the Blot vNext language: its lexical and syntactic
+This document specifies the Squid vNext language: its lexical and syntactic
 grammar, static rules, ownership and sharing model, effects, traits, compile-time
 metaprogramming, and dynamic traps. It supersedes earlier competing drafts and
 is the single language target. [The executable guide](guide.md) continues to
@@ -13,7 +13,7 @@ describe the current compiler while migration is in progress;
 
 ## 1. Core Identity & Design Rules
 
-Blot is a pure, value-semantic, data-oriented language compiling directly to
+Squid is a pure, value-semantic, data-oriented language compiling directly to
 WebAssembly. Every design rule below is an invariant:
 
 1. **Pure shadowing is the only mutation model.** Every value is logically
@@ -265,7 +265,7 @@ DataField   = Tag* LowerName ":" Type ("=" Expression)?
 - **Type members**: `type Pool.Id = U32` lives in `Pool`'s namespace.
 - **Length variables in data**: A data record may share a length variable across
   fields (Section 6.2), proving equal length across parallel arrays:
-  ```blot
+  ```squid
   type Robots is data = $Robots {
     pos: #[n; Vec2],
     vel: #[n; Vec2],
@@ -283,7 +283,7 @@ OutputTypes = "{" OutputType,+ "}"
 OutputType  = LowerName ":" Type
 ```
 
-```blot
+```squid
 type Eq a is trait = { eq: a -> a -> Bool }
 type Mul left { right, out } is trait = { mul: left -> right -> out }
 
@@ -312,7 +312,7 @@ func square (x: a): a where { Mul a { right: a, out: a } } => x * x
 
 ### 5.5 Effects
 
-```blot
+```squid
 type Log is effect = { write: Text -> Unit }
 ```
 
@@ -381,7 +381,7 @@ EffectLabel = TypePath TypeArg?
 
 ### 6.2 Intrinsic Collection Symbols (`#[T]`, `#[n; T]`, `%[T]`, `~[T]`)
 
-Blot uses four intrinsic collection type symbols, with length mutations gated by
+Squid uses four intrinsic collection type symbols, with length mutations gated by
 unique ownership (`own`) rather than separate grow/resize types:
 
 | Symbol | Mode | Length / Bounds & Layout Guarantee |
@@ -558,7 +558,7 @@ Lambdas follow the 2A/2B rules (Section 6.4).
    only against the function's `where` clause).
 
 A line starting with `.name` continues the expression above it:
-```blot
+```squid
 let reach = robots
   .filter (func r => r.charge > 0.2)
   .map (func r => r.home.length)
@@ -657,7 +657,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
 
 ### 9.4 Speculative Shadowing: `fork`
 
-```blot
+```squid
 let score = fork world:
   let (_, w) = step world candidate_move
   world := w
@@ -696,7 +696,7 @@ HandlerStmt = "handler" LowerName ":" TypeApp "=>" HandlerBody
 HandlerBody = IndentedArms | RecordLiteral | Lambda | CallableArm
 ```
 
-```blot
+```squid
 let lines: #[Text] = #[]
 handler log: Log =>
   write msg => lines := self.push msg
@@ -709,7 +709,7 @@ let value = run_game.handle log
 - `@handle handler thunk` is the core compiler intrinsic: it installs `handler`
   (an effect record, local `handler` binding, or `Layer`), runs `thunk ()`,
   subtracts the handled effects, and returns `thunk`'s result.
-- The standard prelude (`std/prelude.blot`) provides pure value wrappers and
+- The standard prelude (`std/prelude.sq`) provides pure value wrappers and
   fluent chaining on top of `@handle`:
   - `type Layer [inner, outer] is data = $Layer { inner: inner, outer: outer }`
     and `layer a b` / `env.layer c` to bundle reusable handler stacks (including
@@ -757,7 +757,7 @@ ComptimeFor = "#for" LowerName "in" ("#fields" | "#variants") TypeAtom ":" Suite
 ComptimeIf  = "#if" Expression ":" Suite ("#else" ":" Suite)?
 ```
 
-```blot
+```squid
 func derive_encode (own out: #[U8]) -> (val: t): #[U8] =>
   #for field in #fields t:
     #if not (field.has_tag Codec.Skip):
@@ -769,7 +769,7 @@ func derive_encode (own out: #[U8]) -> (val: t): #[U8] =>
   interfaces remain 100% known after parsing.
 - During monomorphization for a concrete type `T`, `#for field in #fields T`
   unrolls its suite once per field of `T` (and `#variants T` once per data
-  constructor), type-checking each unrolled iteration with ordinary Blot rules.
+  constructor), type-checking each unrolled iteration with ordinary Squid rules.
 - `val.(field)` projects the compile-time field from `val`; `field.name`,
   `field.has_tag`, `field.tag`, and `field.has_default` inspect field metadata
   and `@[...]` tags at compile time.
@@ -791,7 +791,7 @@ Integer `+`, `-`, `*` wrap deterministically at bit width; floats follow IEEE 75
 
 ---
 
-## Annex A. Retired Forms (Removed From Earlier Blot)
+## Annex A. Retired Forms (Removed From Earlier Squid)
 
 | Retired | vNext Replacement |
 | --- | --- |

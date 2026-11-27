@@ -1,4 +1,4 @@
-// Matching Rust implementations of the 6 kernels in blot_kernels.blot.
+// Matching Rust implementations of the 6 kernels in squid_kernels.sq.
 // Compiled both as a standalone wasm32-unknown-unknown cdylib (-C opt-level=3 -C target-feature=+simd128)
 // and directly into the native x86_64 (-O3) benchmark harness.
 

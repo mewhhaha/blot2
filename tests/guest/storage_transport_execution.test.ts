@@ -30,8 +30,8 @@ io const typed = func (input: F32): F32 => return do:
 `;
 
 Deno.test(`scoped transport preserves nested swaps stack operands and F32 bits`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-transport-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-transport-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

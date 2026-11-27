@@ -7,23 +7,23 @@ parser, shader adapter, input overlays, manifests and ownership rules.
 The package root exports `createCompiler({ entry, executable? })`. It starts the
 packaged Zig compiler by default and supplies the standard prelude. For an
 explicit executable and no implicit prelude, use `createZigProjectCompiler` from
-`@mewhhaha/blot/zig-project`. Either one runs `blotc serve-project` as a child
+`@mewhhaha/squid/zig-project`. Either one runs `squidc serve-project` as a child
 process with a cleared environment and speaks
 [the project protocol](PROJECT_PROTOCOL.md) to it. Every build loads, checks,
 lowers and compiles the project from its sources with the direct backend; no
 checked or compiled module carries over from one build to the next.
 
 ```ts
-import { createCompiler } from "@mewhhaha/blot";
+import { createCompiler } from "@mewhhaha/squid";
 
 const compiler = await createCompiler({
-  entry: "/project/main.blot",
+  entry: "/project/main.sq",
   imports: { "lib/": "/project/library" },
 });
 try {
   const result = await compiler.build({
     sources: {
-      "/project/main.blot": "#entry const answer = func () => return 42\n",
+      "/project/main.sq": "#entry const answer = func () => return 42\n",
     },
   });
   if (result.success) await Deno.writeFile("program.wasm", result.bytes);
@@ -41,8 +41,8 @@ request frame. Paths identify modules consistently across disk and buffered
 builds.
 
 `prelude: null` disables the prelude. `stdRoot` sets the `std/` alias; `imports`
-supplies other directory aliases. `dependencies` accepts a compatible `.blotdep`
-file created by `blot dependencies`. Each build takes the bundle's modules whose
+supplies other directory aliases. `dependencies` accepts a compatible `.sqdep`
+file created by `squid dependencies`. Each build takes the bundle's modules whose
 sources are unchanged as checked and checks the rest; if checking with the
 bundle rejects, the build is checked fresh from source. A mismatched bundle is
 rejected when the compiler starts. `expectedCompilerIdentity` can pin a
@@ -136,8 +136,8 @@ bounds and graph acyclicity before exposing it.
 the client. Cancelling active work disposes the process and rejects queued work.
 `close()` drains queued requests; `dispose()` interrupts them. Both reap the
 child and are idempotent. The packaged wrapper also removes its extracted
-binary. Standalone Deno/desktop executables must include `blotCompilerBinary`
-and `blotStdRoot` (exported URLs). Their embedded standard library is extracted
+binary. Standalone Deno/desktop executables must include `squidCompilerBinary`
+and `squidStdRoot` (exported URLs). Their embedded standard library is extracted
 for the native child and removed when the compiler closes. Project source paths
 and explicit dependency/prelude paths must refer to files accessible to that
 child.

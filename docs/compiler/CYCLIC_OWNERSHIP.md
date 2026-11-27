@@ -106,7 +106,7 @@ deletion without tracing. An unrelated 8192-object heap does not enter a
 one-node candidate closure. Existing alias, copy, million-node destruction,
 provider, request and suspension laws remain exercised.
 
-The optional `blot:cycles` section version 1 declares admission and four scalar
+The optional `squid:cycles` section version 1 declares admission and four scalar
 counters: passes, vertices, dynamic strong edges and reclaimed payload bytes.
 The guest rejects duplicate, malformed or inconsistent sections. Existing
 ownership versions and public call signatures remain unchanged.

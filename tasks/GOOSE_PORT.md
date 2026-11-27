@@ -19,7 +19,7 @@ compiler-goose/ was the scoped compiler as the Zig source stood at 44ee94f4
 direct one and deleted about 170,000 lines. The port followed that cut and
 was then brought up to the Zig source of 15 November.
 
-`compiler-goose/build/blotc-goose` now has every command of `blotc`:
+`compiler-goose/build/squidc-goose` now has every command of `squidc`:
 `lex`, `parse`, `check`, `build`, `parse-project`, `check-project`,
 `build-project`, `dependencies`, `serve-project` and `migrate-stores`.
 
@@ -30,7 +30,7 @@ Against the Zig release compiler:
 | Guest and host suite | 1,054 pass, 0 fail, 101 ignored, as for Zig |
 | The 187 fixture programs (now compiler-goose/tests/fixtures) | Wasm and records identical on 183; the other four differ in one counter (see "Known differences") |
 | Ink's 112 test programs, `build-project` | Wasm byte-identical |
-| Ink's suite through Pen (`pen test-blot`) | Same log line for line, timings aside: 268 passed, 1 failed, 3 did not compile, in 73 modules |
+| Ink's suite through Pen (`pen test-squid`) | Same log line for line, timings aside: 268 passed, 1 failed, 3 did not compile, in 73 modules |
 | Gdev Main | Wasm byte-identical through `serve-project` (2,720,970 bytes, sha256 af9f24dd…); its first Pen frame matches the recorded hashes (frame.png c1ff619f… on the software driver, frames.trace 86d50101…) |
 | `migrate-stores` on compiler-goose/tests/uniqueness (73 programs, 78 sites) and a dry run on Gdev | Same output and same rewritten files |
 | Dependency bundles | Same size as Zig's; only the 63 header bytes that hold the compiler identity differ. Each compiler declines the other's bundle (SchemaMismatch) |
@@ -64,15 +64,15 @@ Then compile times, as the owner ordered.
   diagnostics of 73 programs) and tests/direct/NAME.expected (backend
   bytes). `--record` rewrites a record after a deliberate change.
 - **Scripts.** `deno task build:compiler` and `build:compiler:dev` build
-  the Goose compiler (optimized to build/blotc-goose, debug to
-  build/blotc-goose-dev). `deno task test:compiler` is the gate: tooling
+  the Goose compiler (optimized to build/squidc-goose, debug to
+  build/squidc-goose-dev). `deno task test:compiler` is the gate: tooling
   tests, the optimized build, the three references, the package and every
   guest and host test. The tests' default compiler path, `pack_native.ts`,
   editor/helix and the benchmark tools name the Goose compiler.
 - **CI** builds the Goose compiler (clang, cmake, ninja; the patched Goose
   is cached) and runs `deno task check`.
 - **Siblings.** ../ink and ../gdev run
-  ../blot2/compiler-goose/build/blotc-goose from their pen.json; Pen's
+  ../squid-lang/compiler-goose/build/squidc-goose from their pen.json; Pen's
   tests, example check and CI, and Ink's CI, build and run it too. A
   machine that builds them needs the compiler built first
   (`deno task build:compiler`).

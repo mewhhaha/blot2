@@ -9,7 +9,7 @@ Issues #29, #30, #31 and #34 are fixed and correctness-qualified. The complete
 compiler gate, zero-finding Zig lint, public runtime benchmarks and application
 compile-cost screen pass. Broader representation, cycle-collection and
 attribution work remains tracked separately in
-[the issue triage](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/ISSUE_TRIAGE.md).
+[the issue triage](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/ISSUE_TRIAGE.md).
 
 ## Changes
 
@@ -64,7 +64,7 @@ release performance results.
 ## Release runtime and code size
 
 31 alternating warmed samples (five invocations each) use LLVM release
-compilers, Blot's optimized Wasm tier, and Deno 2.9.7 / V8 15.0.245.2-rusty on
+compilers, Squid's optimized Wasm tier, and Deno 2.9.7 / V8 15.0.245.2-rusty on
 an AMD Ryzen 7 7800X3D, Linux. No external `wasm-opt` or body instrumentation is
 used. These are local kernel measurements, distinct from whole-application
 runtime and the issue reporter's Node/O3 numbers.

@@ -27,8 +27,8 @@ if (
 }
 const out = resolve(values.out);
 await Deno.mkdir(out); // Never overwrite an earlier experiment.
-const directory = await Deno.makeTempDir({ prefix: "blot-assets-" });
-const entry = directory + "/main.blot";
+const directory = await Deno.makeTempDir({ prefix: "squid-assets-" });
+const entry = directory + "/main.sq";
 const source =
   'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nentry const answer = func () => return do:\n  let $a.Content handle = a.content\n  break @u32.add handle 1\n';
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>

@@ -7,7 +7,7 @@
 - **Originating requirements:** reported on 11 October 2026 by the gdev session:
   16 gdev tests fail to compile. Sources: that session's report.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -18,7 +18,7 @@ instead of failing code emission.
 
 The gdev session reduced it to a program without gdev:
 
-```blot
+```squid
 const count = func xs => return do:
   let n = 0
   for x in xs:
@@ -30,7 +30,7 @@ entry const create = func () => return count #[]
 It fails with
 `unresolved_type: Code emission requires concrete representation
 evidence` at
-`std/prelude.blot` 13092–13144
+`std/prelude.sq` 13092–13144
 (`const Array.iter = func values => return
 @array.cursor values`): the empty
 array leaves its element type unpinned, and specialization reaches the cursor

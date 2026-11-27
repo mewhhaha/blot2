@@ -3,9 +3,9 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const repo = new URL("../../", import.meta.url).pathname;
-const prelude = `${repo}std/prelude.blot`;
+const prelude = `${repo}std/prelude.sq`;
 
 // Constants run at run time. A recursive walk over a registration table
 // thousands long evaluates, and runaway recursion traps at the first read, in
@@ -23,8 +23,8 @@ const value: U32 = forever 0
 io const found = func () : U32 => return value
 `;
 Deno.test("constant recursion walks long tables and traps runaway calls at run time", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-depth-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-depth-" });
+  const entry = `${directory}/main.sq`;
   const options = { executable, entry, prelude };
   // [source, expected guest result, or null for a trap]
   const revisions: [string, number | null][] = [

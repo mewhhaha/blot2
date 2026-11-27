@@ -117,17 +117,17 @@ export function observeGuestAllocations(
         entry,
       ) => [entry.name, entry.kind]),
     );
-    for (const name of ["blot:ownership_enter", "blot:ownership_leave"]) {
+    for (const name of ["squid:ownership_enter", "squid:ownership_leave"]) {
       assert.equal(exports.get(name), "function");
     }
-    for (const name of ["blot:rc_roots", "blot:rc_leases"]) {
+    for (const name of ["squid:rc_roots", "squid:rc_leases"]) {
       assert.equal(exports.get(name), "global");
     }
-    if (options.host) assert.equal(exports.get("blot:rc_host_refs"), "global");
+    if (options.host) assert.equal(exports.get("squid:rc_host_refs"), "global");
     assert.deepEqual(
       [
         ...new Uint8Array(
-          WebAssembly.Module.customSections(original, "blot:ownership")[0],
+          WebAssembly.Module.customSections(original, "squid:ownership")[0],
         ),
       ],
       [2, 2, 0],
@@ -145,17 +145,17 @@ export function observeGuestAllocations(
   }
   const invoke = (exports: WebAssembly.Exports) => {
     for (const [name, argument, expected] of calls) {
-      (exports["blot:ownership_enter"] as CallableFunction | undefined)?.();
+      (exports["squid:ownership_enter"] as CallableFunction | undefined)?.();
       try {
         const run = () => (exports[name] as CallableFunction)(argument);
         if (expected === "trap") assert.throws(run, WebAssembly.RuntimeError);
         // Callers supply the raw Wasm result (signed i32 for U32).
         else assert.equal(run(), expected);
       } finally {
-        (exports["blot:ownership_leave"] as CallableFunction | undefined)?.();
+        (exports["squid:ownership_leave"] as CallableFunction | undefined)?.();
       }
       for (
-        const name of ["blot:rc_roots", "blot:rc_leases", "blot:rc_host_refs"]
+        const name of ["squid:rc_roots", "squid:rc_leases", "squid:rc_host_refs"]
       ) {
         const count = exports[name] as WebAssembly.Global | undefined;
         if (count) assert.equal(count.value, 0);
@@ -176,9 +176,9 @@ export function observeGuestAllocations(
   for (let warm = 0; warm < 3; warm++) invoke(observed);
   const names = [
     "qual:allocated",
-    "blot:rc_retains",
-    "blot:rc_releases",
-    "blot:rc_destroyed",
+    "squid:rc_retains",
+    "squid:rc_releases",
+    "squid:rc_destroyed",
   ];
   const before = names.map(global), committed = memory();
   for (let repeat = 0; repeat < 100; repeat++) invoke(observed);

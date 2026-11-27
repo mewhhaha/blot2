@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 
 function asWords(value: unknown): number[] {
@@ -270,8 +270,8 @@ io bool_fork_rollback (unused: U32): U32 =>
 });
 
 Deno.test("Tier 2F: in-place for-loop auto-SIMD matches scalar across tails, offsets, and overlapping dependencies", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "blot-tier2f-simd-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-tier2f-simd-" });
+  const entry = `${dir}/main.sq`;
   const src = `// 1. SAXPY with affine local offset alias (matmul_64 inner-loop shape)
 io saxpy_offset (n: U32): #[F32] =>
   let row: U32 = 1

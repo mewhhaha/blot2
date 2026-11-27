@@ -101,14 +101,14 @@ heap at that point.
 
 Use the #16 repro shape: persistent records, per-frame draw records with a
 foreign matrix, an optional field and an array field, nested comprehension and
-flatten. Report `blot:cycle_*` and `blot:rc_*` per frame, committed memory over
+flatten. Report `squid:cycle_*` and `squid:rc_*` per frame, committed memory over
 many frames, and ms per frame at N = 128, 512 and 2048. The existing
 cyclic-reclamation laws must keep passing.
 
 ## Current gdev density control (22 October 2026)
 
 The original #16 saved game and its exact 151 positions did not survive. A new,
-reproducible control uses gdev `52fbc5a`, Ink `1a291a1`, Pen `8008d95` and blot2
+reproducible control uses gdev `52fbc5a`, Ink `1a291a1`, Pen `8008d95` and squid
 `97e386b`. The [density seeder](../../benchmarks/tools/bench_issue16_source.py)
 changes only gdev's starting `Salt`: 151 settled stacks on the same 13-column
 grid with one, four or eight bricks per stack. The zero control has no stacks.

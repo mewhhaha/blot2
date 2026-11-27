@@ -3,14 +3,14 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 Deno.test("trait methods select caller evidence and preserve a defining module's private implementation", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   try {
-    await Deno.writeTextFile(`${directory}/convert.blot`, `
+    await Deno.writeTextFile(`${directory}/convert.sq`, `
 type Read a is trait = { read: a -> U32 }
 private const U32.Read: Read U32 = {
   read: func (value: U32) => return value + 1,
@@ -62,9 +62,9 @@ io as_value (value: U32): U32 => return invoke convert.Read.read ($Wrapped value
 
 Deno.test("imported and qualified traits survive retained edits, errors and serialized dependencies", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`,
-    library = `${directory}/contracts.blot`;
-  const bundle = `${directory}/dependencies.blotdep`;
+  const entry = `${directory}/main.sq`,
+    library = `${directory}/contracts.sq`;
+  const bundle = `${directory}/dependencies.sqdep`;
   const librarySource = `
 type Read a is trait = { read: a -> U32 }
 type Action a = Unit -> a ! {| e}

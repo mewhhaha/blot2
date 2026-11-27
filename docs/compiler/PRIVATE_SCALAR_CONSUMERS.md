@@ -25,7 +25,7 @@ LLVM/Fast binary SHA256:
 `338eea709a2e9ecfabfbc64d483a80cbe49b580d630ac319a270a3d11cd04945`. Compiler
 identity: `1248c8786b60469da226d08d0e3b8c10e02b42d1ddca6489147b8a618ebe74ca`.
 Exact source, artifact pins and raw reports are in
-`/var/tmp/blot2-adapter-cost-047/build/bench/adapter-cost/pins.json`. Zig 0.17.0
+`/var/tmp/squid-adapter-cost-047/build/bench/adapter-cost/pins.json`. Zig 0.17.0
 is used throughout. Screening/rejected and diagnostic-only artifacts remain
 alongside the accepted pin; they are not release qualification.
 

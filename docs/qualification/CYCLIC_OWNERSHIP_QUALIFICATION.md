@@ -9,13 +9,13 @@ open. The algorithm and ownership boundaries are in
 
 Incoming is qualified `f184dde`, tree
 `1431522db1bd9b93b1e0b3f3f69949e2122aa5e6`. Its Fast / LLVM executable is
-`build/bench/joint-052-033-038-054/final/blotc-candidate`, SHA-256
+`build/bench/joint-052-033-038-054/final/squidc-candidate`, SHA-256
 `5c689ad5caad6952f1c4643f5c40e10d6e41bcf819bf016f751ac105d82020a1`,
 compiler-input identity
 `bb6bda62bee29cebe741d9f3baf9b8184cc722a1691c109ecc43e1feef2f1ed5`.
 
 The frozen candidate is
-`/var/tmp/blot2-cycles-034/build/bench/cycles/blotc-candidate-final`, SHA-256
+`/var/tmp/squid-cycles-034/build/bench/cycles/squidc-candidate-final`, SHA-256
 `a0d1e4a8be72c0b7f1bd18bc60e8a8b46a5945c3c41c7c08c6903e4b9705bca7`,
 compiler-input identity
 `1a74bc888ba273f5a6dcdc3e0b5181bbe3ce7cae42cd5016adc6eaa07fd0188b`. The executed
@@ -118,7 +118,7 @@ Raw rounds, logs, exact programs and harnesses remain under the isolated
 
 | Evidence              | SHA-256                                                            |
 | --------------------- | ------------------------------------------------------------------ |
-| `cost.blot`           | `e8453fb91db389710b3f30e0401951637a055de945275f9391c134f81efb63a6` |
+| `cost.sq`           | `e8453fb91db389710b3f30e0401951637a055de945275f9391c134f81efb63a6` |
 | `measure_compiler.py` | `2082a3a4317ab82f63cfa98de15ae6ab7e678896005961652ca05418d1ad12d4` |
 | `measure_runtime.ts`  | `a919bba89b9a9297572c95c9f38633efcddad87eb9447afa63b2a5e9ac9e2404` |
 | `measure_graphs.ts`   | `932f2c43fbadbe107051d078053f3fab3a715d21e49f0e34ebae45061fa3a72e` |
@@ -135,7 +135,7 @@ Zig 0.17.0 standard LLVM Fast release SHA-256 is
 `c0959e9a375b2ba8d2a2263278417fb917b434e733c9a13f80af1d372e80b060`, size
 41,088,912 bytes, compiler identity
 `5377b20b121d61488c63ceb986efe45aabe27cec79f6744205b3b5aa407734a5`. It is
-immutable at `build/bench/joint-002-034/blotc-candidate`.
+immutable at `build/bench/joint-002-034/squidc-candidate`.
 
 `deno task test:compiler` passes the full native suite and all 892 guest/client
 laws, including all eight unchanged allocation budgets. The required analyzer

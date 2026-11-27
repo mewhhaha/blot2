@@ -1,5 +1,5 @@
 // Portable BLAKE3 byte semantics used by dependency content/edge fingerprints.
-namespace blot_support_blake3;
+namespace squid_support_blake3;
 import std;
 import support.bytes;
 
@@ -70,7 +70,7 @@ fn start_flag(chunk: Chunk) -> u32 {
 }
 fn words(bytes: u8[64]) -> u32[16] {
     var result: u32[16] = default<u32[16]>();
-    for index in 16 { result[index] = blot_bytes::get_u32(bytes, index * 4); }
+    for index in 16 { result[index] = squid_bytes::get_u32(bytes, index * 4); }
     return result;
 }
 fn chunk_output(chunk: Chunk) -> Output {
@@ -88,7 +88,7 @@ fn make_chunk(key: u32[8], counter: u64, flags: u32) -> Chunk {
 fn init() -> State { State { iv, make_chunk(iv, 0, 0), default<u32[8][54]>(), 0, 0 } }
 fn initKeyed(key: u8[32]) -> State {
     var words: u32[8] = default<u32[8]>();
-    for index in 8 { words[index] = blot_bytes::get_u32(key, index * 4); }
+    for index in 8 { words[index] = squid_bytes::get_u32(key, index * 4); }
     return State { words, make_chunk(words, 0, KEYED), default<u32[8][54]>(), 0, KEYED , ..};
 }
 fn update_chunk(chunk: Chunk&, bytes: const u8[:]) {
@@ -139,7 +139,7 @@ fn finalBytes(state: State, out: u8[:]) {
     while at < out.len {
         let block_ = compress(output.cv, output.block_, counter, output.length, output.flags | ROOT);
         var encoded: u8[64] = default<u8[64]>();
-        for word in 16 { blot_bytes::put_u32(encoded, word * 4, block_[word]); }
+        for word in 16 { squid_bytes::put_u32(encoded, word * 4, block_[word]); }
         let count = min(64, out.len - at);
         for byte in count { out[at + byte] = encoded[byte]; }
         at += count; counter++;
@@ -154,6 +154,6 @@ fn initDerived(context: const u8[:]) -> State {
     context_state.chunk.flags = DERIVE_CONTEXT; update(context_state, context);
     let key = final(context_state);
     var words: u32[8] = default<u32[8]>();
-    for index in 8 { words[index] = blot_bytes::get_u32(key, index * 4); }
+    for index in 8 { words[index] = squid_bytes::get_u32(key, index * 4); }
     return State { words, make_chunk(words, 0, DERIVE_MATERIAL), default<u32[8][54]>(), 0, DERIVE_MATERIAL , ..};
 }

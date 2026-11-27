@@ -1,7 +1,7 @@
 # CT110: shared effect proofs and bounded admission work
 
 The complete compiler gate, seven final release pairs, held-out execution and
-local installation checks pass. The [work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT110_WORK.md)
+local installation checks pass. The [work record](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT110_WORK.md)
 retains the diagnostic candidates, rejected experiments and limitations.
 
 ## Candidate and controls
@@ -170,7 +170,7 @@ outputs. All 44 independent original/edited Wasm executions across both
 compilers pass their result oracles. Coverage includes records, effects,
 closures, shared graphs, module edits and lexical generic schemes.
 
-Both `~/.local/bin/blot` and `blotc` are installed and verified from an external
+Both `~/.local/bin/squid` and `squidc` are installed and verified from an external
 working directory: format/check/build, exact staged/installed CLI/native Wasm,
 runtime answer 29 and bundled-guide equality. Native bytes match the qualified
 release above. Installed CLI SHA-256:

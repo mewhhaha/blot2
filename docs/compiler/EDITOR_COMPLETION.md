@@ -45,7 +45,7 @@ For example, a complete request with no overlays and empty payload is:
   "epoch": "1",
   "revision": 1,
   "snapshot": 10,
-  "filename": "/p/main.blot",
+  "filename": "/p/main.sq",
   "position": 0,
   "sources": []
 }
@@ -274,7 +274,7 @@ consuming a native ID.
 
 Task 050 adds `host/lsp.ts`, a small Deno stdio adapter. Helix speaks
 standard LSP JSON-RPC with Content-Length framing to it; it speaks the separate
-eight-byte native protocol to blotc. Keep logs on stderr. Bound LSP headers to 8
+eight-byte native protocol to squidc. Keep logs on stderr. Bound LSP headers to 8
 KiB and Content-Length bodies to 64 MiB before allocation. Malformed/truncated
 framing closes the bridge and reaps its child; valid framing with invalid JSON
 returns ParseError (-32700), and an invalid JSON-RPC request object returns
@@ -282,8 +282,8 @@ InvalidRequest (-32600). The proposed launch is:
 
 ```sh
 deno run --allow-read --allow-run host/lsp.ts \
-  --compiler /absolute/path/to/blotc \
-  --prelude /absolute/path/to/std/prelude.blot \
+  --compiler /absolute/path/to/squidc \
+  --prelude /absolute/path/to/std/prelude.sq \
   --std-root /absolute/path/to/std
 ```
 
@@ -292,7 +292,7 @@ Use absolute paths in the installed configuration. Repeated optional
 aliases; otherwise only std/ is configured. No source-file writes or parser
 functions are involved. Cache persistence is disabled for the editor child. One
 child serves the active document as its opened entry; switching completion to
-another document closes/reaps it and opens that document. Maintain all open Blot
+another document closes/reaps it and opens that document. Maintain all open Squid
 buffers as complete overlays, so imports observe unsaved buffers. These children
 are separate from any build client; cancellation never kills a running
 application/build session.
@@ -316,7 +316,7 @@ handle CRLF and supplementary code points without splitting them. It accepts
 file URIs only. Apply each full-text didChange only when its document version is
 newer; ignore/log an out-of-order notification without regressing the buffer.
 didClose removes the buffer override; didChange increments the workspace
-snapshot token and invalidates older pending replies. Watch `.blot` changes
+snapshot token and invalidates older pending replies. Watch `.sq` changes
 recursively under workspace/std/import roots, and root-parent events for symlink
 replacement; changes also invalidate the token. An imported path outside these
 watched roots is reacquired at the next query, but unsolicited stale
@@ -337,26 +337,26 @@ parser and highlighting queries, preserving language-server and formatter
 settings. Restart Helix afterward to load the new parser.
 
 ```toml
-[language-server.blot]
+[language-server.squid]
 command = "deno"
 args = ["run", "--allow-read", "--allow-run",
-        "/projects/blot2/host/lsp.ts", "--compiler",
-        "/projects/blot2/compiler/zig-out/bin/blotc", "--prelude",
-        "/projects/blot2/std/prelude.blot", "--std-root", "/projects/blot2/std"]
+        "/projects/squid-lang/host/lsp.ts", "--compiler",
+        "/projects/squid-lang/compiler/zig-out/bin/squidc", "--prelude",
+        "/projects/squid-lang/std/prelude.sq", "--std-root", "/projects/squid-lang/std"]
 
 [[language]]
-name = "blot"
-language-servers = ["blot"]
+name = "squid"
+language-servers = ["squid"]
 # Retain the existing language block's other fields.
 ```
 
-Update the existing Blot language block rather than adding a duplicate. Update
+Update the existing Squid language block rather than adding a duplicate. Update
 installer health assertions and registration tests from “no language server” to
-configured blot. Helix supports this server table and language assignment in
+configured squid. Helix supports this server table and language assignment in
 [languages.toml](https://docs.helix-editor.com/languages.html). In insert mode,
 manual completion is Ctrl-x in the
 [default keymap](https://docs.helix-editor.com/keymap.html#insert-mode).
-Qualification must use `hx --health blot` and a real unsaved-buffer completion
+Qualification must use `hx --health squid` and a real unsaved-buffer completion
 session; syntax highlighting alone is insufficient.
 
 ## Acceptance transcripts for task 050
@@ -364,13 +364,13 @@ session; syntax highlighting alone is insufficient.
 These are executable acceptance requirements, not observations. `C(text)`
 removes the sole `<cursor>` marker and computes position as the UTF-8 byte
 length of the preceding text. `Q(id,snapshot,text)` sends a complete request
-using filename `/p/main.blot`, the current epoch/revision and a single source
+using filename `/p/main.sq`, the current epoch/revision and a single source
 range covering C(text)'s bytes. `context.expected` assertions below refer to its
 indexed node, not a textual parser. Unless stated otherwise, use no prelude and
 expect no real diagnostic besides errors explicitly shown.
 
 Start: hello contains editor-completion-v1; send
-`{"kind":"open","id":1,"version":1,"entry":"/p/main.blot"}`. Build disk source
+`{"kind":"open","id":1,"version":1,"entry":"/p/main.sq"}`. Build disk source
 `#entry const answer = 42` with id 2, obtaining revision 1. All following
 complete replies keep revision 1. Each scenario uses fresh increasing IDs and
 tokens.
@@ -386,7 +386,7 @@ tokens.
 
 Selector fixture, with no prelude:
 
-```blot
+```squid
 type Point = { x: U32, y: F32 }
 const select = func (get: Point -> F32) => return func (point: Point) => return get point
 const work = func (point: Point) : F32 => return select .<cursor> point
@@ -397,7 +397,7 @@ Expected callback is Point -> F32: y inserts `y` after the existing dot and is
 exact, x is incompatible. Without a known callback receiver, the query returns
 no invented receiver members and context/matches stay unknown.
 
-Import fixture `/p/library.blot` contains `const visible = 7`,
+Import fixture `/p/library.sq` contains `const visible = 7`,
 `type Choice is data = $Picked U32 | $Empty`, and
 `const helper = func value => return value`. All are public under current language rules:
 
@@ -411,7 +411,7 @@ Import fixture `/p/library.blot` contains `const visible = 7`,
 
 Generic fixture:
 
-```blot
+```squid
 type Add a is contract = { associated "add" a a a }
 const twice: a -> a where { Add a } = func value => return value
 const work: a -> a where { Add a } = func value => return tw<cursor>
@@ -585,7 +585,7 @@ from these conclusions.
 
 Helix 25.07.1 (3dae6a17), Deno 2.9.7 and Tree-sitter 0.27.1 were exercised with
 an isolated XDG configuration. Grammar generation/corpus/example parsing,
-installer idempotence/neighbor preservation and hx --health blot pass. The real
+installer idempotence/neighbor preservation and hx --health squid pass. The real
 PTY session left text unsaved, requested Ctrl-x, accepted an item and saved each
 public fixture. Value, member, imported alias, shadowed hole and Unicode/CRLF
 edits affect only the reported token. The held-peer race ends as valzz; the old

@@ -50,7 +50,7 @@ ${
 const directory = resolve(values.output!);
 await Deno.mkdir(directory, { recursive: true });
 const evidence = await Deno.makeTempDir({ dir: directory, prefix: "pair-" });
-const entry = `${evidence}/main.blot`;
+const entry = `${evidence}/main.sq`;
 await Deno.writeTextFile(entry, source);
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]

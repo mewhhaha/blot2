@@ -44,7 +44,7 @@ const stdRoot = resolve(values["std-root"]);
 const project = await gdevProject(
   root,
   stdRoot,
-  values.entry ?? "src/main.blot",
+  values.entry ?? "src/main.sq",
   values.compiler,
 );
 const { executable: compilerPath, entry: entryPath } = project;

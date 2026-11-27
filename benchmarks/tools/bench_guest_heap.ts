@@ -6,7 +6,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const root = new URL("../../", import.meta.url).pathname;
 const executable = resolve(
-  Deno.args[0] ?? `${root}compiler-goose/build/blotc-goose`,
+  Deno.args[0] ?? `${root}compiler-goose/build/squidc-goose`,
 );
 const output = resolve(Deno.args[1] ?? `${root}build/bench/guest-heap`);
 await Deno.mkdir(output, { recursive: true });
@@ -17,7 +17,7 @@ const source = `io const gen = func (count: U32) => return do:
     checksum := self + row[0] + row[1]
   break checksum
 `;
-const entry = `${output}/main.blot`;
+const entry = `${output}/main.sq`;
 await Deno.writeTextFile(entry, source);
 const sha = async (bytes: Uint8Array) =>
   [
@@ -118,7 +118,7 @@ function observeGlobals(
 const compiler = await createZigProjectCompiler({
   executable,
   entry,
-  prelude: `${root}std/prelude.blot`,
+  prelude: `${root}std/prelude.sq`,
 });
 try {
   const built = await compiler.build({ sources: { [entry]: source } });
@@ -128,7 +128,7 @@ try {
   const originalModule = new WebAssembly.Module(bytes);
   assert.deepEqual([
     ...new Uint8Array(
-      WebAssembly.Module.customSections(originalModule, "blot:ownership")[0],
+      WebAssembly.Module.customSections(originalModule, "squid:ownership")[0],
     ),
   ], [2, 2, 0]);
   const observedModule = new WebAssembly.Module(observeGlobals(bytes));
@@ -140,7 +140,7 @@ try {
     const global = (name: string) =>
       Number((raw[name] as WebAssembly.Global).value);
     const memory = raw["qual:memory"] as WebAssembly.Memory;
-    call("blot:ownership_enter");
+    call("squid:ownership_enter");
     const expected = count * (128578 + 97) +
       Array.from({ length: count }, (_, index) => index % 26).reduce(
         (a, b) => a + b,
@@ -178,21 +178,21 @@ try {
       "The invocation must exercise root journal storage",
     );
     const committed = memory.buffer.byteLength;
-    call("blot:ownership_leave");
-    assert.equal(global("blot:rc_roots"), 0);
-    assert.equal(global("blot:rc_leases"), 0);
+    call("squid:ownership_leave");
+    assert.equal(global("squid:rc_roots"), 0);
+    assert.equal(global("squid:rc_leases"), 0);
     // A control adds the private memory export alone. Neither control nor
     // full telemetry changes the executable sections.
     const plain = new WebAssembly.Instance(
       new WebAssembly.Module(observeGlobals(bytes, false)),
     ).exports;
-    (plain["blot:ownership_enter"] as CallableFunction)();
+    (plain["squid:ownership_enter"] as CallableFunction)();
     assert.equal((plain.gen as CallableFunction)(count), expected);
     assert.equal(
       (plain["qual:memory"] as WebAssembly.Memory).buffer.byteLength,
       committed,
     );
-    (plain["blot:ownership_leave"] as CallableFunction)(0);
+    (plain["squid:ownership_leave"] as CallableFunction)(0);
     rows.push({
       count,
       committed_bytes: committed,

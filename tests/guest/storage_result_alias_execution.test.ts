@@ -46,9 +46,9 @@ io const answer = func (input: U32): Array U32 => return do:
 `;
   Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-result-alias-",
+      prefix: "squid-result-alias-",
     });
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0],
       entry,

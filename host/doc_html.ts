@@ -53,8 +53,8 @@ function slugifyHeading(text: string): string {
     .replace(/^-+|-+$/g, "") || "section";
 }
 
-/** Lightweight syntax highlighter for Blot code blocks (HTML-safe). */
-export function highlightBlotHtml(code: string): string {
+/** Lightweight syntax highlighter for Squid code blocks (HTML-safe). */
+export function highlightSquidHtml(code: string): string {
   const keywords = new Set([
     "type",
     "is",
@@ -231,7 +231,7 @@ function renderInlineMarkdownHtml(
         continue;
       }
     }
-    // Markdown link [label](dest) (including [label](`Symbol`) and [label](blot:Symbol))
+    // Markdown link [label](dest) (including [label](`Symbol`) and [label](squid:Symbol))
     if (text[i] === "[") {
       const closeBracket = findMatchingBracket(text, i);
       if (closeBracket !== -1 && text[closeBracket + 1] === "(") {
@@ -247,9 +247,9 @@ function renderInlineMarkdownHtml(
           if (
             (destRaw.startsWith("`") && destRaw.endsWith("`") &&
               destRaw.length > 2) ||
-            destRaw.startsWith("blot:")
+            destRaw.startsWith("squid:")
           ) {
-            const sym = destRaw.startsWith("blot:")
+            const sym = destRaw.startsWith("squid:")
               ? destRaw.slice(5).trim()
               : destRaw.slice(1, -1).trim();
             const resolved = resolveLink(sym, currentModuleId);
@@ -388,14 +388,14 @@ export function renderMarkdownHtml(
       }
       if (i < lines.length) i++;
       const code = bodyLines.join("\n");
-      const matchedBlock = lang === "blot"
+      const matchedBlock = lang === "squid"
         ? codeBlocks[blockCursor++]
         : undefined;
       const precompiled = matchedBlock
         ? examples?.get(matchedBlock.id)
         : undefined;
-      const codeHtml = lang === "blot"
-        ? highlightBlotHtml(code)
+      const codeHtml = lang === "squid"
+        ? highlightSquidHtml(code)
         : escapeHtml(code);
       if (precompiled && !precompiled.error) {
         const badge = precompiled.isTestSuite
@@ -406,14 +406,14 @@ export function renderMarkdownHtml(
             escapeAttr(precompiled.id)
           }">` +
             `<div class="code-toolbar">` +
-            `<span class="code-lang">blot · ${badge}</span>` +
+            `<span class="code-lang">squid · ${badge}</span>` +
             `<div class="code-actions">` +
             `<button type="button" class="btn-run" data-run-example="${
               escapeAttr(precompiled.id)
             }">▶ Run</button>` +
             `<button type="button" class="btn-copy" data-copy-code>Copy</button>` +
             `</div></div>` +
-            `<pre><code class="lang-blot">${codeHtml}</code></pre>` +
+            `<pre><code class="lang-squid">${codeHtml}</code></pre>` +
             `<div class="example-output" hidden></div>` +
             `</div>`,
         );
@@ -614,7 +614,7 @@ function renderSidebar(
   return `<nav class="sidebar" aria-label="Modules">
   <div class="sidebar-brand">
     <a href="${rootPrefix}index.html">${escapeHtml(pkg.name)}</a>
-    <span class="badge">blot doc</span>
+    <span class="badge">squid doc</span>
   </div>
   <div class="search-box">
     <input id="doc-search" type="search" placeholder="Search symbols (/)..." autocomplete="off" aria-label="Search symbols">
@@ -656,7 +656,7 @@ function renderValueSection(
   }</a>
     ${badges.join(" ")}
   </div>
-  <pre class="signature"><code>${highlightBlotHtml(val.signature)}</code></pre>
+  <pre class="signature"><code>${highlightSquidHtml(val.signature)}</code></pre>
   ${docHtml ? `<div class="item-doc">${docHtml}</div>` : ""}
 </article>`;
 }
@@ -703,14 +703,14 @@ function renderTypeSection(
             }</div>`
             : "";
           return `<li><code>${escapeHtml(f.name)}: ${
-            highlightBlotHtml(f.type)
+            highlightSquidHtml(f.type)
           }</code>${def}${fdoc}</li>`;
         }).join("\n");
         return `<div class="ctor"><div class="ctor-head"><code>$${
           escapeHtml(c.name)
         }</code></div>${cdoc}<ul class="field-list">${fields}</ul></div>`;
       }
-      const pay = c.payload ? ` ${highlightBlotHtml(c.payload)}` : "";
+      const pay = c.payload ? ` ${highlightSquidHtml(c.payload)}` : "";
       return `<div class="ctor"><div class="ctor-head"><code>$${
         escapeHtml(c.name)
       }${pay}</code></div>${cdoc}</div>`;
@@ -734,7 +734,7 @@ function renderTypeSection(
   }</a>
     ${ty.private ? '<span class="pill pill-priv">private</span>' : ""}
   </div>
-  <pre class="signature"><code>${highlightBlotHtml(sig)}</code></pre>
+  <pre class="signature"><code>${highlightSquidHtml(sig)}</code></pre>
   ${docHtml ? `<div class="item-doc">${docHtml}</div>` : ""}
   ${bodyHtml}
 </article>`;
@@ -761,7 +761,7 @@ function renderTraitSection(
   const membersHtml = tr.members.length
     ? `<div class="sub-section"><h4>Members</h4><ul class="field-list">${
       tr.members.map((m) => {
-        const ty = m.type ? `: ${highlightBlotHtml(m.type)}` : "";
+        const ty = m.type ? `: ${highlightSquidHtml(m.type)}` : "";
         return `<li><span class="pill">${escapeHtml(m.kind)}</span> <code>${
           escapeHtml(m.name)
         }${ty}</code></li>`;
@@ -775,7 +775,7 @@ function renderTraitSection(
     escapeHtml(tr.name)
   }</a>
   </div>
-  <pre class="signature"><code>${highlightBlotHtml(sig)}</code></pre>
+  <pre class="signature"><code>${highlightSquidHtml(sig)}</code></pre>
   ${docHtml ? `<div class="item-doc">${docHtml}</div>` : ""}
   ${membersHtml}
 </article>`;
@@ -804,7 +804,7 @@ function renderEffectSection(
     ? `<div class="sub-section"><h4>Operations</h4><ul class="field-list">${
       eff.operations.map((op) =>
         `<li><code>${escapeHtml(op.name)}: ${
-          highlightBlotHtml(`${op.parameter} -> ${op.result}`)
+          highlightSquidHtml(`${op.parameter} -> ${op.result}`)
         }</code></li>`
       ).join("\n")
     }</ul></div>`
@@ -816,7 +816,7 @@ function renderEffectSection(
     escapeHtml(eff.name)
   }</a>
   </div>
-  <pre class="signature"><code>${highlightBlotHtml(sig)}</code></pre>
+  <pre class="signature"><code>${highlightSquidHtml(sig)}</code></pre>
   ${docHtml ? `<div class="item-doc">${docHtml}</div>` : ""}
   ${opsHtml}
 </article>`;
@@ -1130,7 +1130,7 @@ th { background: var(--bg-alt); }
 `;
 
 /**
- * Pure-JS browser ABI 8 + blot:traps v1 + BTST v1 runner for static HTML docs.
+ * Pure-JS browser ABI 8 + squid:traps v1 + BTST v1 runner for static HTML docs.
  * Works both on static HTTP hosts (GitHub Pages, etc.) and local file:// previews.
  */
 export const DOC_RUNNER_JS = `(function () {
@@ -1157,7 +1157,7 @@ export const DOC_RUNNER_JS = `(function () {
   }
 
   function readTrapTable(mod) {
-    var sections = WebAssembly.Module.customSections(mod, "blot:traps");
+    var sections = WebAssembly.Module.customSections(mod, "squid:traps");
     if (!sections.length) return [];
     var bytes = new Uint8Array(sections[0]);
     if (bytes.length < 5 || bytes[0] !== 1) return [];
@@ -1235,9 +1235,9 @@ export const DOC_RUNNER_JS = `(function () {
     var traps = readTrapTable(mod);
     var inst = await WebAssembly.instantiate(mod, {});
     var exp = inst.exports;
-    var mem = exp["blot:memory"] || exp.memory;
-    var reset = exp["blot:reset"];
-    var finish = exp["blot:finish_invocation"];
+    var mem = exp["squid:memory"] || exp.memory;
+    var reset = exp["squid:reset"];
+    var finish = exp["squid:finish_invocation"];
 
     if (spec.isTestSuite && spec.tests && spec.tests.length) {
       var passed = 0;
@@ -1304,7 +1304,7 @@ export const DOC_RUNNER_JS = `(function () {
   }
 
   if (typeof globalThis !== "undefined") {
-    globalThis.__blotDocRunExample = runExample;
+    globalThis.__squidDocRunExample = runExample;
   }
 
   if (typeof document !== "undefined") {
@@ -1328,7 +1328,7 @@ export const DOC_RUNNER_JS = `(function () {
         var id = runBtn.getAttribute("data-run-example");
         var box = runBtn.closest(".code-example");
         var outEl = box && box.querySelector(".example-output");
-        var map = globalThis.__BLOT_DOC_EXAMPLES || {};
+        var map = globalThis.__SQUID_DOC_EXAMPLES || {};
         var spec = map[id];
         if (!spec || !outEl) return;
         outEl.hidden = false;
@@ -1354,7 +1354,7 @@ const DOC_SEARCH_JS = `(function () {
   var box = document.getElementById("search-results");
   if (!input || !box) return;
   var root = document.body.getAttribute("data-root") || "";
-  var items = globalThis.__BLOT_DOC_SEARCH || [];
+  var items = globalThis.__SQUID_DOC_SEARCH || [];
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -1526,11 +1526,11 @@ export async function generateHtmlDocs(
   await writeFile("search.js", DOC_SEARCH_JS);
   await writeFile(
     "search-index.js",
-    `globalThis.__BLOT_DOC_SEARCH = ${JSON.stringify(searchEntries)};\n`,
+    `globalThis.__SQUID_DOC_SEARCH = ${JSON.stringify(searchEntries)};\n`,
   );
   await writeFile(
     "examples.js",
-    `globalThis.__BLOT_DOC_EXAMPLES = ${JSON.stringify(examplesObj)};\n`,
+    `globalThis.__SQUID_DOC_EXAMPLES = ${JSON.stringify(examplesObj)};\n`,
   );
 
   // Render index.html
@@ -1560,7 +1560,7 @@ export async function generateHtmlDocs(
   await writeFile(
     "index.html",
     renderPageShell(
-      `${options.title ?? pkg.name} — Blot Documentation`,
+      `${options.title ?? pkg.name} — Squid Documentation`,
       "",
       renderSidebar(pkg, null, ""),
       indexMain,
@@ -1640,7 +1640,7 @@ export async function generateHtmlDocs(
               ? ` where { ${imp.where.join(", ")} }`
               : "";
             const sig = `impl ${imp.contract}${head ? ` ${head}` : ""}${wh}`;
-            return `<li><code>${highlightBlotHtml(sig)}</code></li>`;
+            return `<li><code>${highlightSquidHtml(sig)}</code></li>`;
           }).join("\n")
         }</ul>`,
       );

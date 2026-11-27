@@ -122,9 +122,9 @@ objects still release exactly once. Never combine individual releases with a
 second bulk recycle of the same member.
 
 No new public guest value types, raw pointer handles or close methods are
-implied. Ownership-aware adapters require an explicit `blot:abi` revision 3
+implied. Ownership-aware adapters require an explicit `squid:abi` revision 3
 alongside version 2 support during migration. The new private exports are
-`blot:ownership_enter()` and `blot:ownership_leave(outcome)`; outcomes 0/1/2
+`squid:ownership_enter()` and `squid:ownership_leave(outcome)`; outcomes 0/1/2
 mean normal completion, Wasm/host failure, and idle module teardown. They manage
 the outer journal frame. Enter requires idle state; normal/failure leave
 requires an active invocation, and teardown requires idle state. Existing

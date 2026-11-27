@@ -9,9 +9,9 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { jsonAssetParser } from "../../host/assets.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 const encoder = new TextEncoder();
-const echo = { revision: 0, snapshot: 7, filename: "/query.blot", position: 3 };
+const echo = { revision: 0, snapshot: 7, filename: "/query.sq", position: 3 };
 function reply() {
   return {
     ...echo,
@@ -77,7 +77,7 @@ Deno.test("completion replies own their fields and reject malformed ranges graph
 
 Deno.test("completion has no entry or build dependency and never publishes its repaired overlays", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   await Deno.writeTextFile(entry, "io const answer = 42\n");
   const compiler = await createZigProjectCompiler({
     executable,
@@ -139,7 +139,7 @@ Deno.test("completion has no entry or build dependency and never publishes its r
     ok(conflicting.success, JSON.stringify(conflicting));
     equal(conflicting.items[0].match, "unknown");
     const missing = await compiler.complete({
-      filename: directory + "/missing.blot",
+      filename: directory + "/missing.sq",
       position: 0,
       snapshot: ++snapshot,
     });
@@ -177,7 +177,7 @@ Deno.test("completion has no entry or build dependency and never publishes its r
 
 Deno.test("asset completion reads generated names without publishing parser caches or resources", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   await Deno.writeTextFile(directory + "/config.json", '{"offset":42}');
   await Deno.writeTextFile(
     entry,
@@ -230,7 +230,7 @@ Deno.test("asset completion reads generated names without publishing parser cach
 
 Deno.test("completion retains the deterministic best prefix in an oversized semantic scope", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const names = Array.from(
     { length: 4200 },
     (_, index) => "candidate" + String(index).padStart(4, "0"),
@@ -271,7 +271,7 @@ Deno.test("completion retains the deterministic best prefix in an oversized sema
 
 Deno.test("completion bounds asset parser failure messages at a UTF-8 boundary", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   await Deno.writeTextFile(
     entry,
     'import * as config from "./asset"\nconst work = config.va',

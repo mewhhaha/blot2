@@ -1,4 +1,4 @@
-# Idiomatic Blot and Rust workloads
+# Idiomatic Squid and Rust workloads
 
 These public source pairs implement the same computation using ordinary language
 features and standard libraries. They compare small programs, not whole language
@@ -54,8 +54,8 @@ workload order across rounds. Filesystem caches are warm; there is no claim of
 cold disk performance. Rust uses
 `--edition=2024 --crate-type=cdylib
 --target=wasm32-unknown-unknown -C opt-level=3 -C panic=abort`.
-Blot uses its optimized release tier and standard prelude. Rust links a
-precompiled standard library; Blot checks imported library source. Timings
+Squid uses its optimized release tier and standard prelude. Rust links a
+precompiled standard library; Squid checks imported library source. Timings
 include each compiler's code generation and linking. Wrapper startup, toolchain
 installation and compiler self-builds are excluded. The process wrapper records
 wall time, child CPU and peak RSS on Linux.
@@ -63,18 +63,18 @@ wall time, child CPU and peak RSS on Linux.
 Runtime samples alternate between languages after warmup. Each sample performs
 enough calls to target about 5 ms, bounded to 7–7,168 calls, using balanced seed
 cycles. Every sample's checksum is validated outside its timed interval.
-Independent TypeScript witnesses validate both programs; the Blot adapter is
-also checked against the public guest API. Timed Blot calls use the required
+Independent TypeScript witnesses validate both programs; the Squid adapter is
+also checked against the public guest API. Timed Squid calls use the required
 ownership entry/exit and arena reset hooks; Rust calls include its generated
 allocation and drop code. Module compilation/instantiation and JavaScript
 argument validation are excluded from runtime samples. Scalar calls avoid array
 marshalling costs.
 
 Language differences remain visible. Rust iterators can fuse map/filter/scan
-pipelines where Blot's standard functions construct intermediate collections.
-Blot Lists are persistent collections; Rust uses the idiomatic `Vec` for these
+pipelines where Squid's standard functions construct intermediate collections.
+Squid Lists are persistent collections; Rust uses the idiomatic `Vec` for these
 sequential workloads. Text workloads use ASCII but retain native representation:
-Blot Unicode scalar arrays and Rust UTF-8 strings. Tree allocations and
+Squid Unicode scalar arrays and Rust UTF-8 strings. Tree allocations and
 ownership representations differ. The prime sieve uses each language's ordinary
 boolean collection. Results should not be described as identical low-level
 algorithms or proof that one compiler is universally faster.

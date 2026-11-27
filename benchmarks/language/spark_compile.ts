@@ -1,4 +1,4 @@
-// deno run -A benchmarks/language/spark_compile.ts [gdev checkout] [blotc]
+// deno run -A benchmarks/language/spark_compile.ts [gdev checkout] [squidc]
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -7,7 +7,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 
 const root = resolve(Deno.args[0] ?? "../gdev");
-const executable = resolve(Deno.args[1] ?? "compiler-goose/build/blotc-goose");
+const executable = resolve(Deno.args[1] ?? "compiler-goose/build/squidc-goose");
 const fixtures = [
   {
     name: "spark_routes",
@@ -27,14 +27,14 @@ const digest = async (bytes: Uint8Array<ArrayBuffer>) =>
 const records = [];
 for (const fixture of fixtures) {
   const source = await Deno.readTextFile(
-    new URL(`./${fixture.name}.blot`, import.meta.url),
+    new URL(`./${fixture.name}.sq`, import.meta.url),
   );
   assert.equal(source.split(fixture.from).length, 2);
   const edit = source.replace(fixture.from, fixture.to);
   const project = await gdevProject(
     root,
     resolve("std"),
-    `performance/modernize/${fixture.name}.blot`,
+    `performance/modernize/${fixture.name}.sq`,
     executable,
   );
   const hashes = new Map<string, string>();

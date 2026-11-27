@@ -17,7 +17,7 @@ broader performance/coverage and tracing-removal gates remain open.
 | Compiler identity          | `ddaac9d20cb2f2e18dd530e5d6c08cb1240496f02c3124e4076c449446d9e4a3` |
 
 The immutable executable is 43,006,168 bytes, retained at
-`build/bench/joint-024-035-039-055/blotc-final-candidate`. The qualification
+`build/bench/joint-024-035-039-055/squidc-final-candidate`. The qualification
 tree adds the corrected independent raw-wire fixture to the release build tree;
 compiler source, identity and executable are unchanged. Source patches, pins,
 all gate attempts and paired samples remain in the same ignored directory.

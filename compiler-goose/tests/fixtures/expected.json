@@ -1,7 +1,7 @@
 {
  "differences": {},
  "programs": {
-  "alias-project-fixtures/logical-long-2048.blot": {
+  "alias-project-fixtures/logical-long-2048.sq": {
    "exit": 0,
    "records": [
     {
@@ -24,24 +24,24 @@
      "core_nodes": 3670,
      "effect_rows": 5646,
      "emitted_functions": 543,
-     "filename": "alias-project-fixtures/logical-long-2048.blot",
+     "filename": "alias-project-fixtures/logical-long-2048.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 2894,
-     "source_bytes": 84196,
+     "source_bytes": 84197,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 10295,
      "type_nodes": 10742,
      "type_versions": 3286,
-     "wasm_bytes": 35450
+     "wasm_bytes": 35453
     }
    ],
-   "wasm_bytes": 35450,
-   "wasm_sha256": "2c814e2154e9d545c45f477ad77810b796162c6d5a63d0d87a1d08d8c576fd17"
+   "wasm_bytes": 35453,
+   "wasm_sha256": "afef38a966bcb4148fa0be17676291463eec90588ca2e695585c6f6b2b31a793"
   },
-  "bottom_bindings.blot": {
+  "bottom_bindings.sq": {
    "exit": 0,
    "records": [
     {
@@ -64,24 +64,24 @@
      "core_nodes": 1712,
      "effect_rows": 3659,
      "emitted_functions": 50,
-     "filename": "bottom_bindings.blot",
+     "filename": "bottom_bindings.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 877,
-     "source_bytes": 28318,
+     "source_bytes": 28319,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4340,
      "type_nodes": 8882,
      "type_versions": 1285,
-     "wasm_bytes": 5960
+     "wasm_bytes": 5966
     }
    ],
-   "wasm_bytes": 5960,
-   "wasm_sha256": "9073e56b0db58229c8703bab4654077d6fd8f5565f70bd4124af3f2a7267a93e"
+   "wasm_bytes": 5966,
+   "wasm_sha256": "2a719e56c1c1cb16f47315ffbdef3c0cb0124750f0c0232a43867d837523dc6a"
   },
-  "callback-fixtures/capture.blot": {
+  "callback-fixtures/capture.sq": {
    "exit": 0,
    "records": [
     {
@@ -104,24 +104,24 @@
      "core_nodes": 1646,
      "effect_rows": 3628,
      "emitted_functions": 36,
-     "filename": "callback-fixtures/capture.blot",
+     "filename": "callback-fixtures/capture.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27298,
+     "source_bytes": 27299,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4194,
      "type_nodes": 8729,
      "type_versions": 1244,
-     "wasm_bytes": 4862
+     "wasm_bytes": 4866
     }
    ],
-   "wasm_bytes": 4862,
-   "wasm_sha256": "eb6e53312b23907aa0e2857bf16ae56387e6ca434e77f78189317c2edb24f08e"
+   "wasm_bytes": 4866,
+   "wasm_sha256": "c2fd149c5f8509c65eaf5611817ac4657fb0adbe66d6bda5c8efe1f52aa67b7d"
   },
-  "callback-fixtures/parameter.blot": {
+  "callback-fixtures/parameter.sq": {
    "exit": 0,
    "records": [
     {
@@ -144,24 +144,24 @@
      "core_nodes": 1639,
      "effect_rows": 3620,
      "emitted_functions": 35,
-     "filename": "callback-fixtures/parameter.blot",
+     "filename": "callback-fixtures/parameter.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27241,
+     "source_bytes": 27242,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4185,
      "type_nodes": 8719,
      "type_versions": 1242,
-     "wasm_bytes": 4766
+     "wasm_bytes": 4770
     }
    ],
-   "wasm_bytes": 4766,
-   "wasm_sha256": "4988a7d7320996ae180ff9dfa84db5e8be48025e1f88300ca51b6f7ef7fb163b"
+   "wasm_bytes": 4770,
+   "wasm_sha256": "58cfc790c0b3a375190e14db555c6210db5e30286df6cd2a9f83b409e6712f74"
   },
-  "callback-fixtures/record.blot": {
+  "callback-fixtures/record.sq": {
    "exit": 0,
    "records": [
     {
@@ -184,24 +184,24 @@
      "core_nodes": 1646,
      "effect_rows": 3626,
      "emitted_functions": 35,
-     "filename": "callback-fixtures/record.blot",
+     "filename": "callback-fixtures/record.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27352,
+     "source_bytes": 27353,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4202,
      "type_nodes": 8728,
      "type_versions": 1243,
-     "wasm_bytes": 4775
+     "wasm_bytes": 4779
     }
    ],
-   "wasm_bytes": 4775,
-   "wasm_sha256": "1effb3f61cfb63d2a5a3f4c3ed2fc8e7822d8e7af6d513d18bdcefcb7b56d992"
+   "wasm_bytes": 4779,
+   "wasm_sha256": "bd000f99420828cac3a097dfd86af4ff073d2d03eb55f36ae391addd7a7b3265"
   },
-  "captured-callable-fixtures/bound-cache-effects.blot": {
+  "captured-callable-fixtures/bound-cache-effects.sq": {
    "exit": 0,
    "records": [
     {
@@ -224,30 +224,30 @@
      "core_nodes": 1662,
      "effect_rows": 3654,
      "emitted_functions": 44,
-     "filename": "captured-callable-fixtures/bound-cache-effects.blot",
+     "filename": "captured-callable-fixtures/bound-cache-effects.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 860,
-     "source_bytes": 27481,
+     "source_bytes": 27482,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4221,
      "type_nodes": 8780,
      "type_versions": 1255,
-     "wasm_bytes": 5281
+     "wasm_bytes": 5284
     }
    ],
-   "wasm_bytes": 5281,
-   "wasm_sha256": "05c0f5b84d5048d10cf3fd3b4ae019dd71b5ef27eb9e8e2d6f06488c71cad951"
+   "wasm_bytes": 5284,
+   "wasm_sha256": "60ea8b7440345f4e5ca549f7a81ee2051d37bdd3501bf6cc38f582c07bb2c5b6"
   },
-  "captured-callable-fixtures/bound-cache-missing.blot": {
+  "captured-callable-fixtures/bound-cache-missing.sq": {
    "exit": 1,
    "records": [
     {
      "code": "storage_unsupported",
      "end": 288,
-     "filename": "captured-callable-fixtures/bound-cache-missing.blot",
+     "filename": "captured-callable-fixtures/bound-cache-missing.sq",
      "kind": "diagnostic",
      "message": "Direct backend: 1 unsupported form(s): no member plus for this receiver (1x at 2:280)",
      "stage": "emit",
@@ -273,12 +273,12 @@
      "core_nodes": 1644,
      "effect_rows": 3618,
      "emitted_functions": 0,
-     "filename": "captured-callable-fixtures/bound-cache-missing.blot",
+     "filename": "captured-callable-fixtures/bound-cache-missing.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 855,
-     "source_bytes": 27428,
+     "source_bytes": 27429,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4215,
@@ -288,7 +288,7 @@
     }
    ]
   },
-  "captured-callable-fixtures/bound-cache-nominals.blot": {
+  "captured-callable-fixtures/bound-cache-nominals.sq": {
    "exit": 0,
    "records": [
     {
@@ -311,24 +311,24 @@
      "core_nodes": 1650,
      "effect_rows": 3625,
      "emitted_functions": 39,
-     "filename": "captured-callable-fixtures/bound-cache-nominals.blot",
+     "filename": "captured-callable-fixtures/bound-cache-nominals.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 856,
-     "source_bytes": 27526,
+     "source_bytes": 27527,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4230,
      "type_nodes": 8796,
      "type_versions": 1255,
-     "wasm_bytes": 4802
+     "wasm_bytes": 4805
     }
    ],
-   "wasm_bytes": 4802,
-   "wasm_sha256": "d9160f7e6fe68a363f8fb494a04d4c774f5236edfb33b26d4cc99a6d6c7e8799"
+   "wasm_bytes": 4805,
+   "wasm_sha256": "aae37774ea178eed5932e6720ade9392e54bde85e3d2e8a239b3de60259d256f"
   },
-  "captured-callable-fixtures/bound-method.blot": {
+  "captured-callable-fixtures/bound-method.sq": {
    "exit": 0,
    "records": [
     {
@@ -351,24 +351,24 @@
      "core_nodes": 1639,
      "effect_rows": 3616,
      "emitted_functions": 37,
-     "filename": "captured-callable-fixtures/bound-method.blot",
+     "filename": "captured-callable-fixtures/bound-method.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 854,
-     "source_bytes": 27332,
+     "source_bytes": 27333,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4198,
      "type_nodes": 8765,
      "type_versions": 1250,
-     "wasm_bytes": 4619
+     "wasm_bytes": 4622
     }
    ],
-   "wasm_bytes": 4619,
-   "wasm_sha256": "e78b9a5233856efec58fcac890db6f5dc04d8396e2ac67fa11c68c821211dbf4"
+   "wasm_bytes": 4622,
+   "wasm_sha256": "d00f49e0db9ad0b9e8421c1efc9abcb73fcfcb994db3a3804fc4811e11422bb0"
   },
-  "captured-callable-fixtures/captured-builtin.blot": {
+  "captured-callable-fixtures/captured-builtin.sq": {
    "exit": 0,
    "records": [
     {
@@ -391,24 +391,24 @@
      "core_nodes": 1654,
      "effect_rows": 3678,
      "emitted_functions": 46,
-     "filename": "captured-callable-fixtures/captured-builtin.blot",
+     "filename": "captured-callable-fixtures/captured-builtin.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 863,
-     "source_bytes": 27412,
+     "source_bytes": 27413,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4205,
      "type_nodes": 8830,
      "type_versions": 1258,
-     "wasm_bytes": 5421
+     "wasm_bytes": 5424
     }
    ],
-   "wasm_bytes": 5421,
-   "wasm_sha256": "f78cf024e70afe4e7a17ba8f5bc564631df45389bed0d6fa655c4db081217512"
+   "wasm_bytes": 5424,
+   "wasm_sha256": "0f00fe6f150e5b54dfbc56db3e4ee9fcec51dc5f8cb7ce7e841dde6da6632a45"
   },
-  "captured-callable-fixtures/captured-effect.blot": {
+  "captured-callable-fixtures/captured-effect.sq": {
    "exit": 0,
    "records": [
     {
@@ -431,30 +431,30 @@
      "core_nodes": 1664,
      "effect_rows": 3690,
      "emitted_functions": 47,
-     "filename": "captured-callable-fixtures/captured-effect.blot",
+     "filename": "captured-callable-fixtures/captured-effect.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 862,
-     "source_bytes": 27546,
+     "source_bytes": 27547,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4229,
      "type_nodes": 8839,
      "type_versions": 1259,
-     "wasm_bytes": 5377
+     "wasm_bytes": 5380
     }
    ],
-   "wasm_bytes": 5377,
-   "wasm_sha256": "23a94595d5714dc322840ebc8511750214de16ba60fb73b8ec7aec8b1b97fa0c"
+   "wasm_bytes": 5380,
+   "wasm_sha256": "a5cf20e44fc21bbd1d8244b8eca02e401bc75af880bdfc062ceb6ddb9f38720d"
   },
-  "closure-fixtures/left.blot": {
+  "closure-fixtures/left.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "closure-fixtures/left.blot",
+     "filename": "closure-fixtures/left.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -480,12 +480,12 @@
      "core_nodes": 1654,
      "effect_rows": 3725,
      "emitted_functions": 0,
-     "filename": "closure-fixtures/left.blot",
+     "filename": "closure-fixtures/left.sq",
      "files": 3,
      "imported_schemes": 52,
      "kind": "compilation",
      "row_versions": 860,
-     "source_bytes": 27747,
+     "source_bytes": 27748,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4255,
@@ -495,7 +495,7 @@
     }
    ]
   },
-  "closure-fixtures/main.blot": {
+  "closure-fixtures/main.sq": {
    "exit": 0,
    "records": [
     {
@@ -518,30 +518,30 @@
      "core_nodes": 1661,
      "effect_rows": 3865,
      "emitted_functions": 38,
-     "filename": "closure-fixtures/main.blot",
+     "filename": "closure-fixtures/main.sq",
      "files": 5,
      "imported_schemes": 104,
      "kind": "compilation",
      "row_versions": 870,
-     "source_bytes": 28117,
+     "source_bytes": 28118,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4290,
      "type_nodes": 9577,
      "type_versions": 1276,
-     "wasm_bytes": 4818
+     "wasm_bytes": 4821
     }
    ],
-   "wasm_bytes": 4818,
-   "wasm_sha256": "a86e19506732c6eb450afeb11b239b59d0d6b8869dcc70178d94961e7b721726"
+   "wasm_bytes": 4821,
+   "wasm_sha256": "ebd8ad29165623c862c541b834938b8d5941c2251b924608cea546f32a325c6e"
   },
-  "closure-fixtures/right.blot": {
+  "closure-fixtures/right.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "closure-fixtures/right.blot",
+     "filename": "closure-fixtures/right.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -567,12 +567,12 @@
      "core_nodes": 1641,
      "effect_rows": 3705,
      "emitted_functions": 0,
-     "filename": "closure-fixtures/right.blot",
+     "filename": "closure-fixtures/right.sq",
      "files": 3,
      "imported_schemes": 50,
      "kind": "compilation",
      "row_versions": 857,
-     "source_bytes": 27646,
+     "source_bytes": 27647,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4232,
@@ -582,13 +582,13 @@
     }
    ]
   },
-  "closure-fixtures/shared.blot": {
+  "closure-fixtures/shared.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "closure-fixtures/shared.blot",
+     "filename": "closure-fixtures/shared.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -614,12 +614,12 @@
      "core_nodes": 1638,
      "effect_rows": 3635,
      "emitted_functions": 0,
-     "filename": "closure-fixtures/shared.blot",
+     "filename": "closure-fixtures/shared.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27524,
+     "source_bytes": 27525,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4219,
@@ -629,7 +629,7 @@
     }
    ]
   },
-  "deferred_join.blot": {
+  "deferred_join.sq": {
    "exit": 0,
    "records": [
     {
@@ -652,30 +652,30 @@
      "core_nodes": 1963,
      "effect_rows": 3692,
      "emitted_functions": 43,
-     "filename": "deferred_join.blot",
+     "filename": "deferred_join.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 892,
-     "source_bytes": 29867,
+     "source_bytes": 29868,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4654,
      "type_nodes": 8978,
      "type_versions": 1303,
-     "wasm_bytes": 8546
+     "wasm_bytes": 8553
     }
    ],
-   "wasm_bytes": 8546,
-   "wasm_sha256": "c71f11c3ade9ce71dc44ca24eda93a1cbca8a13ba8ad53e5cbbf82d43648cbfa"
+   "wasm_bytes": 8553,
+   "wasm_sha256": "4f9b73fcbdd7b50fe97b8f5d44045e54728deb188d56fc901c9534f3f471f82c"
   },
-  "dependency-fixtures/prelude.blot": {
+  "dependency-fixtures/prelude.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "dependency-fixtures/prelude.blot",
+     "filename": "dependency-fixtures/prelude.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -701,12 +701,12 @@
      "core_nodes": 2310,
      "effect_rows": 5050,
      "emitted_functions": 0,
-     "filename": "dependency-fixtures/prelude.blot",
+     "filename": "dependency-fixtures/prelude.sq",
      "files": 2,
      "imported_schemes": 17,
      "kind": "compilation",
      "row_versions": 1216,
-     "source_bytes": 40563,
+     "source_bytes": 40565,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 6011,
@@ -716,13 +716,13 @@
     }
    ]
   },
-  "dependency-prelude.blot": {
+  "dependency-prelude.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "dependency-prelude.blot",
+     "filename": "dependency-prelude.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -748,12 +748,12 @@
      "core_nodes": 2310,
      "effect_rows": 5050,
      "emitted_functions": 0,
-     "filename": "dependency-prelude.blot",
+     "filename": "dependency-prelude.sq",
      "files": 2,
      "imported_schemes": 17,
      "kind": "compilation",
      "row_versions": 1216,
-     "source_bytes": 40563,
+     "source_bytes": 40565,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 6011,
@@ -763,7 +763,7 @@
     }
    ]
   },
-  "direct/boxed_records.blot": {
+  "direct/boxed_records.sq": {
    "exit": 0,
    "records": [
     {
@@ -786,24 +786,24 @@
      "core_nodes": 1781,
      "effect_rows": 3716,
      "emitted_functions": 41,
-     "filename": "direct/boxed_records.blot",
+     "filename": "direct/boxed_records.sq",
      "files": 2,
      "imported_schemes": 32,
      "kind": "compilation",
      "row_versions": 914,
-     "source_bytes": 28290,
+     "source_bytes": 28291,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4439,
      "type_nodes": 9038,
      "type_versions": 1291,
-     "wasm_bytes": 6402
+     "wasm_bytes": 6405
     }
    ],
-   "wasm_bytes": 6402,
-   "wasm_sha256": "e2bc65937f03bb145d5894e120ff625a7c3d4b9707d1d54f64bd7a4e8b065323"
+   "wasm_bytes": 6405,
+   "wasm_sha256": "fe98c57b719eba5010b228689e9bb2f288cf5ace5d0ff1dca8f847774462eb2e"
   },
-  "direct/branch_appends.blot": {
+  "direct/branch_appends.sq": {
    "exit": 0,
    "records": [
     {
@@ -826,24 +826,24 @@
      "core_nodes": 1688,
      "effect_rows": 3662,
      "emitted_functions": 32,
-     "filename": "direct/branch_appends.blot",
+     "filename": "direct/branch_appends.sq",
      "files": 2,
      "imported_schemes": 32,
      "kind": "compilation",
      "row_versions": 876,
-     "source_bytes": 27443,
+     "source_bytes": 27444,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4247,
      "type_nodes": 8885,
      "type_versions": 1267,
-     "wasm_bytes": 4987
+     "wasm_bytes": 4993
     }
    ],
-   "wasm_bytes": 4987,
-   "wasm_sha256": "8edc77ff78aefab876db8ac53ea13e1548a16d548996ddbc377b0a4faad61837"
+   "wasm_bytes": 4993,
+   "wasm_sha256": "906502539b2fcb616e950a4530aee8a2f6afaf15dc525967a36e362814269dd3"
   },
-  "direct/calls.blot": {
+  "direct/calls.sq": {
    "exit": 0,
    "records": [
     {
@@ -866,24 +866,24 @@
      "core_nodes": 1627,
      "effect_rows": 3620,
      "emitted_functions": 32,
-     "filename": "direct/calls.blot",
+     "filename": "direct/calls.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27086,
+     "source_bytes": 27087,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4168,
      "type_nodes": 8744,
      "type_versions": 1245,
-     "wasm_bytes": 4297
+     "wasm_bytes": 4300
     }
    ],
-   "wasm_bytes": 4297,
-   "wasm_sha256": "a92b406e280a7f8d76ac1d057b38a8f562486aaf68f02c7f79b134b144077ab9"
+   "wasm_bytes": 4300,
+   "wasm_sha256": "be60f13487b0dc46789404560df35ad1ab143f666c8ca570d27366534096e67c"
   },
-  "direct/captured_generalized.blot": {
+  "direct/captured_generalized.sq": {
    "exit": 0,
    "records": [
     {
@@ -906,24 +906,24 @@
      "core_nodes": 1646,
      "effect_rows": 3639,
      "emitted_functions": 38,
-     "filename": "direct/captured_generalized.blot",
+     "filename": "direct/captured_generalized.sq",
      "files": 2,
      "imported_schemes": 27,
      "kind": "compilation",
      "row_versions": 857,
-     "source_bytes": 27322,
+     "source_bytes": 27323,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4202,
      "type_nodes": 8828,
      "type_versions": 1259,
-     "wasm_bytes": 4956
+     "wasm_bytes": 4959
     }
    ],
-   "wasm_bytes": 4956,
-   "wasm_sha256": "c2706ecef4d10a6b8c5933a84974dac6c4689ef48318c799a0a0e37edf00ca29"
+   "wasm_bytes": 4959,
+   "wasm_sha256": "cc25885908370be3ff6a0d2b6512b97fa1484928ba99e7adb969b52847b3b361"
   },
-  "direct/carried_owners.blot": {
+  "direct/carried_owners.sq": {
    "exit": 0,
    "records": [
     {
@@ -946,24 +946,24 @@
      "core_nodes": 1745,
      "effect_rows": 3759,
      "emitted_functions": 39,
-     "filename": "direct/carried_owners.blot",
+     "filename": "direct/carried_owners.sq",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
      "row_versions": 900,
-     "source_bytes": 27693,
+     "source_bytes": 27694,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4335,
      "type_nodes": 9112,
      "type_versions": 1302,
-     "wasm_bytes": 6682
+     "wasm_bytes": 6685
     }
    ],
-   "wasm_bytes": 6682,
-   "wasm_sha256": "ea28fa474211f526de86e4309a469cf3a99c9224ec2a0b4868d5370430d554ca"
+   "wasm_bytes": 6685,
+   "wasm_sha256": "7795d8c52f621bfbbf374357031dab52c3d7dd688fc6fcc484931f675b363b64"
   },
-  "direct/closures.blot": {
+  "direct/closures.sq": {
    "exit": 0,
    "records": [
     {
@@ -986,24 +986,24 @@
      "core_nodes": 1737,
      "effect_rows": 3832,
      "emitted_functions": 54,
-     "filename": "direct/closures.blot",
+     "filename": "direct/closures.sq",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
      "row_versions": 917,
-     "source_bytes": 28107,
+     "source_bytes": 28108,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4374,
      "type_nodes": 9234,
      "type_versions": 1323,
-     "wasm_bytes": 6263
+     "wasm_bytes": 6266
     }
    ],
-   "wasm_bytes": 6263,
-   "wasm_sha256": "69c3170cf6224f615e958a5864d5ae6e0b13dfb7ed77dde589801ba7be2b5368"
+   "wasm_bytes": 6266,
+   "wasm_sha256": "540013a555dd178e3d80e3f5e419f6386e3148e4bee57834c15f038bfd16da66"
   },
-  "direct/closures_in_data.blot": {
+  "direct/closures_in_data.sq": {
    "exit": 0,
    "records": [
     {
@@ -1026,24 +1026,24 @@
      "core_nodes": 1651,
      "effect_rows": 3631,
      "emitted_functions": 36,
-     "filename": "direct/closures_in_data.blot",
+     "filename": "direct/closures_in_data.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 855,
-     "source_bytes": 27316,
+     "source_bytes": 27317,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4200,
      "type_nodes": 8777,
      "type_versions": 1253,
-     "wasm_bytes": 4530
+     "wasm_bytes": 4533
     }
    ],
-   "wasm_bytes": 4530,
-   "wasm_sha256": "24b7db60f2dcd79c29b2fb87bed4b97666117245510733b0d4548e37a7ee6166"
+   "wasm_bytes": 4533,
+   "wasm_sha256": "8c6dbdd1f896d59d6ac3017965ec31b26799b271358af57effabbe0ff6bb6fd8"
   },
-  "direct/comprehensions.blot": {
+  "direct/comprehensions.sq": {
    "exit": 0,
    "records": [
     {
@@ -1066,24 +1066,24 @@
      "core_nodes": 1843,
      "effect_rows": 3782,
      "emitted_functions": 41,
-     "filename": "direct/comprehensions.blot",
+     "filename": "direct/comprehensions.sq",
      "files": 2,
      "imported_schemes": 36,
      "kind": "compilation",
      "row_versions": 940,
-     "source_bytes": 28054,
+     "source_bytes": 28055,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4570,
      "type_nodes": 9345,
      "type_versions": 1353,
-     "wasm_bytes": 7778
+     "wasm_bytes": 7781
     }
    ],
-   "wasm_bytes": 7778,
-   "wasm_sha256": "7ef99fadbcd82e51164354dbaf0a82a3fa2ee208f8dd53608baaefc21ea12587"
+   "wasm_bytes": 7781,
+   "wasm_sha256": "a20926232f430bffed694a4bc3586c931f0d72064774aab82eb242a8dd210c69"
   },
-  "direct/constants.blot": {
+  "direct/constants.sq": {
    "exit": 0,
    "records": [
     {
@@ -1106,24 +1106,24 @@
      "core_nodes": 1637,
      "effect_rows": 3629,
      "emitted_functions": 41,
-     "filename": "direct/constants.blot",
+     "filename": "direct/constants.sq",
      "files": 2,
      "imported_schemes": 30,
      "kind": "compilation",
      "row_versions": 859,
-     "source_bytes": 27184,
+     "source_bytes": 27185,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4176,
      "type_nodes": 8758,
      "type_versions": 1249,
-     "wasm_bytes": 4729
+     "wasm_bytes": 4732
     }
    ],
-   "wasm_bytes": 4729,
-   "wasm_sha256": "a1a60dfd42b00182cb2a4d886619af78fa45731ab67293863ec7eb308e556404"
+   "wasm_bytes": 4732,
+   "wasm_sha256": "d10d0d0fe47db51b9b44b14d0ba22fee5de214000b6705b08d837d15e6421530"
   },
-  "direct/data_and_control.blot": {
+  "direct/data_and_control.sq": {
    "exit": 0,
    "records": [
     {
@@ -1146,24 +1146,24 @@
      "core_nodes": 1759,
      "effect_rows": 3759,
      "emitted_functions": 46,
-     "filename": "direct/data_and_control.blot",
+     "filename": "direct/data_and_control.sq",
      "files": 2,
      "imported_schemes": 39,
      "kind": "compilation",
      "row_versions": 912,
-     "source_bytes": 28362,
+     "source_bytes": 28363,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4428,
      "type_nodes": 9147,
      "type_versions": 1318,
-     "wasm_bytes": 5609
+     "wasm_bytes": 5612
     }
    ],
-   "wasm_bytes": 5609,
-   "wasm_sha256": "e4837942fb161a9b918d62567d0eec1512a00aa7ffb5dc456b16d84a4efb81cf"
+   "wasm_bytes": 5612,
+   "wasm_sha256": "39d18f8153e808545cc2249a5ed79952a7abdae24bdfb1412c569b0739f6040f"
   },
-  "direct/dispatch.blot": {
+  "direct/dispatch.sq": {
    "exit": 0,
    "records": [
     {
@@ -1186,24 +1186,24 @@
      "core_nodes": 2059,
      "effect_rows": 4180,
      "emitted_functions": 37,
-     "filename": "direct/dispatch.blot",
+     "filename": "direct/dispatch.sq",
      "files": 3,
      "imported_schemes": 73,
      "kind": "compilation",
      "row_versions": 1072,
-     "source_bytes": 31191,
+     "source_bytes": 31194,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4809,
      "type_nodes": 10374,
      "type_versions": 1434,
-     "wasm_bytes": 5124
+     "wasm_bytes": 5127
     }
    ],
-   "wasm_bytes": 5124,
-   "wasm_sha256": "1cdd341925998eb2cc85859e160762c9f185a084c58a6fcee7aafc9eab4d4649"
+   "wasm_bytes": 5127,
+   "wasm_sha256": "90644edb6b12a70ed2c10741f9708eb9585b438c2782ec2eba1a3724f13c872e"
   },
-  "direct/empty_literals.blot": {
+  "direct/empty_literals.sq": {
    "exit": 0,
    "records": [
     {
@@ -1226,24 +1226,24 @@
      "core_nodes": 2158,
      "effect_rows": 4233,
      "emitted_functions": 38,
-     "filename": "direct/empty_literals.blot",
+     "filename": "direct/empty_literals.sq",
      "files": 3,
      "imported_schemes": 67,
      "kind": "compilation",
      "row_versions": 1019,
-     "source_bytes": 32609,
+     "source_bytes": 32610,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4977,
      "type_nodes": 10925,
      "type_versions": 1511,
-     "wasm_bytes": 5582
+     "wasm_bytes": 5587
     }
    ],
-   "wasm_bytes": 5582,
-   "wasm_sha256": "900bab54e9e52fe1ed037d08aacadbe1e2ad3bbbd5bb4783c220b6b9862c5d9f"
+   "wasm_bytes": 5587,
+   "wasm_sha256": "ffef1a12a889795d1f6826a024883680ca550543565ad2e6ee37071230583321"
   },
-  "direct/generalized_values.blot": {
+  "direct/generalized_values.sq": {
    "exit": 0,
    "records": [
     {
@@ -1266,24 +1266,24 @@
      "core_nodes": 1650,
      "effect_rows": 3629,
      "emitted_functions": 36,
-     "filename": "direct/generalized_values.blot",
+     "filename": "direct/generalized_values.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 865,
-     "source_bytes": 27543,
+     "source_bytes": 27544,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4260,
      "type_nodes": 8936,
      "type_versions": 1270,
-     "wasm_bytes": 4625
+     "wasm_bytes": 4628
     }
    ],
-   "wasm_bytes": 4625,
-   "wasm_sha256": "f67557fc5b6d461f35019ed075a2da31f46720653d49f29bee7f541793dc611f"
+   "wasm_bytes": 4628,
+   "wasm_sha256": "aea46635e599ed771b4c8ecc3cb91b70f01469ad7e6ffaf73f297385fb2a749f"
   },
-  "direct/generated_from_filter.blot": {
+  "direct/generated_from_filter.sq": {
    "exit": 0,
    "records": [
     {
@@ -1306,24 +1306,24 @@
      "core_nodes": 2183,
      "effect_rows": 4227,
      "emitted_functions": 35,
-     "filename": "direct/generated_from_filter.blot",
+     "filename": "direct/generated_from_filter.sq",
      "files": 3,
      "imported_schemes": 71,
      "kind": "compilation",
      "row_versions": 1024,
-     "source_bytes": 32690,
+     "source_bytes": 32691,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 5005,
      "type_nodes": 10901,
      "type_versions": 1499,
-     "wasm_bytes": 5284
+     "wasm_bytes": 5287
     }
    ],
-   "wasm_bytes": 5284,
-   "wasm_sha256": "d1aea159f39c04e3f070f3d423dc53f9c412bb36b15e8ad199096c12fe99d114"
+   "wasm_bytes": 5287,
+   "wasm_sha256": "b808caed4a7826aac27e25a2cec057275aa6b2a535d50a46894a52a07b2c4ae4"
   },
-  "direct/generic_comprehensions.blot": {
+  "direct/generic_comprehensions.sq": {
    "exit": 0,
    "records": [
     {
@@ -1346,24 +1346,24 @@
      "core_nodes": 1774,
      "effect_rows": 3728,
      "emitted_functions": 39,
-     "filename": "direct/generic_comprehensions.blot",
+     "filename": "direct/generic_comprehensions.sq",
      "files": 2,
      "imported_schemes": 32,
      "kind": "compilation",
      "row_versions": 906,
-     "source_bytes": 27734,
+     "source_bytes": 27735,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4382,
      "type_nodes": 9230,
      "type_versions": 1326,
-     "wasm_bytes": 7253
+     "wasm_bytes": 7256
     }
    ],
-   "wasm_bytes": 7253,
-   "wasm_sha256": "77895d72e15687537c3f40b3855b8488e01c2d8bbdc2371363289d365972a02e"
+   "wasm_bytes": 7256,
+   "wasm_sha256": "a88d0b4c5d0d8485d7dd93388c9c016ef1c1a004e5550a052da97ab1e25a53b3"
   },
-  "direct/host.blot": {
+  "direct/host.sq": {
    "exit": 0,
    "records": [
     {
@@ -1386,24 +1386,24 @@
      "core_nodes": 1663,
      "effect_rows": 3699,
      "emitted_functions": 36,
-     "filename": "direct/host.blot",
+     "filename": "direct/host.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 867,
-     "source_bytes": 27440,
+     "source_bytes": 27441,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4228,
      "type_nodes": 8879,
      "type_versions": 1269,
-     "wasm_bytes": 5754
+     "wasm_bytes": 5762
     }
    ],
-   "wasm_bytes": 5754,
-   "wasm_sha256": "a565ca785bd516df81f9a9fd058962f07a330f38fc445202a14f1a27d01581b8"
+   "wasm_bytes": 5762,
+   "wasm_sha256": "cbda6edaa04ef50a4ec2da328e3c57cb2cd80da7d93783c0753d8ba40a9b64bb"
   },
-  "direct/inferred_types.blot": {
+  "direct/inferred_types.sq": {
    "exit": 0,
    "records": [
     {
@@ -1426,24 +1426,24 @@
      "core_nodes": 2173,
      "effect_rows": 4214,
      "emitted_functions": 38,
-     "filename": "direct/inferred_types.blot",
+     "filename": "direct/inferred_types.sq",
      "files": 3,
      "imported_schemes": 68,
      "kind": "compilation",
      "row_versions": 1012,
-     "source_bytes": 32680,
+     "source_bytes": 32681,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 5022,
      "type_nodes": 10842,
      "type_versions": 1492,
-     "wasm_bytes": 5327
+     "wasm_bytes": 5330
     }
    ],
-   "wasm_bytes": 5327,
-   "wasm_sha256": "382f765fad092ed7a7510f6ba79cefde41ac8453016b6f7207c43ea5e9c89d81"
+   "wasm_bytes": 5330,
+   "wasm_sha256": "a5cef601f996dadd99767c1a5ec3cd61c0f6b1821c307fa9fc8a7e14bdc1632c"
   },
-  "direct/miscompiles.blot": {
+  "direct/miscompiles.sq": {
    "exit": 0,
    "records": [
     {
@@ -1466,24 +1466,24 @@
      "core_nodes": 1692,
      "effect_rows": 3663,
      "emitted_functions": 40,
-     "filename": "direct/miscompiles.blot",
+     "filename": "direct/miscompiles.sq",
      "files": 2,
      "imported_schemes": 33,
      "kind": "compilation",
      "row_versions": 873,
-     "source_bytes": 27675,
+     "source_bytes": 27676,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4281,
      "type_nodes": 8863,
      "type_versions": 1265,
-     "wasm_bytes": 5330
+     "wasm_bytes": 5335
     }
    ],
-   "wasm_bytes": 5330,
-   "wasm_sha256": "918ff9c888f800f30f3ef1aecf85b91b9a706ecfee94d1261f4f197a04275af1"
+   "wasm_bytes": 5335,
+   "wasm_sha256": "8e986c65dd6ef4f6422cff0fd01be6c66987fd4e95948b5fb9230d85e6e46305"
   },
-  "direct/nested_updates.blot": {
+  "direct/nested_updates.sq": {
    "exit": 0,
    "records": [
     {
@@ -1506,24 +1506,24 @@
      "core_nodes": 1685,
      "effect_rows": 3641,
      "emitted_functions": 32,
-     "filename": "direct/nested_updates.blot",
+     "filename": "direct/nested_updates.sq",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
      "row_versions": 866,
-     "source_bytes": 27584,
+     "source_bytes": 27585,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4254,
      "type_nodes": 8825,
      "type_versions": 1256,
-     "wasm_bytes": 4890
+     "wasm_bytes": 4893
     }
    ],
-   "wasm_bytes": 4890,
-   "wasm_sha256": "c40b98b342b42ede813612da27f6d73360e1ced8c8d4ce2b3fc046f1a2270508"
+   "wasm_bytes": 4893,
+   "wasm_sha256": "f2b2fd359545754d6aca051e78cf87a52e51abbe57b6042d0ddec28f3618d1fe"
   },
-  "direct/nested_updates_indexed.blot": {
+  "direct/nested_updates_indexed.sq": {
    "exit": 0,
    "records": [
     {
@@ -1546,24 +1546,24 @@
      "core_nodes": 1696,
      "effect_rows": 3630,
      "emitted_functions": 34,
-     "filename": "direct/nested_updates_indexed.blot",
+     "filename": "direct/nested_updates_indexed.sq",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
      "row_versions": 863,
-     "source_bytes": 27364,
+     "source_bytes": 27365,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4244,
      "type_nodes": 8812,
      "type_versions": 1265,
-     "wasm_bytes": 5550
+     "wasm_bytes": 5553
     }
    ],
-   "wasm_bytes": 5550,
-   "wasm_sha256": "e653af19fc0ae7d28fdae0a26560e142267b2d5aaedee1c186e0bb46a70b5fd5"
+   "wasm_bytes": 5553,
+   "wasm_sha256": "1b4bfac0c7aac84b3519d3986bcd9fd1d43b39c615d0beae65d881614485d42b"
   },
-  "direct/open_codec.blot": {
+  "direct/open_codec.sq": {
    "exit": 0,
    "records": [
     {
@@ -1586,24 +1586,24 @@
      "core_nodes": 1648,
      "effect_rows": 3649,
      "emitted_functions": 39,
-     "filename": "direct/open_codec.blot",
+     "filename": "direct/open_codec.sq",
      "files": 2,
      "imported_schemes": 27,
      "kind": "compilation",
      "row_versions": 857,
-     "source_bytes": 27363,
+     "source_bytes": 27364,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4213,
      "type_nodes": 8850,
      "type_versions": 1260,
-     "wasm_bytes": 5073
+     "wasm_bytes": 5076
     }
    ],
-   "wasm_bytes": 5073,
-   "wasm_sha256": "82056a4c8791f10e029990e292bafc6f89ff7b2e58222e7f3615ecf6b1168f3e"
+   "wasm_bytes": 5076,
+   "wasm_sha256": "c49841f4ad734fac14ae28e3b8506d0362d2578ff9825af5f4095c3030df5865"
   },
-  "direct/policy_record.blot": {
+  "direct/policy_record.sq": {
    "exit": 0,
    "records": [
     {
@@ -1626,24 +1626,24 @@
      "core_nodes": 1640,
      "effect_rows": 3678,
      "emitted_functions": 37,
-     "filename": "direct/policy_record.blot",
+     "filename": "direct/policy_record.sq",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
      "row_versions": 857,
-     "source_bytes": 27273,
+     "source_bytes": 27274,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4199,
      "type_nodes": 8869,
      "type_versions": 1260,
-     "wasm_bytes": 4635
+     "wasm_bytes": 4638
     }
    ],
-   "wasm_bytes": 4635,
-   "wasm_sha256": "9bc48281f218180ba8544eef6c7295291c0424c84d4e9df995e5c5393caad28f"
+   "wasm_bytes": 4638,
+   "wasm_sha256": "23a20f0b5d5e976080a902857ea37381d9f5b58e66383c00c855752d04c302f0"
   },
-  "direct/pools.blot": {
+  "direct/pools.sq": {
    "exit": 0,
    "records": [
     {
@@ -1666,24 +1666,24 @@
      "core_nodes": 1649,
      "effect_rows": 3635,
      "emitted_functions": 36,
-     "filename": "direct/pools.blot",
+     "filename": "direct/pools.sq",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
      "row_versions": 859,
-     "source_bytes": 27305,
+     "source_bytes": 27306,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4226,
      "type_nodes": 8795,
      "type_versions": 1255,
-     "wasm_bytes": 5159
+     "wasm_bytes": 5165
     }
    ],
-   "wasm_bytes": 5159,
-   "wasm_sha256": "2f76366ea52c9e711e3e81f30eddd7508241094c740e3739d99db8b3717f6541"
+   "wasm_bytes": 5165,
+   "wasm_sha256": "2715a0b16695248ac38d62242e4f2fc9fcda1795035f91b615cb060db47a9453"
   },
-  "direct/providers.blot": {
+  "direct/providers.sq": {
    "exit": 0,
    "records": [
     {
@@ -1706,24 +1706,24 @@
      "core_nodes": 1739,
      "effect_rows": 3782,
      "emitted_functions": 52,
-     "filename": "direct/providers.blot",
+     "filename": "direct/providers.sq",
      "files": 2,
      "imported_schemes": 30,
      "kind": "compilation",
      "row_versions": 898,
-     "source_bytes": 28150,
+     "source_bytes": 28151,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4343,
      "type_nodes": 8976,
      "type_versions": 1288,
-     "wasm_bytes": 6206
+     "wasm_bytes": 6209
     }
    ],
-   "wasm_bytes": 6206,
-   "wasm_sha256": "8d79df637e48256684b523599b8cda6d55ecab0c79766969e9a9c1b42461a6cc"
+   "wasm_bytes": 6209,
+   "wasm_sha256": "5bcb6f4e9a2b960e08bdce7e569c7bbcd094b0742926987b16cb8c3ce5358656"
   },
-  "direct/recursive_data.blot": {
+  "direct/recursive_data.sq": {
    "exit": 0,
    "records": [
     {
@@ -1746,24 +1746,24 @@
      "core_nodes": 1690,
      "effect_rows": 3658,
      "emitted_functions": 36,
-     "filename": "direct/recursive_data.blot",
+     "filename": "direct/recursive_data.sq",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
      "row_versions": 871,
-     "source_bytes": 27755,
+     "source_bytes": 27756,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4295,
      "type_nodes": 8881,
      "type_versions": 1273,
-     "wasm_bytes": 5232
+     "wasm_bytes": 5235
     }
    ],
-   "wasm_bytes": 5232,
-   "wasm_sha256": "d41de2f2bbbba6e350701f0bff3dfe277d2918bcb73eee1c5746ff884e706990"
+   "wasm_bytes": 5235,
+   "wasm_sha256": "efaf3be40bf7969d83eef80285c21bdb8bb79ffd98e38e7839e387dfb486c9ad"
   },
-  "direct/shared_field_update.blot": {
+  "direct/shared_field_update.sq": {
    "exit": 0,
    "records": [
     {
@@ -1786,24 +1786,24 @@
      "core_nodes": 1663,
      "effect_rows": 3627,
      "emitted_functions": 32,
-     "filename": "direct/shared_field_update.blot",
+     "filename": "direct/shared_field_update.sq",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
      "row_versions": 859,
-     "source_bytes": 27454,
+     "source_bytes": 27455,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4224,
      "type_nodes": 8789,
      "type_versions": 1249,
-     "wasm_bytes": 4706
+     "wasm_bytes": 4709
     }
    ],
-   "wasm_bytes": 4706,
-   "wasm_sha256": "ec91db058d5ebacf1036966f195a0b68612da1f72daabcea02a26714749e9aa3"
+   "wasm_bytes": 4709,
+   "wasm_sha256": "bdbadc6b42ab165c974f80c89c545ebdaffea0ef7a96c56763dad1d44ddf6393"
   },
-  "direct/shared_fields.blot": {
+  "direct/shared_fields.sq": {
    "exit": 0,
    "records": [
     {
@@ -1826,24 +1826,24 @@
      "core_nodes": 1656,
      "effect_rows": 3628,
      "emitted_functions": 33,
-     "filename": "direct/shared_fields.blot",
+     "filename": "direct/shared_fields.sq",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
      "row_versions": 858,
-     "source_bytes": 27331,
+     "source_bytes": 27332,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4214,
      "type_nodes": 8792,
      "type_versions": 1252,
-     "wasm_bytes": 5028
+     "wasm_bytes": 5031
     }
    ],
-   "wasm_bytes": 5028,
-   "wasm_sha256": "35e927f7fcf0402c3bd183c1d0130fbb98e8191d33f2b81a28afd440eb3ba552"
+   "wasm_bytes": 5031,
+   "wasm_sha256": "ce7bb34e30f28831c69770362d30c1f4f551f88412050c1d24fdcbc550d58e1c"
   },
-  "direct/simd_conversions.blot": {
+  "direct/simd_conversions.sq": {
    "exit": 0,
    "records": [
     {
@@ -1866,24 +1866,24 @@
      "core_nodes": 2165,
      "effect_rows": 5380,
      "emitted_functions": 34,
-     "filename": "direct/simd_conversions.blot",
+     "filename": "direct/simd_conversions.sq",
      "files": 3,
      "imported_schemes": 60,
      "kind": "compilation",
      "row_versions": 1278,
-     "source_bytes": 39268,
+     "source_bytes": 39269,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 5819,
      "type_nodes": 13391,
      "type_versions": 1923,
-     "wasm_bytes": 4675
+     "wasm_bytes": 4678
     }
    ],
-   "wasm_bytes": 4675,
-   "wasm_sha256": "1ca632fbe0a9e0498e38e442b447e1f3dbc34e6bb4e2b487d70fa2a616e8d625"
+   "wasm_bytes": 4678,
+   "wasm_sha256": "f888e9e6ad657fbcb2d6bcad5f3a1ab4838d93db7c3266dffec66f9cb398c6c0"
   },
-  "direct/simd_lanes.blot": {
+  "direct/simd_lanes.sq": {
    "exit": 0,
    "records": [
     {
@@ -1906,24 +1906,24 @@
      "core_nodes": 2220,
      "effect_rows": 5438,
      "emitted_functions": 38,
-     "filename": "direct/simd_lanes.blot",
+     "filename": "direct/simd_lanes.sq",
      "files": 3,
      "imported_schemes": 62,
      "kind": "compilation",
      "row_versions": 1309,
-     "source_bytes": 39547,
+     "source_bytes": 39548,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 5894,
      "type_nodes": 13545,
      "type_versions": 1953,
-     "wasm_bytes": 5210
+     "wasm_bytes": 5213
     }
    ],
-   "wasm_bytes": 5210,
-   "wasm_sha256": "8f944df301b36dfee62514151695cce90bd1821e73665b2ef8de5be5c57101f1"
+   "wasm_bytes": 5213,
+   "wasm_sha256": "47a56e34c82780dee3f045af3682a8defd1218b2582e9135352f75e60991e9a7"
   },
-  "direct/staged_scalar.blot": {
+  "direct/staged_scalar.sq": {
    "exit": 0,
    "records": [
     {
@@ -1946,24 +1946,24 @@
      "core_nodes": 1642,
      "effect_rows": 3632,
      "emitted_functions": 34,
-     "filename": "direct/staged_scalar.blot",
+     "filename": "direct/staged_scalar.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 857,
-     "source_bytes": 27207,
+     "source_bytes": 27208,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4197,
      "type_nodes": 8760,
      "type_versions": 1248,
-     "wasm_bytes": 4374
+     "wasm_bytes": 4377
     }
    ],
-   "wasm_bytes": 4374,
-   "wasm_sha256": "66c789916717f6fe22e3fa31006e775747f13c489ee8e133e4aec98f01a539dd"
+   "wasm_bytes": 4377,
+   "wasm_sha256": "f1942264a8e4d95feb28bc2a83890ecc1d1dfe78812f57bb79a460609e9b4fb7"
   },
-  "direct/storage.blot": {
+  "direct/storage.sq": {
    "exit": 0,
    "records": [
     {
@@ -1986,24 +1986,24 @@
      "core_nodes": 1810,
      "effect_rows": 3713,
      "emitted_functions": 45,
-     "filename": "direct/storage.blot",
+     "filename": "direct/storage.sq",
      "files": 2,
      "imported_schemes": 30,
      "kind": "compilation",
      "row_versions": 919,
-     "source_bytes": 28432,
+     "source_bytes": 28433,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4503,
      "type_nodes": 9002,
      "type_versions": 1295,
-     "wasm_bytes": 7158
+     "wasm_bytes": 7161
     }
    ],
-   "wasm_bytes": 7158,
-   "wasm_sha256": "b8b8260aa8de907a9f9d86658957583cd5a38e5029e01d92ba4265849dc1059e"
+   "wasm_bytes": 7161,
+   "wasm_sha256": "a5f7b75c6e332a1bda72a3586380df366319aac23ac563108ca4646a9731bf63"
   },
-  "direct/terminal_scratch_reads.blot": {
+  "direct/terminal_scratch_reads.sq": {
    "exit": 0,
    "records": [
     {
@@ -2026,24 +2026,24 @@
      "core_nodes": 2050,
      "effect_rows": 3905,
      "emitted_functions": 53,
-     "filename": "direct/terminal_scratch_reads.blot",
+     "filename": "direct/terminal_scratch_reads.sq",
      "files": 2,
      "imported_schemes": 37,
      "kind": "compilation",
      "row_versions": 1009,
-     "source_bytes": 29938,
+     "source_bytes": 29939,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4756,
      "type_nodes": 9692,
      "type_versions": 1424,
-     "wasm_bytes": 13667
+     "wasm_bytes": 13673
     }
    ],
-   "wasm_bytes": 13667,
-   "wasm_sha256": "6de7ba847c0c34e4222dbdd8d0068d05e8527da7cc9da777bdc1c67412d954dc"
+   "wasm_bytes": 13673,
+   "wasm_sha256": "b3ad328b6683b7a5eca10ef1e4b22dd6a0bd05e7301ed65f72112d6e647e1ae1"
   },
-  "direct/unused_generic_fields.blot": {
+  "direct/unused_generic_fields.sq": {
    "exit": 0,
    "records": [
     {
@@ -2066,24 +2066,24 @@
      "core_nodes": 1643,
      "effect_rows": 3663,
      "emitted_functions": 37,
-     "filename": "direct/unused_generic_fields.blot",
+     "filename": "direct/unused_generic_fields.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 856,
-     "source_bytes": 27416,
+     "source_bytes": 27417,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4204,
      "type_nodes": 8839,
      "type_versions": 1256,
-     "wasm_bytes": 4781
+     "wasm_bytes": 4784
     }
    ],
-   "wasm_bytes": 4781,
-   "wasm_sha256": "13e620e6eccd671ce2086fbbc5184582daab73e19d566fdd5dbcdbff86cfac08"
+   "wasm_bytes": 4784,
+   "wasm_sha256": "ec9c3e62870e15dd3aeb53fd504cec4d38b42f8b33160da99cd472e2613a842b"
   },
-  "direct/unused_stages.blot": {
+  "direct/unused_stages.sq": {
    "exit": 0,
    "records": [
     {
@@ -2106,24 +2106,24 @@
      "core_nodes": 1670,
      "effect_rows": 3714,
      "emitted_functions": 40,
-     "filename": "direct/unused_stages.blot",
+     "filename": "direct/unused_stages.sq",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
      "row_versions": 876,
-     "source_bytes": 27744,
+     "source_bytes": 27745,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4291,
      "type_nodes": 8990,
      "type_versions": 1270,
-     "wasm_bytes": 5781
+     "wasm_bytes": 5784
     }
    ],
-   "wasm_bytes": 5781,
-   "wasm_sha256": "796a2857f99187e1f5e14fbab735338a0eb9d63b2fee8f3d9bf79e8203116eba"
+   "wasm_bytes": 5784,
+   "wasm_sha256": "b547d3bab7b077d7d3ced2079c6af51aac426cc47dae96f9eeb9998b050a3756"
   },
-  "direct/view_calls.blot": {
+  "direct/view_calls.sq": {
    "exit": 0,
    "records": [
     {
@@ -2146,24 +2146,24 @@
      "core_nodes": 1728,
      "effect_rows": 3719,
      "emitted_functions": 36,
-     "filename": "direct/view_calls.blot",
+     "filename": "direct/view_calls.sq",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
      "row_versions": 893,
-     "source_bytes": 27944,
+     "source_bytes": 27945,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4369,
      "type_nodes": 9024,
      "type_versions": 1283,
-     "wasm_bytes": 6101
+     "wasm_bytes": 6104
     }
    ],
-   "wasm_bytes": 6101,
-   "wasm_sha256": "27bd85f616191aaa1d55cd6b7995aa1aac28eefdfe56dca63eaf5c6fa604d9af"
+   "wasm_bytes": 6104,
+   "wasm_sha256": "31f49c3cfaa81f7a6b43bb9926f706a18ddd7e546c2e35ccd4f8436bf5f17ccd"
   },
-  "discard-fixtures/deferred-alias.blot": {
+  "discard-fixtures/deferred-alias.sq": {
    "exit": 0,
    "records": [
     {
@@ -2186,24 +2186,24 @@
      "core_nodes": 1634,
      "effect_rows": 3620,
      "emitted_functions": 34,
-     "filename": "discard-fixtures/deferred-alias.blot",
+     "filename": "discard-fixtures/deferred-alias.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27207,
+     "source_bytes": 27208,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4170,
      "type_nodes": 8745,
      "type_versions": 1242,
-     "wasm_bytes": 4490
+     "wasm_bytes": 4493
     }
    ],
-   "wasm_bytes": 4490,
-   "wasm_sha256": "430d014ec1cf1b39f9c819b55ee86f3703127c039669cbba76ab16290973beaa"
+   "wasm_bytes": 4493,
+   "wasm_sha256": "55c6cf4ec4543fc5433b01068020ecc7d0cd7d541e1767551105474f75798b63"
   },
-  "discard-fixtures/deferred-anonymous.blot": {
+  "discard-fixtures/deferred-anonymous.sq": {
    "exit": 1,
    "records": [
     {
@@ -2227,7 +2227,7 @@
      },
      "end": 151,
      "expected_token": null,
-     "filename": "discard-fixtures/deferred-anonymous.blot",
+     "filename": "discard-fixtures/deferred-anonymous.sq",
      "kind": "diagnostic",
      "message": "This receiver has no associated member with this name",
      "offset_encoding": "utf8_bytes",
@@ -2258,12 +2258,12 @@
      "core_nodes": 0,
      "effect_rows": 3605,
      "emitted_functions": 0,
-     "filename": "discard-fixtures/deferred-anonymous.blot",
+     "filename": "discard-fixtures/deferred-anonymous.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 848,
-     "source_bytes": 27149,
+     "source_bytes": 27150,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4164,
@@ -2273,7 +2273,7 @@
     }
    ]
   },
-  "discard-fixtures/deferred-body.blot": {
+  "discard-fixtures/deferred-body.sq": {
    "exit": 1,
    "records": [
     {
@@ -2297,7 +2297,7 @@
      },
      "end": 218,
      "expected_token": null,
-     "filename": "discard-fixtures/deferred-body.blot",
+     "filename": "discard-fixtures/deferred-body.sq",
      "kind": "diagnostic",
      "message": "This receiver has no associated member with this name",
      "offset_encoding": "utf8_bytes",
@@ -2328,12 +2328,12 @@
      "core_nodes": 0,
      "effect_rows": 3617,
      "emitted_functions": 0,
-     "filename": "discard-fixtures/deferred-body.blot",
+     "filename": "discard-fixtures/deferred-body.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27244,
+     "source_bytes": 27245,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4173,
@@ -2343,7 +2343,7 @@
     }
    ]
   },
-  "discard-fixtures/eager-order.blot": {
+  "discard-fixtures/eager-order.sq": {
    "exit": 0,
    "records": [
     {
@@ -2366,24 +2366,24 @@
      "core_nodes": 1710,
      "effect_rows": 3734,
      "emitted_functions": 49,
-     "filename": "discard-fixtures/eager-order.blot",
+     "filename": "discard-fixtures/eager-order.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 875,
-     "source_bytes": 27782,
+     "source_bytes": 27783,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4285,
      "type_nodes": 8961,
      "type_versions": 1275,
-     "wasm_bytes": 5923
+     "wasm_bytes": 5928
     }
    ],
-   "wasm_bytes": 5923,
-   "wasm_sha256": "78410179b0d9e0d903953343be130c3c72afa0436f073a9a01103f81f8bb5661"
+   "wasm_bytes": 5928,
+   "wasm_sha256": "58d2a0098f43ff114a081093950031b4fcd81eb5066f5a1e637e387072095389"
   },
-  "discard-fixtures/explicit-qualifier.blot": {
+  "discard-fixtures/explicit-qualifier.sq": {
    "exit": 0,
    "records": [
     {
@@ -2406,24 +2406,24 @@
      "core_nodes": 1628,
      "effect_rows": 3600,
      "emitted_functions": 32,
-     "filename": "discard-fixtures/explicit-qualifier.blot",
+     "filename": "discard-fixtures/explicit-qualifier.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 847,
-     "source_bytes": 27117,
+     "source_bytes": 27118,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4166,
      "type_nodes": 8700,
      "type_versions": 1239,
-     "wasm_bytes": 4291
+     "wasm_bytes": 4294
     }
    ],
-   "wasm_bytes": 4291,
-   "wasm_sha256": "c901908f644f165ba08d7fd409f63c1f08a4d02c076f1bdc7749d054da5eb3fb"
+   "wasm_bytes": 4294,
+   "wasm_sha256": "206fcab886ae87776c2ab6250b58ddf1484d5041195b6595f2ba2e5cc96fc518"
   },
-  "discard-fixtures/generate-panic.blot": {
+  "discard-fixtures/generate-panic.sq": {
    "exit": 0,
    "records": [
     {
@@ -2446,24 +2446,24 @@
      "core_nodes": 1632,
      "effect_rows": 3609,
      "emitted_functions": 33,
-     "filename": "discard-fixtures/generate-panic.blot",
+     "filename": "discard-fixtures/generate-panic.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27200,
+     "source_bytes": 27201,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4174,
      "type_nodes": 8739,
      "type_versions": 1245,
-     "wasm_bytes": 4561
+     "wasm_bytes": 4566
     }
    ],
-   "wasm_bytes": 4561,
-   "wasm_sha256": "1ea3f6156264e90d2a048e0dd247b8e6bcfaaccb4bc1d64d1461a7e7a6cd4ff9"
+   "wasm_bytes": 4566,
+   "wasm_sha256": "74060232ad611bbb861b662c80f24f36b58b94c2a60d376b3410137a41f84df2"
   },
-  "discard-fixtures/implicit-uses.blot": {
+  "discard-fixtures/implicit-uses.sq": {
    "exit": 0,
    "records": [
     {
@@ -2486,30 +2486,30 @@
      "core_nodes": 1697,
      "effect_rows": 3622,
      "emitted_functions": 39,
-     "filename": "discard-fixtures/implicit-uses.blot",
+     "filename": "discard-fixtures/implicit-uses.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 859,
-     "source_bytes": 27670,
+     "source_bytes": 27671,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4282,
      "type_nodes": 8744,
      "type_versions": 1248,
-     "wasm_bytes": 4942
+     "wasm_bytes": 4945
     }
    ],
-   "wasm_bytes": 4942,
-   "wasm_sha256": "24d96b32cf9cc2fae5285a4cbddfcafcb3f13768de268f58fc3bd45cfb43872e"
+   "wasm_bytes": 4945,
+   "wasm_sha256": "e344e7fab1746fb5980ec617fe9f298472d6df21dd725a73d48a4c0329d686bf"
   },
-  "discard-fixtures/original.blot": {
+  "discard-fixtures/original.sq": {
    "exit": 1,
    "records": [
     {
      "code": "storage_unsupported",
      "end": 389,
-     "filename": "discard-fixtures/original.blot",
+     "filename": "discard-fixtures/original.sq",
      "kind": "diagnostic",
      "message": "Direct backend: 1 unsupported form(s): value of `empty` (unit 2) has a type its uses leave open [Direct backend: unsupported type (unresolved type variable) at a reference] (1x at 2:384)",
      "stage": "emit",
@@ -2535,12 +2535,12 @@
      "core_nodes": 1647,
      "effect_rows": 3633,
      "emitted_functions": 0,
-     "filename": "discard-fixtures/original.blot",
+     "filename": "discard-fixtures/original.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 858,
-     "source_bytes": 27418,
+     "source_bytes": 27419,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4202,
@@ -2550,7 +2550,7 @@
     }
    ]
   },
-  "discard-fixtures/runtime-panic.blot": {
+  "discard-fixtures/runtime-panic.sq": {
    "exit": 0,
    "records": [
     {
@@ -2573,24 +2573,24 @@
      "core_nodes": 1635,
      "effect_rows": 3606,
      "emitted_functions": 34,
-     "filename": "discard-fixtures/runtime-panic.blot",
+     "filename": "discard-fixtures/runtime-panic.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 849,
-     "source_bytes": 27185,
+     "source_bytes": 27186,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4175,
      "type_nodes": 8717,
      "type_versions": 1243,
-     "wasm_bytes": 4453
+     "wasm_bytes": 4458
     }
    ],
-   "wasm_bytes": 4453,
-   "wasm_sha256": "4c0e7f3a89d202f76813fe3c7577987e90a5754cb16719a1ce51f662469cba83"
+   "wasm_bytes": 4458,
+   "wasm_sha256": "364887a4bbe31c2140f4075703f4e0e27d2df46c65630745cc73f932b45c7151"
   },
-  "fallbacks.blot": {
+  "fallbacks.sq": {
    "exit": 0,
    "records": [
     {
@@ -2613,24 +2613,24 @@
      "core_nodes": 1715,
      "effect_rows": 3656,
      "emitted_functions": 48,
-     "filename": "fallbacks.blot",
+     "filename": "fallbacks.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 870,
-     "source_bytes": 28191,
+     "source_bytes": 28192,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4320,
      "type_nodes": 8877,
      "type_versions": 1284,
-     "wasm_bytes": 5797
+     "wasm_bytes": 5803
     }
    ],
-   "wasm_bytes": 5797,
-   "wasm_sha256": "7fa167a37fdaa9a3c9b97b086fb8b7a4846297d308c22d76a1d932fe95a8dc48"
+   "wasm_bytes": 5803,
+   "wasm_sha256": "d43f79bc70200725e4cd591988d99fed87fe32a9bfea7fe1ff82505f5beb71ad"
   },
-  "fixed_scalar_spans.blot": {
+  "fixed_scalar_spans.sq": {
    "exit": 0,
    "records": [
     {
@@ -2653,24 +2653,24 @@
      "core_nodes": 1960,
      "effect_rows": 3774,
      "emitted_functions": 48,
-     "filename": "fixed_scalar_spans.blot",
+     "filename": "fixed_scalar_spans.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 917,
-     "source_bytes": 30019,
+     "source_bytes": 30020,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4736,
      "type_nodes": 9137,
      "type_versions": 1322,
-     "wasm_bytes": 9396
+     "wasm_bytes": 9402
     }
    ],
-   "wasm_bytes": 9396,
-   "wasm_sha256": "2d13931df208588f6fa5aef7bd95cfe29709e8dfa16bb7caba60b20493e39434"
+   "wasm_bytes": 9402,
+   "wasm_sha256": "0dea410344976d34fbb071df6d6c8f2e168dac7e42b77802a37f68429066c21b"
   },
-  "fresh_owner_borrow_escape.blot": {
+  "fresh_owner_borrow_escape.sq": {
    "exit": 0,
    "records": [
     {
@@ -2693,24 +2693,24 @@
      "core_nodes": 1645,
      "effect_rows": 3606,
      "emitted_functions": 33,
-     "filename": "fresh_owner_borrow_escape.blot",
+     "filename": "fresh_owner_borrow_escape.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27224,
+     "source_bytes": 27225,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4194,
      "type_nodes": 8722,
      "type_versions": 1245,
-     "wasm_bytes": 4695
+     "wasm_bytes": 4698
     }
    ],
-   "wasm_bytes": 4695,
-   "wasm_sha256": "b6992007a6c860b589d6df38ebb7c24170d7a20003673b38292e478e4d5ea46c"
+   "wasm_bytes": 4698,
+   "wasm_sha256": "07761ef3d5aa29a115037d97d0371963b6aaa65d44cc7f7c017a5e6d1f272d50"
   },
-  "fresh_owner_cleanup.blot": {
+  "fresh_owner_cleanup.sq": {
    "exit": 0,
    "records": [
     {
@@ -2733,30 +2733,30 @@
      "core_nodes": 1719,
      "effect_rows": 3635,
      "emitted_functions": 35,
-     "filename": "fresh_owner_cleanup.blot",
+     "filename": "fresh_owner_cleanup.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 865,
-     "source_bytes": 27863,
+     "source_bytes": 27864,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4309,
      "type_nodes": 8784,
      "type_versions": 1262,
-     "wasm_bytes": 5753
+     "wasm_bytes": 5759
     }
    ],
-   "wasm_bytes": 5753,
-   "wasm_sha256": "31c6a49c115d1d2ee6193d1e124a10d3d54cb9128c24f519278145b1c44dacdc"
+   "wasm_bytes": 5759,
+   "wasm_sha256": "11779da106f486ff9e0ecf701a8a52cd44b06c0280f22348e43e747c57baf644"
   },
-  "fresh_owner_stored_borrow_escape.blot": {
+  "fresh_owner_stored_borrow_escape.sq": {
    "exit": 1,
    "records": [
     {
      "code": "result_not_owned",
      "end": 241,
-     "filename": "fresh_owner_stored_borrow_escape.blot",
+     "filename": "fresh_owner_stored_borrow_escape.sq",
      "kind": "diagnostic",
      "message": "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`",
      "stage": "lower",
@@ -2782,12 +2782,12 @@
      "core_nodes": 1664,
      "effect_rows": 3615,
      "emitted_functions": 0,
-     "filename": "fresh_owner_stored_borrow_escape.blot",
+     "filename": "fresh_owner_stored_borrow_escape.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27467,
+     "source_bytes": 27468,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4247,
@@ -2797,7 +2797,7 @@
     }
    ]
   },
-  "global_call_borrow_escape.blot": {
+  "global_call_borrow_escape.sq": {
    "exit": 0,
    "records": [
     {
@@ -2820,24 +2820,24 @@
      "core_nodes": 1640,
      "effect_rows": 3606,
      "emitted_functions": 33,
-     "filename": "global_call_borrow_escape.blot",
+     "filename": "global_call_borrow_escape.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27222,
+     "source_bytes": 27223,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4192,
      "type_nodes": 8721,
      "type_versions": 1245,
-     "wasm_bytes": 4629
+     "wasm_bytes": 4632
     }
    ],
-   "wasm_bytes": 4629,
-   "wasm_sha256": "765a50aba8cebc9e6db21c5d066429be3962ca8abdec2634ddb47ca3a7ab5f2d"
+   "wasm_bytes": 4632,
+   "wasm_sha256": "799bbc7a6326900b7b8fdf27e48ec923777405f081613af83a8508a5676aa94e"
   },
-  "global_call_conditional.blot": {
+  "global_call_conditional.sq": {
    "exit": 0,
    "records": [
     {
@@ -2860,30 +2860,30 @@
      "core_nodes": 1647,
      "effect_rows": 3609,
      "emitted_functions": 32,
-     "filename": "global_call_conditional.blot",
+     "filename": "global_call_conditional.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 852,
-     "source_bytes": 27292,
+     "source_bytes": 27293,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4200,
      "type_nodes": 8721,
      "type_versions": 1245,
-     "wasm_bytes": 4456
+     "wasm_bytes": 4459
     }
    ],
-   "wasm_bytes": 4456,
-   "wasm_sha256": "cd37f30abb9530dfaee1b62eef0ff8a237444ffa96b41c66b76fa026c6de981d"
+   "wasm_bytes": 4459,
+   "wasm_sha256": "0feb7a6110651987a454a15afbdbd8a9578fb970238f67e4c99c8c27a285b7ba"
   },
-  "global_call_freeze.blot": {
+  "global_call_freeze.sq": {
    "exit": 1,
    "records": [
     {
      "code": "aliased_update",
      "end": 116,
-     "filename": "global_call_freeze.blot",
+     "filename": "global_call_freeze.sq",
      "holder_end": 0,
      "holder_start": 0,
      "kind": "diagnostic",
@@ -2916,12 +2916,12 @@
      "core_nodes": 1635,
      "effect_rows": 3600,
      "emitted_functions": 0,
-     "filename": "global_call_freeze.blot",
+     "filename": "global_call_freeze.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 848,
-     "source_bytes": 27119,
+     "source_bytes": 27120,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4170,
@@ -2931,7 +2931,7 @@
     }
    ]
   },
-  "global_call_initialization.blot": {
+  "global_call_initialization.sq": {
    "exit": 0,
    "records": [
     {
@@ -2954,24 +2954,24 @@
      "core_nodes": 1672,
      "effect_rows": 3633,
      "emitted_functions": 42,
-     "filename": "global_call_initialization.blot",
+     "filename": "global_call_initialization.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 861,
-     "source_bytes": 27602,
+     "source_bytes": 27603,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4269,
      "type_nodes": 8791,
      "type_versions": 1264,
-     "wasm_bytes": 6647
+     "wasm_bytes": 6653
     }
    ],
-   "wasm_bytes": 6647,
-   "wasm_sha256": "156b012006ef1df12397e6166622c9235479f813128f24d4539ce36498a5a1b9"
+   "wasm_bytes": 6653,
+   "wasm_sha256": "a964c6b97219923a0427521ee750e6aa00c4abee7ffb8c81df32a0c16069f761"
   },
-  "global_call_mutation.blot": {
+  "global_call_mutation.sq": {
    "exit": 0,
    "records": [
     {
@@ -2994,24 +2994,24 @@
      "core_nodes": 1730,
      "effect_rows": 3684,
      "emitted_functions": 44,
-     "filename": "global_call_mutation.blot",
+     "filename": "global_call_mutation.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 880,
-     "source_bytes": 28423,
+     "source_bytes": 28424,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4393,
      "type_nodes": 8913,
      "type_versions": 1281,
-     "wasm_bytes": 6605
+     "wasm_bytes": 6611
     }
    ],
-   "wasm_bytes": 6605,
-   "wasm_sha256": "f565c71c6de7c1392a316e5713067674f228a7478b443b11d76d41825adec815"
+   "wasm_bytes": 6611,
+   "wasm_sha256": "07eb488a9a8b15f0611724435334e8810068af3c95c55fa1f0f437d59c4cf9c4"
   },
-  "global_call_read.blot": {
+  "global_call_read.sq": {
    "exit": 0,
    "records": [
     {
@@ -3034,24 +3034,24 @@
      "core_nodes": 1652,
      "effect_rows": 3627,
      "emitted_functions": 34,
-     "filename": "global_call_read.blot",
+     "filename": "global_call_read.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 859,
-     "source_bytes": 27355,
+     "source_bytes": 27356,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4218,
      "type_nodes": 8770,
      "type_versions": 1254,
-     "wasm_bytes": 5153
+     "wasm_bytes": 5159
     }
    ],
-   "wasm_bytes": 5153,
-   "wasm_sha256": "1e79d546172cf9fcfd6a1cc6f2712e7c69b1fd5e02c64fda0f301dd9bedff33c"
+   "wasm_bytes": 5159,
+   "wasm_sha256": "c11615989131bba2e9101b67ea35bdb21f6ff23d9c620d3d7c3bdfd85def26a2"
   },
-  "identity_join.blot": {
+  "identity_join.sq": {
    "exit": 0,
    "records": [
     {
@@ -3074,24 +3074,24 @@
      "core_nodes": 1859,
      "effect_rows": 3727,
      "emitted_functions": 42,
-     "filename": "identity_join.blot",
+     "filename": "identity_join.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 886,
-     "source_bytes": 28731,
+     "source_bytes": 28732,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4513,
      "type_nodes": 8995,
      "type_versions": 1271,
-     "wasm_bytes": 7743
+     "wasm_bytes": 7749
     }
    ],
-   "wasm_bytes": 7743,
-   "wasm_sha256": "b46bd208707c1d907e5ee3bca6d519cf65c6b6af322a3ab1ed3fa3757f34ffc3"
+   "wasm_bytes": 7749,
+   "wasm_sha256": "3645c35fcb95d5f17523a0d2d201cd2661ddee07d2f16b13c38f26de31107f22"
   },
-  "identity_join_address.blot": {
+  "identity_join_address.sq": {
    "exit": 0,
    "records": [
     {
@@ -3114,24 +3114,24 @@
      "core_nodes": 1696,
      "effect_rows": 3629,
      "emitted_functions": 35,
-     "filename": "identity_join_address.blot",
+     "filename": "identity_join_address.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 858,
-     "source_bytes": 27587,
+     "source_bytes": 27588,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4268,
      "type_nodes": 8758,
      "type_versions": 1247,
-     "wasm_bytes": 5313
+     "wasm_bytes": 5319
     }
    ],
-   "wasm_bytes": 5313,
-   "wasm_sha256": "9210e744bfdde47298dd0869133111c8ef8eccae3587f36c28aeff4ff5efe27f"
+   "wasm_bytes": 5319,
+   "wasm_sha256": "6c1d0d3a1a69ad839d5ee69c86c3621df46ef94fdd696d1b1bebd9199b992cf6"
   },
-  "immutable_survivor.blot": {
+  "immutable_survivor.sq": {
    "exit": 0,
    "records": [
     {
@@ -3154,24 +3154,24 @@
      "core_nodes": 1716,
      "effect_rows": 3637,
      "emitted_functions": 37,
-     "filename": "immutable_survivor.blot",
+     "filename": "immutable_survivor.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 863,
-     "source_bytes": 28023,
+     "source_bytes": 28024,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4321,
      "type_nodes": 8826,
      "type_versions": 1257,
-     "wasm_bytes": 5712
+     "wasm_bytes": 5718
     }
    ],
-   "wasm_bytes": 5712,
-   "wasm_sha256": "6ba8b66a09324c055316e70b018c0e4f673d5e08d00d063673f213cd30342a8b"
+   "wasm_bytes": 5718,
+   "wasm_sha256": "6a6a76d12357e040c83c98d04d75ae3d7f2334646f326d4bba693788358e90e3"
   },
-  "input_alias_borrow_escape.blot": {
+  "input_alias_borrow_escape.sq": {
    "exit": 0,
    "records": [
     {
@@ -3194,24 +3194,24 @@
      "core_nodes": 1644,
      "effect_rows": 3615,
      "emitted_functions": 32,
-     "filename": "input_alias_borrow_escape.blot",
+     "filename": "input_alias_borrow_escape.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 852,
-     "source_bytes": 27307,
+     "source_bytes": 27308,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4207,
      "type_nodes": 8740,
      "type_versions": 1246,
-     "wasm_bytes": 4670
+     "wasm_bytes": 4673
     }
    ],
-   "wasm_bytes": 4670,
-   "wasm_sha256": "b32eee43784c5f0353632dc2dadc26f1d6659c6cc373369956e11e624fd84910"
+   "wasm_bytes": 4673,
+   "wasm_sha256": "abf888b4d6918cb82d497595fd7c6d6a585a22ed48b8d1ad0eceb727a78b81f6"
   },
-  "input_alias_descriptors.blot": {
+  "input_alias_descriptors.sq": {
    "exit": 0,
    "records": [
     {
@@ -3234,24 +3234,24 @@
      "core_nodes": 1819,
      "effect_rows": 3689,
      "emitted_functions": 32,
-     "filename": "input_alias_descriptors.blot",
+     "filename": "input_alias_descriptors.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 889,
-     "source_bytes": 28947,
+     "source_bytes": 28948,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4519,
      "type_nodes": 8902,
      "type_versions": 1277,
-     "wasm_bytes": 6730
+     "wasm_bytes": 6736
     }
    ],
-   "wasm_bytes": 6730,
-   "wasm_sha256": "4a1e1319148af8485258efb898891e7445ff8c2c08d201dd64ccd16588f00d96"
+   "wasm_bytes": 6736,
+   "wasm_sha256": "a4a6ae5a29713351a876568065918c4977a9dff73d93d5096e85312cc2900b43"
   },
-  "input_alias_partition.blot": {
+  "input_alias_partition.sq": {
    "exit": 0,
    "records": [
     {
@@ -3274,24 +3274,24 @@
      "core_nodes": 1695,
      "effect_rows": 3625,
      "emitted_functions": 32,
-     "filename": "input_alias_partition.blot",
+     "filename": "input_alias_partition.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 862,
-     "source_bytes": 27688,
+     "source_bytes": 27689,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4278,
      "type_nodes": 8778,
      "type_versions": 1252,
-     "wasm_bytes": 4866
+     "wasm_bytes": 4872
     }
    ],
-   "wasm_bytes": 4866,
-   "wasm_sha256": "a82987d9fd8de44bab17b8dddf621e9c1543cba2a426434dce16a71fb3f2239d"
+   "wasm_bytes": 4872,
+   "wasm_sha256": "decffc9e9739fca3d3bba22c18e5240bcf3d7d8113b06f20cb3b87fbe3cfbe6d"
   },
-  "mutating_owner_return_fresh.blot": {
+  "mutating_owner_return_fresh.sq": {
    "exit": 0,
    "records": [
     {
@@ -3314,30 +3314,30 @@
      "core_nodes": 1667,
      "effect_rows": 3611,
      "emitted_functions": 33,
-     "filename": "mutating_owner_return_fresh.blot",
+     "filename": "mutating_owner_return_fresh.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 854,
-     "source_bytes": 27372,
+     "source_bytes": 27373,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4224,
      "type_nodes": 8742,
      "type_versions": 1249,
-     "wasm_bytes": 5206
+     "wasm_bytes": 5212
     }
    ],
-   "wasm_bytes": 5206,
-   "wasm_sha256": "8893f646c35fcaf03dc286096d8c6c0360c41e998236b1d6468fc290e6ee7271"
+   "wasm_bytes": 5212,
+   "wasm_sha256": "8c057241614f92cf89b7df95d5bcf24b0f4873e5fe8a7e039b2bf318f6495953"
   },
-  "mutating_owner_return_truncate.blot": {
+  "mutating_owner_return_truncate.sq": {
    "exit": 1,
    "records": [
     {
      "code": "aliased_update",
      "end": 202,
-     "filename": "mutating_owner_return_truncate.blot",
+     "filename": "mutating_owner_return_truncate.sq",
      "holder_end": 162,
      "holder_start": 157,
      "kind": "diagnostic",
@@ -3370,12 +3370,12 @@
      "core_nodes": 1640,
      "effect_rows": 3606,
      "emitted_functions": 0,
-     "filename": "mutating_owner_return_truncate.blot",
+     "filename": "mutating_owner_return_truncate.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27217,
+     "source_bytes": 27218,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4188,
@@ -3385,7 +3385,7 @@
     }
    ]
   },
-  "named-closure-parameter-fixtures/applied-provider-capture.blot": {
+  "named-closure-parameter-fixtures/applied-provider-capture.sq": {
    "exit": 0,
    "records": [
     {
@@ -3408,24 +3408,24 @@
      "core_nodes": 1643,
      "effect_rows": 3632,
      "emitted_functions": 39,
-     "filename": "named-closure-parameter-fixtures/applied-provider-capture.blot",
+     "filename": "named-closure-parameter-fixtures/applied-provider-capture.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 855,
-     "source_bytes": 27270,
+     "source_bytes": 27271,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4191,
      "type_nodes": 8745,
      "type_versions": 1246,
-     "wasm_bytes": 4869
+     "wasm_bytes": 4872
     }
    ],
-   "wasm_bytes": 4869,
-   "wasm_sha256": "0d76a6fd08a665048f092d25608fde7e96e2dc5a4844a3b8de0ee9c55ccc5745"
+   "wasm_bytes": 4872,
+   "wasm_sha256": "7ef0eb17da193842bca3643111f60798142e3f63f9309a75417c000481ecd146"
   },
-  "named-closure-parameter-fixtures/direct-cell-cycle.blot": {
+  "named-closure-parameter-fixtures/direct-cell-cycle.sq": {
    "exit": 0,
    "records": [
     {
@@ -3448,24 +3448,24 @@
      "core_nodes": 1623,
      "effect_rows": 3599,
      "emitted_functions": 33,
-     "filename": "named-closure-parameter-fixtures/direct-cell-cycle.blot",
+     "filename": "named-closure-parameter-fixtures/direct-cell-cycle.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 847,
-     "source_bytes": 27050,
+     "source_bytes": 27051,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4154,
      "type_nodes": 8695,
      "type_versions": 1239,
-     "wasm_bytes": 4316
+     "wasm_bytes": 4319
     }
    ],
-   "wasm_bytes": 4316,
-   "wasm_sha256": "8725024e546c5105b101a8325e9ea60e37233a432ec43adc8e9de673a1a83344"
+   "wasm_bytes": 4319,
+   "wasm_sha256": "3691f93c6cbdbc9ef15fdbc17b60711d0cbb07d33adc1e23fa5f2ce741ba4fcd"
   },
-  "named-closure-parameter-fixtures/generic-unit-captures.blot": {
+  "named-closure-parameter-fixtures/generic-unit-captures.sq": {
    "exit": 0,
    "records": [
     {
@@ -3488,24 +3488,24 @@
      "core_nodes": 1634,
      "effect_rows": 3635,
      "emitted_functions": 44,
-     "filename": "named-closure-parameter-fixtures/generic-unit-captures.blot",
+     "filename": "named-closure-parameter-fixtures/generic-unit-captures.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 856,
-     "source_bytes": 27196,
+     "source_bytes": 27197,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4177,
      "type_nodes": 8770,
      "type_versions": 1248,
-     "wasm_bytes": 4978
+     "wasm_bytes": 4981
     }
    ],
-   "wasm_bytes": 4978,
-   "wasm_sha256": "bd044f190a58fb1bdc82790c9a94f999eabb099853474a261bfc5b03864715dd"
+   "wasm_bytes": 4981,
+   "wasm_sha256": "d744c2c4a9d51d8640716cd1737d2956feda0efb6c0be88ba15fe864342cea3f"
   },
-  "named-closure-parameter-fixtures/lexical-generic-capture.blot": {
+  "named-closure-parameter-fixtures/lexical-generic-capture.sq": {
    "exit": 0,
    "records": [
     {
@@ -3528,24 +3528,24 @@
      "core_nodes": 1633,
      "effect_rows": 3617,
      "emitted_functions": 36,
-     "filename": "named-closure-parameter-fixtures/lexical-generic-capture.blot",
+     "filename": "named-closure-parameter-fixtures/lexical-generic-capture.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27158,
+     "source_bytes": 27159,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4172,
      "type_nodes": 8726,
      "type_versions": 1243,
-     "wasm_bytes": 4544
+     "wasm_bytes": 4547
     }
    ],
-   "wasm_bytes": 4544,
-   "wasm_sha256": "acd2950f206f085633f333f0e3bf850235664c6554a3b09ab100a4ed1cb70c69"
+   "wasm_bytes": 4547,
+   "wasm_sha256": "16eb41a2dd4f84acd3a33b3e82fc109dac067c45f9e3e08fea08b7ad5c733b92"
   },
-  "named-closure-parameter-fixtures/nonunit-applied-export.blot": {
+  "named-closure-parameter-fixtures/nonunit-applied-export.sq": {
    "exit": 0,
    "records": [
     {
@@ -3568,24 +3568,24 @@
      "core_nodes": 1628,
      "effect_rows": 3612,
      "emitted_functions": 36,
-     "filename": "named-closure-parameter-fixtures/nonunit-applied-export.blot",
+     "filename": "named-closure-parameter-fixtures/nonunit-applied-export.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27134,
+     "source_bytes": 27135,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4168,
      "type_nodes": 8724,
      "type_versions": 1243,
-     "wasm_bytes": 4548
+     "wasm_bytes": 4551
     }
    ],
-   "wasm_bytes": 4548,
-   "wasm_sha256": "453901c0ef1ac027c843c600db3998f25efc41e7de413f6762f6d5bef6aaf53b"
+   "wasm_bytes": 4551,
+   "wasm_sha256": "f9db467a861947a0978e8335c8ae94e50578339a84af135dc9b641e4683955f7"
   },
-  "named-closure-parameter-fixtures/returned-closure-cycle.blot": {
+  "named-closure-parameter-fixtures/returned-closure-cycle.sq": {
    "exit": 0,
    "records": [
     {
@@ -3608,24 +3608,24 @@
      "core_nodes": 1629,
      "effect_rows": 3611,
      "emitted_functions": 37,
-     "filename": "named-closure-parameter-fixtures/returned-closure-cycle.blot",
+     "filename": "named-closure-parameter-fixtures/returned-closure-cycle.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27118,
+     "source_bytes": 27119,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4166,
      "type_nodes": 8721,
      "type_versions": 1243,
-     "wasm_bytes": 4580
+     "wasm_bytes": 4583
     }
    ],
-   "wasm_bytes": 4580,
-   "wasm_sha256": "1d6da838d71b464abc56096f0ff1427466885cc424a067ca362981637f7280cc"
+   "wasm_bytes": 4583,
+   "wasm_sha256": "7294241273566ff6a57272dcbf232c8e08227ef0355a0b950a5292f0b47d32bc"
   },
-  "named-closure-parameter-fixtures/unit-applied-effect-row.blot": {
+  "named-closure-parameter-fixtures/unit-applied-effect-row.sq": {
    "exit": 0,
    "records": [
     {
@@ -3648,24 +3648,24 @@
      "core_nodes": 1637,
      "effect_rows": 3632,
      "emitted_functions": 38,
-     "filename": "named-closure-parameter-fixtures/unit-applied-effect-row.blot",
+     "filename": "named-closure-parameter-fixtures/unit-applied-effect-row.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27193,
+     "source_bytes": 27194,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4180,
      "type_nodes": 8743,
      "type_versions": 1244,
-     "wasm_bytes": 4754
+     "wasm_bytes": 4757
     }
    ],
-   "wasm_bytes": 4754,
-   "wasm_sha256": "23a34f793595be81aeb8ebdb63121eb4b40d7f15cedc7dc72cd4efd17bb3bfba"
+   "wasm_bytes": 4757,
+   "wasm_sha256": "a6f7dc92d94f7169612b80782a13aa488b63cc615468726ec01ecb00e6b959ba"
   },
-  "named-closure-parameter-fixtures/unit-applied-export.blot": {
+  "named-closure-parameter-fixtures/unit-applied-export.sq": {
    "exit": 0,
    "records": [
     {
@@ -3688,24 +3688,24 @@
      "core_nodes": 1628,
      "effect_rows": 3612,
      "emitted_functions": 36,
-     "filename": "named-closure-parameter-fixtures/unit-applied-export.blot",
+     "filename": "named-closure-parameter-fixtures/unit-applied-export.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27119,
+     "source_bytes": 27120,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4167,
      "type_nodes": 8723,
      "type_versions": 1242,
-     "wasm_bytes": 4502
+     "wasm_bytes": 4505
     }
    ],
-   "wasm_bytes": 4502,
-   "wasm_sha256": "63116c10c069dc9d8faee573ef479ed5f96ea5a1fbc911a367d01e4ab7283b7c"
+   "wasm_bytes": 4505,
+   "wasm_sha256": "54b884fa264baa9cf73800155f60bbb1481079b9aff9bfdd523537721b6a091f"
   },
-  "nominal/compiler-binary-type-call.blot": {
+  "nominal/compiler-binary-type-call.sq": {
    "exit": 0,
    "records": [
     {
@@ -3728,24 +3728,24 @@
      "core_nodes": 1630,
      "effect_rows": 3614,
      "emitted_functions": 32,
-     "filename": "nominal/compiler-binary-type-call.blot",
+     "filename": "nominal/compiler-binary-type-call.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 850,
-     "source_bytes": 27184,
+     "source_bytes": 27185,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4177,
      "type_nodes": 8732,
      "type_versions": 1243,
-     "wasm_bytes": 4235
+     "wasm_bytes": 4236
     }
    ],
-   "wasm_bytes": 4235,
-   "wasm_sha256": "9c330713ef7e21d92f95a360c7db148d0cc30fafeb48b0e927e339c9a2edf787"
+   "wasm_bytes": 4236,
+   "wasm_sha256": "a33f6c25549dce06c2830de074ceff59a60789eb9bb3e20dbb885ecf8c8597af"
   },
-  "nominal/generic-fields-and-associated.blot": {
+  "nominal/generic-fields-and-associated.sq": {
    "exit": 0,
    "records": [
     {
@@ -3768,30 +3768,30 @@
      "core_nodes": 1658,
      "effect_rows": 3653,
      "emitted_functions": 38,
-     "filename": "nominal/generic-fields-and-associated.blot",
+     "filename": "nominal/generic-fields-and-associated.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 860,
-     "source_bytes": 27630,
+     "source_bytes": 27631,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4239,
      "type_nodes": 8852,
      "type_versions": 1265,
-     "wasm_bytes": 4584
+     "wasm_bytes": 4585
     }
    ],
-   "wasm_bytes": 4584,
-   "wasm_sha256": "a4be12071a4300362af6d827a42c5891592c9fccc1cb67faf5e97e5d12065405"
+   "wasm_bytes": 4585,
+   "wasm_sha256": "e536da35fb8129dd8649d39c6179e414d47b81867aa81ad4a3aa81ecf17e0a9e"
   },
-  "nominal/left-result-conflict.blot": {
+  "nominal/left-result-conflict.sq": {
    "exit": 1,
    "records": [
     {
      "code": "type_mismatch",
      "end": 414,
-     "filename": "nominal/left-result-conflict.blot",
+     "filename": "nominal/left-result-conflict.sq",
      "kind": "diagnostic",
      "message": "Types do not match; one side: F32; other side: U32",
      "stage": "check-project",
@@ -3817,12 +3817,12 @@
      "core_nodes": 0,
      "effect_rows": 3634,
      "emitted_functions": 0,
-     "filename": "nominal/left-result-conflict.blot",
+     "filename": "nominal/left-result-conflict.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 853,
-     "source_bytes": 27400,
+     "source_bytes": 27401,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4202,
@@ -3832,7 +3832,7 @@
     }
    ]
   },
-  "nominal/ordered-right-fallback.blot": {
+  "nominal/ordered-right-fallback.sq": {
    "exit": 1,
    "records": [
     {
@@ -3871,7 +3871,7 @@
      },
      "end": 407,
      "expected_token": null,
-     "filename": "nominal/ordered-right-fallback.blot",
+     "filename": "nominal/ordered-right-fallback.sq",
      "kind": "diagnostic",
      "message": "No compatible associated implementation exists",
      "offset_encoding": "utf8_bytes",
@@ -3902,12 +3902,12 @@
      "core_nodes": 0,
      "effect_rows": 3634,
      "emitted_functions": 0,
-     "filename": "nominal/ordered-right-fallback.blot",
+     "filename": "nominal/ordered-right-fallback.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 851,
-     "source_bytes": 27393,
+     "source_bytes": 27394,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4201,
@@ -3917,7 +3917,7 @@
     }
    ]
   },
-  "packed_input_oom.blot": {
+  "packed_input_oom.sq": {
    "exit": 0,
    "records": [
     {
@@ -3940,30 +3940,30 @@
      "core_nodes": 1717,
      "effect_rows": 3679,
      "emitted_functions": 33,
-     "filename": "packed_input_oom.blot",
+     "filename": "packed_input_oom.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 868,
-     "source_bytes": 27712,
+     "source_bytes": 27713,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4291,
      "type_nodes": 8976,
      "type_versions": 1295,
-     "wasm_bytes": 5360
+     "wasm_bytes": 5363
     }
    ],
-   "wasm_bytes": 5360,
-   "wasm_sha256": "0682b7ff546d080cd49f0d8e1ee055f3f8b0a9f2ac481bc630277ccb47ed45b2"
+   "wasm_bytes": 5363,
+   "wasm_sha256": "5ff4468d214e1e11a3ac6b9d1822c5f6e3f1c6871dadb75135562ba9dd42fc66"
   },
-  "partial-runtime-fixtures/a.blot": {
+  "partial-runtime-fixtures/a.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "partial-runtime-fixtures/a.blot",
+     "filename": "partial-runtime-fixtures/a.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -3989,54 +3989,7 @@
      "core_nodes": 1625,
      "effect_rows": 3602,
      "emitted_functions": 0,
-     "filename": "partial-runtime-fixtures/a.blot",
-     "files": 2,
-     "imported_schemes": 24,
-     "kind": "compilation",
-     "row_versions": 847,
-     "source_bytes": 27070,
-     "stage": "build-project",
-     "success": false,
-     "syntax_nodes": 4160,
-     "type_nodes": 8700,
-     "type_versions": 1238,
-     "wasm_bytes": 0
-    }
-   ]
-  },
-  "partial-runtime-fixtures/b.blot": {
-   "exit": 1,
-   "records": [
-    {
-     "code": "no_entry",
-     "end": 0,
-     "filename": "partial-runtime-fixtures/b.blot",
-     "kind": "diagnostic",
-     "message": "A build requires at least one io, #kernel, or #process declaration",
-     "stage": "emit",
-     "start": 0
-    },
-    {
-     "body_elaborations": 382,
-     "body_lowerings": 382,
-     "check_occurs_steps": 2869,
-     "checker": {
-      "associated_steps": 0,
-      "inference_steps": 5416,
-      "instantiations": 373,
-      "memo_declined": 0,
-      "memo_hits": 0,
-      "memo_misses": 3,
-      "obligations_appended": 56,
-      "pending_peak": 56,
-      "projection_memo_hits": 0,
-      "shared_uses": 3,
-      "use_expansions": 3
-     },
-     "core_nodes": 1625,
-     "effect_rows": 3602,
-     "emitted_functions": 0,
-     "filename": "partial-runtime-fixtures/b.blot",
+     "filename": "partial-runtime-fixtures/a.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
@@ -4051,7 +4004,54 @@
     }
    ]
   },
-  "partial-runtime-fixtures/namespace-ab.blot": {
+  "partial-runtime-fixtures/b.sq": {
+   "exit": 1,
+   "records": [
+    {
+     "code": "no_entry",
+     "end": 0,
+     "filename": "partial-runtime-fixtures/b.sq",
+     "kind": "diagnostic",
+     "message": "A build requires at least one io, #kernel, or #process declaration",
+     "stage": "emit",
+     "start": 0
+    },
+    {
+     "body_elaborations": 382,
+     "body_lowerings": 382,
+     "check_occurs_steps": 2869,
+     "checker": {
+      "associated_steps": 0,
+      "inference_steps": 5416,
+      "instantiations": 373,
+      "memo_declined": 0,
+      "memo_hits": 0,
+      "memo_misses": 3,
+      "obligations_appended": 56,
+      "pending_peak": 56,
+      "projection_memo_hits": 0,
+      "shared_uses": 3,
+      "use_expansions": 3
+     },
+     "core_nodes": 1625,
+     "effect_rows": 3602,
+     "emitted_functions": 0,
+     "filename": "partial-runtime-fixtures/b.sq",
+     "files": 2,
+     "imported_schemes": 24,
+     "kind": "compilation",
+     "row_versions": 847,
+     "source_bytes": 27072,
+     "stage": "build-project",
+     "success": false,
+     "syntax_nodes": 4160,
+     "type_nodes": 8700,
+     "type_versions": 1238,
+     "wasm_bytes": 0
+    }
+   ]
+  },
+  "partial-runtime-fixtures/namespace-ab.sq": {
    "exit": 0,
    "records": [
     {
@@ -4074,24 +4074,24 @@
      "core_nodes": 1695,
      "effect_rows": 3804,
      "emitted_functions": 50,
-     "filename": "partial-runtime-fixtures/namespace-ab.blot",
+     "filename": "partial-runtime-fixtures/namespace-ab.sq",
      "files": 4,
      "imported_schemes": 74,
      "kind": "compilation",
      "row_versions": 871,
-     "source_bytes": 27761,
+     "source_bytes": 27762,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4267,
      "type_nodes": 9247,
      "type_versions": 1256,
-     "wasm_bytes": 5775
+     "wasm_bytes": 5778
     }
    ],
-   "wasm_bytes": 5775,
-   "wasm_sha256": "d3b67f315885aa75f93679ec19e1a62c018b65dca8c966de1a2c75b717d62582"
+   "wasm_bytes": 5778,
+   "wasm_sha256": "f80eabff665c7de366809a02f87ec17f534c1feac9004201f246918a9ca3e2a9"
   },
-  "primitive-aliases.blot": {
+  "primitive-aliases.sq": {
    "exit": 0,
    "records": [
     {
@@ -4114,24 +4114,24 @@
      "core_nodes": 2098,
      "effect_rows": 4710,
      "emitted_functions": 83,
-     "filename": "primitive-aliases.blot",
+     "filename": "primitive-aliases.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 1100,
-     "source_bytes": 32112,
+     "source_bytes": 32113,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 5007,
      "type_nodes": 10536,
      "type_versions": 1521,
-     "wasm_bytes": 13266
+     "wasm_bytes": 13273
     }
    ],
-   "wasm_bytes": 13266,
-   "wasm_sha256": "448a59561bac1a781165d955a75b6f2a975773a5a3fbaa7e1cc25de18a13922b"
+   "wasm_bytes": 13273,
+   "wasm_sha256": "8e97cfa5c3b8ac0b69e219528d76dbf6a14ee7bf352bc36b656977beef947610"
   },
-  "qualified-row-fixtures/associated-direct.blot": {
+  "qualified-row-fixtures/associated-direct.sq": {
    "exit": 0,
    "records": [
     {
@@ -4154,24 +4154,24 @@
      "core_nodes": 1658,
      "effect_rows": 3645,
      "emitted_functions": 38,
-     "filename": "qualified-row-fixtures/associated-direct.blot",
+     "filename": "qualified-row-fixtures/associated-direct.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 861,
-     "source_bytes": 27581,
+     "source_bytes": 27582,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4247,
      "type_nodes": 8793,
      "type_versions": 1255,
-     "wasm_bytes": 4728
+     "wasm_bytes": 4731
     }
    ],
-   "wasm_bytes": 4728,
-   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
+   "wasm_bytes": 4731,
+   "wasm_sha256": "123232b9af8fce290774905f8d7d3cc714f08c18bc97bbbbf9a17d52c9f2db9f"
   },
-  "qualified-row-fixtures/associated.blot": {
+  "qualified-row-fixtures/associated.sq": {
    "exit": 0,
    "records": [
     {
@@ -4194,24 +4194,24 @@
      "core_nodes": 1658,
      "effect_rows": 3649,
      "emitted_functions": 38,
-     "filename": "qualified-row-fixtures/associated.blot",
+     "filename": "qualified-row-fixtures/associated.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 861,
-     "source_bytes": 27566,
+     "source_bytes": 27567,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4243,
      "type_nodes": 8800,
      "type_versions": 1255,
-     "wasm_bytes": 4728
+     "wasm_bytes": 4731
     }
    ],
-   "wasm_bytes": 4728,
-   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
+   "wasm_bytes": 4731,
+   "wasm_sha256": "123232b9af8fce290774905f8d7d3cc714f08c18bc97bbbbf9a17d52c9f2db9f"
   },
-  "qualified-row-fixtures/reject-effectful.blot": {
+  "qualified-row-fixtures/reject-effectful.sq": {
    "exit": 0,
    "records": [
     {
@@ -4234,24 +4234,24 @@
      "core_nodes": 1661,
      "effect_rows": 3656,
      "emitted_functions": 39,
-     "filename": "qualified-row-fixtures/reject-effectful.blot",
+     "filename": "qualified-row-fixtures/reject-effectful.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 862,
-     "source_bytes": 27580,
+     "source_bytes": 27581,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4247,
      "type_nodes": 8804,
      "type_versions": 1256,
-     "wasm_bytes": 4777
+     "wasm_bytes": 4780
     }
    ],
-   "wasm_bytes": 4777,
-   "wasm_sha256": "85d0a0fc97d2eda1344ad3f596ec917ace452cb870d8b898e89241c006242dea"
+   "wasm_bytes": 4780,
+   "wasm_sha256": "20ae9e66fa5fa7718cea6d0f6bf7e2c08a962053ecc0952883e93abeb1c0720d"
   },
-  "qualified-row-fixtures/reject-pure.blot": {
+  "qualified-row-fixtures/reject-pure.sq": {
    "exit": 0,
    "records": [
     {
@@ -4274,24 +4274,24 @@
      "core_nodes": 1658,
      "effect_rows": 3650,
      "emitted_functions": 38,
-     "filename": "qualified-row-fixtures/reject-pure.blot",
+     "filename": "qualified-row-fixtures/reject-pure.sq",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
      "row_versions": 861,
-     "source_bytes": 27570,
+     "source_bytes": 27571,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4244,
      "type_nodes": 8800,
      "type_versions": 1255,
-     "wasm_bytes": 4728
+     "wasm_bytes": 4731
     }
    ],
-   "wasm_bytes": 4728,
-   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
+   "wasm_bytes": 4731,
+   "wasm_sha256": "123232b9af8fce290774905f8d7d3cc714f08c18bc97bbbbf9a17d52c9f2db9f"
   },
-  "result_selected_operand.blot": {
+  "result_selected_operand.sq": {
    "exit": 0,
    "records": [
     {
@@ -4314,24 +4314,24 @@
      "core_nodes": 1682,
      "effect_rows": 3787,
      "emitted_functions": 43,
-     "filename": "result_selected_operand.blot",
+     "filename": "result_selected_operand.sq",
      "files": 2,
      "imported_schemes": 54,
      "kind": "compilation",
      "row_versions": 891,
-     "source_bytes": 27831,
+     "source_bytes": 27832,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4272,
      "type_nodes": 9118,
      "type_versions": 1305,
-     "wasm_bytes": 5173
+     "wasm_bytes": 5176
     }
    ],
-   "wasm_bytes": 5173,
-   "wasm_sha256": "5ff91af7b5d27a95250a2fc657be41568f7090ecde0f175c37a726eb6839d819"
+   "wasm_bytes": 5176,
+   "wasm_sha256": "d2cf8d61b39c6464f977293eee906c919fb386660718242a13858d67fd6dde8c"
   },
-  "scoped-loop-cleanup.blot": {
+  "scoped-loop-cleanup.sq": {
    "exit": 0,
    "records": [
     {
@@ -4354,24 +4354,24 @@
      "core_nodes": 1962,
      "effect_rows": 3707,
      "emitted_functions": 53,
-     "filename": "scoped-loop-cleanup.blot",
+     "filename": "scoped-loop-cleanup.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 896,
-     "source_bytes": 30059,
+     "source_bytes": 30060,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4718,
      "type_nodes": 8980,
      "type_versions": 1306,
-     "wasm_bytes": 9595
+     "wasm_bytes": 9601
     }
    ],
-   "wasm_bytes": 9595,
-   "wasm_sha256": "7d5c678727d33e8968c3dd4bf966dc8e480a15ab31015950eeb3d5c59301f1f9"
+   "wasm_bytes": 9601,
+   "wasm_sha256": "4246b0e3268c63b7568781479b8ccf5a85cb67b25c59470c40f09e06b69cc546"
   },
-  "scoped-loop-refinement.blot": {
+  "scoped-loop-refinement.sq": {
    "exit": 0,
    "records": [
     {
@@ -4394,30 +4394,30 @@
      "core_nodes": 2864,
      "effect_rows": 4875,
      "emitted_functions": 47,
-     "filename": "scoped-loop-refinement.blot",
+     "filename": "scoped-loop-refinement.sq",
      "files": 4,
      "imported_schemes": 116,
      "kind": "compilation",
      "row_versions": 1297,
-     "source_bytes": 40531,
+     "source_bytes": 40534,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 6153,
      "type_nodes": 12883,
      "type_versions": 1756,
-     "wasm_bytes": 10783
+     "wasm_bytes": 10790
     }
    ],
-   "wasm_bytes": 10783,
-   "wasm_sha256": "21c9aab9b12ce4cfd70e90ac7ad13ec2baa8258bfef939124f445e120a5967ab"
+   "wasm_bytes": 10790,
+   "wasm_sha256": "c9855e4877a7092d09c603a17f2e25e5cca1051152933f7a38633cf5ac289b03"
   },
-  "scoped-opaque/facade.blot": {
+  "scoped-opaque/facade.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "scoped-opaque/facade.blot",
+     "filename": "scoped-opaque/facade.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -4443,12 +4443,12 @@
      "core_nodes": 1646,
      "effect_rows": 3686,
      "emitted_functions": 0,
-     "filename": "scoped-opaque/facade.blot",
+     "filename": "scoped-opaque/facade.sq",
      "files": 3,
      "imported_schemes": 48,
      "kind": "compilation",
      "row_versions": 852,
-     "source_bytes": 27666,
+     "source_bytes": 27667,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4238,
@@ -4458,7 +4458,7 @@
     }
    ]
   },
-  "scoped-opaque/main.blot": {
+  "scoped-opaque/main.sq": {
    "exit": 0,
    "records": [
     {
@@ -4481,30 +4481,30 @@
      "core_nodes": 1810,
      "effect_rows": 3911,
      "emitted_functions": 39,
-     "filename": "scoped-opaque/main.blot",
+     "filename": "scoped-opaque/main.sq",
      "files": 4,
      "imported_schemes": 77,
      "kind": "compilation",
      "row_versions": 906,
-     "source_bytes": 29417,
+     "source_bytes": 29418,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4530,
      "type_nodes": 9822,
      "type_versions": 1348,
-     "wasm_bytes": 6819
+     "wasm_bytes": 6825
     }
    ],
-   "wasm_bytes": 6819,
-   "wasm_sha256": "655ef739e1ddea763b76440d8625ec4850299276ca375c3286f79db69b6d11b1"
+   "wasm_bytes": 6825,
+   "wasm_sha256": "d35ad68376fcce021ba2c2e40bf672d2c756864330c5208b64e81563e62b79a3"
   },
-  "scoped-opaque/tokens.blot": {
+  "scoped-opaque/tokens.sq": {
    "exit": 1,
    "records": [
     {
      "code": "no_entry",
      "end": 0,
-     "filename": "scoped-opaque/tokens.blot",
+     "filename": "scoped-opaque/tokens.sq",
      "kind": "diagnostic",
      "message": "A build requires at least one io, #kernel, or #process declaration",
      "stage": "emit",
@@ -4530,12 +4530,12 @@
      "core_nodes": 1646,
      "effect_rows": 3624,
      "emitted_functions": 0,
-     "filename": "scoped-opaque/tokens.blot",
+     "filename": "scoped-opaque/tokens.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 852,
-     "source_bytes": 27592,
+     "source_bytes": 27593,
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 4230,
@@ -4545,7 +4545,7 @@
     }
    ]
   },
-  "staged_catalog.blot": {
+  "staged_catalog.sq": {
    "exit": 0,
    "records": [
     {
@@ -4568,22 +4568,22 @@
      "core_nodes": 1643,
      "effect_rows": 3610,
      "emitted_functions": 32,
-     "filename": "staged_catalog.blot",
+     "filename": "staged_catalog.sq",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
      "row_versions": 852,
-     "source_bytes": 27245,
+     "source_bytes": 27246,
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 4194,
      "type_nodes": 8738,
      "type_versions": 1246,
-     "wasm_bytes": 4281
+     "wasm_bytes": 4284
     }
    ],
-   "wasm_bytes": 4281,
-   "wasm_sha256": "0d33e76ba8544d65d949cf3ccfd550b7cedc59db1694437d84db83d17aea4dd8"
+   "wasm_bytes": 4284,
+   "wasm_sha256": "4d7a50d86b73a79aff84db1e2ea5ee97ac9b75f8174cf91e3c80bf9878123702"
   }
  }
 }

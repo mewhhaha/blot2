@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build the Blot compiler written in Goose: compiler-goose/build/blotc-goose.
+# Build the Squid compiler written in Goose: compiler-goose/build/squidc-goose.
 # Development builds prefer ../goose-to-wasm/build/bin/goosew when present
 # (~6s emit, ~48s total). Release builds default to the patched upstream C++
 # Goose compiler (faster emitted binary + runtime allocation observer hooks).

@@ -8,7 +8,7 @@ import type { NativeAssetOptions } from "../../host/native_assets.ts";
 import { fileURLToPath } from "node:url";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 function success(result: ZigProjectBuildResult) {
   ok(result.success, JSON.stringify(result));
   return result;
@@ -23,7 +23,7 @@ async function answer(result: ZigProjectBuildResult, name = "answer") {
 }
 Deno.test("native asset modules execute retained edits rejection recovery and copied overlays", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const source =
     'import * as config from "./config.json"\nio const answer = func () => return @u32.add (config.value).offset (config.value).items[1].value\n';
   const original = '{"offset":20,"items":[{"value":10},{"value":22}]}';
@@ -70,7 +70,7 @@ Deno.test("native asset modules execute retained edits rejection recovery and co
     equal(recovered.bytes, first.bytes);
     equal(await answer(recovered), 42);
     await rejects(
-      Deno.stat(directory + "/config.json.blot"),
+      Deno.stat(directory + "/config.json.sq"),
       Deno.errors.NotFound,
     );
     await compiler.close();
@@ -81,7 +81,7 @@ Deno.test("native asset modules execute retained edits rejection recovery and co
 });
 Deno.test("native references publish deterministic handles and independent binary snapshots", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const source =
     'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nio const answer = func () => return do:\n  let $a.Content handle = a.content\n  break handle\n';
   const compiler = await createCompiler({
@@ -152,7 +152,7 @@ async function peer(mode: string) {
   await Deno.chmod(executable, 0o755);
   const options = {
     executable,
-    entry: directory + "/entry.blot",
+    entry: directory + "/entry.sq",
     prelude: null,
     nativeAssets: { imports: [] },
   };
@@ -205,7 +205,7 @@ Deno.test("native client captures definitions and queued raw/source partitions b
     const open = records.find((item) => item.kind === "open");
     equal(
       open.nativeAssets.imports[0].module,
-      fixture.directory + "/config.json.blot",
+      fixture.directory + "/config.json.sq",
     );
     equal(
       open.nativeAssets.imports[0].path,
@@ -274,7 +274,7 @@ for (
 }
 Deno.test("native roots discover four readers and refresh membership before retained admission", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   await Deno.mkdir(directory + "/assets");
   await Deno.writeTextFile(
     directory + "/assets/catalog.json",

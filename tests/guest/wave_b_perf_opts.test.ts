@@ -3,8 +3,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url);
 const stdRoot = new URL("../../std", import.meta.url);
 
 async function compileAndRun(
@@ -14,8 +14,8 @@ async function compileAndRun(
     bytes: Uint8Array,
   ) => void | Promise<void>,
 ): Promise<void> {
-  const dir = await Deno.makeTempDir({ prefix: "blot-wave-b-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-wave-b-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -323,8 +323,8 @@ io test_ast (d: U32): U32 =>
     },
   );
   // Passing a static const array to an `own` external worker param must be rejected at compile time.
-  const dir = await Deno.makeTempDir({ prefix: "blot-wave-b-frozen-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-wave-b-frozen-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

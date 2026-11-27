@@ -59,10 +59,10 @@ io const update_snapshot = func (count: U32): U32 => return do:
 `;
 
 Deno.test("allocation cost matrix programs keep equivalent results in both tiers", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-cost-matrix-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-cost-matrix-" });
+  const entry = `${directory}/main.sq`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   const run = (bytes: Uint8Array<ArrayBuffer>, name: string, input: number) => {
     const exports =
       new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
@@ -73,7 +73,7 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
         stdRoot: new URL("../../std", import.meta.url),
       });
       try {

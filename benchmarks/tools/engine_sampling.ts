@@ -50,7 +50,7 @@ export async function createSampledCompiler(
   await Deno.remove(`${output}/sampling-window.json`).catch((error) => {
     if (!(error instanceof Deno.errors.NotFound)) throw error;
   });
-  const wrapper = `${output}/blotc-ptracer`;
+  const wrapper = `${output}/squidc-ptracer`;
   await Deno.writeTextFile(
     wrapper,
     `#!/usr/bin/env python3

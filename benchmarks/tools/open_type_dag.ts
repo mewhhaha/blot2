@@ -1,5 +1,5 @@
 // Unused generic signatures share an open DAG; only checking grows with depth.
-// deno run -A benchmarks/tools/open_type_dag.ts --blotc PATH [--depths 8,12,16,20]
+// deno run -A benchmarks/tools/open_type_dag.ts --squidc PATH [--depths 8,12,16,20]
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -7,7 +7,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const options = new Map<string, string>();
 for (let at = 0; at < Deno.args.length; at++) {
   const key = Deno.args[at];
-  if (!["--blotc", "--depths", "--timeout-ms"].includes(key)) {
+  if (!["--squidc", "--depths", "--timeout-ms"].includes(key)) {
     throw new Error(`Unexpected argument: ${key}`);
   }
   const value = Deno.args[++at];
@@ -25,9 +25,9 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 5000) {
 }
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const executable = resolve(
-  options.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
+  options.get("--squidc") ?? `${repo}/compiler-goose/build/squidc-goose-dev`,
 );
-const entry = `${repo}/build/bench/open-type-dag.blot`;
+const entry = `${repo}/build/bench/open-type-dag.sq`;
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(
     (byte) => byte.toString(16).padStart(2, "0"),
@@ -58,7 +58,7 @@ for (const depth of depths) {
       executable,
       entry,
       stdRoot: `${repo}/std`,
-      prelude: `${repo}/std/prelude.blot`,
+      prelude: `${repo}/std/prelude.sq`,
       startupTimeoutMs: timeoutMs,
       profileBackend: true,
     });

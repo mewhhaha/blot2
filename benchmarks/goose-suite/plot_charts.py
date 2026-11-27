@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Generate clean editorial SVG bar charts for the 16-benchmark Goose suite + Blot.
+"""Generate clean editorial SVG bar charts for the 16-benchmark Goose suite + Squid.
 
 Reads `benchmarks/evidence/measurements/2026-11-26-goose-suite/results.json`
 and writes publication-ready SVG bar charts into the same directory:
-  - summary_overview.svg      (geomean runtime, peak RSS, compile speed + 16-bench Blot vs idiomatic C++)
+  - summary_overview.svg      (geomean runtime, peak RSS, compile speed + 16-bench Squid vs idiomatic C++)
   - runtime_part1.svg         (wall-clock ms, benchmarks 1-8)
   - runtime_part2.svg         (wall-clock ms, benchmarks 9-16)
   - memory_part1.svg          (exact per-process peak RSS MiB, benchmarks 1-8)
   - memory_part2.svg          (exact per-process peak RSS MiB, benchmarks 9-16)
-  - compile_and_size.svg      (cold compile ms across all 16 + Blot .wasm sizes)
+  - compile_and_size.svg      (cold compile ms across all 16 + Squid .wasm sizes)
 """
 
 from __future__ import annotations
@@ -34,8 +34,8 @@ TEXT_MUTED = "#64748b"
 GRID = "#f1f5f9"
 AXIS = "#cbd5e1"
 
-C_BLOT = "#0f766e"       # Blot deep teal
-C_BLOT_AOT = "#2dd4bf"   # Blot wtime-aot light teal (stacked compile bar)
+C_SQUID = "#0f766e"       # Squid deep teal
+C_SQUID_AOT = "#2dd4bf"   # Squid wtime-aot light teal (stacked compile bar)
 C_GOOSE = "#2563eb"      # Goose cobalt blue
 C_RUST_EXP = "#c2592b"   # Rust expert / arena terracotta
 C_RUST_ID = "#e69f73"    # Rust idiomatic warm sand
@@ -55,26 +55,26 @@ BENCH_ORDER = [
 ]
 
 SHORT_LABELS = {
-    # Blot
-    "blot grow array": "Blot",
-    "blot array+reserve, indices": "Blot",
-    "blot packed bytes + offsets": "Blot",
-    "blot packed records + text pool": "Blot",
-    "blot arena + indices": "Blot",
-    "blot arena + tag dispatch": "Blot",
-    "blot CSR two-pass": "Blot",
-    "blot packed bytes + open addressing": "Blot",
-    "blot AoS, per component": "Blot",
-    "blot SoA, 4-wide SIMD": "Blot (SIMD)",
-    "blot 8B arena + packed text": "Blot",
-    "blot open addressing + arena": "Blot",
-    "blot arena + inline transforms": "Blot",
-    "blot arena + error codes": "Blot",
-    "blot arena per tree": "Blot",
-    "blot streaming": "Blot",
-    "blot sliding 3-col": "Blot",
-    "blot sliding 3-col, #[U8]": "Blot",
-    "blot 16-wide U8x16 SIMD": "Blot (SIMD)",
+    # Squid
+    "squid grow array": "Squid",
+    "squid array+reserve, indices": "Squid",
+    "squid packed bytes + offsets": "Squid",
+    "squid packed records + text pool": "Squid",
+    "squid arena + indices": "Squid",
+    "squid arena + tag dispatch": "Squid",
+    "squid CSR two-pass": "Squid",
+    "squid packed bytes + open addressing": "Squid",
+    "squid AoS, per component": "Squid",
+    "squid SoA, 4-wide SIMD": "Squid (SIMD)",
+    "squid 8B arena + packed text": "Squid",
+    "squid open addressing + arena": "Squid",
+    "squid arena + inline transforms": "Squid",
+    "squid arena + error codes": "Squid",
+    "squid arena per tree": "Squid",
+    "squid streaming": "Squid",
+    "squid sliding 3-col": "Squid",
+    "squid sliding 3-col, #[U8]": "Squid",
+    "squid 16-wide U8x16 SIMD": "Squid (SIMD)",
     # Goose
     "goose grow-only array": "Goose",
     "goose array, typed references": "Goose",
@@ -245,8 +245,8 @@ def fmt_mb(v: float) -> str:
 
 def row_color(label: str, r: dict, rust_count: int) -> str:
     kind = r["kind"]
-    if kind == "blot":
-        return C_BLOT
+    if kind == "squid":
+        return C_SQUID
     if kind == "goose":
         return C_GOOSE
     if kind == "cpp":
@@ -259,19 +259,19 @@ def row_color(label: str, r: dict, rust_count: int) -> str:
 
 def pick_tier_rows(rows: dict[str, dict]) -> dict[str, tuple[str, dict]]:
     """Extract canonical single representative per tier for summary geomeans."""
-    blot_rows = [(k, v) for k, v in rows.items() if v["kind"] == "blot" and v.get("ok")]
+    squid_rows = [(k, v) for k, v in rows.items() if v["kind"] == "squid" and v.get("ok")]
     goose_rows = [(k, v) for k, v in rows.items() if v["kind"] == "goose" and v.get("ok")]
     cpp_exp = [(k, v) for k, v in rows.items() if v["kind"] == "cpp" and v.get("tier") == "expert" and v.get("ok")]
     cpp_id = [(k, v) for k, v in rows.items() if v["kind"] == "cpp" and v.get("tier") == "idiomatic" and v.get("ok")]
     rust_rows = [(k, v) for k, v in rows.items() if v["kind"] == "rust" and v.get("ok")]
 
-    # When Goose has 2 rows (respond: inline DTO + streaming), pick streaming for fair apples-to-apples with Blot/C++ expert/Rust expert,
+    # When Goose has 2 rows (respond: inline DTO + streaming), pick streaming for fair apples-to-apples with Squid/C++ expert/Rust expert,
     # or fastest Goose row.
     goose_pick = min(goose_rows, key=lambda kv: kv[1]["ms"])
     rust_exp = rust_rows[-1]  # expert/arena row is listed second when 2 exist
     rust_id = rust_rows[0]    # idiomatic row is listed first (same as exp when 1 exists)
     return {
-        "blot": blot_rows[0],
+        "squid": squid_rows[0],
         "goose": goose_pick,
         "cpp_exp": cpp_exp[0],
         "cpp_id": cpp_id[0],
@@ -282,11 +282,11 @@ def pick_tier_rows(rows: dict[str, dict]) -> dict[str, tuple[str, dict]]:
 
 def build_summary_overview(data: dict, size: str) -> str:
     benches = data["benchmarks"]
-    tiers = ["blot", "goose", "rust_exp", "rust_id", "cpp_exp", "cpp_id"]
+    tiers = ["squid", "goose", "rust_exp", "rust_id", "cpp_exp", "cpp_id"]
     time_ratios = {t: [] for t in tiers}
     mem_ratios = {t: [] for t in tiers}
-    compile_ms = {"blot": [], "goose": [], "rust": [], "cpp": []}
-    blot_vs_cpp_id = []  # (name, time_ratio, mem_ratio)
+    compile_ms = {"squid": [], "goose": [], "rust": [], "cpp": []}
+    squid_vs_cpp_id = []  # (name, time_ratio, mem_ratio)
 
     for bname in BENCH_ORDER:
         rows = benches[bname]["sizes"][size]["rows"]
@@ -296,19 +296,19 @@ def build_summary_overview(data: dict, size: str) -> str:
         for t in tiers:
             time_ratios[t].append(picks[t][1]["ms"] / base_t)
             mem_ratios[t].append(picks[t][1]["peak_mb"] / base_m)
-        compile_ms["blot"].append(picks["blot"][1]["compile_ms"])
+        compile_ms["squid"].append(picks["squid"][1]["compile_ms"])
         compile_ms["goose"].append(picks["goose"][1]["compile_ms"])
         compile_ms["rust"].append(picks["rust_exp"][1]["compile_ms"])
         compile_ms["cpp"].append(picks["cpp_exp"][1]["compile_ms"])
-        blot_vs_cpp_id.append((
+        squid_vs_cpp_id.append((
             bname,
-            picks["blot"][1]["ms"] / picks["cpp_id"][1]["ms"],
-            picks["blot"][1]["peak_mb"] / picks["cpp_id"][1]["peak_mb"],
+            picks["squid"][1]["ms"] / picks["cpp_id"][1]["ms"],
+            picks["squid"][1]["peak_mb"] / picks["cpp_id"][1]["peak_mb"],
         ))
 
     w, h = 960, 770
-    els = svg_header(w, h, "16-benchmark suite summary: Blot vs Goose, Rust, and C++")
-    els.append(text(28, 36, "16-Benchmark Suite: Blot vs Goose, Rust & C++", size=20, weight="700"))
+    els = svg_header(w, h, "16-benchmark suite summary: Squid vs Goose, Rust, and C++")
+    els.append(text(28, 36, "16-Benchmark Suite: Squid vs Goose, Rust & C++", size=20, weight="700"))
     meta = data["meta"]
     els.append(
         text(
@@ -337,19 +337,19 @@ def build_summary_overview(data: dict, size: str) -> str:
             ("Rust expert", geomean(time_ratios["rust_exp"]), C_RUST_EXP, False),
             ("Rust idiomatic", geomean(time_ratios["rust_id"]), C_RUST_ID, False),
             ("C++ idiomatic", geomean(time_ratios["cpp_id"]), C_CPP_ID, False),
-            ("Blot (wtime-aot)", geomean(time_ratios["blot"]), C_BLOT, True),
+            ("Squid (wtime-aot)", geomean(time_ratios["squid"]), C_SQUID, True),
         ],
         key=lambda x: x[1],
     )
     rmax = max(v for _, v, _, _ in rt_bars)
     bx, bmax = cx1 + 114, 114.0
-    for i, (lbl, val, col, is_blot) in enumerate(rt_bars):
+    for i, (lbl, val, col, is_squid) in enumerate(rt_bars):
         by = cy0 + 54 + i * 27
         bw = max(4.0, (val / rmax) * bmax)
-        els.append(text(cx1 + 14, by + 13, lbl, size=10.5, weight="700" if is_blot else "500", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(cx1 + 14, by + 13, lbl, size=10.5, weight="700" if is_squid else "500", fill=C_SQUID if is_squid else TEXT_MAIN))
         els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bmax:.1f}" height="17" rx="3.5" fill="{GRID}"/>')
         els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bw:.1f}" height="17" rx="3.5" fill="{col}"/>')
-        els.append(text(bx + bw + 6, by + 13, f"{val:.2f}×", size=10.5, weight="700" if is_blot else "600", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(bx + bw + 6, by + 13, f"{val:.2f}×", size=10.5, weight="700" if is_squid else "600", fill=C_SQUID if is_squid else TEXT_MAIN))
 
     # --- Card 2: Geomean Peak RSS ---
     cx2 = cx1 + card_w + gap
@@ -364,32 +364,32 @@ def build_summary_overview(data: dict, size: str) -> str:
             ("Rust expert", geomean(mem_ratios["rust_exp"]), C_RUST_EXP, False),
             ("Rust idiomatic", geomean(mem_ratios["rust_id"]), C_RUST_ID, False),
             ("C++ idiomatic", geomean(mem_ratios["cpp_id"]), C_CPP_ID, False),
-            ("Blot (wtime-aot)", geomean(mem_ratios["blot"]), C_BLOT, True),
+            ("Squid (wtime-aot)", geomean(mem_ratios["squid"]), C_SQUID, True),
         ],
         key=lambda x: x[1],
     )
     mmax = max(v for _, v, _, _ in mem_bars)
     bx2, bmax2 = cx2 + 114, 114.0
-    for i, (lbl, val, col, is_blot) in enumerate(mem_bars):
+    for i, (lbl, val, col, is_squid) in enumerate(mem_bars):
         by = cy0 + 54 + i * 27
         bw = max(4.0, (val / mmax) * bmax2)
-        els.append(text(cx2 + 14, by + 13, lbl, size=10.5, weight="700" if is_blot else "500", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(cx2 + 14, by + 13, lbl, size=10.5, weight="700" if is_squid else "500", fill=C_SQUID if is_squid else TEXT_MAIN))
         els.append(f'  <rect x="{bx2:.1f}" y="{by:.1f}" width="{bmax2:.1f}" height="17" rx="3.5" fill="{GRID}"/>')
         els.append(f'  <rect x="{bx2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="17" rx="3.5" fill="{col}"/>')
-        els.append(text(bx2 + bw + 6, by + 13, f"{val:.2f}×", size=10.5, weight="700" if is_blot else "600", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(bx2 + bw + 6, by + 13, f"{val:.2f}×", size=10.5, weight="700" if is_squid else "600", fill=C_SQUID if is_squid else TEXT_MAIN))
 
     # --- Card 3: Geomean Cold Compile ---
     cx3 = cx2 + card_w + gap
     els.append(f'  <rect x="{cx3}" y="{cy0}" width="{card_w}" height="{card_h}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
     els.append(text(cx3 + 14, cy0 + 24, "Geomean cold compile", size=13.0, weight="700"))
-    gc_blot = geomean(compile_ms["blot"])
+    gc_squid = geomean(compile_ms["squid"])
     gc_cpp = geomean(compile_ms["cpp"])
-    els.append(pill(cx3 + card_w - 12, cy0 + 23, f"{gc_cpp / gc_blot:.1f}× vs C++", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    els.append(pill(cx3 + card_w - 12, cy0 + 23, f"{gc_cpp / gc_squid:.1f}× vs C++", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
     els.append(text(cx3 + 14, cy0 + 40, "Full build to executable / native .so", size=10.2, fill=TEXT_MUTED))
 
     cmp_bars = sorted(
         [
-            ("Blot (+AOT)", gc_blot, C_BLOT, True),
+            ("Squid (+AOT)", gc_squid, C_SQUID, True),
             ("Rust (-O)", geomean(compile_ms["rust"]), C_RUST_EXP, False),
             ("Goose (-O2)", geomean(compile_ms["goose"]), C_GOOSE, False),
             ("C++ (-O2)", gc_cpp, C_CPP_EXP, False),
@@ -398,28 +398,28 @@ def build_summary_overview(data: dict, size: str) -> str:
     )
     cmax = max(v for _, v, _, _ in cmp_bars)
     bx3, bmax3 = cx3 + 98, 122.0
-    for i, (lbl, val, col, is_blot) in enumerate(cmp_bars):
+    for i, (lbl, val, col, is_squid) in enumerate(cmp_bars):
         by = cy0 + 62 + i * 38
         bw = max(4.0, (val / cmax) * bmax3)
-        els.append(text(cx3 + 14, by + 14, lbl, size=10.8, weight="700" if is_blot else "500", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(cx3 + 14, by + 14, lbl, size=10.8, weight="700" if is_squid else "500", fill=C_SQUID if is_squid else TEXT_MAIN))
         els.append(f'  <rect x="{bx3:.1f}" y="{by:.1f}" width="{bmax3:.1f}" height="20" rx="3.5" fill="{GRID}"/>')
         els.append(f'  <rect x="{bx3:.1f}" y="{by:.1f}" width="{bw:.1f}" height="20" rx="3.5" fill="{col}"/>')
-        els.append(text(bx3 + bw + 6, by + 14, f"{val:.0f} ms", size=10.5, weight="700" if is_blot else "600", fill=C_BLOT if is_blot else TEXT_MAIN))
+        els.append(text(bx3 + bw + 6, by + 14, f"{val:.0f} ms", size=10.5, weight="700" if is_squid else "600", fill=C_SQUID if is_squid else TEXT_MAIN))
 
-    # --- Bottom full-width card: All 16 benchmarks Blot vs Idiomatic C++ (Peak RSS & Runtime) ---
+    # --- Bottom full-width card: All 16 benchmarks Squid vs Idiomatic C++ (Peak RSS & Runtime) ---
     by_card = cy0 + card_h + 18
     bh_card = 408
     els.append(f'  <rect x="28" y="{by_card}" width="904" height="{bh_card}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
-    els.append(text(44, by_card + 24, "Blot vs Idiomatic C++ across all 16 benchmarks (log scale, < 1.0× = Blot wins)", size=13.0, weight="700"))
+    els.append(text(44, by_card + 24, "Squid vs Idiomatic C++ across all 16 benchmarks (log scale, < 1.0× = Squid wins)", size=13.0, weight="700"))
 
-    mem_wins = sum(1 for _, _, mr in blot_vs_cpp_id if mr <= 1.0)
-    rt_wins = sum(1 for _, tr, _ in blot_vs_cpp_id if tr <= 1.0)
+    mem_wins = sum(1 for _, _, mr in squid_vs_cpp_id if mr <= 1.0)
+    rt_wins = sum(1 for _, tr, _ in squid_vs_cpp_id if tr <= 1.0)
     els.append(pill(918, by_card + 23, f"Memory: {mem_wins}/16 wins · Runtime: {rt_wins}/16 wins", PILL_NEU_BG, PILL_NEU_FG, anchor="end"))
 
     # Two side-by-side 16-row mini bar panels inside the bottom card: Left = Peak Memory ratio, Right = Runtime ratio
     panel_specs = [
-        ("Peak RSS ratio (Blot / Idiomatic C++)", 44, 1, C_BLOT, "#94a3b8"),
-        ("CPU runtime ratio (Blot / Idiomatic C++)", 494, 0, C_BLOT, "#d97706"),
+        ("Peak RSS ratio (Squid / Idiomatic C++)", 44, 1, C_SQUID, "#94a3b8"),
+        ("CPU runtime ratio (Squid / Idiomatic C++)", 494, 0, C_SQUID, "#d97706"),
     ]
     # Use log2 scale centered on 1.0× (range 0.125× .. 8.0× -> -3 .. +3)
     log_min, log_max = -3.0, 3.0
@@ -438,7 +438,7 @@ def build_summary_overview(data: dict, size: str) -> str:
             els.append(f'  <line x1="{tx:.1f}" y1="{by_card + 56}" x2="{tx:.1f}" y2="{by_card + 382}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
             els.append(text(tx, by_card + 396, tick_lbl, size=9.5, weight="600" if tick_v == 1.0 else "400", fill=TEXT_MUTED, anchor="middle"))
 
-        for row_i, (bname, tr, mr) in enumerate(blot_vs_cpp_id):
+        for row_i, (bname, tr, mr) in enumerate(squid_vs_cpp_id):
             val = tr if idx_col == 0 else mr
             ry = by_card + 62 + row_i * 20
             els.append(text(px, ry + 11.5, bname, size=10.3, weight="500", fill=TEXT_MAIN))
@@ -492,7 +492,7 @@ def build_grid_page(
             28,
             84,
             [
-                (C_BLOT, "Blot (wtime-aot x64)"),
+                (C_SQUID, "Squid (wtime-aot x64)"),
                 (C_GOOSE, "Goose (clang -O2)"),
                 (C_RUST_EXP, "Rust (expert / arena)"),
                 (C_RUST_ID, "Rust (idiomatic)"),
@@ -529,19 +529,19 @@ def build_grid_page(
                 SHORT_LABELS.get(lbl, lbl[:15]),
                 r[metric],
                 row_color(lbl, r, rust_count),
-                r["kind"] == "blot",
+                r["kind"] == "squid",
             ))
         entries.sort(key=lambda e: e[1])
 
-        # Badge showing Blot rank or win vs idiomatic C++
+        # Badge showing Squid rank or win vs idiomatic C++
         picks = pick_tier_rows(rows_map)
-        blot_v = picks["blot"][1][metric]
+        squid_v = picks["squid"][1][metric]
         cpp_id_v = picks["cpp_id"][1][metric]
-        if blot_v <= cpp_id_v:
-            badge = f"Blot {cpp_id_v / blot_v:.2f}× vs idiomatic C++"
+        if squid_v <= cpp_id_v:
+            badge = f"Squid {cpp_id_v / squid_v:.2f}× vs idiomatic C++"
             pbg, pfg = PILL_WIN_BG, PILL_WIN_FG
         else:
-            badge = f"Blot {blot_v / cpp_id_v:.2f}× idiomatic C++"
+            badge = f"Squid {squid_v / cpp_id_v:.2f}× idiomatic C++"
             pbg, pfg = PILL_NEU_BG, PILL_NEU_FG
         els.append(pill(cx + card_w - 10, cy + 21, badge, pbg, pfg, anchor="end"))
         els.append(text(cx + 14, cy + 37, bdata["what"], size=9.8, fill=TEXT_MUTED))
@@ -554,7 +554,7 @@ def build_grid_page(
         bar_h = 14.2 if n_bars >= 7 else (15.5 if n_bars == 6 else 17.0)
         y_first = cy + 48 + (4 if n_bars <= 5 else 0)
 
-        for bi, (short_lbl, val, col_hex, is_blot) in enumerate(entries):
+        for bi, (short_lbl, val, col_hex, is_squid) in enumerate(entries):
             by = y_first + bi * bar_step
             bw = max(3.5, (val / vmax) * bmax_w)
             els.append(
@@ -563,8 +563,8 @@ def build_grid_page(
                     by + bar_h - 3.0,
                     short_lbl,
                     size=10.3,
-                    weight="700" if is_blot else "500",
-                    fill=C_BLOT if is_blot else TEXT_MAIN,
+                    weight="700" if is_squid else "500",
+                    fill=C_SQUID if is_squid else TEXT_MAIN,
                 )
             )
             els.append(f'  <rect x="{bx:.1f}" y="{by:.1f}" width="{bmax_w:.1f}" height="{bar_h:.1f}" rx="3.5" fill="{GRID}"/>')
@@ -576,8 +576,8 @@ def build_grid_page(
                     by + bar_h - 3.0,
                     val_txt,
                     size=10.2,
-                    weight="700" if is_blot else "600",
-                    fill=C_BLOT if is_blot else TEXT_MAIN,
+                    weight="700" if is_squid else "600",
+                    fill=C_SQUID if is_squid else TEXT_MAIN,
                 )
             )
 
@@ -594,13 +594,13 @@ def build_grid_page(
 def build_compile_and_size(data: dict, size: str) -> str:
     benches = data["benchmarks"]
     w, h = 960, 680
-    els = svg_header(w, h, "Cold compile time across all 16 benchmarks and Blot Wasm output size")
-    els.append(text(28, 36, "Cold Compile Time & Blot Wasm Binary Size (All 16 Benchmarks)", size=20, weight="700"))
+    els = svg_header(w, h, "Cold compile time across all 16 benchmarks and Squid Wasm output size")
+    els.append(text(28, 36, "Cold Compile Time & Squid Wasm Binary Size (All 16 Benchmarks)", size=20, weight="700"))
     els.append(
         text(
             28,
             57,
-            "Full clean build from source to native binary / wtime-aot .so (ms, lower is better) · Blot .wasm size in KiB",
+            "Full clean build from source to native binary / wtime-aot .so (ms, lower is better) · Squid .wasm size in KiB",
             size=11.8,
             fill=TEXT_SUB,
         )
@@ -611,8 +611,8 @@ def build_compile_and_size(data: dict, size: str) -> str:
             28,
             84,
             [
-                (C_BLOT, "Blot (blotc-goose)"),
-                (C_BLOT_AOT, "Blot (+ wtime-aot x64)"),
+                (C_SQUID, "Squid (squidc-goose)"),
+                (C_SQUID_AOT, "Squid (+ wtime-aot x64)"),
                 (C_RUST_EXP, "Rust (rustc -O)"),
                 (C_GOOSE, "Goose (goose + clang -O2)"),
                 (C_CPP_EXP, "C++ (clang++ -O2)"),
@@ -629,30 +629,30 @@ def build_compile_and_size(data: dict, size: str) -> str:
     max_cmp = 0.0
     for bname in BENCH_ORDER:
         picks = pick_tier_rows(benches[bname]["sizes"][size]["rows"])
-        b_row = picks["blot"][1]
+        b_row = picks["squid"][1]
         g_ms = picks["goose"][1]["compile_ms"]
         r_ms = picks["rust_exp"][1]["compile_ms"]
         c_ms = picks["cpp_exp"][1]["compile_ms"]
-        rows_data.append((bname, b_row["blotc_ms"], b_row["aot_ms"], r_ms, g_ms, c_ms, b_row["wasm_bytes"] / 1024.0))
+        rows_data.append((bname, b_row["squidc_ms"], b_row["aot_ms"], r_ms, g_ms, c_ms, b_row["wasm_bytes"] / 1024.0))
         max_cmp = max(max_cmp, b_row["compile_ms"], g_ms, r_ms, c_ms)
 
-    geomean_blot = geomean([r[1] + r[2] for r in rows_data])
+    geomean_squid = geomean([r[1] + r[2] for r in rows_data])
     geomean_cpp = geomean([r[5] for r in rows_data])
-    els.append(pill(lx + lw - 12, ly + 21, f"Blot geomean {geomean_blot:.0f} ms ({geomean_cpp / geomean_blot:.1f}× vs C++)", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
+    els.append(pill(lx + lw - 12, ly + 21, f"Squid geomean {geomean_squid:.0f} ms ({geomean_cpp / geomean_squid:.1f}× vs C++)", PILL_WIN_BG, PILL_WIN_FG, anchor="end"))
 
     bx = lx + 82
     bmax_w = 486.0
     row_step = 30.8
-    for i, (bname, blotc_ms, aot_ms, r_ms, g_ms, c_ms, _) in enumerate(rows_data):
+    for i, (bname, squidc_ms, aot_ms, r_ms, g_ms, c_ms, _) in enumerate(rows_data):
         ry = ly + 36 + i * row_step
         els.append(text(lx + 14, ry + 16, bname, size=10.8, weight="600", fill=TEXT_MAIN))
         # 4 slim bars per benchmark (height 5.2px each, 1.3px gap)
-        # 1. Blot stacked (blotc + aot)
-        bw_c = max(2.0, (blotc_ms / max_cmp) * bmax_w)
+        # 1. Squid stacked (squidc + aot)
+        bw_c = max(2.0, (squidc_ms / max_cmp) * bmax_w)
         bw_a = max(1.5, (aot_ms / max_cmp) * bmax_w)
-        els.append(f'  <rect x="{bx:.1f}" y="{ry:.1f}" width="{bw_c:.1f}" height="5.5" rx="1.5" fill="{C_BLOT}"/>')
-        els.append(f'  <rect x="{bx + bw_c:.1f}" y="{ry:.1f}" width="{bw_a:.1f}" height="5.5" rx="1.5" fill="{C_BLOT_AOT}"/>')
-        els.append(text(bx + bw_c + bw_a + 5, ry + 5.5, f"{blotc_ms + aot_ms:.0f} ms", size=8.5, weight="700", fill=C_BLOT))
+        els.append(f'  <rect x="{bx:.1f}" y="{ry:.1f}" width="{bw_c:.1f}" height="5.5" rx="1.5" fill="{C_SQUID}"/>')
+        els.append(f'  <rect x="{bx + bw_c:.1f}" y="{ry:.1f}" width="{bw_a:.1f}" height="5.5" rx="1.5" fill="{C_SQUID_AOT}"/>')
+        els.append(text(bx + bw_c + bw_a + 5, ry + 5.5, f"{squidc_ms + aot_ms:.0f} ms", size=8.5, weight="700", fill=C_SQUID))
 
         # 2. Rust
         rw = max(2.0, (r_ms / max_cmp) * bmax_w)
@@ -667,10 +667,10 @@ def build_compile_and_size(data: dict, size: str) -> str:
         els.append(f'  <rect x="{bx:.1f}" y="{ry + 18.5:.1f}" width="{cw:.1f}" height="5.0" rx="1.5" fill="{C_CPP_EXP}"/>')
         els.append(text(bx + max(rw, gw, cw) + 5, ry + 22.5, f"{c_ms:.0f} ms", size=8.5, weight="500", fill=TEXT_MUTED))
 
-    # Right card: Blot .wasm output size across all 16 benchmarks
+    # Right card: Squid .wasm output size across all 16 benchmarks
     rx, ry0, rw_card, rh_card = 682, 106, 250, 536
     els.append(f'  <rect x="{rx}" y="{ry0}" width="{rw_card}" height="{rh_card}" rx="8" fill="{BG_CARD}" stroke="{BORDER}"/>')
-    els.append(text(rx + 14, ry0 + 22, "Blot .wasm output size", size=12.8, weight="700"))
+    els.append(text(rx + 14, ry0 + 22, "Squid .wasm output size", size=12.8, weight="700"))
 
     max_kib = max(r[6] for r in rows_data)
     sbx = rx + 76
@@ -680,7 +680,7 @@ def build_compile_and_size(data: dict, size: str) -> str:
         bw = max(3.0, (kib / max_kib) * sbmax)
         els.append(text(rx + 14, ry + 13, bname, size=10.3, weight="500", fill=TEXT_MAIN))
         els.append(f'  <rect x="{sbx:.1f}" y="{ry + 2:.1f}" width="{sbmax:.1f}" height="14" rx="3" fill="{GRID}"/>')
-        els.append(f'  <rect x="{sbx:.1f}" y="{ry + 2:.1f}" width="{bw:.1f}" height="14" rx="3" fill="{C_BLOT}"/>')
+        els.append(f'  <rect x="{sbx:.1f}" y="{ry + 2:.1f}" width="{bw:.1f}" height="14" rx="3" fill="{C_SQUID}"/>')
         els.append(text(sbx + bw + 5, ry + 12.5, f"{kib:.1f} KiB", size=9.6, weight="600", fill=TEXT_MAIN))
 
     min_kib = min(r[6] for r in rows_data)
@@ -688,7 +688,7 @@ def build_compile_and_size(data: dict, size: str) -> str:
         text(
             28,
             h - 14,
-            f"Blot builds include full blotc-goose compilation + wtime-aot native x64 codegen. Every .wasm artifact is self-contained ({min_kib:.1f}–{max_kib:.1f} KiB).",
+            f"Squid builds include full squidc-goose compilation + wtime-aot native x64 codegen. Every .wasm artifact is self-contained ({min_kib:.1f}–{max_kib:.1f} KiB).",
             size=10.2,
             fill=TEXT_MUTED,
         )

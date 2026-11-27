@@ -4,7 +4,7 @@ Usage: python3 scripts/integration/harvest_stores.py PROJECT_DIR ENTRY... [--com
 
 For each ENTRY (checked from PROJECT_DIR with its pen.json) the compiler
 reports the stores whose place is provably the function's own
-(BLOT_REPORT_STORES); each becomes `place := value`. Then the entries are
+(SQUID_REPORT_STORES); each becomes `place := value`. Then the entries are
 checked again: an update the compiler would turn back into a store
 (`"kind":"store"`, an `aliased_update`) goes back to `=`, until none is
 left. Only sites in PROJECT_DIR proposed during this run are rewritten. The
@@ -21,7 +21,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 parser.add_argument("project", type=Path)
 parser.add_argument("entries", nargs="+")
-parser.add_argument("--compiler", type=Path, default=Path(__file__).resolve().parents[2] / "compiler-goose/build/blotc-goose-dev")
+parser.add_argument("--compiler", type=Path, default=Path(__file__).resolve().parents[2] / "compiler-goose/build/squidc-goose-dev")
 parser.add_argument("--jobs", type=int, default=4)
 args = parser.parse_args()
 project = args.project.resolve()
@@ -29,9 +29,9 @@ compiler = args.compiler.resolve()
 
 def run(entry, report):
     env = os.environ.copy()
-    env.pop("BLOT_REPORT_STORES", None)
+    env.pop("SQUID_REPORT_STORES", None)
     if report:
-        env["BLOT_REPORT_STORES"] = "1"
+        env["SQUID_REPORT_STORES"] = "1"
     command = [compiler, "migrate-stores", entry, "--project", "pen.json", "--dry-run", "--inference-budget", "20000000"]
     process = subprocess.run(command, cwd=project, capture_output=True, text=True, env=env)
     proven, aliased, errors = set(), set(), set()

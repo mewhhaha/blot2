@@ -54,23 +54,23 @@ io const fallback = func (input: U32): Array U32 => return do:
 {
   Deno.test(`nominal physical fields preserve imported dictionaries aliases getters and whole uses`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-nominal-fields-",
+      prefix: "squid-nominal-fields-",
     });
-    const entry = `${directory}/main.blot`;
+    const entry = `${directory}/main.sq`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     const options = {
       executable: Deno.args[0],
       entry,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     };
     const compiler = await createZigProjectCompiler(options);
     try {
       const sources = {
         [entry]: caller,
-        [`${directory}/left.blot`]: producer(false),
-        [`${directory}/right.blot`]: producer(true),
-        [`${directory}/common.blot`]: common,
+        [`${directory}/left.sq`]: producer(false),
+        [`${directory}/right.sq`]: producer(true),
+        [`${directory}/common.sq`]: common,
       };
       const result = await compiler.build({ sources });
       assert(result.success, JSON.stringify(result));
@@ -111,7 +111,7 @@ const make_callback = func state => return do:
   return func (argument: U32): U32 => return @u32.add captured.value argument
 `;
       const changed = await compiler.build({
-        sources: { ...sources, [`${directory}/left.blot`]: capturedCallback },
+        sources: { ...sources, [`${directory}/left.sq`]: capturedCallback },
       });
       assert(changed.success, JSON.stringify(changed));
       for (const asynchronous of [false, true]) {

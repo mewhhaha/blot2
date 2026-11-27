@@ -21,7 +21,7 @@ import {
 } from "../../../pen/crates/pen-web/kernels.js";
 import { compileAndRun, equal } from "../guest/compile_helpers.ts";
 
-async function compileBlot(source: string): Promise<Uint8Array<ArrayBuffer>> {
+async function compileSquid(source: string): Promise<Uint8Array<ArrayBuffer>> {
   let compiled: Uint8Array<ArrayBuffer> | undefined;
   await compileAndRun(source, (_guest, bytes) => {
     compiled = copyPrivateBytes(bytes);
@@ -160,7 +160,7 @@ func mk_z32k (): W32K => return #[mk_z4k (), mk_z4k (), mk_z4k (), mk_z4k (), mk
 `;
 
 Deno.test("Law #4: unforgeable CompiledModuleReceipt, primordial copyPrivateBytes, MemoryShape & deadline admission", async () => {
-  const bytes = await compileBlot(kernelSuiteSource);
+  const bytes = await compileSquid(kernelSuiteSource);
 
   // 1. Opaque WebAssembly.Module MUST be rejected!
   const opaqueModule = new WebAssembly.Module(bytes);
@@ -304,7 +304,7 @@ Deno.test("Law #4: unforgeable CompiledModuleReceipt, primordial copyPrivateByte
 });
 
 Deno.test("Law #4(a)(4): bounded policy.memory warm-vs-fresh transport symmetry via MemorySection rewriter", async () => {
-  const bytes = await compileBlot(`
+  const bytes = await compileSquid(`
 #kernel func var_mem (n: U32): #[U32] =>
   return @array.generate n (func i => i)
 `);
@@ -350,16 +350,16 @@ Deno.test("Law #4(a)(4): bounded policy.memory warm-vs-fresh transport symmetry 
   }
   const freshRequiredPages = lo;
   equal(freshRequiredPages > 4 && freshRequiredPages < 40, true);
-  // At freshRequiredPages - 1, BOTH fresh AND warm-after-blot:reset MUST fail with OOM!
+  // At freshRequiredPages - 1, BOTH fresh AND warm-after-squid:reset MUST fail with OOM!
   equal(await testRun(freshRequiredPages - 1, false), false);
   equal(await testRun(freshRequiredPages - 1, true), false);
-  // At freshRequiredPages, BOTH fresh AND warm-after-blot:reset MUST succeed identically!
+  // At freshRequiredPages, BOTH fresh AND warm-after-squid:reset MUST succeed identically!
   equal(await testRun(freshRequiredPages, false), true);
   equal(await testRun(freshRequiredPages, true), true);
 });
 
 Deno.test("Law #4(b)-(f): queued-ready CLEANUP_FAIL->discard, BYOB fault, PendingFrontierGrant 12B race, precedence, [0xffffffff], & post-concat timeout", async () => {
-  const bytes = await compileBlot(kernelSuiteSource);
+  const bytes = await compileSquid(kernelSuiteSource);
   const receipt = compileKernelModule(bytes);
 
   // 1. runFixed 1x single-buffer peak (12 B), out-of-order completion, and queued-ready CLEANUP_FAIL -> discard!
@@ -628,7 +628,7 @@ Deno.test("Law #4(b)-(f): queued-ready CLEANUP_FAIL->discard, BYOB fault, Pendin
 });
 
 Deno.test("Law #4(e): off-thread direct/fallback/context deadlines, pool exclusivity, private input mutation & platform-honest Browser close()", async () => {
-  const bytes = await compileBlot(kernelSuiteSource);
+  const bytes = await compileSquid(kernelSuiteSource);
   const receipt = compileKernelModule(bytes);
 
   // 1. workers == 0 direct spinning guest under deadlineMs runs off-thread and preempts cleanly!
@@ -819,9 +819,9 @@ Deno.test("Law #4(e): off-thread direct/fallback/context deadlines, pool exclusi
   const makeMockWorkerFactory = (holdGrantReply: boolean) => () => {
     const inst = new WebAssembly.Instance(receipt.module, {});
     const exp = inst.exports as Record<string, unknown>;
-    const mem = exp["blot:memory"] as WebAssembly.Memory;
-    const alloc = exp["blot:allocate"] as (n: number) => number;
-    const reset = exp["blot:reset"] as (n: number) => void;
+    const mem = exp["squid:memory"] as WebAssembly.Memory;
+    const alloc = exp["squid:allocate"] as (n: number) => number;
+    const reset = exp["squid:reset"] as (n: number) => void;
     const entry = exp["add_one"] as (p: number) => number;
     let heldPtr = 0;
     let heldBytes = 0;
@@ -1069,8 +1069,8 @@ func s_step (st: own F32) -> (x: F32): (F32, F32) =>
 `;
 
 Deno.test("Law #5: admission, all 4 ABI wire_tag categories (incl. scalar-only & 1-word Score & Unit mailbox=1), private copies & persistent two-turn accounting", async () => {
-  const bytes = await compileBlot(processSuiteSource);
-  const scalarBytes = await compileBlot(scalarOnlyProcessSource);
+  const bytes = await compileSquid(processSuiteSource);
+  const scalarBytes = await compileSquid(scalarOnlyProcessSource);
   const receipt = compileKernelModule(bytes);
 
   // 1. Admission checks: reject rustWasmtimeFuel, bad deadlineMs, maxReplyBytes < 4 for scalar/1-word record, opaque module!
@@ -1129,7 +1129,7 @@ Deno.test("Law #5: admission, all 4 ABI wire_tag categories (incl. scalar-only &
   const scalarReceipt = compileKernelModule(scalarBytes);
   equal(
     WebAssembly.Module.exports(scalarReceipt.module).some((e) =>
-      e.name === "blot:memory"
+      e.name === "squid:memory"
     ),
     false,
   );
@@ -1355,7 +1355,7 @@ Deno.test("Law #5: admission, all 4 ABI wire_tag categories (incl. scalar-only &
 });
 
 Deno.test("Law #5(f)-(h): spinning init/step preemption, timer-latch honor, never-spawned close, sync spawn fail, close-before-commit & exclusive restore-vs-overrun drain", async () => {
-  const bytes = await compileBlot(processSuiteSource);
+  const bytes = await compileSquid(processSuiteSource);
   const receipt = compileKernelModule(bytes);
 
   // 1. Spinning proc_init preempted via kill-first retireSubprocess + idle persistent child reaped!
@@ -1776,7 +1776,7 @@ Deno.test("Law #5(f)-(h): spinning init/step preemption, timer-latch honor, neve
 });
 
 Deno.test("Law #5: exhaustive 3-endpoint advanceAllParallel == serial advance non-fatal equivalence", async () => {
-  const bytes = await compileBlot(processSuiteSource);
+  const bytes = await compileSquid(processSuiteSource);
   const receipt = compileKernelModule(bytes);
 
   const runSeq = async (parallel: boolean, budgets: number[]) => {

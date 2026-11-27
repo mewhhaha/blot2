@@ -69,8 +69,8 @@ async function inspectBuild(
   source: string,
   inspect: (bytes: Uint8Array<ArrayBuffer>) => void | Promise<void>,
 ) {
-  const directory = await Deno.makeTempDir({ prefix: "blot-wrapper-heap-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-wrapper-heap-" });
+  const entry = `${directory}/main.sq`;
   try {
     await Deno.writeTextFile(entry, source);
     const compiler = await createZigProjectCompiler({
@@ -161,8 +161,8 @@ io const pair = func (value: U32) => return do:
 
 for (const type of ["U32", "F32"]) {
   Deno.test(`opaque ${type} round trips preserve exported machine operations`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-wrapper-ops-" });
-    const entry = `${directory}/main.blot`;
+    const directory = await Deno.makeTempDir({ prefix: "squid-wrapper-ops-" });
+    const entry = `${directory}/main.sq`;
     let plain: ReturnType<typeof exportedFunction> | undefined;
     try {
       for (const opaque of [false, true]) {

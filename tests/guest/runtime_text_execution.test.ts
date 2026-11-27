@@ -10,8 +10,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 Deno.test.ignore("retained text modules preserve literal capability shapes through edits", async () => {
   const root = new URL("../../", import.meta.url);
   const directory = await Deno.makeTempDir({ dir: new URL("build/", root).pathname, prefix: "retained-text-" });
-  const entry = `${directory}/main.blot`;
-  const words = `${directory}/words.blot`;
+  const entry = `${directory}/main.sq`;
+  const words = `${directory}/words.sq`;
   const original = 'const words = func value => return if value then "Hi, 世界🙂" else ""\n';
   await Deno.writeTextFile(words, original);
   await Deno.writeTextFile(entry, `
@@ -22,8 +22,8 @@ io const answer = func () => return text.concat (words.words true) (text.format 
   try {
     {
       const options = {
-        executable: Deno.args[0] ?? new URL("compiler-goose/build/blotc-goose", root),
-        entry, prelude: new URL("std/prelude.blot", root), stdRoot: new URL("std/", root),
+        executable: Deno.args[0] ?? new URL("compiler-goose/build/squidc-goose", root),
+        entry, prelude: new URL("std/prelude.sq", root), stdRoot: new URL("std/", root),
       };
       const compiler = await createZigProjectCompiler(options);
       try {

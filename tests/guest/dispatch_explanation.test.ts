@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { readDispatchExplanation } from "../../host/type_diagnostics.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 async function cli(args: string[]): Promise<Record<string, unknown>[]> {
   const output = await new Deno.Command(executable, {
@@ -40,7 +40,7 @@ Deno.test.ignore("operator failures explain prelude dispatch through the CLI", a
       ]],
     ];
     for (const [source, candidates] of cases) {
-      const input = `${directory}/main.blot`;
+      const input = `${directory}/main.sq`;
       await Deno.writeTextFile(input, source);
       const result = explained(
         await cli([
@@ -69,7 +69,7 @@ Deno.test.ignore("operator failures explain prelude dispatch through the CLI", a
 // Direct backend: an operator on a function value reports storage_unsupported in the prelude instead of missing_associated (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("callable subtraction reports source operands and recovers after correction", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const invalid = `io const good = func (value: F32) : F32 => return value - 1.0
 io const broken = func (value: F32) : F32 => return do:
   let transform: F32 -> F32 = func (x: F32) => return x + 1.0
@@ -111,7 +111,7 @@ io const broken = func (value: F32) : F32 => return do:
           ],
           truncated: false,
         });
-        ok(bad.diagnostics[0].related?.filename.endsWith("prelude.blot"));
+        ok(bad.diagnostics[0].related?.filename.endsWith("prelude.sq"));
         const fixed = await compiler.build({ sources: { [entry]: corrected } });
         ok(fixed.success, JSON.stringify(fixed));
         const guest = await instantiateGuest(fixed.bytes);
@@ -141,8 +141,8 @@ io const broken = func (value: F32) : F32 => return do:
 // Direct backend: an operator on a function value reports storage_unsupported in the prelude instead of missing_associated (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("imported generic subtraction points to the mismatched call", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const helper = `${directory}/helper.blot`;
+  const entry = `${directory}/main.sq`;
+  const helper = `${directory}/helper.sq`;
   const generic = "const difference = func left => return func right => return left - right\n";
   const invalid = `import { difference } from "./helper"
 io const broken = func (value: F32) : F32 => return do:
@@ -213,7 +213,7 @@ io const broken = func (value: F32) : F32 => return do:
 
 Deno.test("mixed-type associated subtraction remains valid in both tiers", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const source = `type Meters is data = $Meters F32
 const Meters.sub = func (left: Meters) => return func (right: F32) => return do:
   let $Meters amount = left
@@ -258,14 +258,14 @@ const main = (annotation: string) =>
 // Direct backend: missing_associated has no dispatch explanation and points into the prelude (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("project diagnostics carry dispatch explanations and recover after correction", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
     prelude,
   });
   try {
-    const libraryPath = `${directory}/library.blot`;
+    const libraryPath = `${directory}/library.sq`;
     const fixed = { [entry]: main(""), [libraryPath]: library + method };
     const first = await compiler.build({ sources: fixed });
     ok(first.success, JSON.stringify(first));
@@ -318,10 +318,10 @@ Deno.test.ignore("project diagnostics carry dispatch explanations and recover af
 // Direct backend: missing_associated has no dispatch explanation and points into the prelude (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("dispatch over a compiled dependency's type is explained", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const bundle = `${directory}/dependencies.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const bundle = `${directory}/dependencies.sqdep`;
   try {
-    await Deno.writeTextFile(`${directory}/library.blot`, library);
+    await Deno.writeTextFile(`${directory}/library.sq`, library);
     await Deno.writeTextFile(
       entry,
       'import { meters } from "./library"\nio const answer = func () => return 7\n',
@@ -344,7 +344,7 @@ Deno.test.ignore("dispatch over a compiled dependency's type is explained", asyn
       ok(!built.success);
       equal(built.diagnostics[0].code, "missing_associated");
       equal(built.diagnostics[0].filename, entry);
-      ok(built.diagnostics[0].related?.filename.endsWith("prelude.blot"));
+      ok(built.diagnostics[0].related?.filename.endsWith("prelude.sq"));
       const explanation = built.diagnostics[0].explanation;
       ok(explanation, JSON.stringify(built.diagnostics[0]));
       equal(explanation.candidates.map((item) => item.outcome), [

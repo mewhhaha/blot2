@@ -1,4 +1,4 @@
-// Three-way compiled-Wasm benchmark comparing Blot's three collection families:
+// Three-way compiled-Wasm benchmark comparing Squid's three collection families:
 //   #[T]  (Array T)  — contiguous flat indexable array
 //   %[T]  (Packed T) — non-indexable dense sequential array (split-stream sums, SoA records)
 //   ~[T]  (Seq T)    — Design H reversible generative SIMD-RRB sequence with focus gap & packed leaves
@@ -11,7 +11,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 let compilerPath = resolve(
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname,
 );
 let samples = 11;
 let warmup = 3;
@@ -25,7 +25,7 @@ for (let i = 0; i < Deno.args.length; i++) {
   }
 }
 
-const prelude = new URL("../../std/prelude.blot", import.meta.url);
+const prelude = new URL("../../std/prelude.sq", import.meta.url);
 const stdRoot = new URL("../../std", import.meta.url);
 
 const median = (xs: number[]) => {
@@ -41,8 +41,8 @@ interface VariantResult {
 }
 
 async function compileModule(source: string): Promise<Uint8Array> {
-  const dir = await Deno.makeTempDir({ prefix: "blot-bench3-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-bench3-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: compilerPath,
     entry,
@@ -67,7 +67,7 @@ async function measureVariant(
   opts: { freshPerSample?: boolean } = {},
 ): Promise<VariantResult> {
   const freshPerSample = opts.freshPerSample ?? false;
-  // Returning #[acc] ensures blot:memory is exported so guest.memoryBytes()
+  // Returning #[acc] ensures squid:memory is exported so guest.memoryBytes()
   // reports exact committed Wasm linear memory after one fresh invocation.
   const memGuest = await instantiateGuest(bytes);
   let checksum = 0;

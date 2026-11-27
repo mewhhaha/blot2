@@ -23,15 +23,15 @@ ${
 `;
 Deno.test(`wide fields use scoped indexes or forward complete result words`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-refinement-index-",
+    prefix: "squid-refinement-index-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

@@ -1,6 +1,6 @@
 // Checked type store images for copied workers. Logical IDs survive the
 // handoff. The receiving process creates a fresh owner for the store.
-namespace blot_check_type_store_snapshot;
+namespace squid_check_type_store_snapshot;
 import check.types;
 import support.error;
 import support.native;
@@ -8,9 +8,9 @@ import support.native;
 import .type_store_snapshot;
 // The checked packet borrows these lanes only while encoding. Inference's
 // resolution caches and occurs-check scratch can be rebuilt in the receiver.
-fn viewPacketStore(store: const blot_check_types::Store&) -> Snapshot, Error {
-    if !blot_check_types::valid(store) || store.owner_id == 0 {
-        return Snapshot {..}, blot_error::Error.invalid_artifact;
+fn viewPacketStore(store: const squid_check_types::Store&) -> Snapshot, Error {
+    if !squid_check_types::valid(store) || store.owner_id == 0 {
+        return Snapshot {..}, squid_error::Error.invalid_artifact;
     }
     return Snapshot {
         state: State {
@@ -72,28 +72,28 @@ fn viewPacketStore(store: const blot_check_types::Store&) -> Snapshot, Error {
         effects_variables: store.effects.variables.items,
         effects_versions: store.effects.versions.items,
         ..
-    }, blot_error::Error.none;
+    }, squid_error::Error.none;
 }
 
-fn restorePacketStore(snapshot: const Snapshot&, store: blot_check_types::Store&) -> Error {
-    if !blot_check_types::valid(store) { return blot_error::Error.invalid_artifact; }
-    let error = store.nodes.restore(snapshot.store_nodes); if error != blot_error::Error.none { return error; }
-    let error = store.extra.restore(snapshot.store_extra); if error != blot_error::Error.none { return error; }
-    let error = store.variables.restore(snapshot.store_variables); if error != blot_error::Error.none { return error; }
-    let error = store.versions.restore(snapshot.store_versions); if error != blot_error::Error.none { return error; }
-    let error = store.operations.restore(snapshot.store_operations); if error != blot_error::Error.none { return error; }
-    let error = store.operation_links.restore(snapshot.store_operation_links); if error != blot_error::Error.none { return error; }
-    let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != blot_error::Error.none { return error; }
-    let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != blot_error::Error.none { return error; }
-    let error = store.variable_views.restore(snapshot.store_variable_views, snapshot.state.store_variable_views_count); if error != blot_error::Error.none { return error; }
-    let error = store.associated_equations.restore(snapshot.store_associated_equations, snapshot.state.store_associated_equations_count); if error != blot_error::Error.none { return error; }
-    let error = store.projection_resolutions.restore(snapshot.store_projection_resolutions, snapshot.state.store_projection_resolutions_count); if error != blot_error::Error.none { return error; }
-    let error = store.operation_chains.restore(snapshot.store_operation_chains, snapshot.state.store_operation_chains_count); if error != blot_error::Error.none { return error; }
-    let error = store.effects.rows.restore(snapshot.effects_rows); if error != blot_error::Error.none { return error; }
-    let error = store.effects.labels.restore(snapshot.effects_labels); if error != blot_error::Error.none { return error; }
-    let error = store.effects.variables.restore(snapshot.effects_variables); if error != blot_error::Error.none { return error; }
-    let error = store.effects.versions.restore(snapshot.effects_versions); if error != blot_error::Error.none { return error; }
-    store.owner_id = blot_native::fresh_owner_id();
+fn restorePacketStore(snapshot: const Snapshot&, store: squid_check_types::Store&) -> Error {
+    if !squid_check_types::valid(store) { return squid_error::Error.invalid_artifact; }
+    let error = store.nodes.restore(snapshot.store_nodes); if error != squid_error::Error.none { return error; }
+    let error = store.extra.restore(snapshot.store_extra); if error != squid_error::Error.none { return error; }
+    let error = store.variables.restore(snapshot.store_variables); if error != squid_error::Error.none { return error; }
+    let error = store.versions.restore(snapshot.store_versions); if error != squid_error::Error.none { return error; }
+    let error = store.operations.restore(snapshot.store_operations); if error != squid_error::Error.none { return error; }
+    let error = store.operation_links.restore(snapshot.store_operation_links); if error != squid_error::Error.none { return error; }
+    let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != squid_error::Error.none { return error; }
+    let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != squid_error::Error.none { return error; }
+    let error = store.variable_views.restore(snapshot.store_variable_views, snapshot.state.store_variable_views_count); if error != squid_error::Error.none { return error; }
+    let error = store.associated_equations.restore(snapshot.store_associated_equations, snapshot.state.store_associated_equations_count); if error != squid_error::Error.none { return error; }
+    let error = store.projection_resolutions.restore(snapshot.store_projection_resolutions, snapshot.state.store_projection_resolutions_count); if error != squid_error::Error.none { return error; }
+    let error = store.operation_chains.restore(snapshot.store_operation_chains, snapshot.state.store_operation_chains_count); if error != squid_error::Error.none { return error; }
+    let error = store.effects.rows.restore(snapshot.effects_rows); if error != squid_error::Error.none { return error; }
+    let error = store.effects.labels.restore(snapshot.effects_labels); if error != squid_error::Error.none { return error; }
+    let error = store.effects.variables.restore(snapshot.effects_variables); if error != squid_error::Error.none { return error; }
+    let error = store.effects.versions.restore(snapshot.effects_versions); if error != squid_error::Error.none { return error; }
+    store.owner_id = squid_native::fresh_owner_id();
     store.use_closed_rows = snapshot.state.store_use_closed_rows;
     store.closed_rows = snapshot.state.store_closed_rows;
     store.use_operation_rows = snapshot.state.store_use_operation_rows;
@@ -127,5 +127,5 @@ fn restorePacketStore(snapshot: const Snapshot&, store: blot_check_types::Store&
     store.effects.mutation_epoch = snapshot.state.effects_mutation_epoch;
     store.effects.use_resolution_cache = snapshot.state.effects_use_resolution_cache;
     store.effects.next_position = snapshot.state.effects_next_position;
-    return blot_error::Error.none;
+    return squid_error::Error.none;
 }

@@ -1,6 +1,6 @@
 import {throws} from "node:assert/strict";
 import {compileAndRun,equal} from "./compile_helpers.ts";
-const source = await Deno.readTextFile(new URL("./let_fallbacks.blot",import.meta.url));
+const source = await Deno.readTextFile(new URL("./let_fallbacks.sq",import.meta.url));
 
 for(const asynchronous of [false,true]) Deno.test(`diverging pattern fallback preserves selected values effects and recovery (${asynchronous?"JSPI":"sync"})`,async()=>{
       await compileAndRun(source,async native=>{

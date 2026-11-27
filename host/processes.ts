@@ -658,10 +658,10 @@ class InlineProcessGuest {
     }
     const instance = new WebAssembly.Instance(meta.module, stubImports);
     const exports = instance.exports;
-    const mem = exports["blot:memory"];
-    const alloc = exports["blot:allocate"];
-    const reset = exports["blot:reset"];
-    const finish = exports["blot:finish_invocation"];
+    const mem = exports["squid:memory"];
+    const alloc = exports["squid:allocate"];
+    const reset = exports["squid:reset"];
+    const finish = exports["squid:finish_invocation"];
     const hasArena = mem instanceof WebAssembly.Memory &&
       typeof alloc === "function" && typeof reset === "function";
     this.memory = hasArena ? mem : null;

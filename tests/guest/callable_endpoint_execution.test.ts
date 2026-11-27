@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const main = `io const run = func (seed: U32) => return do:
   let callable = make seed
   let alias = callable
@@ -19,15 +19,15 @@ const read = func value => return value[0]
 `;
 Deno.test("returned callable endpoints retain owners through graph publication and single-unit producer type edits with identical ABI", async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-callable-endpoint-",
+    prefix: "squid-callable-endpoint-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   try {
     {
       const options = {
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       };
       const compiler = await createZigProjectCompiler(options);
       try {

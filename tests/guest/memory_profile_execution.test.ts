@@ -26,17 +26,17 @@ io const closures = func (steps: U32) => return do:
 `;
 
 const options = (entry: string) => ({
-  executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+  executable: resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
   entry,
-  prelude: new URL("../../std/prelude.blot", import.meta.url),
+  prelude: new URL("../../std/prelude.sq", import.meta.url),
   stdRoot: new URL("../../std", import.meta.url),
 });
 
 Deno.test(`copies, traps and retained source edits keep their results`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-memory-profile-",
+    prefix: "squid-memory-profile-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     ...options(entry),
   });
@@ -88,8 +88,8 @@ Deno.test(`copies, traps and retained source edits keep their results`, async ()
 
 // Direct backend gap: a closure parameter typed only by a later call is an unresolved type variable (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("copied arrays of curried closures keep their results", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-memory-closures-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-memory-closures-" });
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler(options(entry));
   try {
     const built = await compiler.build({ sources: { [entry]: closures } });

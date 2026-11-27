@@ -10,7 +10,7 @@
   [docs/language/guide.md](../docs/language/guide.md#demand-parameters) and
   [DEFERRED_WORK.md](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -24,7 +24,7 @@ reports `type_mismatch` over the whole declaration, with or without the
 annotation and with `func ~value`. Forwarding to another lazy function
 (`func ~(value: U32) => return twice (@demand value)`) checks. The law
 "recursive demand forwarding declines its bounded inline proof" in
-[demand_inline_tests.zig](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline_tests.zig)
+[demand_inline_tests.zig](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline_tests.zig)
 expects the recursive program to check and is skipped until this task completes;
 it never ran before its file was registered.
 

@@ -144,7 +144,7 @@ under allocation pressure, synchronous/JSPI effects and flat warmed memory.
 Existing import/edit/failure/revert controls pass. Immutable patch SHA-256 is
 `9662f78178e6ca89c7f442a72251e63cc2d9d74ab1e200f50d202f1345e87b7e`; binary/Wasm
 pins and raw measurements are in
-`/var/tmp/blot2-continue-1791939463/window-inspection/`. The combined LLVM gate
+`/var/tmp/squid-continue-1791939463/window-inspection/`. The combined LLVM gate
 remains required; remaining window state keeps task 047 open.
 
 ## Immediate collection steps, 15 October 2026
@@ -192,7 +192,7 @@ identify per-row retain/release and root-journal work, with only 64 allocated
 bytes per 16384-row cursor traversal. The width1 output is byte-identical
 before/after this successor delta. No all-width or task 047 completion is
 claimed. Raw rounds, section parity and diagnostic-only source pins are under
-`/var/tmp/blot2-collection-successor-20261015/build/bench/task047-final-preparation-20261015/`.
+`/var/tmp/squid-collection-successor-20261015/build/bench/task047-final-preparation-20261015/`.
 
 ## Empty scalar lexical frames, 15 October 2026
 
@@ -242,7 +242,7 @@ medians are limited by the 10 ms clock and do not prove zero overhead. One 60 s
 cap preserved 43 of 80 samples; one continuation collected only the missing 37.
 Exact paired records, cross-slot sensitivity and the read-only 949-instruction
 List helper attribution are frozen in
-`/var/tmp/blot2-cursor-owner-20261015/build/bench/persistent-cursor-borrows-followup-final-20261015/`.
+`/var/tmp/squid-cursor-owner-20261015/build/bench/persistent-cursor-borrows-followup-final-20261015/`.
 The original List and broad task 047 performance gates remain open.
 
 ## Persistent descriptor snapshots, 15 October 2026
@@ -278,7 +278,7 @@ comparisons, broader state elimination and the final combined release/full gate
 remain open. The older forever-loop tracing fallback mentioned above has already
 been removed by Task 035; actual unconfined cycle collection remains intact.
 Private source, failures and measurements are retained at
-`/var/tmp/blot2-task047-final-owners-20261015/`.
+`/var/tmp/squid-task047-final-owners-20261015/`.
 
 ## Direct constructor sinks, 15 October 2026
 
@@ -306,7 +306,7 @@ both controls because cache setup allocates additional memory; those failures
 are retained. Twelve fresh/unchanged/edit/revert byte/work records and three
 whole cold allocation records match exactly. Three changed Zig files have zero
 analyzer findings. Evidence is pinned under
-`/var/tmp/blot2-task047-direct-pattern-20261015/`. No LLVM timing or full gate
+`/var/tmp/squid-task047-direct-pattern-20261015/`. No LLVM timing or full gate
 is claimed by this focused checkpoint; task 047 remains open.
 
 ## Scalar closure snapshots (Task 047)

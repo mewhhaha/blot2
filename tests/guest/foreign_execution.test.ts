@@ -31,8 +31,8 @@ io const pure = func () => return 7
 `,
     async (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
-      deepStrictEqual(WebAssembly.Module.imports(module), [{ module: "blot:host/1", name: "call_u32_u32", kind: "function" }]);
-      equal(WebAssembly.Module.exports(module).some(item => item.name === "blot:reset"), false);
+      deepStrictEqual(WebAssembly.Module.imports(module), [{ module: "squid:host/1", name: "call_u32_u32", kind: "function" }]);
+      equal(WebAssembly.Module.exports(module).some(item => item.name === "squid:reset"), false);
       let calls = 0;
       const host = guest.capability({ parameter: "U32", result: "U32", call: value => { calls++; equal(value, 41); return value + 1; } });
       for (let iteration = 0; iteration < 100; iteration++) {
@@ -121,7 +121,7 @@ io const main = func (host: Array F32 -> Array F32 ! {Foreign}) => return do:
   break #[@array.get retained 69999, @array.get first 0, @array.get second 69999]
 `,
     (guest, bytes) => {
-      deepStrictEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [{ module: "blot:host/1", name: "call_array_f32_array_f32", kind: "function" }]);
+      deepStrictEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), [{ module: "squid:host/1", name: "call_array_f32_array_f32", kind: "function" }]);
       let calls = 0;
       const response = new Float32Array(70000).fill(6.25);
       const packets: Float32Array[] = [];

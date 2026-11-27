@@ -21,7 +21,7 @@ attempt recovery rule. Root integrates shared Wasm ABI/export changes.
 - `compiler/src/backend/storage_globals.zig`.
 - `compiler/src/runtime/storage_packets.zig`.
 - `host/guest.ts` ordinary host/packet/invocation portions.
-- Pen `crates/blot-host/src/lib.rs` and `src/native.rs`, ordinary host portions
+- Pen `crates/squid-host/src/lib.rs` and `src/native.rs`, ordinary host portions
   in `/home/mewhhaha/src/pen`.
 - `tests/guest/storage_host_execution.test.ts`; new
   `tests/guest/storage_globals_execution.test.ts` and

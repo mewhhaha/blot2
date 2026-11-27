@@ -34,15 +34,15 @@ io const mixed = func (tag: U32) => return do:
 `;
 Deno.test(`owned returns preserve completed and continuing match exits`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-owned-return-",
+    prefix: "squid-owned-return-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

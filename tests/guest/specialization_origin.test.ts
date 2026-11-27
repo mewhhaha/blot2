@@ -2,8 +2,8 @@ import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const definition = '@type.call "add" left right';
 const preludeSource = await Deno.readTextFile(prelude);
 function range(source: string, expression: string) {
@@ -16,8 +16,8 @@ function range(source: string, expression: string) {
 // Direct backend: missing_associated points into the prelude instead of the use and has no dispatch explanation (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("specialization uses survive fresh CLI, retained project rejection and recovery", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -117,8 +117,8 @@ Deno.test.ignore("specialization uses survive fresh CLI, retained project reject
 // Direct backend: missing_associated for `true + false` points into the prelude instead of the library (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("a concrete invalid operation in a library stays in that library", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -148,9 +148,9 @@ Deno.test.ignore("a concrete invalid operation in a library stays in that librar
 // Direct backend: missing_associated for `v + v` at Bool points into the library instead of the entry's use (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("compiled callback definitions preserve source origins", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
-  const dependencies = `${directory}/dependencies.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
+  const dependencies = `${directory}/dependencies.sqdep`;
   try {
     await Deno.writeTextFile(
       library,
@@ -184,7 +184,7 @@ Deno.test.ignore("compiled callback definitions preserve source origins", async 
         { start: diagnostic.start, end: diagnostic.end },
         range(source, "twice callback true"),
       );
-      ok(diagnostic.related?.filename.endsWith("prelude.blot"));
+      ok(diagnostic.related?.filename.endsWith("prelude.sq"));
       equal(diagnostic.code, "missing_associated");
     } finally {
       await compiler.dispose();

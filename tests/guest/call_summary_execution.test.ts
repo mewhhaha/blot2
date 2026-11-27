@@ -9,8 +9,8 @@ import {
 import { compileAndRun } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 
 Deno.test("source closed State witness diamonds retain unrelated argument instances", async () => {
   const lines = [
@@ -78,8 +78,8 @@ Deno.test("source parametric State witness heads preserve independent nominal ar
 
 Deno.test("inferred graph edges preserve result witnesses through diamonds, imports and failed edits", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
   const source = (double: boolean, invalid: boolean) => {
     const lines = [
       `const f_0 = func value => return ${
@@ -220,7 +220,7 @@ for (
   const test = kind === "operator" ? Deno.test.ignore : Deno.test;
   test(`failed summary jobs retain ${kind} leaf diagnostics beyond the former depth limit`, async () => {
     const directory = await Deno.makeTempDir();
-    const input = `${directory}/main.blot`;
+    const input = `${directory}/main.sq`;
     try {
       {
         const diagnostics = [];
@@ -282,9 +282,9 @@ for (
 
 Deno.test("summary jobs survive dependencies edits and failed revision recovery", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
-  const bundle = `${directory}/library.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
+  const bundle = `${directory}/library.sqdep`;
   const source = (value: string) =>
     chain(`const f_0 = func value => return @u32.add value ${value}`, 300) +
     "const apply = func callback => return func value => return callback value\n" +
@@ -352,9 +352,9 @@ Deno.test("summary jobs survive dependencies edits and failed revision recovery"
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("written predicate summaries preserve independent witnesses through imports and recovery", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/library.blot`;
-  const bundle = `${directory}/library.blotdep`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/library.sq`;
+  const bundle = `${directory}/library.sqdep`;
   const source = (double: boolean) =>
     chain(
       'const f_0: a -> a where { associated "add" a a a } = func value => return ' +

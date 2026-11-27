@@ -10,7 +10,7 @@ const output = resolve(Deno.args[2] ?? "build/tmp/stdlib-bench");
 const variants = [
   {
     name: "current",
-    compiler: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+    compiler: resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
     std: resolve(Deno.args[1] ?? "std"),
   },
 ];
@@ -111,7 +111,7 @@ for (const variant of variants) {
     const path of [
       variant.compiler,
       ...["prelude", "array", "list", "vector"].map((name) =>
-        `${variant.std}/${name}.blot`
+        `${variant.std}/${name}.sq`
       ),
     ]
   ) pins[path] = await hash(await Deno.readFile(path));
@@ -134,16 +134,16 @@ for (const [name, body, argument, expected] of cases) {
     for (const variant of variants) {
       const stem = `${output}/${variant.name}-${name}`;
       await Deno.writeTextFile(
-        `${stem}.blot`,
+        `${stem}.sq`,
         `import * as array from "std/array"\nimport * as list from "std/list"\nimport { Vec3 } from "std/vector"\nentry const run = ${body}\n`,
       );
       const compiled = await new Deno.Command(variant.compiler, {
         args: [
           "build",
-          `${stem}.blot`,
+          `${stem}.sq`,
           `${stem}.wasm`,
           "--prelude",
-          `${variant.std}/prelude.blot`,
+          `${variant.std}/prelude.sq`,
           "--std-root",
           variant.std,
         ],
@@ -222,7 +222,7 @@ const staged: {
   }[];
 }[] = [];
 for (const length of [256, 1024, 4096, 8193]) {
-  const source = `${output}/staged-${length}.blot`;
+  const source = `${output}/staged-${length}.sq`;
   await Deno.writeTextFile(
     source,
     `const build = func count => return do:
@@ -254,7 +254,7 @@ io const answer = (Array.from_list (build ${length}))[${length - 1}]
           source,
           `${stem}.wasm`,
           "--prelude",
-          `${variant.std}/prelude.blot`,
+          `${variant.std}/prelude.sq`,
         ],
         stdout: "piped",
         stderr: "piped",

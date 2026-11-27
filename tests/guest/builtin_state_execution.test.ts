@@ -29,7 +29,7 @@ io const witness = func () => return do:
       equal(guest.call("run", null), 82.5);
       equal(guest.call("witness", null), 42);
     }
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.sq" });
 });
 
 Deno.test("builtin State readers and writers retain residual effects and shadow exact instances", async () => {

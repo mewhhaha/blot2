@@ -35,7 +35,7 @@ not create proof authority.
 A dependent arrow exposes a value name in subsequent annotations, as specified
 for capability rows. For example:
 
-```blot
+```squid
 const at: (values: Array a) -> (index: U32) ->
   (@proof.Index values index) -> a =
   func values => return func index => return func proof => return @array.get values index
@@ -70,7 +70,7 @@ instead retains its trap; it does not assert an unchecked contract.
 Contradictory automatic branch facts make that successor unreachable after
 evaluating its guard. They never supply a witness to a reachable successor.
 
-```blot
+```squid
 #entry const checked = func (values: Array U32) => return func (index: U32) => return do:
   let valid = @proof.index values index
   break at values index valid
@@ -159,7 +159,7 @@ These examples specify 070–071 behavior; proof syntax is not yet executable. T
 ordinary guard below evaluates once. The access retains its load and result but
 removes its redundant bounds comparison:
 
-```blot
+```squid
 #entry const guarded = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     break @array.get values index
@@ -173,7 +173,7 @@ comparison requires proof from its checked body before supplying these facts.
 
 A new index version keeps its own check:
 
-```blot
+```squid
 #entry const next = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     index := index + 1

@@ -66,13 +66,13 @@ io const floating = func (seed: F32) => return do:
 `;
 Deno.test(`numeric variants preserve active arms lists static values and snapshots`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-numeric-variants-",
+    prefix: "squid-numeric-variants-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
   });
   try {
     const built = await compiler.build({ sources: { [entry]: source } });

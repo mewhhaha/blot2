@@ -5,7 +5,7 @@ import { resolveProject } from "../../host/packages.ts";
 import { fileURLToPath } from "node:url";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 async function writeProject(
   directory: string,
@@ -16,15 +16,15 @@ async function writeProject(
   await Deno.mkdir(`${library}/src`, { recursive: true });
   await Deno.mkdir(`${app}/nested/deep`, { recursive: true });
   let workspace = "exports:\n  .: ./src\n";
-  if (options.prelude) workspace += "prelude: ./src/prelude.blot\n";
+  if (options.prelude) workspace += "prelude: ./src/prelude.sq\n";
   await Deno.writeTextFile(
-    `${library}/blot-workspace.yaml`,
+    `${library}/squid-workspace.yaml`,
     workspace,
   );
-  await Deno.writeTextFile(`${library}/src/value.blot`, "const value = 42\n");
+  await Deno.writeTextFile(`${library}/src/value.sq`, "const value = 42\n");
   if (options.prelude) {
     await Deno.writeTextFile(
-      `${library}/src/prelude.blot`,
+      `${library}/src/prelude.sq`,
       "const from_package_prelude = 9\n",
     );
   }
@@ -32,12 +32,12 @@ async function writeProject(
     dependencies: { math: { path: "../library" } },
   };
   if (options.prelude) project.prelude = options.prelude;
-  await Deno.writeTextFile(`${app}/blot.json`, JSON.stringify(project));
+  await Deno.writeTextFile(`${app}/squid.json`, JSON.stringify(project));
   await Deno.writeTextFile(
-    `${app}/nested/deep/main.blot`,
+    `${app}/nested/deep/main.sq`,
     'import { value } from "math/value"\nio const answer = func () => return value\n',
   );
-  return { app, entry: `${app}/nested/deep/main.blot`, library };
+  return { app, entry: `${app}/nested/deep/main.sq`, library };
 }
 
 Deno.test("CLI resolves declared local imports and package prelude from the nearest project", async () => {
@@ -49,16 +49,16 @@ Deno.test("CLI resolves declared local imports and package prelude from the near
     const resolved = await resolveProject(entry);
     ok(resolved);
     equal(resolved.root, app);
-    equal(resolved.prelude, `${library}/src/prelude.blot`);
+    equal(resolved.prelude, `${library}/src/prelude.sq`);
     equal(resolved.imports["math/"], `${library}/src`);
 
     // A deeper config is nearest and may select the same dependency with no prelude.
     await Deno.writeTextFile(
-      `${app}/nested/blot.json`,
+      `${app}/nested/squid.json`,
       JSON.stringify({ dependencies: { math: { path: "../../library" } } }),
     );
     await Deno.writeTextFile(
-      `${app}/nested/blot-workspace.yaml`,
+      `${app}/nested/squid-workspace.yaml`,
       "exports:\n  .: ./src\n",
     );
     const nearest = await resolveProject(entry);
@@ -93,7 +93,7 @@ Deno.test("CLI manifest defaults can be overridden and omitted prelude stays abs
 
     // No manifest prelude means no implicit standard prelude.
     await Deno.writeTextFile(
-      `${directory}/app/blot.json`,
+      `${directory}/app/squid.json`,
       JSON.stringify({ dependencies: { math: { path: "../library" } } }),
     );
     await Deno.writeTextFile(
@@ -105,7 +105,7 @@ Deno.test("CLI manifest defaults can be overridden and omitted prelude stays abs
     // An explicit alias with the same prefix replaces the package mapping.
     const override = `${directory}/override`;
     await Deno.mkdir(override);
-    await Deno.writeTextFile(`${override}/value.blot`, "const value = 43\n");
+    await Deno.writeTextFile(`${override}/value.sq`, "const value = 43\n");
     await Deno.writeTextFile(
       entry,
       'import { value } from "math/value"\nio const answer = func () => return value\n',
@@ -141,14 +141,14 @@ Deno.test("manifest dependency failures are surfaced by CLI", async () => {
     const app = `${directory}/app`;
     await Deno.mkdir(app);
     await Deno.writeTextFile(
-      `${app}/blot.json`,
+      `${app}/squid.json`,
       JSON.stringify({ dependencies: { missing: "owner/repo#tag" } }),
     );
     await Deno.writeTextFile(
-      `${app}/blot-workspace.yaml`,
+      `${app}/squid-workspace.yaml`,
       "exports:\n  .: ./src\n",
     );
-    const entry = `${app}/main.blot`;
+    const entry = `${app}/main.sq`;
     await Deno.writeTextFile(
       entry,
       "io const answer = func () => return 42\n",
@@ -165,8 +165,8 @@ Deno.test("this checkout exports the standard prelude as an explicit package cho
     const dependencies = {
       std: { path: fileURLToPath(new URL("../../", import.meta.url)) },
     };
-    const manifest = `${directory}/blot.json`;
-    const entry = `${directory}/main.blot`;
+    const manifest = `${directory}/squid.json`;
+    const entry = `${directory}/main.sq`;
     const output = `${directory}/answer.wasm`;
     await Deno.writeTextFile(
       manifest,

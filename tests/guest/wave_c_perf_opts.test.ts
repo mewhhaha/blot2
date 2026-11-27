@@ -3,8 +3,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url);
 const stdRoot = new URL("../../std", import.meta.url);
 
 async function compileAndRun(
@@ -14,8 +14,8 @@ async function compileAndRun(
     bytes: Uint8Array,
   ) => void | Promise<void>,
 ): Promise<void> {
-  const dir = await Deno.makeTempDir({ prefix: "blot-wave-c-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-wave-c-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
@@ -290,13 +290,13 @@ io test_packing (n: U32): #[U32] =>
       assert.deepEqual(r, [25000, 26665, 201349754, 874291, 33813510, 1]);
 
       // Verify #process persistent state with packed structs + fork rollback across turns!
-      guest.call("blot:proc_init:pack_proc", 5);
+      guest.call("squid:proc_init:pack_proc", 5);
       // Initial: recs=[{flag1:T, id:5, kind:$B(2), flag2:F}] (5+2+10=17), sums=[$PPair($C(3),T)] (3+3=6) -> 23
       // Turn 1 (cmd=4): fork saw len=2; pushed rec {flag1:T, id:4, kind:$A(1), flag2:T} (4+1+10+20=35), sum $PTriple($A(1),T,$B(2)) (1+2+5=8) -> 23+43 = 66
-      const t1 = Array.from(guest.call("blot:proc_step:pack_proc", 4) as Uint32Array);
+      const t1 = Array.from(guest.call("squid:proc_step:pack_proc", 4) as Uint32Array);
       assert.deepEqual(t1, [2, 2, 66]);
       // Turn 2 (cmd=3): fork saw len=3; pushed rec {flag1:F, id:3, kind:$D(4), flag2:T} (3+4+20=27), sum $PTriple($D(4),F,$B(2)) (4+2=6) -> 66+33 = 99
-      const t2 = Array.from(guest.call("blot:proc_step:pack_proc", 3) as Uint32Array);
+      const t2 = Array.from(guest.call("squid:proc_step:pack_proc", 3) as Uint32Array);
       assert.deepEqual(t2, [3, 3, 99]);
     },
   );
@@ -520,24 +520,24 @@ io test_static_and_outline (n: U32): #[U32] =>
       );
 
       // Verify #process persistence across turns with outlined ShapeKind, Maybe Collider niche, BigBoxed, and STATIC_SHAPE!
-      guest.call("blot:proc_init:outline_proc", 5);
+      guest.call("squid:proc_init:outline_proc", 5);
       // Turn 1 (cmd=3):
       // fork saw kinds.length=3; rolled back;
       // active = $Some (mk_terrain_col 3) -> layer(2)+0+sx(1)+(cols 2 + h[1] 4)=9
       // kinds = [$Box(1), STATIC(10), STATIC(10)] -> 21
       // mixed = [$PSmall 5 (5), $PBig 5 (5 + 21 + 10 = 36), $PPacked (F, T) (3)] -> 44
-      const t1 = Array.from(guest.call("blot:proc_step:outline_proc", 3) as Uint32Array);
+      const t1 = Array.from(guest.call("squid:proc_step:outline_proc", 3) as Uint32Array);
       assert.deepEqual(t1, [3, 9, 21, 44]);
       // Turn 2 (cmd=0):
       // fork saw kinds.length=4; active = $Nothing -> 1
       // kinds += $Box(1) -> 22
       // mixed += $PPacked (T, F) (+7) -> 51
-      const t2 = Array.from(guest.call("blot:proc_step:outline_proc", 0) as Uint32Array);
+      const t2 = Array.from(guest.call("squid:proc_step:outline_proc", 0) as Uint32Array);
       assert.deepEqual(t2, [4, 1, 22, 51]);
       // Turn 3 (cmd=6):
       // fork saw kinds.length=5; active = $Some (mk_terrain_col 6) -> 2+0+1+(2+7)=12
       // kinds += $Box(1) -> 23; mixed += $PPacked (T, T) (+10) -> 61
-      const t3 = Array.from(guest.call("blot:proc_step:outline_proc", 6) as Uint32Array);
+      const t3 = Array.from(guest.call("squid:proc_step:outline_proc", 6) as Uint32Array);
       assert.deepEqual(t3, [5, 12, 23, 61]);
     },
   );

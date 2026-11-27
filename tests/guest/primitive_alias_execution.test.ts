@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const fixture = new URL("../../compiler-goose/tests/fixtures/primitive-aliases.blot", import.meta.url);
+const fixture = new URL("../../compiler-goose/tests/fixtures/primitive-aliases.sq", import.meta.url);
 const importedSource = `import * as primitives from "./primitives"
 const apply = func operation -> left -> right => return operation left right
 io const imported = func (value: U32): Array U32 => return do:
@@ -41,10 +41,10 @@ io const float_operators = func (value: F32): F32 => return do:
 // Direct backend gap: references to whole local values are not supported yet (tasks/DELETE_SCOPED.md).
 Deno.test.ignore(`primitive scalar aliases preserve eager calls partial snapshots identities and numeric laws`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-primitive-alias-",
+    prefix: "squid-primitive-alias-",
   });
-  const entry = `${directory}/main.blot`;
-  const library = `${directory}/primitives.blot`;
+  const entry = `${directory}/main.sq`;
+  const library = `${directory}/primitives.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
@@ -283,13 +283,13 @@ Deno.test.ignore(`primitive scalar aliases preserve eager calls partial snapshot
 
 Deno.test(`prelude primitive aliases retain operators associated dispatch and nominal behavior`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-primitive-prelude-",
+    prefix: "squid-primitive-prelude-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    prelude: new URL("../../std/prelude.sq", import.meta.url).pathname,
   });
   try {
     const built = await compiler.build({

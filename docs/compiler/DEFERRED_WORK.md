@@ -11,7 +11,7 @@ project options. Typed Code carries its latent effects on an ordinary
 Unit-to-Unit function type.
 
 The previous
-[demand design](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/docs/compiler/DEMANDS.md)
+[demand design](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/docs/compiler/DEMANDS.md)
 and
-[callback memo experiments](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/docs/compiler/KNOWN_CALLBACK_MEMOS.md)
+[callback memo experiments](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/docs/compiler/KNOWN_CALLBACK_MEMOS.md)
 remain pinned historical evidence. They do not describe the current compiler.

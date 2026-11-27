@@ -10,10 +10,10 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
   fileURLToPath(
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
   );
 const prelude = fileURLToPath(
-  new URL("../../std/prelude.blot", import.meta.url),
+  new URL("../../std/prelude.sq", import.meta.url),
 );
 const stdRoot = fileURLToPath(new URL("../../std", import.meta.url));
 
@@ -55,7 +55,7 @@ async function withModule(
   ) => void,
 ) {
   const dir = await Deno.makeTempDir({ prefix });
-  const entry = `${dir}/main.blot`;
+  const entry = `${dir}/main.sq`;
   await Deno.writeTextFile(entry, source);
   const compiler = await createZigProjectCompiler({
     executable,
@@ -126,7 +126,7 @@ io test_relaxed_ops (n: U32): Array U32 =>
   const RELAXED_TRUNC_U = [0xfd, 0x82, 0x02];
 
   let strictWords: number[] = [];
-  await withModule("blot-w3ext-def-", src, {}, (guest, bytes) => {
+  await withModule("squid-w3ext-def-", src, {}, (guest, bytes) => {
     ok(!hasByteSeq(bytes, RELAXED_MIN), "default must not emit relaxed_min");
     ok(!hasByteSeq(bytes, RELAXED_MAX), "default must not emit relaxed_max");
     ok(
@@ -137,7 +137,7 @@ io test_relaxed_ops (n: U32): Array U32 =>
     strictEqual(guest.call("test_indirect_tco", 200), 777);
   });
 
-  await withModule("blot-w3ext-on-", src, { wasm3: true }, (guest, bytes) => {
+  await withModule("squid-w3ext-on-", src, { wasm3: true }, (guest, bytes) => {
     ok(hasByteSeq(bytes, RELAXED_MIN), "expected f32x4.relaxed_min");
     ok(hasByteSeq(bytes, RELAXED_MAX), "expected f32x4.relaxed_max");
     ok(
@@ -175,7 +175,7 @@ io test_post_trap (idx: U32): U32 =>
   let c: #[4; U32] = #[100, 200, 300, 400]
   return sum_post_trap a b c idx
 `;
-  await withModule("blot-sized-bce-", src, {}, (guest, bytes) => {
+  await withModule("squid-sized-bce-", src, {}, (guest, bytes) => {
     strictEqual(guest.call("test_guarded", 0), 111);
     strictEqual(guest.call("test_guarded", 3), 444);
     strictEqual(guest.call("test_guarded", 4), 0);
@@ -245,7 +245,7 @@ io test_vec4_nominal (n: U32): Array U32 =>
   return out
 `;
   const V128_STORE = [0xfd, 0x0b];
-  await withModule("blot-aos-simd-", src, {}, (guest, bytes) => {
+  await withModule("squid-aos-simd-", src, {}, (guest, bytes) => {
     // Must emit v128.store instructions for both Vec2 (4x + 1x) and Vec4 (4x + 1x)!
     ok(
       countByteSeq(bytes, V128_STORE) >= 10,

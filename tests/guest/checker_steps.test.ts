@@ -1,18 +1,18 @@
 import { strict as assert } from "node:assert";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const repo = new URL("../../", import.meta.url).pathname;
-const prelude = `${repo}std/prelude.blot`;
+const prelude = `${repo}std/prelude.sq`;
 
 interface Checker {
   obligations_appended: number;
   inference_steps: number;
 }
 async function check(source: string): Promise<Checker> {
-  const directory = await Deno.makeTempDir({ prefix: "blot-checker-steps-" });
+  const directory = await Deno.makeTempDir({ prefix: "squid-checker-steps-" });
   try {
-    const input = `${directory}/main.blot`;
+    const input = `${directory}/main.sq`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(executable, {
       args: ["check", input, "--prelude", prelude],

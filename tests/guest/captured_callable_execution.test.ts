@@ -108,7 +108,7 @@ Deno.test("retained callable captured-original sync", async () => {
       equal(guest.call("answer", null), 42);
       equal(guest.call("add_forty", 2), 42);
     }
-  }, { prelude: "std/prelude.blot", asynchronous: false });
+  }, { prelude: "std/prelude.sq", asynchronous: false });
 });
 
 Deno.test("retained callable captured-original JSPI", async () => {
@@ -119,7 +119,7 @@ Deno.test("retained callable captured-original JSPI", async () => {
       equal(await guest.callAsync("answer", null), 42);
       equal(await guest.callAsync("add_forty", 2), 42);
     }
-  }, { prelude: "std/prelude.blot", asynchronous: true });
+  }, { prelude: "std/prelude.sq", asynchronous: true });
 });
 
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
@@ -205,9 +205,9 @@ io const run = func (count: U32) => return do:
 Deno.test("named environment roles keep scalar bits distinct in both tiers and invocation modes", async () => {
   const directory = await Deno.makeTempDir({
     dir: new URL("../../build", import.meta.url).pathname,
-    prefix: "blot-callable-roles-",
+    prefix: "squid-callable-roles-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   try {
     await Deno.writeTextFile(entry, `
 const read = func (values: Array U32) => return func (index: U32) => return values[index]
@@ -227,7 +227,7 @@ io const floating = func (values: Array F32) => return do:
 `);
     {
       const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+        executable: Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url),
         entry,
         prelude: null,
       });

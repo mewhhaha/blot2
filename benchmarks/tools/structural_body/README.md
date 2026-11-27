@@ -4,8 +4,8 @@ This Linux experiment retains a direct-backend generator, then measures how
 much work it takes to emit complete Wasm after a named function changes.
 The runner checks each result against a separate fresh Gdev build.
 
-From the Blot repository root, with the patched Goose toolchain and profiled
-Blot compiler already built, run
+From the Squid repository root, with the patched Goose toolchain and profiled
+Squid compiler already built, run
 
 ```sh
 python3 benchmarks/tools/structural_body/build.py
@@ -15,10 +15,10 @@ python3 benchmarks/tools/structural_body/run.py --rounds 12
 
 The build copies compiler sources and the Goose standard library to scratch
 storage, instruments the copy, and fingerprints the inputs and executables.
-Capture reads Git archives from the existing Blot, Gdev and Ink repositories.
-The 293-module graph uses Blot std from `bdd1f678`, Gdev `cc4bbbf` and Ink
+Capture reads Git archives from the existing Squid, Gdev and Ink repositories.
+The 293-module graph uses Squid std from `bdd1f678`, Gdev `cc4bbbf` and Ink
 `77697fe`. Source overlays apply only to the captured project. Set
-`BLOT_COMPILER` to select the reference executable. The capture library
+`SQUID_COMPILER` to select the reference executable. The capture library
 requires its matching native worker queue layout. Each capture builds with
 and without that library and validates the resulting Wasm.
 

@@ -21,7 +21,7 @@ import {
   readTestMetadata,
   readTrapMetadata,
   resolveProject,
-  runBlotTests,
+  runSquidTests,
   TEST_REPORT_MAGIC,
   TEST_REPORT_VERSION,
   type TestFailure,
@@ -30,7 +30,7 @@ import {
 } from "../../mod.ts";
 
 const executable = Deno.args.at(0) ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 function packet(passed: number, failures: TestFailure[]) {
   return [
@@ -115,13 +115,13 @@ function wasmWithTests(...payloads: number[][]): Uint8Array<ArrayBuffer> {
     0,
     0,
     ...payloads.flatMap((payload) => {
-      const data = [...utf8("blot:tests"), ...payload];
+      const data = [...utf8("squid:tests"), ...payload];
       return [0, ...leb(data.length), ...data];
     }),
   );
 }
 
-Deno.test("blot:tests metadata keeps wire order, kinds, UTF-8 and u32 lines", () => {
+Deno.test("squid:tests metadata keeps wire order, kinds, UTF-8 and u32 lines", () => {
   const name = "check 🌱".repeat(24);
   const bytes = wasmWithTests([
     1,
@@ -129,12 +129,12 @@ Deno.test("blot:tests metadata keeps wire order, kinds, UTF-8 and u32 lines", ()
     0,
     ...utf8("generated_check"),
     ...utf8(name),
-    ...utf8("prüfung.blot"),
+    ...utf8("prüfung.sq"),
     ...leb(128),
     1,
     ...utf8("generated_trap"),
     ...utf8("trap"),
-    ...utf8("é.blot"),
+    ...utf8("é.sq"),
     ...leb(0xFFFF_FFFF),
   ]);
   equal(readTestMetadata(new WebAssembly.Module(bytes)), [
@@ -142,14 +142,14 @@ Deno.test("blot:tests metadata keeps wire order, kinds, UTF-8 and u32 lines", ()
       kind: "check",
       exportName: "generated_check",
       displayName: name,
-      filename: "prüfung.blot",
+      filename: "prüfung.sq",
       line: 128,
     },
     {
       kind: "trap",
       exportName: "generated_trap",
       displayName: "trap",
-      filename: "é.blot",
+      filename: "é.sq",
       line: 0xFFFF_FFFF,
     },
   ]);
@@ -157,7 +157,7 @@ Deno.test("blot:tests metadata keeps wire order, kinds, UTF-8 and u32 lines", ()
   equal(readTestMetadata(wasmWithTests([1, 0])), []);
 });
 
-Deno.test("blot:tests rejects malformed sections", () => {
+Deno.test("squid:tests rejects malformed sections", () => {
   for (
     const [payload, message] of [
       [[], /Truncated/],
@@ -204,30 +204,30 @@ const infiniteLoop = `io test_a_loop (): Unit =>
 
 Deno.test("directory discovery selects first-class tests and rejection fixtures", () =>
   temporary(async (root) => {
-    const plain = await write(root, "src/plain.blot", 'test "check" => true\n');
+    const plain = await write(root, "src/plain.sq", 'test "check" => true\n');
     const trap = await write(
       root,
-      "src/trap.blot",
+      "src/trap.sq",
       'test expect_trap "trap" => 1 / 0\n',
     );
     const tagged = await write(
       root,
-      "src/tagged.blot",
+      "src/tagged.sq",
       '@[test.suite]\ntest "tagged" => true\n',
     );
     const inline = await write(
       root,
-      "src/inline.blot",
+      "src/inline.sq",
       '@[test.suite] test expect_trap "inline" => 1 / 0\n',
     );
     const rejected = await write(
       root,
-      "src/reject.blot",
+      "src/reject.sq",
       "// rejects: unknown_value\nconst value = missing\n",
     );
     const helper = await write(
       root,
-      "src/helper.blot",
+      "src/helper.sq",
       'const test = "helper"\n// test "comment" => true\n',
     );
     equal(await discoverTestModules({ root, paths: ["src"] }), [
@@ -248,8 +248,8 @@ Deno.test({
   fn: () =>
     temporary(async (root) => {
       const paths = await Promise.all([
-        write(root, "first.blot", unit),
-        write(root, "second.blot", unit),
+        write(root, "first.sq", unit),
+        write(root, "second.sq", unit),
       ]);
       const log = join(root, "calls");
       const native = executable instanceof URL
@@ -289,7 +289,7 @@ exec ${quote(native)} "$@"
           ] as const
         ) {
           await Deno.writeTextFile(log, "");
-          const report = await runBlotTests({
+          const report = await runSquidTests({
             executable: wrapper,
             root,
             paths,
@@ -327,7 +327,7 @@ Deno.test("runner executes Unit, Bool and BTST checks and expected traps", () =>
   temporary(async (root) => {
     const path = await write(
       root,
-      "checks.blot",
+      "checks.sq",
       `
 ${unit}
 io test_true (): Bool => return true
@@ -345,7 +345,7 @@ io trap_divide (): U32 => return @u32.div 1 0
 io trap_returns (): U32 => return 42
 `,
     );
-    const report = await runBlotTests({
+    const report = await runSquidTests({
       executable,
       paths: [path],
       jobs: 2,
@@ -378,60 +378,60 @@ io trap_returns (): U32 => return 42
 
 Deno.test("default discovery classifies traps and rejections and skips helpers", () =>
   temporary(async (root) => {
-    await write(root, "tests/helper.blot", "const value = 1\n");
-    await write(root, "node_modules/ignored.test.blot", unit);
-    await write(root, "app/sibling.test.blot", unit);
+    await write(root, "tests/helper.sq", "const value = 1\n");
+    await write(root, "node_modules/ignored.test.sq", unit);
+    await write(root, "app/sibling.test.sq", unit);
     const nested = await write(
       root,
-      "tests/nested/sample.blot",
+      "tests/nested/sample.sq",
       'test "future syntax"\n',
     );
     await write(
       root,
-      "tests/traps/divide.blot",
+      "tests/traps/divide.sq",
       "io test_divide (): U32 => return @u32.div 1 0\n",
     );
     const bad = "io demo (): Bool => return missing_value\n";
     await write(
       root,
-      "tests/rejected/a_code.blot",
+      "tests/rejected/a_code.sq",
       "// rejects: unknown_value\n" + bad,
     );
     await write(
       root,
-      "tests/rejected/b_message.blot",
+      "tests/rejected/b_message.sq",
       "// first comment\n\n// rejects: missing_value\n" + bad,
     );
     await write(
       root,
-      "tests/rejected/c_compiles.blot",
+      "tests/rejected/c_compiles.sq",
       "// rejects: unknown_value\n" + unit,
     );
     await write(
       root,
-      "tests/rejected/d_wrong.blot",
+      "tests/rejected/d_wrong.sq",
       "// rejects: unknown_type\n" + bad,
     );
-    await write(root, "tests/rejected/e_missing.blot", bad);
+    await write(root, "tests/rejected/e_missing.sq", bad);
     await write(
       root,
-      "tests/rejection_marker.blot",
+      "tests/rejection_marker.sq",
       "// rejects: unknown_value\n" + bad,
     );
-    const report = await runBlotTests({ executable, root, jobs: 2 });
+    const report = await runSquidTests({ executable, root, jobs: 2 });
     equal(
       report.modules.map((
         { path, kind, tests },
       ) => [basename(path), kind, tests[0].status]),
       [
-        ["sibling.test.blot", "checks", "passed"],
-        ["a_code.blot", "rejected", "passed"],
-        ["b_message.blot", "rejected", "passed"],
-        ["c_compiles.blot", "rejected", "failed"],
-        ["d_wrong.blot", "rejected", "failed"],
-        ["e_missing.blot", "rejected", "failed"],
-        ["rejection_marker.blot", "rejected", "passed"],
-        ["divide.blot", "traps", "passed"],
+        ["sibling.test.sq", "checks", "passed"],
+        ["a_code.sq", "rejected", "passed"],
+        ["b_message.sq", "rejected", "passed"],
+        ["c_compiles.sq", "rejected", "failed"],
+        ["d_wrong.sq", "rejected", "failed"],
+        ["e_missing.sq", "rejected", "failed"],
+        ["rejection_marker.sq", "rejected", "passed"],
+        ["divide.sq", "traps", "passed"],
       ],
     );
     equal(
@@ -442,19 +442,23 @@ Deno.test("default discovery classifies traps and rejections and skips helpers",
     match(await formatTestRunReport(report), /missing_value/);
     const helper = await discoverTestModules({
       root,
-      paths: ["tests/helper.blot"],
+      paths: ["tests/helper.sq"],
     });
-    equal(helper.map(({ path }) => basename(path)), ["helper.blot"]);
+    equal(helper.map(({ path }) => basename(path)), ["helper.sq"]);
     equal(
       await discoverTestModules({ root, paths: ["tests/nested"] }),
       [{ path: nested, kind: "checks" }],
     );
     const fromTrapDirectory = await discoverTestModules({
       root: join(root, "tests/traps"),
-      paths: ["divide.blot"],
+      paths: ["divide.sq"],
     });
     equal(fromTrapDirectory[0].kind, "traps");
-    const filtered = await runBlotTests({ executable, root, filter: "a_code" });
+    const filtered = await runSquidTests({
+      executable,
+      root,
+      filter: "a_code",
+    });
     equal([filtered.success, filtered.testsPassed, filtered.modules.length], [
       true,
       1,
@@ -466,22 +470,22 @@ Deno.test("filter skips unrelated compilation and bail stops queued tests and mo
   temporary(async (root) => {
     await write(
       root,
-      "tests/a.blot",
+      "tests/a.sq",
       `io test_a_fails (): Bool => return false
 io test_b_target (): Bool => return true
 `,
     );
     await write(
       root,
-      "tests/b.blot",
+      "tests/b.sq",
       "io test_other (): Bool => return unknown\n",
     );
     await write(
       root,
-      "tests/c.blot",
+      "tests/c.sq",
       `${unit}// mentions target but has no matching export\n`,
     );
-    const filtered = await runBlotTests({
+    const filtered = await runSquidTests({
       executable,
       root,
       filter: "target",
@@ -493,7 +497,7 @@ io test_b_target (): Bool => return true
       1,
     ]);
     equal(filtered.modules[0].tests[0].exportName, "test_b_target");
-    const unmatched = await runBlotTests({
+    const unmatched = await runSquidTests({
       executable,
       root,
       filter: "unmatched",
@@ -502,7 +506,7 @@ io test_b_target (): Bool => return true
       false,
       "No tests matched filter",
     ]);
-    const bailed = await runBlotTests({
+    const bailed = await runSquidTests({
       executable,
       root,
       bail: true,
@@ -516,7 +520,7 @@ io test_b_target (): Bool => return true
     equal(bailed.modules[0].tests[0].exportName, "test_a_fails");
     const emptyRoot = join(root, "empty");
     await Deno.mkdir(emptyRoot);
-    const empty = await runBlotTests({ executable, root: emptyRoot });
+    const empty = await runSquidTests({ executable, root: emptyRoot });
     equal([empty.success, empty.message], [false, "No test modules found"]);
   }));
 
@@ -526,8 +530,8 @@ Deno.test({
   sanitizeResources: true,
   fn: () =>
     temporary(async (root) => {
-      const path = await write(root, "deadline.blot", infiniteLoop + unit);
-      const report = await runBlotTests({
+      const path = await write(root, "deadline.sq", infiniteLoop + unit);
+      const report = await runSquidTests({
         executable,
         paths: [path],
         deadline: 0.15,
@@ -544,22 +548,22 @@ Deno.test({
 
 Deno.test("manifest discovery compiles each test with its own relative imports and package aliases", () =>
   temporary(async (root) => {
-    await write(root, "library/blot-workspace.yaml", "exports:\n  .: ./src\n");
-    await write(root, "library/src/value.blot", "const shared = 40\n");
+    await write(root, "library/squid-workspace.yaml", "exports:\n  .: ./src\n");
+    await write(root, "library/src/value.sq", "const shared = 40\n");
     const app = join(root, "app");
-    const paths = ["a/check.blot", "b/check.blot"];
+    const paths = ["a/check.sq", "b/check.sq"];
     const manifest = {
       tests: { files: paths },
       dependencies: { math: { path: "../library" } },
     };
-    await write(app, "blot.json", JSON.stringify(manifest));
+    await write(app, "squid.json", JSON.stringify(manifest));
     await write(
       app,
-      "tests/ignored.blot",
+      "tests/ignored.sq",
       "io test_ignored (): Bool => return false\n",
     );
-    await write(app, "a/helper.blot", "const local = 2\n");
-    await write(app, "b/helper.blot", "const local = 3\n");
+    await write(app, "a/helper.sq", "const local = 2\n");
+    await write(app, "b/helper.sq", "const local = 3\n");
     for (const [index, path] of paths.entries()) {
       await write(
         app,
@@ -571,7 +575,7 @@ io test_imports () => return @u32.eq (@u32.add shared local) ${42 + index}
       );
     }
     equal((await resolveProject(join(app, paths[0])))?.tests, { files: paths });
-    const report = await runBlotTests({
+    const report = await runSquidTests({
       executable,
       root: join(app, "a"),
       jobs: 2,
@@ -582,8 +586,8 @@ io test_imports () => return @u32.eq (@u32.add shared local) ${42 + index}
       JSON.stringify(report),
     );
 
-    await write(root, "override/value.blot", "const shared = 41\n");
-    const override = await runBlotTests({
+    await write(root, "override/value.sq", "const shared = 41\n");
+    const override = await runSquidTests({
       executable,
       root: app,
       paths: [paths[0]],
@@ -598,24 +602,24 @@ Deno.test("manifest validates the tests object and confines its paths to the pro
       const [tests, error] of [
         [null, /must be an object/],
         [{ extra: true }, /unknown field extra/],
-        [{ files: "check.blot" }, /must be an array/],
+        [{ files: "check.sq" }, /must be an array/],
         [{ files: [""] }, /nonempty string/],
         [{ files: [42] }, /nonempty string/],
-        [{ files: ["../check.blot"] }, /relative path/],
-        [{ files: [`../${basename(root)}/check.blot`] }, /relative path/],
-        [{ files: ["/check.blot"] }, /relative path/],
-        [{ files: ["C:/check.blot"] }, /relative path/],
-        [{ files: ["test\\check.blot"] }, /relative path/],
+        [{ files: ["../check.sq"] }, /relative path/],
+        [{ files: [`../${basename(root)}/check.sq`] }, /relative path/],
+        [{ files: ["/check.sq"] }, /relative path/],
+        [{ files: ["C:/check.sq"] }, /relative path/],
+        [{ files: ["test\\check.sq"] }, /relative path/],
       ] as const
     ) {
-      await write(root, "blot.json", JSON.stringify({ tests }));
-      await rejects(() => resolveProject(join(root, "test.blot")), error);
+      await write(root, "squid.json", JSON.stringify({ tests }));
+      await rejects(() => resolveProject(join(root, "test.sq")), error);
     }
   }));
 
-Deno.test("CLI emits a single JSON report under the blot task permissions", () =>
+Deno.test("CLI emits a single JSON report under the squid task permissions", () =>
   temporary(async (root) => {
-    const path = await write(root, "checks.blot", unit);
+    const path = await write(root, "checks.sq", unit);
     const cli = await write(
       root,
       "cli.ts",
@@ -633,7 +637,7 @@ Deno.exitCode = await runCli(compiler.startsWith("file:") ? new URL(compiler) : 
         "--allow-read",
         "--allow-write",
         "--allow-run",
-        "--allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR",
+        "--allow-env=HOME,XDG_CACHE_HOME,SPM_CACHE_DIR",
         cli,
         String(executable),
         "test",
@@ -698,13 +702,13 @@ function wasmWithTraps(...payloads: number[][]): Uint8Array<ArrayBuffer> {
     0,
     0,
     ...payloads.flatMap((payload) => {
-      const data = [...utf8("blot:traps"), ...payload];
+      const data = [...utf8("squid:traps"), ...payload];
       return [0, ...leb(data.length), ...data];
     }),
   );
 }
 
-Deno.test("blot:traps v1 decodes panic, bounds, and unreachable metadata and rejects malformed sections", () => {
+Deno.test("squid:traps v1 decodes panic, bounds, and unreachable metadata and rejects malformed sections", () => {
   equal(TRAP_SITE_OFFSET, 772);
   equal(readTrapMetadata(wasmWithTraps()), undefined);
   equal(readTrapMetadata(wasmWithTraps([1, ...u32le(0)])), []);
@@ -839,18 +843,18 @@ Deno.test("blot:traps v1 decodes panic, bounds, and unreachable metadata and rej
   );
 });
 
-Deno.test("blot test reports decoded panic and bounds traps with source line/col and keeps expect_trap passing", () =>
+Deno.test("squid test reports decoded panic and bounds traps with source line/col and keeps expect_trap passing", () =>
   temporary(async (root) => {
     const scalarPanicPath = await write(
       root,
-      "scalar_panic.blot",
+      "scalar_panic.sq",
       `test "panics":
   @panic "audit: lost receipt"
 `,
     );
     const mixedPath = await write(
       root,
-      "traps_provenance.blot",
+      "traps_provenance.sq",
       `import * as test from "std/test"
 
 test "out of bounds":
@@ -864,7 +868,7 @@ test "btst assertion location":
   use test.eq "expected sum" 42 41
 `,
     );
-    const report = await runBlotTests({
+    const report = await runSquidTests({
       executable,
       paths: [scalarPanicPath, mixedPath],
       jobs: 1,
@@ -901,15 +905,15 @@ test "btst assertion location":
     const formatted = await formatTestRunReport(report);
     match(
       formatted,
-      /panic: "audit: lost receipt"\n    at .*scalar_panic\.blot:2:3/,
+      /panic: "audit: lost receipt"\n    at .*scalar_panic\.sq:2:3/,
     );
     match(
       formatted,
-      /index out of bounds\n    at .*traps_provenance\.blot:5:11/,
+      /index out of bounds\n    at .*traps_provenance\.sq:5:11/,
     );
     match(
       formatted,
-      /expected sum: expected equal values\n      at .*traps_provenance\.blot:11\n      expected: 42\n      actual: 41/,
+      /expected sum: expected equal values\n      at .*traps_provenance\.sq:11\n      expected: 42\n      actual: 41/,
     );
   }));
 
@@ -917,7 +921,7 @@ Deno.test("repeated calls on the same guest after a trap never leak a stale trap
   temporary(async (root) => {
     const entry = await write(
       root,
-      "trap_reuse.blot",
+      "trap_reuse.sq",
       `io first_panic (): U32 => return @panic "first panic"
 io second_panic (): U32 => return @panic "second panic"
 io div_zero (): U32 => return @u32.div 1 0
@@ -940,8 +944,8 @@ io ok_value (): U32 => return 42
             equal(trap.kind, "panic");
             equal(trap.message, "first panic");
             equal(
-              (error as WebAssembly.RuntimeError & { blotTrap?: unknown })
-                .blotTrap,
+              (error as WebAssembly.RuntimeError & { squidTrap?: unknown })
+                .squidTrap,
               trap,
             );
             ok(error.cause instanceof WebAssembly.RuntimeError);

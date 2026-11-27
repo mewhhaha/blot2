@@ -1,6 +1,6 @@
 # Compiler direction
 
-Blot has one compiler, written in Goose (compiler-goose/). Deno provides its
+Squid has one compiler, written in Goose (compiler-goose/). Deno provides its
 project client, CLI, formatter,
 source generators, editor integration and WebAssembly host. See the
 [repository map](docs/README.md) and [current frontier](CONTINUE.md).
@@ -35,7 +35,7 @@ Keep these requirements while simplifying the implementation:
 
 The [task inventory](tasks/README.md) retains unresolved requirements and their
 origin. Earlier plans and design alternatives are preserved at the
-[pre-cleanup revision](https://github.com/mewhhaha/blot2/tree/541ff890f1df53b5fe8572bd7f2bc41230f2fddb);
+[pre-cleanup revision](https://github.com/mewhhaha/squid-lang/tree/541ff890f1df53b5fe8572bd7f2bc41230f2fddb);
 [the documentation map](docs/README.md) links the individual records. Superseded
 counted-memory and language-task directions are historical, not features to
 restore. Task 999's final completion audit remains unfinished.

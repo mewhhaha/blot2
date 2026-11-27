@@ -24,7 +24,7 @@ for (const variant of variants) {
   pins[variant.compiler] = await hash(variant.compiler);
 }
 for await (const entry of Deno.readDir(stdRoot)) {
-  if (entry.isFile && entry.name.endsWith(".blot")) {
+  if (entry.isFile && entry.name.endsWith(".sq")) {
     pins[`${stdRoot}/${entry.name}`] = await hash(`${stdRoot}/${entry.name}`);
   }
 }
@@ -84,11 +84,11 @@ async function compile(
       "--std-root",
       stdRoot,
       "--prelude",
-      `${stdRoot}/prelude.blot`,
+      `${stdRoot}/prelude.sq`,
     ],
     stdout: "piped",
     stderr: "piped",
-    env: { BLOT_CACHE_DIR: "" },
+    env: { SQUID_CACHE_DIR: "" },
   }).output();
   const wall_ms = performance.now() - started;
   const log = new TextDecoder().decode(result.stdout);
@@ -193,7 +193,7 @@ function allocation(
   const heap = Number((exported["qual:heap"] as WebAssembly.Global).value);
   const base = Number((exported["qual:base"] as WebAssembly.Global).value);
   const view = new DataView(
-    (exported["blot:memory"] as WebAssembly.Memory).buffer,
+    (exported["squid:memory"] as WebAssembly.Memory).buffer,
   );
   let blocks = 0, requested_bytes = 0, cursor = view.getUint32(4, true);
   while (cursor !== 0 && cursor < heap) {
@@ -217,7 +217,7 @@ function allocation(
 const runtime: Record<string, unknown>[] = [];
 let consumed = 0;
 for (const count of [0, 1, 8, 32, 128, 256, 16384]) {
-  const input = `${output}/runtime-${count}.blot`;
+  const input = `${output}/runtime-${count}.sq`;
   await Deno.writeTextFile(input, source(count));
   pins[input] = await hash(input);
   const built = [];
@@ -269,7 +269,7 @@ for (const count of [0, 1, 8, 32, 128, 256, 16384]) {
       for (let warm = 0; warm < 16; warm++) consumed ^= fn(argument);
       const pointer = fn(argument);
       const view = new DataView(
-        (instance.exports["blot:memory"] as WebAssembly.Memory).buffer,
+        (instance.exports["squid:memory"] as WebAssembly.Memory).buffer,
       );
       if (
         ["triangle_list", "packed2", "packed4", "references", "list_packed2"]
@@ -335,7 +335,7 @@ for (const count of [0, 1, 8, 32, 128, 256, 16384]) {
   );
 }
 const compilation: Record<string, unknown>[] = [];
-const input = `${output}/compile.blot`;
+const input = `${output}/compile.sq`;
 const original = source(128) +
   "const saved = list 32\nentry const staged = func () => return @array.length (@array.from_list saved)\n";
 await Deno.writeTextFile(input, original);
@@ -355,7 +355,7 @@ for (let pair = 0; pair < 7; pair++) {
       executable: variant.compiler,
       entry: input,
       stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
     });
     try {
       for (

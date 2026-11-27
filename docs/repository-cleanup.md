@@ -54,7 +54,7 @@ The
 records the subsequent physical reorganization and caller updates. Zig now owns
 `compiler/`; Deno tools live in `host/`; tests, benchmarks and reference
 material have separate roots. There are no compatibility directories. Historical
-raw records and all Blot programs remain byte-identical, and the README retains
+raw records and all Squid programs remain byte-identical, and the README retains
 both benchmark charts.
 
 The checked batch passes 57 tooling, six editor, 55 host/migration and 68 guest

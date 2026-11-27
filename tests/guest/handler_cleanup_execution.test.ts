@@ -21,8 +21,8 @@ io const memory = func () : Array U32 => return #[]
       // Array entries also skip the generated scalar-entry reset.
       const { instance } = await WebAssembly.instantiate(bytes);
       const exercise = instance.exports.exercise as (seed: number) => number;
-      const memory = instance.exports["blot:memory"] as WebAssembly.Memory;
-      const allocate = instance.exports["blot:allocate"] as (
+      const memory = instance.exports["squid:memory"] as WebAssembly.Memory;
+      const allocate = instance.exports["squid:allocate"] as (
         bytes: number,
       ) => number;
       const input = allocate(8);

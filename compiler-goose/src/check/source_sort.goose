@@ -15,7 +15,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-namespace blot_check_source_sort;
+namespace squid_check_source_sort;
 import std;
 enum Hint {increasing,decreasing,unknown}
 struct Range {a:i64,b:i64,limit:i64,leftmost:bool,balanced:bool,partitioned:bool}

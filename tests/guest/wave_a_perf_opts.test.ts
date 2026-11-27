@@ -3,16 +3,16 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
-const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url);
 const stdRoot = new URL("../../std", import.meta.url);
 
 async function compileAndRun(
   source: string,
   run: (guest: Awaited<ReturnType<typeof instantiateGuest>>) => void | Promise<void>,
 ): Promise<void> {
-  const dir = await Deno.makeTempDir({ prefix: "blot-wave-a-" });
-  const entry = `${dir}/main.blot`;
+  const dir = await Deno.makeTempDir({ prefix: "squid-wave-a-" });
+  const entry = `${dir}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

@@ -5,9 +5,9 @@ import {
 } from "./compile_helpers.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
+const prelude = new URL("../../std/prelude.sq", import.meta.url).pathname;
 const compiler = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 Deno.test("qualified aliases and local templates instantiate separate concrete evidence", async () => {
   await compileAndRun(
@@ -165,12 +165,12 @@ Deno.test.ignore("qualified imports preserve representation predicates and callb
     prefix: "zig-native-where-import-",
   });
   try {
-    const library = `${directory}/library.blot`;
+    const library = `${directory}/library.sq`;
     await Deno.writeTextFile(
       library,
       "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {} } = func callback => return callback ()\n",
     );
-    const main = `${directory}/main.blot`;
+    const main = `${directory}/main.sq`;
     const output = `${directory}/program.wasm`;
     await Deno.writeTextFile(
       main,

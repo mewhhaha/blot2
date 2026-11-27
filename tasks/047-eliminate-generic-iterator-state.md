@@ -9,7 +9,7 @@
 - **Originating requirements:** PLAN: Earlier programs / iterator step and
   cursor allocation. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -18,7 +18,7 @@ and loops.
 
 ## Starting point
 
-[std/iter.blot](../std/iter.blot),
+[std/iter.sq](../std/iter.sq),
 [known_call.zig](../compiler/src/backend/known_call.zig),
 [wasm_sroa.zig](../compiler/src/backend/wasm_sroa.zig) and
 [wasm_inline.zig](../compiler/src/backend/wasm_inline.zig) remove some
@@ -43,7 +43,7 @@ pins pull semantics.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Test map/filter/take/take_while/enumerate/zip/zip_strict/windows pipelines,

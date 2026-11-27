@@ -12,7 +12,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     baseline: { type: "string" },
     repetitions: { type: "string", default: "3" },
@@ -53,7 +53,7 @@ async function pinSources(directory: string): Promise<void> {
   for await (const file of Deno.readDir(directory)) {
     const path = resolve(directory, file.name);
     if (file.isDirectory) pending.push(pinSources(path));
-    else if (file.name.endsWith(".blot")) {
+    else if (file.name.endsWith(".sq")) {
       pending.push((async () => {
         sourceFiles[path] = await hash(await Deno.readFile(path));
       })());
@@ -139,7 +139,7 @@ type Sample = {
 };
 const samples: Sample[] = [];
 for (const callers of [1, 4, 8]) {
-  const entry = resolve(evidence, `ecs-${callers}.blot`);
+  const entry = resolve(evidence, `ecs-${callers}.sq`);
   const source = sourceFor(callers);
   await Deno.writeTextFile(entry, source);
   for (let repetition = 0; repetition < repetitions; repetition++) {
@@ -161,7 +161,7 @@ for (const callers of [1, 4, 8]) {
           entry,
           imports: { "ink/": resolve(root, "../ink/lib") },
           stdRoot: resolve(root, "std"),
-          prelude: resolve(root, "std/prelude.blot"),
+          prelude: resolve(root, "std/prelude.sq"),
           profileBackend: true,
           startupTimeoutMs: 5000,
         });

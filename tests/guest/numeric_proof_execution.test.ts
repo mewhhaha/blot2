@@ -3,16 +3,16 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 {
   Deno.test(`selected numeric result operands preserve exact bodies imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-proof-operands-",
+      prefix: "squid-proof-operands-",
     });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/index.blot`;
-    const archive = `${directory}/index.blotdep`;
+    const entry = `${directory}/main.sq`;
+    const dependency = `${directory}/index.sq`;
+    const archive = `${directory}/index.sqdep`;
     const library = `const selected = func (unused: U32) => return func (index: U32) => return do:
   let copied = index
   break copied
@@ -125,11 +125,11 @@ io const lookup = func (index: U32) => return do:
 {
   Deno.test(`prepared associated numeric operands preserve exact methods imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-associated-proof-",
+      prefix: "squid-associated-proof-",
     });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/index.blot`;
-    const archive = `${directory}/index.blotdep`;
+    const entry = `${directory}/main.sq`;
+    const dependency = `${directory}/index.sq`;
+    const archive = `${directory}/index.sqdep`;
     const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let copied = index
@@ -265,11 +265,11 @@ io const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
 {
   Deno.test(`selected arithmetic identities preserve boundaries exact methods imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-identity-proof-",
+      prefix: "squid-identity-proof-",
     });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/index.blot`;
-    const archive = `${directory}/index.blotdep`;
+    const entry = `${directory}/main.sq`;
+    const dependency = `${directory}/index.sq`;
+    const archive = `${directory}/index.sqdep`;
     const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let zero = @u32.sub index index
@@ -415,10 +415,10 @@ io const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
 {
   Deno.test(`conditional numeric identities preserve condition traps and invalidate edited branches`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-conditional-proof-",
+      prefix: "squid-conditional-proof-",
     });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/index.blot`;
+    const entry = `${directory}/main.sq`;
+    const dependency = `${directory}/index.sq`;
     const library =
       `const selected = func (index: U32) => return if @u32.eq (@u32.div 1 index) 0 then index else index
 `;

@@ -1,7 +1,7 @@
 # Numeric proof prototype
 
 Task 070 is in progress. The isolated source in
-`/var/tmp/blot2-erased-proofs-070` grants no runtime witness authority and is
+`/var/tmp/squid-erased-proofs-070` grants no runtime witness authority and is
 not part of the qualified main compiler. [The design](../compiler/ERASED_PROOFS.md) remains
 the acceptance contract.
 

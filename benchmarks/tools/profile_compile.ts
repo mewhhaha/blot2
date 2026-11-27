@@ -1,7 +1,7 @@
-// Sampling profile of blotc builds, for attributing compile time to code:
+// Sampling profile of squidc builds, for attributing compile time to code:
 //
-//   deno task profile:compile [--blotc compiler-goose/build/blotc-goose]
-//     [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
+//   deno task profile:compile [--squidc compiler-goose/build/squidc-goose]
+//     [--workload game|devtools] [--test tests/NAME.sq] [--edit SCENARIO]
 //     [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
 //     [--snapshot DIR] [--out DIR]
 //   deno task profile:compile --aggregate SAMPLES.jsonl... [--top 40]
@@ -12,8 +12,8 @@
 // per run; --edit populates the session unsampled, then samples --reps
 // edit/revert pairs of a retained scenario. The report has self, inclusive,
 // subsystem, file, line and caller-attribution tables. A wrapper allows the
-// attach under Yama ptrace_scope=1 (PR_SET_PTRACER) and then execs blotc.
-// Requires Linux, gdb and python3, and a blotc with DWARF (release builds keep
+// attach under Yama ptrace_scope=1 (PR_SET_PTRACER) and then execs squidc.
+// Requires Linux, gdb and python3, and a squidc with DWARF (release builds keep
 // it). Samples stay in the output directory: they name compiler functions and
 // files only, never gdev source.
 import { parseArgs } from "node:util";
@@ -37,8 +37,8 @@ async function digest(path: string): Promise<string> {
     ),
   ].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-const usage = `Usage: deno task profile:compile [--blotc BLOTC]
-  [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
+const usage = `Usage: deno task profile:compile [--squidc SQUIDC]
+  [--workload game|devtools] [--test tests/NAME.sq] [--edit SCENARIO]
   [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
   [--snapshot DIR] [--out DIR] [--codegen-workers 4]
   [--successive-literals] [--verify-manifest] [--manifest FILE]
@@ -48,7 +48,7 @@ Results: build/tmp/profile/<timestamp>/{samples.jsonl,report.txt}.`;
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
   options: {
-    blotc: { type: "string" },
+    squidc: { type: "string" },
     workload: { type: "string", default: "game" },
     test: { type: "string" },
     edit: { type: "string" },
@@ -97,9 +97,9 @@ async function waitFor(path: string, gdb: Deno.ChildProcess, what: string) {
   throw new Error(`gdb did not ${what} within two minutes`);
 }
 
-/** Lets gdb attach under Yama ptrace_scope=1, then execs blotc unchanged. */
-async function ptracerWrapper(out: string, blotc: string): Promise<string> {
-  const path = `${out}/blotc-ptracer`;
+/** Lets gdb attach under Yama ptrace_scope=1, then execs squidc unchanged. */
+async function ptracerWrapper(out: string, squidc: string): Promise<string> {
+  const path = `${out}/squidc-ptracer`;
   await Deno.writeTextFile(
     path,
     `#!/usr/bin/env python3
@@ -107,7 +107,7 @@ async function ptracerWrapper(out: string, blotc: string): Promise<string> {
 import ctypes, os, sys
 PR_SET_PTRACER, PR_SET_PTRACER_ANY = 0x59616D61, ctypes.c_ulong(-1).value
 ctypes.CDLL(None).prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)
-os.execv(${JSON.stringify(blotc)}, [${JSON.stringify(blotc)}] + sys.argv[1:])
+os.execv(${JSON.stringify(squidc)}, [${JSON.stringify(squidc)}] + sys.argv[1:])
 `,
   );
   await Deno.chmod(path, 0o755);
@@ -117,7 +117,7 @@ os.execv(${JSON.stringify(blotc)}, [${JSON.stringify(blotc)}] + sys.argv[1:])
 async function sampleRun(
   run: number,
   out: string,
-  blotc: string,
+  squidc: string,
   wrapper: string,
   workload: Workload,
 ): Promise<void> {
@@ -144,7 +144,7 @@ async function sampleRun(
     env: {
       SAMPLE_CONTROL: control,
       SAMPLE_RUN: String(run),
-      SAMPLE_BINARY: blotc,
+      SAMPLE_BINARY: squidc,
       SAMPLE_OUT: `${out}/samples.jsonl`,
       SAMPLE_MIN_MS: args["min-ms"]!,
       SAMPLE_MAX_MS: args["max-ms"]!,
@@ -236,7 +236,7 @@ async function sampleRun(
         if (second) await build({}, `revert ${scenario.name}`);
       };
     } else measured = () => build({}, "cold build");
-    // The wrapper execs blotc in place, so the client's pid is the compiler.
+    // The wrapper execs squidc in place, so the client's pid is the compiler.
     await Deno.writeTextFile(`${control}/pid`, String(compiler.pid));
     await waitFor(`${control}/attached`, gdb, "attached");
     await sleep(150);
@@ -433,7 +433,7 @@ async function main(): Promise<number> {
   if (args["successive-literals"] && args.edit !== "literal_constant") {
     throw new Error("--successive-literals requires --edit literal_constant");
   }
-  const blotc = resolve(args.blotc ?? `${repo}/compiler-goose/build/blotc-goose`);
+  const squidc = resolve(args.squidc ?? `${repo}/compiler-goose/build/squidc-goose`);
   const snapshotRoot = resolve(
     args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
   );
@@ -464,7 +464,7 @@ async function main(): Promise<number> {
   const pins: Record<string, string> = {};
   for (
     const path of [
-      blotc,
+      squidc,
       fileURLToPath(import.meta.url),
       `${repo}/benchmarks/tools/gdb_sampler.py`,
       manifestPath,
@@ -495,7 +495,7 @@ async function main(): Promise<number> {
     for await (const entry of Deno.readDir(directory)) {
       const path = `${directory}/${entry.name}`;
       if (entry.isDirectory) await pinTree(path);
-      else if (entry.isFile && entry.name.endsWith(".blot")) {
+      else if (entry.isFile && entry.name.endsWith(".sq")) {
         pins[path] = await digest(path);
       }
     }
@@ -522,9 +522,9 @@ async function main(): Promise<number> {
       2,
     ) + "\n",
   );
-  const wrapper = await ptracerWrapper(out, blotc);
+  const wrapper = await ptracerWrapper(out, squidc);
   for (let run = 0; run < Number(args.runs); run++) {
-    await sampleRun(run, out, blotc, wrapper, workload);
+    await sampleRun(run, out, squidc, wrapper, workload);
   }
   for (const [path, expected] of Object.entries(pins)) {
     if (await digest(path) !== expected) {

@@ -1,13 +1,13 @@
-// Run from the Blot root, with the Gdev checkout next to it.
+// Run from the Squid root, with the Gdev checkout next to it.
 import { strict as assert } from "node:assert";
 import { basename, join, resolve } from "node:path";
 import { createCompiler, instantiateGuest } from "../../mod.ts";
 
 const root = resolve("../gdev/src/assets");
-const entry = join(root, "stage-catalog-probe.blot");
+const entry = join(root, "stage-catalog-probe.sq");
 const names = ["catalog.json", "aim.png", "checker.png"];
 const compiler = await createCompiler({
-  executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+  executable: resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
   entry,
   prelude: null,
   nativeAssets: {

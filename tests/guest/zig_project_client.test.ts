@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 const executable = resolve(
   Deno.args[0] ??
-    fileURLToPath(new URL("../../compiler-goose/build/blotc-goose", import.meta.url)),
+    fileURLToPath(new URL("../../compiler-goose/build/squidc-goose", import.meta.url)),
 );
 async function sha(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   return Array.from(
@@ -22,8 +22,8 @@ async function sha(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
 async function verified(directory: string): Promise<string> {
   const seed = directory + "/identity";
   await Deno.mkdir(seed);
-  const entry = seed + "/main.blot", bundle = seed + "/dependencies.blotdep";
-  await Deno.writeTextFile(seed + "/library.blot", "const value = 42\n");
+  const entry = seed + "/main.sq", bundle = seed + "/dependencies.sqdep";
+  await Deno.writeTextFile(seed + "/library.sq", "const value = 42\n");
   await Deno.writeTextFile(
     entry,
     'import {value} from "./library"\nio const answer = value\n',
@@ -37,7 +37,7 @@ async function verified(directory: string): Promise<string> {
   ]);
   const bytes = await Deno.readFile(bundle);
   ok(bytes.length >= 212);
-  equal(new TextDecoder().decode(bytes.subarray(0, 8)), "BLOTDEP1");
+  equal(new TextDecoder().decode(bytes.subarray(0, 8)), "SQUIDEP1");
   equal(new DataView(bytes.buffer).getUint32(8, true), 5);
   const identity = Array.from(
     bytes.subarray(44, 76),
@@ -152,9 +152,9 @@ function reaped(pid: number) {
 }
 
 Deno.test("Zig project client streams bounded profile trace through disposal", async () => {
-  const item = await fixture("blot-zig-project-trace-");
+  const item = await fixture("squid-zig-project-trace-");
   const { directory } = item;
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   const readyPath = directory + "/third-ready";
   const peerSource = String.raw`
 const encoder = new TextEncoder();
@@ -184,14 +184,14 @@ async function trace(line: string) {
   await Deno.stderr.write(bytes.subarray(11));
 }
 async function record(value: Record<string, unknown>) {
-  await trace("BLOT_PROFILE " + JSON.stringify({ ...value, space: value.space ?? "source" }) + "\n");
+  await trace("SQUID_PROFILE " + JSON.stringify({ ...value, space: value.space ?? "source" }) + "\n");
 }
 async function rejectBuild(metadata: Record<string, any>) {
-  await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.blot",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}]});
+  await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.sq",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}]});
 }
 await writeFrame({
   kind: "hello",
-  protocol: "blot-zig-project",
+  protocol: "squid-zig-project",
   version: 1,
   maxFrameBytes: 67108864,
   compilerIdentity: "a".repeat(64),
@@ -211,19 +211,19 @@ while (true) {
     buildCount++;
     if (buildCount === 1) firstBuild = metadata.id;
     if (buildCount === 1) {
-      await record({kind:"module",build:metadata.id,unit:1,filename:"build-one.blot",bytes:41});
+      await record({kind:"module",build:metadata.id,unit:1,filename:"build-one.sq",bytes:41});
       await rejectBuild(metadata);
     } else if (buildCount === 2) {
-      await record({kind:"module",build:firstBuild,unit:99,filename:"late-old.blot",bytes:999});
+      await record({kind:"module",build:firstBuild,unit:99,filename:"late-old.sq",bytes:999});
       await record({kind:"end",build:firstBuild,id:199,thread:1,stage:"check.module",unit:2,start:0,end:1,at_us:80,us:9000,cpu_us:9000,input_items:0,output_items:0});
-      await record({kind:"module",build:metadata.id,unit:1,filename:"build-two.blot",bytes:42});
-      await record({kind:"module",build:metadata.id,space:"core",unit:1,filename:"core-two.blot",bytes:0});
+      await record({kind:"module",build:metadata.id,unit:1,filename:"build-two.sq",bytes:42});
+      await record({kind:"module",build:metadata.id,space:"core",unit:1,filename:"core-two.sq",bytes:0});
       await record({kind:"phases",build:metadata.id,active:"check",phase_us:Array(11).fill(7),at_us:90});
       await record({kind:"begin",build:metadata.id,id:200,thread:1,stage:"long",unit:2,start:0,end:1,at_us:91});
       await record({kind:"end",build:metadata.id,id:202,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:92,us:7,cpu_us:4,input_items:0,output_items:0});
       await record({kind:"end",build:metadata.id,id:203,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:93,us:11,cpu_us:5,input_items:0,output_items:0});
       await record({kind:"end",build:metadata.id,space:"core",id:204,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:94,us:3,cpu_us:1,input_items:0,output_items:0});
-      await trace('BLOT_PROFILE {broken json}\n');
+      await trace('SQUID_PROFILE {broken json}\n');
       await trace("x".repeat(70000) + "\n");
       for (let index = 0; index < 300; index++) {
         await record({kind:"detail",build:metadata.id,thread:1,stage:"body",unit:2,start:index,end:index+1,items:index,at_us:100+index});
@@ -231,7 +231,7 @@ while (true) {
       await record({kind:"end",build:metadata.id,id:201,thread:1,stage:"lower",unit:2,start:0,end:1,at_us:500,us:12,cpu_us:null,input_items:345,output_items:123});
       await rejectBuild(metadata);
     } else {
-      await record({kind:"module",build:metadata.id,unit:3,filename:"cancelled.blot",bytes:43});
+      await record({kind:"module",build:metadata.id,unit:3,filename:"cancelled.sq",bytes:43});
       await Deno.writeTextFile(readyPath, String(metadata.id));
       await readExact(8);
     }
@@ -303,13 +303,13 @@ while (true) {
       build: Number(buildId),
       space: "source",
       unit: 3,
-      filename: "cancelled.blot",
+      filename: "cancelled.sq",
       bytes: 43,
     });
     equal(progress.modules, [{
       space: "source",
       unit: 3,
-      filename: "cancelled.blot",
+      filename: "cancelled.sq",
       bytes: 43,
     }]);
     equal(progress.phases, null);
@@ -329,12 +329,12 @@ while (true) {
     equal(isolated.modules, [{
       space: "source",
       unit: 1,
-      filename: "build-two.blot",
+      filename: "build-two.sq",
       bytes: 42,
     }, {
       space: "core",
       unit: 1,
-      filename: "core-two.blot",
+      filename: "core-two.sq",
       bytes: 0,
     }]);
     equal(isolated.phases?.phase_us, Array(11).fill(7));
@@ -361,9 +361,9 @@ while (true) {
 });
 
 Deno.test("Zig project client queues revisions and preserves entry edit/error/missing/correction bytes", async () => {
-  const item = await fixture("blot-zig-project-entry-");
+  const item = await fixture("squid-zig-project-entry-");
   const { directory } = item;
-  const entry = directory + "/main.blot";
+  const entry = directory + "/main.sq";
   let compiler: ZigProjectCompiler | undefined;
   const original = "io const answer: Unit -> U32 = func () => return 42\n";
   try {
@@ -426,7 +426,7 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
 });
 
 Deno.test("Zig project client keeps lexical alias roots through retargeting and compiled dependency admission", async () => {
-  const item = await fixture("blot-zig-project-imports-");
+  const item = await fixture("squid-zig-project-imports-");
   const { directory } = item;
   let compiler: ZigProjectCompiler | undefined;
   try {
@@ -436,15 +436,15 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     await Deno.mkdir(left);
     await Deno.mkdir(right);
     await Deno.writeTextFile(
-      left + "/library.blot",
+      left + "/library.sq",
       "const exported_value = 40\n",
     );
     await Deno.writeTextFile(
-      right + "/library.blot",
+      right + "/library.sq",
       "const exported_value = 60\n",
     );
     await Deno.symlink(left, link);
-    const entry = directory + "/main.blot";
+    const entry = directory + "/main.sq";
     await Deno.writeTextFile(
       entry,
       'import {exported_value} from "lib/library"\nio const answer: Unit -> U32 = func () => return @u32.add exported_value 2\n',
@@ -468,12 +468,12 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     equal(retargeted.revision, 2);
     await answer(retargeted, 62);
     await fresh(directory, entry, retargeted, "project-retargeted", aliases);
-    await Deno.remove(right + "/library.blot");
+    await Deno.remove(right + "/library.sq");
     const missing = await compiler.build();
     ok(!missing.success);
     equal(missing.revision, 2);
     await Deno.writeTextFile(
-      right + "/library.blot",
+      right + "/library.sq",
       "const exported_value = 60\n",
     );
     const restored = await compiler.build();
@@ -481,7 +481,7 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     await answer(restored, 62);
     await compiler.close();
     reaped(compiler.pid);
-    const bundle = directory + "/dependencies.blotdep";
+    const bundle = directory + "/dependencies.sqdep";
     await command(directory, "bundle-create", [
       "dependencies",
       entry,
@@ -500,7 +500,7 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     ok(success(cached).stats.cachedModules === 1);
     await fresh(directory, entry, cached, "project-cached", aliases);
     await Deno.writeTextFile(
-      right + "/library.blot",
+      right + "/library.sq",
       "const exported_value = 61\n",
     );
     const changed = await compiler.build();
@@ -519,13 +519,13 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
 });
 
 Deno.test("Zig project client rejects an incompatible dependency schema during open without fallback", async () => {
-  const item = await fixture("blot-zig-project-decline-");
-  const { directory } = item, entry = directory + "/main.blot";
+  const item = await fixture("squid-zig-project-decline-");
+  const { directory } = item, entry = directory + "/main.sq";
   try {
     await Deno.writeTextFile(entry, "io const answer = 42\n");
     const identity = await verified(directory);
     const valid = await Deno.readFile(
-      directory + "/identity/dependencies.blotdep",
+      directory + "/identity/dependencies.sqdep",
     );
     const incompatible = valid.slice();
     // The fixed schema digest starts after magic and version.
@@ -533,7 +533,7 @@ Deno.test("Zig project client rejects an incompatible dependency schema during o
     incompatible[12] ^= 1;
     equal(incompatible.subarray(0, 12), valid.subarray(0, 12));
     equal(incompatible.subarray(13), valid.subarray(13));
-    const bundle = directory + "/incompatible.blotdep";
+    const bundle = directory + "/incompatible.sqdep";
     await Deno.writeFile(bundle, incompatible);
     await rejects(
       createZigProjectCompiler({
@@ -553,8 +553,8 @@ Deno.test("Zig project client rejects an incompatible dependency schema during o
 });
 
 Deno.test("chunk runtime and static chains survive dependency bundles and retained entry edits", async () => {
-  const item = await fixture("blot-zig-project-collections-");
-  const { directory } = item, entry = directory + "/main.blot";
+  const item = await fixture("squid-zig-project-collections-");
+  const { directory } = item, entry = directory + "/main.sq";
   let compiler: ZigProjectCompiler | undefined;
   const source = (offset: number) =>
     `import * as lists from "./lists"
@@ -562,7 +562,7 @@ io const answer = func () => return @u32.add (lists.read 40) ${offset}
 `;
   try {
     await Deno.writeTextFile(
-      directory + "/lists.blot",
+      directory + "/lists.sq",
       `
 const frozen = @array.generate 513 (func index => return index)
 const first = func values => return values[0]
@@ -575,7 +575,7 @@ const read = func (seed: U32) => return do:
     );
     await Deno.writeTextFile(entry, source(2));
     const identity = await verified(directory);
-    const bundle = directory + "/collections.blotdep";
+    const bundle = directory + "/collections.sqdep";
     await command(directory, "collection-bundle", [
       "dependencies",
       entry,

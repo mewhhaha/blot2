@@ -13,7 +13,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     widths: { type: "string", default: "32,128" },
     captures: { type: "string", default: "1,4" },
@@ -201,7 +201,7 @@ for (const width of widths) {
               `w${width}-c${captureCount}-n${callCount}-${ownerMode}-${readMode}-r${repetition}`;
             const directory = resolve(outputRoot, name);
             await Deno.mkdir(directory, { recursive: true });
-            const entry = resolve(directory, "main.blot");
+            const entry = resolve(directory, "main.sq");
             const source = sourceFor(
               width,
               captureCount,

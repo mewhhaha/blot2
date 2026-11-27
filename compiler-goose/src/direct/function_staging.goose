@@ -1,5 +1,5 @@
 // Evaluate closed Core values before writing the caller's Wasm body.
-namespace blot_direct_function;
+namespace squid_direct_function;
 import .function;
 import check.scalar_ops;
 import backend.native_assets;
@@ -11,7 +11,7 @@ reusable[] var binding_runs:StageBinding[>..]=[];
 import check.typed_staging;
 import support.native;
 
-struct StageValue { bits: u32 = 0, ty: u32 = blot_check_types::unit, returning_to: u32 = 0, high: u32 = 0 }
+struct StageValue { bits: u32 = 0, ty: u32 = squid_check_types::unit, returning_to: u32 = 0, high: u32 = 0 }
 struct StageFunction { unit: u32, target: u32, captures: u32, count: u32, named: bool }
 reusable[] var stage_function_runs:StageFunction[>..]=[];
 let stage_function: u32 = 0xfffffffe;
@@ -20,13 +20,13 @@ struct StageBinding { binding: u32, value: StageValue }
 // ranges so that bindings and calls can share values during evaluation.
 
 struct StagePart { name: u32 = 0, value: StageValue = StageValue {} }
-struct StageAggregate { kind: blot_check_core::Tag, start: u32, len: u32, tag: u32, nom_unit: u32 = 0, nom_decl: u32 = 0 }
+struct StageAggregate { kind: squid_check_core::Tag, start: u32, len: u32, tag: u32, nom_unit: u32 = 0, nom_decl: u32 = 0 }
 let stage_aggregate: u32 = 0xffffffff;
 struct Stage {
-    parts: blot_support_pooled_buffer::Buffer<StagePart> = blot_support_pooled_buffer::Buffer<StagePart>{..},
-    aggregates: blot_support_pooled_buffer::Buffer<StageAggregate> = blot_support_pooled_buffer::Buffer<StageAggregate>{..},
-    bindings: blot_support_pooled_buffer::Buffer<StageBinding> = blot_support_pooled_buffer::Buffer<StageBinding>{..},
-    functions: blot_support_pooled_buffer::Buffer<StageFunction> = blot_support_pooled_buffer::Buffer<StageFunction>{..},
+    parts: squid_support_pooled_buffer::Buffer<StagePart> = squid_support_pooled_buffer::Buffer<StagePart>{..},
+    aggregates: squid_support_pooled_buffer::Buffer<StageAggregate> = squid_support_pooled_buffer::Buffer<StageAggregate>{..},
+    bindings: squid_support_pooled_buffer::Buffer<StageBinding> = squid_support_pooled_buffer::Buffer<StageBinding>{..},
+    functions: squid_support_pooled_buffer::Buffer<StageFunction> = squid_support_pooled_buffer::Buffer<StageFunction>{..},
     remaining: i64 = 65536,
     failure: Chars = "",
     failure_buf: u8[256] = [0; 256],
@@ -78,11 +78,11 @@ recursive fn hashStageValue(g: Generator&, s: const Stage&, v: StageValue, depth
         return;
     }
     let agg = s.aggregates.items[v.bits];
-    g.mixStagedDigest(blot_check_core::tagCode(agg.kind) as u64);
+    g.mixStagedDigest(squid_check_core::tagCode(agg.kind) as u64);
     g.mixStagedDigest(agg.len as u64);
     g.mixStagedDigest(agg.tag as u64);
-    if agg.kind == blot_check_core::Tag.array && agg.tag != 0 {
-        let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, agg.tag);
+    if agg.kind == squid_check_core::Tag.array && agg.tag != 0 {
+        let bytes, found = squid_backend_native_assets::readBuildInput(g.build_inputs, agg.tag);
         if found {
             g.mixStagedDigest(bytes.len as u64);
             for b in bytes { g.mixStagedDigest(b as u64); }
@@ -98,12 +98,12 @@ recursive fn hashStageValue(g: Generator&, s: const Stage&, v: StageValue, depth
 
 fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
-    if m.node(id).c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) { return neverVal(), g.fail(m, id, "@build.read needs a surrounding #run"); }
+    if m.node(id).c == squid_check_typed_staging::opCode(squid_check_typed_staging::Op.read_input) { return neverVal(), g.fail(m, id, "@build.read needs a surrounding #run"); }
     g.recordStagedDepUnit(m.unit);
     var s = Stage {..};
     let value = evaluateStage(g, f, s, m, id, 0, 0);
     var result = neverVal();
-    var error = blot_direct_types::Error.none;
+    var error = squid_direct_types::Error.none;
     let failed = stageFailureText(s);
     if failed.len != 0 { error = g.fail(m, id, failed); }
     else {
@@ -113,16 +113,16 @@ fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         else {
             let ty, lowered = typeOf(g, f, id);
             error = lowered;
-            if error == blot_direct_types::Error.none {
+            if error == squid_direct_types::Error.none {
                 var remaining: i64 = 65536;
                 result, error = emitStageValue(g, f, s, value, ty, id, remaining, 0);
             }
         }
     }
-    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
-    blot_support_pooled_buffer::deinit(s.parts, part_runs);
-    blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
-    blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
+    squid_support_pooled_buffer::deinit(s.functions, stage_function_runs);
+    squid_support_pooled_buffer::deinit(s.parts, part_runs);
+    squid_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
+    squid_support_pooled_buffer::deinit(s.bindings, binding_runs);
     return result, error;
 }
 
@@ -152,11 +152,11 @@ fn stageStringValue(s: Stage&, text: Chars) -> StageValue {
     p = 0;
     while p < text.len {
         let cp, next = utf8Next(text, p);
-        blot_support_pooled_buffer::push(s.parts, StagePart { 0, StageValue { cp, blot_check_types::u32_type, 0 } }, part_runs);
+        squid_support_pooled_buffer::push(s.parts, StagePart { 0, StageValue { cp, squid_check_types::u32_type, 0 } }, part_runs);
         p = next;
     }
     let index = s.aggregates.items.len as u32;
-    blot_support_pooled_buffer::push(s.aggregates, StageAggregate { blot_check_core::Tag.array, start, count as u32, 0, 0, 0 }, aggregate_runs);
+    squid_support_pooled_buffer::push(s.aggregates, StageAggregate { squid_check_core::Tag.array, start, count as u32, 0, 0, 0 }, aggregate_runs);
     return StageValue { index, stage_aggregate, 0 };
 }
 
@@ -164,11 +164,11 @@ recursive fn stageValueEqual(s: const Stage&, a: StageValue, b: StageValue, dept
     if depth >= 64 { return false; }
     if a.ty != b.ty { return false; }
     if a.ty != stage_aggregate {
-        if a.ty == blot_check_types::f32_type {
-            return blot_native::f32_from_bits(a.bits) == blot_native::f32_from_bits(b.bits);
+        if a.ty == squid_check_types::f32_type {
+            return squid_native::f32_from_bits(a.bits) == squid_native::f32_from_bits(b.bits);
         }
-        if a.ty == blot_check_types::f64_type {
-            return blot_native::f64_from_bits(stageBits(a)) == blot_native::f64_from_bits(stageBits(b));
+        if a.ty == squid_check_types::f64_type {
+            return squid_native::f64_from_bits(stageBits(a)) == squid_native::f64_from_bits(stageBits(b));
         }
         return stageBits(a) == stageBits(b);
     }
@@ -176,7 +176,7 @@ recursive fn stageValueEqual(s: const Stage&, a: StageValue, b: StageValue, dept
     let ba = s.aggregates.items[b.bits];
     if aa.kind != ba.kind || aa.tag != ba.tag || aa.len != ba.len { return false; }
     for at in 0..(aa.len as i64) {
-        if aa.kind == blot_check_core::Tag.record {
+        if aa.kind == squid_check_core::Tag.record {
             let ap = s.parts.items[aa.start + at];
             var found = false;
             for bt in 0..(ba.len as i64) {
@@ -216,7 +216,7 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
         let spell = g.types.spelling(cf.name_id);
         return stageStringValue(s, spell);
     }
-    if n.c == 5 { return StageValue { cf.index, blot_check_types::u32_type, 0 }; }
+    if n.c == 5 { return StageValue { cf.index, squid_check_types::u32_type, 0 }; }
     if n.c == 2 {
         if cf.nominal_unit == 0 { return stageBool(false); }
         let owner .= g.units[cf.nominal_unit - 1];
@@ -231,12 +231,12 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
     let owner .= g.units[cf.nominal_unit - 1];
     g.recordStagedDepUnit(owner.unit);
     var want_ty: Ty = 0;
-    var want_nom = blot_check_types::NominalIdentity { 0, 0 };
+    var want_nom = squid_check_types::NominalIdentity { 0, 0 };
     var want_ctor_tag: u32 = 0;
     var want_val = StageValue {};
     if n.c == 3 || n.c == 4 {
         let lt, lerr = g.types.lower(m, n.b, f.env);
-        if lerr != blot_direct_types::Error.none { return stopStage(s, "comptime tag type is not concrete"); }
+        if lerr != squid_direct_types::Error.none { return stopStage(s, "comptime tag type is not concrete"); }
         want_ty = lt;
     } else if n.c == 6 || n.c == 7 {
         let ctor = m.constructor(n.b);
@@ -244,7 +244,7 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
         want_ctor_tag = ctor.tag;
     } else if n.c == 8 || n.c == 9 {
         let lt, lerr = g.types.lower(m, m.typeOf(n.b), f.env);
-        if lerr != blot_direct_types::Error.none { return stopStage(s, "comptime tag value type is not concrete"); }
+        if lerr != squid_direct_types::Error.none { return stopStage(s, "comptime tag value type is not concrete"); }
         want_ty = lt;
         want_val = evaluateStage(g, f, s, m, n.b, frame, depth + 1);
         if s.failure.len != 0 { return want_val; }
@@ -261,28 +261,28 @@ recursive fn evalComptimeMetaStage(g: Generator&, f: const Fn&, s: Stage&, m: co
             if !sp.present || g.types.fieldName(sp.value) != cf.name_id { continue; }
         }
         let raw_tag_node = owner.types.node(tt.ty);
-        if n.c == 3 && raw_tag_node.tag == blot_check_types::Tag.type_constructor {
-            if tagOf(g, want_ty) == blot_direct_types::Tag.nominal {
+        if n.c == 3 && raw_tag_node.tag == squid_check_types::Tag.type_constructor {
+            if tagOf(g, want_ty) == squid_direct_types::Tag.nominal {
                 let wnom = g.types.nominalIdentity(want_ty);
                 if raw_tag_node.a == wnom.unit && raw_tag_node.b == wnom.decl { return stageBool(true); }
             }
             continue;
         }
         let tag_ty, terr = g.types.lower(owner, tt.ty, Env {});
-        if terr != blot_direct_types::Error.none { continue; }
+        if terr != squid_direct_types::Error.none { continue; }
         if n.c == 3 || n.c == 4 {
             if tag_ty != want_ty { continue; }
             if n.c == 3 { return stageBool(true); }
             return evaluateStage(g, f, s, owner, tt.value, 0, depth + 1);
         } else if n.c == 6 || n.c == 7 {
-            if tagOf(g, tag_ty) != blot_direct_types::Tag.nominal { continue; }
+            if tagOf(g, tag_ty) != squid_direct_types::Tag.nominal { continue; }
             let tnom = g.types.nominalIdentity(tag_ty);
             if tnom.unit != want_nom.unit || tnom.decl != want_nom.decl { continue; }
             let tv = evaluateStage(g, f, s, owner, tt.value, 0, depth + 1);
             if s.failure.len != 0 { return tv; }
             if tv.ty != stage_aggregate { continue; }
             let agg = s.aggregates.items[tv.bits];
-            if agg.kind != blot_check_core::Tag.construct || agg.tag != want_ctor_tag { continue; }
+            if agg.kind != squid_check_core::Tag.construct || agg.tag != want_ctor_tag { continue; }
             if n.c == 6 { return stageBool(true); }
             if agg.len == 1 { return s.parts.items[agg.start].value; }
             return tv;
@@ -309,8 +309,8 @@ fn stageBinding(s: const Stage&, frame: i64, binding: u32) -> StageValue, bool {
 }
 
 fn stageBool(value: bool) -> StageValue {
-    if value { return StageValue {1, blot_check_types::boolean, 0}; }
-    return StageValue {0, blot_check_types::boolean, 0};
+    if value { return StageValue {1, squid_check_types::boolean, 0}; }
+    return StageValue {0, squid_check_types::boolean, 0};
 }
 
 recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id: u32, value: StageValue, depth: i64) -> bool {
@@ -320,7 +320,7 @@ recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id
     match pat.tag {
         wildcard => { return true; },
         bind => {
-            blot_support_pooled_buffer::push(s.bindings, StageBinding {pat.a, value}, binding_runs);
+            squid_support_pooled_buffer::push(s.bindings, StageBinding {pat.a, value}, binding_runs);
             return true;
         },
         constant => { return value.ty != stage_aggregate && value.ty != stage_function && value.bits == pat.a && value.high == pat.b; },
@@ -328,14 +328,14 @@ recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id
             let children = m.patternChildren(pat_id);
             if value.ty != stage_aggregate { return children.len == 0; }
             let agg = s.aggregates.items[value.bits];
-            if agg.kind == blot_check_core::Tag.product {
+            if agg.kind == squid_check_core::Tag.product {
                 if agg.len != children.len { return false; }
                 for child, at in children {
                     if !bindStagePattern(g, s, m, child, s.parts.items[agg.start + at].value, depth + 1) { return false; }
                 }
                 return true;
             }
-            if agg.kind == blot_check_core::Tag.record && m.types.node(pat.ty).tag == blot_check_types::Tag.record {
+            if agg.kind == squid_check_core::Tag.record && m.types.node(pat.ty).tag == squid_check_types::Tag.record {
                 let rnode = m.types.node(pat.ty);
                 if rnode.b != children.len { return false; }
                 for child, at in children {
@@ -358,7 +358,7 @@ recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id
             if value.ty != stage_aggregate { return false; }
             let agg = s.aggregates.items[value.bits];
             let ctor = m.constructor(pat.a);
-            if agg.kind != blot_check_core::Tag.construct || agg.tag != ctor.tag { return false; }
+            if agg.kind != squid_check_core::Tag.construct || agg.tag != ctor.tag { return false; }
             if pat.b == 0 { return true; }
             if agg.len != 1 { return false; }
             return bindStagePattern(g, s, m, pat.b, s.parts.items[agg.start].value, depth + 1);
@@ -367,7 +367,7 @@ recursive fn bindStagePattern(g: Generator&, s: Stage&, m: const Module&, pat_id
     }
 }
 
-fn compareStage<T>(op: blot_check_core::Op, a: T, b: T) -> StageValue, bool {
+fn compareStage<T>(op: squid_check_core::Op, a: T, b: T) -> StageValue, bool {
     match op {
         equal => { return stageBool(a == b), true; }, not_equal => { return stageBool(a != b), true; },
         less => { return stageBool(a < b), true; }, less_equal => { return stageBool(a <= b), true; },
@@ -383,66 +383,66 @@ fn stageWide(bits: u64, ty: u32) -> StageValue {
     return StageValue {bits as! u32, ty, 0, (bits >> 32) as u32};
 }
 fn stageF64(value: f64) -> StageValue {
-    let bits = if value != value { 0x7ff8000000000000 as u64 } else { blot_native::f64_bits(value) };
-    return stageWide(bits, blot_check_types::f64_type);
+    let bits = if value != value { 0x7ff8000000000000 as u64 } else { squid_native::f64_bits(value) };
+    return stageWide(bits, squid_check_types::f64_type);
 }
 fn stageFloat(value: StageValue) -> f64 {
-    if value.ty == blot_check_types::f64_type { return blot_native::f64_from_bits(stageBits(value)); }
-    return blot_native::f32_from_bits(value.bits) as f64;
+    if value.ty == squid_check_types::f64_type { return squid_native::f64_from_bits(stageBits(value)); }
+    return squid_native::f32_from_bits(value.bits) as f64;
 }
 fn stageSigned(value: StageValue) -> i64 {
-    if value.ty == blot_check_types::i32_type { return (value.bits as! i32) as i64; }
+    if value.ty == squid_check_types::i32_type { return (value.bits as! i32) as i64; }
     return stageBits(value) as! i64;
 }
 fn stageIntegerMask(ty: u32) -> u64 {
-    if ty == blot_check_types::u8_type { return 255; }
-    if ty == blot_check_types::u64_type || ty == blot_check_types::i64_type { return 0xffffffffffffffff; }
+    if ty == squid_check_types::u8_type { return 255; }
+    if ty == squid_check_types::u64_type || ty == squid_check_types::i64_type { return 0xffffffffffffffff; }
     return 0xffffffff;
 }
 fn stageSaturate(value: f64, ty: u32) -> u64 {
     if value != value { return 0; }
-    if ty == blot_check_types::i32_type {
+    if ty == squid_check_types::i32_type {
         if value >= 2147483648.0 { return 0x7fffffff; }
         if value <= -2147483648.0 { return 0x80000000; }
         return (value as! i32) as! u32;
     }
-    if ty == blot_check_types::i64_type {
+    if ty == squid_check_types::i64_type {
         if value >= 9223372036854775808.0 { return 0x7fffffffffffffff; }
         if value <= -9223372036854775808.0 { return 0x8000000000000000; }
         return (value as! i64) as! u64;
     }
     if value <= 0.0 { return 0; }
-    if ty == blot_check_types::u8_type && value >= 255.0 { return 255; }
-    if ty == blot_check_types::u32_type && value >= 4294967296.0 { return 0xffffffff; }
-    if ty == blot_check_types::u64_type && value >= 18446744073709551616.0 { return 0xffffffffffffffff; }
+    if ty == squid_check_types::u8_type && value >= 255.0 { return 255; }
+    if ty == squid_check_types::u32_type && value >= 4294967296.0 { return 0xffffffff; }
+    if ty == squid_check_types::u64_type && value >= 18446744073709551616.0 { return 0xffffffffffffffff; }
     return value as! u64;
 }
 fn stageConvert(s: Stage&, value: StageValue, ty: u32) -> StageValue {
     if value.ty == ty { return value; }
-    if !blot_check_types::isNumericId(ty) { return stopStage(s, "#run conversion needs a concrete numeric result"); }
-    let src_float = value.ty == blot_check_types::f32_type || value.ty == blot_check_types::f64_type;
-    let src_signed = value.ty == blot_check_types::i32_type || value.ty == blot_check_types::i64_type;
-    if ty == blot_check_types::f64_type {
+    if !squid_check_types::isNumericId(ty) { return stopStage(s, "#run conversion needs a concrete numeric result"); }
+    let src_float = value.ty == squid_check_types::f32_type || value.ty == squid_check_types::f64_type;
+    let src_signed = value.ty == squid_check_types::i32_type || value.ty == squid_check_types::i64_type;
+    if ty == squid_check_types::f64_type {
         if src_float { return stageF64(stageFloat(value)); }
         if src_signed { return stageF64(stageSigned(value) as! f64); }
         return stageF64(stageBits(value) as! f64);
     }
-    if ty == blot_check_types::f32_type {
+    if ty == squid_check_types::f32_type {
         var n: f32 = 0.0;
         if src_float { n = stageFloat(value) as! f32; }
         else if src_signed { n = stageSigned(value) as! f32; }
         else { n = stageBits(value) as! f32; }
-        return StageValue {if n != n { 0x7fc00000 } else { blot_native::f32_bits(n) }, ty, 0};
+        return StageValue {if n != n { 0x7fc00000 } else { squid_native::f32_bits(n) }, ty, 0};
     }
     if src_float { return stageWide(stageSaturate(stageFloat(value), ty), ty); }
     var bits = stageBits(value);
     if src_signed { bits = stageSigned(value) as! u64; }
     return stageWide(bits & stageIntegerMask(ty), ty);
 }
-fn stageFloating64(s: Stage&, op: blot_check_core::Op, a: StageValue, b: StageValue) -> StageValue {
+fn stageFloating64(s: Stage&, op: squid_check_core::Op, a: StageValue, b: StageValue) -> StageValue {
     let raw = stageBits(a);
     let x = stageFloat(a);
-    let y = blot_native::f64_from_bits(stageBits(b));
+    let y = squid_native::f64_from_bits(stageBits(b));
     let cmp, compared = compareStage(op, x, y);
     if compared { return cmp; }
     match op {
@@ -457,22 +457,22 @@ fn stageFloating64(s: Stage&, op: blot_check_core::Op, a: StageValue, b: StageVa
             if y != y { return stageF64(y); }
             if x == 0.0 && y == 0.0 {
                 let other = stageBits(b);
-                return stageWide(if op == blot_check_core::Op.min { raw | other } else { raw & other }, a.ty);
+                return stageWide(if op == squid_check_core::Op.min { raw | other } else { raw & other }, a.ty);
             }
-            if op == blot_check_core::Op.min { return stageF64(min(x, y)); }
+            if op == squid_check_core::Op.min { return stageF64(min(x, y)); }
             return stageF64(max(x, y));
         },
-        bits => { return stageWide(raw, blot_check_types::u64_type); },
+        bits => { return stageWide(raw, squid_check_types::u64_type); },
         _ => { return stopStage(s, "#run does not support this F64 operation"); },
     }
 }
-fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: StageValue) -> StageValue {
+fn stageInteger(s: Stage&, op: squid_check_core::Op, left: StageValue, right: StageValue) -> StageValue {
     let ty = left.ty;
     let a = stageBits(left);
     let b = stageBits(right);
     let x = stageSigned(left);
     let y = stageSigned(right);
-    let signed = ty == blot_check_types::i32_type || ty == blot_check_types::i64_type;
+    let signed = ty == squid_check_types::i32_type || ty == squid_check_types::i64_type;
     if signed {
         let cmp, compared = compareStage(op, x, y);
         if compared { return cmp; }
@@ -482,8 +482,8 @@ fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Sta
     }
     let mask = stageIntegerMask(ty);
     var shift_mask: u64 = 31;
-    if ty == blot_check_types::u8_type { shift_mask = 7; }
-    if ty == blot_check_types::u64_type || ty == blot_check_types::i64_type { shift_mask = 63; }
+    if ty == squid_check_types::u8_type { shift_mask = 7; }
+    if ty == squid_check_types::u64_type || ty == squid_check_types::i64_type { shift_mask = 63; }
     let shift = b & shift_mask;
     var bits: u64 = 0;
     match op {
@@ -495,17 +495,17 @@ fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Sta
             if signed {
                 let min_bits = (mask >> 1) + 1;
                 if a == min_bits && b == mask {
-                    if op == blot_check_core::Op.div { return stopStage(s, "#run trapped on integer division overflow"); }
+                    if op == squid_check_core::Op.div { return stopStage(s, "#run trapped on integer division overflow"); }
                     return stageWide(0, ty);
                 }
-                bits = if op == blot_check_core::Op.div { (x / y) as! u64 } else { (x % y) as! u64 };
-            } else { bits = if op == blot_check_core::Op.div { a / b } else { a % b }; }
+                bits = if op == squid_check_core::Op.div { (x / y) as! u64 } else { (x % y) as! u64 };
+            } else { bits = if op == squid_check_core::Op.div { a / b } else { a % b }; }
         },
         bit_and => { bits = a & b; }, bit_or => { bits = a | b; }, bit_xor => { bits = a ^ b; },
         bit_not => { bits = a ^ mask; },
         shift_left => { bits = a << shift; },
         shift_right => { bits = if signed { (x >> shift) as! u64 } else { a >> shift }; },
-        from_bits => { return stageWide(a, blot_check_types::f64_type); },
+        from_bits => { return stageWide(a, squid_check_types::f64_type); },
         mul_wide => {
             let al = a & 0xffffffff;
             let ah = a >> 32;
@@ -519,10 +519,10 @@ fn stageInteger(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Sta
             let hi = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
             let lo = a * b;
             let start = s.parts.items.len as u32;
-            blot_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(lo, blot_check_types::u64_type) }, part_runs);
-            blot_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(hi, blot_check_types::u64_type) }, part_runs);
+            squid_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(lo, squid_check_types::u64_type) }, part_runs);
+            squid_support_pooled_buffer::push(s.parts, StagePart { 0, stageWide(hi, squid_check_types::u64_type) }, part_runs);
             let idx = s.aggregates.items.len as u32;
-            blot_support_pooled_buffer::push(s.aggregates, StageAggregate { blot_check_core::Tag.product, start, 2, 0, 0, 0 }, aggregate_runs);
+            squid_support_pooled_buffer::push(s.aggregates, StageAggregate { squid_check_core::Tag.product, start, 2, 0, 0, 0 }, aggregate_runs);
             return StageValue { idx, stage_aggregate, 0 };
         },
         _ => { return stopStage(s, "#run does not support this integer operation"); },
@@ -533,24 +533,24 @@ fn stagePrimitiveResult(m: const Module&, alias: u32, arity: i64) -> u32 {
     var ty = m.typeOf(alias);
     for _ in 0..arity {
         let node = m.types.node(ty);
-        if node.tag != blot_check_types::Tag.function { return 0; }
+        if node.tag != squid_check_types::Tag.function { return 0; }
         ty = node.b;
     }
     return ty;
 }
 
-fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: StageValue, result_ty: u32 = 0) -> StageValue {
+fn stageScalar(s: Stage&, op: squid_check_core::Op, left: StageValue, right: StageValue, result_ty: u32 = 0) -> StageValue {
     if left.ty == stage_aggregate || right.ty == stage_aggregate { return stopStage(s, "#run requires scalar operands"); }
-    if op == blot_check_core::Op.numeric_convert { return stageConvert(s, left, result_ty); }
-    if left.ty == blot_check_types::f64_type { return stageFloating64(s, op, left, right); }
-    if left.ty >= blot_check_types::u8_type && left.ty <= blot_check_types::i64_type {
+    if op == squid_check_core::Op.numeric_convert { return stageConvert(s, left, result_ty); }
+    if left.ty == squid_check_types::f64_type { return stageFloating64(s, op, left, right); }
+    if left.ty >= squid_check_types::u8_type && left.ty <= squid_check_types::i64_type {
         return stageInteger(s, op, left, right);
     }
     let a = left.bits;
     let b = right.bits;
-    if left.ty == blot_check_types::f32_type {
-        let x = blot_native::f32_from_bits(a);
-        let y = blot_native::f32_from_bits(b);
+    if left.ty == squid_check_types::f32_type {
+        let x = squid_native::f32_from_bits(a);
+        let y = squid_native::f32_from_bits(b);
         let cmp, compared = compareStage(op, x, y);
         if compared { return cmp; }
         var result: f32 = 0.0;
@@ -561,28 +561,28 @@ fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Stag
             abs => { return StageValue {a & 0x7fffffff, left.ty, 0}; },
             ceil => { result = ceil(x); }, floor => { result = floor(x); },
             trunc => { result = trunc(x); }, sqrt => { result = sqrt(x); },
-            bits => { return StageValue {a, blot_check_types::u32_type, 0}; },
-            convert_f32_u32 => { return StageValue {blot_check_scalar_ops::truncate(x), blot_check_types::u32_type, 0}; },
+            bits => { return StageValue {a, squid_check_types::u32_type, 0}; },
+            convert_f32_u32 => { return StageValue {squid_check_scalar_ops::truncate(x), squid_check_types::u32_type, 0}; },
             _ => { return stopStage(s, "#run does not support this floating-point operation"); },
         }
-        return StageValue {if result != result { 0x7fc00000 } else { blot_native::f32_bits(result) }, left.ty, 0};
+        return StageValue {if result != result { 0x7fc00000 } else { squid_native::f32_bits(result) }, left.ty, 0};
     }
     let cmp, compared = compareStage(op, a, b);
     if compared { return cmp; }
-    if op == blot_check_core::Op.from_bits { return StageValue {a, blot_check_types::f32_type, 0}; }
-    if op == blot_check_core::Op.convert_u32_f32 { return StageValue {blot_native::f32_bits(a as f32), blot_check_types::f32_type, 0}; }
-    if op == blot_check_core::Op.neg { let _, bits = blot_check_scalar_ops::foldU32(blot_check_core::Op.sub, 0, a); return StageValue {bits, left.ty, 0}; }
-    if op == blot_check_core::Op.not_ { var bits: u32 = 0; if a == 0 { bits = 1; } return StageValue {bits, left.ty, 0}; }
-    if op == blot_check_core::Op.abs { return left; }
-    if (op == blot_check_core::Op.div || op == blot_check_core::Op.rem) && b == 0 { return stopStage(s, "#run trapped on integer division by zero"); }
-    let folded, bits = blot_check_scalar_ops::foldU32(op, a, b);
-    if folded == blot_check_scalar_ops::Fold.value { return StageValue {bits, blot_check_types::u32_type, 0}; }
+    if op == squid_check_core::Op.from_bits { return StageValue {a, squid_check_types::f32_type, 0}; }
+    if op == squid_check_core::Op.convert_u32_f32 { return StageValue {squid_native::f32_bits(a as f32), squid_check_types::f32_type, 0}; }
+    if op == squid_check_core::Op.neg { let _, bits = squid_check_scalar_ops::foldU32(squid_check_core::Op.sub, 0, a); return StageValue {bits, left.ty, 0}; }
+    if op == squid_check_core::Op.not_ { var bits: u32 = 0; if a == 0 { bits = 1; } return StageValue {bits, left.ty, 0}; }
+    if op == squid_check_core::Op.abs { return left; }
+    if (op == squid_check_core::Op.div || op == squid_check_core::Op.rem) && b == 0 { return stopStage(s, "#run trapped on integer division by zero"); }
+    let folded, bits = squid_check_scalar_ops::foldU32(op, a, b);
+    if folded == squid_check_scalar_ops::Fold.value { return StageValue {bits, squid_check_types::u32_type, 0}; }
     return stopStage(s, "#run does not support this scalar operation");
 }
 
 fn stageFunction(s: Stage&, value: StageFunction) -> StageValue {
     let index = s.functions.items.len as u32;
-    blot_support_pooled_buffer::push(s.functions, value, stage_function_runs);
+    squid_support_pooled_buffer::push(s.functions, value, stage_function_runs);
     return StageValue {index, stage_function, 0};
 }
 
@@ -609,11 +609,11 @@ recursive fn applyStage(g: Generator&, f: const Fn&, s: Stage&, fn_value: StageV
     let base = s.bindings.items.len;
     for at in 0..(fun.count as i64) {
         let part = s.parts.items[fun.captures + at];
-        blot_support_pooled_buffer::push(s.bindings, StageBinding {part.name, part.value}, binding_runs);
+        squid_support_pooled_buffer::push(s.bindings, StageBinding {part.name, part.value}, binding_runs);
     }
-    blot_support_pooled_buffer::push(s.bindings, StageBinding {parameter, argument}, binding_runs);
+    squid_support_pooled_buffer::push(s.bindings, StageBinding {parameter, argument}, binding_runs);
     let result = evaluateStage(g, f, s, owner, root, base, depth + 1);
-    blot_support_pooled_buffer::resize(s.bindings, base);
+    squid_support_pooled_buffer::resize(s.bindings, base);
     return result;
 }
 
@@ -625,11 +625,11 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
     for step in 0..8 {
         let cur_owner .= g.units[target.unit - 1];
         let cur_binding = cur_owner.binding(target.binding);
-        if target.unit == m.unit && (cur_binding.kind == blot_reuse_principal_interface::Kind.local || cur_binding.kind == blot_reuse_principal_interface::Kind.parameter) { break; }
+        if target.unit == m.unit && (cur_binding.kind == squid_reuse_principal_interface::Kind.local || cur_binding.kind == squid_reuse_principal_interface::Kind.parameter) { break; }
         let cur_body .= cur_owner.body(target.binding);
-        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != blot_check_core::Tag.reference { break; }
-        blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
-        blot_direct_relocations::stagedRead(target.unit, 0);
+        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != squid_check_core::Tag.reference { break; }
+        squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+        squid_direct_relocations::stagedRead(target.unit, 0);
         g.recordStagedDepUnit(target.unit);
         let next = g.resolve(cur_owner, cur_owner.reference(cur_body.root));
         if next == target || !g.hasUnit(next.unit) { break; }
@@ -637,7 +637,7 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
     }
     let owner .= g.units[target.unit - 1];
     let binding = owner.binding(target.binding);
-    if target.unit == m.unit && (binding.kind == blot_reuse_principal_interface::Kind.local || binding.kind == blot_reuse_principal_interface::Kind.parameter) {
+    if target.unit == m.unit && (binding.kind == squid_reuse_principal_interface::Kind.local || binding.kind == squid_reuse_principal_interface::Kind.parameter) {
         var callback, found = stageBinding(s, frame, target.binding);
         if !found { return stopStage(s, "#run depends on a runtime callback"); }
         for child in call.arguments {
@@ -648,12 +648,12 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
         }
         return callback;
     }
-    blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+    squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
     g.recordStagedDepUnit(target.unit);
     let alias, primitive = primitiveAlias(owner, target.binding);
     if primitive {
         let info = owner.primitive(alias);
-        if info.kind != blot_check_core::PrimitiveKind.scalar || info.arity != call.arguments.len || call.arguments.len < 1 || call.arguments.len > 2 { return stopStage(s, "#run requires a saturated scalar primitive"); }
+        if info.kind != squid_check_core::PrimitiveKind.scalar || info.arity != call.arguments.len || call.arguments.len < 1 || call.arguments.len > 2 { return stopStage(s, "#run requires a saturated scalar primitive"); }
         let a = evaluateStage(g, f, s, m, call.arguments[0], frame, depth + 1);
         if s.failure.len != 0 || a.returning_to != 0 { return a; }
         var b = StageValue {};
@@ -666,34 +666,34 @@ recursive fn evaluateStageCall(g: Generator&, f: const Fn&, s: Stage&, m: const 
     if !body.is_function || body.runtime || body.parameters.len != call.arguments.len { return stopStage(s, "#run requires a fully applied compile-time function"); }
     // Evaluate arguments in the caller before exposing *any* callee bindings.
     let base = s.bindings.items.len;
-    for argument in call.arguments { blot_support_pooled_buffer::push(s.bindings, StageBinding {0, StageValue {}}, binding_runs); }
+    for argument in call.arguments { squid_support_pooled_buffer::push(s.bindings, StageBinding {0, StageValue {}}, binding_runs); }
     for argument, at in call.arguments {
         let value = evaluateStage(g, f, s, m, argument, frame, depth + 1);
-        if s.failure.len != 0 || value.returning_to != 0 { blot_support_pooled_buffer::resize(s.bindings, base); return value; }
+        if s.failure.len != 0 || value.returning_to != 0 { squid_support_pooled_buffer::resize(s.bindings, base); return value; }
         s.bindings.items[base + at].value = value;
     }
-    blot_support_pooled_buffer::resize(s.bindings, base + call.arguments.len);
+    squid_support_pooled_buffer::resize(s.bindings, base + call.arguments.len);
     for parameter, at in owner.bodyParameters(body) { s.bindings.items[base + at].binding = parameter.binding; }
     let value = evaluateStage(g, f, s, owner, body.root, base, depth + 1);
-    blot_support_pooled_buffer::resize(s.bindings, base);
+    squid_support_pooled_buffer::resize(s.bindings, base);
     return value;
 }
 
-fn stageReceiverIdentity(s: const Stage&, v: StageValue) -> blot_check_types::NominalIdentity, bool {
+fn stageReceiverIdentity(s: const Stage&, v: StageValue) -> squid_check_types::NominalIdentity, bool {
     if v.ty == stage_aggregate {
         let agg = s.aggregates.items[v.bits];
-        if agg.kind == blot_check_core::Tag.construct && agg.nom_decl != 0 {
-            return blot_check_types::NominalIdentity { agg.nom_unit, agg.nom_decl }, true;
+        if agg.kind == squid_check_core::Tag.construct && agg.nom_decl != 0 {
+            return squid_check_types::NominalIdentity { agg.nom_unit, agg.nom_decl }, true;
         }
-        if agg.kind == blot_check_core::Tag.array {
-            return blot_check_types::NominalIdentity { 0, 0xffffffff }, true;
+        if agg.kind == squid_check_core::Tag.array {
+            return squid_check_types::NominalIdentity { 0, 0xffffffff }, true;
         }
-        return blot_check_types::NominalIdentity { 0, 0 }, false;
+        return squid_check_types::NominalIdentity { 0, 0 }, false;
     }
-    if blot_check_types::isNumericId(v.ty) { return blot_check_types::NominalIdentity { 0, v.ty }, true; }
-    if v.ty == blot_check_types::boolean { return blot_check_types::NominalIdentity { 0, blot_check_types::boolean }, true; }
-    if v.ty == blot_check_types::unit { return blot_check_types::NominalIdentity { 0, blot_check_types::unit }, true; }
-    return blot_check_types::NominalIdentity { 0, 0 }, false;
+    if squid_check_types::isNumericId(v.ty) { return squid_check_types::NominalIdentity { 0, v.ty }, true; }
+    if v.ty == squid_check_types::boolean { return squid_check_types::NominalIdentity { 0, squid_check_types::boolean }, true; }
+    if v.ty == squid_check_types::unit { return squid_check_types::NominalIdentity { 0, squid_check_types::unit }, true; }
+    return squid_check_types::NominalIdentity { 0, 0 }, false;
 }
 
 recursive fn callStageTarget(
@@ -712,24 +712,24 @@ recursive fn callStageTarget(
     for step in 0..8 {
         let cur_owner .= g.units[target.unit - 1];
         let cur_binding = cur_owner.binding(target.binding);
-        if target.unit == m.unit && (cur_binding.kind == blot_reuse_principal_interface::Kind.local || cur_binding.kind == blot_reuse_principal_interface::Kind.parameter) { break; }
+        if target.unit == m.unit && (cur_binding.kind == squid_reuse_principal_interface::Kind.local || cur_binding.kind == squid_reuse_principal_interface::Kind.parameter) { break; }
         let cur_body .= cur_owner.body(target.binding);
-        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != blot_check_core::Tag.reference { break; }
-        blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
-        blot_direct_relocations::stagedRead(target.unit, 0);
+        if !cur_body || cur_body.is_function || cur_owner.node(cur_body.root).tag != squid_check_core::Tag.reference { break; }
+        squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+        squid_direct_relocations::stagedRead(target.unit, 0);
         g.recordStagedDepUnit(target.unit);
         let next = g.resolve(cur_owner, cur_owner.reference(cur_body.root));
         if next == target || !g.hasUnit(next.unit) { break; }
         target = next;
     }
     let owner .= g.units[target.unit - 1];
-    blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+    squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
     g.recordStagedDepUnit(target.unit);
     let arity: i64 = if has_b { 2 } else { 1 };
     let alias, primitive = primitiveAlias(owner, target.binding);
     if primitive {
         let info = owner.primitive(alias);
-        if info.kind != blot_check_core::PrimitiveKind.scalar || info.arity != arity {
+        if info.kind != squid_check_core::PrimitiveKind.scalar || info.arity != arity {
             return stopStage(s, "#run requires a saturated scalar primitive");
         }
         return stageScalar(s, info.op, a, b, stagePrimitiveResult(owner, alias, info.arity));
@@ -741,19 +741,19 @@ recursive fn callStageTarget(
     let params = owner.bodyParameters(body);
     if params.len == arity {
         let base = s.bindings.items.len;
-        blot_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
+        squid_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
         if has_b {
-            blot_support_pooled_buffer::push(s.bindings, StageBinding { params[1].binding, b }, binding_runs);
+            squid_support_pooled_buffer::push(s.bindings, StageBinding { params[1].binding, b }, binding_runs);
         }
         let value = evaluateStage(g, f, s, owner, body.root, base, depth + 1);
-        blot_support_pooled_buffer::resize(s.bindings, base);
+        squid_support_pooled_buffer::resize(s.bindings, base);
         return value;
     }
     if has_b && params.len == 1 {
         let base = s.bindings.items.len;
-        blot_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
+        squid_support_pooled_buffer::push(s.bindings, StageBinding { params[0].binding, a }, binding_runs);
         let partial = evaluateStage(g, f, s, owner, body.root, base, depth + 1);
-        blot_support_pooled_buffer::resize(s.bindings, base);
+        squid_support_pooled_buffer::resize(s.bindings, base);
         if s.failure.len != 0 || partial.returning_to != 0 { return partial; }
         return applyStage(g, f, s, partial, b, depth + 1);
     }
@@ -765,7 +765,7 @@ recursive fn evalStageAssociated(
     f: const Fn&,
     s: Stage&,
     m: const Module&,
-    op: blot_check_core::Op,
+    op: squid_check_core::Op,
     member: u32,
     a: StageValue,
     has_b: bool,
@@ -775,14 +775,14 @@ recursive fn evalStageAssociated(
     let identity, has_id = stageReceiverIdentity(s, a);
     let type_op, has_op = operatorOf(op);
     if has_id && (a.ty == stage_aggregate || member != 0) && (member != 0 || has_op) {
-        var lookup_op = blot_check_types::Operator.none;
+        var lookup_op = squid_check_types::Operator.none;
         if member == 0 { lookup_op = type_op; }
         let target, found = g.dispatchTarget(m, identity, member, lookup_op);
         if found {
             return callStageTarget(g, f, s, m, target, a, has_b, b, depth);
         }
-        if member == 0 && op == blot_check_core::Op.not_equal {
-            let eq_target, eq_found = g.dispatchTarget(m, identity, 0, blot_check_types::Operator.equal);
+        if member == 0 && op == squid_check_core::Op.not_equal {
+            let eq_target, eq_found = g.dispatchTarget(m, identity, 0, squid_check_types::Operator.equal);
             if eq_found {
                 let eq_res = callStageTarget(g, f, s, m, eq_target, a, has_b, b, depth);
                 if s.failure.len != 0 || eq_res.returning_to != 0 { return eq_res; }
@@ -790,9 +790,9 @@ recursive fn evalStageAssociated(
             }
         }
     }
-    if op == blot_check_core::Op.equal { return stageBool(stageValueEqual(s, a, b, 0)); }
-    if op == blot_check_core::Op.not_equal { return stageBool(!stageValueEqual(s, a, b, 0)); }
-    if op != blot_check_core::Op.none { return stageScalar(s, op, a, b); }
+    if op == squid_check_core::Op.equal { return stageBool(stageValueEqual(s, a, b, 0)); }
+    if op == squid_check_core::Op.not_equal { return stageBool(!stageValueEqual(s, a, b, 0)); }
+    if op != squid_check_core::Op.none { return stageScalar(s, op, a, b); }
     return stopStage(s, "#run does not support this associated operator");
 }
 
@@ -803,26 +803,26 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
     let n = m.node(id);
     match n.tag {
         staging => {
-            if n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) {
+            if n.c == squid_check_typed_staging::opCode(squid_check_typed_staging::Op.read_input) {
                 let key = evaluateStage(g, f, s, m, n.a, frame, depth + 1);
                 if s.failure.len != 0 || key.returning_to != 0 { return key; }
-                let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, key.bits);
+                let bytes, found = squid_backend_native_assets::readBuildInput(g.build_inputs, key.bits);
                 if !found { return stopStage(s, "#run cannot read the declared build input"); }
                 // A captured input already owns immutable bytes. Keep a handle
                 // so reading one header does not expand an entire file.
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, 0, bytes.len as u32, key.bits, 0, 0}, aggregate_runs);
+                squid_support_pooled_buffer::push(s.aggregates, StageAggregate {squid_check_core::Tag.array, 0, bytes.len as u32, key.bits, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
-            if n.c != blot_check_typed_staging::opCode(blot_check_typed_staging::Op.evaluate) { return stopStage(s, "typed code staging is not supported by the direct backend"); }
+            if n.c != squid_check_typed_staging::opCode(squid_check_typed_staging::Op.evaluate) { return stopStage(s, "typed code staging is not supported by the direct backend"); }
             return evaluateStage(g, f, s, m, n.a, s.bindings.items.len, depth + 1);
         },
         constant => {
-            blot_direct_relocations::stagedRead(m.unit,id);
+            squid_direct_relocations::stagedRead(m.unit,id);
             g.recordStagedDepUnit(m.unit);
             let ty = m.types.node(n.ty).tag;
-            if ty == blot_check_types::Tag.unit { return StageValue {}; }
-            if blot_check_types::isNumeric(ty) || ty == blot_check_types::Tag.boolean { return StageValue {n.a, n.ty, 0, n.b}; }
+            if ty == squid_check_types::Tag.unit { return StageValue {}; }
+            if squid_check_types::isNumeric(ty) || ty == squid_check_types::Tag.boolean { return StageValue {n.a, n.ty, 0, n.b}; }
             return stopStage(s, "#run requires a scalar constant");
         },
         reference => {
@@ -830,16 +830,16 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             if !g.hasUnit(target.unit) { return stopStage(s, "#run has no definition for this value"); }
             let owner .= g.units[target.unit - 1];
             let binding = owner.binding(target.binding);
-            if binding.kind == blot_reuse_principal_interface::Kind.local || binding.kind == blot_reuse_principal_interface::Kind.parameter {
+            if binding.kind == squid_reuse_principal_interface::Kind.local || binding.kind == squid_reuse_principal_interface::Kind.parameter {
                 if target.unit == m.unit {
                     let value, found = stageBinding(s, frame, target.binding);
                     if found { return value; }
                 }
                 return stopStage(s, "#run depends on a runtime binding");
             }
-            blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+            squid_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
     g.recordStagedDepUnit(target.unit);
-            blot_direct_relocations::stagedRead(target.unit, 0);
+            squid_direct_relocations::stagedRead(target.unit, 0);
             let body .= owner.body(target.binding);
             var root = binding.initializer;
             if body {
@@ -850,7 +850,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             if root == 0 { return stopStage(s, "#run has no compile-time initializer"); }
             let base = s.bindings.items.len;
             let value = evaluateStage(g, f, s, owner, root, base, depth + 1);
-            blot_support_pooled_buffer::resize(s.bindings, base);
+            squid_support_pooled_buffer::resize(s.bindings, base);
             return value;
         },
         closure => {
@@ -861,7 +861,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             for binding in captures {
                 let value, found = stageBinding(s, frame, binding);
                 if !found { return stopStage(s, "#run closure captures a runtime binding"); }
-                blot_support_pooled_buffer::push(s.parts, StagePart {binding, value}, part_runs);
+                squid_support_pooled_buffer::push(s.parts, StagePart {binding, value}, part_runs);
             }
             return stageFunction(s, StageFunction {m.unit, id, start, captures.len as u32, false});
         },
@@ -875,14 +875,14 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
         product, record, array, construct => {
             let children = m.children(id);
             var count = children.len;
-            if n.tag == blot_check_core::Tag.construct && n.b != 0 { count = 1; }
+            if n.tag == squid_check_core::Tag.construct && n.b != 0 { count = 1; }
             if count > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
             let start = s.parts.items.len as u32;
-            for at in 0..count { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+            for at in 0..count { squid_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
             var tag: u32 = 0;
             var nom_unit: u32 = 0;
             var nom_decl: u32 = 0;
-            if n.tag == blot_check_core::Tag.construct {
+            if n.tag == squid_check_core::Tag.construct {
                 let ctor = m.constructor(n.a);
                 let nom = m.nominal(ctor.nominal);
                 tag = ctor.tag;
@@ -892,11 +892,11 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             }
             for at in 0..count {
                 var child = n.b;
-                if n.tag != blot_check_core::Tag.construct { child = children[at]; }
+                if n.tag != squid_check_core::Tag.construct { child = children[at]; }
                 let value = evaluateStage(g, f, s, m, child, frame, depth + 1);
                 if s.failure.len != 0 || value.returning_to != 0 { return value; }
                 var name: u32 = 0;
-                if n.tag == blot_check_core::Tag.record {
+                if n.tag == squid_check_core::Tag.record {
                     let field = m.types.recordField(m.types.node(n.ty), m.recordDestinations(id)[at]);
                     let spelling = m.fieldSpelling(field.name);
                     if !spelling.present { return stopStage(s, "#run record field has no name"); }
@@ -905,7 +905,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 s.parts.items[start + at] = StagePart {name, value};
             }
             let index = s.aggregates.items.len as u32;
-            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {n.tag, start, count as u32, tag, nom_unit, nom_decl}, aggregate_runs);
+            squid_support_pooled_buffer::push(s.aggregates, StageAggregate {n.tag, start, count as u32, tag, nom_unit, nom_decl}, aggregate_runs);
             return StageValue {index, stage_aggregate, 0};
         },
         project => {
@@ -914,73 +914,73 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
             if value.ty != stage_aggregate { return stopStage(s, "#run requires an aggregate for projection"); }
             var a = s.aggregates.items[value.bits];
             let spelling = m.fieldSpelling(m.projection(n.b).field);
-            if a.kind == blot_check_core::Tag.array && spelling.present && spelling.value == "length" {
-                return StageValue { a.len, blot_check_types::u32_type, 0 };
+            if a.kind == squid_check_core::Tag.array && spelling.present && spelling.value == "length" {
+                return StageValue { a.len, squid_check_types::u32_type, 0 };
             }
-            if a.kind == blot_check_core::Tag.construct && a.len == 1 {
+            if a.kind == squid_check_core::Tag.construct && a.len == 1 {
                 let payload = s.parts.items[a.start].value;
                 if payload.ty != stage_aggregate { return stopStage(s, "#run projected a scalar payload"); }
                 a = s.aggregates.items[payload.bits];
             }
             let variants = m.projectionVariants(n.b);
-            if a.kind == blot_check_core::Tag.product && variants.len == 1 && variants[0].field < a.len {
+            if a.kind == squid_check_core::Tag.product && variants.len == 1 && variants[0].field < a.len {
                 return s.parts.items[a.start + variants[0].field].value;
             }
-            if spelling.present && a.kind == blot_check_core::Tag.record {
+            if spelling.present && a.kind == squid_check_core::Tag.record {
                 let name = g.types.fieldName(spelling.value);
                 for at in 0..(a.len as i64) { if s.parts.items[a.start + at].name == name { return s.parts.items[a.start + at].value; } }
             }
             return stopStage(s, "#run field missing from the selected value");
         },
         array_op, storage => {
-            var operation = blot_backend_collection_ops::Op.get;
-            if n.tag == blot_check_core::Tag.array_op { operation = m.arrayOperation(id); }
+            var operation = squid_backend_collection_ops::Op.get;
+            if n.tag == squid_check_core::Tag.array_op { operation = m.arrayOperation(id); }
             else {
-                let storage, error = blot_check_storage_ops::opFromCode(n.c);
-                if error != blot_error::Error.none || (storage != blot_check_storage_ops::Op.read && storage != blot_check_storage_ops::Op.length) { return stopStage(s, "#run requires a read-only collection operation"); }
-                if storage == blot_check_storage_ops::Op.length { operation = blot_backend_collection_ops::Op.length; }
+                let storage, error = squid_check_storage_ops::opFromCode(n.c);
+                if error != squid_error::Error.none || (storage != squid_check_storage_ops::Op.read && storage != squid_check_storage_ops::Op.length) { return stopStage(s, "#run requires a read-only collection operation"); }
+                if storage == squid_check_storage_ops::Op.length { operation = squid_backend_collection_ops::Op.length; }
             }
             let children = m.children(id);
             let value = evaluateStage(g, f, s, m, children[0], frame, depth + 1);
             if s.failure.len != 0 || value.returning_to != 0 { return value; }
-            if operation == blot_backend_collection_ops::Op.generate || operation == blot_backend_collection_ops::Op.fill {
+            if operation == squid_backend_collection_ops::Op.generate || operation == squid_backend_collection_ops::Op.fill {
                 let source = evaluateStage(g, f, s, m, children[1], frame, depth + 1);
                 if s.failure.len != 0 || source.returning_to != 0 { return source; }
-                if value.ty != blot_check_types::u32_type || value.bits > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+                if value.ty != squid_check_types::u32_type || value.bits > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
                 s.remaining -= value.bits;
                 let start = s.parts.items.len as u32;
-                for at in 0..(value.bits as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+                for at in 0..(value.bits as i64) { squid_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
                 for at in 0..(value.bits as i64) {
                     var item = source;
-                    if operation == blot_backend_collection_ops::Op.generate {
-                        item = applyStage(g, f, s, source, StageValue {at as u32, blot_check_types::u32_type, 0}, depth + 1);
+                    if operation == squid_backend_collection_ops::Op.generate {
+                        item = applyStage(g, f, s, source, StageValue {at as u32, squid_check_types::u32_type, 0}, depth + 1);
                         if s.failure.len != 0 || item.returning_to != 0 { return item; }
                     }
                     s.parts.items[start + at].value = item;
                 }
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, start, value.bits, 0, 0, 0}, aggregate_runs);
+                squid_support_pooled_buffer::push(s.aggregates, StageAggregate {squid_check_core::Tag.array, start, value.bits, 0, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
-            if value.ty != stage_aggregate || s.aggregates.items[value.bits].kind != blot_check_core::Tag.array { return stopStage(s, "#run requires an array"); }
+            if value.ty != stage_aggregate || s.aggregates.items[value.bits].kind != squid_check_core::Tag.array { return stopStage(s, "#run requires an array"); }
             let a = s.aggregates.items[value.bits];
-            if operation == blot_backend_collection_ops::Op.length { return StageValue {a.len, blot_check_types::u32_type, 0}; }
-            if operation != blot_backend_collection_ops::Op.get { return stopStage(s, "#run does not support this collection operation"); }
+            if operation == squid_backend_collection_ops::Op.length { return StageValue {a.len, squid_check_types::u32_type, 0}; }
+            if operation != squid_backend_collection_ops::Op.get { return stopStage(s, "#run does not support this collection operation"); }
             let index = evaluateStage(g, f, s, m, children[1], frame, depth + 1);
             if s.failure.len != 0 || index.returning_to != 0 { return index; }
             if index.bits >= a.len { return stopStage(s, "#run array index out of bounds"); }
             if a.tag != 0 {
-                let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, a.tag);
+                let bytes, found = squid_backend_native_assets::readBuildInput(g.build_inputs, a.tag);
                 if !found { return stopStage(s, "#run input snapshot missing"); }
-                return StageValue {bytes[index.bits] as u32, blot_check_types::u32_type, 0};
+                return StageValue {bytes[index.bits] as u32, squid_check_types::u32_type, 0};
             }
             return s.parts.items[a.start + index.bits].value;
         },
         scalar, logical => {
             let a = evaluateStage(g, f, s, m, n.a, frame, depth + 1);
             if s.failure.len != 0 || a.returning_to != 0 { return a; }
-            if n.tag == blot_check_core::Tag.logical {
-                if (n.op == blot_check_core::Op.and_ && a.bits == 0) || (n.op == blot_check_core::Op.or_ && a.bits != 0) { return a; }
+            if n.tag == squid_check_core::Tag.logical {
+                if (n.op == squid_check_core::Op.and_ && a.bits == 0) || (n.op == squid_check_core::Op.or_ && a.bits != 0) { return a; }
                 return evaluateStage(g, f, s, m, n.b, frame, depth + 1);
             }
             let b = evaluateStage(g, f, s, m, n.b, frame, depth + 1);
@@ -999,21 +999,21 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 if s.failure.len != 0 || b.returning_to != 0 { return b; }
             }
             var member: u32 = 0;
-            if n.op == blot_check_core::Op.none { member = n.c; }
+            if n.op == squid_check_core::Op.none { member = n.c; }
             return evalStageAssociated(g, f, s, m, n.op, member, a, n.b != 0, b, depth);
         },
         call => { return evaluateStageCall(g, f, s, m, id, frame, depth); },
         bind => {
             let value = evaluateStage(g, f, s, m, n.b, frame, depth + 1);
             if s.failure.len != 0 || value.returning_to != 0 { return value; }
-            blot_support_pooled_buffer::push(s.bindings, StageBinding {n.a, value}, binding_runs);
+            squid_support_pooled_buffer::push(s.bindings, StageBinding {n.a, value}, binding_runs);
             return StageValue {};
         },
         block_, suite => {
             for child in m.children(id) {
                 var value = evaluateStage(g, f, s, m, child, frame, depth + 1);
                 if s.failure.len != 0 || value.returning_to != 0 {
-                    if n.tag == blot_check_core::Tag.block_ && value.returning_to == id { value.returning_to = 0; }
+                    if n.tag == squid_check_core::Tag.block_ && value.returning_to == id { value.returning_to = 0; }
                     return value;
                 }
             }
@@ -1035,7 +1035,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 var from = merge.else_binding;
                 if condition.bits != 0 { from = merge.then_binding; }
                 let value, found = stageBinding(s, frame, from);
-                if found { blot_support_pooled_buffer::push(s.bindings, StageBinding {merge.result, value}, binding_runs); }
+                if found { squid_support_pooled_buffer::push(s.bindings, StageBinding {merge.result, value}, binding_runs); }
             }
             return result;
         },
@@ -1052,7 +1052,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 if s.failure.len != 0 || start_v.returning_to != 0 { return start_v; }
                 let end_v = evaluateStage(g, f, s, m, info.end, frame, depth + 1);
                 if s.failure.len != 0 || end_v.returning_to != 0 { return end_v; }
-                if start_v.ty != blot_check_types::u32_type || end_v.ty != blot_check_types::u32_type {
+                if start_v.ty != squid_check_types::u32_type || end_v.ty != squid_check_types::u32_type {
                     return stopStage(s, "#run spark range requires U32 bounds");
                 }
                 var count: u32 = 0;
@@ -1060,54 +1060,54 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
                 if count > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
                 s.remaining -= count;
                 let parts_start = s.parts.items.len as u32;
-                for at in 0..(count as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+                for at in 0..(count as i64) { squid_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
                 for at in 0..(count as i64) {
                     let bmark = s.bindings.items.len;
-                    let item = StageValue { start_v.bits + (at as u32), blot_check_types::u32_type, 0 };
+                    let item = StageValue { start_v.bits + (at as u32), squid_check_types::u32_type, 0 };
                     if !bindStagePattern(g, s, m, info.pattern, item, 0) {
-                        blot_support_pooled_buffer::resize(s.bindings, bmark);
+                        squid_support_pooled_buffer::resize(s.bindings, bmark);
                         return stopStage(s, "#run spark pattern did not match");
                     }
                     let out = evaluateStage(g, f, s, m, info.body, frame, depth + 1);
-                    blot_support_pooled_buffer::resize(s.bindings, bmark);
+                    squid_support_pooled_buffer::resize(s.bindings, bmark);
                     if s.failure.len != 0 || out.returning_to != 0 { return out; }
                     s.parts.items[parts_start + at].value = out;
                 }
                 let index = s.aggregates.items.len as u32;
-                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, count, 0, 0, 0}, aggregate_runs);
+                squid_support_pooled_buffer::push(s.aggregates, StageAggregate {squid_check_core::Tag.array, parts_start, count, 0, 0, 0}, aggregate_runs);
                 return StageValue {index, stage_aggregate, 0};
             }
             let src_v = evaluateStage(g, f, s, m, info.source, frame, depth + 1);
             if s.failure.len != 0 || src_v.returning_to != 0 { return src_v; }
-            if src_v.ty != stage_aggregate || s.aggregates.items[src_v.bits].kind != blot_check_core::Tag.array {
+            if src_v.ty != stage_aggregate || s.aggregates.items[src_v.bits].kind != squid_check_core::Tag.array {
                 return stopStage(s, "#run spark requires an array or range source");
             }
             let src_agg = s.aggregates.items[src_v.bits];
             if src_agg.len > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
             s.remaining -= src_agg.len;
             let parts_start = s.parts.items.len as u32;
-            for at in 0..(src_agg.len as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+            for at in 0..(src_agg.len as i64) { squid_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
             for at in 0..(src_agg.len as i64) {
                 var item = StageValue {};
                 if src_agg.tag != 0 {
-                    let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, src_agg.tag);
+                    let bytes, found = squid_backend_native_assets::readBuildInput(g.build_inputs, src_agg.tag);
                     if !found { return stopStage(s, "#run input snapshot missing"); }
-                    item = StageValue { bytes[at], blot_check_types::u32_type, 0 };
+                    item = StageValue { bytes[at], squid_check_types::u32_type, 0 };
                 } else {
                     item = s.parts.items[src_agg.start + at].value;
                 }
                 let bmark = s.bindings.items.len;
                 if !bindStagePattern(g, s, m, info.pattern, item, 0) {
-                    blot_support_pooled_buffer::resize(s.bindings, bmark);
+                    squid_support_pooled_buffer::resize(s.bindings, bmark);
                     return stopStage(s, "#run spark pattern did not match");
                 }
                 let out = evaluateStage(g, f, s, m, info.body, frame, depth + 1);
-                blot_support_pooled_buffer::resize(s.bindings, bmark);
+                squid_support_pooled_buffer::resize(s.bindings, bmark);
                 if s.failure.len != 0 || out.returning_to != 0 { return out; }
                 s.parts.items[parts_start + at].value = out;
             }
             let index = s.aggregates.items.len as u32;
-            blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, parts_start, src_agg.len, 0, 0, 0}, aggregate_runs);
+            squid_support_pooled_buffer::push(s.aggregates, StageAggregate {squid_check_core::Tag.array, parts_start, src_agg.len, 0, 0, 0}, aggregate_runs);
             return StageValue {index, stage_aggregate, 0};
         },
         fork_, with_handle, comptime_for, flat_op => { return stopStage(s, "#run does not support this construct"); },
@@ -1115,7 +1115,7 @@ recursive fn evaluateStage(g: Generator&, f: const Fn&, s: Stage&, m: const Modu
     }
 }
 
-// Reconstruct an ordinary Blot value using the layout selected by the caller.
+// Reconstruct an ordinary Squid value using the layout selected by the caller.
 // Evaluation can share subtrees. Bound expansion independently when embedding.
 recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValue, ty: Ty, id: u32, remaining: i64&, depth: i64) -> Val, Error {
     let m .= g.units[f.unit - 1];
@@ -1123,7 +1123,7 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
     remaining--;
     if v.ty == stage_function {
         let fun = s.functions.items[v.bits];
-        if tagOf(g, ty) != blot_direct_types::Tag.function { return neverVal(), g.fail(m, id, "#run function result shape mismatch"); }
+        if tagOf(g, ty) != squid_direct_types::Tag.function { return neverVal(), g.fail(m, id, "#run function result shape mismatch"); }
         if fun.named { return bindingValue(g, f, BindingRef {fun.unit, fun.target}, ty, false, id); }
         let owner .= g.units[fun.unit - 1];
         var env = Env {};
@@ -1132,12 +1132,12 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
         for at in 0..(fun.count as i64) {
             let part = s.parts.items[fun.captures + at];
             let capture_ty, error = g.types.lower(owner, owner.binding(part.name).ty, env);
-            if error != blot_direct_types::Error.none { return neverVal(), g.fail(m, id, "#run needs a concrete captured type"); }
+            if error != squid_direct_types::Error.none { return neverVal(), g.fail(m, id, "#run needs a concrete captured type"); }
             let capture, error = emitStageValue(g, f, s, part.value, capture_ty, id, remaining, depth + 1);
-            if error != blot_direct_types::Error.none { return capture, error; }
+            if error != squid_direct_types::Error.none { return capture, error; }
             g.s.vals[values.start + at] = capture;
         }
-        let key = InstanceKey {blot_direct_emit::InstanceKind.lambda, fun.unit, fun.target, ty, f.instance_id, f.evidence_context};
+        let key = InstanceKey {squid_direct_emit::InstanceKind.lambda, fun.unit, fun.target, ty, f.instance_id, f.evidence_context};
         var instance, present = g.find(key);
         if !present {
             let capture_types = Tys {g.s.tys.len as u32, fun.count};
@@ -1145,7 +1145,7 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
             let arrow = g.types.node(ty);
             let parameters = g.saveTys([arrow.a]);
             let created, error = g.addInstanceWith(key, env, parameters, arrow.b, true, capture_types, owner, fun.target);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != squid_direct_types::Error.none { return neverVal(), error; }
             instance = created;
         } else {
             let layout = g.s.instances[instance].captures;
@@ -1157,23 +1157,23 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
         return makeClosure(g, f, instance, ty, values, id);
     }
     if v.ty != stage_aggregate {
-        if ty == blot_direct_types::unit { return unitVal(), blot_direct_types::Error.none; }
+        if ty == squid_direct_types::unit { return unitVal(), squid_direct_types::Error.none; }
         if !isScalarTag(tagOf(g, ty)) { return neverVal(), g.fail(m, id, "#run scalar result shape mismatch"); }
         pushConstant(g, ty, v.bits, v.high);
         return pop(g, f, ty, id);
     }
     let a = s.aggregates.items[v.bits];
     let shape = g.types.node(ty);
-    if a.kind == blot_check_core::Tag.construct {
+    if a.kind == squid_check_core::Tag.construct {
         let cases, error = g.types.variants(ty);
-        if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+        if error != squid_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
         for at in 0..(cases.len as i64) {
             if g.types.variant_tags[cases.tags + at] != a.tag { continue; }
             var payload = unitVal();
             if a.len != 0 {
                 let part_ty = g.types.variant_payloads[cases.payloads + at];
                 let part, error = emitStageValue(g, f, s, s.parts.items[a.start].value, part_ty, id, remaining, depth + 1);
-                if error != blot_direct_types::Error.none { return part, error; }
+                if error != squid_direct_types::Error.none { return part, error; }
                 payload = part;
             }
             return wrapVariant(g, f, ty, a.tag, payload, id);
@@ -1181,14 +1181,14 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
         return neverVal(), g.fail(m, id, "#run constructor result shape mismatch");
     }
     if a.len > remaining { return neverVal(), g.fail(m, id, "#run result exceeded its materialization budget"); }
-    if a.kind == blot_check_core::Tag.array && a.tag != 0 {
-        let bytes, found = blot_backend_native_assets::readBuildInput(g.build_inputs, a.tag);
+    if a.kind == squid_check_core::Tag.array && a.tag != 0 {
+        let bytes, found = squid_backend_native_assets::readBuildInput(g.build_inputs, a.tag);
         if !found { return neverVal(), g.fail(m, id, "#run input snapshot missing"); }
         let values = g.reserveVals(bytes.len);
         remaining -= bytes.len;
         for byte, at in bytes {
             let local = constLocal(g, f, byte as u32);
-            let item = valOf1(g, blot_direct_types::u32_, local);
+            let item = valOf1(g, squid_direct_types::u32_, local);
             g.s.vals[values.start + at] = item;
         }
         return arrayFromValues(g, f, ty, values, id);
@@ -1198,47 +1198,47 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
         let part = s.parts.items[a.start + at];
         var position = at;
         var child_ty = shape.a;
-        if shape.tag == blot_direct_types::Tag.tuple {
+        if shape.tag == squid_direct_types::Tag.tuple {
             child_ty = g.types.tupleItems(ty)[at];
-        } else if shape.tag == blot_direct_types::Tag.record {
-            if a.kind != blot_check_core::Tag.record { return neverVal(), g.fail(m, id, "#run requires named record fields"); }
+        } else if shape.tag == squid_direct_types::Tag.record {
+            if a.kind != squid_check_core::Tag.record { return neverVal(), g.fail(m, id, "#run requires named record fields"); }
             position = g.types.findField(ty, part.name);
             if position < 0 { return neverVal(), g.fail(m, id, "#run record result shape mismatch"); }
             child_ty = g.types.recordField(ty, position).ty;
-        } else if a.kind != blot_check_core::Tag.array {
+        } else if a.kind != squid_check_core::Tag.array {
             return neverVal(), g.fail(m, id, "#run result shape mismatch");
         }
         let item, error = emitStageValue(g, f, s, part.value, child_ty, id, remaining, depth + 1);
-        if error != blot_direct_types::Error.none { return item, error; }
+        if error != squid_direct_types::Error.none { return item, error; }
         g.s.vals[values.start + position] = item;
     }
-    if a.kind == blot_check_core::Tag.array { return arrayFromValues(g, f, ty, values, id); }
+    if a.kind == squid_check_core::Tag.array { return arrayFromValues(g, f, ty, values, id); }
     let boxed, error = isBoxed(g, f, ty, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if error != squid_direct_types::Error.none { return neverVal(), error; }
     if boxed {
         let base, error = newBlock(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if error != squid_direct_types::Error.none { return neverVal(), error; }
         for at in 0..(values.len as i64) {
             let item = g.s.vals[values.start + at];
             var offset: u32 = 0;
-            if shape.tag == blot_direct_types::Tag.record {
+            if shape.tag == squid_direct_types::Tag.record {
                 let foff, ferr = fieldOffset(g, f, ty, at, id);
-                if ferr != blot_direct_types::Error.none { return neverVal(), ferr; }
+                if ferr != squid_direct_types::Error.none { return neverVal(), ferr; }
                 offset = foff;
             } else {
                 let ioff, ierr = itemOffset(g, f, ty, at, id);
-                if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+                if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
                 offset = ioff;
             }
             let written = writeFlat(g, f, base, offset, item, id);
-            if written != blot_direct_types::Error.none { return neverVal(), written; }
+            if written != squid_direct_types::Error.none { return neverVal(), written; }
         }
-        return valOf1(g, ty, base), blot_direct_types::Error.none;
+        return valOf1(g, ty, base), squid_direct_types::Error.none;
     }
     let start = g.s.words.len as u32;
     for at in 0..(values.len as i64) {
         let item = g.s.vals[values.start + at];
         for word in 0..(item.len as i64) { let local = g.s.words[item.start + word]; g.s.words.push(local); }
     }
-    return Val {ty, start, (g.s.words.len as u32) - start}, blot_direct_types::Error.none;
+    return Val {ty, start, (g.s.words.len as u32) - start}, squid_direct_types::Error.none;
 }

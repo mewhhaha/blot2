@@ -33,9 +33,9 @@ python3 benchmarks/goose/compare.py \
   --output build/bench/goose-comparison
 ```
 
-Requires installed release `compiler/zig-out/bin/blotc` and
+Requires installed release `compiler/zig-out/bin/squidc` and
 `../goose-to-wasm/build/bin/goose` with its adjacent `stdlib`. No compiler
-rebuild is performed. Use `--blotc`, `--goose-root`, `--goose`, `--node` and
+rebuild is performed. Use `--squidc`, `--goose-root`, `--goose`, `--node` and
 `--deno` to select installations. Each output directory must be new or empty.
 Reference scripts, catalogs and ports are frozen before measurement. Use
 `--goose-revision REV` to read them from a Git revision matching the installed
@@ -52,7 +52,7 @@ survey. Build diagnostics are retained as structured data, not missing or zero
 timings.
 
 Use `--profiles run` to request unchanged official production iteration counts.
-The first production pilot hit the cap on all three Blot programs. That evidence
+The first production pilot hit the cap on all three Squid programs. That evidence
 is retained separately; bounded results do not replace it.
 
 | Bounded case   | Production problem size | Measured iterations | Kernel warmups |
@@ -76,7 +76,7 @@ python3 benchmarks/goose/reference.py
 ```
 
 Cold compilation measures complete fresh driver process wall time with artifact
-caches disabled; OS and installed-library caches remain warm. Blot uses the
+caches disabled; OS and installed-library caches remain warm. Squid uses the
 optimized codegen tier, with compilation profiling disabled. Pass
 `--profile-backend` only for a diagnostic run; allocation counting and detailed
 clocks change compile costs. Goose uses
@@ -89,15 +89,15 @@ retained-session edits.
 
 Runtime clocks surround the guest's measured loop. Preparation, kernel warmup,
 engine compilation, instantiation, output and checksum validation stay outside.
-There are no host calls per element. Blot crosses its Array U32 capability ABI
-twice for the clock; Goose crosses two scalar imports. The measured Blot region
+There are no host calls per element. Squid crosses its Array U32 capability ABI
+twice for the clock; Goose crosses two scalar imports. The measured Squid region
 includes the start reply and stop request packet costs. These are translated
 program comparisons including their ABI costs, not isolated instruction tests.
 Both processes parse the common TypeScript host; process wall is not the
 standalone Goose runner's startup score. Engine compile/instantiate and entry
 times have separate fields. V8 is the only engine measured here.
 
-Blot uses nonnegative U32 indices and wrapping checksum arithmetic instead of
+Squid uses nonnegative U32 indices and wrapping checksum arithmetic instead of
 Goose's wider scalar plumbing. Hash inputs retain identical byte values, but use
 U32 elements instead of Goose's U8 elements. Owner metadata, checks and language
 ABI also differ. Sieve flags and retained Mandelbrot bytes also use U32 versus

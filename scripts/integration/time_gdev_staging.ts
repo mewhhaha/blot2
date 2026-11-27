@@ -19,12 +19,12 @@ const root = resolve(values["gdev-root"]);
 const project = await gdevProject(
   root,
   resolve("std"),
-  "src/main.blot",
+  "src/main.sq",
   values.compiler,
 );
 const workers = Number(values["frontend-workers"]);
 assert(Number.isInteger(workers) && workers >= 1 && workers <= 16);
-const leaf = resolve(root, "src/effects/lighting_look.blot");
+const leaf = resolve(root, "src/effects/lighting_look.sq");
 const original = await Deno.readTextFile(leaf);
 const preset = "const proposed = $Look { sun: true,";
 assert.equal(original.split(preset).length, 2);

@@ -10,7 +10,7 @@
   2026 (`effect_mismatch` on `func () => return ecs.checkpoint engine` with a
   generic `engine`); owner asked for it to be finished on 17 October 2026.
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

@@ -3,15 +3,15 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 
 Deno.test("discarded Arrays inside nested collecting loops keep the checksum", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
   });
   try {
     const result = await compiler.build({
@@ -53,11 +53,11 @@ io const run = func (count: U32) => return do:
 
 Deno.test("unchanged variants preserve erased payload descriptors and aliases", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
   });
   try {
     const result = await compiler.build({
@@ -102,11 +102,11 @@ io const alias = func (value: U32) => return do:
 
 Deno.test("borrowed reference returns preserve field aliases when their parent replaces the owning edge", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable,
     entry,
-    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    prelude: new URL("../../std/prelude.sq", import.meta.url),
   });
   try {
     const result = await compiler.build({
@@ -144,13 +144,13 @@ io const run = func (count: U32) => return do:
 
 Deno.test("checked field updates preserve variant layouts aliases captures and retained edits in both tiers", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   try {
     {
       const options = {
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -226,13 +226,13 @@ io const floating = func (value: F32) => return do:
 
 Deno.test("allocating loops compute their totals with ordinary and shared machine bodies", async () => {
   const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   try {
     {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       });
       try {
         const result = await compiler.build({

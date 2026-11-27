@@ -1,5 +1,5 @@
 // Source contract: compiler/src/parse/token.zig. Stable public ordinals.
-namespace blot_parse_token;
+namespace squid_parse_token;
 
 type Tag = u32;
 let eof: Tag = 0;

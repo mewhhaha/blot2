@@ -3,7 +3,7 @@
 CT106 fixes the demonstrated first-edit graph correspondence boundary, removes
 repeated type/effect and lexical work, and adds measurements for query stages,
 allocator capacity, hardware counters and compiler construction. The complete
-[86-suggestion ledger](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT106_WORK.md) distinguishes implemented work,
+[86-suggestion ledger](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT106_WORK.md) distinguishes implemented work,
 rejected trials, conditional alternatives and unfinished work. It does not claim
 that every proposed architecture has been implemented.
 
@@ -302,8 +302,8 @@ Final native SHA-256:
 Compiler-identity-file SHA-256:
 `c6f01a199871b66d90fb24354c1d165bfff7bdc10323ea83c7c92cc8964a004f`.
 
-The matching CLI and native compiler are installed at `~/.local/bin/blot` and
-`~/.local/bin/blotc`, with rollback copies. Staged and installed checks run from
+The matching CLI and native compiler are installed at `~/.local/bin/squid` and
+`~/.local/bin/squidc`, with rollback copies. Staged and installed checks run from
 outside the repository: format, format-check, source-check, build, matching
 CLI/native Wasm, no-import instantiation and list-example result **29** all pass.
 The bundled guide matches its source. Installed CLI SHA-256:
@@ -316,5 +316,5 @@ hardware counters, memory sequences, timing frames, all qualification attempts,
 files and installation records. Internal `SHA256SUMS` is verified after writing.
 Private workload sources, binaries, generated Wasm and caches are excluded;
 public generated synthetic fixtures are included. Reproducing gdev requires the
-matching frozen source manifest. See the [ledger](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT106_WORK.md) for
+matching frozen source manifest. See the [ledger](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT106_WORK.md) for
 all 86 dispositions, including partial and remaining work.

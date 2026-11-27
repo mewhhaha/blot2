@@ -59,13 +59,13 @@ type FnCallExport =
     unsafe extern "C" fn(*mut c_void, *const u8, usize, u64, *mut u64, *mut u8) -> i32;
 type FnCallFinish = unsafe extern "C" fn(*mut c_void, *mut i32, *mut u8) -> i32;
 
-fn resolve_wtime_aot(blot_root: &Path) -> PathBuf {
+fn resolve_wtime_aot(squid_root: &Path) -> PathBuf {
     if let Ok(explicit) = std::env::var("WTIME_AOT_BIN") {
         if !explicit.is_empty() {
             return PathBuf::from(explicit);
         }
     }
-    if let Some(parent) = blot_root.parent() {
+    if let Some(parent) = squid_root.parent() {
         let sibling = parent.join("wtime/tools/wtime-aot/target/release/wtime-aot");
         if sibling.is_file() {
             return sibling;
@@ -231,13 +231,13 @@ impl<'a> WtimeAotGuest<'a> {
     }
 
     fn call_proc_init(&mut self, proc_name: &str, arg: u32) {
-        let name = format!("blot:proc_init:{proc_name}");
+        let name = format!("squid:proc_init:{proc_name}");
         let rc = self.call_raw(&name, arg) as i32;
         assert_eq!(rc, 0, "{name}({arg}) returned error status {rc}");
     }
 
     fn call_proc_step(&mut self, proc_name: &str, cmd: u32) -> u32 {
-        let name = format!("blot:proc_step:{proc_name}");
+        let name = format!("squid:proc_step:{proc_name}");
         self.call_raw(&name, cmd)
     }
 }
@@ -316,37 +316,37 @@ fn git_short_rev(repo: &Path) -> String {
 
 fn main() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let blot_root = manifest_dir
+    let squid_root = manifest_dir
         .parent()
         .and_then(|p| p.parent())
-        .expect("blot2 repository root");
-    let workspace_parent = blot_root.parent().expect("workspace parent");
+        .expect("squid repository root");
+    let workspace_parent = squid_root.parent().expect("workspace parent");
     let ink_lib = workspace_parent.join("ink/lib");
     let ink_alias = format!("ink/={}", ink_lib.display());
-    let blotc = blot_root.join("compiler-goose/build/blotc-goose");
-    let wtime_aot = resolve_wtime_aot(blot_root);
-    let blot_kernels_src = blot_root.join("benchmarks/comparison/blot_kernels.blot");
-    let ink_ecs_src = blot_root.join("benchmarks/comparison/ink_ecs_bench.blot");
-    let rust_kernels_src = blot_root.join("benchmarks/comparison/rust_kernels.rs");
-    let blot_kernels_wasm = Path::new("/tmp/blot_kernels.wasm");
+    let squidc = squid_root.join("compiler-goose/build/squidc-goose");
+    let wtime_aot = resolve_wtime_aot(squid_root);
+    let squid_kernels_src = squid_root.join("benchmarks/comparison/squid_kernels.sq");
+    let ink_ecs_src = squid_root.join("benchmarks/comparison/ink_ecs_bench.sq");
+    let rust_kernels_src = squid_root.join("benchmarks/comparison/rust_kernels.rs");
+    let squid_kernels_wasm = Path::new("/tmp/squid_kernels.wasm");
     let rust_kernels_wasm = Path::new("/tmp/rust_kernels.wasm");
     let ink_ecs_wasm = Path::new("/tmp/ink_ecs_bench.wasm");
-    let blot_kernels_so = Path::new("/tmp/blot_kernels_wtime.so");
+    let squid_kernels_so = Path::new("/tmp/squid_kernels_wtime.so");
     let rust_kernels_so = Path::new("/tmp/rust_kernels_wtime.so");
     let ink_ecs_so = Path::new("/tmp/ink_ecs_bench_wtime.so");
 
     // 1. Compile speed comparison (cold single-file 6-kernel suite + Ink ECS app vs rustc -O3).
-    let blot_compile_ms = bench_compile_ms(
+    let squid_compile_ms = bench_compile_ms(
         || {
-            let mut c = Command::new(&blotc);
+            let mut c = Command::new(&squidc);
             c.args([
                 "build-project",
-                blot_kernels_src.to_str().unwrap(),
-                blot_kernels_wasm.to_str().unwrap(),
+                squid_kernels_src.to_str().unwrap(),
+                squid_kernels_wasm.to_str().unwrap(),
                 "--std-root",
-                blot_root.join("std").to_str().unwrap(),
+                squid_root.join("std").to_str().unwrap(),
                 "--prelude",
-                blot_root.join("std/prelude.blot").to_str().unwrap(),
+                squid_root.join("std/prelude.sq").to_str().unwrap(),
             ])
             .stdout(std::process::Stdio::null());
             c
@@ -356,15 +356,15 @@ fn main() {
     );
     let ink_ecs_compile_ms = bench_compile_ms(
         || {
-            let mut c = Command::new(&blotc);
+            let mut c = Command::new(&squidc);
             c.args([
                 "build-project",
                 ink_ecs_src.to_str().unwrap(),
                 ink_ecs_wasm.to_str().unwrap(),
                 "--std-root",
-                blot_root.join("std").to_str().unwrap(),
+                squid_root.join("std").to_str().unwrap(),
                 "--prelude",
-                blot_root.join("std/prelude.blot").to_str().unwrap(),
+                squid_root.join("std/prelude.sq").to_str().unwrap(),
                 "--alias",
                 &ink_alias,
             ])
@@ -414,17 +414,17 @@ fn main() {
         9,
     );
 
-    let (blot_mod, blot_aot_ms) =
-        WtimeAotModule::compile_and_load(&wtime_aot, blot_kernels_wasm, blot_kernels_so);
+    let (squid_mod, blot_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, squid_kernels_wasm, squid_kernels_so);
     let (rust_wasm_mod, rust_aot_ms) =
         WtimeAotModule::compile_and_load(&wtime_aot, rust_kernels_wasm, rust_kernels_so);
     let (ink_ecs_mod, ink_aot_ms) =
         WtimeAotModule::compile_and_load(&wtime_aot, ink_ecs_wasm, ink_ecs_so);
 
-    let mut blot_guest = blot_mod.instantiate();
+    let mut squid_guest = squid_mod.instantiate();
     let mut rust_wasm_guest = rust_wasm_mod.instantiate();
 
-    // 2. Language kernels: Blot (wtime-aot x64) vs Rust -O3 (wasm32 wtime-aot x64) vs Rust -O3 (native x86_64).
+    // 2. Language kernels: Squid (wtime-aot x64) vs Rust -O3 (wasm32 wtime-aot x64) vs Rust -O3 (native x86_64).
     let seed = 42u32;
     let kernel_specs: Vec<(&str, extern "C" fn(u32) -> u32)> = vec![
         ("lcg_recurrence", rust_kernels::lcg_recurrence),
@@ -437,29 +437,29 @@ fn main() {
 
     let mut kernel_rows = Vec::new();
     for (name, native_fn) in kernel_specs {
-        let (blot_ms, blot_chk) = time_ms(3, 15, || blot_guest.call_u32(name, seed));
+        let (squid_ms, squid_chk) = time_ms(3, 15, || squid_guest.call_u32(name, seed));
         let (rust_wasm_ms, rwasm_chk) = time_ms(3, 15, || rust_wasm_guest.call_u32(name, seed));
         let (rust_native_ms, rnat_chk) = time_ms(3, 15, || native_fn(black_box(seed)));
-        let exact_match = blot_chk == rwasm_chk && blot_chk == rnat_chk;
-        let close_match = blot_chk.abs_diff(rwasm_chk) <= 2 && blot_chk.abs_diff(rnat_chk) <= 2;
+        let exact_match = squid_chk == rwasm_chk && squid_chk == rnat_chk;
+        let close_match = squid_chk.abs_diff(rwasm_chk) <= 2 && squid_chk.abs_diff(rnat_chk) <= 2;
         assert!(
             close_match,
-            "checksum mismatch for {name}: blot={blot_chk}, rust_wasm={rwasm_chk}, rust_native={rnat_chk}"
+            "checksum mismatch for {name}: squid={squid_chk}, rust_wasm={rwasm_chk}, rust_native={rnat_chk}"
         );
         kernel_rows.push(serde_json::json!({
             "name": name,
-            "blot_wtime_ms": blot_ms,
+            "squid_wtime_ms": squid_ms,
             "rust_wtime_ms": rust_wasm_ms,
             "rust_native_ms": rust_native_ms,
-            "blot_vs_rust_wasm": blot_ms / rust_wasm_ms,
-            "blot_vs_rust_native": blot_ms / rust_native_ms,
+            "squid_vs_rust_wasm": squid_ms / rust_wasm_ms,
+            "squid_vs_rust_native": squid_ms / rust_native_ms,
             "checksum_exact": exact_match,
-            "checksum_blot": blot_chk,
+            "checksum_squid": squid_chk,
             "checksum_rust_native": rnat_chk,
         }));
     }
 
-    // 3. Ink ECS (Blot -> wtime-aot x64) vs Bevy ECS 0.20.1 (native Rust -O3).
+    // 3. Ink ECS (Squid -> wtime-aot x64) vs Bevy ECS 0.20.1 (native Rust -O3).
     let n_entities = 10_000u32;
     let mut ecs_rows = Vec::new();
 
@@ -677,26 +677,26 @@ fn main() {
     // 4. Wasm 3.0 opt-in (--wasm3: --tail-calls + --relaxed-simd) on wtime-aot 0.1.7,
     //    generalized AoS Vec2/Vec4 record auto-SIMD, multi-core isolated-guest scaling,
     //    and persistent #process throughput.
-    let blot_kernels_w3_wasm = Path::new("/tmp/blot_kernels_w3.wasm");
-    let blot_kernels_w3_so = Path::new("/tmp/blot_kernels_w3_wtime.so");
-    let st = Command::new(&blotc)
+    let squid_kernels_w3_wasm = Path::new("/tmp/squid_kernels_w3.wasm");
+    let squid_kernels_w3_so = Path::new("/tmp/squid_kernels_w3_wtime.so");
+    let st = Command::new(&squidc)
         .args([
             "build-project",
-            blot_kernels_src.to_str().unwrap(),
-            blot_kernels_w3_wasm.to_str().unwrap(),
+            squid_kernels_src.to_str().unwrap(),
+            squid_kernels_w3_wasm.to_str().unwrap(),
             "--std-root",
-            blot_root.join("std").to_str().unwrap(),
+            squid_root.join("std").to_str().unwrap(),
             "--prelude",
-            blot_root.join("std/prelude.blot").to_str().unwrap(),
+            squid_root.join("std/prelude.sq").to_str().unwrap(),
             "--wasm3",
         ])
         .stdout(std::process::Stdio::null())
         .status()
-        .expect("compile blot_kernels --wasm3");
-    assert!(st.success(), "blot_kernels --wasm3 compile failed");
-    let (blot_w3_mod, blot_w3_aot_ms) =
-        WtimeAotModule::compile_and_load(&wtime_aot, blot_kernels_w3_wasm, blot_kernels_w3_so);
-    let mut blot_w3_guest = blot_w3_mod.instantiate();
+        .expect("compile squid_kernels --wasm3");
+    assert!(st.success(), "squid_kernels --wasm3 compile failed");
+    let (squid_w3_mod, squid_w3_aot_ms) =
+        WtimeAotModule::compile_and_load(&wtime_aot, squid_kernels_w3_wasm, squid_kernels_w3_so);
+    let mut squid_w3_guest = squid_w3_mod.instantiate();
     let mut wasm3_kernel_rows = Vec::new();
     for (idx, name) in [
         "lcg_recurrence",
@@ -709,9 +709,9 @@ fn main() {
     .iter()
     .enumerate()
     {
-        let (w3_ms, w3_chk) = time_ms(3, 15, || blot_w3_guest.call_u32(name, seed));
-        let def_ms = kernel_rows[idx]["blot_wtime_ms"].as_f64().unwrap();
-        let def_chk = kernel_rows[idx]["checksum_blot"].as_u64().unwrap() as u32;
+        let (w3_ms, w3_chk) = time_ms(3, 15, || squid_w3_guest.call_u32(name, seed));
+        let def_ms = kernel_rows[idx]["squid_wtime_ms"].as_f64().unwrap();
+        let def_chk = kernel_rows[idx]["checksum_squid"].as_u64().unwrap() as u32;
         wasm3_kernel_rows.push(serde_json::json!({
             "name": name,
             "default_wtime_ms": def_ms,
@@ -723,21 +723,21 @@ fn main() {
     }
 
     // 4b. Generalized AoS #[Vec4] & #[Vec2] record auto-SIMD + multi-core scaling + #process.
-    let mc_src = blot_root.join("benchmarks/comparison/multicore_aos_bench.blot");
+    let mc_src = squid_root.join("benchmarks/comparison/multicore_aos_bench.sq");
     let mc_def_wasm = Path::new("/tmp/multicore_aos_def.wasm");
     let mc_w3_wasm = Path::new("/tmp/multicore_aos_w3.wasm");
     let mc_def_so = Path::new("/tmp/multicore_aos_def_wtime.so");
     let mc_w3_so = Path::new("/tmp/multicore_aos_w3_wtime.so");
     for (out_wasm, extra) in [(mc_def_wasm, false), (mc_w3_wasm, true)] {
-        let mut cmd = Command::new(&blotc);
+        let mut cmd = Command::new(&squidc);
         cmd.args([
             "build-project",
             mc_src.to_str().unwrap(),
             out_wasm.to_str().unwrap(),
             "--std-root",
-            blot_root.join("std").to_str().unwrap(),
+            squid_root.join("std").to_str().unwrap(),
             "--prelude",
-            blot_root.join("std/prelude.blot").to_str().unwrap(),
+            squid_root.join("std/prelude.sq").to_str().unwrap(),
         ]);
         if extra {
             cmd.arg("--wasm3");
@@ -820,33 +820,33 @@ fn main() {
     let (v4_def_ms, v4_def_chk) = time_ms(3, 15, || mc_def_guest.call_u32("aos_vec4_euler", seed));
     let (v4_w3_ms, v4_w3_chk) = time_ms(3, 15, || mc_w3_guest.call_u32("aos_vec4_euler", seed));
     let (v4_nat_ms, v4_nat_chk) = time_ms(3, 15, || native_aos_vec4(black_box(seed)));
-    assert!(v4_def_chk.abs_diff(v4_nat_chk) <= 2, "aos_vec4 mismatch: blot={v4_def_chk} nat={v4_nat_chk}");
+    assert!(v4_def_chk.abs_diff(v4_nat_chk) <= 2, "aos_vec4 mismatch: squid={v4_def_chk} nat={v4_nat_chk}");
 
     let (v2_def_ms, v2_def_chk) = time_ms(3, 15, || mc_def_guest.call_u32("aos_vec2_euler", seed));
     let (v2_w3_ms, v2_w3_chk) = time_ms(3, 15, || mc_w3_guest.call_u32("aos_vec2_euler", seed));
     let (v2_nat_ms, v2_nat_chk) = time_ms(3, 15, || native_aos_vec2(black_box(seed)));
-    assert!(v2_def_chk.abs_diff(v2_nat_chk) <= 2, "aos_vec2 mismatch: blot={v2_def_chk} nat={v2_nat_chk}");
+    assert!(v2_def_chk.abs_diff(v2_nat_chk) <= 2, "aos_vec2 mismatch: squid={v2_def_chk} nat={v2_nat_chk}");
 
     let aos_rows = vec![
         serde_json::json!({
             "name": "aos_vec4_euler_65k_x32",
-            "blot_wtime_ms": v4_def_ms,
-            "blot_wasm3_wtime_ms": v4_w3_ms,
+            "squid_wtime_ms": v4_def_ms,
+            "squid_wasm3_wtime_ms": v4_w3_ms,
             "rust_native_ms": v4_nat_ms,
-            "blot_vs_rust_native": v4_def_ms / v4_nat_ms,
+            "squid_vs_rust_native": v4_def_ms / v4_nat_ms,
             "wasm3_vs_rust_native": v4_w3_ms / v4_nat_ms,
-            "checksum_blot": v4_def_chk,
+            "checksum_squid": v4_def_chk,
             "checksum_wasm3": v4_w3_chk,
             "checksum_rust_native": v4_nat_chk,
         }),
         serde_json::json!({
             "name": "aos_vec2_euler_65k_x32",
-            "blot_wtime_ms": v2_def_ms,
-            "blot_wasm3_wtime_ms": v2_w3_ms,
+            "squid_wtime_ms": v2_def_ms,
+            "squid_wasm3_wtime_ms": v2_w3_ms,
             "rust_native_ms": v2_nat_ms,
-            "blot_vs_rust_native": v2_def_ms / v2_nat_ms,
+            "squid_vs_rust_native": v2_def_ms / v2_nat_ms,
             "wasm3_vs_rust_native": v2_w3_ms / v2_nat_ms,
-            "checksum_blot": v2_def_chk,
+            "checksum_squid": v2_def_chk,
             "checksum_wasm3": v2_w3_chk,
             "checksum_rust_native": v2_nat_chk,
         }),
@@ -854,12 +854,12 @@ fn main() {
 
     // 4c. Multi-core isolated-guest scaling (8 x 256x256 Mandelbrot tiles across 1, 2, 4, 8 threads).
     let mut multicore_rows = Vec::new();
-    let mut blot_1t_ms = 0.0f64;
-    let mut blot_mc_chk = 0u32;
+    let mut squid_1t_ms = 0.0f64;
+    let mut squid_mc_chk = 0u32;
     for threads in [1usize, 2, 4, 8] {
         let mut guests: Vec<WtimeAotGuest<'_>> = (0..threads).map(|_| mc_def_mod.instantiate()).collect();
         let tiles_per_thread = 8 / threads;
-        let (blot_ms, bchk) = time_ms(2, 11, || {
+        let (squid_ms, bchk) = time_ms(2, 11, || {
             std::thread::scope(|s| {
                 let mut handles = Vec::with_capacity(threads);
                 for (tid, g) in guests.iter_mut().enumerate() {
@@ -893,19 +893,19 @@ fn main() {
                 handles.into_iter().fold(0u32, |a, h| a.wrapping_add(h.join().unwrap()))
             })
         });
-        assert_eq!(bchk, nchk, "multicore checksum mismatch at threads={threads}: blot={bchk} nat={nchk}");
+        assert_eq!(bchk, nchk, "multicore checksum mismatch at threads={threads}: squid={bchk} nat={nchk}");
         if threads == 1 {
-            blot_1t_ms = blot_ms;
-            blot_mc_chk = bchk;
+            squid_1t_ms = squid_ms;
+            squid_mc_chk = bchk;
         } else {
-            assert_eq!(bchk, blot_mc_chk);
+            assert_eq!(bchk, squid_mc_chk);
         }
         multicore_rows.push(serde_json::json!({
             "threads": threads,
-            "blot_wtime_ms": blot_ms,
-            "blot_scaling": blot_1t_ms / blot_ms,
+            "squid_wtime_ms": squid_ms,
+            "squid_scaling": squid_1t_ms / squid_ms,
             "rust_native_ms": nat_ms,
-            "blot_vs_rust_native": blot_ms / nat_ms,
+            "squid_vs_rust_native": squid_ms / nat_ms,
             "checksum": bchk,
         }));
     }
@@ -931,7 +931,7 @@ fn main() {
         ((noop_batch_ms * 1000.0) / 10_000.0, (phys_batch_ms * 1000.0) / 200.0)
     };
 
-    let blot_commit = git_short_rev(blot_root);
+    let squid_commit = git_short_rev(squid_root);
     let wtime_dir = workspace_parent.join("wtime");
     let wtime_commit = git_short_rev(&wtime_dir);
     let wtime_version = std::fs::read_to_string(wtime_dir.join("tools/wtime-aot/Cargo.toml"))
@@ -977,22 +977,22 @@ fn main() {
     let report = serde_json::json!({
         "hardware": "AMD Ryzen 7 7800X3D (8-core / 16-thread)",
         "toolchains": {
-            "blot_commit": blot_commit,
+            "squid_commit": squid_commit,
             "wtime_aot": format!("{wtime_version} ({x64_profile}, {wtime_commit})"),
             "bevy_ecs": "0.20.1",
             "rustc": rustc_version,
         },
         "compile_speed_ms": {
-            "blot_6_kernels_ms": blot_compile_ms,
-            "blot_ink_ecs_app_ms": ink_ecs_compile_ms,
+            "squid_6_kernels_ms": squid_compile_ms,
+            "squid_ink_ecs_app_ms": ink_ecs_compile_ms,
             "rust_wasm32_opt3_ms": rust_wasm_compile_ms,
             "rust_native_opt3_ms": rust_native_compile_ms,
-            "wtime_aot_blot_kernels_ms": blot_aot_ms,
-            "wtime_aot_blot_kernels_wasm3_ms": blot_w3_aot_ms,
+            "wtime_aot_squid_kernels_ms": blot_aot_ms,
+            "wtime_aot_squid_kernels_wasm3_ms": squid_w3_aot_ms,
             "wtime_aot_ink_ecs_ms": ink_aot_ms,
             "wtime_aot_rust_kernels_ms": rust_aot_ms,
-            "blot_wasm_bytes": std::fs::metadata(blot_kernels_wasm).unwrap().len(),
-            "blot_wasm3_bytes": std::fs::metadata(blot_kernels_w3_wasm).unwrap().len(),
+            "squid_wasm_bytes": std::fs::metadata(squid_kernels_wasm).unwrap().len(),
+            "squid_wasm3_bytes": std::fs::metadata(squid_kernels_w3_wasm).unwrap().len(),
             "rust_wasm_bytes": std::fs::metadata(rust_kernels_wasm).unwrap().len(),
             "ink_ecs_wasm_bytes": std::fs::metadata(ink_ecs_wasm).unwrap().len(),
         },

@@ -9,11 +9,11 @@
   "cache_preserved": "zig-native/.zig-cache",
   "private_benchmarks_preserved": "build/bench",
   "protected_sha256": {
-    "zig-native/zig-out/bin/blotc": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
-    "zig-native/zig-out-dev/bin/blotc": "457bdb9b555f92bd9ff3a001811f8572f83ecc2f585e50afe8558598f17da56b",
-    "zig-native/zig-out-native-dev/bin/blot-tests": "babe48ba500ceb53899b7a4cd1a41e90b19108ed70eb141b99688d617ce032c0",
-    "build/bench/sort-hills/baseline/bin/blotc": "4f0120a091870fd45722f4d878a9699f97843e4e40dd830e6583e06af07b09dd",
-    "build/bench/shared-hills/baseline/bin/blotc": "f90931ef17ec2b143f880db68253d54392ec4f19a44e9eb58ff09b587d6d967b"
+    "zig-native/zig-out/bin/squidc": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "zig-native/zig-out-dev/bin/squidc": "457bdb9b555f92bd9ff3a001811f8572f83ecc2f585e50afe8558598f17da56b",
+    "zig-native/zig-out-native-dev/bin/squid-tests": "babe48ba500ceb53899b7a4cd1a41e90b19108ed70eb141b99688d617ce032c0",
+    "build/bench/sort-hills/baseline/bin/squidc": "4f0120a091870fd45722f4d878a9699f97843e4e40dd830e6583e06af07b09dd",
+    "build/bench/shared-hills/baseline/bin/squidc": "f90931ef17ec2b143f880db68253d54392ec4f19a44e9eb58ff09b587d6d967b"
   },
   "native_tree_allocated_before": 305404026880,
   "removed": [
@@ -188,15 +188,15 @@
     "packaged_binary_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
     "compressed_bytes": 19079470,
     "fixture_witnesses": {
-      "zig-native/fixtures/retained-state-fixtures/plain-annotation-scope.blot": {
+      "zig-native/fixtures/retained-state-fixtures/plain-annotation-scope.sq": {
         "sha256": "73a119d1763218ede6ea8cb6938a22f9594f7e68cc32bdbabec1c7787a3ecaa9",
         "exact_inline_copies": 2
       },
-      "zig-native/fixtures/retained-state-fixtures/template-local-state-identity.blot": {
+      "zig-native/fixtures/retained-state-fixtures/template-local-state-identity.sq": {
         "sha256": "74c4b269109acf937903e1f6e59db2f9894a7f331586d0a862ffacd8de97e263",
         "exact_inline_copies": 1
       },
-      "zig-native/fixtures/retained-state-fixtures/template-local-state-scopes.blot": {
+      "zig-native/fixtures/retained-state-fixtures/template-local-state-scopes.sq": {
         "sha256": "49835b6e2f2e35e22cc8d5b08c69aba6dcd425728cb65dad2405f7db00a17c8c",
         "exact_inline_copies": 2
       }
@@ -247,7 +247,7 @@
             "copied nominal payloads",
             "zig-native/tests/acyclic_updates_execution.test.ts",
             "--",
-            "build/bench/sort-hills/baseline/bin/blotc"
+            "build/bench/sort-hills/baseline/bin/squidc"
           ],
           "returncode": 1,
           "storage_unsupported": true
@@ -261,7 +261,7 @@
             "copied nominal payloads",
             "zig-native/tests/acyclic_updates_execution.test.ts",
             "--",
-            "zig-native/zig-out/bin/blotc"
+            "zig-native/zig-out/bin/squidc"
           ],
           "returncode": 1,
           "storage_unsupported": true
@@ -284,7 +284,7 @@
           "executed memory costs",
           "zig-native/tests/memory_profile_execution.test.ts",
           "--",
-          "build/bench/sort-hills/baseline/bin/blotc"
+          "build/bench/sort-hills/baseline/bin/squidc"
         ],
         "returncode": 1,
         "storage_unsupported": true,

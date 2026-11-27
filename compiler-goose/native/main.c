@@ -11,10 +11,10 @@
 /* Build the Goose source as a C-host library (--header). The generated header
  * exports this fixed scalar entry; no compiler algorithm crosses this shim. */
 extern void goose_init(int argc, char **argv);
-extern int32_t blot_goose_main(void);
-extern void blot_platform_entry_init(int argc, char **argv);
+extern int32_t squid_goose_main(void);
+extern void squid_platform_entry_init(int argc, char **argv);
 
-extern void blot_worker_detach(void);
+extern void squid_worker_detach(void);
 static uint64_t failure_request, failure_at;
 static int failure_kind;
 
@@ -32,23 +32,23 @@ static uint64_t unsigned_environment(const char *name) {
 }
 
 static void observe_request(void) {
-    uint64_t token = blot_request_token();
+    uint64_t token = squid_request_token();
     uint64_t selected = 0;
     if (token == failure_request) selected = failure_at;
-    blot_allocation_observer_begin(token, selected, failure_kind);
+    squid_allocation_observer_begin(token, selected, failure_kind);
 }
 
 static void request_forked(void) {
-    blot_worker_detach();
+    squid_worker_detach();
     observe_request();
 }
 
 static void allocation_failed(int kind, uint64_t bytes) {
     (void)kind;
     (void)bytes;
-    uint64_t token = blot_request_token();
-    if (token) blot_request_fail_oom(token);
-    static const char message[] = "blotc: out_of_memory\n";
+    uint64_t token = squid_request_token();
+    if (token) squid_request_fail_oom(token);
+    static const char message[] = "squidc: out_of_memory\n";
     (void)write(STDERR_FILENO, message, sizeof message - 1);
     _exit(125);
 }
@@ -69,17 +69,17 @@ int main(int argc, char **argv) {
         }
     }
 #endif
-    int stage_child = blot_request_stage_init(&argc, argv);
+    int stage_child = squid_request_stage_init(&argc, argv);
     if (stage_child < 0) _exit(124);
-    blot_platform_entry_init(argc, argv);
-    failure_request = unsigned_environment("BLOT_GOOSE_FAIL_REQUEST");
-    failure_at = unsigned_environment("BLOT_GOOSE_FAIL_AT");
-    uint64_t kind = unsigned_environment("BLOT_GOOSE_FAIL_KIND");
-    if (kind <= BLOT_OBS_POOL_REUSE) failure_kind = (int)kind;
-    blot_request_fork_hook(request_forked);
-    blot_request_adopt_hook(blot_request_cache_publish);
-    blot_allocation_observer_install(allocation_failed);
+    squid_platform_entry_init(argc, argv);
+    failure_request = unsigned_environment("SQUID_GOOSE_FAIL_REQUEST");
+    failure_at = unsigned_environment("SQUID_GOOSE_FAIL_AT");
+    uint64_t kind = unsigned_environment("SQUID_GOOSE_FAIL_KIND");
+    if (kind <= SQUID_OBS_POOL_REUSE) failure_kind = (int)kind;
+    squid_request_fork_hook(request_forked);
+    squid_request_adopt_hook(squid_request_cache_publish);
+    squid_allocation_observer_install(allocation_failed);
     if (stage_child) observe_request();
     goose_init(argc, argv);
-    return blot_goose_main();
+    return squid_goose_main();
 }

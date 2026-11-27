@@ -1,6 +1,6 @@
-# Blot vNext Cheatsheet
+# Squid vNext Cheatsheet
 
-Quick, version-matched reference for humans and coding agents. Run `deno task blot guide --cheatsheet` to print this file, or `deno task blot explain <CODE>` for any compiler error.
+Quick, version-matched reference for humans and coding agents. Run `deno task squid guide --cheatsheet` to print this file, or `deno task squid explain <CODE>` for any compiler error.
 
 ## 1. Top 10 Rules (Avoid Common Mistakes)
 
@@ -33,7 +33,7 @@ Quick, version-matched reference for humans and coding agents. Run `deno task bl
 
 ## 3. Functions, Control Flow & Patterns
 
-```blot
+```squid
 // Single-expression (implicit return)
 func add (a: U32) -> (b: U32): U32 => a + b
 
@@ -52,12 +52,12 @@ io main (): U32 =>
 ```
 
 - Application is curried and left-associative: `add 1 2` means `(add 1) 2`.
-- Custom operators are ordinary functions named in parentheses (`func (++) a -> b => ...`, `import { (++) } from "./ops"`, `fold (+) 0 xs`) with lexical precedence (`|>`/`<|` 5, `or` 20, `and` 25, `= ! < >` 30, `|` 40, `^` 45, `&` 50, `<< >>` 55, `+ - ~ ?` 60, `* / %` 70, `**` 75). Standard operators live in `std/prelude.blot` using `@type.call` and `@pipe`.
+- Custom operators are ordinary functions named in parentheses (`func (++) a -> b => ...`, `import { (++) } from "./ops"`, `fold (+) 0 xs`) with lexical precedence (`|>`/`<|` 5, `or` 20, `and` 25, `= ! < >` 30, `|` 40, `^` 45, `&` 50, `<< >>` 55, `+ - ~ ?` 60, `* / %` 70, `**` 75). Standard operators live in `std/prelude.sq` using `@type.call` and `@pipe`.
 - Tuples use parens: `let (x, y) = pair`.
 - Indented `do:` blocks yield via `break value`.
 - Pattern matching must be exhaustive:
 
-```blot
+```squid
 type Event is data = $Tick U32 | $Reset
 
 func step (ev: Event) -> (acc: U32): U32 => case ev of
@@ -82,7 +82,7 @@ func unwrap_or_zero (opt: Maybe U32): U32 =>
 
 ## 5. Fast SIMD (`spark`) & Multi-Core (`#kernel` / `#process`)
 
-```blot
+```squid
 // Auto-vectorized 4-wide Wasm v128 SIMD (must be pure)
 func saxpy (a: F32) -> (xs: #[F32]) -> (ys: #[F32]): #[F32] =>
   return spark #[a * xs[i] + ys[i] | i <- 0 .. xs.length]
@@ -90,7 +90,7 @@ func saxpy (a: F32) -> (xs: #[F32]) -> (ys: #[F32]): #[F32] =>
 
 ## 6. Algebraic Effects
 
-```blot
+```squid
 type Clock is effect = { delta: Unit -> F32 }
 
 func step (pos: F32) -> (vel: F32): F32 =>
@@ -107,12 +107,12 @@ io run (): F32 =>
 ## 7. CLI Commands
 
 ```sh
-deno task blot check app.blot                  # type-check with agent diagnostics
-deno task blot build app.blot build/app.wasm   # compile to Wasm ABI 8
-deno task blot build app.blot build/app.wasm --wasm3  # opt-in Wasm 3.0 (FMA + return_call)
-deno task blot build app.blot build/app.wasm --stack-mb 256 --heap-mb 256 --transport-mb 16  # custom memory budgets
-deno task blot fmt app.blot                    # format source
-deno task blot explain SPENT_VALUE             # explain any diagnostic code
-deno task blot explain --list                  # list all diagnostic codes
-deno task blot guide --cheatsheet              # print this cheatsheet
+deno task squid check app.sq                  # type-check with agent diagnostics
+deno task squid build app.sq build/app.wasm   # compile to Wasm ABI 8
+deno task squid build app.sq build/app.wasm --wasm3  # opt-in Wasm 3.0 (FMA + return_call)
+deno task squid build app.sq build/app.wasm --stack-mb 256 --heap-mb 256 --transport-mb 16  # custom memory budgets
+deno task squid fmt app.sq                    # format source
+deno task squid explain SPENT_VALUE             # explain any diagnostic code
+deno task squid explain --list                  # list all diagnostic codes
+deno task squid guide --cheatsheet              # print this cheatsheet
 ```

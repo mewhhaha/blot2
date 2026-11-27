@@ -18,16 +18,16 @@ export const taskImports = [
 ] as const;
 export function taskExports(count: number): string[] {
   const names = [
-    "blot:task_context/create",
-    "blot:task_context/save",
-    "blot:task_context/restore",
-    "blot:task_context/drop",
-    "blot:task_retain",
-    "blot:task_release",
+    "squid:task_context/create",
+    "squid:task_context/save",
+    "squid:task_context/restore",
+    "squid:task_context/drop",
+    "squid:task_retain",
+    "squid:task_release",
   ];
   for (let id = 0; id < count; id++) {
     for (const role of ["start", "move_captures", "move_result"]) {
-      names.push(`blot:task_${role}/${id}`);
+      names.push(`squid:task_${role}/${id}`);
     }
   }
   return names;
@@ -132,21 +132,21 @@ export class TaskGuest {
     ) => (value: number) => Promise<unknown>,
   ) {
     const signatures: [string, number, boolean][] = [
-      ["blot:task_context/create", 1, true],
-      ["blot:task_context/save", 1, true],
-      ["blot:task_context/restore", 1, true],
-      ["blot:task_context/drop", 1, true],
-      ["blot:task_retain", 1, false],
-      ["blot:task_release", 1, false],
+      ["squid:task_context/create", 1, true],
+      ["squid:task_context/save", 1, true],
+      ["squid:task_context/restore", 1, true],
+      ["squid:task_context/drop", 1, true],
+      ["squid:task_retain", 1, false],
+      ["squid:task_release", 1, false],
     ];
     for (let id = 0; id < descriptors; id++) {
-      signatures.push([`blot:task_start/${id}`, 1, true]);
-      signatures.push([`blot:task_move_captures/${id}`, 1, false]);
-      signatures.push([`blot:task_move_result/${id}`, 1, false]);
+      signatures.push([`squid:task_start/${id}`, 1, true]);
+      signatures.push([`squid:task_move_captures/${id}`, 1, false]);
+      signatures.push([`squid:task_move_result/${id}`, 1, false]);
     }
     this.#hooks = typedTaskFunctions(exports, signatures);
-    this.#memory = exports["blot:memory"] instanceof WebAssembly.Memory
-      ? exports["blot:memory"]
+    this.#memory = exports["squid:memory"] instanceof WebAssembly.Memory
+      ? exports["squid:memory"]
       : undefined;
   }
   #call(name: string, value: number): number {
@@ -154,13 +154,13 @@ export class TaskGuest {
   }
   #activate(entry: Entry): void {
     if (entry.closed) invalid("Task context has terminated");
-    this.#call("blot:task_context/restore", entry.native);
+    this.#call("squid:task_context/restore", entry.native);
     this.#active = entry;
     this.select(entry.resources);
   }
   begin(resources: ResourceJournal, asynchronous: boolean): void {
     if (!this.#root) {
-      const native = this.#call("blot:task_context/create", 0);
+      const native = this.#call("squid:task_context/create", 0);
       this.#root = {
         id: 0,
         native,
@@ -175,7 +175,7 @@ export class TaskGuest {
         closed: false,
       };
       this.#entries.set(0, this.#root);
-      this.#call("blot:task_context/save", native);
+      this.#call("squid:task_context/save", native);
     }
     this.#active = this.#root;
     this.select(resources);
@@ -248,14 +248,14 @@ export class TaskGuest {
       if (entry.capturesLive) {
         entry.capturesLive = false;
         attempt(() => {
-          this.#call("blot:task_release", entry.captures);
+          this.#call("squid:task_release", entry.captures);
         });
       }
       attempt(() => this.cleanup(() => entry.resources.finish()));
       attempt(() => this.ownership.leave(Number(failed)));
       entry.entered = false;
       attempt(() => {
-        this.#call("blot:task_context/drop", entry.native);
+        this.#call("squid:task_context/drop", entry.native);
       });
       entry.closed = true;
       if (entry.id !== undefined) this.#entries.delete(entry.id);
@@ -296,7 +296,7 @@ export class TaskGuest {
       const results = this.journal();
       resources.begin();
       results.begin();
-      const native = this.#call("blot:task_context/create", 1);
+      const native = this.#call("squid:task_context/create", 1);
       const entry: Entry = {
         native,
         group: group >>> 0,
@@ -309,14 +309,14 @@ export class TaskGuest {
         capturesLive: true,
         closed: false,
       };
-      this.#call("blot:task_retain", captures);
+      this.#call("squid:task_retain", captures);
       let moved = false;
       let published: number | undefined;
       try {
         this.#move(
           parent.resources,
           resources,
-          `blot:task_move_captures/${descriptor}`,
+          `squid:task_move_captures/${descriptor}`,
           captures,
         );
         moved = true;
@@ -329,7 +329,7 @@ export class TaskGuest {
               entry.entered = true;
               context.cleanup(() => this.#retire(entry));
               this.ownership.enter();
-              const fn = this.#hooks[`blot:task_start/${descriptor}`] as (
+              const fn = this.#hooks[`squid:task_start/${descriptor}`] as (
                 value: number,
               ) => number;
               const publish = (result: number): number => {
@@ -338,11 +338,11 @@ export class TaskGuest {
                   this.#move(
                     resources,
                     results,
-                    `blot:task_move_result/${descriptor}`,
+                    `squid:task_move_result/${descriptor}`,
                     result,
                   );
                 } catch (cause) {
-                  this.#call("blot:task_release", result);
+                  this.#call("squid:task_release", result);
                   throw cause;
                 }
                 return result >>> 0;
@@ -361,7 +361,7 @@ export class TaskGuest {
             dropResult: (result) => {
               this.select(results);
               try {
-                this.#call("blot:task_release", result);
+                this.#call("squid:task_release", result);
                 this.cleanup(() => results.finish());
               } finally {
                 this.select(this.#owner().resources);
@@ -382,7 +382,7 @@ export class TaskGuest {
           this.#move(
             resources,
             parent.resources,
-            `blot:task_move_captures/${descriptor}`,
+            `squid:task_move_captures/${descriptor}`,
             captures,
           );
         }
@@ -403,14 +403,14 @@ export class TaskGuest {
           this.#move(
             entry.results,
             owner.resources,
-            `blot:task_move_result/${entry.descriptor}`,
+            `squid:task_move_result/${entry.descriptor}`,
             result,
           );
         } catch (cause) {
           // Join consumed the host envelope. A failed destination reservation
           // still owns its lease and the child's returned cleanup journal.
           try {
-            this.#call("blot:task_release", result);
+            this.#call("squid:task_release", result);
           } finally {
             this.cleanup(() => entry.results.finish());
           }
@@ -467,7 +467,7 @@ export class TaskGuest {
             this.#move(
               entry.results,
               owner.resources,
-              `blot:task_move_result/${entry.descriptor}`,
+              `squid:task_move_result/${entry.descriptor}`,
               results[index],
             );
             moved++;
@@ -485,14 +485,14 @@ export class TaskGuest {
               this.#move(
                 owner.resources,
                 entry.results,
-                `blot:task_move_result/${entry.descriptor}`,
+                `squid:task_move_result/${entry.descriptor}`,
                 results[index],
               );
             } catch { /* Keep draining all acquired results. */ }
           }
           for (let index = 0; index < count; index++) {
             try {
-              this.#call("blot:task_release", results[index]);
+              this.#call("squid:task_release", results[index]);
             } catch { /* Release every other publication lease as well. */ }
             try {
               this.cleanup(() => entries[index].results.finish());
@@ -586,7 +586,7 @@ export class TaskGuest {
   dispose(): void {
     if (!this.#root) return;
     this.#activate(this.#root);
-    this.#call("blot:task_context/drop", this.#root.native);
+    this.#call("squid:task_context/drop", this.#root.native);
     this.#root.closed = true;
     this.#entries.clear();
     this.#handles.clear();

@@ -23,13 +23,13 @@ const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
 /** Default logical transport packet ceiling in bytes (2 MiB). */
 export const DEFAULT_TRANSPORT_BUDGET = 2_097_152;
-/** `blot:kernels` flag bit 0: kernel has a prepared context (`prepare`). */
+/** `squid:kernels` flag bit 0: kernel has a prepared context (`prepare`). */
 export const KERNEL_FLAG_HAS_CONTEXT = 1 << 0;
-/** `blot:kernels` flag bit 1: kernel emits variable-length `[len, words...]` output. */
+/** `squid:kernels` flag bit 1: kernel emits variable-length `[len, words...]` output. */
 export const KERNEL_FLAG_VARIABLE_OUTPUT = 1 << 1;
 /** Page-0 byte offset of the zero-export `arena_oom_flag` (`u32`). */
 export const ARENA_OOM_OFFSET = 640;
-/** Page-0 byte offset of the 1-based `trap_site_id` (`u32 LE`) for `blot:traps`. */
+/** Page-0 byte offset of the 1-based `trap_site_id` (`u32 LE`) for `squid:traps`. */
 export const TRAP_SITE_OFFSET = 772;
 
 export type TrapKind = "panic" | "bounds" | "unreachable";
@@ -434,40 +434,40 @@ export function guestTrapOf(error: unknown): GuestTrapInfo | undefined {
   return guestTrapMap.get(error);
 }
 
-/** Decode the optional `blot:traps` v1 custom section. */
+/** Decode the optional `squid:traps` v1 custom section. */
 export function readTrapMetadata(
   wasm: WebAssembly.Module | Uint8Array<ArrayBuffer>,
 ): readonly TrapMetadataEntry[] | undefined {
   const module = wasm instanceof WebAssembly.Module
     ? wasm
     : new WebAssembly.Module(wasm);
-  const sections = WebAssembly.Module.customSections(module, "blot:traps");
+  const sections = WebAssembly.Module.customSections(module, "squid:traps");
   if (sections.length === 0) return undefined;
   if (sections.length > 1) {
-    throw new GuestError("invalid_abi", "Duplicate blot:traps section");
+    throw new GuestError("invalid_abi", "Duplicate squid:traps section");
   }
   const bytes = new Uint8Array(sections[0]);
   if (bytes.length < 5) {
-    throw new GuestError("invalid_abi", "Truncated blot:traps section");
+    throw new GuestError("invalid_abi", "Truncated squid:traps section");
   }
   const version = bytes[0];
   if (version !== 1) {
     throw new GuestError(
       "invalid_abi",
-      `Unsupported blot:traps version ${version}`,
+      `Unsupported squid:traps version ${version}`,
     );
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(1, true);
   let offset = 5;
   if (count > Math.floor((bytes.length - offset) / 17)) {
-    throw new GuestError("invalid_abi", "Truncated blot:traps entries");
+    throw new GuestError("invalid_abi", "Truncated squid:traps entries");
   }
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   const entries: TrapMetadataEntry[] = [];
   for (let i = 0; i < count; i++) {
     if (bytes.length - offset < 17) {
-      throw new GuestError("invalid_abi", "Truncated blot:traps entry");
+      throw new GuestError("invalid_abi", "Truncated squid:traps entry");
     }
     const kindByte = bytes[offset++];
     let kind: TrapKind;
@@ -477,7 +477,7 @@ export function readTrapMetadata(
     else {
       throw new GuestError(
         "invalid_abi",
-        `Invalid blot:traps kind ${kindByte}`,
+        `Invalid squid:traps kind ${kindByte}`,
       );
     }
     const unit = view.getUint32(offset, true);
@@ -489,7 +489,7 @@ export function readTrapMetadata(
     const messageLen = view.getUint32(offset, true);
     offset += 4;
     if (messageLen > bytes.length - offset) {
-      throw new GuestError("invalid_abi", "Truncated blot:traps message");
+      throw new GuestError("invalid_abi", "Truncated squid:traps message");
     }
     const messageBytes = bytes.subarray(offset, offset + messageLen);
     offset += messageLen;
@@ -497,14 +497,17 @@ export function readTrapMetadata(
     try {
       message = decoder.decode(messageBytes);
     } catch (cause) {
-      throw new GuestError("invalid_abi", "Invalid UTF-8 in blot:traps", {
+      throw new GuestError("invalid_abi", "Invalid UTF-8 in squid:traps", {
         cause,
       });
     }
     entries.push(Object.freeze({ kind, unit, start, end, message }));
   }
   if (offset !== bytes.length) {
-    throw new GuestError("invalid_abi", "Trailing bytes in blot:traps section");
+    throw new GuestError(
+      "invalid_abi",
+      "Trailing bytes in squid:traps section",
+    );
   }
   return Object.freeze(entries);
 }
@@ -546,7 +549,7 @@ function enrichGuestTrap(
       // Preserve default stack if non-writable.
     }
   }
-  Object.defineProperty(enriched, "blotTrap", {
+  Object.defineProperty(enriched, "squidTrap", {
     value: info,
     enumerable: false,
     writable: false,
@@ -567,7 +570,7 @@ class AbiReader {
 
   byte(): number {
     if (this.#offset === this.bytes.length) {
-      throw new GuestError("invalid_abi", "Truncated blot:abi section");
+      throw new GuestError("invalid_abi", "Truncated squid:abi section");
     }
     return this.bytes[this.#offset++];
   }
@@ -585,14 +588,14 @@ class AbiReader {
     }
     throw new GuestError(
       "invalid_abi",
-      "Non-canonical U32 in blot:abi section",
+      "Non-canonical U32 in squid:abi section",
     );
   }
 
   name(): string {
     const length = this.count();
     if (length > this.bytes.length - this.#offset) {
-      throw new GuestError("invalid_abi", "Truncated export name in blot:abi");
+      throw new GuestError("invalid_abi", "Truncated export name in squid:abi");
     }
     const bytes = this.bytes.subarray(this.#offset, this.#offset + length);
     this.#offset += length;
@@ -702,7 +705,10 @@ class AbiReader {
 
   end(): void {
     if (this.#offset !== this.bytes.length) {
-      throw new GuestError("invalid_abi", "Trailing bytes in blot:abi section");
+      throw new GuestError(
+        "invalid_abi",
+        "Trailing bytes in squid:abi section",
+      );
     }
   }
 }
@@ -803,14 +809,14 @@ function parseKernelsSection(
   if (version !== 1) {
     throw new GuestError(
       "invalid_abi",
-      `Unsupported blot:kernels version ${version}`,
+      `Unsupported squid:kernels version ${version}`,
     );
   }
   const transportBudget = reader.count();
   if (transportBudget < 8 || transportBudget % 4 !== 0) {
     throw new GuestError(
       "invalid_abi",
-      `Invalid blot:kernels transport_budget ${transportBudget}`,
+      `Invalid squid:kernels transport_budget ${transportBudget}`,
     );
   }
   const count = reader.count();
@@ -864,7 +870,7 @@ function parseKernelsSection(
     ) {
       throw new GuestError(
         "invalid_abi",
-        `Kernel ${name} signature mismatch against blot:abi`,
+        `Kernel ${name} signature mismatch against squid:abi`,
       );
     }
     const ioSchemaHash = reader.u64Le();
@@ -930,14 +936,14 @@ function parseProcessesSection(
   if (version !== 1) {
     throw new GuestError(
       "invalid_abi",
-      `Unsupported blot:processes version ${version}`,
+      `Unsupported squid:processes version ${version}`,
     );
   }
   const transportBudget = reader.count();
   if (transportBudget < 8 || transportBudget % 4 !== 0) {
     throw new GuestError(
       "invalid_abi",
-      `Invalid blot:processes transport_budget ${transportBudget}`,
+      `Invalid squid:processes transport_budget ${transportBudget}`,
     );
   }
   const count = reader.count();
@@ -1191,12 +1197,12 @@ export function resolveValidatedModule(
 
 function importModule(signature: CallbackType): string {
   if (signature.dataSchema !== undefined) {
-    if (signature.lifetime === "owned") return "blot:cleanup_data/2";
-    return "blot:cleanup_data/1";
+    if (signature.lifetime === "owned") return "squid:cleanup_data/2";
+    return "squid:cleanup_data/1";
   }
-  if (signature.lifetime === "owned") return "blot:cleanup/2";
-  if (signature.kind === "cleanup") return "blot:cleanup/1";
-  return "blot:host/1";
+  if (signature.lifetime === "owned") return "squid:cleanup/2";
+  if (signature.kind === "cleanup") return "squid:cleanup/1";
+  return "squid:host/1";
 }
 function importKey(signature: CallbackType): string {
   return `${importModule(signature)}/${importName(signature)}`;
@@ -1209,11 +1215,11 @@ function importName(signature: CallbackType): string {
 }
 
 export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
-  const sections = WebAssembly.Module.customSections(module, "blot:abi");
+  const sections = WebAssembly.Module.customSections(module, "squid:abi");
   if (sections.length !== 1) {
     throw new GuestError(
       "invalid_abi",
-      "Expected exactly one blot:abi section",
+      "Expected exactly one squid:abi section",
     );
   }
   const reader = new AbiReader(new Uint8Array(sections[0]));
@@ -1256,11 +1262,11 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     exports.set(name, kind);
   };
   if (countedOwnership) {
-    declare("blot:ownership_enter", "function");
-    declare("blot:ownership_leave", "function");
-    declare("blot:rc_roots", "global");
+    declare("squid:ownership_enter", "function");
+    declare("squid:ownership_leave", "function");
+    declare("squid:rc_roots", "global");
   }
-  const taskSections = WebAssembly.Module.customSections(module, "blot:tasks");
+  const taskSections = WebAssembly.Module.customSections(module, "squid:tasks");
   let taskCount: number | undefined;
   if (taskSections.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate task feature section");
@@ -1300,8 +1306,8 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     if (version === 7) publicOwners = (flags & 2) !== 0;
     reader.owners = publicOwners;
     if (publicOwners) {
-      declare("blot:owner_release", "function");
-      declare("blot:owner_token", "function");
+      declare("squid:owner_release", "function");
+      declare("squid:owner_token", "function");
     }
   }
 
@@ -1323,9 +1329,9 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     if (typeof parameter !== "string" && parameter.kind !== "owner") {
       signatures.add(importKey(parameter));
       if (parameter.lifetime === "owned") {
-        let binder = "blot:cleanup_bind/1";
+        let binder = "squid:cleanup_bind/1";
         if (parameter.dataSchema !== undefined) {
-          binder = "blot:cleanup_data_bind/1";
+          binder = "squid:cleanup_data_bind/1";
         }
         signatures.add(`${binder}/${importName(parameter)}`);
       }
@@ -1340,7 +1346,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     if (
       typeof parameter !== "string" && parameter.kind === "owner" &&
       parameter.fresh !== undefined
-    ) declare(`blot:owner_call/${name}`, "function");
+    ) declare(`squid:owner_call/${name}`, "function");
     functions.push(Object.freeze({ name, parameter, result }));
   }
   const constantCount = reader.count();
@@ -1368,7 +1374,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const multiplicity = WebAssembly.Module.customSections(
     module,
-    "blot:multiplicity",
+    "squid:multiplicity",
   );
   if (multiplicity.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate multiplicity section");
@@ -1411,12 +1417,12 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
           isArrayType(fn.parameter.result)))
     )
   ) {
-    declare("blot:memory", "memory");
-    declare("blot:allocate", "function");
-    declare("blot:reset", "function");
+    declare("squid:memory", "memory");
+    declare("squid:allocate", "function");
+    declare("squid:reset", "function");
   }
   if (countedOwnership && (signatures.size !== 0 || taskCount !== undefined)) {
-    declare("blot:rc_host_refs", "global");
+    declare("squid:rc_host_refs", "global");
   }
   if (resources !== 0) {
     for (let index = 0; index < resources; index++) {
@@ -1424,8 +1430,8 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       declare(resourceExport(index, true), "function");
     }
   }
-  if (taskCount !== undefined && !exports.has("blot:memory")) {
-    declare("blot:memory", "memory");
+  if (taskCount !== undefined && !exports.has("squid:memory")) {
+    declare("squid:memory", "memory");
   }
   const expectedTaskImports = new Set<string>();
   if (taskCount !== undefined) {
@@ -1446,7 +1452,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   const actualExports = WebAssembly.Module.exports(module);
   const invocation = WebAssembly.Module.customSections(
     module,
-    "blot:invocation",
+    "squid:invocation",
   );
   if (invocation.length !== 0) {
     const versionBytes = new Uint8Array(invocation[0]);
@@ -1456,9 +1462,12 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     ) {
       throw new GuestError("invalid_abi", "Invalid invocation finish section");
     }
-    declare("blot:finish_invocation", "function");
+    declare("squid:finish_invocation", "function");
   }
-  const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
+  const ownership = WebAssembly.Module.customSections(
+    module,
+    "squid:ownership",
+  );
   if (version === 8 && ownership.length !== 0) {
     throw new GuestError(
       "invalid_abi",
@@ -1479,15 +1488,15 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     if (state[2] !== 1) {
       // Optional raw-allocator identity for development instrumentation. Older
       // modules remain valid; unknown exports and wrong export kinds still fail.
-      if (actualExports.some((entry) => entry.name === "blot:allocation")) {
-        declare("blot:allocation", "function");
+      if (actualExports.some((entry) => entry.name === "squid:allocation")) {
+        declare("squid:allocation", "function");
       }
       for (const counter of ["leases", "retains", "releases", "destroyed"]) {
-        declare(`blot:rc_${counter}`, "global");
+        declare(`squid:rc_${counter}`, "global");
       }
     }
   }
-  const cycles = WebAssembly.Module.customSections(module, "blot:cycles");
+  const cycles = WebAssembly.Module.customSections(module, "squid:cycles");
   if (cycles.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate cycle section");
   }
@@ -1501,7 +1510,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       throw new GuestError("invalid_abi", "Invalid cycle section");
     }
     for (const counter of ["passes", "vertices", "edges", "bytes"]) {
-      declare(`blot:cycle_${counter}`, "global");
+      declare(`squid:cycle_${counter}`, "global");
     }
   }
   if (countedOwnership && ownership.length !== 1) {
@@ -1509,7 +1518,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const memoryProfile = WebAssembly.Module.customSections(
     module,
-    "blot:memory-profile",
+    "squid:memory-profile",
   );
   if (version === 8 && memoryProfile.length !== 0) {
     throw new GuestError(
@@ -1522,53 +1531,53 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   if (memoryProfile.length === 1) {
     for (let word = 0; word < 8; word++) {
-      declare(`blot:profile_identity_${word}`, "global");
+      declare(`squid:profile_identity_${word}`, "global");
     }
     // Instrumentation exposes its diagnostic counters through the same memory
     // as ordinary numeric results, even for scalar-only source exports.
-    if (!exports.has("blot:memory")) declare("blot:memory", "memory");
+    if (!exports.has("squid:memory")) declare("squid:memory", "memory");
   }
   const trapsSections = WebAssembly.Module.customSections(
     module,
-    "blot:traps",
+    "squid:traps",
   );
   if (trapsSections.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate traps section");
   }
   if (
-    trapsSections.length === 1 && !exports.has("blot:memory") &&
+    trapsSections.length === 1 && !exports.has("squid:memory") &&
     actualExports.some((entry) =>
-      entry.name === "blot:memory" && entry.kind === "memory"
+      entry.name === "squid:memory" && entry.kind === "memory"
     )
   ) {
-    declare("blot:memory", "memory");
+    declare("squid:memory", "memory");
   }
   if (
     actualExports.length !== exports.size ||
     actualExports.some((entry) => exports.get(entry.name) !== entry.kind)
   ) {
-    throw new GuestError("invalid_abi", "Wasm exports differ from blot:abi");
+    throw new GuestError("invalid_abi", "Wasm exports differ from squid:abi");
   }
   for (const entry of WebAssembly.Module.imports(module)) {
     if (
-      entry.module === "blot:task/1" && entry.kind === "function" &&
+      entry.module === "squid:task/1" && entry.kind === "function" &&
       expectedTaskImports.delete(entry.name)
     ) continue;
     if (
-      entry.module === "blot:resource/1" && entry.kind === "function" &&
+      entry.module === "squid:resource/1" && entry.kind === "function" &&
       resourceImports.delete(entry.name)
     ) continue;
     if (
-      entry.module === "blot:resource/2" && entry.kind === "function" &&
+      entry.module === "squid:resource/2" && entry.kind === "function" &&
       transferImports.delete(entry.name)
     ) continue;
     if (
-      (entry.module !== "blot:host/1" && entry.module !== "blot:cleanup/1" &&
-        entry.module !== "blot:cleanup/2" &&
-        entry.module !== "blot:cleanup_bind/1" &&
-        entry.module !== "blot:cleanup_data/1" &&
-        entry.module !== "blot:cleanup_data/2" &&
-        entry.module !== "blot:cleanup_data_bind/1") ||
+      (entry.module !== "squid:host/1" && entry.module !== "squid:cleanup/1" &&
+        entry.module !== "squid:cleanup/2" &&
+        entry.module !== "squid:cleanup_bind/1" &&
+        entry.module !== "squid:cleanup_data/1" &&
+        entry.module !== "squid:cleanup_data/2" &&
+        entry.module !== "squid:cleanup_data_bind/1") ||
       entry.kind !== "function" ||
       !signatures.delete(`${entry.module}/${entry.name}`)
     ) {
@@ -1592,23 +1601,23 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const kernelsSections = WebAssembly.Module.customSections(
     module,
-    "blot:kernels",
+    "squid:kernels",
   );
   if (kernelsSections.length > 1) {
-    throw new GuestError("invalid_abi", "Duplicate blot:kernels section");
+    throw new GuestError("invalid_abi", "Duplicate squid:kernels section");
   }
   if (kernelsSections.length === 1 && version !== 8) {
-    throw new GuestError("invalid_abi", "blot:kernels requires ABI 8");
+    throw new GuestError("invalid_abi", "squid:kernels requires ABI 8");
   }
   const processesSections = WebAssembly.Module.customSections(
     module,
-    "blot:processes",
+    "squid:processes",
   );
   if (processesSections.length > 1) {
-    throw new GuestError("invalid_abi", "Duplicate blot:processes section");
+    throw new GuestError("invalid_abi", "Duplicate squid:processes section");
   }
   if (processesSections.length === 1 && version !== 8) {
-    throw new GuestError("invalid_abi", "blot:processes requires ABI 8");
+    throw new GuestError("invalid_abi", "squid:processes requires ABI 8");
   }
   const functionsByName = new Map(functions.map((fn) => [fn.name, fn]));
   const hostInternal: string[] = [];
@@ -1640,7 +1649,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     ) {
       throw new GuestError(
         "invalid_abi",
-        `blot:kernels transport_budget (${transportBudget}) != blot:processes transport_budget (${parsed.transportBudget})`,
+        `squid:kernels transport_budget (${transportBudget}) != squid:processes transport_budget (${parsed.transportBudget})`,
       );
     }
     transportBudget = parsed.transportBudget;
@@ -2110,8 +2119,8 @@ interface PromiseIntegration {
 }
 
 function resourceExport(index: number, drop: boolean): string {
-  if (drop) return `blot:resource_drop/${index}`;
-  return `blot:resource_cleanup/${index}`;
+  if (drop) return `squid:resource_drop/${index}`;
+  return `squid:resource_cleanup/${index}`;
 }
 function resourceU32(value: number): number[] {
   const bytes: number[] = [];
@@ -2562,13 +2571,13 @@ export async function instantiateGuest(
   let tasks: TaskGuest | undefined;
   let initializing = true;
   const modules: WebAssembly.Imports = {
-    "blot:host/1": imports,
-    "blot:cleanup/1": cleanupImports,
-    "blot:cleanup/2": ownedCleanupImports,
-    "blot:cleanup_bind/1": cleanupBindImports,
-    "blot:cleanup_data/1": dataCleanupImports,
-    "blot:cleanup_data/2": ownedDataCleanupImports,
-    "blot:cleanup_data_bind/1": dataBindImports,
+    "squid:host/1": imports,
+    "squid:cleanup/1": cleanupImports,
+    "squid:cleanup/2": ownedCleanupImports,
+    "squid:cleanup_bind/1": cleanupBindImports,
+    "squid:cleanup_data/1": dataCleanupImports,
+    "squid:cleanup_data/2": ownedDataCleanupImports,
+    "squid:cleanup_data_bind/1": dataBindImports,
   };
   if (abi.taskDescriptorCount !== undefined) {
     const callbacks: Record<string, WebAssembly.ImportValue> = {};
@@ -2587,11 +2596,11 @@ export async function instantiateGuest(
       ) callbacks[name] = new (requireAsync().Suspending)(invoke);
       else callbacks[name] = invoke;
     }
-    modules["blot:task/1"] = typedTaskFunctions(callbacks);
+    modules["squid:task/1"] = typedTaskFunctions(callbacks);
   }
   const count = abi.resourceAdapterCount ?? 0;
   if (count !== 0) {
-    modules["blot:resource/1"] = typedResourceImports({
+    modules["squid:resource/1"] = typedResourceImports({
       reserve: () => {
         if (!resources) {
           throw new GuestError("invalid_abi", "Resource journal is not active");
@@ -2625,7 +2634,7 @@ export async function instantiateGuest(
     });
   }
   if (abi.version === 5 || abi.version >= 6 && abi.resourceTransfer) {
-    modules["blot:resource/2"] = typedResourceImports({
+    modules["squid:resource/2"] = typedResourceImports({
       register_owned: (
         token: number,
         adapter: number,
@@ -2644,7 +2653,7 @@ export async function instantiateGuest(
         callable >>>= 0;
         provider >>>= 0;
         let words: Uint32Array;
-        const memory = instance.exports["blot:memory"];
+        const memory = instance.exports["squid:memory"];
         if (
           !(memory instanceof WebAssembly.Memory) || owner < 32 ||
           owner % 4 !== 0 || owner > memory.buffer.byteLength - 8
@@ -2728,7 +2737,7 @@ export async function instantiateGuest(
   if (count !== 0 || abi.taskDescriptorCount !== undefined) {
     let invalidate: ((owner: number, token: number) => void) | undefined;
     if (abi.version === 5 || abi.version >= 6 && abi.resourceTransfer) {
-      const memory = instance.exports["blot:memory"];
+      const memory = instance.exports["squid:memory"];
       if (!(memory instanceof WebAssembly.Memory)) {
         throw new GuestError(
           "invalid_abi",
@@ -2796,8 +2805,8 @@ export async function instantiateGuest(
 
   let ownership: { enter(): void; leave(outcome: number): void } | undefined;
   if (abi.version >= 3 && abi.version <= 7) {
-    const enter = instance.exports["blot:ownership_enter"];
-    const leave = instance.exports["blot:ownership_leave"];
+    const enter = instance.exports["squid:ownership_enter"];
+    const leave = instance.exports["squid:ownership_leave"];
     if (typeof enter !== "function" || typeof leave !== "function") {
       throw new GuestError("invalid_abi", "Missing ownership exports");
     }
@@ -2874,7 +2883,7 @@ export async function instantiateGuest(
   let finishInvocation: (() => number) | undefined;
   let reclaimedOwners: number | undefined;
   if (abi.invocationFinish) {
-    const exit = instance.exports["blot:finish_invocation"];
+    const exit = instance.exports["squid:finish_invocation"];
     if (typeof exit !== "function") {
       throw new GuestError("invalid_abi", "Missing invocation finish hook");
     }
@@ -2899,11 +2908,11 @@ export async function instantiateGuest(
     finishInvocation = exit as () => number;
   }
   let entered = false;
-  const memory = instance.exports["blot:memory"];
-  const allocate = instance.exports["blot:allocate"];
-  const reset = instance.exports["blot:reset"];
+  const memory = instance.exports["squid:memory"];
+  const allocate = instance.exports["squid:allocate"];
+  const reset = instance.exports["squid:reset"];
   const profiling =
-    WebAssembly.Module.customSections(module, "blot:memory-profile").length ===
+    WebAssembly.Module.customSections(module, "squid:memory-profile").length ===
       1;
   const hasTraps = trapTable !== undefined;
   if (
@@ -2996,8 +3005,8 @@ export async function instantiateGuest(
   let liveOwners: Map<number, PublicOwnerState> | undefined;
   let pendingOwner: PublicOwnerState | undefined;
   if (abi.publicOwners) {
-    const release = instance.exports["blot:owner_release"];
-    const token = instance.exports["blot:owner_token"];
+    const release = instance.exports["squid:owner_release"];
+    const token = instance.exports["squid:owner_token"];
     if (typeof release !== "function" || typeof token !== "function") {
       throw new GuestError("invalid_abi", "Missing public owner hooks");
     }
@@ -3045,7 +3054,7 @@ export async function instantiateGuest(
       if (typeof fn.result === "string") result = wasmValTypeCode(fn.result);
       const entries: [string, number][] = [[fn.name, parameter]];
       if (ownerInput && (fn.parameter as OwnerType).fresh !== undefined) {
-        entries.push([`blot:owner_call/${fn.name}`, 127]);
+        entries.push([`squid:owner_call/${fn.name}`, 127]);
       }
       for (const [name, argument] of entries) {
         try {
@@ -3200,7 +3209,7 @@ export async function instantiateGuest(
         }
         value = owned.token;
         if (fn.parameter.fresh !== undefined) {
-          exportedName = `blot:owner_call/${name}`;
+          exportedName = `squid:owner_call/${name}`;
         }
         if (owned.usage === "unique") movedOwner = owned;
       } else {

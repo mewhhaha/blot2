@@ -1,4 +1,4 @@
-"""Build a profile-guided Blot compiler with two ordinary release builds."""
+"""Build a profile-guided Squid compiler with two ordinary release builds."""
 import argparse
 import hashlib
 import os
@@ -11,11 +11,11 @@ import tempfile
 COMPILER = Path(__file__).resolve().parents[1]
 ROOT = COMPILER.parent
 TRAINING = (
-    "checked-grid/hills.blot",
-    "goose/ports/custom_hash.blot",
-    "goose/ports/sort_merge.blot",
-    "idiomatic/expression_eval.blot",
-    "goose/ports/mandelbrot.blot",
+    "checked-grid/hills.sq",
+    "goose/ports/custom_hash.sq",
+    "goose/ports/sort_merge.sq",
+    "idiomatic/expression_eval.sq",
+    "goose/ports/mandelbrot.sq",
 )
 
 
@@ -23,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--goose", required=True)
     parser.add_argument("--stdlib", required=True)
-    parser.add_argument("--output", type=Path, default=COMPILER / "build/blotc-goose-pgo")
+    parser.add_argument("--output", type=Path, default=COMPILER / "build/squidc-goose-pgo")
     args = parser.parse_args()
     profdata = shutil.which("llvm-profdata")
     if not profdata:
@@ -49,7 +49,7 @@ def main():
             result = subprocess.run(
                 [trainer, "build-project", ROOT / "benchmarks" / source,
                  work / "training.wasm", "--std-root", ROOT / "std",
-                 "--prelude", ROOT / "std/prelude.blot", "--frontend-workers", "1"],
+                 "--prelude", ROOT / "std/prelude.sq", "--frontend-workers", "1"],
                 timeout=20, capture_output=True, text=True,
                 env={**os.environ, "LLVM_PROFILE_FILE": str(profile)})
             if result.returncode:

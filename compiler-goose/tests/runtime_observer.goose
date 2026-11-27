@@ -31,9 +31,9 @@ export "observer_invalid" fn invalid(length:i64) {
 
 export "observer_report" fn report() {
     var bytes:u8[>..]=[];
-    var writer=blot_json::Writer{out:bytes,options:blot_json::Options{..},..};
-    let error=blot_runtime_memory::jsonStringify(blot_runtime_memory::Counts{..},writer);
-    assert(error==blot_error::Error.none);
+    var writer=squid_json::Writer{out:bytes,options:squid_json::Options{..},..};
+    let error=squid_runtime_memory::jsonStringify(squid_runtime_memory::Counts{..},writer);
+    assert(error==squid_error::Error.none);
     bytes.push('\n');
-    assert(blot_io::write_all(blot_io::Writer{1},bytes[..])==blot_error::Error.none);
+    assert(squid_io::write_all(squid_io::Writer{1},bytes[..])==squid_error::Error.none);
 }

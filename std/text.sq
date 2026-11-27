@@ -1,0 +1,288 @@
+//! Unicode scalar text utilities (`Text = #[U32]`), zero-copy [`Builder`],
+//! borrowed iterators ([`Words`], [`Lines`]), numeric parsing/formatting, and
+//! the [`Format`] trait.
+//!
+//! ```squid
+//! join ", " #["squid", "wasm", "docs"] // => "squid, wasm, docs"
+//! ```
+
+// Text is a #[U32] of Unicode scalar values. Equality compares scalar
+// sequences exactly; it does not normalize Unicode.
+const empty: Text = ""
+func length (value: Text) => value.length
+func is_empty (value: Text) => value.length == 0
+func at index -> (value: Text) => value[index]
+func concat (left: Text) -> (right: Text) : Text => @array.concat left right
+
+func equal (left: Text) -> (right: Text) : Bool =>
+  if left.length != right.length:
+    return false
+  for index in 0..left.length:
+    if left[index] != right[index]:
+      return false
+  return true
+
+func valid_scalar value =>
+  value <= 0x10FFFF and (value < 0xD800 or value > 0xDFFF)
+// Both take the array over: a Text is its scalars, so nothing is copied.
+func from_scalars (values: own #[U32]) : Maybe Text =>
+  for value in values:
+    if not (valid_scalar value):
+      return $Nothing
+  return $Some values
+func scalars (value: own Text) => value
+
+// Unicode White_Space, excluding the zero-width space and BOM.
+func is_whitespace (value: U32): Bool => return
+  (value >= 9 and value <= 13)
+  or value == 0x20 or value == 0x85 or value == 0xA0
+  or value == 0x1680 or (value >= 0x2000 and value <= 0x200A)
+  or value == 0x2028 or value == 0x2029 or value == 0x202F
+  or value == 0x205F or value == 0x3000
+
+// Borrowed, nonempty words separated by Unicode whitespace. The input owns
+// the scalars; taking a word or copying the cursor does not copy the text.
+type Words is data = $Words { source: &[U32], index: U32 }
+func split_whitespace (source: Text): Words =>
+  $Words { source: &source[0..source.length], index: 0 }
+func Words.iter (cursor: Words): Words => cursor
+func Words.next (cursor: Words): Maybe (&[U32], Words) =>
+  let source = cursor.source
+  let start = cursor.index
+  for index in start..source.length:
+    if not (is_whitespace source[index]):
+      break
+    start := self + 1
+  if start >= source.length:
+    return $Nothing
+  let end = start
+  for index in start..source.length:
+    if is_whitespace source[index]:
+      break
+    end := self + 1
+  return $Some (&source[start..end], $Words { source, index: end })
+
+// Split on LF, removing a CR immediately before it. Interior empty lines
+// remain, but an empty input or a final LF does not add a line.
+type Lines is data = $Lines { source: &[U32], index: U32 }
+func lines (source: Text): Lines =>
+  $Lines { source: &source[0..source.length], index: 0 }
+func Lines.iter (cursor: Lines): Lines => cursor
+func Lines.next (cursor: Lines): Maybe (&[U32], Lines) =>
+  let source = cursor.source
+  let start = cursor.index
+  if start >= source.length:
+    return $Nothing
+  for index in start..source.length:
+    if source[index] == 10:
+      let end = if index > start and source[index - 1] == 13 then index - 1 else index
+      return $Some (&source[start..end], $Lines { source, index: index + 1 })
+  return $Some (&source[start..source.length], $Lines { source, index: source.length })
+
+// Accept a nonempty sequence of ASCII decimal digits, including a borrowed
+// text slice. Reject signs, whitespace, other characters and U32 overflow.
+func parse_u32 value: Maybe U32 =>
+  if value.length == 0:
+    return $Nothing
+  let result = 0
+  for ch in value:
+    if ch < 48 or ch > 57:
+      return $Nothing
+    let digit: U32 = ch - 48
+    if result > (0xFFFF_FFFF - digit) / 10:
+      return $Nothing
+    result := self * 10 + digit
+  return $Some result
+
+// Append into an owned #[U32] builder; finishing returns the final Text with zero copy.
+type Builder = #[U32]
+func builder () : Builder => #[]
+func push scalar -> (out: own Builder) : Builder =>
+  @storage.push out scalar
+  return out
+func append (value: Text) -> (out: own Builder) : Builder =>
+  for scalar in value:
+    @storage.push out scalar
+  return out
+func finish (out: own Builder) : Text => out
+func join (separator: Text) -> (pieces: #[Text]) : Text =>
+  let out = builder ()
+  let first = true
+  for piece in pieces:
+    if not first:
+      out := append separator self
+    out := append piece self
+    first := false
+  return finish out
+
+func from_u32 (value: U32) : Text =>
+  if value < 10:
+    return #[value + 48]
+  let rev: #[U32] = #[]
+  let current = value
+  for ever:
+    @storage.push rev (current % 10 + 48)
+    current := self / 10
+    if current == 0:
+      break
+  let count = rev.length
+  return @array.generate count (func i => rev[count - 1 - i])
+func append_u32 value -> (out: own Builder) : Builder => append (from_u32 value) out
+
+// Fixed decimal places (0..6), rounded half away from zero. Return Nothing
+// for NaN, infinities, excessive precision, or a scaled value outside U32.
+func from_f32_fixed (places: U32) -> (value: F32) : Maybe Text =>
+  if places > 6 or not (F32.is_finite value):
+    return $Nothing
+  let factor = 1
+  for ignored in 0..places:
+    factor := self * 10
+  let x = F32.abs value * F32.from factor
+  if not (F32.is_finite x) or x >= 4294967296.0:
+    return $Nothing
+  let base = F32.floor x
+  let scaled = if x - base >= 0.5 then base + 1.0 else base
+  if scaled >= 4294967296.0:
+    return $Nothing
+  let rounded = F32.to_u32 scaled
+  let out = builder ()
+  if value < 0.0:
+    out := append "-" self
+  out := append (from_u32 (rounded / factor)) self
+  if places > 0:
+    out := push 46 self
+    let divisor = factor / 10
+    for ignored in 0..places:
+      out := push (48 + (rounded / divisor) % 10) self
+      if divisor > 1:
+        divisor := self / 10
+  return $Some (finish out)
+
+// Libraries and applications can provide their own Format implementations.
+type Format a is trait = { format: a -> Text }
+const U32.Format: Format U32 = { format: func value => from_u32 value }
+const Bool.Format: Format Bool = {
+  format: func value => if value then "true" else "false",
+}
+func format (value: a): Text where { Format a } => Format.format value
+func format_sequence (values: #[a]): Text where { Format a } =>
+  let out = append "[" (builder ())
+  let first = true
+  for value in values:
+    if not first:
+      out := append ", " self
+    out := append (format value) self
+    first := false
+  return finish (append "]" out)
+const Array.Format: Format #[a] where { Format a } = {
+  format: func values => format_sequence values,
+}
+
+func quote (value: Text): Text =>
+  let out = push 34 (builder ())
+  for scalar in value:
+    let escape = case scalar of
+      92 => 92
+      34 => 34
+      10 => 110
+      13 => 114
+      9 => 116
+      _ => 0
+    if escape == 0:
+      out := push scalar self
+    else:
+      out := push 92 self
+      out := push escape self
+  return finish (push 34 out)
+
+private func hex_bits (bits: U32): Text =>
+  let digits: Text = "0123456789abcdef"
+  let hex = @array.generate 8 (func index => digits[(bits >> (28 - index * 4)) & 15])
+  return concat "0x" hex
+
+private func decimal_f32 (negative: Bool) -> (whole: U32) -> (digits: U32) -> (factor: U32): Text =>
+  let out = builder ()
+  if negative:
+    out := push 45 self
+  out := append_u32 whole self
+  out := push 46 self
+  let divisor = factor / 10
+  for ever:
+    out := push (48 + (digits / divisor) % 10) self
+    if divisor == 1:
+      return finish out
+    divisor := self / 10
+
+func from_f32 (value: F32): Text =>
+  if not (F32.eq value value):
+    return "NaN"
+  let bits = F32.to_bits value
+  let negative = bits >= 0x8000_0000
+  if not (F32.is_finite value):
+    return if negative then "-inf" else "inf"
+  let magnitude = F32.abs value
+  if magnitude == 0.0:
+    return if negative then "-0.0" else "0.0"
+  if magnitude >= 4294967296.0 or magnitude < 1e-6:
+    return hex_bits bits
+  let abs_bits = bits & 0x7fff_ffff
+  let exponent = abs_bits >> 23
+  if exponent >= 150:
+    return decimal_f32 negative (F32.to_u32 magnitude) 0 10
+  let mantissa = (abs_bits & 0x7f_ffff) | 0x80_0000
+  let shift = 152 - exponent
+  let center = mantissa << 2
+  let whole = if shift >= 32 then 0 else center >> shift
+  let frac_center = if shift >= 32 then center else center & ((1 << shift) - 1)
+  if frac_center == 0:
+    return decimal_f32 negative whole 0 10
+  let boundary = (abs_bits & 0x7f_ffff) == 0
+  let frac_lo: U64 = U32.to_u64 (frac_center - (if boundary then 1 else 2))
+  let frac_hi: U64 = U32.to_u64 (frac_center + 2)
+  let frac_mid: U64 = U32.to_u64 frac_center
+  let even = (abs_bits & 1) == 0
+  let shift64: U64 = U32.to_u64 shift
+  let one64: U64 = 1
+  let pow_shift = one64 << shift64
+  let half_pow = one64 << (shift64 - 1)
+  let factor: U32 = 1
+  // Stop at the shortest decimal fraction (1..9 places) whose exact value rounds to bits.
+  for places in 0..9:
+    factor := self * 10
+    let factor64 = U32.to_u64 factor
+    let lo64 = frac_lo * factor64
+    let hi64 = frac_hi * factor64
+    let q_min = U64.to_u32 (if even then (lo64 + pow_shift - 1) >> shift64 else (lo64 >> shift64) + 1)
+    let q_max = U64.to_u32 (if even then hi64 >> shift64 else (hi64 - 1) >> shift64)
+    if q_min <= q_max:
+      let raw = U64.to_u32 ((frac_mid * factor64 + half_pow) >> shift64)
+      let digits = if raw < q_min then q_min else if raw > q_max then q_max else raw
+      return decimal_f32 negative whole digits factor
+  return hex_bits bits
+
+const F32.Format: Format F32 = { format: func value => from_f32 value }
+
+private func format_maybe (candidate: Maybe a): Text where { Format a } =>
+  case candidate of
+    $Nothing => "$Nothing"
+    $Some value => concat "$Some " (Format.format value)
+
+const Maybe.Format: Format (Maybe a) where { Format a } = { format: format_maybe }
+
+private func format_result (candidate: Result [a, e]): Text where { Format a, Format e } =>
+  case candidate of
+    $Ok value => concat "$Ok " (Format.format value)
+    $Err error => concat "$Err " (Format.format error)
+
+const Result.Format: Format (Result [a, e]) where { Format a, Format e } = { format: format_result }
+
+func format_struct (value: t): Text =>
+  let out = append "{" (builder ())
+  let first = true
+  #for field in #fields t:
+    out := append (if first then " " else ", ") self
+    out := append field.name self
+    out := append ": " self
+    out := append (Format.format value.(field)) self
+    first := false
+  return finish (append (if first then "}" else " }") out)

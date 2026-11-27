@@ -1,7 +1,7 @@
 // Bounded synthetic owned-backend call-graph profile.
 // deno run --allow-all benchmarks/tools/scoped_calls.ts [--sizes 2,4,8]
 // Field refinement: add --fields 72 (sizes count repeated calls); --nominal wraps Row.
-// Optional: --depth 5 --timeout-ms 5000 --profile --blotc PATH
+// Optional: --depth 5 --timeout-ms 5000 --profile --squidc PATH
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -15,7 +15,7 @@ for (let at = 0; at < Deno.args.length; at++) {
       "--fields",
       "--depth",
       "--timeout-ms",
-      "--blotc",
+      "--squidc",
       "--profile",
       "--nominal",
     ]
@@ -63,16 +63,16 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
 }
 
 const repo = resolve(new URL("../..", import.meta.url).pathname);
-const blotc = resolve(
-  option("--blotc", `${repo}/compiler-goose/build/blotc-goose-dev`),
+const squidc = resolve(
+  option("--squidc", `${repo}/compiler-goose/build/squidc-goose-dev`),
 );
 const stdRoot = resolve(`${repo}/std`);
-const entryPath = `${Deno.cwd()}/scoped-call-profile.blot`;
+const entryPath = `${Deno.cwd()}/scoped-call-profile.sq`;
 const hex = (bytes: Uint8Array) =>
   [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 const hashBytes = async (bytes: BufferSource) =>
   hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
-const compilerSha256 = await hashBytes(await Deno.readFile(blotc));
+const compilerSha256 = await hashBytes(await Deno.readFile(squidc));
 
 function fieldSource(repetitions: number, fieldCount: number): string {
   const lines = [
@@ -203,9 +203,9 @@ for (const width of sizes) {
   let guest: Awaited<ReturnType<typeof instantiateGuest>> | undefined;
   try {
     compiler = await createZigProjectCompiler({
-      executable: blotc,
+      executable: squidc,
       entry: entryPath,
-      prelude: `${stdRoot}/prelude.blot`,
+      prelude: `${stdRoot}/prelude.sq`,
       stdRoot,
       startupTimeoutMs: timeoutMs,
       profileBackend: args.has("--profile"),

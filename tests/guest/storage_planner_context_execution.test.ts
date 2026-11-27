@@ -32,20 +32,20 @@ io const floating = func (input: F32) => return do:
 `;
 Deno.test(`imported planner closures retain their own field obligations`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-planner-context-",
+    prefix: "squid-planner-context-",
   });
-  const entry = `${directory}/main.blot`;
-  const helperFile = `${directory}/helper.blot`;
+  const entry = `${directory}/main.sq`;
+  const helperFile = `${directory}/helper.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${directory}/prelude.blot`,
+    prelude: `${directory}/prelude.sq`,
   });
   try {
     await Deno.writeTextFile(helperFile, helper);
-    await Deno.writeTextFile(`${directory}/prelude.blot`, prelude);
+    await Deno.writeTextFile(`${directory}/prelude.sq`, prelude);
     const result = await compiler.build({ sources: { [entry]: source } });
     assert(result.success, JSON.stringify(result));
     for (const asynchronous of [false, true]) {

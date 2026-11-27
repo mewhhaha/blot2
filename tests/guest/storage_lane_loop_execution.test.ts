@@ -83,14 +83,14 @@ function expected(
 }
 
 Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-lane-loops-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-lane-loops-" });
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({
@@ -187,16 +187,16 @@ Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes`, asy
 
 // Direct backend gap: a primitive operator ignores the prelude's member, so U32 `+` does not call a custom `U32.add` (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("cyclic lanes call the prelude's U32.add", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-lane-loops-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-lane-loops-" });
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const rows = Array.from(
     { length: 96 },
     (_, index) => (Math.imul(index, 123456789) + 0xf0000000) >>> 0,
   );
   try {
-    const customPrelude = `${directory}/prelude.blot`;
-    const prelude = await Deno.readTextFile(`${stdRoot}/prelude.blot`);
+    const customPrelude = `${directory}/prelude.sq`;
+    const prelude = await Deno.readTextFile(`${stdRoot}/prelude.sq`);
     await Deno.writeTextFile(
       customPrelude,
       prelude.replace(

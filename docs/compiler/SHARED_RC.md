@@ -63,7 +63,7 @@ allocator links are never owning fields. Entry reset retires counted storage
 before rewinding. A trap leaves its graph leased until that reset; it cannot
 cause duplicate retirement during recovery.
 
-The `blot:ownership` custom section contains revision 1, a counted-mode byte and
+The `squid:ownership` custom section contains revision 1, a counted-mode byte and
 a fallback byte. Fallback codes are 0 admitted, 1 no arena, 2 public Array
 arena, 3 host references, 4 imports, 5 startup initializer, 6 mutable static
 sequence caches and 7 unproven machine body. All bodies must admit together.

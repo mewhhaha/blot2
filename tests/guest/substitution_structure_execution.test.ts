@@ -31,9 +31,9 @@ io const host = func (callback: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => retu
 
 Deno.test(`generic substitution preserves fixed structure and per-use effects`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-substitution-structure-",
+    prefix: "squid-substitution-structure-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

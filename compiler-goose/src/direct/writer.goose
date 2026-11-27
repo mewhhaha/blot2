@@ -1,7 +1,7 @@
 // Lean Wasm module writer (compiler/src/direct/writer.zig). Function bodies
 // are encoded straight to bytes by the emitter; this owner only lays out
 // sections around them.
-namespace blot_direct_writer;
+namespace squid_direct_writer;
 import direct.relocations;
 import std;
 import support.error;
@@ -522,10 +522,10 @@ fn assemble(module: const Module&, out: u8[>..<]&) {
     uleb(out, module.functions.len as! u64);
     for function in module.functions {
         uleb(out, function.body.len as! u64);
-        blot_direct_relocations::linkBody(function.body.start, out.len - code_start);
+        squid_direct_relocations::linkBody(function.body.start, out.len - code_start);
         raw(out, text(module, function.body));
     }
-    blot_direct_relocations::finishCode(code_start);
+    squid_direct_relocations::finishCode(code_start);
     // 11: data
     if module.data.len != 0 {
         uleb(payload, 1);

@@ -18,7 +18,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler-goose/build/blotc-goose-dev",
+      default: "compiler-goose/build/squidc-goose-dev",
     },
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },
@@ -60,7 +60,7 @@ async function sourcePins(directory: string): Promise<Record<string, Hash>> {
         await visit(path);
         continue;
       }
-      if (!entry.isFile || !entry.name.endsWith(".blot")) continue;
+      if (!entry.isFile || !entry.name.endsWith(".sq")) continue;
       pins[path] = await sha256(await Deno.readFile(path));
     }
   }
@@ -126,7 +126,7 @@ const rows: Record<string, unknown>[] = [];
 for (const count of [1, 4, 8]) {
   const directory = resolve(outputRoot, `n${count}`);
   await Deno.mkdir(directory, { recursive: true });
-  const entry = resolve(directory, "main.blot");
+  const entry = resolve(directory, "main.sq");
   const source = sourceFor(count);
   await Deno.writeTextFile(entry, source);
   const sourceHash = await sha256(new TextEncoder().encode(source));
@@ -135,7 +135,7 @@ for (const count of [1, 4, 8]) {
     entry,
     imports: { "ink/": inkRoot },
     stdRoot,
-    prelude: resolve(stdRoot, "prelude.blot"),
+    prelude: resolve(stdRoot, "prelude.sq"),
     profileBackend: true,
     startupTimeoutMs: timeoutMs,
   });

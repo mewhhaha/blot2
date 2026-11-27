@@ -21,7 +21,7 @@ tests:
 3. `src/player/**` and `src/effects/**`.
 4. `src/ui/**`, `src/progression/**`, `src/platform/**`, `src/debug/**`.
 
-Task 119 exclusively owns `src/{game,library,main}.blot`, the new owner/schema
+Task 119 exclusively owns `src/{game,library,main}.sq`, the new owner/schema
 module, `devtools/**`, configuration and shared codec fixtures. Send it schema
 additions and ordering constraints instead of editing those files. For any
 generated module, change its generator input/template and regenerate through

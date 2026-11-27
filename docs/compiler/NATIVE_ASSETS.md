@@ -1,7 +1,7 @@
 # Native asset imports
 
 `native-assets-v1` extends [project protocol version 1](PROJECT_PROTOCOL.md):
-`blotc` captures external bytes and generates typed Blot modules. Hosts send
+`squidc` captures external bytes and generates typed Squid modules. Hosts send
 sources and options; parsing and dependency tracking run inside the compiler.
 Source-only sessions retain their existing request/reply behavior. The
 TypeScript parser wrapper in [host/assets.ts](../../host/assets.ts) remains
@@ -23,16 +23,16 @@ sending `nativeAssets` on `open`:
   "kind": "open",
   "id": 1,
   "version": 1,
-  "entry": "/game/main.blot",
+  "entry": "/game/main.sq",
   "nativeAssets": {
     "imports": [
       {
-        "module": "/game/settings.json.blot",
+        "module": "/game/settings.json.sq",
         "path": "/game/settings.json",
         "kind": "json"
       },
       {
-        "module": "/game/image.bin.blot",
+        "module": "/game/image.bin.sq",
         "path": "/game/image.bin",
         "kind": "reference",
         "type": "Image",
@@ -51,11 +51,11 @@ null. The open reply remains `{kind,id,epoch,revision}` with no payload.
 
 | Field       | Required       | Meaning                                                                  |
 | ----------- | -------------- | ------------------------------------------------------------------------ |
-| `module`    | yes            | Absolute virtual module filename, ending in `.blot`.                     |
+| `module`    | yes            | Absolute virtual module filename, ending in `.sq`.                     |
 | `path`      | yes            | Absolute input filename.                                                 |
 | `kind`      | yes            | `json`, `catalog`, `text`, `tunables`, `wgsl`, or `reference`.           |
-| `type`      | reference only | Nominal Blot type identifier, beginning uppercase.                       |
-| `export`    | reference only | Blot value identifier, beginning lowercase or `_`.                       |
+| `type`      | reference only | Nominal Squid type identifier, beginning uppercase.                       |
+| `export`    | reference only | Squid value identifier, beginning lowercase or `_`.                       |
 | `mediaType` | reference only | Nonempty valid UTF-8 media type, at most 256 UTF-16 units; no CR/LF/NUL. |
 
 Other readers require `type`, `export`, and `mediaType` to be absent or null.
@@ -70,10 +70,10 @@ Each root is a directory containing these optional inputs:
 
 | Input                                | Reader   | Virtual module              |
 | ------------------------------------ | -------- | --------------------------- |
-| `assets/catalog.json`                | catalog  | `assets/catalog.json.blot`  |
-| `text.json`                          | text     | `text.json.blot`            |
-| `tunables.json`                      | tunables | `tunables.json.blot`        |
-| direct regular `assets/*.wgsl` files | WGSL     | input filename plus `.blot` |
+| `assets/catalog.json`                | catalog  | `assets/catalog.json.sq`  |
+| `text.json`                          | text     | `text.json.sq`            |
+| `tunables.json`                      | tunables | `tunables.json.sq`        |
+| direct regular `assets/*.wgsl` files | WGSL     | input filename plus `.sq` |
 
 Discovery runs every build. New and removed files change the candidate's module
 set; a supplied asset overlay can add a nonexistent discovered input or hide
@@ -110,7 +110,7 @@ ranges. A deleted range has `deleted:true` and length zero.
   "epoch": "1",
   "revision": 0,
   "sources": [
-    { "path": "/game/main.blot", "start": 0, "length": 32 }
+    { "path": "/game/main.sq", "start": 0, "length": 32 }
   ],
   "assetSources": [
     { "path": "/game/settings.json", "start": 32, "length": 13 },
@@ -175,7 +175,7 @@ including reference mappings; `reused` counts mappings whose canonical module,
 canonical input, reader kind, and exact bytes match the last successful
 candidate. Reading unchanged disk bytes still counts toward `inputBytes`: reuse
 saves parsing, not acquisition. Bytes shared through one canonical input are
-counted once. `generatedBytes` sums generated Blot modules. Resources are
+counted once. `generatedBytes` sums generated Squid modules. Resources are
 included only by the reference reader; catalog indexes are unrelated.
 
 The payload owns Wasm and captured resource bytes. A host copies the slices it
@@ -185,10 +185,10 @@ Content upload uses these bytes rather than reopening the reported path.
 
 ## Reader interfaces
 
-All exported value/field names obey Blot identifiers. Readers generate imports
-in memory; no `.blot` file is written. Imports use the original input spelling,
+All exported value/field names obey Squid identifiers. Readers generate imports
+in memory; no `.sq` file is written. Imports use the original input spelling,
 for example `import * as config from "./settings.json"` resolves its configured
-`settings.json.blot` virtual module.
+`settings.json.sq` virtual module.
 
 **JSON.** Export `value` and `Data`. An object root gives nominal
 `type Data is data = $Data { ... }`; other roots give a transparent `Data`
@@ -196,7 +196,7 @@ alias. Nested object shapes use shared nominal `JsonRecordN` types. Object
 fields sort by spelling. Duplicate JSON members use the last value, like
 `JSON.parse`; this is distinct from protocol metadata, where duplicates reject.
 
-| JSON value                                                    | Blot representation                             |
+| JSON value                                                    | Squid representation                             |
 | ------------------------------------------------------------- | ----------------------------------------------- |
 | null                                                          | Unit, `()`                                      |
 | boolean                                                       | Bool                                            |
@@ -252,7 +252,7 @@ astral glyph becomes one `?`; newline also becomes `?`. Missing doc is empty.
 This replacement applies to metadata only; the text reader rejects missing
 glyphs.
 
-**WGSL.** Reflect `struct Parameters`, when present, as nominal Blot
+**WGSL.** Reflect `struct Parameters`, when present, as nominal Squid
 `Parameters` with at most four fields, all resolving to f32, including aliases.
 Empty Parameters is allowed. Export module constants only when the pinned
 `wgsl_reflect` 1.6.0 parser folds them to scalar literal expressions with type
@@ -368,5 +368,5 @@ still reads and hashes unchanged disk bytes.
 
 ```sh
 deno test --allow-read --allow-write --allow-run \
-  tests/guest/native_asset_protocol.test.ts -- /absolute/path/to/blotc
+  tests/guest/native_asset_protocol.test.ts -- /absolute/path/to/squidc
 ```

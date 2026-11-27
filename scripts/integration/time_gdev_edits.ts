@@ -20,7 +20,7 @@ const root = resolve(values["gdev-root"]);
 const options = await gdevProject(
   root,
   resolve("std"),
-  "src/main.blot",
+  "src/main.sq",
   values.compiler,
 );
 const repetitions = Number(values.repetitions);
@@ -30,7 +30,7 @@ assert(Number.isSafeInteger(cycles) && cycles > 0);
 if (values["frontend-workers"]) {
   options.frontendWorkers = Number(values["frontend-workers"]);
 }
-const leaf = resolve(root, "src/effects/lighting_look.blot");
+const leaf = resolve(root, "src/effects/lighting_look.sq");
 const source = await Deno.readTextFile(leaf);
 const needle = "const proposed = $Look { sun: true,";
 assert.equal(

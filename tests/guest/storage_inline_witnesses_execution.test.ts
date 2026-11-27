@@ -16,15 +16,15 @@ io const answer = func (input: U32) => return do:
 `;
 Deno.test(`inline results preserve distinct nominal instantiations`, async () => {
   const directory = await Deno.makeTempDir({
-    prefix: "blot-inline-witness-",
+    prefix: "squid-inline-witness-",
   });
-  const entry = `${directory}/main.blot`;
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

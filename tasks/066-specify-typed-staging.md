@@ -9,11 +9,11 @@
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / typed staging.
   Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
-Specify typed Blot code values, descriptors, stage boundaries, hygiene,
+Specify typed Squid code values, descriptors, stage boundaries, hygiene,
 generation and exact dependencies.
 
 ## Starting point

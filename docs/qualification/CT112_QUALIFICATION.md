@@ -14,7 +14,7 @@ CT111 and CT112 are uncommitted and have not been pushed or installed.
 ## Candidate and scope
 
 - Source base: `e56375d18f32b0aef300fb4b80b9a3c0f2c1632d` plus CT111 and CT112.
-- Candidate: `build/bench/ct112/candidate-2-blotc`.
+- Candidate: `build/bench/ct112/candidate-2-squidc`.
 - Release SHA-256:
   `8b08627a14f7e3f8f48d715af056321d42428fd7f3fd5456f6e91963e8ab27c5`.
 - Compiler identity SHA-256:
@@ -23,7 +23,7 @@ CT111 and CT112 are uncommitted and have not been pushed or installed.
   `efb953d79cf6952841e28a20d48570f2ee324a0811f475e8999131f81cb70adf`.
 
 The candidate uses 1,004 pinned compiler/test/client/tool inputs in
-`build/bench/ct112/qualification-work/blot2`, with frozen sibling fixtures.
+`build/bench/ct112/qualification-work/squid-lang`, with frozen sibling fixtures.
 Concurrent changes to `backend/owned_arrays.zig`,
 `backend/owned_arrays_tests.zig` and `tests/owned_array_execution.test.ts` are
 preserved in the shared checkout and excluded from the candidate. Qualification

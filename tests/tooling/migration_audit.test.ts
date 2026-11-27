@@ -23,27 +23,27 @@ Deno.test("batched frontend coverage isolates rejections and never passes a fail
   const outcomes = new Map<string, boolean>();
   const batches: { files: string[]; split: boolean }[] = [];
   const selected = [
-    "a.blot",
-    "bad.blot",
-    "c.blot",
-    "d.blot",
-    "expected.blot",
-    "unreached.blot",
+    "a.sq",
+    "bad.sq",
+    "c.sq",
+    "d.sq",
+    "expected.sq",
+    "unreached.sq",
   ];
   await assert.rejects(() =>
     auditBatches({
       selected,
       batchSize: 4,
-      expectedFiles: new Set(["expected.blot"]),
+      expectedFiles: new Set(["expected.sq"]),
       build: async (files) => {
         calls.push([...files]);
-        if (files.includes("unreached.blot")) {
+        if (files.includes("unreached.sq")) {
           throw new Error("transport stopped");
         }
         // c and d each pass but cannot share an import graph; bad never passes.
-        const success = !files.includes("bad.blot") &&
-          !files.includes("expected.blot") &&
-          !(files.includes("c.blot") && files.includes("d.blot"));
+        const success = !files.includes("bad.sq") &&
+          !files.includes("expected.sq") &&
+          !(files.includes("c.sq") && files.includes("d.sq"));
         return { success, diagnostics: [] };
       },
       batch: async (batch) => {
@@ -61,17 +61,17 @@ Deno.test("batched frontend coverage isolates rejections and never passes a fail
       },
     }), /transport stopped/);
   assert.deepEqual([...outcomes], [
-    ["a.blot", true],
-    ["bad.blot", false],
-    ["c.blot", true],
-    ["d.blot", true],
-    ["expected.blot", false],
+    ["a.sq", true],
+    ["bad.sq", false],
+    ["c.sq", true],
+    ["d.sq", true],
+    ["expected.sq", false],
   ]);
-  assert.equal(outcomes.has("unreached.blot"), false);
+  assert.equal(outcomes.has("unreached.sq"), false);
   assert.ok(calls.some((files) => files.length === 4));
   assert.ok(batches.some((batch) => batch.split));
   assert.ok(
-    calls.filter((files) => files.includes("expected.blot")).every((files) =>
+    calls.filter((files) => files.includes("expected.sq")).every((files) =>
       files.length === 1
     ),
   );
@@ -79,12 +79,12 @@ Deno.test("batched frontend coverage isolates rejections and never passes a fail
 
 Deno.test("migration path selection respects directory boundaries", () => {
   const files = [
-    "tests/a.blot",
-    "tests/negative/b.blot",
-    "test_support/c.blot",
+    "tests/a.sq",
+    "tests/negative/b.sq",
+    "test_support/c.sq",
   ];
   assert.deepEqual(selectPaths(files, ["tests/"]), files.slice(0, 2));
-  assert.deepEqual(selectPaths(files, ["tests/a.blot"]), [files[0]]);
+  assert.deepEqual(selectPaths(files, ["tests/a.sq"]), [files[0]]);
   assert.deepEqual(selectPaths(files, ["test"]), []);
 });
 
@@ -93,7 +93,7 @@ Deno.test("frontend audit checks unused declarations and exact rejection expecta
     dirname(fileURLToPath(import.meta.url)),
     "../..",
   );
-  const project = await Deno.makeTempDir({ prefix: "blot-migration-audit-" });
+  const project = await Deno.makeTempDir({ prefix: "squid-migration-audit-" });
   try {
     const initialized = await new Deno.Command("git", {
       args: ["init", "--quiet", project],
@@ -106,18 +106,18 @@ Deno.test("frontend audit checks unused declarations and exact rejection expecta
       }),
     );
     await Deno.writeTextFile(
-      resolve(project, "valid.blot"),
+      resolve(project, "valid.sq"),
       "io answer () : U32 => return 42\n",
     );
     const invalid = "const unused: U32 = true\n";
-    await Deno.writeTextFile(resolve(project, "invalid.blot"), invalid);
-    await Deno.writeTextFile(resolve(project, "rejected.blot"), invalid);
+    await Deno.writeTextFile(resolve(project, "invalid.sq"), invalid);
+    await Deno.writeTextFile(resolve(project, "rejected.sq"), invalid);
     const report = await auditProject({
       project,
       paths: [],
       report: resolve(project, "report.json"),
       expectations: {
-        "rejected.blot": {
+        "rejected.sq": {
           code: "type_mismatch",
           reason: "A Bool cannot initialize a U32.",
         },
@@ -129,8 +129,8 @@ Deno.test("frontend audit checks unused declarations and exact rejection expecta
     assert.equal(report.unexpectedFailures, 1);
     assert.deepEqual(
       report.results.map(({ file, status }) => [file, status]),
-      [["invalid.blot", "failed"], ["rejected.blot", "expected-rejection"], [
-        "valid.blot",
+      [["invalid.sq", "failed"], ["rejected.sq", "expected-rejection"], [
+        "valid.sq",
         "passed",
       ]],
     );

@@ -114,10 +114,10 @@ emission. The later checkpoint above records them before the target is known.
 
 Gdev `cc4bbbf` gives input, fixed-step simulation and presentation their own
 modules. The stage composition and public game constructors remain in
-`game.blot`. Each stage runs the systems in their previous order.
+`game.sq`. Each stage runs the systems in their previous order.
 
 To locate the cost, the same compiler checked successively longer prefixes of
-`game.blot` with identical imports and a scalar entry point. The imports and
+`game.sq` with identical imports and a scalar entry point. The imports and
 entry alone took 9 ms. Adding `game_using` cost 21 ms for checking and
 interface publication across five paired runs. In a second probe, restoring
 the actual bodies inside this function added about 9 ms for simulation,
@@ -139,7 +139,7 @@ the two equal-length source directories halfway through.
 
 ![Complete Wasm rebuild after three game-stage edits](../benchmarks/evidence/measurements/2026-11-20-gdev-game-stages.png)
 
-In five separately traced pairs, the time between starting `game.blot` and
+In five separately traced pairs, the time between starting `game.sq` and
 publishing its interface fell from 48 to 11 ms. Whole-project checking
 measured 310 → 314 ms. Four of five candidate paths waited on world storage
 and then an event or presentation stage. A separate pilot moving the
@@ -196,7 +196,7 @@ from **327 to 308 ms** median while total checker worker CPU rose from
 1,583 to 1,631 ms. The title published its interface 27 ms earlier. Every
 control trace ended with station → review scenes → scenes → title → game
 → main. Two candidate traces reached game through robots and the console
-handler, one through world storage. Checking `game.blot` through interface
+handler, one through world storage. Checking `game.sq` through interface
 publication took 47 ms median on that shared tail. Measure which declarations
 consume it before changing the game-stage layout.
 
@@ -276,7 +276,7 @@ across 24 more frames each. Pen project and codegen checks passed, and all
 
 ## Checking Gdev storage and rendering without the robot simulation
 
-Blot's workers already publish a module's interface after type checking
+Squid's workers already publish a module's interface after type checking
 and before lowering. They can start a caller as soon as every imported
 interface is ready. Gdev's save code, kites and cannons previously waited
 on the robot simulation for codecs, state types and presentation helpers.
@@ -359,11 +359,11 @@ types. All 283 Ink outcomes and the inspected Gdev frame and trace matched.
 
 ## Native compiler size and checker work
 
-On 20 November 2026, compiling Blot's generated C for size cut its Linux
+On 20 November 2026, compiling Squid's generated C for size cut its Linux
 executable by 3.68 MB. The smaller compiler took longer on every paired
 fresh Gdev build. Each pair produced byte-identical guest Wasm.
 
-| Blot compiler | Executable | Pinned Gdev, 12 pairs | Gdev `54f299a`, 4 pairs |
+| Squid compiler | Executable | Pinned Gdev, 12 pairs | Gdev `54f299a`, 4 pairs |
 | --- | ---: | ---: | ---: |
 | Release | 11.61 MB | 661 ms | 660 ms |
 | Size-optimized and stripped | 7.92 MB | 890 ms | 874 ms |
@@ -386,10 +386,10 @@ the separate 11.1% saving from stripping and folding identical code.
 [Six-project run](https://www.youtube.com/watch?v=HQlk9RGx2dk&t=1190s) ·
 [Public size patch](https://github.com/pingdotgg/ts-rust/pull/110)
 
-The checker result worth testing in Blot is Sentry's reduction from 26.3
+The checker result worth testing in Squid is Sentry's reduction from 26.3
 million generic type instantiations to 10.1 million. An instantiation
 constructs the type needed at a particular use of a generic definition.
-On the Gdev dependency chain, count how often Blot reconstructs the same
+On the Gdev dependency chain, count how often Squid reconstructs the same
 fully determined type and how much CPU those repeats use. Use these counts
 to decide whether to reuse more closed types. Uses with fresh inference
 variables must keep their independent constraints.
@@ -716,7 +716,7 @@ have additional consumers. Three experiments exercised the distinction.
 - Loading the definition from the originating module on the first checker
   lookup recovered byte-identical Wasm on the three-file program and returned
   0, 42 and 1,337 for those inputs. Gdev then reported `own_argument` for
-  `access.robot` in `world_storage.blot` during lowering.
+  `access.robot` in `world_storage.sq` during lowering.
 - Loading definitions for every nominal identity found in the module's type
   graph, including nodes added while loading other definitions, recovered
   byte-identical Gdev Wasm. This reduced imported type nodes from **305,416
@@ -988,7 +988,7 @@ accounted for 297 ms, including 122 ms copying named types from imports.
 A consumer starts after its imported modules publish their inferred interfaces.
 Across 2,390 dependency edges, the longest chain by measured checking and
 publication cost spanned 20 modules and about **436 ms of CPU**. The chain
-runs through `salt.blot`, `pile_batch.blot` and `robots.blot`. The robot
+runs through `salt.sq`, `pile_batch.sq` and `robots.sq`. The robot
 module took **86 ms** to check, made 202,670 type-resolution visits and
 appeared on the sequence of imports that determined completion in all six
 queue traces. Gdev's game module spent its own 52 ms checking 33 bodies
@@ -1027,7 +1027,7 @@ enabled a consumer to compile against 103 modules and run while the salt
 writer contained an unknown name. The same probe before the import change
 failed at that name. All four hauling behavior tests passed through Pen.
 
-`blotc check-exports` checks written public signatures without resolving
+`squidc check-exports` checks written public signatures without resolving
 imports or checking function bodies. `--include-private` also checks private
 values. Before adding signatures, the survey found 3,837 of 4,017 Gdev values
 and 1,912 of 2,184 Ink values missing written public types. This opt-in check
@@ -1036,8 +1036,8 @@ lets a library adopt the policy one module at a time.
 To reproduce the trials, export the Gdev and Ink commits listed in the
 evidence into sibling directories and take the three salt/hauling files
 from the Gdev overlay commit. Use this revision's std. From the Ink repo,
-save `git show 3f2e603:lib/motion.blot` and
-`git show 3c7f868:lib/motion.blot` as two files. From Blot, run
+save `git show 3f2e603:lib/motion.sq` and
+`git show 3c7f868:lib/motion.sq` as two files. From Squid, run
 `deno run -A benchmarks/tools/bench_export_signatures.ts COMPILER GDEV ORIGINAL PUBLIC 6`.
 The runner derives the private annotations and checks Wasm bytes against
 both worker counts and all three source variants.
@@ -1161,8 +1161,8 @@ much smaller program could previously stall downstream.
 
 Core ML provides a relevant theoretical example. Kanellakis, Mairson and
 Mitchell give small polymorphic programs with exponentially growing principal
-types. The Blot measurements above establish a concrete growth curve for this
-implementation. Deriving a complexity bound for the Blot language would
+types. The Squid measurements above establish a concrete growth curve for this
+implementation. Deriving a complexity bound for the Squid language would
 require a separate proof. [Unification and ML Type Reconstruction](https://cs.brown.edu/research/pubs/techreports/reports/CS-90-26.html)
 
 ![Compiler work for field readers and nested pair types](../benchmarks/evidence/measurements/2026-11-19-type-scaling.svg)
@@ -1316,7 +1316,7 @@ implementation is broken.
 
 `#run` can now build structured constants and read declared files. An edit to
 an unselected file reused the previous Wasm. Changed source still goes through
-the existing module checks. Run the two real-source probes from the Blot root.
+the existing module checks. Run the two real-source probes from the Squid root.
 
 ```sh
 deno run -A benchmarks/language/terrain_owner.ts
@@ -1414,7 +1414,7 @@ Changing the prelude root disables reuse for modules that inherit its operators.
 
 The lighting edit acquired all 270 sources and reused 269 syntax trees.
 An independent file-open trace counted 213 speculative opens of
-`.blot` files on the previous compiler and 0 on the current one.
+`.sq` files on the previous compiler and 0 on the current one.
 Both opened 214 disk sources during the authoritative walk. Other
 sources came from in-memory inputs. In two separately profiled pairs,
 load time fell from 92.9 to 14.5 ms.
@@ -1481,11 +1481,11 @@ For the private rename in `world_storage`, checking fell from
 **951.0 to 230.7 ms** and loading, lexing and parsing together fell from
 **314.6 to 52.9 ms** across two separately profiled pairs.
 The compiler reused 269 parsed trees, up from two, and rechecked six modules,
-down from 270. In a separate trace, checking `game.blot` took 101.7 ms and
-checking `world_storage.blot` took 100.4 ms.
+down from 270. In a separate trace, checking `game.sq` took 101.7 ms and
+checking `world_storage.sq` took 100.4 ms.
 
 Relinking names raised the load phase alone from **23.4 to 47.4 ms**.
-The next target is reuse of `game.blot` when an edit preserves the exports it consumes.
+The next target is reuse of `game.sq` when an edit preserves the exports it consumes.
 
 Across four separate pairs, median resident memory after the rename was
 **282.9 MiB** previously and **269.8 MiB** on this release. The measurement sums
@@ -1508,7 +1508,7 @@ in Core merge ranges, field names, obligations and nominals, and in imported
 binding arrays. Thirteen measured tables now use the existing verified Goose
 array image. A shared generator emits the typed encoders and decoders. This
 changes the private representation exchanged between workers running the same
-executable. Guest Wasm, the project protocol and portable BLOTDEP1 records keep
+executable. Guest Wasm, the project protocol and portable SQUIDEP1 records keep
 their formats.
 
 | Paired workload | Previous compiler | Bulk transfers | Median paired saving | Wins |
@@ -1539,7 +1539,7 @@ module for all 269 Gdev modules. The timings exclude file I/O.
 | Read interfaces | 12.97 ms | 3.31 ms |
 
 Together the worker replies shrank by **1,001,880 bytes (1.38%)**. Every
-decoded record matched its counterpart after independent BLOTDEP1 encoding.
+decoded record matched its counterpart after independent SQUIDEP1 encoding.
 The checker dispatched all 269 modules across eight slots. The packet codec occupied 5.7% of
 sampled CPU on the prior release and 1.9% on the new one.
 The sampler attributes the interrupted instruction to its compiled symbol.
@@ -1670,7 +1670,7 @@ The direct reader preserved the distinct `u32` and `bool` results and their
 different effect rows. A second test published a function with an open effect,
 then bound that effect to the empty row. Ordinary Core observed the published
 open tail. The experimental reader observed the later closed tail. This is a
-store-level counterexample. No Gdev or Blot-source failure was observed.
+store-level counterexample. No Gdev or Squid-source failure was observed.
 
 The guarded reader excluded expression types needed by ownership, editor,
 scope and coverage checks. It still reproduced the effect-row divergence.
@@ -1733,7 +1733,7 @@ earlier `u32`. That witness motivated the cursor-aware projection experiments ab
 
 ### Direct variable views
 
-Blot `6b223a73` compiled Main in **868 ms**, down from **890 ms** for
+Squid `6b223a73` compiled Main in **868 ms**, down from **890 ms** for
 `0c4bc0eb` on the same 18 alternating fresh pairs. The median paired gain
 was 22 ms, with 14 wins. In an earlier, busier three-way window the same
 change won 12 of 18 rounds with an 8 ms median paired gain. Filesystem pages
@@ -1780,7 +1780,7 @@ but just 28 matched an earlier signature by its three IDs.
 
 ### Parallel parser release
 
-Blot `0c4bc0eb` compiled 46,109 lines to complete Wasm in **823 ms**
+Squid `0c4bc0eb` compiled 46,109 lines to complete Wasm in **823 ms**
 median on eight cores, about **56,000 lines/s**. The previous release took
 **919 ms** on the same alternating twelve pairs. Each fresh build checked
 269 modules. All 24 emitted the same 2,639,228 bytes.
@@ -1818,7 +1818,7 @@ million lines per second still gives this workload a **46 ms wall budget**.
 
 ### Scalar compile-time execution
 
-Blot `d92d35ac` compiled the 46,109-line project in **938 ms** median over
+Squid `d92d35ac` compiled the 46,109-line project in **938 ms** median over
 twelve fresh processes, about **49,100 lines/s**. A lighting edit took
 **291 ms** median. On the same sources, an unused `#run` fell from **1,938 to
 1,031 ms**. Using it for the actual lighting field took **1,015 ms** and
@@ -1829,7 +1829,7 @@ emitted byte-identical Wasm. All 269 modules used the worker queue.
 
 ### Earlier worker release
 
-Blot `20fed713` took **0.889 s** median on fresh Main and **268 ms**
+Squid `20fed713` took **0.889 s** median on fresh Main and **268 ms**
 on a lighting preset edit in an open session. Each of six fresh builds checked
 all 269 modules, emitted the same 2,639,228 bytes and finished in 870–910 ms. Both defaults used Gdev `45748aba`, Ink `3f2e603`
 and Pen `ad9766c` on the same shared eight-core Linux host.
@@ -1989,7 +1989,7 @@ review; until then keep it minimal and runtime-checked.
 4. Function values are runtime closures (table index + environment pointer).
    Saturated calls of named functions stay direct calls.
 5. Every type has one fixed layout. Nothing is projected or chosen per call.
-6. Blot does not inline. Wasm engines inline hot small functions; release builds
+6. Squid does not inline. Wasm engines inline hot small functions; release builds
    may run `wasm-opt`.
 
 ## Why: measured costs
@@ -2035,7 +2035,7 @@ development tier currently emits identical bytes in the same time (6.9 s).
   owner into older storage keeps its allocations for the enclosing scope.
   Exports reset temporaries on entry, as today.
 - **Output.** A lean Wasm writer encodes bytes directly: multi-value results, a
-  function table for closures, the ABI 8 exports, imports and `blot:abi`.
+  function table for closures, the ABI 8 exports, imports and `squid:abi`.
 - **Parallelism.** Emission per instance has no shared mutable state besides
   the instance table, so it can run on all cores; final indices are assigned in
   a deterministic order at link time.
@@ -2069,7 +2069,7 @@ On a release (LLVM) compiler, Gdev Main builds in 1.15 s against 6.61 s. The
 backend's share is 95 ms against 5,533 ms, so the frontend is now 90% of the
 time.
 
-Ink's suite (`pen test-blot` through a `--backend direct` wrapper) matches
+Ink's suite (`pen test-squid` through a `--backend direct` wrapper) matches
 the scoped backend on all 64 modules both compile, with identical outcomes.
 The direct backend also passes extractions, retained and simd-batches, which
 the scoped backend rejects.

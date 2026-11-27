@@ -10,9 +10,9 @@ import direct.function;
 import check.core;
 import reuse.body_shape;
 
-type Core = blot_check_core::Module;
-type Generator = blot_direct_emit::Generator;
-type Map = blot_direct_map::U64Map;
+type Core = squid_check_core::Module;
+type Generator = squid_direct_emit::Generator;
+type Map = squid_direct_map::U64Map;
 let units = 293;
 
 extern fn packetSize(version:u32,unit:u32)->i64="body_packet_size";
@@ -34,16 +34,16 @@ extern fn diagnostic(text:const u8&,size:i64)="body_diag";
 reusable[] var buffers:u8[>..];
 
 
-fn readCore(version:u32,owner:blot_project_packet::Owner,unit:u32)->Core {
+fn readCore(version:u32,owner:squid_project_packet::Owner,unit:u32)->Core {
     let size=packetSize(version,unit);
     let bytes=buffers.alloc_slice(size);
     packetRead(version,unit,bytes[0],size);
-    var reader=blot_project_packet::Reader{bytes,owner};
+    var reader=squid_project_packet::Reader{bytes,owner};
     var id:u32=0;
     var core=default<Core>();
-    blot_project_packet::get(reader,id);
-    blot_project_packet::getExecutionCore(reader,core);
-    assert(reader.failure==blot_error::Error.none && id==unit && core.unit==unit);
+    squid_project_packet::get(reader,id);
+    squid_project_packet::getExecutionCore(reader,core);
+    assert(reader.failure==squid_error::Error.none && id==unit && core.unit==unit);
     buffers.free_slice(bytes);
     return core;
 }
@@ -51,9 +51,9 @@ fn readCore(version:u32,owner:blot_project_packet::Owner,unit:u32)->Core {
 fn reference(updated:const Core[:],entry:u32,out:u8[>..<]&) {
     enable(false);
     var detail:u8[>..<]=[];
-    let start=blot_native::clock_ns();
-    let result=blot_direct::compile(updated,entry,out,detail);
-    stat(8,blot_native::clock_ns()-start);
+    let start=squid_native::clock_ns();
+    let result=squid_direct::compile(updated,entry,out,detail);
+    stat(8,squid_native::clock_ns()-start);
     assert(!result.failed);
     enable(true);
 }
@@ -70,7 +70,7 @@ fn bindingAt(m:const Core&,point:u32)->u32 {
 }
 
 // Each process makes one speculative edit. A rejected trial is discarded wholesale.
-fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, state:blot_direct_emit::State&, updated:const Core[:], unit:u32,binding:u32,image:u8[>..<]&)->u32 {
+fn replay(types:squid_direct_types::Types&, module:squid_direct_writer::Module&, state:squid_direct_emit::State&, updated:const Core[:], unit:u32,binding:u32,image:u8[>..<]&)->u32 {
     types.units=updated;
     var g=Generator{types,module,state,updated};
     let m .= updated[unit-1];
@@ -90,16 +90,16 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     var matched=true;
     for index in 0..instances {
         let item=s.instances[index];
-        if item.key.kind!=blot_direct_emit::InstanceKind.named || item.key.unit!=unit || item.key.id!=binding {continue;}
+        if item.key.kind!=squid_direct_emit::InstanceKind.named || item.key.unit!=unit || item.key.id!=binding {continue;}
         let id=index as u32;
-        var env=blot_direct_types::Env{};
+        var env=squid_direct_types::Env{};
         g.types.match_(m,m.binding(binding).ty,item.key.ty,env);
-        if blot_direct_emit::solveObligations(g,m,body.scheme.obligations,env)!=blot_direct_types::Error.none {return 2;}
+        if squid_direct_emit::solveObligations(g,m,body.scheme.obligations,env)!=squid_direct_types::Error.none {return 2;}
         s.instances[id].env=env;
         s.instances[id].inferring=inferred(id);
-        let err=blot_direct_function::emitInstance(g,id);
+        let err=squid_direct_function::emitInstance(g,id);
         s.instances[id].inferring=false;
-        if err!=blot_direct_types::Error.none {return 3;}
+        if err!=squid_direct_types::Error.none {return 3;}
         if s.instances[id].result!=item.result {return 9;}
         if !sameLookups(id) {matched=false;}
         emitted++;
@@ -107,7 +107,7 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     stat(4,emitted);
     if s.has_failure || s.failures.len!=0 {
         for record in s.failures {
-            let text=blot_direct_emit::textOf(g,record.failure.message);
+            let text=squid_direct_emit::textOf(g,record.failure.message);
             if text.len!=0 {diagnostic(text[0],text.len);}
         }
         return 5;
@@ -116,19 +116,19 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     if instances!=s.instances.len || functions!=w.functions.len || sections!=[w.signatures.len,w.imports.len,w.table.len,w.globals.len,w.exports.len,w.data.len,w.customs.len] {
         for i in instances..s.instances.len {
             let key=s.instances[i].key;
-            stat(20,blot_direct_emit::kindCode(key.kind));stat(21,key.unit);stat(22,key.id);
+            stat(20,squid_direct_emit::kindCode(key.kind));stat(21,key.unit);stat(22,key.id);
         }
         return 4;
     }
     if !matched {return 7;}
-    blot_direct_writer::assemble(w,image);
+    squid_direct_writer::assemble(w,image);
     return 0;
 }
 
 fn sameUnit(a:const Core&,b:const Core&)->bool {
-    if !blot_reuse_body_shape::same_check_core_Module(a,b) {return false;}
+    if !squid_reuse_body_shape::same_check_core_Module(a,b) {return false;}
     for n,i in a.nodes {
-        if n.tag==blot_check_core::Tag.constant && n.a!=b.nodes[i].a {return false;}
+        if n.tag==squid_check_core::Tag.constant && n.a!=b.nodes[i].a {return false;}
     }
     return true;
 }
@@ -139,22 +139,22 @@ fn sameImporter(old:const Core[:],updated:const Core[:],i:i64,edit:u32)->bool {
     var a=old[i];
     var b=updated[i];
     if a.bindings.len!=b.bindings.len {return false;}
-    var ta=blot_direct_types::Types{units:old,..};
-    var tb=blot_direct_types::Types{units:updated,..};
-    var storage=blot_direct_writer::Module{..};
-    var scratch=blot_direct_emit::State{..};
+    var ta=squid_direct_types::Types{units:old,..};
+    var tb=squid_direct_types::Types{units:updated,..};
+    var storage=squid_direct_writer::Module{..};
+    var scratch=squid_direct_emit::State{..};
     var prior=Generator{ta,storage,scratch,old};
     var next=Generator{tb,storage,scratch,updated};
     for x,at in a.bindings {
         var y=b.bindings[at];
         if x.target!=y.target {
-            if x.kind!=blot_reuse_principal_interface::Kind.external || y.kind!=x.kind {return false;}
+            if x.kind!=squid_reuse_principal_interface::Kind.external || y.kind!=x.kind {return false;}
             let left=prior.resolve(a,x.target);
             let right=next.resolve(b,y.target);
             if left!=right || left.unit==edit || left.unit==a.unit || left.unit==0 {return false;}
             y.target=x.target;
         }
-        if !blot_reuse_body_shape::same_check_core_Binding(x,y) {return false;}
+        if !squid_reuse_body_shape::same_check_core_Binding(x,y) {return false;}
     }
     b.bindings=a.bindings;
     return sameUnit(a,b);
@@ -163,7 +163,7 @@ fn sameImporter(old:const Core[:],updated:const Core[:],i:i64,edit:u32)->bool {
 fn selectBinding(old:const Core[:],updated:const Core[:],unit:u32)->u32,bool {
     var changes:u32=0;
     var other=false;
-    let start=blot_native::clock_ns();
+    let start=squid_native::clock_ns();
     for i in 0..units {
         if !sameUnit(old[i],updated[i]) {
             stat(11,(i+1) as u32);
@@ -176,41 +176,41 @@ fn selectBinding(old:const Core[:],updated:const Core[:],unit:u32)->u32,bool {
     assert(changes==1 && binding!=0);
     // The fixtures insert after this marker. Both revisions must select the same binding.
     assert(bindingAt(updated[unit-1],editPoint())==binding);
-    stat(18,blot_native::clock_ns()-start);
+    stat(18,squid_native::clock_ns()-start);
     return binding,other;
 }
 
 fn checkpoint(old:const Core[:],entry:u32) {
-    var types=blot_direct_types::Types{units:old,..};
-    blot_direct_types::init(types);
-    var module=blot_direct_writer::Module{..};
-    var state=blot_direct_emit::State{..};
+    var types=squid_direct_types::Types{units:old,..};
+    squid_direct_types::init(types);
+    var module=squid_direct_writer::Module{..};
+    var state=squid_direct_emit::State{..};
     var initial=Generator{types,module,state,old};
     var base:u8[>..<]=[];
     enable(recording());
-    let setup=blot_native::clock_ns();
-    assert(blot_direct::build(initial,entry,base)==blot_direct_types::Error.none);
-    stat(26,blot_native::clock_ns()-setup);
+    let setup=squid_native::clock_ns();
+    assert(squid_direct::build(initial,entry,base)==squid_direct_types::Error.none);
+    stat(26,squid_native::clock_ns()-setup);
     assert(!state.has_failure && state.failures.len==0);
     save(1,base[0],base.len);
     if !nextEdit() {return;}
 
     let unit=editUnit();
-    let decodeStart=blot_native::clock_ns();
-    let editOwner,editErr=blot_project_packet::initOwner();
-    assert(editErr==blot_error::Error.none);
+    let decodeStart=squid_native::clock_ns();
+    let editOwner,editErr=squid_project_packet::initOwner();
+    assert(editErr==squid_error::Error.none);
     var edited:Core[293]=[default<Core>();293];
     for i in 0..units {edited[i]=readCore(1,editOwner,(i+1) as u32);}
-    stat(27,blot_native::clock_ns()-decodeStart);
+    stat(27,squid_native::clock_ns()-decodeStart);
     let updated=edited[..];
     let binding,other=selectBinding(old,updated,unit);
     var fresh:u8[>..<]=[];
     if referenceFirst() {reference(updated,entry,fresh);}
     var image:u8[>..<]=[];
-    let start=blot_native::clock_ns();
+    let start=squid_native::clock_ns();
     var reason:u32=8;
     if !other {reason=replay(types,module,state,updated,unit,binding,image);}
-    let elapsed=blot_native::clock_ns()-start;
+    let elapsed=squid_native::clock_ns()-start;
     stat(2,elapsed);stat(14,reason);
     if reason==0 {save(2,image[0],image.len);}
     if !referenceFirst() {
@@ -222,8 +222,8 @@ fn checkpoint(old:const Core[:],entry:u32) {
 }
 
 fn main() {
-    let owner,err=blot_project_packet::initOwner();
-    assert(err==blot_error::Error.none);
+    let owner,err=squid_project_packet::initOwner();
+    assert(err==squid_error::Error.none);
     var old:Core[293]=[default<Core>();293];
     var entry:u32=0;
     for i in 0..units {

@@ -1,5 +1,5 @@
 // Exact deterministic counter names; diagnostic clocks never affect validity.
-namespace blot_work_counters;
+namespace squid_work_counters;
 import std;
 
 enum InferenceStage { general, specialization, preparation, lowering }

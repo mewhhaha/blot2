@@ -16,19 +16,19 @@ import {
 import { resolveProject } from "./packages.ts";
 import {
   formatTestRunReport,
-  runBlotTests,
+  runSquidTests,
   type TestRunOptions,
 } from "./test_runner.ts";
 import { runDocCli } from "./doc.ts";
 
 const usage =
-  `Usage: blot guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
-       blot check ENTRY [project options]
-       blot build ENTRY [OUTPUT.wasm] [--test] [project options]
-       blot dependencies ENTRY OUTPUT.blotdep [project options]
-       blot test [PATHS...] [--filter TEXT] [--jobs N] [--bail] [--release]
+  `Usage: squid guide [--cheatsheet] | explain <CODE|--list> | fmt SOURCE [--check]
+       squid check ENTRY [project options]
+       squid build ENTRY [OUTPUT.wasm] [--test] [project options]
+       squid dependencies ENTRY OUTPUT.sqdep [project options]
+       squid test [PATHS...] [--filter TEXT] [--jobs N] [--bail] [--release]
                  [--deadline SEC] [--json] [project options]
-       blot doc [TARGET] [--out DIR [--html]] [--test] [--check-links]
+       squid doc [TARGET] [--out DIR [--html]] [--test] [--check-links]
                 [--search QUERY] [--compact] [--json] [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
                  --dependencies FILE, --input-mode project|source,
@@ -148,7 +148,7 @@ async function runTestCli(
         break;
     }
   }
-  const report = await runBlotTests(options);
+  const report = await runSquidTests(options);
   console.log(
     json ? JSON.stringify(report) : await formatTestRunReport(report),
   );
@@ -458,7 +458,7 @@ export async function runCli(
       if (!options.includes("--prelude")) {
         options.push(
           "--prelude",
-          join(standardRoot, "prelude.blot"),
+          join(standardRoot, "prelude.sq"),
         );
       }
       if (!options.includes("--std-root")) {
@@ -469,7 +469,7 @@ export async function runCli(
       }
     }
     if (command === "build") {
-      destination ??= `build/${basename(filename, ".blot")}.wasm`;
+      destination ??= `build/${basename(filename, ".sq")}.wasm`;
     }
     if (destination) {
       await Deno.mkdir(dirname(destination), { recursive: true });
@@ -489,7 +489,7 @@ export async function runCli(
     }
     const result = await new Deno.Command(
       executable ?? new URL(
-        "../compiler-goose/build/blotc-goose",
+        "../compiler-goose/build/squidc-goose",
         import.meta.url,
       ),
       {

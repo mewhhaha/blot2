@@ -1,6 +1,6 @@
-# The Blot compiler
+# The Squid compiler
 
-This is Blot's compiler. It is written in Goose and was ported from a
+This is Squid's compiler. It is written in Goose and was ported from a
 compiler written in Zig, which was removed on 15 November 2026 once the two
 matched. [tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md) has the record of the
 port: the comparison, what went with Zig, the known differences and the
@@ -25,17 +25,17 @@ speed.
 From the repository root:
 
 - `deno task build:compiler` writes the optimized compiler,
-  `compiler-goose/build/blotc-goose`, in about seven minutes. Pen, the
+  `compiler-goose/build/squidc-goose`, in about seven minutes. Pen, the
   sibling checkouts and the tests' default path run this file.
 - `deno task build:compiler:dev` writes a debug compiler,
-  `compiler-goose/build/blotc-goose-dev`, in about a minute and a half.
-- `deno task build:compiler:pgo` writes `compiler-goose/build/blotc-goose-pgo`.
+  `compiler-goose/build/squidc-goose-dev`, in about a minute and a half.
+- `deno task build:compiler:pgo` writes `compiler-goose/build/squidc-goose-pgo`.
   This release target needs Clang's profile runtime and matching
-  `llvm-profdata`. It runs five small Blot programs through an instrumented
+  `llvm-profdata`. It runs five small Squid programs through an instrumented
   compiler, then uses their execution counts to optimize the native compiler.
   The merged profile's SHA-256 is part of the compiler identity. To build
   Gdev with it, run `deno run -A scripts/integration/build_gdev.ts
-  --compiler compiler-goose/build/blotc-goose-pgo --frontend-workers 8`.
+  --compiler compiler-goose/build/squidc-goose-pgo --frontend-workers 8`.
 
 The regular builds run `compiler-goose/build.sh`, which takes `--release`, `--output FILE`
 and `--cflag=FLAG`. It needs clang, cmake, ninja and Python 3. A rebuilt
@@ -112,7 +112,7 @@ Two of them read a model that is edited by hand:
 
 ## Checking published types
 
-`build/blotc-goose check-exports FILE...` checks public value signatures from
+`build/squidc-goose check-exports FILE...` checks public value signatures from
 source declarations. Add `--include-private` before the file paths to check
 every module-level value. Each file produces a JSON summary with the number of
 checked declarations and missing signatures. A missing signature exits with
@@ -125,6 +125,6 @@ owners; `live_bytes` must be 0. When it is not, build with debug
 information (`sh compiler-goose/build.sh --cflag=-g`) and trace the pool
 events under gdb: break on `event` in native/allocation_observer.c, sum
 allocated minus freed bytes for each `owner` after
-`blot_allocation_observer_mark`, and match the owner that keeps bytes
+`squid_allocation_observer_mark`, and match the owner that keeps bytes
 against the `base` of each `gs_rhdr` field of `gs_globals_main`. The field
 name is the pool; the callers of its allocations name the site.

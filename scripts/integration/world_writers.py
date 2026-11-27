@@ -15,8 +15,8 @@ checkout = Path(__file__).resolve().parents[2]
 root = (checkout.parent / 'gdev/src').resolve(strict=True)
 defs={}   # (module, name) -> dict
 mods={}
-for f in sorted(root.rglob('*.blot')):
-    mod=os.path.relpath(f,root)[:-5]
+for f in sorted(root.rglob('*.sq')):
+    mod=os.path.relpath(f,root)[:-3]
     s=f.read_text(); L=s.split('\n')
     imports={}
     for m in re.finditer(r'^import \* as (\w+) from "([^"]+)"',s,re.M):

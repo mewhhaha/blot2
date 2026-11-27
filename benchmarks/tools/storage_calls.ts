@@ -1,5 +1,5 @@
 // Bounded storage-bearing DAGs. Each reported build executes independent checks.
-// deno run -A benchmarks/tools/storage_calls.ts --blotc PATH --sizes 1,4,8 --depth 10
+// deno run -A benchmarks/tools/storage_calls.ts --squidc PATH --sizes 1,4,8 --depth 10
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -118,7 +118,7 @@ async function main() {
   for (let at = 0; at < Deno.args.length; at++) {
     const key = Deno.args[at];
     if (
-      !["--blotc", "--sizes", "--depth", "--timeout-ms", "--workloads"]
+      !["--squidc", "--sizes", "--depth", "--timeout-ms", "--workloads"]
         .includes(key)
     ) {
       throw new Error(`Unexpected argument ${key}`);
@@ -148,19 +148,19 @@ async function main() {
     workloads.some((kind) => kind !== "reader" && kind !== "writer")
   ) throw new Error("--workloads must contain reader or writer");
   const repo = resolve(new URL("../..", import.meta.url).pathname);
-  const blotc = resolve(
-    args.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
+  const squidc = resolve(
+    args.get("--squidc") ?? `${repo}/compiler-goose/build/squidc-goose-dev`,
   );
   const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
     [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((
       byte,
     ) => byte.toString(16).padStart(2, "0")).join("");
-  const compilerSha256 = await hash(await Deno.readFile(blotc));
+  const compilerSha256 = await hash(await Deno.readFile(squidc));
   for (const kind of workloads as Workload[]) {
     for (const repeat of repeats) {
       const source = storageCallSource(kind, repeat, depth);
       const sourceSha256 = await hash(new TextEncoder().encode(source));
-      const entry = `${repo}/build/bench/storage-call-profile.blot`;
+      const entry = `${repo}/build/bench/storage-call-profile.sq`;
       const started = performance.now();
       let compiler:
         | Awaited<ReturnType<typeof createZigProjectCompiler>>
@@ -168,10 +168,10 @@ async function main() {
       let guest: Awaited<ReturnType<typeof instantiateGuest>> | undefined;
       try {
         compiler = await createZigProjectCompiler({
-          executable: blotc,
+          executable: squidc,
           entry,
           stdRoot: `${repo}/std`,
-          prelude: `${repo}/std/prelude.blot`,
+          prelude: `${repo}/std/prelude.sq`,
           startupTimeoutMs: timeoutMs,
           profileBackend: true,
         });

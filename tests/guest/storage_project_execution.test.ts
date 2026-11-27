@@ -4,11 +4,11 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 Deno.test("imported generic access projections retain field names without concrete record types", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-storage-fields-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-storage-fields-" });
+  const entry = `${directory}/main.sq`;
   try {
     await Deno.writeTextFile(
-      `${directory}/access.blot`,
+      `${directory}/access.sq`,
       `const write = func (own access) -> (value: U32) => return do:
   access.rows[0] := value
   return access
@@ -25,7 +25,7 @@ io const answer = func (value: U32) => return do:
 `,
     );
     const compiler = await createZigProjectCompiler({
-      executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+      executable: resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
       entry,
       prelude: null,
     });
@@ -48,8 +48,8 @@ io const answer = func (value: U32) => return do:
 });
 
 Deno.test("project service retains data-stack output across edits errors and backend changes", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-storage-project-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-storage-project-" });
+  const entry = `${directory}/main.sq`;
   const source = (value: number) =>
     `const values: Array U32 = #[${value}]
 io const answer = func () => return values[0]
@@ -57,7 +57,7 @@ io const answer = func () => return values[0]
   try {
     await Deno.writeTextFile(entry, source(41));
     const compiler = await createZigProjectCompiler({
-      executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
+      executable: resolve(Deno.args[0] ?? "compiler-goose/build/squidc-goose"),
       entry,
       prelude: null,
     });

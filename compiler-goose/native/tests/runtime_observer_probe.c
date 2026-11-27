@@ -21,7 +21,7 @@ static void oom(int kind, uint64_t bytes) {
 int main(int argc, char **argv) {
     const char *mode="normal";
     if (argc>1) mode=argv[1];
-    blot_allocation_observer_install(oom);
+    squid_allocation_observer_install(oom);
     uint64_t ordinal=0;
     int kind=0;
     if (!strcmp(mode,"inject")) {
@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
         ordinal=strtoull(argv[2],NULL,10);
         kind=atoi(argv[3]);
     }
-    blot_allocation_observer_begin(123,ordinal,kind);
+    squid_allocation_observer_begin(123,ordinal,kind);
     if (!strcmp(mode,"allocator-refusal")) {
         struct rlimit limit={1,1};
         assert(!setrlimit(RLIMIT_AS,&limit));
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     if (!strcmp(mode,"kill")) kill(getpid(),SIGKILL);
     if (!strcmp(mode,"invalid")) observer_invalid(-1);
     assert(observer_probe()==18);
-    const blot_allocation_stats *s=blot_allocation_observer_stats();
+    const squid_allocation_stats *s=squid_allocation_observer_stats();
     assert(s->pool_allocations==6 && s->pool_reallocations==2 && s->pool_frees==4);
     assert(s->pool_reuses==2 && s->pool_payload_allocated_bytes==112);
     assert(s->pool_payload_freed_bytes==96 && s->pool_capacity_growth_bytes==104);

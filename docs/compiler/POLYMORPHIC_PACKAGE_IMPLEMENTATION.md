@@ -298,7 +298,7 @@ screen passes as well.
 Portable rank publication, row/region/predicate evidence, qualified drop
 contracts and the combined release gate remain open. This slice does not resolve
 the imported runtime callback restriction above. Source pins and focused logs
-are in `/var/tmp/blot2-continue-1791939463/` and
+are in `/var/tmp/squid-continue-1791939463/` and
 `build/bench/continuation-20261014/`.
 
 ## Independent package owners and portable structural publication

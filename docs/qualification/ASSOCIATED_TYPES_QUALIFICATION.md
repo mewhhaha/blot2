@@ -106,7 +106,7 @@ subsequently reports 348/zero.
 ## Costs
 
 Raw artifacts and harnesses are retained under
-`/var/tmp/blot2-associated-055-qualified/build/bench/associated055/`.
+`/var/tmp/squid-associated-055-qualified/build/bench/associated055/`.
 `no-feature-schedstat/{results.json,samples.jsonl}` contains seven alternating
 baseline/candidate pairs for each synthetic workload. Fresh/restart CPU uses
 child user+system time; retained CPU sums live thread scheduler runtime in the

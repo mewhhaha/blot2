@@ -15,9 +15,9 @@ type Maybe value is data = $Some value | $Nothing
 async function fixture(run: (dir: string) => Promise<void>): Promise<void> {
   const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-prelude-" });
   try {
-    await Deno.writeTextFile(`${dir}/prelude.blot`, prelude);
-    await Deno.writeTextFile(`${dir}/helper.blot`, "const base = identity 44\n");
-    await Deno.writeTextFile(`${dir}/main.blot`, `
+    await Deno.writeTextFile(`${dir}/prelude.sq`, prelude);
+    await Deno.writeTextFile(`${dir}/helper.sq`, "const base = identity 44\n");
+    await Deno.writeTextFile(`${dir}/main.sq`, `
 import { base } from "./helper"
 io const ordinary = func () : U32 => return base + 2
 io const primitive = func () : U32 => return @u32.add 40 2
@@ -33,7 +33,7 @@ io const nominal = func (value: U32) : U32 => return case $Some value of
 }
 
 async function command(args: string[]): Promise<{ result: Deno.CommandOutput; records: any[]; text: string }> {
-  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
   const result = await new Deno.Command(executable, { args, stdout: "piped", stderr: "piped" }).output();
   const text = new TextDecoder().decode(result.stdout);
   const records = text.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
@@ -44,7 +44,7 @@ async function command(args: string[]): Promise<{ result: Deno.CommandOutput; re
 Deno.test.ignore("actual prelude provides owned generic interfaces, fixities and designated builtin methods", async () => {
   await fixture(async dir => {
     const output = `${dir}/program.wasm`;
-    const { result, records, text } = await command(["build", `${dir}/main.blot`, output, "--prelude", `${dir}/prelude.blot`]);
+    const { result, records, text } = await command(["build", `${dir}/main.sq`, output, "--prelude", `${dir}/prelude.sq`]);
     if (!result.success) throw new Error(text);
     const metrics = records.find(record => record.kind === "compilation");
     if (!metrics?.success || metrics.memory.live_bytes !== 0 || metrics.files !== 3) throw new Error(text);
@@ -64,11 +64,11 @@ Deno.test.ignore("actual prelude provides owned generic interfaces, fixities and
 
 Deno.test("explicit prelude none and invalid unused producer definitions remain visible", async () => {
   await fixture(async dir => {
-    const without = await command(["check", `${dir}/main.blot`, "--prelude", "none"]);
+    const without = await command(["check", `${dir}/main.sq`, "--prelude", "none"]);
     if (without.result.success || !without.records.some(record => record.kind === "diagnostic" && record.code === "unknown_value")) throw new Error(without.text);
-    await Deno.writeTextFile(`${dir}/prelude.blot`, `${prelude}\nconst unused_invalid: Bool = 42\n`);
-    const invalid = await command(["check-project", `${dir}/main.blot`, "--prelude", `${dir}/prelude.blot`]);
-    if (invalid.result.success || !invalid.records.some(record => record.kind === "diagnostic" && record.filename === `${dir}/prelude.blot`)) throw new Error(invalid.text);
+    await Deno.writeTextFile(`${dir}/prelude.sq`, `${prelude}\nconst unused_invalid: Bool = 42\n`);
+    const invalid = await command(["check-project", `${dir}/main.sq`, "--prelude", `${dir}/prelude.sq`]);
+    if (invalid.result.success || !invalid.records.some(record => record.kind === "diagnostic" && record.filename === `${dir}/prelude.sq`)) throw new Error(invalid.text);
     const metrics = invalid.records.find(record => record.kind === "compilation");
     if (metrics?.memory.live_bytes !== 0) throw new Error(invalid.text);
   });

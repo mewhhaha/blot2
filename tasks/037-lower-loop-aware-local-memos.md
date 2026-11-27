@@ -7,7 +7,7 @@
 - **Originating requirements:** DEMANDS: Local memo scope, loops and acceptance
   checks. Sources: [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
-  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -15,7 +15,7 @@ Place local demand memo state in its creation scope across branches and loops.
 
 ## Starting point
 
-[demand_inline.zig](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
+[demand_inline.zig](https://github.com/mewhhaha/squid-lang/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
 and [core_backend.zig](../compiler/src/backend/core_backend.zig) already lower
 repeated admitted expression demands to invocation-local memo state; callee-loop
 cases still use runtime cells.
@@ -34,7 +34,7 @@ cases still use runtime cells.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+[shared validation](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
 commands for focused development and the scenarios below.
 
 - Test inside/outside nested loops, conditional first reads, zero iterations and
@@ -54,7 +54,7 @@ commands for focused development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: `2798ff9` (joint 029/032/037 compiler and bpm milestone).
+- Commit: `2798ff9` (joint 029/032/037 compiler and spm milestone).
 - Implementation: Bounded structured local-demand proofs place ready/result
   state in dynamic creation scope, preserve alias sharing and force-site
   cleanup, and root managed cached results across loops.

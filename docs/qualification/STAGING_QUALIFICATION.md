@@ -422,7 +422,7 @@ gate and do not qualify general staging.
 
 The reproducible command is
 `deno run -A scripts/bench_staging.ts
-zig-native/zig-out/bin/blotc build/bench/staging-current-qualified-cost`.
+zig-native/zig-out/bin/squidc build/bench/staging-current-qualified-cost`.
 The LLVM release executable is the `0f531509…` compiler identified in
 [CLOUD_QUALIFICATION.md](CLOUD_QUALIFICATION.md). Harness SHA-256:
 `554ac6e607126311ebdb48b6259b992d8d17900c0c99545378b1be464c4cd036`. Seven

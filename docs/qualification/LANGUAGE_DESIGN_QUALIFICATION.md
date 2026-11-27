@@ -1,7 +1,7 @@
 # Language design qualification
 
 Documentation checkpoint based on qualified main `ef57ec5`, isolated in
-`/var/tmp/blot2-language-design-20261013`. Specifications 060/063/066/072 settle
+`/var/tmp/squid-language-design-20261013`. Specifications 060/063/066/072 settle
 source syntax, checking/lifecycle laws, owned portable evidence, compatibility,
 diagnostics and accepted/rejected traces. They intentionally proceed ahead of
 unfinished implementation dependencies. No implementation task is marked

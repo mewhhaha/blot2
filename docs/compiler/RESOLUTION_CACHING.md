@@ -27,7 +27,7 @@ compares cached and uncached stores through that transition. This corrects the
 existing variable cache; it does not implement composite caching. Zig 0.17.0,
 the full native suite, all 595 guest/client tests and the source analyzer (287
 files, zero findings) pass. The release is pinned at
-`build/bench/future-alias-qualified/blotc`, SHA-256
+`build/bench/future-alias-qualified/squidc`, SHA-256
 `2a709b4ca9d93fad58057531f7913ce159e6129aeb59596aff6e5534c6c9c258`. The logs are
 `build/bench/future-alias-compiler-gate.log` and
 `build/bench/future-alias-analyzer.log`. Composite caching remained separate

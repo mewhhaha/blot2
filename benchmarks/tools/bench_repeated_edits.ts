@@ -60,7 +60,7 @@ async function pinLibrary(directory: string): Promise<void> {
   for await (const file of Deno.readDir(directory)) {
     const path = `${directory}/${file.name}`;
     if (file.isDirectory) await pinLibrary(path);
-    else if (file.isFile && file.name.endsWith(".blot")) {
+    else if (file.isFile && file.name.endsWith(".sq")) {
       pins[path] = await sha(await Deno.readFile(path));
     }
   }

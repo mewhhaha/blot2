@@ -1,14 +1,14 @@
 # Executable prelude
 
-[prelude.blot](prelude.blot) is ordinary Blot source, implicitly available to
+[prelude.sq](prelude.sq) is ordinary Squid source, implicitly available to
 source compiler sessions. It currently covers generic functions, `Maybe`,
 `Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
-bindings are public to other Blot modules. Import [text.blot](text.blot) for
+bindings are public to other Squid modules. Import [text.sq](text.sq) for
 Unicode-scalar text operations, decimal parsing, whitespace and line iterators,
 formatting, validation and a linear builder. Import
-[equality.blot](equality.blot) for structural equality contracts and
-[codec.blot](codec.blot) for explicit numeric-lane codecs; the
+[equality.sq](equality.sq) for structural equality contracts and
+[codec.sq](codec.sq) for explicit numeric-lane codecs; the
 [derivation guide](../docs/host/derive.md) shows opt-in equality, debug and
 codec generation from checked data declarations. Only the root module's
 `io`, `io const` and `io let` declarations become Wasm exports; they must fit
@@ -41,7 +41,7 @@ optimization guarantees and remaining work.
 | `on combine project a b`    | `combine (project a) (project b)`         |
 | `Bool.not value`            | Exchanges `true` and `false`              |
 
-```blot
+```squid
 const increment = func value => return value + 1
 const double = U32.mul 2
 const transform = compose double increment
@@ -74,7 +74,7 @@ their expression.
 Wrap a value or constructor/function witness with `$Type` (or prefix it with
 `:`) to compare its concrete type using ordinary `==` and `!=`:
 
-```blot
+```squid
 type Count is data = $Count U32
 type Other is data = $Other U32
 
@@ -103,7 +103,7 @@ implementation.
 
 ## Maybe and Result
 
-```blot
+```squid
 type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
 type Iteration [state, result] is data = $Continue state | $Done result
@@ -130,7 +130,7 @@ and `$Some(value)` are equivalent in expressions and patterns.
 | `Result.unwrap_or fallback candidate`  | Extracts `$Ok`, otherwise returns `fallback`                         |
 | `Result.to_maybe candidate`            | Keeps `$Ok` as `$Some`, discards `$Err` as `$Nothing`                |
 
-```blot
+```squid
 const nonzero = func value => return do:
   if value == 0:
     break $Nothing
@@ -154,7 +154,7 @@ Matches must be exhaustive. `if let` binds only in its successful branch;
 and evaluated once. Monadic blocks use the same source-defined `pure` and `bind`
 functions:
 
-```blot
+```squid
 const try = monad Maybe
 const add_present = func left -> right => return do try:
   use first <- left
@@ -180,7 +180,7 @@ result, which can have a different type. `$Nothing` or `$Err error` propagates
 immediately. Callback effects remain visible to callers. These functions also
 work as ordinary calls:
 
-```blot
+```squid
 const step = func count => return
   if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
 io const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
@@ -212,7 +212,7 @@ U32 literals are decimal or hexadecimal, optionally separated by underscores:
 | `U32.eq`, `ne`, `lt`, `le`, `gt`, `ge` | Binary comparisons to Bool |
 | `U32.to_f32 value`                     | Rounded numeric conversion |
 
-The prelude defines all standard symbolic operators as ordinary Blot source functions:
+The prelude defines all standard symbolic operators as ordinary Squid source functions:
 `+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `<<`, `>>`, `==`, `!=`, `<`, `<=`, `>`, `>=`
 via `@type.call`, plus `|>` and `<|` via `@pipe`. `1.0 + 2.0` selects `F32.add`; `1 + 2`
 selects `U32.add`. `/` also supports U32 division. There is no implicit numeric
@@ -227,7 +227,7 @@ implementation takes precedence; an incompatible return annotation is an error.
 
 Nominal types can define associated functions in their owning module:
 
-```blot
+```squid
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
 const Vec2.add = func (a: Vec2) -> (b: Vec2) => return do:
   let $Vec2 { x: ax, y: ay } = a
@@ -257,10 +257,10 @@ binds tighter than operators. `and` and `or` are reserved short-circuit Boolean 
 the right operand runs only when the left operand does not determine the result.
 
 `$` (precedence 0, right-associative) is built-in application syntax: `f $ g $ x` groups
-as `f (g x)` and binds below arithmetic and pipes. Unlike Haskell, Blot still evaluates
+as `f (g x)` and binds below arithmetic and pipes. Unlike Haskell, Squid still evaluates
 ordinary arguments eagerly; `$` neither defers work nor handles effects.
 
-```blot
+```squid
 io const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
 io const discarded = func () => return do:
   use identity $ 42
@@ -294,9 +294,9 @@ arguments: `F32.mul speed (-2.5)`.
 | `F32.to_u32 value`                         | Truncating, saturating conversion           |
 | `F32.wrap period value`                    | Wraps into a positive period                |
 | `F32.lerp_angle left right weight`         | Interpolates along the shortest angular arc |
-| `F32.sin`, `cos`, `tan`                    | Pure Blot trigonometric approximations      |
+| `F32.sin`, `cos`, `tan`                    | Pure Squid trigonometric approximations      |
 
-```blot
+```squid
 io const negative_zero = -0.0
 io const rounded = F32.add 16_777_216.0 1.0
 
@@ -346,7 +346,7 @@ views (`&xs[start..end]`), `length`, `is_empty`, `get`, `set`, `copy`, and
 `freeze` (`*#[T]`). Numeric arrays are the collection type accepted by the host
 ABI.
 
-Import [array.blot](array.blot) for `map`, `filter`, `filter_map`, `fold_left`,
+Import [array.sq](array.sq) for `map`, `filter`, `filter_map`, `fold_left`,
 `any`, `all`, `concat`, `flatten`, `indices`, `prefix_sums`, and related
 helpers. `fold_left`, `filter`, `any`, and `all` propagate callback effects;
 `any`/`all` stop early and return `false`/`true` respectively on an empty array.
@@ -400,7 +400,7 @@ loops, comprehensions (`~[x * 2 | x <- xs]`), spreads (`~[a, ...xs, b]`), `O(1)`
 
 ### Rolling reductions, summaries, and SIMD
 
-[rolling.blot](rolling.blot) provides complete overlapping reductions.
+[rolling.sq](rolling.sq) provides complete overlapping reductions.
 `fold step initial width values` reduces each window in order, including
 effectful reducers and F32 arithmetic. `monoid combine identity width values`
 uses a balanced persistent buffer; `group combine inverse identity width
@@ -411,7 +411,7 @@ two-sided identity and, for groups, a two-sided inverse. These are explicit
 algebra contracts; use `fold` when they do not hold. Width zero traps before
 obtaining the input cursor. Copies of a cursor keep independent windows.
 
-[summary.blot](summary.blot) provides opaque persistent `Summary s` trees.
+[summary.sq](summary.sq) provides opaque persistent `Summary s` trees.
 `build combine identity values` reads its input once; `length tree`,
 `get index
 tree`, `query combine identity start count tree`,
@@ -422,7 +422,7 @@ is linear; queries, updates and concatenation follow logarithmic paths. The
 [full contracts](../docs/compiler/ROLLING_SUMMARIES.md) specify ordering and
 bounds.
 
-[simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
+[simd.sq](simd.sq) supplies explicit four-lane U32/F32 operations on
 ordinary tuple aliases: arithmetic, shifts, min/max, comparison masks and
 bitwise selection, literal shuffles, dot products, bit reinterpretation, an
 opt-in relaxed multiply-add, checked array load/store, and ordered or explicitly
@@ -448,9 +448,9 @@ Receiver members are ordinary receiver-first associated functions. For example,
 `values.get` is `Array.get values`, a function awaiting its index. Record fields
 use the same dot syntax and preserve their values during functional updates.
 
-Import [array.blot](array.blot) for additional collection functions:
+Import [array.sq](array.sq) for additional collection functions:
 
-```blot
+```squid
 import * as array from "std/array"
 
 const values: Array U32 = #[10, 20, 12]
@@ -493,7 +493,7 @@ Collection patterns remain unimplemented. Numeric arrays cross the host ABI as
 copied `Uint32Array` or `Float32Array` values; tuples and other composite values
 remain internal.
 
-See [the executable array example](../examples/arrays.blot).
+See [the executable array example](../examples/arrays.sq).
 
 ## Current boundary
 
@@ -505,7 +505,7 @@ provide application behavior through explicit entrypoint IO capabilities.
 Runtime `Text` values have no implicit IO or privileged asset/window operations.
 
 For a complete small program, see
-[examples/prelude.blot](../examples/prelude.blot).
+[examples/prelude.sq](../examples/prelude.sq).
 
 ## Readability helpers
 
@@ -540,7 +540,7 @@ Math helpers include generic `abs`, `min`, `max`, `clamp`, `lerp`, `square`; F32
 its angle reduction between sine and cosine. `smoothstep low high value` expects
 `low < high`; `saturate` clamps to 0..1.
 
-Import [vector.blot](vector.blot) for `Vec2` and `Vec3` records. Their owning
+Import [vector.sq](vector.sq) for `Vec2` and `Vec3` records. Their owning
 members supply vector `+`/`-`, scalar `*`/`/` (vector on the left), `dot`,
 `length_squared`, `length`, and `normalized`; `Vec3` also supplies `cross`.
 Normalizing the zero vector returns zero. Vector `lerp` constructs its result
@@ -573,7 +573,7 @@ still apply.
 Data constructors use `$` in declarations, expressions and patterns (`#` is also
 accepted):
 
-```blot
+```squid
 type Optional x is data = $Present x | $Absent
 const value: Optional U32 = $Present 42
 const answer = case value of

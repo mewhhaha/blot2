@@ -13,15 +13,15 @@ from source_model import balanced, clean, split
 ROOT = Path(__file__).resolve().parents[1] / 'src'
 
 ROOT_TYPES = [
-    'blot_check_core::Module',
-    'blot_reuse_principal_interface::Interface',
-    'blot_reuse_frozen_dependency::Module',
-    'blot_reuse_frozen_dependency::FrozenDependency',
+    'squid_check_core::Module',
+    'squid_reuse_principal_interface::Interface',
+    'squid_reuse_frozen_dependency::Module',
+    'squid_reuse_frozen_dependency::FrozenDependency',
 ]
 
 # Extra header-level slice pools retained by project/dependency drivers.
 HEADER_RUNS = [
-    ('header_module', 'blot_check_core::Module'),
+    ('header_module', 'squid_check_core::Module'),
     ('header_path', 'HeaderPath'),
     ('header_digest', 'HeaderDigest'),
     ('header_owner', 'Owner'),
@@ -32,69 +32,69 @@ HEADER_RUNS = [
 ELEMENT_BYTES = {
     'u8': 1,
     'u32': 4,
-    'blot_parse_ast::Span': 8,
-    'blot_check_core::FieldName': 12,
-    'blot_check_core::TypeTag': 28,
-    'blot_check_core::RuntimeName': 8,
-    'blot_check_core::DeclarationDependencies': 20,
-    'blot_check_core::BindingRef': 8,
-    'blot_check_core::DependencyMember': 5,
-    'blot_check_core::ErasedDeclarationReference': 12,
-    'blot_check_types::Node': 16,
-    'blot_check_effects::Row': 20,
-    'blot_check_types::Operation': 24,
-    'blot_check_types::Obligation': 52,
-    'blot_check_core::Node': 20,
-    'blot_check_core::Binding': 112,
-    'blot_check_core::Body': 96,
-    'blot_check_core::Parameter': 20,
-    'blot_check_core::CallInfo': 12,
-    'blot_check_core::Merge': 16,
-    'blot_check_core::List': 8,
-    'blot_check_core::Obligation': 64,
-    'blot_check_core::Nominal': 68,
-    'blot_check_core::OperationName': 48,
-    'blot_check_core::Constructor': 68,
-    'blot_check_core::Projection': 32,
-    'blot_check_core::ProjectionVariant': 8,
-    'blot_check_core::Pattern': 28,
-    'blot_check_core::PatternRow': 8,
-    'blot_check_core::MatchArm': 24,
-    'blot_check_core::MatchInfo': 20,
-    'blot_check_core::UpdateInfo': 28,
-    'blot_check_core::UpdateStep': 20,
-    'blot_check_core::ClosureInfo': 48,
-    'blot_check_core::Associated': 24,
-    'blot_check_core::Contract': 72,
-    'blot_reuse_principal_interface::ContractMember': 20,
-    'blot_reuse_principal_interface::Implementation': 104,
-    'blot_reuse_principal_interface::ImplementationMember': 20,
-    'blot_reuse_principal_interface::MemberTemplate': 24,
-    'blot_check_core::Primitive': 8,
-    'blot_check_core::LoopInfo': 28,
-    'blot_check_core::LoopCarry': 16,
-    'blot_check_core::SparkInfo': 28,
-    'blot_check_core::KernelDecl': 56,
-    'blot_check_core::ProcessDecl': 52,
-    'blot_check_core::OperationValue': 40,
-    'blot_check_core::HandleEffects': 20,
-    'blot_check_core::Diagnostic': 12,
-    'blot_check_parameter_patterns::Node': 12,
-    'blot_reuse_principal_interface::Binding': 88,
-    'blot_reuse_principal_interface::Nominal': 88,
-    'blot_reuse_principal_interface::Constructor': 72,
-    'blot_reuse_principal_interface::EffectFamily': 56,
-    'blot_reuse_principal_interface::EffectTemplate': 24,
-    'blot_reuse_principal_interface::Associated': 20,
-    'blot_reuse_principal_interface::Contract': 92,
+    'squid_parse_ast::Span': 8,
+    'squid_check_core::FieldName': 12,
+    'squid_check_core::TypeTag': 28,
+    'squid_check_core::RuntimeName': 8,
+    'squid_check_core::DeclarationDependencies': 20,
+    'squid_check_core::BindingRef': 8,
+    'squid_check_core::DependencyMember': 5,
+    'squid_check_core::ErasedDeclarationReference': 12,
+    'squid_check_types::Node': 16,
+    'squid_check_effects::Row': 20,
+    'squid_check_types::Operation': 24,
+    'squid_check_types::Obligation': 52,
+    'squid_check_core::Node': 20,
+    'squid_check_core::Binding': 112,
+    'squid_check_core::Body': 96,
+    'squid_check_core::Parameter': 20,
+    'squid_check_core::CallInfo': 12,
+    'squid_check_core::Merge': 16,
+    'squid_check_core::List': 8,
+    'squid_check_core::Obligation': 64,
+    'squid_check_core::Nominal': 68,
+    'squid_check_core::OperationName': 48,
+    'squid_check_core::Constructor': 68,
+    'squid_check_core::Projection': 32,
+    'squid_check_core::ProjectionVariant': 8,
+    'squid_check_core::Pattern': 28,
+    'squid_check_core::PatternRow': 8,
+    'squid_check_core::MatchArm': 24,
+    'squid_check_core::MatchInfo': 20,
+    'squid_check_core::UpdateInfo': 28,
+    'squid_check_core::UpdateStep': 20,
+    'squid_check_core::ClosureInfo': 48,
+    'squid_check_core::Associated': 24,
+    'squid_check_core::Contract': 72,
+    'squid_reuse_principal_interface::ContractMember': 20,
+    'squid_reuse_principal_interface::Implementation': 104,
+    'squid_reuse_principal_interface::ImplementationMember': 20,
+    'squid_reuse_principal_interface::MemberTemplate': 24,
+    'squid_check_core::Primitive': 8,
+    'squid_check_core::LoopInfo': 28,
+    'squid_check_core::LoopCarry': 16,
+    'squid_check_core::SparkInfo': 28,
+    'squid_check_core::KernelDecl': 56,
+    'squid_check_core::ProcessDecl': 52,
+    'squid_check_core::OperationValue': 40,
+    'squid_check_core::HandleEffects': 20,
+    'squid_check_core::Diagnostic': 12,
+    'squid_check_parameter_patterns::Node': 12,
+    'squid_reuse_principal_interface::Binding': 88,
+    'squid_reuse_principal_interface::Nominal': 88,
+    'squid_reuse_principal_interface::Constructor': 72,
+    'squid_reuse_principal_interface::EffectFamily': 56,
+    'squid_reuse_principal_interface::EffectTemplate': 24,
+    'squid_reuse_principal_interface::Associated': 20,
+    'squid_reuse_principal_interface::Contract': 92,
 }
 
 # Unwired Module slices are kept out of wire/frozen byte totals to match Zig accounting.
 PAYLOAD_BYTES_SKIP = {
-    ('blot_check_core::Module', 'declaration_dependencies'),
-    ('blot_check_core::Module', 'dependency_references'),
-    ('blot_check_core::Module', 'dependency_members'),
-    ('blot_check_core::Module', 'erased_declaration_references'),
+    ('squid_check_core::Module', 'declaration_dependencies'),
+    ('squid_check_core::Module', 'dependency_references'),
+    ('squid_check_core::Module', 'dependency_members'),
+    ('squid_check_core::Module', 'erased_declaration_references'),
 }
 
 PRIMS = {'bool', 'u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64', 'f32', 'f64'}
@@ -113,7 +113,7 @@ def parse_declarations():
         ns = ns_match[1]
         module_path = path.relative_to(ROOT).with_suffix('').as_posix().replace('/', '.')
         paths.setdefault(ns, module_path)
-        if ns == 'blot_' + module_path.replace('.', '_'):
+        if ns == 'squid_' + module_path.replace('.', '_'):
             paths[ns] = module_path
         for m in re.finditer(r'\b(struct|enum|type)\s+(\w+)\s*(<[^>{}]+>)?\s*(\{|=)', source):
             kind, name, params, tok = m.groups()
@@ -165,9 +165,9 @@ def main():
         m = re.fullmatch(r'(.+)\[(:|\d+)\]', t)
         if m:
             return resolve(m[1], ns) + '[' + m[2] + ']'
-        if t.startswith('blot_support::Option<') and t.endswith('>'):
-            inner = t[len('blot_support::Option<'):-1]
-            return 'blot_support::Option<' + resolve(inner, ns) + '>'
+        if t.startswith('squid_support::Option<') and t.endswith('>'):
+            inner = t[len('squid_support::Option<'):-1]
+            return 'squid_support::Option<' + resolve(inner, ns) + '>'
         m = re.fullmatch(r'(\w+::\w+)(?:<(.*)>)?', t, re.S)
         if m and m[1] in decls:
             k, ps, data, owner = decls[m[1]]
@@ -205,8 +205,8 @@ def main():
             assert not inner_has, f'Array of slice-owning elements unsupported: {t}'
             has_slice_memo[t] = False
             return False
-        if t.startswith('blot_support::Option<'):
-            inner = resolve(t[len('blot_support::Option<'):-1], ns)
+        if t.startswith('squid_support::Option<'):
+            inner = resolve(t[len('squid_support::Option<'):-1], ns)
             inner_has = analyze(inner, ns)
             assert not inner_has, f'Option of slice-owning value unsupported: {t}'
             has_slice_memo[t] = False
@@ -243,13 +243,13 @@ def main():
 
     record_slice('u32')
     for root in ROOT_TYPES:
-        analyze(root, 'blot_reuse_dependency_payload')
+        analyze(root, 'squid_reuse_dependency_payload')
 
     nested_slices = [t for t in slice_elems if has_slice_memo.get(t, False)]
 
     imports = {'support.error', 'support.native', 'support.option'}
     for ty in [t for _, t in HEADER_RUNS] + slice_elems + [t for t, _, _, _ in compounds]:
-        for ns in re.findall(r'\b(blot_\w+)::', ty):
+        for ns in re.findall(r'\b(squid_\w+)::', ty):
             if ns in paths:
                 imports.add(paths[ns])
 
@@ -259,12 +259,12 @@ def main():
         '// Generated by tools/write_dependency_payload.py.',
         '// Exact typed ownership for unpublished dependency/Core/principal payloads.',
         '// All immutable views name registered runs; no const cast or host pointer image.',
-        'namespace blot_reuse_dependency_payload;',
+        'namespace squid_reuse_dependency_payload;',
     ]
     lines += [f'import {m};' for m in sorted(imports)]
     lines += [
         '',
-        'type Error=blot_error::Error;',
+        'type Error=squid_error::Error;',
         'struct Owner {lease:u32=0,generation:u64=0}',
         'struct Owned<T> {value:T,owner:Owner=Owner{..}}',
         'type HeaderPath=const u8[:];',
@@ -290,10 +290,10 @@ def main():
         '',
         'fn valid(self_:const Owner&)->bool {return self_.lease!=0&&self_.lease-1<leases.len&&leases[self_.lease-1].live&&leases[self_.lease-1].generation==self_.generation;}',
         'fn unique(self_:const Owner&)->bool {return valid(self_)&&leases[self_.lease-1].references==1;}',
-        'fn init()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation,..},blot_error::Error.none;}',
-        'fn retain(self_:Owner)->Owner,Error {if !valid(self_) {return Owner{..},blot_error::Error.invalid_artifact;}let at=self_.lease-1;if leases[at].references==0xffffffffffffffff {return Owner{..},blot_error::Error.dependency_limit;}leases[at].references+=1;return self_,blot_error::Error.none;}',
+        'fn init()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},squid_error::Error.out_of_memory;}let generation=squid_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation,..},squid_error::Error.none;}',
+        'fn retain(self_:Owner)->Owner,Error {if !valid(self_) {return Owner{..},squid_error::Error.invalid_artifact;}let at=self_.lease-1;if leases[at].references==0xffffffffffffffff {return Owner{..},squid_error::Error.dependency_limit;}leases[at].references+=1;return self_,squid_error::Error.none;}',
         'fn release(self_:Owner&) {self_.deinit();}',
-        'fn remember(self_:Owner&,value:Run)->Error {assert(unique(self_));if links.len>=0xffffffff {return blot_error::Error.out_of_memory;}let head=leases[self_.lease-1].head;let at=links.alloc_index(Link{value,head,..});leases[self_.lease-1].head=(at+1) as u32;return blot_error::Error.none;}',
+        'fn remember(self_:Owner&,value:Run)->Error {assert(unique(self_));if links.len>=0xffffffff {return squid_error::Error.out_of_memory;}let head=leases[self_.lease-1].head;let at=links.alloc_index(Link{value,head,..});leases[self_.lease-1].head=(at+1) as u32;return squid_error::Error.none;}',
         'fn freeRun(value:Run) {',
         ' match value {',
     ]
@@ -310,9 +310,9 @@ def main():
         '}',
         'fn deinit<T>(self_:Owned<T>&) {self_.owner.deinit();self_.value=default<T>();}',
         'fn adopt(self_:Owner&,source:Owner&)->Error {',
-        ' assert(valid(self_)&&valid(source));if !unique(self_)||!unique(source)||self_.lease==source.lease {return blot_error::Error.invalid_artifact;}',
+        ' assert(valid(self_)&&valid(source));if !unique(self_)||!unique(source)||self_.lease==source.lease {return squid_error::Error.invalid_artifact;}',
         ' let at=source.lease-1;let head=leases[at].head;if head!=0 {var tail=head;while links[tail-1].next!=0 {tail=links[tail-1].next;}links[tail-1].next=leases[self_.lease-1].head;leases[self_.lease-1].head=head;}',
-        ' leases[at].live=false;source=Owner{..};leases.free(at);return blot_error::Error.none;',
+        ' leases[at].live=false;source=Owner{..};leases.free(at);return squid_error::Error.none;',
         '}',
         'fn mark(self_:const Owner&)->Mark {assert(unique(self_));return Mark{self_.lease,self_.generation,leases[self_.lease-1].head,..};}',
         'fn rollback(self_:Owner&,mark:Mark) {',
@@ -325,7 +325,7 @@ def main():
         ' links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;',
         '}',
         'fn alloc<T>(self_:Owner&,length:i64)->T[:],Error {return allocate(self_,default<T>(),length);}',
-        'fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}if values.len!=0 {result.move_from(values);}return result,blot_error::Error.none;}',
+        'fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=squid_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=squid_error::Error.none {return default<T[:]>(),error;}if values.len!=0 {result.move_from(values);}return result,squid_error::Error.none;}',
         '',
     ]
 
@@ -339,17 +339,17 @@ def main():
         )
         lines.append(
             f'fn allocate(self_:Owner&,sample:{ty},length:i64)->{ty}[:],Error {{'
-            f'assert(unique(self_));if length<0 {{return default<{ty}[:]>(),blot_error::Error.invalid_artifact;}}'
-            f'if length==0 {{return default<{ty}[:]>(),blot_error::Error.none;}}'
+            f'assert(unique(self_));if length<0 {{return default<{ty}[:]>(),squid_error::Error.invalid_artifact;}}'
+            f'if length==0 {{return default<{ty}[:]>(),squid_error::Error.none;}}'
             f'let run=pool_{tag}.alloc_slice(length);let error=remember(self_,Run.run_{tag}{{run,..}});'
-            f'if error!=blot_error::Error.none {{pool_{tag}.free_slice(run);return default<{ty}[:]>(),error;}}'
-            f'return run,blot_error::Error.none;}}'
+            f'if error!=squid_error::Error.none {{pool_{tag}.free_slice(run);return default<{ty}[:]>(),error;}}'
+            f'return run,squid_error::Error.none;}}'
         )
         lines.append(
             f'fn mutable(self_:const Owner&,values:const {ty}[:])->{ty}[:] {{'
             f'assert(unique(self_));if values.len==0 {{return default<{ty}[:]>();}}'
             f'var next=leases[self_.lease-1].head;while next!=0 {{let link=links[next-1];next=link.next;'
-            f'match link.value {{run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}}}'
+            f'match link.value {{run_{tag} run=>{{if squid_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}}}'
             f'abort("{abort_msg}");}}'
         )
         if tag not in header_tags and ty in slice_set:
@@ -357,9 +357,9 @@ def main():
                 f'fn detach(self_:Owner&,destination:Owner&,values:const {ty}[:]) {{'
                 f'assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {{return;}}'
                 f'var next=leases[destination.lease-1].head;while next!=0 {{let link=links[next-1];next=link.next;'
-                f'match link.value {{run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{return;}}}},_=>{{}}}}}}'
+                f'match link.value {{run_{tag} run=>{{if squid_support::same_slice_identity(run.values,values) {{return;}}}},_=>{{}}}}}}'
                 f'var previous:u32=0;next=leases[self_.lease-1].head;while next!=0 {{let current=next;let link=links[current-1];next=link.next;'
-                f'match link.value {{run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{transferLink(self_,destination,previous,current,next);return;}}}},_=>{{}}}}previous=current;}}'
+                f'match link.value {{run_{tag} run=>{{if squid_support::same_slice_identity(run.values,values) {{transferLink(self_,destination,previous,current,next);return;}}}},_=>{{}}}}previous=current;}}'
                 f'abort("partitioned payload view must name this private owner\'s exact live run");}}'
             )
 
@@ -367,9 +367,9 @@ def main():
     for ty in nested_slices:
         lines.append(
             f'fn cloneNested(self_:Owner&,values:const {ty}[:])->{ty}[:],Error {{'
-            f'let result,error=alloc<{ty}>(self_,values.len);if error!=blot_error::Error.none {{return default<{ty}[:]>(),error;}}'
-            f'for value,index in values {{let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {{return default<{ty}[:]>(),error;}}result[index]=copied;}}'
-            f'return result,blot_error::Error.none;}}'
+            f'let result,error=alloc<{ty}>(self_,values.len);if error!=squid_error::Error.none {{return default<{ty}[:]>(),error;}}'
+            f'for value,index in values {{let copied,error=cloneValue(self_,value);if error!=squid_error::Error.none {{return default<{ty}[:]>(),error;}}result[index]=copied;}}'
+            f'return result,squid_error::Error.none;}}'
         )
 
     lines.append('')
@@ -382,23 +382,23 @@ def main():
             if ft.endswith('[:]'):
                 elem = ft[:-3]
                 if elem in nested_slices:
-                    lines.append(f' {{let copied,error=cloneNested(self_,value.{fname});if error!=blot_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
+                    lines.append(f' {{let copied,error=cloneNested(self_,value.{fname});if error!=squid_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
                 else:
-                    lines.append(f' {{let copied,error=copy<{elem}>(self_,value.{fname});if error!=blot_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
+                    lines.append(f' {{let copied,error=copy<{elem}>(self_,value.{fname});if error!=squid_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
             else:
-                lines.append(f' {{let copied,error=cloneValue(self_,value.{fname});if error!=blot_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
+                lines.append(f' {{let copied,error=cloneValue(self_,value.{fname});if error!=squid_error::Error.none {{return result,error;}}result.{fname}=copied;}}')
         if has_owner_id:
-            lines.append(' result.owner_id=blot_native::fresh_owner_id();')
-        lines.append(' return result,blot_error::Error.none;')
+            lines.append(' result.owner_id=squid_native::fresh_owner_id();')
+        lines.append(' return result,squid_error::Error.none;')
         lines.append('}')
 
     lines.append('')
     for root in ROOT_TYPES:
         lines.append(
             f'fn clone(value:const {root}&)->Owned<{root}>,Error {{'
-            f'var owner,error=init();if error!=blot_error::Error.none {{return default<Owned<{root}>>(),error;}}'
-            f'let result,error=cloneValue(owner,value);if error!=blot_error::Error.none {{owner.deinit();return default<Owned<{root}>>(),error;}}'
-            f'return Owned<{root}>{{result,owner,..}},blot_error::Error.none;}}'
+            f'var owner,error=init();if error!=squid_error::Error.none {{return default<Owned<{root}>>(),error;}}'
+            f'let result,error=cloneValue(owner,value);if error!=squid_error::Error.none {{owner.deinit();return default<Owned<{root}>>(),error;}}'
+            f'return Owned<{root}>{{result,owner,..}},squid_error::Error.none;}}'
         )
 
     lines.append('')
@@ -435,19 +435,19 @@ def main():
                 return
         raise AssertionError(f'Missing compound for payload_bytes: {ty}')
 
-    collect_bytes_compounds('blot_check_core::Module')
-    collect_bytes_compounds('blot_reuse_principal_interface::Interface')
+    collect_bytes_compounds('squid_check_core::Module')
+    collect_bytes_compounds('squid_reuse_principal_interface::Interface')
 
     bytes_imports = set()
     for ty, _ in bytes_targets:
-        for ns in re.findall(r'\b(blot_\w+)::', ty):
+        for ns in re.findall(r'\b(squid_\w+)::', ty):
             if ns in paths:
                 bytes_imports.add(paths[ns])
 
     blines = [
         '// Generated by tools/write_dependency_payload.py.',
         '// O(1) storage accounting of a frozen payload matching Zig @sizeOf per slice.',
-        'namespace blot_reuse_payload_bytes;',
+        'namespace squid_reuse_payload_bytes;',
     ]
     blines += [f'import {m};' for m in sorted(bytes_imports)]
     for ty, owned_fields in bytes_targets:

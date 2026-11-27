@@ -7,8 +7,8 @@ import {
 } from "../../benchmarks/tools/numeric_aggregates.ts";
 
 Deno.test("numeric aggregates preserve imported calls, lane order and writes through array aliases", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-numeric-rows-" });
-  const entry = `${directory}/main.blot`, library = `${directory}/shapes.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-numeric-rows-" });
+  const entry = `${directory}/main.sq`, library = `${directory}/shapes.sq`;
   const fixture = numericAggregateSources();
   const main = fixture.main + numericShapes.map(([shape]) => `
 io const array_dynamic_${shape} = func (choice: Bool) => return do:
@@ -38,7 +38,7 @@ io const stored_bits_${shape} = func (seed: F32) => return do:
 `).join("");
   const sources = { [entry]: main, [library]: fixture.shapes };
   const executable = Deno.args[0] ??
-    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+    new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
   try {
     await Deno.writeTextFile(entry, main);
     await Deno.writeTextFile(library, fixture.shapes);
@@ -47,7 +47,7 @@ io const stored_bits_${shape} = func (seed: F32) => return do:
         executable,
         entry,
         stdRoot: new URL("../../std", import.meta.url),
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        prelude: new URL("../../std/prelude.sq", import.meta.url),
       };
       const compiler = await createZigProjectCompiler(options);
       try {

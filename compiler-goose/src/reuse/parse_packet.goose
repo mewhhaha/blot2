@@ -1,6 +1,6 @@
 // A fork parses against the prelude's symbol prefix. Replay its new spellings
 // in parser order, then relocate only symbol fields in the packed syntax.
-namespace blot_reuse_parse_packet;
+namespace squid_reuse_parse_packet;
 import std;
 import binary;
 import parse.ast;
@@ -12,10 +12,10 @@ import support.bytes;
 import support.error;
 import support.native;
 
-type Tree = blot_parse_ast::Tree;
-type Pool = blot_parse_symbols::Pool;
-type Writer = blot_bytes::Writer;
-let ok = blot_error::Error.none;
+type Tree = squid_parse_ast::Tree;
+type Pool = squid_parse_symbols::Pool;
+type Writer = squid_bytes::Writer;
+let ok = squid_error::Error.none;
 
 // Compact fixed header: prefix (4) + count (4) + flags (1) + 11 table byte lengths (44) = 53 bytes.
 let header_bytes: i64 = 53;
@@ -81,13 +81,13 @@ fn write_tree(tree: const Tree&, writer: Writer, packet: u8[>..<]&) -> bool {
     return true;
 }
 
-fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: blot_parse_token::Token[>..<]&, comments: blot_parse_token::Token[>..<]&, diagnostics: blot_parse_lexer::Diagnostic[>..<]&, local: Pool&, tree: Tree&, packet: u8[>..<]&) -> bool {
+fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: squid_parse_token::Token[>..<]&, comments: squid_parse_token::Token[>..<]&, diagnostics: squid_parse_lexer::Diagnostic[>..<]&, local: Pool&, tree: Tree&, packet: u8[>..<]&) -> bool {
     packet.clear();
     tokens.clear();
     comments.clear();
     diagnostics.clear();
-    var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
-    if blot_parse_lexer::lex(source,lexed)!=ok || diagnostics.len!=0 {return false;}
+    var lexed=squid_parse_lexer::init(tokens,comments,diagnostics);
+    if squid_parse_lexer::lex(source,lexed)!=ok || diagnostics.len!=0 {return false;}
 
     // Reset worker symbol pool to exactly the seed prefix without re-allocating.
     local.bytes.resize(0);
@@ -97,7 +97,7 @@ fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: blot_parse_
         local.entries.append(seed.entries.items);
     }
     if seed.buckets.len == 0 {
-        if local.buckets.len != 0 { blot_parse_symbols::zeroBuckets(local.buckets.items); }
+        if local.buckets.len != 0 { squid_parse_symbols::zeroBuckets(local.buckets.items); }
     } else if local.buckets.len == seed.buckets.len {
         local.buckets.items.move_from(seed.buckets.items);
     } else {
@@ -105,8 +105,8 @@ fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: blot_parse_
         local.buckets.append(seed.buckets.items);
     }
     if local.bytes.failure!=ok || local.entries.failure!=ok || local.buckets.failure!=ok {return false;}
-    if blot_parse_ast::resetPooled(tree)!=ok {return false;}
-    let parsed=blot_parse_parser::parse(source,tokens,local,tree);
+    if squid_parse_ast::resetPooled(tree)!=ok {return false;}
+    let parsed=squid_parse_parser::parse(source,tokens,local,tree);
     if parsed!=ok || tree.diagnostics.len!=0 {return false;}
 
     let writer=Writer{packet};
@@ -125,12 +125,12 @@ fn encodeWithScratch(source: const u8[:], seed: const Pool&, tokens: blot_parse_
 }
 
 fn encode(source: const u8[:], seed: const Pool&, packet: u8[>..<]&) -> bool {
-    var tokens: blot_parse_token::Token[>..<]=[];
-    var comments: blot_parse_token::Token[>..<]=[];
-    var diagnostics: blot_parse_lexer::Diagnostic[>..<]=[];
-    var local,error=blot_parse_symbols::initPooled();
+    var tokens: squid_parse_token::Token[>..<]=[];
+    var comments: squid_parse_token::Token[>..<]=[];
+    var diagnostics: squid_parse_lexer::Diagnostic[>..<]=[];
+    var local,error=squid_parse_symbols::initPooled();
     if error!=ok {return false;}
-    var tree,tree_error=blot_parse_ast::initPooled();
+    var tree,tree_error=squid_parse_ast::initPooled();
     if tree_error!=ok {local.deinit();return false;}
     let result=encodeWithScratch(source,seed,tokens,comments,diagnostics,local,tree,packet);
     tree.deinit();
@@ -149,7 +149,7 @@ fn read_table_mem<T,B>(packet: const u8[:], at:i64&, length:i64, table: B&, witn
     let target = table.storage[..count];
     let dst = bytes_of(target);
     assert(dst.len == length);
-    blot_native::copy_flat(dst[0], packet[at], length as u64);
+    squid_native::copy_flat(dst[0], packet[at], length as u64);
     at += length;
     table.items = target;
     table.len = count;
@@ -167,7 +167,7 @@ fn read_table_persist<T,B>(shared: u64, id: u32, kind: u32, at: i64&, total: i64
     let target = table.storage[..count];
     let dst = bytes_of(target);
     assert(dst.len == length);
-    if !blot_native::persist_read_at(shared, id, kind, at as u64, dst[0], length as u64) { return false; }
+    if !squid_native::persist_read_at(shared, id, kind, at as u64, dst[0], length as u64) { return false; }
     at += length;
     table.items = target;
     table.len = count;
@@ -186,7 +186,7 @@ fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
     let nlen = names.len;
     for &node in tree.nodes.items {
         let tag = node.tag;
-        if tag > blot_parse_ast::tag_entry_process_decl { return false; }
+        if tag > squid_parse_ast::tag_entry_process_decl { return false; }
         let kind = reloc_kind[tag];
         if kind == 0 { continue; }
         if kind == 1 {
@@ -226,7 +226,7 @@ fn read_names_into(tail: const u8[:], count: u32, symbols: Pool&, out: u32[:]) -
     var check: i64 = 0;
     for index in 0..count {
         if tail.len - check < 12 { return false; }
-        let length = blot_bytes::get_u32(tail, check) as i64;
+        let length = squid_bytes::get_u32(tail, check) as i64;
         check += 12;
         if length > tail.len - check { return false; }
         check += length;
@@ -234,8 +234,8 @@ fn read_names_into(tail: const u8[:], count: u32, symbols: Pool&, out: u32[:]) -
     if check != tail.len { return false; }
     var pos: i64 = 0;
     for index in 0..count {
-        let length = blot_bytes::get_u32(tail, pos) as i64;
-        let hash = blot_bytes::get_u64(tail, pos + 4);
+        let length = squid_bytes::get_u32(tail, pos) as i64;
+        let hash = squid_bytes::get_u64(tail, pos + 4);
         pos += 12;
         let symbol, error = symbols.intern_hashed(tail[pos..pos + length], hash);
         if error != ok { return false; }
@@ -245,29 +245,29 @@ fn read_names_into(tail: const u8[:], count: u32, symbols: Pool&, out: u32[:]) -
     return true;
 }
 
-fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&, recorded: blot_parse_parser::ScratchIdBuffer?=null) -> bool {
+fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&, recorded: squid_parse_parser::ScratchIdBuffer?=null) -> bool {
     if packet.len < header_bytes { return false; }
-    let prefix = blot_bytes::get_u32(packet, 0);
-    let count = blot_bytes::get_u32(packet, 4);
+    let prefix = squid_bytes::get_u32(packet, 0);
+    let count = squid_bytes::get_u32(packet, 4);
     let flags = packet[8];
     if flags > 3 || prefix > symbols.entries.len { return false; }
     var lens: i64[11] = [0; 11];
-    for i in 0..11 { lens[i] = blot_bytes::get_u32(packet, 9 + i * 4) as i64; }
-    var parsed, error = blot_parse_ast::initPooledEmpty();
+    for i in 0..11 { lens[i] = squid_bytes::get_u32(packet, 9 + i * 4) as i64; }
+    var parsed, error = squid_parse_ast::initPooledEmpty();
     if error != ok { return false; }
     var at: i64 = header_bytes;
     let tables_ok =
-        read_table_mem(packet, at, lens[0], parsed.nodes, default<blot_parse_ast::Node>()) &&
-        read_table_mem(packet, at, lens[1], parsed.spans, default<blot_parse_ast::Span>()) &&
+        read_table_mem(packet, at, lens[0], parsed.nodes, default<squid_parse_ast::Node>()) &&
+        read_table_mem(packet, at, lens[1], parsed.spans, default<squid_parse_ast::Span>()) &&
         read_table_mem(packet, at, lens[2], parsed.extra, 0 as u32) &&
         read_table_mem(packet, at, lens[3], parsed.roots, 0 as u32) &&
-        read_table_mem(packet, at, lens[4], parsed.runtime_names, default<blot_parse_ast::RuntimeName>()) &&
-        read_table_mem(packet, at, lens[5], parsed.constant_names, default<blot_parse_ast::RuntimeName>()) &&
-        read_table_mem(packet, at, lens[6], parsed.test_meta, default<blot_parse_ast::TestMeta>()) &&
-        read_table_mem(packet, at, lens[7], parsed.declaration_traits, default<blot_parse_ast::DeclarationTraits>()) &&
-        read_table_mem(packet, at, lens[8], parsed.declaration_nodes, default<blot_parse_ast::DeclarationNodes>()) &&
-        read_table_mem(packet, at, lens[9], parsed.operator_origins, default<blot_parse_ast::OperatorOrigin>()) &&
-        read_table_mem(packet, at, lens[10], parsed.type_conversion_origins, default<blot_parse_ast::TypeConversionOrigin>()) &&
+        read_table_mem(packet, at, lens[4], parsed.runtime_names, default<squid_parse_ast::RuntimeName>()) &&
+        read_table_mem(packet, at, lens[5], parsed.constant_names, default<squid_parse_ast::RuntimeName>()) &&
+        read_table_mem(packet, at, lens[6], parsed.test_meta, default<squid_parse_ast::TestMeta>()) &&
+        read_table_mem(packet, at, lens[7], parsed.declaration_traits, default<squid_parse_ast::DeclarationTraits>()) &&
+        read_table_mem(packet, at, lens[8], parsed.declaration_nodes, default<squid_parse_ast::DeclarationNodes>()) &&
+        read_table_mem(packet, at, lens[9], parsed.operator_origins, default<squid_parse_ast::OperatorOrigin>()) &&
+        read_table_mem(packet, at, lens[10], parsed.type_conversion_origins, default<squid_parse_ast::TypeConversionOrigin>()) &&
         parsed.nodes.len != 0 && parsed.nodes.len == parsed.spans.len;
     if !tables_ok { parsed.deinit(); return false; }
     let tail = packet[at..];
@@ -293,43 +293,43 @@ fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&, recorded: blot_parse
     if !names_ok || !reloc_ok { parsed.deinit(); return false; }
     parsed.has_typed_staging = (flags & 1) != 0;
     tree.deinit();
-    tree = blot_parse_ast::canonical(parsed);
+    tree = squid_parse_ast::canonical(parsed);
     return true;
 }
 
 // Decode directly from the shared persist_queue arena into the tree's pooled
 // tables, copying only the 53-byte header and small symbol tail through stack/scratch.
-fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: Pool&, tree: Tree&, recorded: blot_parse_parser::ScratchIdBuffer?=null) -> bool {
+fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: Pool&, tree: Tree&, recorded: squid_parse_parser::ScratchIdBuffer?=null) -> bool {
     if total_size < header_bytes { return false; }
     var hdr: u8[53] = [0; 53];
-    if !blot_native::persist_read_at(shared, id, kind, 0, hdr[0], header_bytes as u64) { return false; }
-    let prefix = blot_bytes::get_u32(hdr[..], 0);
-    let count = blot_bytes::get_u32(hdr[..], 4);
+    if !squid_native::persist_read_at(shared, id, kind, 0, hdr[0], header_bytes as u64) { return false; }
+    let prefix = squid_bytes::get_u32(hdr[..], 0);
+    let count = squid_bytes::get_u32(hdr[..], 4);
     let flags = hdr[8];
     if flags > 3 || prefix > symbols.entries.len { return false; }
     var lens: i64[11] = [0; 11];
     var table_total: i64 = 0;
     for i in 0..11 {
-        let l = blot_bytes::get_u32(hdr[..], 9 + i * 4) as i64;
+        let l = squid_bytes::get_u32(hdr[..], 9 + i * 4) as i64;
         lens[i] = l;
         table_total += l;
     }
     if header_bytes + table_total > total_size { return false; }
-    var parsed, error = blot_parse_ast::initPooledEmpty();
+    var parsed, error = squid_parse_ast::initPooledEmpty();
     if error != ok { return false; }
     var at: i64 = header_bytes;
     let tables_ok =
-        read_table_persist(shared, id, kind, at, total_size, lens[0], parsed.nodes, default<blot_parse_ast::Node>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[1], parsed.spans, default<blot_parse_ast::Span>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[0], parsed.nodes, default<squid_parse_ast::Node>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[1], parsed.spans, default<squid_parse_ast::Span>()) &&
         read_table_persist(shared, id, kind, at, total_size, lens[2], parsed.extra, 0 as u32) &&
         read_table_persist(shared, id, kind, at, total_size, lens[3], parsed.roots, 0 as u32) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[4], parsed.runtime_names, default<blot_parse_ast::RuntimeName>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[5], parsed.constant_names, default<blot_parse_ast::RuntimeName>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[6], parsed.test_meta, default<blot_parse_ast::TestMeta>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[7], parsed.declaration_traits, default<blot_parse_ast::DeclarationTraits>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[8], parsed.declaration_nodes, default<blot_parse_ast::DeclarationNodes>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[9], parsed.operator_origins, default<blot_parse_ast::OperatorOrigin>()) &&
-        read_table_persist(shared, id, kind, at, total_size, lens[10], parsed.type_conversion_origins, default<blot_parse_ast::TypeConversionOrigin>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[4], parsed.runtime_names, default<squid_parse_ast::RuntimeName>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[5], parsed.constant_names, default<squid_parse_ast::RuntimeName>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[6], parsed.test_meta, default<squid_parse_ast::TestMeta>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[7], parsed.declaration_traits, default<squid_parse_ast::DeclarationTraits>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[8], parsed.declaration_nodes, default<squid_parse_ast::DeclarationNodes>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[9], parsed.operator_origins, default<squid_parse_ast::OperatorOrigin>()) &&
+        read_table_persist(shared, id, kind, at, total_size, lens[10], parsed.type_conversion_origins, default<squid_parse_ast::TypeConversionOrigin>()) &&
         parsed.nodes.len != 0 && parsed.nodes.len == parsed.spans.len;
     if !tables_ok { parsed.deinit(); return false; }
     let tail_len = total_size - at;
@@ -337,7 +337,7 @@ fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: 
         if tail_len != 0 { parsed.deinit(); return false; }
         parsed.has_typed_staging = (flags & 1) != 0;
         tree.deinit();
-        tree = blot_parse_ast::canonical(parsed);
+        tree = squid_parse_ast::canonical(parsed);
         return true;
     }
     var stack_tail: u8[4096] = [0; 4096];
@@ -347,7 +347,7 @@ fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: 
     var names_ok = false;
     var reloc_ok = false;
     if tail_len <= 4096 {
-        if tail_len != 0 && !blot_native::persist_read_at(shared, id, kind, at as u64, stack_tail[0], tail_len as u64) {
+        if tail_len != 0 && !squid_native::persist_read_at(shared, id, kind, at as u64, stack_tail[0], tail_len as u64) {
             parsed.deinit();
             return false;
         }
@@ -369,7 +369,7 @@ fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: 
         }
     } else {
         heap_tail.resize(tail_len, 0);
-        if !blot_native::persist_read_at(shared, id, kind, at as u64, heap_tail[0], tail_len as u64) {
+        if !squid_native::persist_read_at(shared, id, kind, at as u64, heap_tail[0], tail_len as u64) {
             parsed.deinit();
             return false;
         }
@@ -393,6 +393,6 @@ fn decodeFromPersist(shared: u64, id: u32, kind: u32, total_size: i64, symbols: 
     if !names_ok || !reloc_ok { parsed.deinit(); return false; }
     parsed.has_typed_staging = (flags & 1) != 0;
     tree.deinit();
-    tree = blot_parse_ast::canonical(parsed);
+    tree = squid_parse_ast::canonical(parsed);
     return true;
 }

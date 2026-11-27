@@ -1,5 +1,5 @@
 // Immutable typed Core. All slices borrow lexical compilation owners.
-namespace blot_check_core;
+namespace squid_check_core;
 import backend.collection_ops;
 import backend.opaque_storage;
 import check.capability_flow;
@@ -52,7 +52,7 @@ enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,
     op: Op = Op.none,
-    array_op: ArrayOp = blot_backend_collection_ops::Op.length,
+    array_op: ArrayOp = squid_backend_collection_ops::Op.length,
     arity: u8
 }
 enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_, numeric_convert, mul_wide, i8x16_splat, i8x16_add, i8x16_sub, i8x16_min_u, i8x16_max_u, i8x16_eq, i8x16_avgr_u, i8x16_bitmask, i8x16_narrow_u, i16x8_splat, i16x8_extend_low_u, i16x8_extend_high_u, i16x8_add, i16x8_sub, i16x8_mul, i16x8_shl, i16x8_shr_u, i16x8_shr_s, i16x8_min_u, i16x8_max_u }
@@ -64,13 +64,13 @@ struct NumericIntrinsic {
     arity: u8 = 0,
 }
 fn numericSuffix(name: const u8[:]) -> u32 {
-    if name == "u8" { return blot_check_types::u8_type; }
-    if name == "u32" { return blot_check_types::u32_type; }
-    if name == "i32" { return blot_check_types::i32_type; }
-    if name == "u64" { return blot_check_types::u64_type; }
-    if name == "i64" { return blot_check_types::i64_type; }
-    if name == "f32" { return blot_check_types::f32_type; }
-    if name == "f64" { return blot_check_types::f64_type; }
+    if name == "u8" { return squid_check_types::u8_type; }
+    if name == "u32" { return squid_check_types::u32_type; }
+    if name == "i32" { return squid_check_types::i32_type; }
+    if name == "u64" { return squid_check_types::u64_type; }
+    if name == "i64" { return squid_check_types::i64_type; }
+    if name == "f32" { return squid_check_types::f32_type; }
+    if name == "f64" { return squid_check_types::f64_type; }
     return 0;
 }
 fn numericIntrinsic(name: const u8[:]) -> NumericIntrinsic {
@@ -81,13 +81,13 @@ fn numericIntrinsic(name: const u8[:]) -> NumericIntrinsic {
     let input = numericSuffix(name[1..dot]);
     if input == 0 { return NumericIntrinsic {..}; }
     let member = name[dot+1..];
-    let float = input == blot_check_types::f32_type || input == blot_check_types::f64_type;
+    let float = input == squid_check_types::f32_type || input == squid_check_types::f64_type;
     if member == "to_bits" && float {
-        let output = if input == blot_check_types::f32_type { blot_check_types::u32_type } else { blot_check_types::u64_type };
+        let output = if input == squid_check_types::f32_type { squid_check_types::u32_type } else { squid_check_types::u64_type };
         return NumericIntrinsic { input, output, Op.bits, 1 };
     }
     if member == "from_bits" && float {
-        let bits = if input == blot_check_types::f32_type { blot_check_types::u32_type } else { blot_check_types::u64_type };
+        let bits = if input == squid_check_types::f32_type { squid_check_types::u32_type } else { squid_check_types::u64_type };
         return NumericIntrinsic { bits, input, Op.from_bits, 1 };
     }
     if member.len > 3 && member[..3] == "to_" {
@@ -95,19 +95,19 @@ fn numericIntrinsic(name: const u8[:]) -> NumericIntrinsic {
         if output != 0 { return NumericIntrinsic { input, output, Op.numeric_convert, 1 }; }
     }
     // Existing U32/F32 intrinsics are recognized before this lookup.
-    if input == blot_check_types::u32_type || input == blot_check_types::f32_type { return NumericIntrinsic {..}; }
-    let signed = input == blot_check_types::i32_type || input == blot_check_types::i64_type;
+    if input == squid_check_types::u32_type || input == squid_check_types::f32_type { return NumericIntrinsic {..}; }
+    let signed = input == squid_check_types::i32_type || input == squid_check_types::i64_type;
     if member == "add" { return NumericIntrinsic { input, input, Op.add, 2 }; }
     if member == "sub" { return NumericIntrinsic { input, input, Op.sub, 2 }; }
     if member == "mul" { return NumericIntrinsic { input, input, Op.mul, 2 }; }
     if member == "div" { return NumericIntrinsic { input, input, Op.div, 2 }; }
     if member == "rem" && !float { return NumericIntrinsic { input, input, Op.rem, 2 }; }
-    if member == "eq" { return NumericIntrinsic { input, blot_check_types::boolean, Op.equal, 2 }; }
-    if member == "ne" { return NumericIntrinsic { input, blot_check_types::boolean, Op.not_equal, 2 }; }
-    if member == "lt" { return NumericIntrinsic { input, blot_check_types::boolean, Op.less, 2 }; }
-    if member == "le" { return NumericIntrinsic { input, blot_check_types::boolean, Op.less_equal, 2 }; }
-    if member == "gt" { return NumericIntrinsic { input, blot_check_types::boolean, Op.greater, 2 }; }
-    if member == "ge" { return NumericIntrinsic { input, blot_check_types::boolean, Op.greater_equal, 2 }; }
+    if member == "eq" { return NumericIntrinsic { input, squid_check_types::boolean, Op.equal, 2 }; }
+    if member == "ne" { return NumericIntrinsic { input, squid_check_types::boolean, Op.not_equal, 2 }; }
+    if member == "lt" { return NumericIntrinsic { input, squid_check_types::boolean, Op.less, 2 }; }
+    if member == "le" { return NumericIntrinsic { input, squid_check_types::boolean, Op.less_equal, 2 }; }
+    if member == "gt" { return NumericIntrinsic { input, squid_check_types::boolean, Op.greater, 2 }; }
+    if member == "ge" { return NumericIntrinsic { input, squid_check_types::boolean, Op.greater_equal, 2 }; }
     if member == "bit_and" && !float { return NumericIntrinsic { input, input, Op.bit_and, 2 }; }
     if member == "bit_or" && !float { return NumericIntrinsic { input, input, Op.bit_or, 2 }; }
     if member == "bit_xor" && !float { return NumericIntrinsic { input, input, Op.bit_xor, 2 }; }
@@ -129,26 +129,26 @@ fn numericIntrinsic(name: const u8[:]) -> NumericIntrinsic {
 struct Node {
     tag: Tag,
     op: Op = Op.none,
-    ty: blot_check_types::Id = 0,
+    ty: squid_check_types::Id = 0,
     a: u32 = 0,
     b: u32 = 0,
     c: u32 = 0
 }
 struct Parameter {
     binding: BindingId,
-    ty: blot_check_types::Id,
+    ty: squid_check_types::Id,
     span: Span,
     inferred: bool = false
 }
 struct Binding {
-    capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {..},
+    capability_parameters: squid_check_capability_flow::Parameters = squid_check_capability_flow::Parameters {..},
     private: bool = false,
     initializer: Id = 0,
-    kind: blot_check_check::Kind,
-    ty: blot_check_types::Id,
-    scheme: blot_check_types::Scheme,
-    public_variables: blot_check_types::List = blot_check_types::List {..},
-    public_rows: blot_check_types::List = blot_check_types::List {..},
+    kind: squid_check_check::Kind,
+    ty: squid_check_types::Id,
+    scheme: squid_check_types::Scheme,
+    public_variables: squid_check_types::List = squid_check_types::List {..},
+    public_rows: squid_check_types::List = squid_check_types::List {..},
     has_explicit: bool = false,
     body_id: BodyId = 0,
     target: BindingRef,
@@ -165,7 +165,7 @@ struct DeclarationDependencies {
 }
 struct DependencyMember {
     name: u32 = 0,
-    operator: blot_check_types::Operator = blot_check_types::Operator.none
+    operator: squid_check_types::Operator = squid_check_types::Operator.none
 }
 struct ErasedDeclarationReference {
     node: Id,
@@ -175,8 +175,8 @@ struct Body {
     binding: BindingId = 0,
     root: Id = 0,
     parameters: List = List {..},
-    scheme: blot_check_types::Scheme = blot_check_types::Scheme {..},
-    closed_rows: blot_check_types::List = blot_check_types::List {..},
+    scheme: squid_check_types::Scheme = squid_check_types::Scheme {..},
+    closed_rows: squid_check_types::List = squid_check_types::List {..},
     span: Span = Span { start: 0, end: 0 , ..},
     declaration_name: Name = Name {..},
     export_name: Name = Name {..},
@@ -190,13 +190,13 @@ struct Body {
 }
 struct CallInfo {
     target: BindingRef,
-    callee_type: blot_check_types::Id,
+    callee_type: squid_check_types::Id,
     // Bit i: the callee takes over its parameter i (`own`).
     own: u32 = 0
 }
 struct Call {
     target: BindingRef,
-    callee_type: blot_check_types::Id,
+    callee_type: squid_check_types::Id,
     arguments: const Id[:],
     own: u32 = 0
 }
@@ -207,24 +207,24 @@ struct Merge {
     else_binding: BindingId
 }
 struct Obligation {
-    ty: blot_check_types::Id,
-    kind: blot_check_types::ObligationKind,
+    ty: squid_check_types::Id,
+    kind: squid_check_types::ObligationKind,
     span: Span,
     name: u32 = 0,
-    result: blot_check_types::Id = 0,
-    other: blot_check_types::Id = 0,
-    signature: blot_check_types::Id = 0,
-    operator: blot_check_types::Operator = blot_check_types::Operator.none,
-    identity: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
+    result: squid_check_types::Id = 0,
+    other: squid_check_types::Id = 0,
+    signature: squid_check_types::Id = 0,
+    operator: squid_check_types::Operator = squid_check_types::Operator.none,
+    identity: squid_check_types::NominalIdentity = squid_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
     explicit: bool = false,
-    qualification_span: blot_support::Option<Span>   = blot_support::Option<Span> { false, default<Span>() , ..},
+    qualification_span: squid_support::Option<Span>   = squid_support::Option<Span> { false, default<Span>() , ..},
     qualification_unit: u32 = 0,
     diagnostic_name: Name = Name {..}
 }
 struct Associated {
-    identity: blot_check_types::NominalIdentity,
+    identity: squid_check_types::NominalIdentity,
     member: u32,
-    operator: blot_check_types::Operator,
+    operator: squid_check_types::Operator,
     target: BindingRef
 }
 struct Nominal {
@@ -233,55 +233,55 @@ struct Nominal {
     closed_storage: bool = false,
     private: bool = false,
     is_opaque: bool = false,
-    storage: blot_backend_opaque_storage::Storage = blot_backend_opaque_storage::Storage {..},
+    storage: squid_backend_opaque_storage::Storage = squid_backend_opaque_storage::Storage {..},
     diagnostic_name: Name = Name {..},
     diagnostic_origin: Name = Name {..},
-    identity: blot_check_types::NominalIdentity,
-    parameters: blot_check_types::List,
-    variables: blot_check_types::List,
+    identity: squid_check_types::NominalIdentity,
+    parameters: squid_check_types::List,
+    variables: squid_check_types::List,
     constructors: List
 }
 struct OperationName {
-    identity: blot_check_types::NominalIdentity,
+    identity: squid_check_types::NominalIdentity,
     diagnostic_name: Name = Name {..},
     diagnostic_origin: Name = Name {..},
-    variables: blot_check_types::List = blot_check_types::List {..},
-    parameters: blot_check_types::List = blot_check_types::List {..},
-    parameter: blot_check_types::Id = 0,
-    result: blot_check_types::Id = 0
+    variables: squid_check_types::List = squid_check_types::List {..},
+    parameters: squid_check_types::List = squid_check_types::List {..},
+    parameter: squid_check_types::Id = 0,
+    result: squid_check_types::Id = 0
 }
 struct Constructor {
-    identity: blot_check_types::NominalIdentity,
+    identity: squid_check_types::NominalIdentity,
     nominal: u32,
     tag: u32,
-    scheme: blot_check_types::Scheme,
-    payload: blot_check_types::Id,
+    scheme: squid_check_types::Scheme,
+    payload: squid_check_types::Id,
     name: u32 = 0
 }
 struct TypeTag {
-    nominal: blot_check_types::NominalIdentity,
+    nominal: squid_check_types::NominalIdentity,
     constructor_tag: u32 = 0,
     field_name: u32 = 0,
     has_default: bool = false,
     value: Id = 0,
-    ty: blot_check_types::Id = 0
+    ty: squid_check_types::Id = 0
 }
 struct ProjectionVariant {
     tag: u32,
     field: u32
 }
 struct Projection {
-    nominal: blot_check_types::NominalIdentity,
+    nominal: squid_check_types::NominalIdentity,
     field: u32 = 0,
-    source_type: blot_check_types::Id,
-    result_type: blot_check_types::Id,
+    source_type: squid_check_types::Id,
+    result_type: squid_check_types::Id,
     variants: List,
     diagnostic_point: u32 = 0
 }
 enum PatternTag { invalid, wildcard, bind, constant, value, product, constructor, record_payload }
 struct Pattern {
     tag: PatternTag,
-    ty: blot_check_types::Id = 0,
+    ty: squid_check_types::Id = 0,
     a: u32 = 0,
     b: u32 = 0,
     c: u32 = 0,
@@ -306,8 +306,8 @@ struct UpdateStep {
     kind: UpdateKind,
     projection: u32 = 0,
     index: Id = 0,
-    source_type: blot_check_types::Id,
-    result_type: blot_check_types::Id
+    source_type: squid_check_types::Id,
+    result_type: squid_check_types::Id
 }
 struct UpdateInfo {
     root: Id,
@@ -321,24 +321,24 @@ struct ClosureInfo {
     body: Id,
     parameter: Parameter,
     captures: List,
-    function_type: blot_check_types::Id = 0,
-    closed_rows: blot_check_types::List = blot_check_types::List {..}
+    function_type: squid_check_types::Id = 0,
+    closed_rows: squid_check_types::List = squid_check_types::List {..}
 }
 struct OperationValue {
-    identity: blot_check_types::NominalIdentity,
-    arguments: blot_check_types::List,
-    signature: blot_check_types::Id,
+    identity: squid_check_types::NominalIdentity,
+    arguments: squid_check_types::List,
+    signature: squid_check_types::Id,
     witness: Id = 0,
-    witness_result: blot_check_types::Id = 0,
-    instance: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
+    witness_result: squid_check_types::Id = 0,
+    instance: squid_check_types::NominalIdentity = squid_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
     capability: Id = 0
 }
 struct HandleEffects {
     node: Id,
-    first: blot_check_types::Id,
-    second: blot_check_types::Id = 0,
-    extended: blot_check_effects::Id,
-    residual: blot_check_effects::Id
+    first: squid_check_types::Id,
+    second: squid_check_types::Id = 0,
+    extended: squid_check_effects::Id,
+    residual: squid_check_effects::Id
 }
 enum LoopKind { forever, range, array }
 struct LoopCarry {
@@ -370,10 +370,10 @@ struct KernelDecl {
     has_context: bool = false,
     prepare_target: BindingRef = BindingRef { binding: 0, .. },
     run_target: BindingRef = BindingRef { binding: 0, .. },
-    ctx_type: blot_check_types::Id = 0,
-    prepared_type: blot_check_types::Id = 0,
-    item_type: blot_check_types::Id = 0,
-    out_type: blot_check_types::Id = 0,
+    ctx_type: squid_check_types::Id = 0,
+    prepared_type: squid_check_types::Id = 0,
+    item_type: squid_check_types::Id = 0,
+    out_type: squid_check_types::Id = 0,
     span: Span = Span { start: 0, end: 0, .. }
 }
 struct ProcessDecl {
@@ -381,10 +381,10 @@ struct ProcessDecl {
     binding: BindingId = 0,
     init_target: BindingRef = BindingRef { binding: 0, .. },
     step_target: BindingRef = BindingRef { binding: 0, .. },
-    config_type: blot_check_types::Id = 0,
-    state_type: blot_check_types::Id = 0,
-    cmd_type: blot_check_types::Id = 0,
-    reply_type: blot_check_types::Id = 0,
+    config_type: squid_check_types::Id = 0,
+    state_type: squid_check_types::Id = 0,
+    cmd_type: squid_check_types::Id = 0,
+    reply_type: squid_check_types::Id = 0,
     span: Span = Span { start: 0, end: 0, .. }
 }
 enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, spent_value, own_argument, own_function_value, result_not_owned, lent_result_value, kept_value }
@@ -393,31 +393,31 @@ struct Diagnostic {
     span: Span
 }
 struct EffectRows {
-    rows: const blot_check_effects::Row[:] = default<const blot_check_effects::Row[:]>(),
-    labels: const blot_check_effects::Label[:] = default<const blot_check_effects::Label[:]>(),
+    rows: const squid_check_effects::Row[:] = default<const squid_check_effects::Row[:]>(),
+    labels: const squid_check_effects::Label[:] = default<const squid_check_effects::Label[:]>(),
     variable_count: u32 = 0
 }
 struct Contract {
     private: bool,
-    identity: blot_check_types::NominalIdentity,
+    identity: squid_check_types::NominalIdentity,
     name: u32,
-    parameters: blot_check_types::List,
-    variables: blot_check_types::List,
-    row_variables: blot_check_types::List,
-    predicates: blot_check_types::List,
-    members: blot_check_types::List,
+    parameters: squid_check_types::List,
+    variables: squid_check_types::List,
+    row_variables: squid_check_types::List,
+    predicates: squid_check_types::List,
+    members: squid_check_types::List,
     requires_implementation: bool,
-    row_parameter_names: blot_check_types::List = blot_check_types::List {..},
-    row_parameters: blot_check_types::List = blot_check_types::List {..}
+    row_parameter_names: squid_check_types::List = squid_check_types::List {..},
+    row_parameters: squid_check_types::List = squid_check_types::List {..}
 }
 struct Types {
     owner_id: u64 = 0,
-    nodes: const blot_check_types::Node[:],
-    extra: const blot_check_types::Id[:],
+    nodes: const squid_check_types::Node[:],
+    extra: const squid_check_types::Id[:],
     effects: EffectRows = EffectRows {..},
-    operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
+    operations: const squid_check_types::Operation[:] = default<const squid_check_types::Operation[:]>(),
 }
-fn emptyTypes()->Types {return Types{nodes:default<const blot_check_types::Node[:]>(),extra:default<const blot_check_types::Id[:]>(), ..};}
+fn emptyTypes()->Types {return Types{nodes:default<const squid_check_types::Node[:]>(),extra:default<const squid_check_types::Id[:]>(), ..};}
 struct Module {
     owner_id: u64 = 0,
     field_names: FieldName[:] = default<FieldName[:]>(),
@@ -465,7 +465,7 @@ struct Module {
     loop_carries: LoopCarry[:] = default<LoopCarry[:]>(),
     operation_values: OperationValue[:] = default<OperationValue[:]>(),
     handle_effects: HandleEffects[:] = default<HandleEffects[:]>(),
-    dispatch_signatures: blot_check_types::Id[:] = default<blot_check_types::Id[:]>(),
+    dispatch_signatures: squid_check_types::Id[:] = default<squid_check_types::Id[:]>(),
     type_tags: TypeTag[:] = default<TypeTag[:]>(),
     sparks: SparkInfo[:] = default<SparkInfo[:]>(),
     kernels: KernelDecl[:] = default<KernelDecl[:]>(),
@@ -477,12 +477,12 @@ type Id = u32;
 type BindingId = u32;
 type BodyId = u32;
 type PatternId = u32;
-type Span = blot_parse_ast::Span;
-type ArrayOp = blot_backend_collection_ops::Op;
-type ContractMember = blot_reuse_principal_interface::ContractMember;
-type Implementation = blot_reuse_principal_interface::Implementation;
-type ImplementationMember = blot_reuse_principal_interface::ImplementationMember;
-type MemberTemplate = blot_reuse_principal_interface::MemberTemplate;
+type Span = squid_parse_ast::Span;
+type ArrayOp = squid_backend_collection_ops::Op;
+type ContractMember = squid_reuse_principal_interface::ContractMember;
+type Implementation = squid_reuse_principal_interface::Implementation;
+type ImplementationMember = squid_reuse_principal_interface::ImplementationMember;
+type MemberTemplate = squid_reuse_principal_interface::MemberTemplate;
 fn message(self_: Diagnostic) -> const u8[:] {
     match self_.code {
         unchecked => { return "Typed core requires successful semantic checking"; },
@@ -499,35 +499,35 @@ fn message(self_: Diagnostic) -> const u8[:] {
         own_function_value => { return "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls"; },
     }
 }
-fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {
-    if id == 0 && self_.rows.len == 0 { return blot_check_effects::Row {..}; }
+fn node(self_: const EffectRows&, id: squid_check_effects::Id) -> squid_check_effects::Row {
+    if id == 0 && self_.rows.len == 0 { return squid_check_effects::Row {..}; }
     return self_.rows[id];
 }
-fn list(self_: const EffectRows&, span: blot_check_effects::List) -> const blot_check_effects::Label[:] { return self_.labels[span.start..span.start + span.len]; }
-fn node(self_: const Types&, id: blot_check_types::Id) -> blot_check_types::Node { return self_.nodes[id]; }
-fn withoutForall(self_: const Types&, id: blot_check_types::Id) -> blot_check_types::Id, blot_error::Error {
+fn list(self_: const EffectRows&, span: squid_check_effects::List) -> const squid_check_effects::Label[:] { return self_.labels[span.start..span.start + span.len]; }
+fn node(self_: const Types&, id: squid_check_types::Id) -> squid_check_types::Node { return self_.nodes[id]; }
+fn withoutForall(self_: const Types&, id: squid_check_types::Id) -> squid_check_types::Id, squid_error::Error {
     var current = id; var depth: i64 = 0;
-    while self_.node(current).tag == blot_check_types::Tag.forall || self_.node(current).tag == blot_check_types::Tag.usage {
-        if depth == 128 { return 0, blot_error::Error.core_limit; }
+    while self_.node(current).tag == squid_check_types::Tag.forall || self_.node(current).tag == squid_check_types::Tag.usage {
+        if depth == 128 { return 0, squid_error::Error.core_limit; }
         depth += 1; current = self_.node(current).a;
     }
-    return current, blot_error::Error.none;
+    return current, squid_error::Error.none;
 }
-fn head(self_: const Types&, id: blot_check_types::Id, at: blot_check_types::Cursor) -> blot_check_types::Id { return id; }
-fn list(self_: const Types&, span: blot_check_types::List) -> const blot_check_types::Id[:] { return self_.extra[span.start..span.start + span.len]; }
-fn projectionMember(self_: const Types&, value: blot_check_types::Node) -> u32 { return self_.extra[value.c + 1 + self_.extra[value.c]]; }
-fn nominalArguments(self_: const Types&, value: blot_check_types::Node) -> const blot_check_types::Id[:] {
-    assert(value.tag == blot_check_types::Tag.nominal || value.tag == blot_check_types::Tag.projection || value.tag == blot_check_types::Tag.instance_selection);
+fn head(self_: const Types&, id: squid_check_types::Id, at: squid_check_types::Cursor) -> squid_check_types::Id { return id; }
+fn list(self_: const Types&, span: squid_check_types::List) -> const squid_check_types::Id[:] { return self_.extra[span.start..span.start + span.len]; }
+fn projectionMember(self_: const Types&, value: squid_check_types::Node) -> u32 { return self_.extra[value.c + 1 + self_.extra[value.c]]; }
+fn nominalArguments(self_: const Types&, value: squid_check_types::Node) -> const squid_check_types::Id[:] {
+    assert(value.tag == squid_check_types::Tag.nominal || value.tag == squid_check_types::Tag.projection || value.tag == squid_check_types::Tag.instance_selection);
     return self_.extra[value.c + 1..value.c + 1 + self_.extra[value.c]];
 }
-fn recordField(self_: const Types&, value: blot_check_types::Node, index: i64) -> blot_check_types::Field {
-    assert(value.tag == blot_check_types::Tag.record && index < value.b);
-    return blot_check_types::Field { self_.extra[value.a + index * 2], self_.extra[value.a + index * 2 + 1] , ..};
+fn recordField(self_: const Types&, value: squid_check_types::Node, index: i64) -> squid_check_types::Field {
+    assert(value.tag == squid_check_types::Tag.record && index < value.b);
+    return squid_check_types::Field { self_.extra[value.a + index * 2], self_.extra[value.a + index * 2 + 1] , ..};
 }
-fn row(self_: const Types&, id: blot_check_effects::Id) -> blot_check_effects::Row { return self_.effects.node(id); }
-fn rowLabels(self_: const Types&, id: blot_check_effects::Id) -> const blot_check_effects::Label[:] { return self_.effects.list(self_.row(id).labels); }
-fn operation(self_: const Types&, label: blot_check_effects::Label) -> blot_check_types::Operation { return self_.operations[label]; }
-fn operationArguments(self_: const Types&, label: blot_check_effects::Label) -> const blot_check_types::Id[:] { return self_.list(self_.operation(label).arguments); }
+fn row(self_: const Types&, id: squid_check_effects::Id) -> squid_check_effects::Row { return self_.effects.node(id); }
+fn rowLabels(self_: const Types&, id: squid_check_effects::Id) -> const squid_check_effects::Label[:] { return self_.effects.list(self_.row(id).labels); }
+fn operation(self_: const Types&, label: squid_check_effects::Label) -> squid_check_types::Operation { return self_.operations[label]; }
+fn operationArguments(self_: const Types&, label: squid_check_effects::Label) -> const squid_check_types::Id[:] { return self_.list(self_.operation(label).arguments); }
 fn node(self_: const Module&, id: Id) -> Node { return self_.nodes[id]; }
 fn span(self_: const Module&, id: Id) -> Span { return self_.spans[id]; }
 fn namePoint(values: const RuntimeName[:], id: BindingId) -> u32, bool {
@@ -559,17 +559,17 @@ fn isTagCall(self_: const Module&, id: Id) -> bool {
     }
     return false;
 }
-fn typeOf(self_: const Module&, id: Id) -> blot_check_types::Id { return self_.nodes[id].ty; }
+fn typeOf(self_: const Module&, id: Id) -> squid_check_types::Id { return self_.nodes[id].ty; }
 fn operationValue(self_: const Module&, id: Id) -> OperationValue {
     assert(self_.node(id).tag == Tag.operation_value); return self_.operation_values[self_.node(id).a];
 }
-fn operationValueArguments(self_: const Module&, id: Id) -> const blot_check_types::Id[:] { return self_.types.list(self_.operationValue(id).arguments); }
-fn handleEffects(self_: const Module&, id: Id) -> blot_support::Option<HandleEffects> {
+fn operationValueArguments(self_: const Module&, id: Id) -> const squid_check_types::Id[:] { return self_.types.list(self_.operationValue(id).arguments); }
+fn handleEffects(self_: const Module&, id: Id) -> squid_support::Option<HandleEffects> {
     let value = self_.node(id); assert(value.tag == Tag.handle);
-    if value.c == 0 { return blot_support::Option<HandleEffects> { false, default<HandleEffects>() , ..}; }
-    return blot_support::Option<HandleEffects> { true, self_.handle_effects[value.c - 1] , ..};
+    if value.c == 0 { return squid_support::Option<HandleEffects> { false, default<HandleEffects>() , ..}; }
+    return squid_support::Option<HandleEffects> { true, self_.handle_effects[value.c - 1] , ..};
 }
-fn dispatchSignature(self_: const Module&, id: Id) -> blot_check_types::Id {
+fn dispatchSignature(self_: const Module&, id: Id) -> squid_check_types::Id {
     if self_.dispatch_signatures.len == 0 { return 0; } return self_.dispatch_signatures[id];
 }
 fn children(self_: const Module&, id: Id) -> const Id[:] {
@@ -601,14 +601,14 @@ fn sparkInfo(self_: const Module&, id: Id) -> SparkInfo { let value = self_.node
 fn sparkCaptures(self_: const Module&, id: Id) -> const BindingId[:] { let range = self_.sparkInfo(id).captures; return self_.extra[range.start..range.start + range.len]; }
 fn breakValues(self_: const Module&, id: Id) -> const Id[:] { assert(self_.node(id).tag == Tag.break_); return self_.children(id); }
 fn name(self_: const Module&, range: Name) -> const u8[:] { return self_.names[range.start..range.start + range.len]; }
-fn fieldSpelling(self_: const Module&, symbol: u32) -> blot_support::Option<const u8[:]> {
+fn fieldSpelling(self_: const Module&, symbol: u32) -> squid_support::Option<const u8[:]> {
     var low: i64 = 0; var high = self_.field_names.len;
     while low < high {
         let middle = low + (high - low) / 2; let value = self_.field_names[middle];
         if value.symbol < symbol { low = middle + 1; } else if value.symbol > symbol { high = middle; }
-        else { return blot_support::some<const u8[:]>(self_.name(value.spelling)); }
+        else { return squid_support::some<const u8[:]>(self_.name(value.spelling)); }
     }
-    return blot_support::none<const u8[:]>();
+    return squid_support::none<const u8[:]>();
 }
 fn nominal(self_: const Module&, index: u32) -> Nominal { return self_.nominals[index]; }
 fn nominalConstructors(self_: const Module&, index: u32) -> const u32[:] { let range = self_.nominals[index].constructors; return self_.extra[range.start..range.start + range.len]; }
@@ -628,8 +628,8 @@ fn updatePath(self_: const Module&, id: Id) -> const u32[:] { let range = self_.
 fn updateSelectors(self_: const Module&, id: Id) -> const UpdateStep[:] { let range = self_.updateInfo(id).selectors; return self_.update_steps[range.start..range.start + range.len]; }
 fn arrayOperation(self_: const Module&, id: Id) -> ArrayOp {
     let value = self_.node(id); assert(value.tag == Tag.array_op);
-    let operation, error = blot_backend_collection_ops::opFromCode(value.c);
-    assert(error == blot_error::Error.none); return operation;
+    let operation, error = squid_backend_collection_ops::opFromCode(value.c);
+    assert(error == squid_error::Error.none); return operation;
 }
 fn closure(self_: const Module&, id: Id) -> ClosureInfo { let value = self_.node(id); assert(value.tag == Tag.closure); return self_.closures[value.a]; }
 fn closureCaptures(self_: const Module&, id: Id) -> const BindingId[:] { let range = self_.closure(id).captures; return self_.extra[range.start..range.start + range.len]; }
@@ -687,56 +687,56 @@ fn tagCode(value: Tag) -> u32 {
         flat_op => { return 46; },
     }
 }
-fn tagFromCode(code: u32) -> Tag, blot_error::Error {
+fn tagFromCode(code: u32) -> Tag, squid_error::Error {
     match code {
-        0 => { return Tag.invalid, blot_error::Error.none; },
-        1 => { return Tag.constant, blot_error::Error.none; },
-        2 => { return Tag.reference, blot_error::Error.none; },
-        3 => { return Tag.scalar, blot_error::Error.none; },
-        4 => { return Tag.logical, blot_error::Error.none; },
-        5 => { return Tag.call, blot_error::Error.none; },
-        6 => { return Tag.if_value, blot_error::Error.none; },
-        7 => { return Tag.block_, blot_error::Error.none; },
-        8 => { return Tag.suite, blot_error::Error.none; },
-        9 => { return Tag.bind, blot_error::Error.none; },
-        10 => { return Tag.return_, blot_error::Error.none; },
-        11 => { return Tag.if_stmt, blot_error::Error.none; },
-        12 => { return Tag.product, blot_error::Error.none; },
-        13 => { return Tag.record, blot_error::Error.none; },
-        14 => { return Tag.construct, blot_error::Error.none; },
-        15 => { return Tag.project, blot_error::Error.none; },
-        16 => { return Tag.match_, blot_error::Error.none; },
-        17 => { return Tag.pattern_bind, blot_error::Error.none; },
-        18 => { return Tag.update, blot_error::Error.none; },
-        19 => { return Tag.array, blot_error::Error.none; },
-        20 => { return Tag.array_op, blot_error::Error.none; },
-        21 => { return Tag.closure, blot_error::Error.none; },
-        22 => { return Tag.apply, blot_error::Error.none; },
-        23 => { return Tag.constructor_function, blot_error::Error.none; },
-        24 => { return Tag.associated, blot_error::Error.none; },
-        25 => { return Tag.primitive_function, blot_error::Error.none; },
-        26 => { return Tag.panic, blot_error::Error.none; },
-        27 => { return Tag.loop_, blot_error::Error.none; },
-        28 => { return Tag.break_, blot_error::Error.none; },
-        29 => { return Tag.type_same, blot_error::Error.none; },
-        30 => { return Tag.result_associated, blot_error::Error.none; },
-        31 => { return Tag.type_constructor, blot_error::Error.none; },
-        32 => { return Tag.operation_value, blot_error::Error.none; },
-        33 => { return Tag.effect_provider, blot_error::Error.none; },
-        34 => { return Tag.state_provider, blot_error::Error.none; },
-        35 => { return Tag.handle, blot_error::Error.none; },
-        36 => { return Tag.effect_reflection, blot_error::Error.none; },
-        37 => { return Tag.contract_method, blot_error::Error.none; },
-        38 => { return Tag.staging, blot_error::Error.none; },
-        39 => { return Tag.storage, blot_error::Error.none; },
-        40 => { return Tag.fork_, blot_error::Error.none; },
-        41 => { return Tag.with_handle, blot_error::Error.none; },
-        42 => { return Tag.comptime_for, blot_error::Error.none; },
-        43 => { return Tag.comptime_if, blot_error::Error.none; },
-        44 => { return Tag.comptime_meta, blot_error::Error.none; },
-        45 => { return Tag.spark, blot_error::Error.none; },
-        46 => { return Tag.flat_op, blot_error::Error.none; },
-        _ => { return Tag.invalid, blot_error::Error.core_limit; },
+        0 => { return Tag.invalid, squid_error::Error.none; },
+        1 => { return Tag.constant, squid_error::Error.none; },
+        2 => { return Tag.reference, squid_error::Error.none; },
+        3 => { return Tag.scalar, squid_error::Error.none; },
+        4 => { return Tag.logical, squid_error::Error.none; },
+        5 => { return Tag.call, squid_error::Error.none; },
+        6 => { return Tag.if_value, squid_error::Error.none; },
+        7 => { return Tag.block_, squid_error::Error.none; },
+        8 => { return Tag.suite, squid_error::Error.none; },
+        9 => { return Tag.bind, squid_error::Error.none; },
+        10 => { return Tag.return_, squid_error::Error.none; },
+        11 => { return Tag.if_stmt, squid_error::Error.none; },
+        12 => { return Tag.product, squid_error::Error.none; },
+        13 => { return Tag.record, squid_error::Error.none; },
+        14 => { return Tag.construct, squid_error::Error.none; },
+        15 => { return Tag.project, squid_error::Error.none; },
+        16 => { return Tag.match_, squid_error::Error.none; },
+        17 => { return Tag.pattern_bind, squid_error::Error.none; },
+        18 => { return Tag.update, squid_error::Error.none; },
+        19 => { return Tag.array, squid_error::Error.none; },
+        20 => { return Tag.array_op, squid_error::Error.none; },
+        21 => { return Tag.closure, squid_error::Error.none; },
+        22 => { return Tag.apply, squid_error::Error.none; },
+        23 => { return Tag.constructor_function, squid_error::Error.none; },
+        24 => { return Tag.associated, squid_error::Error.none; },
+        25 => { return Tag.primitive_function, squid_error::Error.none; },
+        26 => { return Tag.panic, squid_error::Error.none; },
+        27 => { return Tag.loop_, squid_error::Error.none; },
+        28 => { return Tag.break_, squid_error::Error.none; },
+        29 => { return Tag.type_same, squid_error::Error.none; },
+        30 => { return Tag.result_associated, squid_error::Error.none; },
+        31 => { return Tag.type_constructor, squid_error::Error.none; },
+        32 => { return Tag.operation_value, squid_error::Error.none; },
+        33 => { return Tag.effect_provider, squid_error::Error.none; },
+        34 => { return Tag.state_provider, squid_error::Error.none; },
+        35 => { return Tag.handle, squid_error::Error.none; },
+        36 => { return Tag.effect_reflection, squid_error::Error.none; },
+        37 => { return Tag.contract_method, squid_error::Error.none; },
+        38 => { return Tag.staging, squid_error::Error.none; },
+        39 => { return Tag.storage, squid_error::Error.none; },
+        40 => { return Tag.fork_, squid_error::Error.none; },
+        41 => { return Tag.with_handle, squid_error::Error.none; },
+        42 => { return Tag.comptime_for, squid_error::Error.none; },
+        43 => { return Tag.comptime_if, squid_error::Error.none; },
+        44 => { return Tag.comptime_meta, squid_error::Error.none; },
+        45 => { return Tag.spark, squid_error::Error.none; },
+        46 => { return Tag.flat_op, squid_error::Error.none; },
+        _ => { return Tag.invalid, squid_error::Error.core_limit; },
     }
 }
 
@@ -812,77 +812,77 @@ fn opCode(value: Op) -> u32 {
         i16x8_max_u => { return 67; },
     }
 }
-fn opFromCode(code: u32) -> Op, blot_error::Error {
+fn opFromCode(code: u32) -> Op, squid_error::Error {
     match code {
-        0 => { return Op.none, blot_error::Error.none; },
-        1 => { return Op.add, blot_error::Error.none; },
-        2 => { return Op.sub, blot_error::Error.none; },
-        3 => { return Op.mul, blot_error::Error.none; },
-        4 => { return Op.div, blot_error::Error.none; },
-        5 => { return Op.rem, blot_error::Error.none; },
-        6 => { return Op.equal, blot_error::Error.none; },
-        7 => { return Op.not_equal, blot_error::Error.none; },
-        8 => { return Op.less, blot_error::Error.none; },
-        9 => { return Op.less_equal, blot_error::Error.none; },
-        10 => { return Op.greater, blot_error::Error.none; },
-        11 => { return Op.greater_equal, blot_error::Error.none; },
-        12 => { return Op.bit_and, blot_error::Error.none; },
-        13 => { return Op.bit_or, blot_error::Error.none; },
-        14 => { return Op.bit_xor, blot_error::Error.none; },
-        15 => { return Op.shift_left, blot_error::Error.none; },
-        16 => { return Op.shift_right, blot_error::Error.none; },
-        17 => { return Op.and_, blot_error::Error.none; },
-        18 => { return Op.or_, blot_error::Error.none; },
-        19 => { return Op.neg, blot_error::Error.none; },
-        20 => { return Op.abs, blot_error::Error.none; },
-        21 => { return Op.ceil, blot_error::Error.none; },
-        22 => { return Op.floor, blot_error::Error.none; },
-        23 => { return Op.trunc, blot_error::Error.none; },
-        24 => { return Op.sqrt, blot_error::Error.none; },
-        25 => { return Op.convert_u32_f32, blot_error::Error.none; },
-        26 => { return Op.convert_f32_u32, blot_error::Error.none; },
-        27 => { return Op.shift_right_signed, blot_error::Error.none; },
-        28 => { return Op.min, blot_error::Error.none; },
-        29 => { return Op.max, blot_error::Error.none; },
-        30 => { return Op.bit_not, blot_error::Error.none; },
-        31 => { return Op.bit_andnot, blot_error::Error.none; },
-        32 => { return Op.any_true, blot_error::Error.none; },
-        33 => { return Op.all_true, blot_error::Error.none; },
-        34 => { return Op.select, blot_error::Error.none; },
-        35 => { return Op.shuffle, blot_error::Error.none; },
-        36 => { return Op.swizzle, blot_error::Error.none; },
-        37 => { return Op.broadcast, blot_error::Error.none; },
-        38 => { return Op.bits, blot_error::Error.none; },
-        39 => { return Op.from_bits, blot_error::Error.none; },
-        40 => { return Op.relaxed_madd, blot_error::Error.none; },
-        41 => { return Op.relaxed_nmadd, blot_error::Error.none; },
-        42 => { return Op.convert_i32_f32, blot_error::Error.none; },
-        43 => { return Op.convert_f32_i32, blot_error::Error.none; },
-        44 => { return Op.continue_, blot_error::Error.none; },
-        45 => { return Op.not_, blot_error::Error.none; },
-        46 => { return Op.numeric_convert, blot_error::Error.none; },
-        47 => { return Op.mul_wide, blot_error::Error.none; },
-        48 => { return Op.i8x16_splat, blot_error::Error.none; },
-        49 => { return Op.i8x16_add, blot_error::Error.none; },
-        50 => { return Op.i8x16_sub, blot_error::Error.none; },
-        51 => { return Op.i8x16_min_u, blot_error::Error.none; },
-        52 => { return Op.i8x16_max_u, blot_error::Error.none; },
-        53 => { return Op.i8x16_eq, blot_error::Error.none; },
-        54 => { return Op.i8x16_avgr_u, blot_error::Error.none; },
-        55 => { return Op.i8x16_bitmask, blot_error::Error.none; },
-        56 => { return Op.i8x16_narrow_u, blot_error::Error.none; },
-        57 => { return Op.i16x8_splat, blot_error::Error.none; },
-        58 => { return Op.i16x8_extend_low_u, blot_error::Error.none; },
-        59 => { return Op.i16x8_extend_high_u, blot_error::Error.none; },
-        60 => { return Op.i16x8_add, blot_error::Error.none; },
-        61 => { return Op.i16x8_sub, blot_error::Error.none; },
-        62 => { return Op.i16x8_mul, blot_error::Error.none; },
-        63 => { return Op.i16x8_shl, blot_error::Error.none; },
-        64 => { return Op.i16x8_shr_u, blot_error::Error.none; },
-        65 => { return Op.i16x8_shr_s, blot_error::Error.none; },
-        66 => { return Op.i16x8_min_u, blot_error::Error.none; },
-        67 => { return Op.i16x8_max_u, blot_error::Error.none; },
-        _ => { return Op.none, blot_error::Error.core_limit; },
+        0 => { return Op.none, squid_error::Error.none; },
+        1 => { return Op.add, squid_error::Error.none; },
+        2 => { return Op.sub, squid_error::Error.none; },
+        3 => { return Op.mul, squid_error::Error.none; },
+        4 => { return Op.div, squid_error::Error.none; },
+        5 => { return Op.rem, squid_error::Error.none; },
+        6 => { return Op.equal, squid_error::Error.none; },
+        7 => { return Op.not_equal, squid_error::Error.none; },
+        8 => { return Op.less, squid_error::Error.none; },
+        9 => { return Op.less_equal, squid_error::Error.none; },
+        10 => { return Op.greater, squid_error::Error.none; },
+        11 => { return Op.greater_equal, squid_error::Error.none; },
+        12 => { return Op.bit_and, squid_error::Error.none; },
+        13 => { return Op.bit_or, squid_error::Error.none; },
+        14 => { return Op.bit_xor, squid_error::Error.none; },
+        15 => { return Op.shift_left, squid_error::Error.none; },
+        16 => { return Op.shift_right, squid_error::Error.none; },
+        17 => { return Op.and_, squid_error::Error.none; },
+        18 => { return Op.or_, squid_error::Error.none; },
+        19 => { return Op.neg, squid_error::Error.none; },
+        20 => { return Op.abs, squid_error::Error.none; },
+        21 => { return Op.ceil, squid_error::Error.none; },
+        22 => { return Op.floor, squid_error::Error.none; },
+        23 => { return Op.trunc, squid_error::Error.none; },
+        24 => { return Op.sqrt, squid_error::Error.none; },
+        25 => { return Op.convert_u32_f32, squid_error::Error.none; },
+        26 => { return Op.convert_f32_u32, squid_error::Error.none; },
+        27 => { return Op.shift_right_signed, squid_error::Error.none; },
+        28 => { return Op.min, squid_error::Error.none; },
+        29 => { return Op.max, squid_error::Error.none; },
+        30 => { return Op.bit_not, squid_error::Error.none; },
+        31 => { return Op.bit_andnot, squid_error::Error.none; },
+        32 => { return Op.any_true, squid_error::Error.none; },
+        33 => { return Op.all_true, squid_error::Error.none; },
+        34 => { return Op.select, squid_error::Error.none; },
+        35 => { return Op.shuffle, squid_error::Error.none; },
+        36 => { return Op.swizzle, squid_error::Error.none; },
+        37 => { return Op.broadcast, squid_error::Error.none; },
+        38 => { return Op.bits, squid_error::Error.none; },
+        39 => { return Op.from_bits, squid_error::Error.none; },
+        40 => { return Op.relaxed_madd, squid_error::Error.none; },
+        41 => { return Op.relaxed_nmadd, squid_error::Error.none; },
+        42 => { return Op.convert_i32_f32, squid_error::Error.none; },
+        43 => { return Op.convert_f32_i32, squid_error::Error.none; },
+        44 => { return Op.continue_, squid_error::Error.none; },
+        45 => { return Op.not_, squid_error::Error.none; },
+        46 => { return Op.numeric_convert, squid_error::Error.none; },
+        47 => { return Op.mul_wide, squid_error::Error.none; },
+        48 => { return Op.i8x16_splat, squid_error::Error.none; },
+        49 => { return Op.i8x16_add, squid_error::Error.none; },
+        50 => { return Op.i8x16_sub, squid_error::Error.none; },
+        51 => { return Op.i8x16_min_u, squid_error::Error.none; },
+        52 => { return Op.i8x16_max_u, squid_error::Error.none; },
+        53 => { return Op.i8x16_eq, squid_error::Error.none; },
+        54 => { return Op.i8x16_avgr_u, squid_error::Error.none; },
+        55 => { return Op.i8x16_bitmask, squid_error::Error.none; },
+        56 => { return Op.i8x16_narrow_u, squid_error::Error.none; },
+        57 => { return Op.i16x8_splat, squid_error::Error.none; },
+        58 => { return Op.i16x8_extend_low_u, squid_error::Error.none; },
+        59 => { return Op.i16x8_extend_high_u, squid_error::Error.none; },
+        60 => { return Op.i16x8_add, squid_error::Error.none; },
+        61 => { return Op.i16x8_sub, squid_error::Error.none; },
+        62 => { return Op.i16x8_mul, squid_error::Error.none; },
+        63 => { return Op.i16x8_shl, squid_error::Error.none; },
+        64 => { return Op.i16x8_shr_u, squid_error::Error.none; },
+        65 => { return Op.i16x8_shr_s, squid_error::Error.none; },
+        66 => { return Op.i16x8_min_u, squid_error::Error.none; },
+        67 => { return Op.i16x8_max_u, squid_error::Error.none; },
+        _ => { return Op.none, squid_error::Error.core_limit; },
     }
 }
 
@@ -898,17 +898,17 @@ fn patternTagCode(value: PatternTag) -> u32 {
         record_payload => { return 7; },
     }
 }
-fn patternTagFromCode(code: u32) -> PatternTag, blot_error::Error {
+fn patternTagFromCode(code: u32) -> PatternTag, squid_error::Error {
     match code {
-        0 => { return PatternTag.invalid, blot_error::Error.none; },
-        1 => { return PatternTag.wildcard, blot_error::Error.none; },
-        2 => { return PatternTag.bind, blot_error::Error.none; },
-        3 => { return PatternTag.constant, blot_error::Error.none; },
-        4 => { return PatternTag.value, blot_error::Error.none; },
-        5 => { return PatternTag.product, blot_error::Error.none; },
-        6 => { return PatternTag.constructor, blot_error::Error.none; },
-        7 => { return PatternTag.record_payload, blot_error::Error.none; },
-        _ => { return PatternTag.invalid, blot_error::Error.core_limit; },
+        0 => { return PatternTag.invalid, squid_error::Error.none; },
+        1 => { return PatternTag.wildcard, squid_error::Error.none; },
+        2 => { return PatternTag.bind, squid_error::Error.none; },
+        3 => { return PatternTag.constant, squid_error::Error.none; },
+        4 => { return PatternTag.value, squid_error::Error.none; },
+        5 => { return PatternTag.product, squid_error::Error.none; },
+        6 => { return PatternTag.constructor, squid_error::Error.none; },
+        7 => { return PatternTag.record_payload, squid_error::Error.none; },
+        _ => { return PatternTag.invalid, squid_error::Error.core_limit; },
     }
 }
 
@@ -918,11 +918,11 @@ fn primitiveKindCode(value: PrimitiveKind) -> u32 {
         array => { return 1; },
     }
 }
-fn primitiveKindFromCode(code: u32) -> PrimitiveKind, blot_error::Error {
+fn primitiveKindFromCode(code: u32) -> PrimitiveKind, squid_error::Error {
     match code {
-        0 => { return PrimitiveKind.scalar, blot_error::Error.none; },
-        1 => { return PrimitiveKind.array, blot_error::Error.none; },
-        _ => { return PrimitiveKind.scalar, blot_error::Error.core_limit; },
+        0 => { return PrimitiveKind.scalar, squid_error::Error.none; },
+        1 => { return PrimitiveKind.array, squid_error::Error.none; },
+        _ => { return PrimitiveKind.scalar, squid_error::Error.core_limit; },
     }
 }
 
@@ -933,12 +933,12 @@ fn updateKindCode(value: UpdateKind) -> u32 {
         comptime_field => { return 2; },
     }
 }
-fn updateKindFromCode(code: u32) -> UpdateKind, blot_error::Error {
+fn updateKindFromCode(code: u32) -> UpdateKind, squid_error::Error {
     match code {
-        0 => { return UpdateKind.field, blot_error::Error.none; },
-        1 => { return UpdateKind.index, blot_error::Error.none; },
-        2 => { return UpdateKind.comptime_field, blot_error::Error.none; },
-        _ => { return UpdateKind.field, blot_error::Error.core_limit; },
+        0 => { return UpdateKind.field, squid_error::Error.none; },
+        1 => { return UpdateKind.index, squid_error::Error.none; },
+        2 => { return UpdateKind.comptime_field, squid_error::Error.none; },
+        _ => { return UpdateKind.field, squid_error::Error.core_limit; },
     }
 }
 
@@ -949,12 +949,12 @@ fn loopKindCode(value: LoopKind) -> u32 {
         array => { return 2; },
     }
 }
-fn loopKindFromCode(code: u32) -> LoopKind, blot_error::Error {
+fn loopKindFromCode(code: u32) -> LoopKind, squid_error::Error {
     match code {
-        0 => { return LoopKind.forever, blot_error::Error.none; },
-        1 => { return LoopKind.range, blot_error::Error.none; },
-        2 => { return LoopKind.array, blot_error::Error.none; },
-        _ => { return LoopKind.forever, blot_error::Error.core_limit; },
+        0 => { return LoopKind.forever, squid_error::Error.none; },
+        1 => { return LoopKind.range, squid_error::Error.none; },
+        2 => { return LoopKind.array, squid_error::Error.none; },
+        _ => { return LoopKind.forever, squid_error::Error.core_limit; },
     }
 }
 
@@ -974,106 +974,106 @@ fn codeCode(value: Code) -> u32 {
         kept_value => { return 11; },
     }
 }
-fn codeFromCode(code: u32) -> Code, blot_error::Error {
+fn codeFromCode(code: u32) -> Code, squid_error::Error {
     match code {
-        0 => { return Code.unchecked, blot_error::Error.none; },
-        1 => { return Code.unsupported, blot_error::Error.none; },
-        2 => { return Code.unresolved_binding, blot_error::Error.none; },
-        3 => { return Code.invalid_call, blot_error::Error.none; },
-        4 => { return Code.complexity, blot_error::Error.none; },
-        5 => { return Code.aliased_update, blot_error::Error.none; },
-        6 => { return Code.spent_value, blot_error::Error.none; },
-        7 => { return Code.own_argument, blot_error::Error.none; },
-        8 => { return Code.own_function_value, blot_error::Error.none; },
-        9 => { return Code.result_not_owned, blot_error::Error.none; },
-        10 => { return Code.lent_result_value, blot_error::Error.none; },
-        11 => { return Code.kept_value, blot_error::Error.none; },
-        _ => { return Code.unchecked, blot_error::Error.core_limit; },
+        0 => { return Code.unchecked, squid_error::Error.none; },
+        1 => { return Code.unsupported, squid_error::Error.none; },
+        2 => { return Code.unresolved_binding, squid_error::Error.none; },
+        3 => { return Code.invalid_call, squid_error::Error.none; },
+        4 => { return Code.complexity, squid_error::Error.none; },
+        5 => { return Code.aliased_update, squid_error::Error.none; },
+        6 => { return Code.spent_value, squid_error::Error.none; },
+        7 => { return Code.own_argument, squid_error::Error.none; },
+        8 => { return Code.own_function_value, squid_error::Error.none; },
+        9 => { return Code.result_not_owned, squid_error::Error.none; },
+        10 => { return Code.lent_result_value, squid_error::Error.none; },
+        11 => { return Code.kept_value, squid_error::Error.none; },
+        _ => { return Code.unchecked, squid_error::Error.core_limit; },
     }
 }
 
 fn deinit(self_: Module&) {
-    self_.field_names = default<blot_check_core::FieldName[:]>();
-    self_.runtime_names = default<blot_check_core::RuntimeName[:]>();
-    self_.source_names = default<blot_check_core::RuntimeName[:]>();
-    self_.declaration_dependencies = default<blot_check_core::DeclarationDependencies[:]>();
-    self_.dependency_references = default<blot_check_core::BindingRef[:]>();
-    self_.dependency_members = default<blot_check_core::DependencyMember[:]>();
-    self_.erased_declaration_references = default<blot_check_core::ErasedDeclarationReference[:]>();
-    self_.tag_calls = default<blot_check_core::Id[:]>();
-    self_.nodes = default<blot_check_core::Node[:]>();
-    self_.spans = default<blot_check_core::Span[:]>();
-    self_.extra = default<blot_check_core::Id[:]>();
-    self_.bindings = default<blot_check_core::Binding[:]>();
-    self_.bodies = default<blot_check_core::Body[:]>();
-    self_.parameters = default<blot_check_core::Parameter[:]>();
-    self_.references = default<blot_check_core::BindingRef[:]>();
-    self_.calls = default<blot_check_core::CallInfo[:]>();
-    self_.merges = default<blot_check_core::Merge[:]>();
-    self_.merge_ranges = default<blot_check_core::List[:]>();
+    self_.field_names = default<squid_check_core::FieldName[:]>();
+    self_.runtime_names = default<squid_check_core::RuntimeName[:]>();
+    self_.source_names = default<squid_check_core::RuntimeName[:]>();
+    self_.declaration_dependencies = default<squid_check_core::DeclarationDependencies[:]>();
+    self_.dependency_references = default<squid_check_core::BindingRef[:]>();
+    self_.dependency_members = default<squid_check_core::DependencyMember[:]>();
+    self_.erased_declaration_references = default<squid_check_core::ErasedDeclarationReference[:]>();
+    self_.tag_calls = default<squid_check_core::Id[:]>();
+    self_.nodes = default<squid_check_core::Node[:]>();
+    self_.spans = default<squid_check_core::Span[:]>();
+    self_.extra = default<squid_check_core::Id[:]>();
+    self_.bindings = default<squid_check_core::Binding[:]>();
+    self_.bodies = default<squid_check_core::Body[:]>();
+    self_.parameters = default<squid_check_core::Parameter[:]>();
+    self_.references = default<squid_check_core::BindingRef[:]>();
+    self_.calls = default<squid_check_core::CallInfo[:]>();
+    self_.merges = default<squid_check_core::Merge[:]>();
+    self_.merge_ranges = default<squid_check_core::List[:]>();
     self_.names = default<u8[:]>();
-    self_.obligations = default<blot_check_core::Obligation[:]>();
-    self_.nominals = default<blot_check_core::Nominal[:]>();
-    self_.operation_names = default<blot_check_core::OperationName[:]>();
-    self_.constructors = default<blot_check_core::Constructor[:]>();
-    self_.projections = default<blot_check_core::Projection[:]>();
-    self_.projection_variants = default<blot_check_core::ProjectionVariant[:]>();
-    self_.patterns = default<blot_check_core::Pattern[:]>();
-    self_.pattern_rows = default<blot_check_core::PatternRow[:]>();
-    self_.match_arms = default<blot_check_core::MatchArm[:]>();
-    self_.matches = default<blot_check_core::MatchInfo[:]>();
-    self_.updates = default<blot_check_core::UpdateInfo[:]>();
-    self_.update_steps = default<blot_check_core::UpdateStep[:]>();
-    self_.closures = default<blot_check_core::ClosureInfo[:]>();
-    self_.associated = default<blot_check_core::Associated[:]>();
-    self_.contracts = default<blot_check_core::Contract[:]>();
-    self_.contract_members = default<blot_check_core::ContractMember[:]>();
-    self_.implementations = default<blot_check_core::Implementation[:]>();
-    self_.implementation_members = default<blot_check_core::ImplementationMember[:]>();
-    self_.member_templates = default<blot_check_core::MemberTemplate[:]>();
-    self_.primitives = default<blot_check_core::Primitive[:]>();
-    self_.loops = default<blot_check_core::LoopInfo[:]>();
-    self_.loop_carries = default<blot_check_core::LoopCarry[:]>();
-    self_.operation_values = default<blot_check_core::OperationValue[:]>();
-    self_.handle_effects = default<blot_check_core::HandleEffects[:]>();
-    self_.dispatch_signatures = default<blot_check_types::Id[:]>();
-    self_.type_tags = default<blot_check_core::TypeTag[:]>();
-    self_.sparks = default<blot_check_core::SparkInfo[:]>();
-    self_.kernels = default<blot_check_core::KernelDecl[:]>();
-    self_.processes = default<blot_check_core::ProcessDecl[:]>();
-    self_.diagnostics = default<blot_check_core::Diagnostic[:]>();
-    self_.types.nodes = default<const blot_check_types::Node[:]>(); self_.types.extra = default<const blot_check_types::Id[:]>(); self_.types.effects.rows = default<const blot_check_effects::Row[:]>(); self_.types.effects.labels = default<const blot_check_effects::Label[:]>();
-    self_.types.operations = default<const blot_check_types::Operation[:]>();
+    self_.obligations = default<squid_check_core::Obligation[:]>();
+    self_.nominals = default<squid_check_core::Nominal[:]>();
+    self_.operation_names = default<squid_check_core::OperationName[:]>();
+    self_.constructors = default<squid_check_core::Constructor[:]>();
+    self_.projections = default<squid_check_core::Projection[:]>();
+    self_.projection_variants = default<squid_check_core::ProjectionVariant[:]>();
+    self_.patterns = default<squid_check_core::Pattern[:]>();
+    self_.pattern_rows = default<squid_check_core::PatternRow[:]>();
+    self_.match_arms = default<squid_check_core::MatchArm[:]>();
+    self_.matches = default<squid_check_core::MatchInfo[:]>();
+    self_.updates = default<squid_check_core::UpdateInfo[:]>();
+    self_.update_steps = default<squid_check_core::UpdateStep[:]>();
+    self_.closures = default<squid_check_core::ClosureInfo[:]>();
+    self_.associated = default<squid_check_core::Associated[:]>();
+    self_.contracts = default<squid_check_core::Contract[:]>();
+    self_.contract_members = default<squid_check_core::ContractMember[:]>();
+    self_.implementations = default<squid_check_core::Implementation[:]>();
+    self_.implementation_members = default<squid_check_core::ImplementationMember[:]>();
+    self_.member_templates = default<squid_check_core::MemberTemplate[:]>();
+    self_.primitives = default<squid_check_core::Primitive[:]>();
+    self_.loops = default<squid_check_core::LoopInfo[:]>();
+    self_.loop_carries = default<squid_check_core::LoopCarry[:]>();
+    self_.operation_values = default<squid_check_core::OperationValue[:]>();
+    self_.handle_effects = default<squid_check_core::HandleEffects[:]>();
+    self_.dispatch_signatures = default<squid_check_types::Id[:]>();
+    self_.type_tags = default<squid_check_core::TypeTag[:]>();
+    self_.sparks = default<squid_check_core::SparkInfo[:]>();
+    self_.kernels = default<squid_check_core::KernelDecl[:]>();
+    self_.processes = default<squid_check_core::ProcessDecl[:]>();
+    self_.diagnostics = default<squid_check_core::Diagnostic[:]>();
+    self_.types.nodes = default<const squid_check_types::Node[:]>(); self_.types.extra = default<const squid_check_types::Id[:]>(); self_.types.effects.rows = default<const squid_check_effects::Row[:]>(); self_.types.effects.labels = default<const squid_check_effects::Label[:]>();
+    self_.types.operations = default<const squid_check_types::Operation[:]>();
     self_.owner_id = 0; self_.types.owner_id = 0;
 }
 
 
-fn blot_structural::equal(left: blot_check_core::Tag, right: blot_check_core::Tag) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Tag,sink: S&) { blot_structural::hash(sink, blot_check_core::tagCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::Tag, right: squid_check_core::Tag) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::Tag,sink: S&) { squid_structural::hash(sink, squid_check_core::tagCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::PrimitiveKind, right: blot_check_core::PrimitiveKind) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::PrimitiveKind,sink: S&) { blot_structural::hash(sink, blot_check_core::primitiveKindCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::PrimitiveKind, right: squid_check_core::PrimitiveKind) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::PrimitiveKind,sink: S&) { squid_structural::hash(sink, squid_check_core::primitiveKindCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::Op, right: blot_check_core::Op) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Op,sink: S&) { blot_structural::hash(sink, blot_check_core::opCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::Op, right: squid_check_core::Op) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::Op,sink: S&) { squid_structural::hash(sink, squid_check_core::opCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::PatternTag, right: blot_check_core::PatternTag) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::PatternTag,sink: S&) { blot_structural::hash(sink, blot_check_core::patternTagCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::PatternTag, right: squid_check_core::PatternTag) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::PatternTag,sink: S&) { squid_structural::hash(sink, squid_check_core::patternTagCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::UpdateKind, right: blot_check_core::UpdateKind) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::UpdateKind,sink: S&) { blot_structural::hash(sink, blot_check_core::updateKindCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::UpdateKind, right: squid_check_core::UpdateKind) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::UpdateKind,sink: S&) { squid_structural::hash(sink, squid_check_core::updateKindCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::LoopKind, right: blot_check_core::LoopKind) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::LoopKind,sink: S&) { blot_structural::hash(sink, blot_check_core::loopKindCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::LoopKind, right: squid_check_core::LoopKind) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::LoopKind,sink: S&) { squid_structural::hash(sink, squid_check_core::loopKindCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::Code, right: blot_check_core::Code) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Code,sink: S&) { blot_structural::hash(sink, blot_check_core::codeCode(value) as! u8); }
+fn squid_structural::equal(left: squid_check_core::Code, right: squid_check_core::Code) -> bool { return left == right; }
+fn squid_check_core::squidStructuralHash<S>(value: squid_check_core::Code,sink: S&) { squid_structural::hash(sink, squid_check_core::codeCode(value) as! u8); }
 
 struct TypesStampView {
-    nodes: const blot_check_types::Node[:],
-    extra: const blot_check_types::Id[:],
+    nodes: const squid_check_types::Node[:],
+    extra: const squid_check_types::Id[:],
     effects: EffectRows = EffectRows {..},
-    operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
+    operations: const squid_check_types::Operation[:] = default<const squid_check_types::Operation[:]>(),
 }
 fn typesStampView(self_: const Types&) -> TypesStampView {
     return TypesStampView { self_.nodes, self_.extra, self_.effects, self_.operations , ..};
@@ -1125,7 +1125,7 @@ struct StampView {
     loop_carries: const LoopCarry[:] = default<const LoopCarry[:]>(),
     operation_values: const OperationValue[:] = default<const OperationValue[:]>(),
     handle_effects: const HandleEffects[:] = default<const HandleEffects[:]>(),
-    dispatch_signatures: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),
+    dispatch_signatures: const squid_check_types::Id[:] = default<const squid_check_types::Id[:]>(),
     type_tags: const TypeTag[:] = default<const TypeTag[:]>(),
     sparks: const SparkInfo[:] = default<const SparkInfo[:]>(),
     kernels: const KernelDecl[:] = default<const KernelDecl[:]>(),
@@ -1137,11 +1137,11 @@ fn stampView(self_: const Module&) -> StampView {
     return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.primitives, self_.loops, self_.loop_carries, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.sparks, self_.kernels, self_.processes, self_.diagnostics, self_.body_lowerings , ..};
 }
 
-type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;
-type ContractMemberKind = blot_reuse_principal_interface::ContractMemberKind;
+type ImplementationMemberKind = squid_reuse_principal_interface::ImplementationMemberKind;
+type ContractMemberKind = squid_reuse_principal_interface::ContractMemberKind;
 
 // Named binding classification is shared by all immutable consumers.
-type BindingKind = blot_check_check::Kind;
+type BindingKind = squid_check_check::Kind;
 
 fn sameFieldSymbol(a:const Module&,sa:u32,b:const Module&,sb:u32)->bool {
     let fa=a.fieldSpelling(sa);
@@ -1153,7 +1153,7 @@ fn sameFieldSymbol(a:const Module&,sa:u32,b:const Module&,sb:u32)->bool {
 
 recursive fn sameCoreType(a:const Module&,ta:u32,b:const Module&,tb:u32,depth:i64)->bool {
     if depth>64 { return false; }
-    if ta<=blot_check_types::never || tb<=blot_check_types::never { return ta==tb; }
+    if ta<=squid_check_types::never || tb<=squid_check_types::never { return ta==tb; }
     if ta>=a.types.nodes.len || tb>=b.types.nodes.len { return false; }
     let na=a.types.nodes[ta];
     let nb=b.types.nodes[tb];
@@ -1200,7 +1200,7 @@ recursive fn sameCoreType(a:const Module&,ta:u32,b:const Module&,tb:u32,depth:i6
             for i in 0..aa.len {
                 if !sameCoreType(a,aa[i],b,bb[i],depth+1) { return false; }
             }
-            if na.tag==blot_check_types::Tag.projection {
+            if na.tag==squid_check_types::Tag.projection {
                 return sameFieldSymbol(a,a.types.projectionMember(na),b,b.types.projectionMember(nb));
             }
             return true;

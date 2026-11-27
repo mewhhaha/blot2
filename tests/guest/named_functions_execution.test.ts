@@ -8,7 +8,7 @@ import {
 } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url);
 
 Deno.test("named functions execute curried calls and partial applications alongside ordinary function values", async () => {
   await compileAndRun(
@@ -80,15 +80,15 @@ Deno.test("named function tags reject changed dispatch parameters and written re
 });
 
 Deno.test("project imports expose public named functions while private helpers stay private through failed edits", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-named-functions-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-named-functions-" });
+  const entry = `${directory}/main.sq`;
   const accepted = `import { increment as renamed } from "./library"
 import * as library from "./library"
 io answer (value: U32) : U32 => return @u32.add (renamed value) (library.increment value)
 `;
   try {
     await Deno.writeTextFile(
-      `${directory}/library.blot`,
+      `${directory}/library.sq`,
       `private func hidden (value: U32) : U32 => return @u32.add value 2
 func increment (value: U32) : U32 => return hidden value
 `,

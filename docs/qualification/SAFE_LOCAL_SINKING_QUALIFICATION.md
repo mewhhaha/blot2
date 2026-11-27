@@ -22,7 +22,7 @@ pre-change version stored the producer before the branch. Both versions have
 two Wasm functions (body and export wrapper), so the sink adds no thunk.
 
 The paired benchmark is reproducible with
-`scripts/bench_safe_local_sinking.ts BASELINE_BLOTC CANDIDATE_BLOTC` under
+`scripts/bench_safe_local_sinking.ts BASELINE_SQUIDC CANDIDATE_SQUIDC` under
 `deno run --allow-read --allow-write --allow-run`. Both compilers were LLVM
 release builds from the same toolchain; the baseline source is `9cae6f7` and
 the candidate is this change. The fixture has 48 scalar operations and skips

@@ -33,7 +33,7 @@ bits; packed loads may be unaligned. An enum has a dense tag followed by only
 its selected payload: one tag byte up to 256 alternatives, two up to 65,536. Do
 not reserve or clear inactive alternatives.
 
-```blot
+```squid
 type Event is data =
   $Empty
   | $Point (U32, F32)
@@ -97,11 +97,11 @@ The 100,000-element 80% Empty/20% Point witness actually encodes 260,000 bytes
 and decodes all entries with checksum 999,950,000. Its worst-case backing buffer
 reserves 900,000 bytes. The current tag-word/max-payload layout models 1,200,000
 bytes for this element schema, excluding sequence metadata. The 78.3% reduction
-describes encoded element bytes; it is not a measured Blot runtime, Wasm-size or
+describes encoded element bytes; it is not a measured Squid runtime, Wasm-size or
 compile-time improvement.
 
 
-## Blot builder and shared-tail measurements
+## Squid builder and shared-tail measurements
 
 A source implementation now exercises the released List builder, the real
 Gdev Intent type, tag-word alignment, independently hashed branches sharing a
@@ -110,4 +110,4 @@ A one-level list of chunk references avoids copying either input payload.
 The measured grouped layout uses three private streams and reserves 45.5 KiB
 for the Gdev tail and two prefixes. Flat rows reserve 160 KiB. Arbitrary
 nested concatenation, balancing and general escaping lifetimes remain open.
-[Workloads and results](../../benchmarks/intent/README.md#building-and-sharing-lists-in-blot)
+[Workloads and results](../../benchmarks/intent/README.md#building-and-sharing-lists-in-squid)

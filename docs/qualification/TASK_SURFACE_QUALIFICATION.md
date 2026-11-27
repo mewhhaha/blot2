@@ -7,7 +7,7 @@
 
 This continuation of `87ba3f6` implements ordinary scope wrappers, exact
 explicit spawn wrappers and task tuple collection. It does not complete
-[issue #25's remaining program](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
+[issue #25's remaining program](https://github.com/mewhhaha/squid-lang/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
 
 ## Qualified behavior
 
@@ -70,15 +70,15 @@ deno task test:compiler --resume --native-shards 4 \
 
 This host uses writable `ZIG_GLOBAL_CACHE_DIR` and `ZIG_LOCAL_CACHE_DIR`
 directories under the repository's `build/`. The command runs from
-`build/qualification-snapshot/blot2`: compiler sources are linked to the same
+`build/qualification-snapshot/squid-lang`: compiler sources are linked to the same
 checkout, scripts and package files are identical copies, and the sibling gdev
-corpus is a frozen copy of 78 `.blot` files. The archive records those files'
+corpus is a frozen copy of 78 `.sq` files. The archive records those files'
 hashes. It does not redistribute the private application sources.
 
 ## Local installation
 
-The verified release is installed as `~/.local/bin/blot` and
-`~/.local/bin/blotc`. The CLI embeds its matching native compiler, parser,
+The verified release is installed as `~/.local/bin/squid` and
+`~/.local/bin/squidc`. The CLI embeds its matching native compiler, parser,
 standard library and language guide. The packaged compiler's decompressed hash
 matches the standalone native executable. The previous installed binaries are
 preserved under `build/install/previous`.
@@ -87,7 +87,7 @@ Both the staged and installed CLI pass an out-of-checkout check of the embedded
 guide, formatter, standard prelude and the README's task example. That example
 returns 42 in synchronous and JSPI guests. The raw native compiler also builds
 the example and produces 42. See the
-[installation commands](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#build-and-use).
+[installation commands](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#build-and-use).
 
 ## Repairs during verification
 
@@ -121,7 +121,7 @@ scoped nonlocal exits, purity certification and CPU worker transport remain
 unfinished. Iterator and compiler performance targets also remain open. This
 record makes no new application-performance claim and closes no upstream issue.
 
-See [the language guide](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/compiler/guide.md#structured-tasks),
+See [the language guide](https://github.com/mewhhaha/squid-lang/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/compiler/guide.md#structured-tasks),
 [the task contract](../compiler/STRUCTURED_CONCURRENCY.md),
-[the task ABI](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension) and
+[the task ABI](https://github.com/mewhhaha/squid-lang/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension) and
 [the continuation plan](../../CONTINUE.md).

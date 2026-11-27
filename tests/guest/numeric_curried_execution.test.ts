@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/squidc-goose", import.meta.url).pathname;
 const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return do:
   let copied = 0
@@ -88,11 +88,11 @@ for (
 ) {
   Deno.test(`curried selected proofs preserve ${name} captures traps and archives`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-curried-proof-",
+      prefix: "squid-curried-proof-",
     });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/logic.blot`;
-    const dependencies = `${directory}/logic.blotdep`;
+    const entry = `${directory}/main.sq`;
+    const dependency = `${directory}/logic.sq`;
+    const dependencies = `${directory}/logic.sqdep`;
     const options = {
       executable,
       entry,

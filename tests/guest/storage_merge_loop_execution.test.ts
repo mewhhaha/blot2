@@ -174,14 +174,14 @@ function expectedSeparate(
 }
 
 Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap prefixes`, async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-merge-loops-" });
-  const entry = `${directory}/main.blot`;
+  const directory = await Deno.makeTempDir({ prefix: "squid-merge-loops-" });
+  const entry = `${directory}/main.sq`;
   const stdRoot = new URL("../../std", import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,
     stdRoot,
-    prelude: `${stdRoot}/prelude.blot`,
+    prelude: `${stdRoot}/prelude.sq`,
   });
   try {
     const result = await compiler.build({
