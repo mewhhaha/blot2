@@ -486,10 +486,10 @@ io run (n: U32): #[U32] =>
 `,
   },
 
-  // 4. Wide 10-field Entity SoA (N = 100,000, 64B AoS row, build + 80x scan touching only 2/10 fields)
+  // 4. Wide 10-field Entity SoA (N = 100,000, 72B AoS row, build + 80x scan touching only 2/10 fields)
   {
     id: "wide_soa",
-    label: "4. Wide 10-field Record (64B) 80× touched-2-col scan (N=100k)",
+    label: "4. Wide 10-field Record (72B) 80× touched-2-col scan (N=100k)",
     arg: 100_000,
     arraySource: `
 type Entity = {
@@ -643,7 +643,7 @@ io run (n: U32): #[U32] =>
 `,
   },
 
-  // 7. Snapshot CoW branching (2,000 versions copied from frozen 50,000-element base + 1 edit each)
+  // 7. Snapshot CoW branching (2,000 versions copied from frozen 50,000-element base + 1 indexed edit each)
   {
     id: "snapshot_cow",
     label: "7. 2,000× snapshot copy + 1 edit from 50k base",
@@ -661,19 +661,6 @@ io run (n: U32): #[U32] =>
     let idx = (v * 97) % n
     snap[idx] := v + 1000
     acc := self + snap[idx] + snap[(idx + 1) % n]
-  return #[acc]
-`,
-    packedSource: `
-io run (n: U32): #[U32] =>
-  let base: %[U32] = Packed.with_capacity n
-  for i in 0..n:
-    base := base.push i
-  let frz = freeze base
-  let acc: U32 = 0
-  for v in 0..2000:
-    let snap = copy frz
-    snap := snap.push (v + 1000)
-    acc := self + snap.length
   return #[acc]
 `,
     seqSource: `
@@ -815,6 +802,122 @@ io run (n: U32): #[U32] =>
     let (l, r) = xs.split cut
     xs := r.concat l
   return #[xs[0] + xs[n / 2] + xs[n - 1]]
+`,
+  },
+
+  // 11. Zero-copy frozen span: wrap *#[U32] (100k) -> 500x slice + reverse + 100-elem sum
+  {
+    id: "frozen_span",
+    label: "11. Frozen 100k array: 500× slice + reverse + 100-elem sum",
+    arg: 100_000,
+    arraySource: `
+io run (n: U32): #[U32] =>
+  let base: #[U32] = Array.with_capacity n
+  for i in 0..n:
+    base := base.push (i * 5 + 7)
+  let frz = freeze base
+  let acc: U32 = 0
+  let seed: U32 = 314159
+  for _ in 0..500:
+    seed := self * 1664525 + 1013904223
+    let start = seed % (n - 20_000)
+    let len: U32 = 20_000
+    let sub: #[U32] = Array.with_capacity len
+    for j in 0..len:
+      sub := sub.push frz[start + len - 1 - j]
+    for j in 0..100:
+      acc := self + sub[j]
+  return #[acc]
+`,
+    seqSource: `
+io run (n: U32): #[U32] =>
+  let base: #[U32] = Array.with_capacity n
+  for i in 0..n:
+    base := base.push (i * 5 + 7)
+  let frz = freeze base
+  let span = Seq.from_frozen_array frz
+  let acc: U32 = 0
+  let seed: U32 = 314159
+  for _ in 0..500:
+    seed := self * 1664525 + 1013904223
+    let start = seed % (n - 20_000)
+    let sub = (span.slice start (start + 20_000)).reverse
+    let head = sub.slice 0 100
+    for x in head:
+      acc := self + x
+  return #[acc]
+`,
+  },
+
+  // 12. Persistent CoW branching on skewed 64B sum (1,000 versions from 50k base + 1 edit each)
+  {
+    id: "packed_sum_cow",
+    label: "12. 1,000× CoW snapshot + 1 edit on 50k skewed 64B sum",
+    arg: 50_000,
+    freshPerSample: true,
+    arraySource: `
+type BigEvent is data =
+  | $Tick
+  | $Big { a: U64, b: U64, c: U64, d: U64, e: U64, f: U64, g: U64, h: U64 }
+
+io run (n: U32): #[U32] =>
+  let evs: #[BigEvent] = Array.with_capacity n
+  for i in 0..n:
+    if i % 100 == 0:
+      let v = i.to_u64
+      evs := evs.push ($Big { a: v, b: 1u64, c: 2u64, d: 3u64, e: 4u64, f: 5u64, g: 6u64, h: v + 7u64 })
+    else:
+      evs := evs.push $Tick
+  let frz = freeze evs
+  let acc: U32 = 0
+  for v in 0..1000:
+    let snap = copy frz
+    let idx = (v * 97) % n
+    let vv = v.to_u64
+    snap[idx] := $Big { a: vv, b: 0u64, c: 0u64, d: 0u64, e: 0u64, f: 0u64, g: 0u64, h: vv + 1u64 }
+    case snap[idx] of
+      $Tick =>
+        acc := self + 1
+      $Big { a, h } =>
+        acc := self + a.to_u32 + h.to_u32
+    case snap[(idx + 1) % n] of
+      $Tick =>
+        acc := self + 1
+      $Big { a, h } =>
+        acc := self + a.to_u32 + h.to_u32
+  return #[acc]
+`,
+    seqSource: `
+type BigEvent is data =
+  | $Tick
+  | $Big { a: U64, b: U64, c: U64, d: U64, e: U64, f: U64, g: U64, h: U64 }
+
+io run (n: U32): #[U32] =>
+  let evs: ~[BigEvent] = ~[]
+  for i in 0..n:
+    if i % 100 == 0:
+      let v = i.to_u64
+      evs := evs.push ($Big { a: v, b: 1u64, c: 2u64, d: 3u64, e: 4u64, f: 5u64, g: 6u64, h: v + 7u64 })
+    else:
+      evs := evs.push $Tick
+  let frz = freeze evs
+  let acc: U32 = 0
+  for v in 0..1000:
+    let snap = copy frz
+    let idx = (v * 97) % n
+    let vv = v.to_u64
+    snap[idx] := $Big { a: vv, b: 0u64, c: 0u64, d: 0u64, e: 0u64, f: 0u64, g: 0u64, h: vv + 1u64 }
+    case snap[idx] of
+      $Tick =>
+        acc := self + 1
+      $Big { a, h } =>
+        acc := self + a.to_u32 + h.to_u32
+    case snap[(idx + 1) % n] of
+      $Tick =>
+        acc := self + 1
+      $Big { a, h } =>
+        acc := self + a.to_u32 + h.to_u32
+  return #[acc]
 `,
   },
 ];

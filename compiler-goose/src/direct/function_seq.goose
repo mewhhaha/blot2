@@ -3903,7 +3903,6 @@ fn emitSeqSetVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Val, 
     if serr != squid_direct_types::Error.none { return neverVal(), serr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-    noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
     lget(g, index);
@@ -3959,7 +3958,6 @@ fn emitSeqPushVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u32, se
     if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-    noteAllocation(f);
     let entry = ensureCheckedGrow(g, f, container);
     let hdr = local32(g, f);
     let total = local32(g, f);
@@ -4011,7 +4009,6 @@ fn emitSeqPushFrontVal(g: Generator&, f: Fn&, container: Val, value: Val, id: u3
     if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-    noteAllocation(f);
     let entry = ensureCheckedGrow(g, f, container);
     let hdr = local32(g, f);
     let foc = local32(g, f);
@@ -4063,7 +4060,6 @@ fn emitSeqInsertVal(g: Generator&, f: Fn&, container: Val, index: u32, value: Va
     if ierr != squid_direct_types::Error.none { return neverVal(), ierr; }
     let noted = noteStoreToSlot(g, f, w(g, container, 0), value);
     if noted != squid_direct_types::Error.none { return neverVal(), noted; }
-    noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
     lget(g, index);
@@ -4089,7 +4085,6 @@ fn emitSeqPopFrontVal(g: Generator&, f: Fn&, container: Val, ty: Ty, id: u32, se
     if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let rem_fn, rerr = ensureSeqHdrRemove(g, sp);
     if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
-    noteAllocation(f);
     let out, oerr = fresh(g, f, ty, id);
     if oerr != squid_direct_types::Error.none { return out, oerr; }
     let entry = ensureCheckedGrow(g, f, container);
@@ -4144,7 +4139,6 @@ fn emitSeqRemoveVal(g: Generator&, f: Fn&, container: Val, index: u32, ty: Ty, i
     if sperr != squid_direct_types::Error.none { return neverVal(), sperr; }
     let rem_fn, rerr = ensureSeqHdrRemove(g, sp);
     if rerr != squid_direct_types::Error.none { return neverVal(), rerr; }
-    noteAllocation(f);
     lget(g, w(g, container, 0));
     lget(g, w(g, container, 1));
     lget(g, index);
@@ -4439,7 +4433,6 @@ fn emitSeqExtend(g: Generator&, f: Fn&, dst: Val, src: Val, src_core_ty: TId, id
         if nerr != squid_direct_types::Error.none { return neverVal(), nerr; }
         let concat_fn, cerr = ensureSeqTreeConcat(g, sp);
         if cerr != squid_direct_types::Error.none { return neverVal(), cerr; }
-        noteAllocation(f);
         let rt = g.runtime_();
         let entry = local32(g, f);
         let dhdr = local32(g, f);
