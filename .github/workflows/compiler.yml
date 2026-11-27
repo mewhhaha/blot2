@@ -18,20 +18,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: squid-lang
-      # The browser kernel qualification tests import Pen's host implementation.
-      - uses: actions/checkout@v4
-        with:
-          repository: mewhhhaha/pen
-          ref: b301f55cc94620a409444ffd001b490844c7886e
-          path: pen
-          persist-credentials: false
-      # The render-copy qualification tests compile against Ink's source library.
-      - uses: actions/checkout@v4
-        with:
-          repository: mewhhhaha/ink
-          ref: 29b672fb7323bafc8c612885c3e9ba228bf60994
-          path: ink
-          persist-credentials: false
+      # Browser kernel and render-copy tests need these public sibling sources.
+      - name: Fetch pinned Pen and Ink sources
+        shell: bash
+        run: |
+          fetch_sources() {
+            local repo="$1" revision="$2"
+            mkdir -p "../$repo"
+            curl --fail --silent --show-error --location --retry 3 \
+              "https://codeload.github.com/mewhhaha/$repo/tar.gz/$revision" \
+              | tar -xz --strip-components=1 -C "../$repo"
+          }
+          fetch_sources pen b301f55cc94620a409444ffd001b490844c7886e
+          fetch_sources ink 29b672fb7323bafc8c612885c3e9ba228bf60994
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
