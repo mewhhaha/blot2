@@ -12,7 +12,10 @@ Dynamic Arrays Phase 5 (removed `Runtime.freeze` and the `GrowArray`/
 `ResizeArray` distinction; `runtime.expected` shrinks to 7707 bytes), and on
 25 November 2026 for Audit Soundness + Trap Provenance (`r.create`
 `length > capacity_mask / stride` overflow guard and Page-0 offset `772`
-`trap_site_offset` zeroing in `r.reset`; `runtime.expected` is 7765 bytes).
+`trap_site_offset` zeroing in `r.reset`; `runtime.expected` is 7765 bytes),
+and on 27 November 2026 for Batch 1+2 (`stack_slow` best-fit large-chunk reuse
+within 4x and `r.reserve` for `@storage.reserve`/`@storage.extend`;
+`runtime.expected` is 8371 bytes).
 The output must equal the record, and Goose must not warn.
 
 Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]

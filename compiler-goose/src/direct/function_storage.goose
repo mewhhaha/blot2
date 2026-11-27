@@ -278,6 +278,10 @@ fn emitScaledBytes(g: Generator&, f: const Fn&, count: u32, step: u32) -> u32 {
 }
 fn ensureCheckedArray(g: Generator&, f: Fn&, container: Val) -> u32, u32 {
     let slot = w(g, container, 0);
+    let da_idx = findDirectArrayBySlot(f, slot);
+    if da_idx >= 0 {
+        return f.direct_arrays[da_idx].base, f.direct_arrays[da_idx].len_local;
+    }
     let generation = w(g, container, 1);
     let cached = findCheckedArray(f, slot, generation);
     if cached >= 0 {
@@ -496,6 +500,42 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, co
             in_bounds = true;
         }
         if !in_bounds {
+            let cm = findCheckedMask(f, index);
+            if cm >= 0 {
+                let entry = f.checked_masks[cm];
+                if entry.max_local != 0xffffffff && findCheckedBound(f, entry.max_local, len) >= 0 {
+                    in_bounds = true;
+                } else if entry.has_const {
+                    let clen, known_len = constU32(f, len);
+                    if known_len && entry.max_const < clen.value {
+                        useConstU32(clen);
+                        in_bounds = true;
+                    }
+                }
+            }
+        }
+        if !in_bounds && !range.is_view && range.end_local != 0xffffffff {
+            let ca = findCheckedAdd(f, index);
+            if ca >= 0 {
+                let add_e = f.checked_adds[ca];
+                if add_e.idx == range.index {
+                    if add_e.base == 0xffffffff && add_e.c == 1 && findCheckedBound(f, range.end_local, len) >= 0 {
+                        in_bounds = true;
+                    } else if findCheckedAffine(f, add_e.base, range.end_local, add_e.c, len) >= 0 {
+                        in_bounds = true;
+                    } else if add_e.base == 0xffffffff {
+                        let clen, klen = constU32(f, len);
+                        let cend, kend = constU32(f, range.end_local);
+                        if klen && kend && (cend.value as u64) + (add_e.c as u64) <= (clen.value as u64) {
+                            useConstU32(clen);
+                            useConstU32(cend);
+                            in_bounds = true;
+                        }
+                    }
+                }
+            }
+        }
+        if !in_bounds {
             lget(g, index);
             lget(g, len);
             op(g, OP_i32_ge_u);
@@ -626,6 +666,141 @@ fn constLocal(g: Generator&, f: const Fn&, value: u32) -> u32 {
     return made;
 }
 
+fn directArrayAddress(g: Generator&, f: Fn&, da: DirectArray, index: u32, id: u32) -> u32 {
+    var skip_bounds = false;
+    let cf, known = constU32(f, index);
+    if known && cf.value < da.length {
+        useConstU32(cf);
+        skip_bounds = true;
+    }
+    if !skip_bounds {
+        let cm = findCheckedMask(f, index);
+        if cm >= 0 && f.checked_masks[cm].has_const && f.checked_masks[cm].max_const < da.length {
+            skip_bounds = true;
+        }
+    }
+    if !skip_bounds && !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff && index == f.checked_range.index {
+        let ce, ek = constU32(f, f.checked_range.end_local);
+        if ek && ce.value <= da.length {
+            useConstU32(ce);
+            skip_bounds = true;
+        }
+    }
+    if !skip_bounds {
+        lget(g, index);
+        i32Const(g, da.length);
+        op(g, OP_i32_ge_u);
+        trapBounds(g, f, id);
+    }
+    return emitOffsetAddress(g, f, da.base, index, da.step);
+}
+
+recursive fn tryEmitDirectLocalArray(g: Generator&, f: Fn&, binding: u32, init_id: u32, id: u32) -> Val, bool, Error {
+    let m .= g.units[f.unit - 1];
+    let init_n = m.node(init_id);
+    var is_lit = false;
+    var count_val: u32 = 0;
+    var count_node: u32 = 0;
+    var fill_val_node: u32 = 0;
+    if init_n.tag == blot_check_core::Tag.array {
+        let ch = m.children(init_id);
+        if ch.len < 1 || ch.len > 32 { return neverVal(), false, blot_direct_types::Error.none; }
+        is_lit = true;
+        count_val = ch.len as u32;
+    } else if init_n.tag == blot_check_core::Tag.array_op && m.arrayOperation(init_id) == blot_backend_collection_ops::Op.fill {
+        let ch = m.children(init_id);
+        if ch.len != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+        let cn = m.node(ch[0]);
+        if cn.tag != blot_check_core::Tag.constant || cn.a < 1 || cn.a > 32 { return neverVal(), false, blot_direct_types::Error.none; }
+        count_val = cn.a;
+        count_node = ch[0];
+        fill_val_node = ch[1];
+    } else {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    let arr_ty, ty_err = g.types.lower(m, m.binding(binding).ty, f.env);
+    if ty_err != blot_direct_types::Error.none {
+        g.dropFailure();
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    if tagOf(g, arr_ty) != blot_direct_types::Tag.array { return neverVal(), false, blot_direct_types::Error.none; }
+    let elem_ty, eerr = elementOf(g, f, arr_ty, id);
+    if eerr != blot_direct_types::Error.none || !isScalarTag(tagOf(g, elem_ty)) {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    let body .= enclosingBody(g, f);
+    if !body || !isDirectLocalArrayBinding(g, f, m, body.root, binding) {
+        return neverVal(), false, blot_direct_types::Error.none;
+    }
+    let step, serr = stride(g, f, elem_ty, id);
+    if serr != blot_direct_types::Error.none { return neverVal(), false, serr; }
+    let total_bytes = count_val * step;
+    let slot_local = constLocal(g, f, 0);
+    let len_local = constLocal(g, f, count_val);
+    recordConstU32(f, len_local, count_val);
+    if is_lit {
+        let ch = m.children(init_id);
+        let values = g.reserveVals(ch.len);
+        for child, at in ch {
+            let v, verr = expr(g, f, child);
+            if verr != blot_direct_types::Error.none { return v, false, verr; }
+            g.s.vals[values.start + at] = v;
+        }
+        let base = allocate(g, f, total_bytes);
+        for i in 0..(count_val as i64) {
+            let werr = writeElement(g, f, base, (i as u32) * step, g.s.vals[values.start + i], id);
+            if werr != blot_direct_types::Error.none { return neverVal(), false, werr; }
+        }
+        recordDirectArray(f, binding, slot_local, base, len_local, count_val, elem_ty, step);
+    } else {
+        let val, verr = expr(g, f, fill_val_node);
+        if verr != blot_direct_types::Error.none { return val, false, verr; }
+        blot_direct_relocations::unpatchableOperand(m.unit, count_node);
+        let base = allocate(g, f, total_bytes);
+        let skip_fill = consumeSkipFillNode(f, init_id);
+        if !skip_fill {
+            if step == 1 && val.len == 1 {
+                lget(g, base);
+                lget(g, w(g, val, 0));
+                i32Const(g, total_bytes);
+                memoryFillOp(g);
+            } else if count_val <= 8 {
+                for i in 0..(count_val as i64) {
+                    let werr = writeElement(g, f, base, (i as u32) * step, val, id);
+                    if werr != blot_direct_types::Error.none { return neverVal(), false, werr; }
+                }
+            } else {
+                let ptr = local32(g, f);
+                let end_ptr = local32(g, f);
+                lget(g, base);
+                ltee(g, ptr);
+                i32Const(g, total_bytes);
+                op(g, OP_i32_add);
+                lset(g, end_ptr);
+                let exit = open(g, f, OP_block);
+                let top = open(g, f, OP_loop);
+                lget(g, ptr);
+                lget(g, end_ptr);
+                op(g, OP_i32_ge_u);
+                br(g, f, OP_br_if, exit);
+                let werr = writeElement(g, f, ptr, 0, val, id);
+                if werr != blot_direct_types::Error.none { return neverVal(), false, werr; }
+                lget(g, ptr);
+                i32Const(g, step);
+                op(g, OP_i32_add);
+                lset(g, ptr);
+                br(g, f, OP_br, top);
+                close(g, f);
+                close(g, f);
+            }
+        }
+        recordDirectArray(f, binding, slot_local, base, len_local, count_val, elem_ty, step);
+    }
+    let dummy = valOf2(g, arr_ty, slot_local, slot_local);
+    recordMutable(g, f, dummy);
+    return dummy, true, blot_direct_types::Error.none;
+}
+
 recursive fn arrayLiteral(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let children = m.children(id);
@@ -685,6 +860,12 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if has_declared { ty = declared; }
     match operation {
         length => {
+            let da_idx = findDirectArray(f, localRef(m, children[0]));
+            if da_idx >= 0 {
+                let klen = constLocal(g, f, f.direct_arrays[da_idx].length);
+                recordConstU32(f, klen, f.direct_arrays[da_idx].length);
+                return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let length, error = lengthOf(g, f, container, id);
@@ -692,6 +873,16 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             return valOf1(g, blot_direct_types::u32_, length), blot_direct_types::Error.none;
         },
         get => {
+            let da_idx = findDirectArray(f, localRef(m, children[0]));
+            if da_idx >= 0 {
+                let da = f.direct_arrays[da_idx];
+                let position, perr = expr(g, f, children[1]);
+                if perr != blot_direct_types::Error.none { return position, perr; }
+                let index, ierr = scalarLocal(g, f, position, id);
+                if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+                let addr = directArrayAddress(g, f, da, index, id);
+                return loadElement(g, f, addr, 0, da.elem_ty, id);
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let position, error = expr(g, f, children[1]);
@@ -1446,11 +1637,31 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let operation, decoded = blot_check_storage_ops::opFromCode(n.c);
     assert(decoded == blot_error::Error.none);
     let children = m.children(id);
-    let ty, error = typeOf(g, f, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    var ty: Ty = blot_direct_types::never;
+    if operation == blot_check_storage_ops::Op.with_capacity {
+        var lowered_ty, lerr = g.types.lower(m, m.typeOf(id), f.env);
+        if lerr != blot_direct_types::Error.none {
+            if !holesUnused(g, f, m.typeOf(id), 0) { return neverVal(), g.typeFailure(m, id); }
+            defaultUnused(g, f, m.typeOf(id), 0);
+            let defaulted, derr = lower(g, f, m.typeOf(id), id);
+            if derr != blot_direct_types::Error.none { return neverVal(), derr; }
+            lowered_ty = defaulted;
+        }
+        ty = lowered_ty;
+    } else {
+        let lowered_ty, error = typeOf(g, f, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        ty = lowered_ty;
+    }
     let address_function = g.runtime_().address;
     match operation {
         length => {
+            let da_idx = findDirectArray(f, localRef(m, children[0]));
+            if da_idx >= 0 {
+                let klen = constLocal(g, f, f.direct_arrays[da_idx].length);
+                recordConstU32(f, klen, f.direct_arrays[da_idx].length);
+                return valOf1(g, blot_direct_types::u32_, klen), blot_direct_types::Error.none;
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let length, error = lengthOf(g, f, container, id);
@@ -1458,6 +1669,16 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             return valOf1(g, blot_direct_types::u32_, length), blot_direct_types::Error.none;
         },
         read => {
+            let da_idx = findDirectArray(f, localRef(m, children[0]));
+            if da_idx >= 0 {
+                let da = f.direct_arrays[da_idx];
+                let position, perr = expr(g, f, children[1]);
+                if perr != blot_direct_types::Error.none { return position, perr; }
+                let index, ierr = scalarLocal(g, f, position, id);
+                if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+                let addr = directArrayAddress(g, f, da, index, id);
+                return loadElement(g, f, addr, 0, da.elem_ty, id);
+            }
             let container, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return container, error; }
             let position, error = expr(g, f, children[1]);
@@ -1523,6 +1744,173 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let value, error = expr(g, f, children[0]);
             if error != blot_direct_types::Error.none { return value, error; }
             return deepCopyValue(g, f, value, ty, id, 0);
+        },
+        with_capacity => {
+            let cap_val, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return cap_val, error; }
+            let cap, cerr = scalarLocal(g, f, cap_val, id);
+            if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+            let element, eerr = elementOf(g, f, ty, id);
+            if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+            let step, serr = stride(g, f, element, id);
+            if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+            let rt = g.runtime_();
+            noteAllocation(f);
+            lget(g, cap);
+            i32Const(g, 0x04000000);
+            op(g, OP_i32_gt_u);
+            trap(g, f);
+            if step != 0 {
+                lget(g, cap);
+                i32Const(g, blot_direct_runtime::capacity_mask / step);
+                op(g, OP_i32_gt_u);
+                trap(g, f);
+            }
+            let bytes = emitScaledBytes(g, f, cap, step);
+            let result, rerr = fresh(g, f, ty, id);
+            if rerr != blot_direct_types::Error.none { return result, rerr; }
+            lget(g, bytes);
+            let nonzero = open(g, f, OP_if_);
+            lget(g, bytes);
+            i32Const(g, 0);
+            callf(g, rt.open_heap);
+            op(g, OP_drop);
+            op(g, OP_drop);
+            lset(g, w(g, result, 1));
+            lset(g, w(g, result, 0));
+            popCheckedArraysAt(f, nonzero);
+            op(g, OP_else_);
+            i32Const(g, 0);
+            i32Const(g, step);
+            i32Const(g, 0);
+            callf(g, rt.create);
+            lset(g, w(g, result, 1));
+            lset(g, w(g, result, 0));
+            close(g, f);
+            recordMutable(g, f, result);
+            return result, blot_direct_types::Error.none;
+        },
+        reserve => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let container, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return container, error; }
+            let add_val, aerr = expr(g, f, children[1]);
+            if aerr != blot_direct_types::Error.none { return add_val, aerr; }
+            let additional, serr = scalarLocal(g, f, add_val, id);
+            if serr != blot_direct_types::Error.none { return neverVal(), serr; }
+            let element, eerr = elementOf(g, f, container.ty, id);
+            if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+            let step, sterr = stride(g, f, element, id);
+            if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+            let cur_len, lerr = lengthOf(g, f, container, id);
+            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+            let need_elems = local32(g, f);
+            lget(g, cur_len);
+            lget(g, additional);
+            op(g, OP_i32_add);
+            ltee(g, need_elems);
+            lget(g, cur_len);
+            op(g, OP_i32_lt_u);
+            trap(g, f);
+            lget(g, w(g, container, 0));
+            lget(g, w(g, container, 1));
+            lget(g, need_elems);
+            i32Const(g, step);
+            callf(g, g.runtime_().reserve);
+            if is_direct && tagOf(g, container.ty) == blot_direct_types::Tag.array {
+                invalidateCheckedOwner(g, f, container);
+            } else {
+                invalidateCheckedContainers(f);
+            }
+            return container, blot_direct_types::Error.none;
+        },
+        extend => {
+            let is_direct = localRef(m, children[0]) != 0;
+            let dst, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return dst, error; }
+            let src, serr = expr(g, f, children[1]);
+            if serr != blot_direct_types::Error.none { return src, serr; }
+            let element, eerr = elementOf(g, f, dst.ty, id);
+            if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+            let step, sterr = stride(g, f, element, id);
+            if sterr != blot_direct_types::Error.none { return neverVal(), sterr; }
+            let src_len, slerr = lengthOf(g, f, src, id);
+            if slerr != blot_direct_types::Error.none { return neverVal(), slerr; }
+            let dst_len, dlerr = lengthOf(g, f, dst, id);
+            if dlerr != blot_direct_types::Error.none { return neverVal(), dlerr; }
+            let next_len = local32(g, f);
+            lget(g, dst_len);
+            lget(g, src_len);
+            op(g, OP_i32_add);
+            ltee(g, next_len);
+            lget(g, dst_len);
+            op(g, OP_i32_lt_u);
+            trap(g, f);
+            let rt = g.runtime_();
+            lget(g, w(g, dst, 0));
+            lget(g, w(g, dst, 1));
+            lget(g, next_len);
+            i32Const(g, step);
+            callf(g, rt.reserve);
+            if !holdsContainer(g, element, 0) {
+                let non_empty = open(g, f, OP_block);
+                lget(g, src_len);
+                op(g, OP_i32_eqz);
+                opIndex(g, OP_br_if, 0);
+                let dst_entry = local32(g, f);
+                lget(g, w(g, dst, 0));
+                lget(g, w(g, dst, 1));
+                callf(g, rt.check);
+                lset(g, dst_entry);
+                let dst_base = local32(g, f);
+                lget(g, dst_entry);
+                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+                lset(g, dst_base);
+                let dst_ptr = emitOffsetAddress(g, f, dst_base, dst_len, step);
+                var src_ptr = baseOf(g, f, src);
+                if tagOf(g, src.ty) == blot_direct_types::Tag.view {
+                    src_ptr = emitOffsetAddress(g, f, src_ptr, w(g, src, 2), step);
+                }
+                let copy_bytes = emitScaledBytes(g, f, src_len, step);
+                if rt.has_fork {
+                    recordBeforeWrite(g, f, w(g, dst, 0), dst_entry, blot_direct_runtime::entry_length, 4);
+                }
+                lget(g, dst_ptr);
+                lget(g, src_ptr);
+                lget(g, copy_bytes);
+                memoryCopyOp(g);
+                lget(g, dst_entry);
+                lget(g, next_len);
+                op(g, OP_i32_store); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+                close(g, f);
+            } else {
+                let idx = constLocal(g, f, 0);
+                let exit = open(g, f, OP_block);
+                let top = open(g, f, OP_loop);
+                lget(g, idx);
+                lget(g, src_len);
+                op(g, OP_i32_ge_u);
+                br(g, f, OP_br_if, exit);
+                let elem_val, rerr = readElement(g, f, src, idx, id, m.typeOf(children[1]), false);
+                if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+                let copied_elem, cerr = deepCopyValue(g, f, elem_val, element, id, 0);
+                if cerr != blot_direct_types::Error.none { return neverVal(), cerr; }
+                let _, perr = emitStoragePushVal(g, f, dst, copied_elem, id, is_direct);
+                if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+                lget(g, idx);
+                i32Const(g, 1);
+                op(g, OP_i32_add);
+                lset(g, idx);
+                br(g, f, OP_br, top);
+                close(g, f);
+                close(g, f);
+            }
+            if is_direct && tagOf(g, dst.ty) == blot_direct_types::Tag.array {
+                invalidateCheckedOwner(g, f, dst);
+            } else {
+                invalidateCheckedContainers(f);
+            }
+            return dst, blot_direct_types::Error.none;
         },
         view => {
             let container, error = expr(g, f, children[0]);

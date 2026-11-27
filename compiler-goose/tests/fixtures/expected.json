@@ -5,12 +5,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 2341,
-     "body_lowerings": 2341,
-     "check_occurs_steps": 3928,
+     "body_elaborations": 2345,
+     "body_lowerings": 2345,
+     "check_occurs_steps": 3972,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 15618,
+      "inference_steps": 15678,
       "instantiations": 2249,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -21,36 +21,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 2967,
-     "effect_rows": 4597,
-     "emitted_functions": 2078,
+     "core_nodes": 2990,
+     "effect_rows": 4622,
+     "emitted_functions": 2079,
      "filename": "alias-project-fixtures/logical-long-2048.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 2599,
-     "source_bytes": 73719,
+     "row_versions": 2603,
+     "source_bytes": 74116,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 8392,
-     "type_nodes": 7877,
-     "type_versions": 2860,
-     "wasm_bytes": 87614
+     "syntax_nodes": 8466,
+     "type_nodes": 7974,
+     "type_versions": 2875,
+     "wasm_bytes": 87921
     }
    ],
-   "wasm_bytes": 87614,
-   "wasm_sha256": "0600a0ea85ec287622e4c97d99ece3c06fb0b1559ac6427bc41f7cb40ec908dd"
+   "wasm_bytes": 87921,
+   "wasm_sha256": "a8b56c0ffef7ce0a760b637cadd49eec8d2735b418885a85ae2d8cbf0e125ed5"
   },
   "bottom_bindings.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 301,
-     "body_lowerings": 301,
-     "check_occurs_steps": 1937,
+     "body_elaborations": 305,
+     "body_lowerings": 305,
+     "check_occurs_steps": 1981,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3575,
+      "inference_steps": 3635,
       "instantiations": 209,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -61,36 +61,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1009,
-     "effect_rows": 2610,
-     "emitted_functions": 49,
+     "core_nodes": 1032,
+     "effect_rows": 2635,
+     "emitted_functions": 50,
      "filename": "bottom_bindings.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 582,
-     "source_bytes": 17841,
+     "row_versions": 586,
+     "source_bytes": 18238,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2437,
-     "type_nodes": 6017,
-     "type_versions": 859,
-     "wasm_bytes": 5657
+     "syntax_nodes": 2511,
+     "type_nodes": 6114,
+     "type_versions": 874,
+     "wasm_bytes": 5960
     }
    ],
-   "wasm_bytes": 5657,
-   "wasm_sha256": "67c7337b0e6cfaec5ebb49bdef0e95bd063e78697b633c1b37d7de9fd7444029"
+   "wasm_bytes": 5960,
+   "wasm_sha256": "9073e56b0db58229c8703bab4654077d6fd8f5565f70bd4124af3f2a7267a93e"
   },
   "callback-fixtures/capture.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1886,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1930,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3368,
+      "inference_steps": 3428,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -101,36 +101,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
-     "effect_rows": 2579,
-     "emitted_functions": 35,
+     "core_nodes": 966,
+     "effect_rows": 2604,
+     "emitted_functions": 36,
      "filename": "callback-fixtures/capture.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 16821,
+     "row_versions": 562,
+     "source_bytes": 17218,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2291,
-     "type_nodes": 5864,
-     "type_versions": 818,
-     "wasm_bytes": 4559
+     "syntax_nodes": 2365,
+     "type_nodes": 5961,
+     "type_versions": 833,
+     "wasm_bytes": 4862
     }
    ],
-   "wasm_bytes": 4559,
-   "wasm_sha256": "59d0c4561b8d4ce7cf2b28b151e1bf1f39f95ba1b1c9591323ebaf23fbd76485"
+   "wasm_bytes": 4862,
+   "wasm_sha256": "eb6e53312b23907aa0e2857bf16ae56387e6ca434e77f78189317c2edb24f08e"
   },
   "callback-fixtures/parameter.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1884,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1928,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3357,
+      "inference_steps": 3417,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -141,36 +141,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 936,
-     "effect_rows": 2571,
-     "emitted_functions": 34,
+     "core_nodes": 959,
+     "effect_rows": 2596,
+     "emitted_functions": 35,
      "filename": "callback-fixtures/parameter.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16764,
+     "row_versions": 560,
+     "source_bytes": 17161,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2282,
-     "type_nodes": 5854,
-     "type_versions": 816,
-     "wasm_bytes": 4463
+     "syntax_nodes": 2356,
+     "type_nodes": 5951,
+     "type_versions": 831,
+     "wasm_bytes": 4766
     }
    ],
-   "wasm_bytes": 4463,
-   "wasm_sha256": "157f6cd1cf6348df0b7ec5b2024b370e290693c70340a767a03d98479bab5668"
+   "wasm_bytes": 4766,
+   "wasm_sha256": "4988a7d7320996ae180ff9dfa84db5e8be48025e1f88300ca51b6f7ef7fb163b"
   },
   "callback-fixtures/record.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1885,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1929,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3366,
+      "inference_steps": 3426,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -181,36 +181,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
-     "effect_rows": 2577,
-     "emitted_functions": 34,
+     "core_nodes": 966,
+     "effect_rows": 2602,
+     "emitted_functions": 35,
      "filename": "callback-fixtures/record.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 16875,
+     "row_versions": 562,
+     "source_bytes": 17272,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2299,
-     "type_nodes": 5863,
-     "type_versions": 817,
-     "wasm_bytes": 4472
+     "syntax_nodes": 2373,
+     "type_nodes": 5960,
+     "type_versions": 832,
+     "wasm_bytes": 4775
     }
    ],
-   "wasm_bytes": 4472,
-   "wasm_sha256": "d3e7c85bc4a0aaf9bce0ff869411e33c39d3931248ae086be3d7e855025bf38c"
+   "wasm_bytes": 4775,
+   "wasm_sha256": "1effb3f61cfb63d2a5a3f4c3ed2fc8e7822d8e7af6d513d18bdcefcb7b56d992"
   },
   "captured-callable-fixtures/bound-cache-effects.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1903,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1947,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3419,
+      "inference_steps": 3479,
       "instantiations": 209,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -221,25 +221,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 959,
-     "effect_rows": 2605,
-     "emitted_functions": 41,
+     "core_nodes": 982,
+     "effect_rows": 2630,
+     "emitted_functions": 42,
      "filename": "captured-callable-fixtures/bound-cache-effects.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 565,
-     "source_bytes": 17004,
+     "row_versions": 569,
+     "source_bytes": 17401,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2318,
-     "type_nodes": 5915,
-     "type_versions": 829,
-     "wasm_bytes": 4756
+     "syntax_nodes": 2392,
+     "type_nodes": 6012,
+     "type_versions": 844,
+     "wasm_bytes": 5059
     }
    ],
-   "wasm_bytes": 4756,
-   "wasm_sha256": "0999f1afe1dff250e44fea513e9bfaff6390621321af37138d8b555799260752"
+   "wasm_bytes": 5059,
+   "wasm_sha256": "e1fb90eeb11545c34188455a840842ec4aab116ab54b082f7af6a76e862dce85"
   },
   "captured-callable-fixtures/bound-cache-missing.blot": {
    "exit": 1,
@@ -254,12 +254,12 @@
      "start": 280
     },
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1901,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1945,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3394,
+      "inference_steps": 3454,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -270,20 +270,20 @@
       "shared_uses": 6,
       "use_expansions": 3
      },
-     "core_nodes": 941,
-     "effect_rows": 2569,
+     "core_nodes": 964,
+     "effect_rows": 2594,
      "emitted_functions": 0,
      "filename": "captured-callable-fixtures/bound-cache-missing.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 560,
-     "source_bytes": 16951,
+     "row_versions": 564,
+     "source_bytes": 17348,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2312,
-     "type_nodes": 5911,
-     "type_versions": 826,
+     "syntax_nodes": 2386,
+     "type_nodes": 6008,
+     "type_versions": 841,
      "wasm_bytes": 0
     }
    ]
@@ -292,12 +292,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1907,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1951,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3414,
+      "inference_steps": 3474,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -308,36 +308,36 @@
       "shared_uses": 6,
       "use_expansions": 3
      },
-     "core_nodes": 947,
-     "effect_rows": 2576,
-     "emitted_functions": 38,
+     "core_nodes": 970,
+     "effect_rows": 2601,
+     "emitted_functions": 39,
      "filename": "captured-callable-fixtures/bound-cache-nominals.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 561,
-     "source_bytes": 17049,
+     "row_versions": 565,
+     "source_bytes": 17446,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2327,
-     "type_nodes": 5931,
-     "type_versions": 829,
-     "wasm_bytes": 4486
+     "syntax_nodes": 2401,
+     "type_nodes": 6028,
+     "type_versions": 844,
+     "wasm_bytes": 4789
     }
    ],
-   "wasm_bytes": 4486,
-   "wasm_sha256": "f0a3dbc916b7f72136f365a4ec7ca5e6edd06ff67d0fe103a71c875133b15bee"
+   "wasm_bytes": 4789,
+   "wasm_sha256": "5e6fdde7756f266c8f82f54b9ad85ec52a9e63a2434f00ad7c26db128b5eeaa5"
   },
   "captured-callable-fixtures/bound-method.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1899,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1943,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3380,
+      "inference_steps": 3440,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -348,36 +348,36 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 936,
-     "effect_rows": 2567,
-     "emitted_functions": 36,
+     "core_nodes": 959,
+     "effect_rows": 2592,
+     "emitted_functions": 37,
      "filename": "captured-callable-fixtures/bound-method.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 559,
-     "source_bytes": 16855,
+     "row_versions": 563,
+     "source_bytes": 17252,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2295,
-     "type_nodes": 5900,
-     "type_versions": 824,
-     "wasm_bytes": 4313
+     "syntax_nodes": 2369,
+     "type_nodes": 5997,
+     "type_versions": 839,
+     "wasm_bytes": 4616
     }
    ],
-   "wasm_bytes": 4313,
-   "wasm_sha256": "4f836ecabd2d101c751e846ada92067fd397e069546bc69c871721b4a38aaac3"
+   "wasm_bytes": 4616,
+   "wasm_sha256": "ffc494adbd328579c1298bf85bcee7d679245bc1ed63fb00427fde2db28209d7"
   },
   "captured-callable-fixtures/captured-builtin.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1921,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 1965,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3415,
+      "inference_steps": 3475,
       "instantiations": 209,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -388,36 +388,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 951,
-     "effect_rows": 2629,
-     "emitted_functions": 45,
+     "core_nodes": 974,
+     "effect_rows": 2654,
+     "emitted_functions": 46,
      "filename": "captured-callable-fixtures/captured-builtin.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 568,
-     "source_bytes": 16935,
+     "row_versions": 572,
+     "source_bytes": 17332,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2302,
-     "type_nodes": 5965,
-     "type_versions": 832,
-     "wasm_bytes": 5069
+     "syntax_nodes": 2376,
+     "type_nodes": 6062,
+     "type_versions": 847,
+     "wasm_bytes": 5372
     }
    ],
-   "wasm_bytes": 5069,
-   "wasm_sha256": "89b51ba99dbda3a9b932429ff6820dc02588bd5d3a57096a3a5a80700bf7e69d"
+   "wasm_bytes": 5372,
+   "wasm_sha256": "0b09fd66fc2aff520d3e909a22affdd398077d367e6aa32ce927c928e20290f6"
   },
   "captured-callable-fixtures/captured-effect.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1922,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 1966,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3433,
+      "inference_steps": 3493,
       "instantiations": 209,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -428,25 +428,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 961,
-     "effect_rows": 2641,
-     "emitted_functions": 46,
+     "core_nodes": 984,
+     "effect_rows": 2666,
+     "emitted_functions": 47,
      "filename": "captured-callable-fixtures/captured-effect.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 567,
-     "source_bytes": 17069,
+     "row_versions": 571,
+     "source_bytes": 17466,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2326,
-     "type_nodes": 5974,
-     "type_versions": 833,
-     "wasm_bytes": 5075
+     "syntax_nodes": 2400,
+     "type_nodes": 6071,
+     "type_versions": 848,
+     "wasm_bytes": 5378
     }
    ],
-   "wasm_bytes": 5075,
-   "wasm_sha256": "b1888e5c21c321f8219de83fd2f56d7f1755afdfd122c93887f607a11e12aaf2"
+   "wasm_bytes": 5378,
+   "wasm_sha256": "77a3455a2b05ac10372629f804b71dd158878b8c1267677e8c3f184e41adca3c"
   },
   "closure-fixtures/left.blot": {
    "exit": 1,
@@ -461,12 +461,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1918,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1962,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3436,
+      "inference_steps": 3496,
       "instantiations": 206,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -477,20 +477,20 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 951,
-     "effect_rows": 2672,
+     "core_nodes": 974,
+     "effect_rows": 2697,
      "emitted_functions": 0,
      "filename": "closure-fixtures/left.blot",
      "files": 3,
      "imported_schemes": 48,
      "kind": "compilation",
-     "row_versions": 565,
-     "source_bytes": 17270,
+     "row_versions": 569,
+     "source_bytes": 17667,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2352,
-     "type_nodes": 6184,
-     "type_versions": 840,
+     "syntax_nodes": 2426,
+     "type_nodes": 6281,
+     "type_versions": 855,
      "wasm_bytes": 0
     }
    ]
@@ -499,12 +499,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 303,
-     "body_lowerings": 303,
-     "check_occurs_steps": 1928,
+     "body_elaborations": 307,
+     "body_lowerings": 307,
+     "check_occurs_steps": 1972,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3464,
+      "inference_steps": 3524,
       "instantiations": 210,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -515,25 +515,25 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 958,
-     "effect_rows": 2804,
-     "emitted_functions": 37,
+     "core_nodes": 981,
+     "effect_rows": 2829,
+     "emitted_functions": 38,
      "filename": "closure-fixtures/main.blot",
      "files": 5,
      "imported_schemes": 96,
      "kind": "compilation",
-     "row_versions": 575,
-     "source_bytes": 17640,
+     "row_versions": 579,
+     "source_bytes": 18037,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2387,
-     "type_nodes": 6616,
-     "type_versions": 850,
-     "wasm_bytes": 4515
+     "syntax_nodes": 2461,
+     "type_nodes": 6713,
+     "type_versions": 865,
+     "wasm_bytes": 4818
     }
    ],
-   "wasm_bytes": 4515,
-   "wasm_sha256": "14c789f2d5bd3c21620955a31da9bdb39a380b4017ab2d5e66ec6f2020bcb53c"
+   "wasm_bytes": 4818,
+   "wasm_sha256": "a86e19506732c6eb450afeb11b239b59d0d6b8869dcc70178d94961e7b721726"
   },
   "closure-fixtures/right.blot": {
    "exit": 1,
@@ -548,12 +548,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1908,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1952,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3414,
+      "inference_steps": 3474,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -564,20 +564,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 938,
-     "effect_rows": 2652,
+     "core_nodes": 961,
+     "effect_rows": 2677,
      "emitted_functions": 0,
      "filename": "closure-fixtures/right.blot",
      "files": 3,
      "imported_schemes": 46,
      "kind": "compilation",
-     "row_versions": 562,
-     "source_bytes": 17169,
+     "row_versions": 566,
+     "source_bytes": 17566,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2329,
-     "type_nodes": 6139,
-     "type_versions": 831,
+     "syntax_nodes": 2403,
+     "type_nodes": 6236,
+     "type_versions": 846,
      "wasm_bytes": 0
     }
    ]
@@ -595,12 +595,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 299,
-     "body_lowerings": 299,
-     "check_occurs_steps": 1902,
+     "body_elaborations": 303,
+     "body_lowerings": 303,
+     "check_occurs_steps": 1946,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3402,
+      "inference_steps": 3462,
       "instantiations": 201,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -611,20 +611,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 935,
-     "effect_rows": 2586,
+     "core_nodes": 958,
+     "effect_rows": 2611,
      "emitted_functions": 0,
      "filename": "closure-fixtures/shared.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 17047,
+     "row_versions": 562,
+     "source_bytes": 17444,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2316,
-     "type_nodes": 5922,
-     "type_versions": 825,
+     "syntax_nodes": 2390,
+     "type_nodes": 6019,
+     "type_versions": 840,
      "wasm_bytes": 0
     }
    ]
@@ -633,12 +633,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 302,
-     "body_lowerings": 302,
-     "check_occurs_steps": 2023,
+     "body_elaborations": 306,
+     "body_lowerings": 306,
+     "check_occurs_steps": 2067,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3952,
+      "inference_steps": 4012,
       "instantiations": 281,
       "memo_declined": 0,
       "memo_hits": 1,
@@ -649,25 +649,25 @@
       "shared_uses": 5,
       "use_expansions": 5
      },
-     "core_nodes": 1260,
-     "effect_rows": 2643,
+     "core_nodes": 1283,
+     "effect_rows": 2668,
      "emitted_functions": 43,
      "filename": "deferred_join.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 597,
-     "source_bytes": 19390,
+     "row_versions": 601,
+     "source_bytes": 19787,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2751,
-     "type_nodes": 6113,
-     "type_versions": 877,
-     "wasm_bytes": 7706
+     "syntax_nodes": 2825,
+     "type_nodes": 6210,
+     "type_versions": 892,
+     "wasm_bytes": 8546
     }
    ],
-   "wasm_bytes": 7706,
-   "wasm_sha256": "d0a3c020f810bd93a6df3b2372ad4b50171b36d4f400853208417e26d27a12c6"
+   "wasm_bytes": 8546,
+   "wasm_sha256": "c71f11c3ade9ce71dc44ca24eda93a1cbca8a13ba8ad53e5cbbf82d43648cbfa"
   },
   "dependency-fixtures/prelude.blot": {
    "exit": 1,
@@ -682,12 +682,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 418,
-     "body_lowerings": 418,
-     "check_occurs_steps": 3178,
+     "body_elaborations": 422,
+     "body_lowerings": 422,
+     "check_occurs_steps": 3222,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 6082,
+      "inference_steps": 6142,
       "instantiations": 393,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -698,20 +698,20 @@
       "shared_uses": 6,
       "use_expansions": 6
      },
-     "core_nodes": 1607,
-     "effect_rows": 3977,
+     "core_nodes": 1630,
+     "effect_rows": 4002,
      "emitted_functions": 0,
      "filename": "dependency-fixtures/prelude.blot",
      "files": 2,
      "imported_schemes": 9,
      "kind": "compilation",
-     "row_versions": 921,
-     "source_bytes": 30086,
+     "row_versions": 925,
+     "source_bytes": 30483,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 4108,
-     "type_nodes": 9676,
-     "type_versions": 1447,
+     "syntax_nodes": 4182,
+     "type_nodes": 9773,
+     "type_versions": 1462,
      "wasm_bytes": 0
     }
    ]
@@ -729,12 +729,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 418,
-     "body_lowerings": 418,
-     "check_occurs_steps": 3178,
+     "body_elaborations": 422,
+     "body_lowerings": 422,
+     "check_occurs_steps": 3222,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 6082,
+      "inference_steps": 6142,
       "instantiations": 393,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -745,20 +745,20 @@
       "shared_uses": 6,
       "use_expansions": 6
      },
-     "core_nodes": 1607,
-     "effect_rows": 3977,
+     "core_nodes": 1630,
+     "effect_rows": 4002,
      "emitted_functions": 0,
      "filename": "dependency-prelude.blot",
      "files": 2,
      "imported_schemes": 9,
      "kind": "compilation",
-     "row_versions": 921,
-     "source_bytes": 30086,
+     "row_versions": 925,
+     "source_bytes": 30483,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 4108,
-     "type_nodes": 9676,
-     "type_versions": 1447,
+     "syntax_nodes": 4182,
+     "type_nodes": 9773,
+     "type_versions": 1462,
      "wasm_bytes": 0
     }
    ]
@@ -767,12 +767,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 299,
-     "body_lowerings": 299,
-     "check_occurs_steps": 1940,
+     "body_elaborations": 303,
+     "body_lowerings": 303,
+     "check_occurs_steps": 1984,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3620,
+      "inference_steps": 3680,
       "instantiations": 251,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -783,36 +783,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1078,
-     "effect_rows": 2655,
-     "emitted_functions": 40,
+     "core_nodes": 1101,
+     "effect_rows": 2680,
+     "emitted_functions": 41,
      "filename": "direct/boxed_records.blot",
      "files": 2,
      "imported_schemes": 27,
      "kind": "compilation",
-     "row_versions": 619,
-     "source_bytes": 17813,
+     "row_versions": 623,
+     "source_bytes": 18210,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2536,
-     "type_nodes": 6152,
-     "type_versions": 865,
-     "wasm_bytes": 6118
+     "syntax_nodes": 2610,
+     "type_nodes": 6249,
+     "type_versions": 880,
+     "wasm_bytes": 6421
     }
    ],
-   "wasm_bytes": 6118,
-   "wasm_sha256": "72ef48697e7b5e574a437d8947c3009be169a018c89243e9d7ced3d90d0a0d8a"
+   "wasm_bytes": 6421,
+   "wasm_sha256": "0e8bc1ef94da092565e991667355241ccca32423ced2f70d2835522cfad6373e"
   },
   "direct/branch_appends.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1919,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1963,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3460,
+      "inference_steps": 3520,
       "instantiations": 221,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -823,36 +823,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 985,
-     "effect_rows": 2597,
-     "emitted_functions": 31,
+     "core_nodes": 1008,
+     "effect_rows": 2622,
+     "emitted_functions": 32,
      "filename": "direct/branch_appends.blot",
      "files": 2,
      "imported_schemes": 26,
      "kind": "compilation",
-     "row_versions": 581,
-     "source_bytes": 16966,
+     "row_versions": 585,
+     "source_bytes": 17363,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2344,
-     "type_nodes": 5992,
-     "type_versions": 841,
-     "wasm_bytes": 4608
+     "syntax_nodes": 2418,
+     "type_nodes": 6089,
+     "type_versions": 856,
+     "wasm_bytes": 4987
     }
    ],
-   "wasm_bytes": 4608,
-   "wasm_sha256": "4c96980d6e804a456ed64a3d78a445bde2207954654c289f4f728de2f51d5df1"
+   "wasm_bytes": 4987,
+   "wasm_sha256": "8edc77ff78aefab876db8ac53ea13e1548a16d548996ddbc377b0a4faad61837"
   },
   "direct/calls.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1889,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1933,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3349,
+      "inference_steps": 3409,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -863,36 +863,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 924,
-     "effect_rows": 2567,
-     "emitted_functions": 31,
+     "core_nodes": 947,
+     "effect_rows": 2592,
+     "emitted_functions": 32,
      "filename": "direct/calls.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16609,
+     "row_versions": 560,
+     "source_bytes": 17006,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2265,
-     "type_nodes": 5872,
-     "type_versions": 819,
-     "wasm_bytes": 3994
+     "syntax_nodes": 2339,
+     "type_nodes": 5969,
+     "type_versions": 834,
+     "wasm_bytes": 4297
     }
    ],
-   "wasm_bytes": 3994,
-   "wasm_sha256": "e79d7b8b838a8a0cc95b05b711e8171346ff2eee60621b9681c3001dbef57f86"
+   "wasm_bytes": 4297,
+   "wasm_sha256": "a92b406e280a7f8d76ac1d057b38a8f562486aaf68f02c7f79b134b144077ab9"
   },
   "direct/captured_generalized.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1912,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1956,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3390,
+      "inference_steps": 3450,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -903,36 +903,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
-     "effect_rows": 2586,
-     "emitted_functions": 37,
+     "core_nodes": 966,
+     "effect_rows": 2611,
+     "emitted_functions": 38,
      "filename": "direct/captured_generalized.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 562,
-     "source_bytes": 16845,
+     "row_versions": 566,
+     "source_bytes": 17242,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2299,
-     "type_nodes": 5956,
-     "type_versions": 833,
-     "wasm_bytes": 4658
+     "syntax_nodes": 2373,
+     "type_nodes": 6053,
+     "type_versions": 848,
+     "wasm_bytes": 4961
     }
    ],
-   "wasm_bytes": 4658,
-   "wasm_sha256": "a11db44ff6529fe020775d1244a430bdf22af2b8cae8e7afc07501ab1608863d"
+   "wasm_bytes": 4961,
+   "wasm_sha256": "566b703442411a7dfdcff34084ae2547733be3b53dbc2b3307bf221b0fab6ce1"
   },
   "direct/carried_owners.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 2000,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 2044,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3534,
+      "inference_steps": 3594,
       "instantiations": 232,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -943,36 +943,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1042,
-     "effect_rows": 2702,
-     "emitted_functions": 38,
+     "core_nodes": 1065,
+     "effect_rows": 2727,
+     "emitted_functions": 39,
      "filename": "direct/carried_owners.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 605,
-     "source_bytes": 17216,
+     "row_versions": 609,
+     "source_bytes": 17613,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2432,
-     "type_nodes": 6233,
-     "type_versions": 876,
-     "wasm_bytes": 6433
+     "syntax_nodes": 2506,
+     "type_nodes": 6330,
+     "type_versions": 891,
+     "wasm_bytes": 6682
     }
    ],
-   "wasm_bytes": 6433,
-   "wasm_sha256": "90b896da8de85fff4d5384d6e3554d9559935b0935775cc16b25e4538db37b67"
+   "wasm_bytes": 6682,
+   "wasm_sha256": "ea28fa474211f526de86e4309a469cf3a99c9224ec2a0b4868d5370430d554ca"
   },
   "direct/closures.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 303,
-     "body_lowerings": 303,
-     "check_occurs_steps": 2011,
+     "body_elaborations": 307,
+     "body_lowerings": 307,
+     "check_occurs_steps": 2055,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3613,
+      "inference_steps": 3673,
       "instantiations": 235,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -983,36 +983,36 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1034,
-     "effect_rows": 2775,
-     "emitted_functions": 53,
+     "core_nodes": 1057,
+     "effect_rows": 2800,
+     "emitted_functions": 54,
      "filename": "direct/closures.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 622,
-     "source_bytes": 17630,
+     "row_versions": 626,
+     "source_bytes": 18027,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2471,
-     "type_nodes": 6355,
-     "type_versions": 897,
-     "wasm_bytes": 5869
+     "syntax_nodes": 2545,
+     "type_nodes": 6452,
+     "type_versions": 912,
+     "wasm_bytes": 6172
     }
    ],
-   "wasm_bytes": 5869,
-   "wasm_sha256": "4ce6f84cc77639f26117934a825f9ef7ab8cbaf84f0037d3366b97a7e807eda0"
+   "wasm_bytes": 6172,
+   "wasm_sha256": "f05ae5cc3674b3f3f6801b15ec07bd073a4203010be0a2061f8f5543e897bbf5"
   },
   "direct/closures_in_data.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1900,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1944,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3386,
+      "inference_steps": 3446,
       "instantiations": 206,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1023,36 +1023,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 948,
-     "effect_rows": 2578,
-     "emitted_functions": 35,
+     "core_nodes": 971,
+     "effect_rows": 2603,
+     "emitted_functions": 36,
      "filename": "direct/closures_in_data.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 560,
-     "source_bytes": 16839,
+     "row_versions": 564,
+     "source_bytes": 17236,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2297,
-     "type_nodes": 5905,
-     "type_versions": 827,
-     "wasm_bytes": 4228
+     "syntax_nodes": 2371,
+     "type_nodes": 6002,
+     "type_versions": 842,
+     "wasm_bytes": 4531
     }
    ],
-   "wasm_bytes": 4228,
-   "wasm_sha256": "dff1fe048f6f8f7fa37c7a94a683dc9b7459aa556af0ce22f665084ba705d182"
+   "wasm_bytes": 4531,
+   "wasm_sha256": "7340bb2432e0cbcd841208c69eb4c6db6b27d5d440574ae5554e4d7d0b10f995"
   },
   "direct/comprehensions.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 2033,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 2077,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4031,
+      "inference_steps": 4091,
       "instantiations": 274,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1063,36 +1063,36 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1140,
-     "effect_rows": 2717,
-     "emitted_functions": 41,
+     "core_nodes": 1163,
+     "effect_rows": 2742,
+     "emitted_functions": 42,
      "filename": "direct/comprehensions.blot",
      "files": 2,
      "imported_schemes": 30,
      "kind": "compilation",
-     "row_versions": 645,
-     "source_bytes": 17577,
+     "row_versions": 649,
+     "source_bytes": 17974,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2667,
-     "type_nodes": 6452,
-     "type_versions": 927,
-     "wasm_bytes": 7531
+     "syntax_nodes": 2741,
+     "type_nodes": 6549,
+     "type_versions": 942,
+     "wasm_bytes": 7834
     }
    ],
-   "wasm_bytes": 7531,
-   "wasm_sha256": "667c54f61b1b8c18c1dd110679e169b2057cd8b327660868e35bc629c4ffa522"
+   "wasm_bytes": 7834,
+   "wasm_sha256": "f4606118c585d287d6fbac115acce6a6d3c929453d16023d245b805eb0eb36f6"
   },
   "direct/constants.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1890,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 1934,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3373,
+      "inference_steps": 3433,
       "instantiations": 208,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1103,36 +1103,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 934,
-     "effect_rows": 2568,
-     "emitted_functions": 40,
+     "core_nodes": 957,
+     "effect_rows": 2593,
+     "emitted_functions": 41,
      "filename": "direct/constants.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 564,
-     "source_bytes": 16707,
+     "row_versions": 568,
+     "source_bytes": 17104,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2273,
-     "type_nodes": 5872,
-     "type_versions": 823,
-     "wasm_bytes": 4426
+     "syntax_nodes": 2347,
+     "type_nodes": 5969,
+     "type_versions": 838,
+     "wasm_bytes": 4729
     }
    ],
-   "wasm_bytes": 4426,
-   "wasm_sha256": "d348133655cb26e1c5d1362d285245a7215eb1ceb78fc71e3872b9ad823513cd"
+   "wasm_bytes": 4729,
+   "wasm_sha256": "a1a60dfd42b00182cb2a4d886619af78fa45731ab67293863ec7eb308e556404"
   },
   "direct/data_and_control.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 306,
-     "body_lowerings": 306,
-     "check_occurs_steps": 1986,
+     "body_elaborations": 310,
+     "body_lowerings": 310,
+     "check_occurs_steps": 2030,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3675,
+      "inference_steps": 3735,
       "instantiations": 245,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1143,36 +1143,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1056,
-     "effect_rows": 2686,
-     "emitted_functions": 45,
+     "core_nodes": 1079,
+     "effect_rows": 2711,
+     "emitted_functions": 46,
      "filename": "direct/data_and_control.blot",
      "files": 2,
      "imported_schemes": 31,
      "kind": "compilation",
-     "row_versions": 617,
-     "source_bytes": 17885,
+     "row_versions": 621,
+     "source_bytes": 18282,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2525,
-     "type_nodes": 6240,
-     "type_versions": 892,
-     "wasm_bytes": 5323
+     "syntax_nodes": 2599,
+     "type_nodes": 6337,
+     "type_versions": 907,
+     "wasm_bytes": 5616
     }
    ],
-   "wasm_bytes": 5323,
-   "wasm_sha256": "7648162942e7d6aaacb452d34bc1dd6df3d0934bea6bbe07c20b05612325b381"
+   "wasm_bytes": 5616,
+   "wasm_sha256": "7bd920ff373f86f2ae169204b3b3033070a3a93cd5c1f181332d37f43ba4dd4e"
   },
   "direct/dispatch.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 316,
-     "body_lowerings": 316,
-     "check_occurs_steps": 2179,
+     "body_elaborations": 320,
+     "body_lowerings": 320,
+     "check_occurs_steps": 2223,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4061,
+      "inference_steps": 4121,
       "instantiations": 340,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1183,36 +1183,36 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1356,
-     "effect_rows": 3091,
-     "emitted_functions": 36,
+     "core_nodes": 1379,
+     "effect_rows": 3116,
+     "emitted_functions": 37,
      "filename": "direct/dispatch.blot",
      "files": 3,
      "imported_schemes": 60,
      "kind": "compilation",
-     "row_versions": 777,
-     "source_bytes": 20714,
+     "row_versions": 781,
+     "source_bytes": 21111,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2906,
-     "type_nodes": 7414,
-     "type_versions": 1008,
-     "wasm_bytes": 4821
+     "syntax_nodes": 2980,
+     "type_nodes": 7511,
+     "type_versions": 1023,
+     "wasm_bytes": 5124
     }
    ],
-   "wasm_bytes": 4821,
-   "wasm_sha256": "5b622073674145191ef26b41af890a4425e609305af7f43c2280b652e3512465"
+   "wasm_bytes": 5124,
+   "wasm_sha256": "1cdd341925998eb2cc85859e160762c9f185a084c58a6fcee7aafc9eab4d4649"
   },
   "direct/empty_literals.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 321,
-     "body_lowerings": 321,
-     "check_occurs_steps": 2490,
+     "body_elaborations": 325,
+     "body_lowerings": 325,
+     "check_occurs_steps": 2534,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4493,
+      "inference_steps": 4553,
       "instantiations": 316,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1223,36 +1223,36 @@
       "shared_uses": 13,
       "use_expansions": 12
      },
-     "core_nodes": 1455,
-     "effect_rows": 3152,
-     "emitted_functions": 37,
+     "core_nodes": 1478,
+     "effect_rows": 3177,
+     "emitted_functions": 38,
      "filename": "direct/empty_literals.blot",
      "files": 3,
      "imported_schemes": 56,
      "kind": "compilation",
-     "row_versions": 724,
-     "source_bytes": 22132,
+     "row_versions": 728,
+     "source_bytes": 22529,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3074,
-     "type_nodes": 7979,
-     "type_versions": 1085,
-     "wasm_bytes": 5203
+     "syntax_nodes": 3148,
+     "type_nodes": 8076,
+     "type_versions": 1100,
+     "wasm_bytes": 5582
     }
    ],
-   "wasm_bytes": 5203,
-   "wasm_sha256": "ddf82556b0b9f5632d41a23fde091d87887bd1b178d2b401afccf4968177c533"
+   "wasm_bytes": 5582,
+   "wasm_sha256": "900bab54e9e52fe1ed037d08aacadbe1e2ad3bbbd5bb4783c220b6b9862c5d9f"
   },
   "direct/generalized_values.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1966,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 2010,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3412,
+      "inference_steps": 3472,
       "instantiations": 208,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1263,36 +1263,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 947,
-     "effect_rows": 2580,
-     "emitted_functions": 35,
+     "core_nodes": 970,
+     "effect_rows": 2605,
+     "emitted_functions": 36,
      "filename": "direct/generalized_values.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 570,
-     "source_bytes": 17066,
+     "row_versions": 574,
+     "source_bytes": 17463,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2357,
-     "type_nodes": 6071,
-     "type_versions": 844,
-     "wasm_bytes": 4330
+     "syntax_nodes": 2431,
+     "type_nodes": 6168,
+     "type_versions": 859,
+     "wasm_bytes": 4633
     }
    ],
-   "wasm_bytes": 4330,
-   "wasm_sha256": "c4e0af58c38c88d94cc9f90cd7e2121d9c3cbe0bdc9202ec2b51d5e5dcb50090"
+   "wasm_bytes": 4633,
+   "wasm_sha256": "f0afa0c8b96b3d3053a038155fc253b6a274c36ae10355fa0f5435b9690fec6b"
   },
   "direct/generated_from_filter.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 319,
-     "body_lowerings": 319,
-     "check_occurs_steps": 2477,
+     "body_elaborations": 323,
+     "body_lowerings": 323,
+     "check_occurs_steps": 2521,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4501,
+      "inference_steps": 4561,
       "instantiations": 321,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1303,36 +1303,36 @@
       "shared_uses": 11,
       "use_expansions": 10
      },
-     "core_nodes": 1480,
-     "effect_rows": 3138,
-     "emitted_functions": 34,
+     "core_nodes": 1503,
+     "effect_rows": 3163,
+     "emitted_functions": 35,
      "filename": "direct/generated_from_filter.blot",
      "files": 3,
      "imported_schemes": 58,
      "kind": "compilation",
-     "row_versions": 729,
-     "source_bytes": 22213,
+     "row_versions": 733,
+     "source_bytes": 22610,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3102,
-     "type_nodes": 7941,
-     "type_versions": 1073,
-     "wasm_bytes": 4838
+     "syntax_nodes": 3176,
+     "type_nodes": 8038,
+     "type_versions": 1088,
+     "wasm_bytes": 5293
     }
    ],
-   "wasm_bytes": 4838,
-   "wasm_sha256": "cb2a383b550935cf1a28b4a2ae0f460238b62e626916b11cfb3114940f08e5f9"
+   "wasm_bytes": 5293,
+   "wasm_sha256": "74b1aa1025dcc6f69f8aec0588dc744374d5e9eb9083433608bad3027848f9c2"
   },
   "direct/generic_comprehensions.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 299,
-     "body_lowerings": 299,
-     "check_occurs_steps": 2006,
+     "body_elaborations": 303,
+     "body_lowerings": 303,
+     "check_occurs_steps": 2050,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3739,
+      "inference_steps": 3799,
       "instantiations": 249,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1343,36 +1343,36 @@
       "shared_uses": 5,
       "use_expansions": 5
      },
-     "core_nodes": 1071,
-     "effect_rows": 2671,
-     "emitted_functions": 39,
+     "core_nodes": 1094,
+     "effect_rows": 2696,
+     "emitted_functions": 40,
      "filename": "direct/generic_comprehensions.blot",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
-     "row_versions": 611,
-     "source_bytes": 17257,
+     "row_versions": 615,
+     "source_bytes": 17654,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2479,
-     "type_nodes": 6351,
-     "type_versions": 900,
-     "wasm_bytes": 6930
+     "syntax_nodes": 2553,
+     "type_nodes": 6448,
+     "type_versions": 915,
+     "wasm_bytes": 7233
     }
    ],
-   "wasm_bytes": 6930,
-   "wasm_sha256": "b6ae436e7296e2073f309e7fc8ad6dc296fd809bc8c14a91e9a12ca974505cb0"
+   "wasm_bytes": 7233,
+   "wasm_sha256": "29574f0de9b2bb3108087645c672d5dcdf6c15b288ce0afb48bcc71458bb17d7"
   },
   "direct/host.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1931,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1975,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3411,
+      "inference_steps": 3471,
       "instantiations": 211,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1383,36 +1383,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 960,
-     "effect_rows": 2646,
-     "emitted_functions": 35,
+     "core_nodes": 983,
+     "effect_rows": 2671,
+     "emitted_functions": 36,
      "filename": "direct/host.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 572,
-     "source_bytes": 16963,
+     "row_versions": 576,
+     "source_bytes": 17360,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2325,
-     "type_nodes": 6007,
-     "type_versions": 843,
-     "wasm_bytes": 5299
+     "syntax_nodes": 2399,
+     "type_nodes": 6104,
+     "type_versions": 858,
+     "wasm_bytes": 5754
     }
    ],
-   "wasm_bytes": 5299,
-   "wasm_sha256": "81780e3a242b6b921d98106cc9fca4ea29d594094f7da6d8ebf0fac64b1d17e6"
+   "wasm_bytes": 5754,
+   "wasm_sha256": "a565ca785bd516df81f9a9fd058962f07a330f38fc445202a14f1a27d01581b8"
   },
   "direct/inferred_types.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 321,
-     "body_lowerings": 321,
-     "check_occurs_steps": 2467,
+     "body_elaborations": 325,
+     "body_lowerings": 325,
+     "check_occurs_steps": 2511,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4573,
+      "inference_steps": 4633,
       "instantiations": 314,
       "memo_declined": 1,
       "memo_hits": 0,
@@ -1423,36 +1423,36 @@
       "shared_uses": 12,
       "use_expansions": 11
      },
-     "core_nodes": 1470,
-     "effect_rows": 3133,
-     "emitted_functions": 37,
+     "core_nodes": 1493,
+     "effect_rows": 3158,
+     "emitted_functions": 38,
      "filename": "direct/inferred_types.blot",
      "files": 3,
      "imported_schemes": 57,
      "kind": "compilation",
-     "row_versions": 717,
-     "source_bytes": 22203,
+     "row_versions": 721,
+     "source_bytes": 22600,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3119,
-     "type_nodes": 7896,
-     "type_versions": 1066,
-     "wasm_bytes": 4948
+     "syntax_nodes": 3193,
+     "type_nodes": 7993,
+     "type_versions": 1081,
+     "wasm_bytes": 5327
     }
    ],
-   "wasm_bytes": 4948,
-   "wasm_sha256": "f8e3462786cfb1761e30e985164c1ed78a1b7681441cc325b013aee7de807dcb"
+   "wasm_bytes": 5327,
+   "wasm_sha256": "382f765fad092ed7a7510f6ba79cefde41ac8453016b6f7207c43ea5e9c89d81"
   },
   "direct/miscompiles.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1911,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1955,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3467,
+      "inference_steps": 3527,
       "instantiations": 219,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1463,36 +1463,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 989,
-     "effect_rows": 2602,
-     "emitted_functions": 39,
+     "core_nodes": 1012,
+     "effect_rows": 2627,
+     "emitted_functions": 40,
      "filename": "direct/miscompiles.blot",
      "files": 2,
      "imported_schemes": 28,
      "kind": "compilation",
-     "row_versions": 578,
-     "source_bytes": 17198,
+     "row_versions": 582,
+     "source_bytes": 17595,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2378,
-     "type_nodes": 5977,
-     "type_versions": 839,
-     "wasm_bytes": 5052
+     "syntax_nodes": 2452,
+     "type_nodes": 6074,
+     "type_versions": 854,
+     "wasm_bytes": 5355
     }
    ],
-   "wasm_bytes": 5052,
-   "wasm_sha256": "5849c79b65e37b6c3a24d7c071790b6f06d66434b4cb9634499472dfd955fc3e"
+   "wasm_bytes": 5355,
+   "wasm_sha256": "fb81f09089bea2377cc9aff5293ea63855232afb614af6f80b205afd998db9db"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1903,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1947,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3435,
+      "inference_steps": 3495,
       "instantiations": 219,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1503,36 +1503,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 982,
-     "effect_rows": 2584,
-     "emitted_functions": 31,
+     "core_nodes": 1005,
+     "effect_rows": 2609,
+     "emitted_functions": 32,
      "filename": "direct/nested_updates.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 571,
-     "source_bytes": 17107,
+     "row_versions": 575,
+     "source_bytes": 17504,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2351,
-     "type_nodes": 5946,
-     "type_versions": 830,
-     "wasm_bytes": 4587
+     "syntax_nodes": 2425,
+     "type_nodes": 6043,
+     "type_versions": 845,
+     "wasm_bytes": 4890
     }
    ],
-   "wasm_bytes": 4587,
-   "wasm_sha256": "8f97f591bde3667da31148d080d8534cebb60300e38fd3000b61f5214d84cc22"
+   "wasm_bytes": 4890,
+   "wasm_sha256": "c40b98b342b42ede813612da27f6d73360e1ced8c8d4ce2b3fc046f1a2270508"
   },
   "direct/nested_updates_indexed.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1907,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1951,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3423,
+      "inference_steps": 3483,
       "instantiations": 215,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1543,36 +1543,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 993,
-     "effect_rows": 2573,
-     "emitted_functions": 33,
+     "core_nodes": 1016,
+     "effect_rows": 2598,
+     "emitted_functions": 34,
      "filename": "direct/nested_updates_indexed.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 568,
-     "source_bytes": 16887,
+     "row_versions": 572,
+     "source_bytes": 17284,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2341,
-     "type_nodes": 5933,
-     "type_versions": 839,
-     "wasm_bytes": 5247
+     "syntax_nodes": 2415,
+     "type_nodes": 6030,
+     "type_versions": 854,
+     "wasm_bytes": 5550
     }
    ],
-   "wasm_bytes": 5247,
-   "wasm_sha256": "8dddc428244a3abf94387605a6c65ac8b8d6d4c14b6f7f25604650301772cdae"
+   "wasm_bytes": 5550,
+   "wasm_sha256": "e653af19fc0ae7d28fdae0a26560e142267b2d5aaedee1c186e0bb46a70b5fd5"
   },
   "direct/open_codec.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1923,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1967,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3400,
+      "inference_steps": 3460,
       "instantiations": 208,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1583,36 +1583,36 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 945,
-     "effect_rows": 2596,
-     "emitted_functions": 39,
+     "core_nodes": 968,
+     "effect_rows": 2621,
+     "emitted_functions": 40,
      "filename": "direct/open_codec.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 562,
-     "source_bytes": 16886,
+     "row_versions": 566,
+     "source_bytes": 17283,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2310,
-     "type_nodes": 5978,
-     "type_versions": 834,
-     "wasm_bytes": 4658
+     "syntax_nodes": 2384,
+     "type_nodes": 6075,
+     "type_versions": 849,
+     "wasm_bytes": 5114
     }
    ],
-   "wasm_bytes": 4658,
-   "wasm_sha256": "7213335ec7d5519d4254c9995610a5d8fbed3ef8c5bef5378de2f317503eac89"
+   "wasm_bytes": 5114,
+   "wasm_sha256": "457ae1b0dc9379a528f8a41713a249fd250fb544d0e3bcb006f298b0801755a0"
   },
   "direct/policy_record.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1927,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1971,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3390,
+      "inference_steps": 3450,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1623,36 +1623,36 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 937,
-     "effect_rows": 2621,
-     "emitted_functions": 36,
+     "core_nodes": 960,
+     "effect_rows": 2646,
+     "emitted_functions": 37,
      "filename": "direct/policy_record.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 562,
-     "source_bytes": 16796,
+     "row_versions": 566,
+     "source_bytes": 17193,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2296,
-     "type_nodes": 5990,
-     "type_versions": 834,
-     "wasm_bytes": 4332
+     "syntax_nodes": 2370,
+     "type_nodes": 6087,
+     "type_versions": 849,
+     "wasm_bytes": 4635
     }
    ],
-   "wasm_bytes": 4332,
-   "wasm_sha256": "8c5d432b75d533d19dcd2dbc1034e37a93cf6ca9dbb24c9b11ed4cf39dc35f9c"
+   "wasm_bytes": 4635,
+   "wasm_sha256": "9bc48281f218180ba8544eef6c7295291c0424c84d4e9df995e5c5393caad28f"
   },
   "direct/pools.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1904,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3434,
+      "inference_steps": 3494,
       "instantiations": 208,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1663,36 +1663,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 946,
-     "effect_rows": 2578,
-     "emitted_functions": 39,
+     "core_nodes": 969,
+     "effect_rows": 2603,
+     "emitted_functions": 40,
      "filename": "direct/pools.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 564,
-     "source_bytes": 16828,
+     "row_versions": 568,
+     "source_bytes": 17225,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2323,
-     "type_nodes": 5916,
-     "type_versions": 829,
-     "wasm_bytes": 5098
+     "syntax_nodes": 2397,
+     "type_nodes": 6013,
+     "type_versions": 844,
+     "wasm_bytes": 5554
     }
    ],
-   "wasm_bytes": 5098,
-   "wasm_sha256": "b9397fa6261972940c7b6fe7208bb71a22853f6ab0efa8a35ad097864a941fa9"
+   "wasm_bytes": 5554,
+   "wasm_sha256": "ac87431086e0f222ede4b3c953373f5143f5213bef3a3684829165b1e9a8d55d"
   },
   "direct/providers.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 302,
-     "body_lowerings": 302,
-     "check_occurs_steps": 1939,
+     "body_elaborations": 306,
+     "body_lowerings": 306,
+     "check_occurs_steps": 1983,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3559,
+      "inference_steps": 3619,
       "instantiations": 233,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1703,36 +1703,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1036,
-     "effect_rows": 2721,
-     "emitted_functions": 51,
+     "core_nodes": 1059,
+     "effect_rows": 2746,
+     "emitted_functions": 52,
      "filename": "direct/providers.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 603,
-     "source_bytes": 17673,
+     "row_versions": 607,
+     "source_bytes": 18070,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2440,
-     "type_nodes": 6090,
-     "type_versions": 862,
-     "wasm_bytes": 5903
+     "syntax_nodes": 2514,
+     "type_nodes": 6187,
+     "type_versions": 877,
+     "wasm_bytes": 6206
     }
    ],
-   "wasm_bytes": 5903,
-   "wasm_sha256": "cc4ceefdb4c44c999c83ce237de9debbc6be21bb46681c05a3b3314ff68a7b27"
+   "wasm_bytes": 6206,
+   "wasm_sha256": "8d79df637e48256684b523599b8cda6d55ecab0c79766969e9a9c1b42461a6cc"
   },
   "direct/recursive_data.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1921,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1965,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3508,
+      "inference_steps": 3568,
       "instantiations": 223,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1743,36 +1743,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 987,
-     "effect_rows": 2601,
-     "emitted_functions": 36,
+     "core_nodes": 1010,
+     "effect_rows": 2626,
+     "emitted_functions": 37,
      "filename": "direct/recursive_data.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 576,
-     "source_bytes": 17278,
+     "row_versions": 580,
+     "source_bytes": 17675,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2392,
-     "type_nodes": 6002,
-     "type_versions": 847,
-     "wasm_bytes": 4836
+     "syntax_nodes": 2466,
+     "type_nodes": 6099,
+     "type_versions": 862,
+     "wasm_bytes": 5139
     }
    ],
-   "wasm_bytes": 4836,
-   "wasm_sha256": "4705d892cb6fdd6f145e31fb34ec22b9ca74d70c774290b3383ba2d3dc2d3b65"
+   "wasm_bytes": 5139,
+   "wasm_sha256": "bb8ea8fc84265a01cca10da0ed90509d9eb4a778323c6864ebf3a411a47d63a3"
   },
   "direct/shared_field_update.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1892,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1936,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3407,
+      "inference_steps": 3467,
       "instantiations": 212,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1783,36 +1783,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 960,
-     "effect_rows": 2570,
-     "emitted_functions": 31,
+     "core_nodes": 983,
+     "effect_rows": 2595,
+     "emitted_functions": 32,
      "filename": "direct/shared_field_update.blot",
      "files": 2,
      "imported_schemes": 24,
      "kind": "compilation",
-     "row_versions": 564,
-     "source_bytes": 16977,
+     "row_versions": 568,
+     "source_bytes": 17374,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2321,
-     "type_nodes": 5910,
-     "type_versions": 823,
-     "wasm_bytes": 4399
+     "syntax_nodes": 2395,
+     "type_nodes": 6007,
+     "type_versions": 838,
+     "wasm_bytes": 4702
     }
    ],
-   "wasm_bytes": 4399,
-   "wasm_sha256": "b0a2fc1c6cc79c6acc2f33e2bca3dbb48ba569211be19c93541cea7b4afebde0"
+   "wasm_bytes": 4702,
+   "wasm_sha256": "68bb21751bbfcb1c28819800dfc53deccb4b4be88142fa7a1419d2981c33b677"
   },
   "direct/shared_fields.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1895,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1939,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3383,
+      "inference_steps": 3443,
       "instantiations": 210,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1823,36 +1823,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 953,
-     "effect_rows": 2571,
-     "emitted_functions": 32,
+     "core_nodes": 976,
+     "effect_rows": 2596,
+     "emitted_functions": 33,
      "filename": "direct/shared_fields.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 563,
-     "source_bytes": 16854,
+     "row_versions": 567,
+     "source_bytes": 17251,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2311,
-     "type_nodes": 5913,
-     "type_versions": 826,
-     "wasm_bytes": 4649
+     "syntax_nodes": 2385,
+     "type_nodes": 6010,
+     "type_versions": 841,
+     "wasm_bytes": 5028
     }
    ],
-   "wasm_bytes": 4649,
-   "wasm_sha256": "865776483f4187856207ec3a1139473d034eb7e884c3b7cf28963ddbb78ef56f"
+   "wasm_bytes": 5028,
+   "wasm_sha256": "35e927f7fcf0402c3bd183c1d0130fbb98e8191d33f2b81a28afd440eb3ba552"
   },
   "direct/simd_conversions.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 366,
-     "body_lowerings": 366,
-     "check_occurs_steps": 2635,
+     "body_elaborations": 370,
+     "body_lowerings": 370,
+     "check_occurs_steps": 2679,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4609,
+      "inference_steps": 4669,
       "instantiations": 288,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1863,36 +1863,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1280,
-     "effect_rows": 3613,
-     "emitted_functions": 33,
+     "core_nodes": 1303,
+     "effect_rows": 3638,
+     "emitted_functions": 34,
      "filename": "direct/simd_conversions.blot",
      "files": 3,
      "imported_schemes": 52,
      "kind": "compilation",
-     "row_versions": 821,
-     "source_bytes": 23811,
+     "row_versions": 825,
+     "source_bytes": 24208,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3182,
-     "type_nodes": 8637,
-     "type_versions": 1227,
-     "wasm_bytes": 4386
+     "syntax_nodes": 3256,
+     "type_nodes": 8734,
+     "type_versions": 1242,
+     "wasm_bytes": 4689
     }
    ],
-   "wasm_bytes": 4386,
-   "wasm_sha256": "0711019b32c50980e8d589e4e6952a1118aed2bbd2bec87cd91be93c190645fd"
+   "wasm_bytes": 4689,
+   "wasm_sha256": "5c0380e91d37dad70279b82e5491d0735dc863207ca6832d49c39b62f91078c9"
   },
   "direct/simd_lanes.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 368,
-     "body_lowerings": 368,
-     "check_occurs_steps": 2671,
+     "body_elaborations": 372,
+     "body_lowerings": 372,
+     "check_occurs_steps": 2715,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4698,
+      "inference_steps": 4758,
       "instantiations": 308,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1903,36 +1903,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1335,
-     "effect_rows": 3671,
-     "emitted_functions": 37,
+     "core_nodes": 1358,
+     "effect_rows": 3696,
+     "emitted_functions": 38,
      "filename": "direct/simd_lanes.blot",
      "files": 3,
      "imported_schemes": 54,
      "kind": "compilation",
-     "row_versions": 852,
-     "source_bytes": 24090,
+     "row_versions": 856,
+     "source_bytes": 24487,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3257,
-     "type_nodes": 8791,
-     "type_versions": 1257,
-     "wasm_bytes": 4935
+     "syntax_nodes": 3331,
+     "type_nodes": 8888,
+     "type_versions": 1272,
+     "wasm_bytes": 5238
     }
    ],
-   "wasm_bytes": 4935,
-   "wasm_sha256": "8c026e9138bf11a02a0b81399922bf9cc1d37e5c04b767be230acac358a607a8"
+   "wasm_bytes": 5238,
+   "wasm_sha256": "bb0a5c73857a07bd99bdc1d34ef5240af33f1fad83f48df7741d486dc9bc6cd1"
   },
   "direct/staged_scalar.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1896,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1940,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3383,
+      "inference_steps": 3443,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1943,36 +1943,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 939,
-     "effect_rows": 2579,
-     "emitted_functions": 33,
+     "core_nodes": 962,
+     "effect_rows": 2604,
+     "emitted_functions": 34,
      "filename": "direct/staged_scalar.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 562,
-     "source_bytes": 16730,
+     "row_versions": 566,
+     "source_bytes": 17127,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2294,
-     "type_nodes": 5888,
-     "type_versions": 822,
-     "wasm_bytes": 4071
+     "syntax_nodes": 2368,
+     "type_nodes": 5985,
+     "type_versions": 837,
+     "wasm_bytes": 4374
     }
    ],
-   "wasm_bytes": 4071,
-   "wasm_sha256": "7c28abf1aec6fe2d97cc5ee9514f47053980c510d711eb74cea3637c583cec0c"
+   "wasm_bytes": 4374,
+   "wasm_sha256": "66c789916717f6fe22e3fa31006e775747f13c489ee8e133e4aec98f01a539dd"
   },
   "direct/storage.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1949,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1993,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3830,
+      "inference_steps": 3890,
       "instantiations": 258,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -1983,36 +1983,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1107,
-     "effect_rows": 2652,
-     "emitted_functions": 44,
+     "core_nodes": 1130,
+     "effect_rows": 2677,
+     "emitted_functions": 45,
      "filename": "direct/storage.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 624,
-     "source_bytes": 17955,
+     "row_versions": 628,
+     "source_bytes": 18352,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2600,
-     "type_nodes": 6116,
-     "type_versions": 869,
-     "wasm_bytes": 6849
+     "syntax_nodes": 2674,
+     "type_nodes": 6213,
+     "type_versions": 884,
+     "wasm_bytes": 7202
     }
    ],
-   "wasm_bytes": 6849,
-   "wasm_sha256": "9e1f3f718c09ccb4b40f901a12f267e33eef7ed2cd16c582aa98ea5fb091ff7a"
+   "wasm_bytes": 7202,
+   "wasm_sha256": "e7f6fc9fa1a31e9cd797e691a09c21d6871531e32cb3872dc1bafd2e57103d35"
   },
   "direct/terminal_scratch_reads.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 305,
-     "body_lowerings": 305,
-     "check_occurs_steps": 2137,
+     "body_elaborations": 309,
+     "body_lowerings": 309,
+     "check_occurs_steps": 2181,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3981,
+      "inference_steps": 4041,
       "instantiations": 312,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2023,36 +2023,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1347,
-     "effect_rows": 2832,
-     "emitted_functions": 52,
+     "core_nodes": 1370,
+     "effect_rows": 2857,
+     "emitted_functions": 53,
      "filename": "direct/terminal_scratch_reads.blot",
      "files": 2,
      "imported_schemes": 29,
      "kind": "compilation",
-     "row_versions": 714,
-     "source_bytes": 19461,
+     "row_versions": 718,
+     "source_bytes": 19858,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2853,
-     "type_nodes": 6785,
-     "type_versions": 998,
-     "wasm_bytes": 12768
+     "syntax_nodes": 2927,
+     "type_nodes": 6882,
+     "type_versions": 1013,
+     "wasm_bytes": 13664
     }
    ],
-   "wasm_bytes": 12768,
-   "wasm_sha256": "8367d5271dd5a4b0bb8950d40f50c99a37478e0dced29e89e38d746593bbeab7"
+   "wasm_bytes": 13664,
+   "wasm_sha256": "76764156a32551a3caec6be7ff5e852e9667e93e811fc8873d7ef2e92d11d6fe"
   },
   "direct/unused_generic_fields.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1923,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1967,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3390,
+      "inference_steps": 3450,
       "instantiations": 206,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2063,36 +2063,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 940,
-     "effect_rows": 2610,
-     "emitted_functions": 37,
+     "core_nodes": 963,
+     "effect_rows": 2635,
+     "emitted_functions": 38,
      "filename": "direct/unused_generic_fields.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 561,
-     "source_bytes": 16939,
+     "row_versions": 565,
+     "source_bytes": 17336,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2301,
-     "type_nodes": 5967,
-     "type_versions": 830,
-     "wasm_bytes": 4484
+     "syntax_nodes": 2375,
+     "type_nodes": 6064,
+     "type_versions": 845,
+     "wasm_bytes": 4787
     }
    ],
-   "wasm_bytes": 4484,
-   "wasm_sha256": "9b6bb277e682ef449fcab3c9da98b63326149b1f8b0b0eb362d8103fb016b45a"
+   "wasm_bytes": 4787,
+   "wasm_sha256": "523919e5aea2af4dfab00592526b951f35e01d19440d30e4a09646e48ae763e8"
   },
   "direct/unused_stages.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1967,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 2011,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3459,
+      "inference_steps": 3519,
       "instantiations": 215,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2103,36 +2103,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 967,
-     "effect_rows": 2661,
-     "emitted_functions": 40,
+     "core_nodes": 990,
+     "effect_rows": 2686,
+     "emitted_functions": 41,
      "filename": "direct/unused_stages.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 581,
-     "source_bytes": 17267,
+     "row_versions": 585,
+     "source_bytes": 17664,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2388,
-     "type_nodes": 6118,
-     "type_versions": 844,
-     "wasm_bytes": 5089
+     "syntax_nodes": 2462,
+     "type_nodes": 6215,
+     "type_versions": 859,
+     "wasm_bytes": 5544
     }
    ],
-   "wasm_bytes": 5089,
-   "wasm_sha256": "a874b3a455cb7cbd17062ba34bbd90e97d52da23ec93d437e26da2b170c7e028"
+   "wasm_bytes": 5544,
+   "wasm_sha256": "256552afc32d6124c120d9c7a9b9a04baec5cdb2c6bb138671d10e8796a2b87f"
   },
   "direct/view_calls.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1956,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 2000,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3612,
+      "inference_steps": 3672,
       "instantiations": 234,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2143,36 +2143,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1025,
-     "effect_rows": 2662,
-     "emitted_functions": 36,
+     "core_nodes": 1048,
+     "effect_rows": 2687,
+     "emitted_functions": 37,
      "filename": "direct/view_calls.blot",
      "files": 2,
      "imported_schemes": 25,
      "kind": "compilation",
-     "row_versions": 598,
-     "source_bytes": 17467,
+     "row_versions": 602,
+     "source_bytes": 17864,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2466,
-     "type_nodes": 6145,
-     "type_versions": 857,
-     "wasm_bytes": 5527
+     "syntax_nodes": 2540,
+     "type_nodes": 6242,
+     "type_versions": 872,
+     "wasm_bytes": 5907
     }
    ],
-   "wasm_bytes": 5527,
-   "wasm_sha256": "ae9685affe3267dc3a353a8649a17a9767d85e674c536e8142a51943a9ec1235"
+   "wasm_bytes": 5907,
+   "wasm_sha256": "4ef7d7c3451be0d484c4dcf6ab51ae5a82077675910ed9be3f2016ad53bdd2b4"
   },
   "discard-fixtures/deferred-alias.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1892,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1936,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3371,
+      "inference_steps": 3431,
       "instantiations": 205,
       "memo_declined": 1,
       "memo_hits": 0,
@@ -2183,25 +2183,25 @@
       "shared_uses": 5,
       "use_expansions": 4
      },
-     "core_nodes": 931,
-     "effect_rows": 2571,
-     "emitted_functions": 33,
+     "core_nodes": 954,
+     "effect_rows": 2596,
+     "emitted_functions": 34,
      "filename": "discard-fixtures/deferred-alias.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16730,
+     "row_versions": 559,
+     "source_bytes": 17127,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2267,
-     "type_nodes": 5880,
-     "type_versions": 816,
-     "wasm_bytes": 4187
+     "syntax_nodes": 2341,
+     "type_nodes": 5977,
+     "type_versions": 831,
+     "wasm_bytes": 4490
     }
    ],
-   "wasm_bytes": 4187,
-   "wasm_sha256": "a123e78846c5f47d44d400831b5b40360e26a6a0c9963f4fd3f5abd121a1facb"
+   "wasm_bytes": 4490,
+   "wasm_sha256": "430d014ec1cf1b39f9c819b55ee86f3703127c039669cbba76ab16290973beaa"
   },
   "discard-fixtures/deferred-anonymous.blot": {
    "exit": 1,
@@ -2239,12 +2239,12 @@
      }
     },
     {
-     "body_elaborations": 294,
+     "body_elaborations": 298,
      "body_lowerings": 0,
-     "check_occurs_steps": 1883,
+     "check_occurs_steps": 1927,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3352,
+      "inference_steps": 3412,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2256,19 +2256,19 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2556,
+     "effect_rows": 2581,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-anonymous.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 553,
-     "source_bytes": 16672,
+     "row_versions": 557,
+     "source_bytes": 17069,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2261,
-     "type_nodes": 5847,
-     "type_versions": 814,
+     "syntax_nodes": 2335,
+     "type_nodes": 5944,
+     "type_versions": 829,
      "wasm_bytes": 0
     }
    ]
@@ -2309,12 +2309,12 @@
      }
     },
     {
-     "body_elaborations": 296,
+     "body_elaborations": 300,
      "body_lowerings": 0,
-     "check_occurs_steps": 1888,
+     "check_occurs_steps": 1932,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3374,
+      "inference_steps": 3434,
       "instantiations": 204,
       "memo_declined": 1,
       "memo_hits": 0,
@@ -2326,19 +2326,19 @@
       "use_expansions": 4
      },
      "core_nodes": 0,
-     "effect_rows": 2568,
+     "effect_rows": 2593,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-body.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16767,
+     "row_versions": 560,
+     "source_bytes": 17164,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2270,
-     "type_nodes": 5871,
-     "type_versions": 817,
+     "syntax_nodes": 2344,
+     "type_nodes": 5968,
+     "type_versions": 832,
      "wasm_bytes": 0
     }
    ]
@@ -2347,12 +2347,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1934,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 1978,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3516,
+      "inference_steps": 3576,
       "instantiations": 217,
       "memo_declined": 1,
       "memo_hits": 6,
@@ -2363,36 +2363,36 @@
       "shared_uses": 11,
       "use_expansions": 11
      },
-     "core_nodes": 1007,
-     "effect_rows": 2685,
-     "emitted_functions": 48,
+     "core_nodes": 1030,
+     "effect_rows": 2710,
+     "emitted_functions": 49,
      "filename": "discard-fixtures/eager-order.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 580,
-     "source_bytes": 17305,
+     "row_versions": 584,
+     "source_bytes": 17702,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2382,
-     "type_nodes": 6096,
-     "type_versions": 849,
-     "wasm_bytes": 5600
+     "syntax_nodes": 2456,
+     "type_nodes": 6193,
+     "type_versions": 864,
+     "wasm_bytes": 5903
     }
    ],
-   "wasm_bytes": 5600,
-   "wasm_sha256": "926d7e3a29710844c97d4e068bdc8346b1b77382912cbb601ad30d55c53e96bb"
+   "wasm_bytes": 5903,
+   "wasm_sha256": "515d5a8d70cfc10c3ca6357db6573f6a2454cc7599c1906009c63a2cddcbc6e3"
   },
   "discard-fixtures/explicit-qualifier.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1881,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1925,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3339,
+      "inference_steps": 3399,
       "instantiations": 201,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2403,36 +2403,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 925,
-     "effect_rows": 2551,
-     "emitted_functions": 31,
+     "core_nodes": 948,
+     "effect_rows": 2576,
+     "emitted_functions": 32,
      "filename": "discard-fixtures/explicit-qualifier.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 552,
-     "source_bytes": 16640,
+     "row_versions": 556,
+     "source_bytes": 17037,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2263,
-     "type_nodes": 5835,
-     "type_versions": 813,
-     "wasm_bytes": 3988
+     "syntax_nodes": 2337,
+     "type_nodes": 5932,
+     "type_versions": 828,
+     "wasm_bytes": 4291
     }
    ],
-   "wasm_bytes": 3988,
-   "wasm_sha256": "204007869d9d25acf38c444b23cd1bfae2e1cad99d6c0899eb89d2580a4629ce"
+   "wasm_bytes": 4291,
+   "wasm_sha256": "c901908f644f165ba08d7fd409f63c1f08a4d02c076f1bdc7749d054da5eb3fb"
   },
   "discard-fixtures/generate-panic.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1891,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1935,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3359,
+      "inference_steps": 3419,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2443,36 +2443,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 929,
-     "effect_rows": 2560,
-     "emitted_functions": 32,
+     "core_nodes": 952,
+     "effect_rows": 2585,
+     "emitted_functions": 33,
      "filename": "discard-fixtures/generate-panic.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16723,
+     "row_versions": 560,
+     "source_bytes": 17120,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2271,
-     "type_nodes": 5874,
-     "type_versions": 819,
-     "wasm_bytes": 4258
+     "syntax_nodes": 2345,
+     "type_nodes": 5971,
+     "type_versions": 834,
+     "wasm_bytes": 4561
     }
    ],
-   "wasm_bytes": 4258,
-   "wasm_sha256": "11cf4a538dc04c08726d37d2a4234b14c1b5260efd200ffb9490041b2a32d65a"
+   "wasm_bytes": 4561,
+   "wasm_sha256": "1ea3f6156264e90d2a048e0dd247b8e6bcfaaccb4bc1d64d1461a7e7a6cd4ff9"
   },
   "discard-fixtures/implicit-uses.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1896,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1940,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3487,
+      "inference_steps": 3547,
       "instantiations": 206,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2483,25 +2483,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 994,
-     "effect_rows": 2573,
-     "emitted_functions": 38,
+     "core_nodes": 1017,
+     "effect_rows": 2598,
+     "emitted_functions": 39,
      "filename": "discard-fixtures/implicit-uses.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 564,
-     "source_bytes": 17193,
+     "row_versions": 568,
+     "source_bytes": 17590,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2379,
-     "type_nodes": 5879,
-     "type_versions": 822,
-     "wasm_bytes": 4639
+     "syntax_nodes": 2453,
+     "type_nodes": 5976,
+     "type_versions": 837,
+     "wasm_bytes": 4942
     }
    ],
-   "wasm_bytes": 4639,
-   "wasm_sha256": "8595956ad41fe9698062b2f4b73ac1e4a1f7e1ffe987b69836ebb8656e9a999b"
+   "wasm_bytes": 4942,
+   "wasm_sha256": "24d96b32cf9cc2fae5285a4cbddfcafcb3f13768de268f58fc3bd45cfb43872e"
   },
   "discard-fixtures/original.blot": {
    "exit": 1,
@@ -2516,12 +2516,12 @@
      "start": 384
     },
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1905,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1949,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3406,
+      "inference_steps": 3466,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2532,20 +2532,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 944,
-     "effect_rows": 2584,
+     "core_nodes": 967,
+     "effect_rows": 2609,
      "emitted_functions": 0,
      "filename": "discard-fixtures/original.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 563,
-     "source_bytes": 16941,
+     "row_versions": 567,
+     "source_bytes": 17338,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2299,
-     "type_nodes": 5929,
-     "type_versions": 828,
+     "syntax_nodes": 2373,
+     "type_nodes": 6026,
+     "type_versions": 843,
      "wasm_bytes": 0
     }
    ]
@@ -2554,12 +2554,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1885,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1929,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3362,
+      "inference_steps": 3422,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2570,36 +2570,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 932,
-     "effect_rows": 2557,
-     "emitted_functions": 33,
+     "core_nodes": 955,
+     "effect_rows": 2582,
+     "emitted_functions": 34,
      "filename": "discard-fixtures/runtime-panic.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 554,
-     "source_bytes": 16708,
+     "row_versions": 558,
+     "source_bytes": 17105,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2272,
-     "type_nodes": 5852,
-     "type_versions": 817,
-     "wasm_bytes": 4150
+     "syntax_nodes": 2346,
+     "type_nodes": 5949,
+     "type_versions": 832,
+     "wasm_bytes": 4453
     }
    ],
-   "wasm_bytes": 4150,
-   "wasm_sha256": "18addef3ebe2249ee4f0be4eb93e47a318563a2159673a7127110ea70dbe4e43"
+   "wasm_bytes": 4453,
+   "wasm_sha256": "4c0e7f3a89d202f76813fe3c7577987e90a5754cb16719a1ce51f662469cba83"
   },
   "fallbacks.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1938,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1982,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3555,
+      "inference_steps": 3615,
       "instantiations": 211,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2610,36 +2610,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1012,
-     "effect_rows": 2607,
-     "emitted_functions": 47,
+     "core_nodes": 1035,
+     "effect_rows": 2632,
+     "emitted_functions": 48,
      "filename": "fallbacks.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 575,
-     "source_bytes": 17714,
+     "row_versions": 579,
+     "source_bytes": 18111,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2417,
-     "type_nodes": 6012,
-     "type_versions": 858,
-     "wasm_bytes": 5494
+     "syntax_nodes": 2491,
+     "type_nodes": 6109,
+     "type_versions": 873,
+     "wasm_bytes": 5797
     }
    ],
-   "wasm_bytes": 5494,
-   "wasm_sha256": "b9141e5fe679f8c0f8012bbcb47d5a3f7fad41ec4ae7dfa10cc69e69021fabe8"
+   "wasm_bytes": 5797,
+   "wasm_sha256": "7fa167a37fdaa9a3c9b97b086fb8b7a4846297d308c22d76a1d932fe95a8dc48"
   },
   "fixed_scalar_spans.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 306,
-     "body_lowerings": 306,
-     "check_occurs_steps": 2018,
+     "body_elaborations": 310,
+     "body_lowerings": 310,
+     "check_occurs_steps": 2062,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4044,
+      "inference_steps": 4104,
       "instantiations": 268,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2650,36 +2650,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1257,
-     "effect_rows": 2725,
-     "emitted_functions": 47,
+     "core_nodes": 1280,
+     "effect_rows": 2750,
+     "emitted_functions": 48,
      "filename": "fixed_scalar_spans.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 622,
-     "source_bytes": 19542,
+     "row_versions": 626,
+     "source_bytes": 19939,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2833,
-     "type_nodes": 6272,
-     "type_versions": 896,
-     "wasm_bytes": 8705
+     "syntax_nodes": 2907,
+     "type_nodes": 6369,
+     "type_versions": 911,
+     "wasm_bytes": 9440
     }
    ],
-   "wasm_bytes": 8705,
-   "wasm_sha256": "a9464f4b26fe368a99ed59b03cb993481638897be3bb9bf75369c058e4428a75"
+   "wasm_bytes": 9440,
+   "wasm_sha256": "44442613c76646b4c7c186cb1cf9bf6130c341b2c34c843307889bb1196f188c"
   },
   "fresh_owner_borrow_escape.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1888,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1932,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3371,
+      "inference_steps": 3431,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2690,36 +2690,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 942,
-     "effect_rows": 2557,
-     "emitted_functions": 32,
+     "core_nodes": 965,
+     "effect_rows": 2582,
+     "emitted_functions": 33,
      "filename": "fresh_owner_borrow_escape.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16747,
+     "row_versions": 559,
+     "source_bytes": 17144,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2291,
-     "type_nodes": 5857,
-     "type_versions": 819,
-     "wasm_bytes": 4343
+     "syntax_nodes": 2365,
+     "type_nodes": 5954,
+     "type_versions": 834,
+     "wasm_bytes": 4695
     }
    ],
-   "wasm_bytes": 4343,
-   "wasm_sha256": "e438cc3998f9dd3f771fff64137c63c259af10749d71e46c12e3f93d44445b0a"
+   "wasm_bytes": 4695,
+   "wasm_sha256": "b6992007a6c860b589d6df38ebb7c24170d7a20003673b38292e478e4d5ea46c"
   },
   "fresh_owner_cleanup.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1910,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1954,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3521,
+      "inference_steps": 3581,
       "instantiations": 221,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2730,25 +2730,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1016,
-     "effect_rows": 2586,
-     "emitted_functions": 34,
+     "core_nodes": 1039,
+     "effect_rows": 2611,
+     "emitted_functions": 35,
      "filename": "fresh_owner_cleanup.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 570,
-     "source_bytes": 17386,
+     "row_versions": 574,
+     "source_bytes": 17783,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2406,
-     "type_nodes": 5919,
-     "type_versions": 836,
-     "wasm_bytes": 5351
+     "syntax_nodes": 2480,
+     "type_nodes": 6016,
+     "type_versions": 851,
+     "wasm_bytes": 5753
     }
    ],
-   "wasm_bytes": 5351,
-   "wasm_sha256": "3a48423568373290cf8485a5de4d2ff1ed5c531c492e0d8837e6e3b62413e1b6"
+   "wasm_bytes": 5753,
+   "wasm_sha256": "31c6a49c115d1d2ee6193d1e124a10d3d54cb9128c24f519278145b1c44dacdc"
   },
   "fresh_owner_stored_borrow_escape.blot": {
    "exit": 1,
@@ -2763,12 +2763,12 @@
      "start": 228
     },
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1895,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1939,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3410,
+      "inference_steps": 3470,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2779,20 +2779,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 961,
-     "effect_rows": 2566,
+     "core_nodes": 984,
+     "effect_rows": 2591,
      "emitted_functions": 0,
      "filename": "fresh_owner_stored_borrow_escape.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 16990,
+     "row_versions": 562,
+     "source_bytes": 17387,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2344,
-     "type_nodes": 5897,
-     "type_versions": 822,
+     "syntax_nodes": 2418,
+     "type_nodes": 5994,
+     "type_versions": 837,
      "wasm_bytes": 0
     }
    ]
@@ -2801,12 +2801,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1888,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1932,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3370,
+      "inference_steps": 3430,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2817,36 +2817,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 937,
-     "effect_rows": 2557,
-     "emitted_functions": 36,
+     "core_nodes": 960,
+     "effect_rows": 2582,
+     "emitted_functions": 37,
      "filename": "global_call_borrow_escape.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16745,
+     "row_versions": 559,
+     "source_bytes": 17142,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2289,
-     "type_nodes": 5856,
-     "type_versions": 819,
-     "wasm_bytes": 4562
+     "syntax_nodes": 2363,
+     "type_nodes": 5953,
+     "type_versions": 834,
+     "wasm_bytes": 5018
     }
    ],
-   "wasm_bytes": 4562,
-   "wasm_sha256": "58586e495fc4025888d42a183f9f0058280881b9e12233039109055bd44a952d"
+   "wasm_bytes": 5018,
+   "wasm_sha256": "2dc853e40d8c94704684d1b077a49310351cf2f09202415da58a619d5f5bd8cd"
   },
   "global_call_conditional.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1889,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1933,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3392,
+      "inference_steps": 3452,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2857,25 +2857,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 944,
-     "effect_rows": 2560,
-     "emitted_functions": 35,
+     "core_nodes": 967,
+     "effect_rows": 2585,
+     "emitted_functions": 36,
      "filename": "global_call_conditional.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 557,
-     "source_bytes": 16815,
+     "row_versions": 561,
+     "source_bytes": 17212,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2297,
-     "type_nodes": 5856,
-     "type_versions": 819,
-     "wasm_bytes": 4596
+     "syntax_nodes": 2371,
+     "type_nodes": 5953,
+     "type_versions": 834,
+     "wasm_bytes": 4976
     }
    ],
-   "wasm_bytes": 4596,
-   "wasm_sha256": "d1561318ab91a9620883f458cf61a6d4f7d5baf9e198342fafec0d756af20fc3"
+   "wasm_bytes": 4976,
+   "wasm_sha256": "a05dddb606d89e9b7e1c8a5665d97b0018d78e42c50d062f0e709353e3e8df92"
   },
   "global_call_freeze.blot": {
    "exit": 1,
@@ -2897,12 +2897,12 @@
      "subject_start": 80
     },
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1883,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1927,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3353,
+      "inference_steps": 3413,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2913,20 +2913,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 932,
-     "effect_rows": 2551,
+     "core_nodes": 955,
+     "effect_rows": 2576,
      "emitted_functions": 0,
      "filename": "global_call_freeze.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 553,
-     "source_bytes": 16642,
+     "row_versions": 557,
+     "source_bytes": 17039,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2267,
-     "type_nodes": 5835,
-     "type_versions": 815,
+     "syntax_nodes": 2341,
+     "type_nodes": 5932,
+     "type_versions": 830,
      "wasm_bytes": 0
     }
    ]
@@ -2935,12 +2935,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 300,
-     "body_lowerings": 300,
-     "check_occurs_steps": 1911,
+     "body_elaborations": 304,
+     "body_lowerings": 304,
+     "check_occurs_steps": 1955,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3476,
+      "inference_steps": 3536,
       "instantiations": 217,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2951,36 +2951,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 969,
-     "effect_rows": 2584,
-     "emitted_functions": 41,
+     "core_nodes": 992,
+     "effect_rows": 2609,
+     "emitted_functions": 42,
      "filename": "global_call_initialization.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 566,
-     "source_bytes": 17125,
+     "row_versions": 570,
+     "source_bytes": 17522,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2366,
-     "type_nodes": 5926,
-     "type_versions": 838,
-     "wasm_bytes": 6039
+     "syntax_nodes": 2440,
+     "type_nodes": 6023,
+     "type_versions": 853,
+     "wasm_bytes": 6647
     }
    ],
-   "wasm_bytes": 6039,
-   "wasm_sha256": "03bb43434de3e06e7caa29ebc3246cc0e5891d29314b0f29c49813ae084f53c0"
+   "wasm_bytes": 6647,
+   "wasm_sha256": "156b012006ef1df12397e6166622c9235479f813128f24d4539ce36498a5a1b9"
   },
   "global_call_mutation.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 303,
-     "body_lowerings": 303,
-     "check_occurs_steps": 1948,
+     "body_elaborations": 307,
+     "body_lowerings": 307,
+     "check_occurs_steps": 1992,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3625,
+      "inference_steps": 3685,
       "instantiations": 233,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -2991,36 +2991,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1027,
-     "effect_rows": 2635,
-     "emitted_functions": 43,
+     "core_nodes": 1050,
+     "effect_rows": 2660,
+     "emitted_functions": 44,
      "filename": "global_call_mutation.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 585,
-     "source_bytes": 17946,
+     "row_versions": 589,
+     "source_bytes": 18343,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2490,
-     "type_nodes": 6048,
-     "type_versions": 855,
-     "wasm_bytes": 6224
+     "syntax_nodes": 2564,
+     "type_nodes": 6145,
+     "type_versions": 870,
+     "wasm_bytes": 6680
     }
    ],
-   "wasm_bytes": 6224,
-   "wasm_sha256": "f543db0b1951784b744cfbe930866b323b3aa4e287b388a328499f6d6bd50da3"
+   "wasm_bytes": 6680,
+   "wasm_sha256": "68464d0fe08a157092f23ce0fdca6ba61f15969b2c74361ecea085b1d37b0afe"
   },
   "global_call_read.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1898,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1942,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3417,
+      "inference_steps": 3477,
       "instantiations": 212,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3031,36 +3031,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 949,
-     "effect_rows": 2578,
-     "emitted_functions": 37,
+     "core_nodes": 972,
+     "effect_rows": 2603,
+     "emitted_functions": 38,
      "filename": "global_call_read.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 564,
-     "source_bytes": 16878,
+     "row_versions": 568,
+     "source_bytes": 17275,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2315,
-     "type_nodes": 5905,
-     "type_versions": 828,
-     "wasm_bytes": 5345
+     "syntax_nodes": 2389,
+     "type_nodes": 6002,
+     "type_versions": 843,
+     "wasm_bytes": 5801
     }
    ],
-   "wasm_bytes": 5345,
-   "wasm_sha256": "ab7f381e7553fecc03fee5dd84eb03da15efb82aa59722bb8416294460dc5bb4"
+   "wasm_bytes": 5801,
+   "wasm_sha256": "54d6188ed6852fac09c02bf3c59643246894615a0c91156a587fe2621ea16b44"
   },
   "identity_join.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1929,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1973,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3747,
+      "inference_steps": 3807,
       "instantiations": 227,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3071,36 +3071,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1156,
-     "effect_rows": 2678,
-     "emitted_functions": 41,
+     "core_nodes": 1179,
+     "effect_rows": 2703,
+     "emitted_functions": 42,
      "filename": "identity_join.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 591,
-     "source_bytes": 18254,
+     "row_versions": 595,
+     "source_bytes": 18651,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2610,
-     "type_nodes": 6130,
-     "type_versions": 845,
-     "wasm_bytes": 7024
+     "syntax_nodes": 2684,
+     "type_nodes": 6227,
+     "type_versions": 860,
+     "wasm_bytes": 7555
     }
    ],
-   "wasm_bytes": 7024,
-   "wasm_sha256": "2fc7f1938a717dd6efdba4c1fcb5534e2d69b64c38c72bebbaaee26fae1ef40b"
+   "wasm_bytes": 7555,
+   "wasm_sha256": "b578450af8b3e5df79b756d82e06bf5b6c69194a77f4d5a7a26816378962a1d9"
   },
   "identity_join_address.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1892,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1936,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3460,
+      "inference_steps": 3520,
       "instantiations": 208,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3111,36 +3111,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 993,
-     "effect_rows": 2580,
-     "emitted_functions": 34,
+     "core_nodes": 1016,
+     "effect_rows": 2605,
+     "emitted_functions": 35,
      "filename": "identity_join_address.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 563,
-     "source_bytes": 17110,
+     "row_versions": 567,
+     "source_bytes": 17507,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2365,
-     "type_nodes": 5893,
-     "type_versions": 821,
-     "wasm_bytes": 4926
+     "syntax_nodes": 2439,
+     "type_nodes": 5990,
+     "type_versions": 836,
+     "wasm_bytes": 5305
     }
    ],
-   "wasm_bytes": 4926,
-   "wasm_sha256": "6c0eeaa365f27232a1cc52e42a98c652f01e3ddaf6d89740eabac42ec575f9a6"
+   "wasm_bytes": 5305,
+   "wasm_sha256": "d284c7637f2e23a5ae761880fc1e4efdc021095da4aa45f1e65617a19d377ae0"
   },
   "immutable_survivor.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1904,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3516,
+      "inference_steps": 3576,
       "instantiations": 214,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3151,36 +3151,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1013,
-     "effect_rows": 2588,
-     "emitted_functions": 36,
+     "core_nodes": 1036,
+     "effect_rows": 2613,
+     "emitted_functions": 37,
      "filename": "immutable_survivor.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 568,
-     "source_bytes": 17546,
+     "row_versions": 572,
+     "source_bytes": 17943,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2418,
-     "type_nodes": 5961,
-     "type_versions": 831,
-     "wasm_bytes": 5265
+     "syntax_nodes": 2492,
+     "type_nodes": 6058,
+     "type_versions": 846,
+     "wasm_bytes": 5720
     }
    ],
-   "wasm_bytes": 5265,
-   "wasm_sha256": "9496302f9a2e4349759751389f14a854ded79bbea688d0160480fac3bf7b0341"
+   "wasm_bytes": 5720,
+   "wasm_sha256": "a091d84cb136744ed2a4a2e74b86a5feb38461b66a11d3a34f7cf462c288cfe7"
   },
   "input_alias_borrow_escape.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1893,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1937,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3379,
+      "inference_steps": 3439,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3191,36 +3191,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 941,
-     "effect_rows": 2566,
-     "emitted_functions": 31,
+     "core_nodes": 964,
+     "effect_rows": 2591,
+     "emitted_functions": 32,
      "filename": "input_alias_borrow_escape.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 557,
-     "source_bytes": 16830,
+     "row_versions": 561,
+     "source_bytes": 17227,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2304,
-     "type_nodes": 5875,
-     "type_versions": 820,
-     "wasm_bytes": 4386
+     "syntax_nodes": 2378,
+     "type_nodes": 5972,
+     "type_versions": 835,
+     "wasm_bytes": 4689
     }
    ],
-   "wasm_bytes": 4386,
-   "wasm_sha256": "c2273bb3405bd1734187bf5cd1e1409f72e376fb35672b3a58109a64cd04597b"
+   "wasm_bytes": 4689,
+   "wasm_sha256": "af3d97e2b2890d1bf7b40f00123795ec5ea02e8c60a77756cec4fa65f1b61ffd"
   },
   "input_alias_descriptors.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1945,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1989,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3718,
+      "inference_steps": 3778,
       "instantiations": 254,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3231,36 +3231,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1116,
-     "effect_rows": 2640,
-     "emitted_functions": 31,
+     "core_nodes": 1139,
+     "effect_rows": 2665,
+     "emitted_functions": 32,
      "filename": "input_alias_descriptors.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 594,
-     "source_bytes": 18470,
+     "row_versions": 598,
+     "source_bytes": 18867,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2616,
-     "type_nodes": 6037,
-     "type_versions": 851,
-     "wasm_bytes": 6369
+     "syntax_nodes": 2690,
+     "type_nodes": 6134,
+     "type_versions": 866,
+     "wasm_bytes": 6751
     }
    ],
-   "wasm_bytes": 6369,
-   "wasm_sha256": "0f191a7a7cd0358f3693a44705d9b6437a796c24b184b6a364e6c31071aca9aa"
+   "wasm_bytes": 6751,
+   "wasm_sha256": "1208b2da20c19e19e64b2bdaa1a15b77406d995eb0e0070ac6f518b8a4d16ce8"
   },
   "input_alias_partition.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1898,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1942,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3469,
+      "inference_steps": 3529,
       "instantiations": 227,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3271,36 +3271,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 992,
-     "effect_rows": 2576,
-     "emitted_functions": 31,
+     "core_nodes": 1015,
+     "effect_rows": 2601,
+     "emitted_functions": 32,
      "filename": "input_alias_partition.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 567,
-     "source_bytes": 17211,
+     "row_versions": 571,
+     "source_bytes": 17608,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2375,
-     "type_nodes": 5913,
-     "type_versions": 826,
-     "wasm_bytes": 4514
+     "syntax_nodes": 2449,
+     "type_nodes": 6010,
+     "type_versions": 841,
+     "wasm_bytes": 4866
     }
    ],
-   "wasm_bytes": 4514,
-   "wasm_sha256": "b4afb4d6c74d87b9f9f71268ad6e30071cde0ba40c0eef5ea8855c322622dedc"
+   "wasm_bytes": 4866,
+   "wasm_sha256": "a82987d9fd8de44bab17b8dddf621e9c1543cba2a426434dce16a71fb3f2239d"
   },
   "mutating_owner_return_fresh.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1893,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1937,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3398,
+      "inference_steps": 3458,
       "instantiations": 212,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3311,25 +3311,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 964,
-     "effect_rows": 2562,
-     "emitted_functions": 32,
+     "core_nodes": 987,
+     "effect_rows": 2587,
+     "emitted_functions": 33,
      "filename": "mutating_owner_return_fresh.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 559,
-     "source_bytes": 16895,
+     "row_versions": 563,
+     "source_bytes": 17292,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2321,
-     "type_nodes": 5877,
-     "type_versions": 823,
-     "wasm_bytes": 4737
+     "syntax_nodes": 2395,
+     "type_nodes": 5974,
+     "type_versions": 838,
+     "wasm_bytes": 5206
     }
    ],
-   "wasm_bytes": 4737,
-   "wasm_sha256": "f290dae09c40c1ae1844f4da6812536aba964119baa23acab14ba21d0020af08"
+   "wasm_bytes": 5206,
+   "wasm_sha256": "8893f646c35fcaf03dc286096d8c6c0360c41e998236b1d6468fc290e6ee7271"
   },
   "mutating_owner_return_truncate.blot": {
    "exit": 1,
@@ -3351,12 +3351,12 @@
      "subject_start": 126
     },
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1886,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1930,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3365,
+      "inference_steps": 3425,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3367,20 +3367,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 937,
-     "effect_rows": 2557,
+     "core_nodes": 960,
+     "effect_rows": 2582,
      "emitted_functions": 0,
      "filename": "mutating_owner_return_truncate.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16740,
+     "row_versions": 559,
+     "source_bytes": 17137,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2285,
-     "type_nodes": 5850,
-     "type_versions": 816,
+     "syntax_nodes": 2359,
+     "type_nodes": 5947,
+     "type_versions": 831,
      "wasm_bytes": 0
     }
    ]
@@ -3389,12 +3389,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1893,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1937,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3378,
+      "inference_steps": 3438,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3405,36 +3405,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 940,
-     "effect_rows": 2583,
-     "emitted_functions": 38,
+     "core_nodes": 963,
+     "effect_rows": 2608,
+     "emitted_functions": 39,
      "filename": "named-closure-parameter-fixtures/applied-provider-capture.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 560,
-     "source_bytes": 16793,
+     "row_versions": 564,
+     "source_bytes": 17190,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2288,
-     "type_nodes": 5880,
-     "type_versions": 820,
-     "wasm_bytes": 4571
+     "syntax_nodes": 2362,
+     "type_nodes": 5977,
+     "type_versions": 835,
+     "wasm_bytes": 4874
     }
    ],
-   "wasm_bytes": 4571,
-   "wasm_sha256": "5767b94e80f3b8158656d5b48f11a8a3885cf9ab28f1723a2481a606bd31d25a"
+   "wasm_bytes": 4874,
+   "wasm_sha256": "c6bd79e0a56ba6b50afef6f7ea03e1ac1d136fa744f0b608a771dcd7e36b5a7a"
   },
   "named-closure-parameter-fixtures/direct-cell-cycle.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1881,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1925,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3338,
+      "inference_steps": 3398,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3445,36 +3445,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 920,
-     "effect_rows": 2550,
-     "emitted_functions": 32,
+     "core_nodes": 943,
+     "effect_rows": 2575,
+     "emitted_functions": 33,
      "filename": "named-closure-parameter-fixtures/direct-cell-cycle.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 552,
-     "source_bytes": 16573,
+     "row_versions": 556,
+     "source_bytes": 16970,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2251,
-     "type_nodes": 5830,
-     "type_versions": 813,
-     "wasm_bytes": 4013
+     "syntax_nodes": 2325,
+     "type_nodes": 5927,
+     "type_versions": 828,
+     "wasm_bytes": 4316
     }
    ],
-   "wasm_bytes": 4013,
-   "wasm_sha256": "b5813b688b13a4c5b5066302f786bfb5ec026bdf7a818816e1835fa3e9a7277a"
+   "wasm_bytes": 4316,
+   "wasm_sha256": "8725024e546c5105b101a8325e9ea60e37233a432ec43adc8e9de673a1a83344"
   },
   "named-closure-parameter-fixtures/generic-unit-captures.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1906,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1950,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3367,
+      "inference_steps": 3427,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3485,36 +3485,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 931,
-     "effect_rows": 2586,
-     "emitted_functions": 43,
+     "core_nodes": 954,
+     "effect_rows": 2611,
+     "emitted_functions": 44,
      "filename": "named-closure-parameter-fixtures/generic-unit-captures.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 561,
-     "source_bytes": 16719,
+     "row_versions": 565,
+     "source_bytes": 17116,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2274,
-     "type_nodes": 5905,
-     "type_versions": 822,
-     "wasm_bytes": 4681
+     "syntax_nodes": 2348,
+     "type_nodes": 6002,
+     "type_versions": 837,
+     "wasm_bytes": 4984
     }
    ],
-   "wasm_bytes": 4681,
-   "wasm_sha256": "75f690400c06ae19cd5d2505c9d94db9820c23644ac78e9be9b3cc242a20ea72"
+   "wasm_bytes": 4984,
+   "wasm_sha256": "f7346c0584bf8f927ee2d7eb263c52800f631fb323aa1e5048835a97384d0b17"
   },
   "named-closure-parameter-fixtures/lexical-generic-capture.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1889,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1933,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3358,
+      "inference_steps": 3418,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3525,36 +3525,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 930,
-     "effect_rows": 2568,
-     "emitted_functions": 35,
+     "core_nodes": 953,
+     "effect_rows": 2593,
+     "emitted_functions": 36,
      "filename": "named-closure-parameter-fixtures/lexical-generic-capture.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16681,
+     "row_versions": 560,
+     "source_bytes": 17078,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2269,
-     "type_nodes": 5861,
-     "type_versions": 817,
-     "wasm_bytes": 4246
+     "syntax_nodes": 2343,
+     "type_nodes": 5958,
+     "type_versions": 832,
+     "wasm_bytes": 4549
     }
    ],
-   "wasm_bytes": 4246,
-   "wasm_sha256": "3a3288eddce70cc1a45360f0b87b5e943c2187fe5327876d317ad51a74ff6653"
+   "wasm_bytes": 4549,
+   "wasm_sha256": "11c38ed718fb0725ec0505e6cbe81dae40922886b8ebbfc0f1ef9004c97dc755"
   },
   "named-closure-parameter-fixtures/nonunit-applied-export.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1887,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1931,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3352,
+      "inference_steps": 3412,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3565,36 +3565,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 925,
-     "effect_rows": 2563,
-     "emitted_functions": 35,
+     "core_nodes": 948,
+     "effect_rows": 2588,
+     "emitted_functions": 36,
      "filename": "named-closure-parameter-fixtures/nonunit-applied-export.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16657,
+     "row_versions": 559,
+     "source_bytes": 17054,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2265,
-     "type_nodes": 5859,
-     "type_versions": 817,
-     "wasm_bytes": 4237
+     "syntax_nodes": 2339,
+     "type_nodes": 5956,
+     "type_versions": 832,
+     "wasm_bytes": 4540
     }
    ],
-   "wasm_bytes": 4237,
-   "wasm_sha256": "9f826a9e209fc43edb2a7f377c7c95db5fd1b822d44358605e0d59654671bd92"
+   "wasm_bytes": 4540,
+   "wasm_sha256": "86bfd4466910b5d676be3dac5a46560bb9309f897c2b39029f0a884fc93b5f9e"
   },
   "named-closure-parameter-fixtures/returned-closure-cycle.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 296,
-     "body_lowerings": 296,
-     "check_occurs_steps": 1892,
+     "body_elaborations": 300,
+     "body_lowerings": 300,
+     "check_occurs_steps": 1936,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3356,
+      "inference_steps": 3416,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3605,36 +3605,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 926,
-     "effect_rows": 2562,
-     "emitted_functions": 36,
+     "core_nodes": 949,
+     "effect_rows": 2587,
+     "emitted_functions": 37,
      "filename": "named-closure-parameter-fixtures/returned-closure-cycle.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16641,
+     "row_versions": 560,
+     "source_bytes": 17038,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2263,
-     "type_nodes": 5856,
-     "type_versions": 817,
-     "wasm_bytes": 4280
+     "syntax_nodes": 2337,
+     "type_nodes": 5953,
+     "type_versions": 832,
+     "wasm_bytes": 4583
     }
    ],
-   "wasm_bytes": 4280,
-   "wasm_sha256": "7c544756e8e451bec302aca3510a672894c6291607fbe182ca034dd4d9255610"
+   "wasm_bytes": 4583,
+   "wasm_sha256": "895d46c601bfaeff22a0fccc6e4390413089528bc7738f15ad336bcfded53157"
   },
   "named-closure-parameter-fixtures/unit-applied-effect-row.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1893,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1937,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3364,
+      "inference_steps": 3424,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3645,36 +3645,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 934,
-     "effect_rows": 2583,
-     "emitted_functions": 37,
+     "core_nodes": 957,
+     "effect_rows": 2608,
+     "emitted_functions": 38,
      "filename": "named-closure-parameter-fixtures/unit-applied-effect-row.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 16716,
+     "row_versions": 562,
+     "source_bytes": 17113,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2277,
-     "type_nodes": 5878,
-     "type_versions": 818,
-     "wasm_bytes": 4454
+     "syntax_nodes": 2351,
+     "type_nodes": 5975,
+     "type_versions": 833,
+     "wasm_bytes": 4757
     }
    ],
-   "wasm_bytes": 4454,
-   "wasm_sha256": "bde614cfc051fc38622e48830e853f77bb9f98ebcaad58fce7af93096df29084"
+   "wasm_bytes": 4757,
+   "wasm_sha256": "f7fb01f2e166bfd48a33746bb1d90e5353da5e9ef50ca47325a3ac3111b93858"
   },
   "named-closure-parameter-fixtures/unit-applied-export.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1887,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1931,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3351,
+      "inference_steps": 3411,
       "instantiations": 203,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3685,36 +3685,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 925,
-     "effect_rows": 2563,
-     "emitted_functions": 35,
+     "core_nodes": 948,
+     "effect_rows": 2588,
+     "emitted_functions": 36,
      "filename": "named-closure-parameter-fixtures/unit-applied-export.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16642,
+     "row_versions": 559,
+     "source_bytes": 17039,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2264,
-     "type_nodes": 5858,
-     "type_versions": 816,
-     "wasm_bytes": 4202
+     "syntax_nodes": 2338,
+     "type_nodes": 5955,
+     "type_versions": 831,
+     "wasm_bytes": 4505
     }
    ],
-   "wasm_bytes": 4202,
-   "wasm_sha256": "1580dbaafd938a97dbc0f4b88dc42cc1c347f01442ee7be13ce11c3f3653ae10"
+   "wasm_bytes": 4505,
+   "wasm_sha256": "0da00d4868a655f8f3092ddf3e9f368f4a9f560f2e3825bf5f83aa2e9df92f84"
   },
   "nominal/compiler-binary-type-call.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1889,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1933,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3365,
+      "inference_steps": 3425,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3725,36 +3725,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 927,
-     "effect_rows": 2565,
-     "emitted_functions": 31,
+     "core_nodes": 950,
+     "effect_rows": 2590,
+     "emitted_functions": 32,
      "filename": "nominal/compiler-binary-type-call.blot",
      "files": 2,
      "imported_schemes": 23,
      "kind": "compilation",
-     "row_versions": 555,
-     "source_bytes": 16707,
+     "row_versions": 559,
+     "source_bytes": 17104,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2274,
-     "type_nodes": 5867,
-     "type_versions": 817,
-     "wasm_bytes": 3932
+     "syntax_nodes": 2348,
+     "type_nodes": 5964,
+     "type_versions": 832,
+     "wasm_bytes": 4235
     }
    ],
-   "wasm_bytes": 3932,
-   "wasm_sha256": "07478d4ed0066bcd57f5f6a501abcd9875bd0b28a0ac8b7534a1734dff822683"
+   "wasm_bytes": 4235,
+   "wasm_sha256": "9c330713ef7e21d92f95a360c7db148d0cc30fafeb48b0e927e339c9a2edf787"
   },
   "nominal/generic-fields-and-associated.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 301,
-     "body_lowerings": 301,
-     "check_occurs_steps": 1923,
+     "body_elaborations": 305,
+     "body_lowerings": 305,
+     "check_occurs_steps": 1967,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3453,
+      "inference_steps": 3513,
       "instantiations": 205,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3765,25 +3765,25 @@
       "shared_uses": 7,
       "use_expansions": 7
      },
-     "core_nodes": 955,
-     "effect_rows": 2600,
-     "emitted_functions": 37,
+     "core_nodes": 978,
+     "effect_rows": 2625,
+     "emitted_functions": 38,
      "filename": "nominal/generic-fields-and-associated.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 565,
-     "source_bytes": 17153,
+     "row_versions": 569,
+     "source_bytes": 17550,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2336,
-     "type_nodes": 5980,
-     "type_versions": 839,
-     "wasm_bytes": 4288
+     "syntax_nodes": 2410,
+     "type_nodes": 6077,
+     "type_versions": 854,
+     "wasm_bytes": 4591
     }
    ],
-   "wasm_bytes": 4288,
-   "wasm_sha256": "f270fc8e2658e8a02ceea0561defed16e29b3aee4d09ce8289bee465e7182cc8"
+   "wasm_bytes": 4591,
+   "wasm_sha256": "cafb29d1bed0f0f8651dde70a3c73583383be31c54a91935e59365cec0ec26b0"
   },
   "nominal/left-result-conflict.blot": {
    "exit": 1,
@@ -3798,12 +3798,12 @@
      "start": 374
     },
     {
-     "body_elaborations": 297,
+     "body_elaborations": 301,
      "body_lowerings": 0,
-     "check_occurs_steps": 1905,
+     "check_occurs_steps": 1949,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3386,
+      "inference_steps": 3446,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3815,19 +3815,19 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2581,
+     "effect_rows": 2606,
      "emitted_functions": 0,
      "filename": "nominal/left-result-conflict.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 558,
-     "source_bytes": 16923,
+     "row_versions": 562,
+     "source_bytes": 17320,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2299,
-     "type_nodes": 5921,
-     "type_versions": 825,
+     "syntax_nodes": 2373,
+     "type_nodes": 6018,
+     "type_versions": 840,
      "wasm_bytes": 0
     }
    ]
@@ -3868,12 +3868,12 @@
      }
     },
     {
-     "body_elaborations": 297,
+     "body_elaborations": 301,
      "body_lowerings": 0,
-     "check_occurs_steps": 1904,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3386,
+      "inference_steps": 3446,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3885,19 +3885,19 @@
       "use_expansions": 3
      },
      "core_nodes": 0,
-     "effect_rows": 2581,
+     "effect_rows": 2606,
      "emitted_functions": 0,
      "filename": "nominal/ordered-right-fallback.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 556,
-     "source_bytes": 16916,
+     "row_versions": 560,
+     "source_bytes": 17313,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2298,
-     "type_nodes": 5915,
-     "type_versions": 824,
+     "syntax_nodes": 2372,
+     "type_nodes": 6012,
+     "type_versions": 839,
      "wasm_bytes": 0
     }
    ]
@@ -3906,12 +3906,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 295,
-     "body_lowerings": 295,
-     "check_occurs_steps": 1946,
+     "body_elaborations": 299,
+     "body_lowerings": 299,
+     "check_occurs_steps": 1990,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3560,
+      "inference_steps": 3620,
       "instantiations": 226,
       "memo_declined": 0,
       "memo_hits": 1,
@@ -3922,25 +3922,25 @@
       "shared_uses": 7,
       "use_expansions": 8
      },
-     "core_nodes": 1014,
-     "effect_rows": 2630,
-     "emitted_functions": 32,
+     "core_nodes": 1037,
+     "effect_rows": 2655,
+     "emitted_functions": 33,
      "filename": "packed_input_oom.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 573,
-     "source_bytes": 17235,
+     "row_versions": 577,
+     "source_bytes": 17632,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2388,
-     "type_nodes": 6111,
-     "type_versions": 869,
-     "wasm_bytes": 5076
+     "syntax_nodes": 2462,
+     "type_nodes": 6208,
+     "type_versions": 884,
+     "wasm_bytes": 5379
     }
    ],
-   "wasm_bytes": 5076,
-   "wasm_sha256": "6ea518f43535abf823f4a47a279969e2ecbaba278f884b950c7aed3624e98103"
+   "wasm_bytes": 5379,
+   "wasm_sha256": "094deac66b833287089b82b373e71132ec14bb1e07b9d353aaa383a542e76bf8"
   },
   "partial-runtime-fixtures/a.blot": {
    "exit": 1,
@@ -3955,12 +3955,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1879,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1923,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3335,
+      "inference_steps": 3395,
       "instantiations": 201,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -3971,20 +3971,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 922,
-     "effect_rows": 2553,
+     "core_nodes": 945,
+     "effect_rows": 2578,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/a.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 552,
-     "source_bytes": 16593,
+     "row_versions": 556,
+     "source_bytes": 16990,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2257,
-     "type_nodes": 5835,
-     "type_versions": 812,
+     "syntax_nodes": 2331,
+     "type_nodes": 5932,
+     "type_versions": 827,
      "wasm_bytes": 0
     }
    ]
@@ -4002,12 +4002,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 293,
-     "body_lowerings": 293,
-     "check_occurs_steps": 1879,
+     "body_elaborations": 297,
+     "body_lowerings": 297,
+     "check_occurs_steps": 1923,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3335,
+      "inference_steps": 3395,
       "instantiations": 201,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4018,20 +4018,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 922,
-     "effect_rows": 2553,
+     "core_nodes": 945,
+     "effect_rows": 2578,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/b.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 552,
-     "source_bytes": 16594,
+     "row_versions": 556,
+     "source_bytes": 16991,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2257,
-     "type_nodes": 5835,
-     "type_versions": 812,
+     "syntax_nodes": 2331,
+     "type_nodes": 5932,
+     "type_versions": 827,
      "wasm_bytes": 0
     }
    ]
@@ -4040,12 +4040,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 298,
-     "body_lowerings": 298,
-     "check_occurs_steps": 1903,
+     "body_elaborations": 302,
+     "body_lowerings": 302,
+     "check_occurs_steps": 1947,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3455,
+      "inference_steps": 3515,
       "instantiations": 210,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4056,36 +4056,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 992,
-     "effect_rows": 2747,
-     "emitted_functions": 49,
+     "core_nodes": 1015,
+     "effect_rows": 2772,
+     "emitted_functions": 50,
      "filename": "partial-runtime-fixtures/namespace-ab.blot",
      "files": 4,
      "imported_schemes": 68,
      "kind": "compilation",
-     "row_versions": 576,
-     "source_bytes": 17284,
+     "row_versions": 580,
+     "source_bytes": 17681,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2364,
-     "type_nodes": 6318,
-     "type_versions": 830,
-     "wasm_bytes": 5472
+     "syntax_nodes": 2438,
+     "type_nodes": 6415,
+     "type_versions": 845,
+     "wasm_bytes": 5775
     }
    ],
-   "wasm_bytes": 5472,
-   "wasm_sha256": "a3f151dc73f30dc1268ba7437e483a383803d5466b671712c03036203398404a"
+   "wasm_bytes": 5775,
+   "wasm_sha256": "d3b67f315885aa75f93679ec19e1a62c018b65dca8c966de1a2c75b717d62582"
   },
   "primitive-aliases.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 347,
-     "body_lowerings": 347,
-     "check_occurs_steps": 2379,
+     "body_elaborations": 351,
+     "body_lowerings": 351,
+     "check_occurs_steps": 2423,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4466,
+      "inference_steps": 4526,
       "instantiations": 326,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4096,36 +4096,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1395,
-     "effect_rows": 3661,
-     "emitted_functions": 86,
+     "core_nodes": 1418,
+     "effect_rows": 3686,
+     "emitted_functions": 87,
      "filename": "primitive-aliases.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 805,
-     "source_bytes": 21635,
+     "row_versions": 809,
+     "source_bytes": 22032,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3104,
-     "type_nodes": 7671,
-     "type_versions": 1095,
-     "wasm_bytes": 12981
+     "syntax_nodes": 3178,
+     "type_nodes": 7768,
+     "type_versions": 1110,
+     "wasm_bytes": 14045
     }
    ],
-   "wasm_bytes": 12981,
-   "wasm_sha256": "a4fbfebb390b3e4e5d352e3749f5d73d3e469144815119156db6496116650e94"
+   "wasm_bytes": 14045,
+   "wasm_sha256": "ced412fb0735dbcea974832eaa38fc7ebb6bcaa11108c22d37f098090dc2e4b8"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1904,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3439,
+      "inference_steps": 3499,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4136,36 +4136,36 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 955,
-     "effect_rows": 2596,
-     "emitted_functions": 37,
+     "core_nodes": 978,
+     "effect_rows": 2621,
+     "emitted_functions": 38,
      "filename": "qualified-row-fixtures/associated-direct.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 566,
-     "source_bytes": 17104,
+     "row_versions": 570,
+     "source_bytes": 17501,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2344,
-     "type_nodes": 5928,
-     "type_versions": 829,
-     "wasm_bytes": 4425
+     "syntax_nodes": 2418,
+     "type_nodes": 6025,
+     "type_versions": 844,
+     "wasm_bytes": 4728
     }
    ],
-   "wasm_bytes": 4425,
-   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
+   "wasm_bytes": 4728,
+   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
   },
   "qualified-row-fixtures/associated.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1904,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3435,
+      "inference_steps": 3495,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4176,36 +4176,36 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 955,
-     "effect_rows": 2596,
-     "emitted_functions": 37,
+     "core_nodes": 978,
+     "effect_rows": 2621,
+     "emitted_functions": 38,
      "filename": "qualified-row-fixtures/associated.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 566,
-     "source_bytes": 17089,
+     "row_versions": 570,
+     "source_bytes": 17486,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2340,
-     "type_nodes": 5928,
-     "type_versions": 829,
-     "wasm_bytes": 4425
+     "syntax_nodes": 2414,
+     "type_nodes": 6025,
+     "type_versions": 844,
+     "wasm_bytes": 4728
     }
    ],
-   "wasm_bytes": 4425,
-   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
+   "wasm_bytes": 4728,
+   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
   },
   "qualified-row-fixtures/reject-effectful.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1905,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1949,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3439,
+      "inference_steps": 3499,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4216,36 +4216,36 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 958,
-     "effect_rows": 2603,
-     "emitted_functions": 38,
+     "core_nodes": 981,
+     "effect_rows": 2628,
+     "emitted_functions": 39,
      "filename": "qualified-row-fixtures/reject-effectful.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 567,
-     "source_bytes": 17103,
+     "row_versions": 571,
+     "source_bytes": 17500,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2344,
-     "type_nodes": 5932,
-     "type_versions": 830,
-     "wasm_bytes": 4474
+     "syntax_nodes": 2418,
+     "type_nodes": 6029,
+     "type_versions": 845,
+     "wasm_bytes": 4777
     }
    ],
-   "wasm_bytes": 4474,
-   "wasm_sha256": "7693754cd126c3753f21c38336cd15fa6b65ad8fba78dd2aea03df3de3916d56"
+   "wasm_bytes": 4777,
+   "wasm_sha256": "85d0a0fc97d2eda1344ad3f596ec917ace452cb870d8b898e89241c006242dea"
   },
   "qualified-row-fixtures/reject-pure.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1904,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1948,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3435,
+      "inference_steps": 3495,
       "instantiations": 207,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4256,36 +4256,36 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 955,
-     "effect_rows": 2597,
-     "emitted_functions": 37,
+     "core_nodes": 978,
+     "effect_rows": 2622,
+     "emitted_functions": 38,
      "filename": "qualified-row-fixtures/reject-pure.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 566,
-     "source_bytes": 17093,
+     "row_versions": 570,
+     "source_bytes": 17490,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2341,
-     "type_nodes": 5928,
-     "type_versions": 829,
-     "wasm_bytes": 4425
+     "syntax_nodes": 2415,
+     "type_nodes": 6025,
+     "type_versions": 844,
+     "wasm_bytes": 4728
     }
    ],
-   "wasm_bytes": 4425,
-   "wasm_sha256": "7904202a5a3db90f8131a4fb10f637a6176e11dbbb5a460f465f671f80273628"
+   "wasm_bytes": 4728,
+   "wasm_sha256": "d949f3b94b1aa6aad9fa5ed7709325f5ae2170ffa7ee1ea884b45e51df7c8a4e"
   },
   "result_selected_operand.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 299,
-     "body_lowerings": 299,
-     "check_occurs_steps": 1972,
+     "body_elaborations": 303,
+     "body_lowerings": 303,
+     "check_occurs_steps": 2016,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3502,
+      "inference_steps": 3562,
       "instantiations": 229,
       "memo_declined": 2,
       "memo_hits": 1,
@@ -4296,36 +4296,36 @@
       "shared_uses": 12,
       "use_expansions": 11
      },
-     "core_nodes": 979,
-     "effect_rows": 2722,
-     "emitted_functions": 42,
+     "core_nodes": 1002,
+     "effect_rows": 2747,
+     "emitted_functions": 43,
      "filename": "result_selected_operand.blot",
      "files": 2,
      "imported_schemes": 48,
      "kind": "compilation",
-     "row_versions": 596,
-     "source_bytes": 17354,
+     "row_versions": 600,
+     "source_bytes": 17751,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2369,
-     "type_nodes": 6225,
-     "type_versions": 879,
-     "wasm_bytes": 4866
+     "syntax_nodes": 2443,
+     "type_nodes": 6322,
+     "type_versions": 894,
+     "wasm_bytes": 5169
     }
    ],
-   "wasm_bytes": 4866,
-   "wasm_sha256": "56c303e5b85a9165ccd909be366d6241a0c0e25b2d48d149570068b79def9a5c"
+   "wasm_bytes": 5169,
+   "wasm_sha256": "79a54bc944766683d0024cfa4a6b4926f7204b323aefae838218e54bd909d4bd"
   },
   "scoped-loop-cleanup.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 308,
-     "body_lowerings": 308,
-     "check_occurs_steps": 1978,
+     "body_elaborations": 312,
+     "body_lowerings": 312,
+     "check_occurs_steps": 2022,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3949,
+      "inference_steps": 4009,
       "instantiations": 253,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4336,36 +4336,36 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1259,
-     "effect_rows": 2658,
-     "emitted_functions": 56,
+     "core_nodes": 1282,
+     "effect_rows": 2683,
+     "emitted_functions": 57,
      "filename": "scoped-loop-cleanup.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 601,
-     "source_bytes": 19582,
+     "row_versions": 605,
+     "source_bytes": 19979,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2815,
-     "type_nodes": 6115,
-     "type_versions": 880,
-     "wasm_bytes": 9405
+     "syntax_nodes": 2889,
+     "type_nodes": 6212,
+     "type_versions": 895,
+     "wasm_bytes": 10064
     }
    ],
-   "wasm_bytes": 9405,
-   "wasm_sha256": "aeeab345d2616f6e77ee7616bc4a96a0901a790e84bd3b9e34f7afb5913609fb"
+   "wasm_bytes": 10064,
+   "wasm_sha256": "5a77376db74592c6df23659798a35d9be5baeb79fe235df234168bf1cb92f214"
   },
   "scoped-loop-refinement.blot": {
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 345,
-     "body_lowerings": 345,
-     "check_occurs_steps": 2846,
+     "body_elaborations": 349,
+     "body_lowerings": 349,
+     "check_occurs_steps": 2890,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 5698,
+      "inference_steps": 5758,
       "instantiations": 510,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4376,25 +4376,25 @@
       "shared_uses": 11,
       "use_expansions": 10
      },
-     "core_nodes": 2161,
-     "effect_rows": 3758,
-     "emitted_functions": 46,
+     "core_nodes": 2184,
+     "effect_rows": 3783,
+     "emitted_functions": 47,
      "filename": "scoped-loop-refinement.blot",
      "files": 4,
      "imported_schemes": 95,
      "kind": "compilation",
-     "row_versions": 1002,
-     "source_bytes": 30054,
+     "row_versions": 1006,
+     "source_bytes": 30451,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 4250,
-     "type_nodes": 9849,
-     "type_versions": 1330,
-     "wasm_bytes": 10399
+     "syntax_nodes": 4324,
+     "type_nodes": 9946,
+     "type_versions": 1345,
+     "wasm_bytes": 11158
     }
    ],
-   "wasm_bytes": 10399,
-   "wasm_sha256": "8dc140433e809886a00b5e73923ded057d5476aa94c32b52eae828576e0d940c"
+   "wasm_bytes": 11158,
+   "wasm_sha256": "7fb30ab17dab8a2eb1b5b05f5f03da8772a5621a01e59e4a4d5490d11f1557c4"
   },
   "scoped-opaque/facade.blot": {
    "exit": 1,
@@ -4409,12 +4409,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1922,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1966,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3391,
+      "inference_steps": 3451,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4425,20 +4425,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
-     "effect_rows": 2633,
+     "core_nodes": 966,
+     "effect_rows": 2658,
      "emitted_functions": 0,
      "filename": "scoped-opaque/facade.blot",
      "files": 3,
      "imported_schemes": 44,
      "kind": "compilation",
-     "row_versions": 557,
-     "source_bytes": 17189,
+     "row_versions": 561,
+     "source_bytes": 17586,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2335,
-     "type_nodes": 6162,
-     "type_versions": 836,
+     "syntax_nodes": 2409,
+     "type_nodes": 6259,
+     "type_versions": 851,
      "wasm_bytes": 0
     }
    ]
@@ -4447,12 +4447,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 303,
-     "body_lowerings": 303,
-     "check_occurs_steps": 2058,
+     "body_elaborations": 307,
+     "body_lowerings": 307,
+     "check_occurs_steps": 2102,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3711,
+      "inference_steps": 3771,
       "instantiations": 235,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4463,25 +4463,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1107,
-     "effect_rows": 2854,
-     "emitted_functions": 38,
+     "core_nodes": 1130,
+     "effect_rows": 2879,
+     "emitted_functions": 39,
      "filename": "scoped-opaque/main.blot",
      "files": 4,
      "imported_schemes": 71,
      "kind": "compilation",
-     "row_versions": 611,
-     "source_bytes": 18940,
+     "row_versions": 615,
+     "source_bytes": 19337,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2627,
-     "type_nodes": 6893,
-     "type_versions": 922,
-     "wasm_bytes": 6363
+     "syntax_nodes": 2701,
+     "type_nodes": 6990,
+     "type_versions": 937,
+     "wasm_bytes": 6819
     }
    ],
-   "wasm_bytes": 6363,
-   "wasm_sha256": "e764dfbe487ebc720c5c75950e0d56902b45e108271d76902fc2701fc2abbcc9"
+   "wasm_bytes": 6819,
+   "wasm_sha256": "655ef739e1ddea763b76440d8625ec4850299276ca375c3286f79db69b6d11b1"
   },
   "scoped-opaque/tokens.blot": {
    "exit": 1,
@@ -4496,12 +4496,12 @@
      "start": 0
     },
     {
-     "body_elaborations": 297,
-     "body_lowerings": 297,
-     "check_occurs_steps": 1922,
+     "body_elaborations": 301,
+     "body_lowerings": 301,
+     "check_occurs_steps": 1966,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3391,
+      "inference_steps": 3451,
       "instantiations": 202,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4512,20 +4512,20 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
-     "effect_rows": 2575,
+     "core_nodes": 966,
+     "effect_rows": 2600,
      "emitted_functions": 0,
      "filename": "scoped-opaque/tokens.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 557,
-     "source_bytes": 17115,
+     "row_versions": 561,
+     "source_bytes": 17512,
      "stage": "build-project",
      "success": false,
-     "syntax_nodes": 2327,
-     "type_nodes": 5974,
-     "type_versions": 836,
+     "syntax_nodes": 2401,
+     "type_nodes": 6071,
+     "type_versions": 851,
      "wasm_bytes": 0
     }
    ]
@@ -4534,12 +4534,12 @@
    "exit": 0,
    "records": [
     {
-     "body_elaborations": 294,
-     "body_lowerings": 294,
-     "check_occurs_steps": 1891,
+     "body_elaborations": 298,
+     "body_lowerings": 298,
+     "check_occurs_steps": 1935,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 3369,
+      "inference_steps": 3429,
       "instantiations": 204,
       "memo_declined": 0,
       "memo_hits": 0,
@@ -4550,25 +4550,25 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 940,
-     "effect_rows": 2561,
-     "emitted_functions": 31,
+     "core_nodes": 963,
+     "effect_rows": 2586,
+     "emitted_functions": 32,
      "filename": "staged_catalog.blot",
      "files": 2,
      "imported_schemes": 22,
      "kind": "compilation",
-     "row_versions": 557,
-     "source_bytes": 16768,
+     "row_versions": 561,
+     "source_bytes": 17165,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2291,
-     "type_nodes": 5873,
-     "type_versions": 820,
-     "wasm_bytes": 3978
+     "syntax_nodes": 2365,
+     "type_nodes": 5970,
+     "type_versions": 835,
+     "wasm_bytes": 4281
     }
    ],
-   "wasm_bytes": 3978,
-   "wasm_sha256": "5d8a5448c033b3d4cef45b6cce3d9243858c5380d735967c92b4b55642347817"
+   "wasm_bytes": 4281,
+   "wasm_sha256": "0d33e76ba8544d65d949cf3ccfd550b7cedc59db1694437d84db83d17aea4dd8"
   }
  }
 }

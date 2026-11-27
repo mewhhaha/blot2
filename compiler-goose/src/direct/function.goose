@@ -129,6 +129,16 @@ struct ConstU32 {
     unit: u32 = 0,
     node: u32 = 0,
 }
+struct ConstU64 {
+    local_id: u32 = 0,
+    value: u64 = 0,
+    unit: u32 = 0,
+    node: u32 = 0,
+}
+struct ExtU32U64 {
+    u64_local: u32 = 0,
+    u32_local: u32 = 0,
+}
 struct MutableOwner {
     slot: u32 = 0,
     generation: u32 = 0,
@@ -139,15 +149,61 @@ struct LoopReciprocal {
     shift: u32 = 0,
     check_at_use: bool = true,
 }
+struct LoopReciprocalU64 {
+    divisor: u32 = 0,
+    from_u32: bool = false,
+    m_lo: u32 = 0,
+    m_hi: u32 = 0,
+    sh1: u32 = 0,
+    sh2: u32 = 0,
+    check_at_use: bool = true,
+}
+struct CheckedMask {
+    index: u32 = 0,
+    max_local: u32 = 0xffffffff,
+    max_const: u32 = 0,
+    has_const: bool = false,
+    depth: u32 = 0,
+}
+struct CheckedAdd {
+    res: u32 = 0,
+    base: u32 = 0xffffffff,
+    idx: u32 = 0,
+    c: u32 = 0,
+    depth: u32 = 0,
+}
+struct CheckedAffineBound {
+    base: u32 = 0xffffffff,
+    end_local: u32 = 0,
+    c: u32 = 0,
+    bound: u32 = 0,
+    depth: u32 = 0,
+}
+struct DirectArray {
+    binding: u32 = 0,
+    slot_local: u32 = 0xffffffff,
+    base: u32 = 0,
+    len_local: u32 = 0,
+    length: u32 = 0,
+    elem_ty: Ty = 0,
+    step: u32 = 0,
+    depth: u32 = 0,
+}
 struct Fn {
     // Only stable value locals have facts. Loop-carried copies and mutable
     // counters start out unknown. An in-place array carry keeps its handle.
     const_u32: ConstU32[32] = [ConstU32 {}; 32],
     const_u32_len: i64 = 0,
+    const_u64: ConstU64[16] = [ConstU64 {}; 16],
+    const_u64_len: i64 = 0,
+    ext_u32_u64: ExtU32U64[16] = [ExtU32U64 {}; 16],
+    ext_u32_u64_len: i64 = 0,
     known_mutable: MutableOwner[32] = [MutableOwner {}; 32],
     known_mutable_len: i64 = 0,
     loop_reciprocals: LoopReciprocal[8] = [LoopReciprocal {}; 8],
     loop_reciprocals_len: i64 = 0,
+    loop_reciprocals_u64: LoopReciprocalU64[8] = [LoopReciprocalU64 {}; 8],
+    loop_reciprocals_u64_len: i64 = 0,
     checked_range: CheckedRange = CheckedRange {},
     checked_arrays: CheckedArray[16] = [CheckedArray {}; 16],
     checked_arrays_len: i64 = 0,
@@ -161,6 +217,12 @@ struct Fn {
     checked_bounds_len: i64 = 0,
     checked_le: CheckedLeBound[8] = [CheckedLeBound {}; 8],
     checked_le_len: i64 = 0,
+    checked_masks: CheckedMask[8] = [CheckedMask {}; 8],
+    checked_masks_len: i64 = 0,
+    checked_adds: CheckedAdd[8] = [CheckedAdd {}; 8],
+    checked_adds_len: i64 = 0,
+    checked_affines: CheckedAffineBound[8] = [CheckedAffineBound {}; 8],
+    checked_affines_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -260,6 +322,9 @@ struct Fn {
     // 7B: `@array.fill` node IDs proved completely overwritten by an immediately following 0..n loop.
     skip_fill_nodes: u32[8] = [0; 8],
     skip_fill_len: i64 = 0,
+    // Backend-only stack-inlined small fixed local arrays (skip owner table open/check/release).
+    direct_arrays: DirectArray[16] = [DirectArray {}; 16],
+    direct_arrays_len: i64 = 0,
 }
 
 fn recordSkipFillNode(f: Fn&, id: u32) {
@@ -269,6 +334,28 @@ fn recordSkipFillNode(f: Fn&, id: u32) {
     }
     f.skip_fill_nodes[f.skip_fill_len] = id;
     f.skip_fill_len += 1;
+}
+fn findDirectArray(f: const Fn&, binding: u32) -> i64 {
+    if binding == 0 { return -1; }
+    var at = f.direct_arrays_len;
+    while at > 0 {
+        at -= 1;
+        if f.direct_arrays[at].binding == binding { return at; }
+    }
+    return -1;
+}
+fn findDirectArrayBySlot(f: const Fn&, slot_local: u32) -> i64 {
+    var at = f.direct_arrays_len;
+    while at > 0 {
+        at -= 1;
+        if f.direct_arrays[at].slot_local == slot_local { return at; }
+    }
+    return -1;
+}
+fn recordDirectArray(f: Fn&, binding: u32, slot_local: u32, base: u32, len_local: u32, length: u32, elem_ty: Ty, step: u32) {
+    if binding == 0 || f.direct_arrays_len >= 16 { return; }
+    f.direct_arrays[f.direct_arrays_len] = DirectArray { binding, slot_local, base, len_local, length, elem_ty, step, f.depth };
+    f.direct_arrays_len += 1;
 }
 fn consumeSkipFillNode(f: Fn&, id: u32) -> bool {
     if id == 0 || f.skip_fill_len == 0 { return false; }
@@ -295,6 +382,77 @@ fn recordConstU32(f: Fn&, local_id: u32, value: u32, unit: u32 = 0, node: u32 = 
 }
 fn useConstU32(fact: ConstU32) {
     if fact.node != 0 { blot_direct_relocations::unpatchableOperand(fact.unit, fact.node); }
+}
+fn constU64(f: const Fn&, local_id: u32) -> ConstU64, bool {
+    for at in 0..f.const_u64_len {
+        let fact = f.const_u64[at];
+        if fact.local_id == local_id { return fact, true; }
+    }
+    return ConstU64 {}, false;
+}
+fn recordConstU64(f: Fn&, local_id: u32, value: u64, unit: u32 = 0, node: u32 = 0) {
+    if f.const_u64_len >= 16 { return; }
+    f.const_u64[f.const_u64_len] = ConstU64 { local_id, value, unit, node };
+    f.const_u64_len += 1;
+}
+fn useConstU64(fact: ConstU64) {
+    if fact.node != 0 { blot_direct_relocations::unpatchableOperand(fact.unit, fact.node); }
+}
+fn recordExtU32U64(f: Fn&, u64_local: u32, u32_local: u32) {
+    if f.ext_u32_u64_len >= 16 { return; }
+    f.ext_u32_u64[f.ext_u32_u64_len] = ExtU32U64 { u64_local, u32_local };
+    f.ext_u32_u64_len += 1;
+}
+fn findExtU32U64(f: const Fn&, u64_local: u32) -> u32, bool {
+    var i = f.ext_u32_u64_len;
+    while i > 0 {
+        i -= 1;
+        if f.ext_u32_u64[i].u64_local == u64_local { return f.ext_u32_u64[i].u32_local, true; }
+    }
+    return 0, false;
+}
+fn recordCheckedMask(f: Fn&, index: u32, max_local: u32, max_const: u32, has_const: bool) {
+    if f.checked_masks_len >= 8 { return; }
+    f.checked_masks[f.checked_masks_len] = CheckedMask { index, max_local, max_const, has_const, f.depth };
+    f.checked_masks_len += 1;
+}
+fn findCheckedMask(f: const Fn&, index: u32) -> i64 {
+    var i = f.checked_masks_len;
+    while i > 0 {
+        i -= 1;
+        if f.checked_masks[i].index == index { return i; }
+    }
+    return -1;
+}
+fn recordCheckedAdd(f: Fn&, res: u32, base: u32, idx: u32, c: u32) {
+    if f.checked_adds_len >= 8 { return; }
+    f.checked_adds[f.checked_adds_len] = CheckedAdd { res, base, idx, c, f.depth };
+    f.checked_adds_len += 1;
+}
+fn findCheckedAdd(f: const Fn&, res: u32) -> i64 {
+    var i = f.checked_adds_len;
+    while i > 0 {
+        i -= 1;
+        if f.checked_adds[i].res == res { return i; }
+    }
+    return -1;
+}
+fn recordCheckedAffine(f: Fn&, base: u32, end_local: u32, c: u32, bound: u32) {
+    if f.checked_affines_len >= 8 { return; }
+    f.checked_affines[f.checked_affines_len] = CheckedAffineBound { base, end_local, c, bound, f.depth };
+    f.checked_affines_len += 1;
+}
+fn findCheckedAffine(f: const Fn&, base: u32, end_local: u32, c: u32, bound: u32) -> i64 {
+    var i = f.checked_affines_len;
+    while i > 0 {
+        i -= 1;
+        let e = f.checked_affines[i];
+        if e.base == base && e.end_local == end_local && c <= e.c &&
+            (e.bound == bound || findCheckedLe(f, e.bound, bound) >= 0) {
+            return i;
+        }
+    }
+    return -1;
 }
 fn knownMutable(g: const Generator&, f: const Fn&, owner: Val) -> bool {
     if tagOf(g, owner.ty) != blot_direct_types::Tag.array { return false; }
@@ -444,6 +602,18 @@ fn popCheckedArrays(f: Fn&, max_depth: u32) {
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth > max_depth {
         f.const_tags_len -= 1;
     }
+    while f.checked_masks_len > 0 && f.checked_masks[f.checked_masks_len - 1].depth > max_depth {
+        f.checked_masks_len -= 1;
+    }
+    while f.checked_adds_len > 0 && f.checked_adds[f.checked_adds_len - 1].depth > max_depth {
+        f.checked_adds_len -= 1;
+    }
+    while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth > max_depth {
+        f.checked_affines_len -= 1;
+    }
+    while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth > max_depth {
+        f.direct_arrays_len -= 1;
+    }
 }
 fn popCheckedArraysAt(f: Fn&, depth: u32) {
     while f.checked_arrays_len > 0 && f.checked_arrays[f.checked_arrays_len - 1].depth >= depth {
@@ -466,6 +636,18 @@ fn popCheckedArraysAt(f: Fn&, depth: u32) {
     }
     while f.const_tags_len > 0 && f.const_tags[f.const_tags_len - 1].depth >= depth {
         f.const_tags_len -= 1;
+    }
+    while f.checked_masks_len > 0 && f.checked_masks[f.checked_masks_len - 1].depth >= depth {
+        f.checked_masks_len -= 1;
+    }
+    while f.checked_adds_len > 0 && f.checked_adds[f.checked_adds_len - 1].depth >= depth {
+        f.checked_adds_len -= 1;
+    }
+    while f.checked_affines_len > 0 && f.checked_affines[f.checked_affines_len - 1].depth >= depth {
+        f.checked_affines_len -= 1;
+    }
+    while f.direct_arrays_len > 0 && f.direct_arrays[f.direct_arrays_len - 1].depth >= depth {
+        f.direct_arrays_len -= 1;
     }
 }
 fn findConstTag(f: const Fn&, local_id: u32) -> u32, bool {
@@ -653,6 +835,7 @@ fn invalidateCheckedContainers(f: Fn&) {
     f.checked_elems_len = 0;
     f.checked_bounds_len = 0;
     f.checked_le_len = 0;
+    f.checked_affines_len = 0;
 }
 fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
     if value.len == 0 { return; }
@@ -805,6 +988,45 @@ fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
             }
         }
         f.const_tags_len = out;
+    }
+    if f.checked_masks_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_masks_len {
+            let entry = f.checked_masks[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let lid = g.s.words[value.start + at];
+                if lid == entry.index || lid == entry.max_local { hit = true; break; }
+            }
+            if !hit { f.checked_masks[out] = entry; out += 1; }
+        }
+        f.checked_masks_len = out;
+    }
+    if f.checked_adds_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_adds_len {
+            let entry = f.checked_adds[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let lid = g.s.words[value.start + at];
+                if lid == entry.res || lid == entry.base || lid == entry.idx { hit = true; break; }
+            }
+            if !hit { f.checked_adds[out] = entry; out += 1; }
+        }
+        f.checked_adds_len = out;
+    }
+    if f.checked_affines_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_affines_len {
+            let entry = f.checked_affines[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let lid = g.s.words[value.start + at];
+                if lid == entry.base || lid == entry.end_local || lid == entry.bound { hit = true; break; }
+            }
+            if !hit { f.checked_affines[out] = entry; out += 1; }
+        }
+        f.checked_affines_len = out;
     }
 }
 fn br(g: Generator&, f: const Fn&, value: u8, depth: u32) { opIndex(g, value, f.depth - depth); }
@@ -1133,14 +1355,25 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     var value = neverVal();
     var has_grown = false;
-    if rhs_tag == blot_check_core::Tag.array_op {
+    var has_direct = false;
+    if n.c < 2 && m.binding(n.a).scheme.variables.len == 0 && !g.runtime_().has_fork && f.direct_arrays_len < 16 && f.tco_inhibit == 0 && !bindingCaptured(g, f, n.a) {
+        if rhs_tag == blot_check_core::Tag.array || (rhs_tag == blot_check_core::Tag.array_op && m.arrayOperation(n.b) == blot_backend_collection_ops::Op.fill) {
+            let direct_val, ok_direct, derr = tryEmitDirectLocalArray(g, f, n.a, n.b, id);
+            if derr != blot_direct_types::Error.none { return direct_val, derr; }
+            if ok_direct {
+                value = direct_val;
+                has_direct = true;
+            }
+        }
+    }
+    if !has_direct && rhs_tag == blot_check_core::Tag.array_op {
         let grown, ok_grown, error = linearAppend(g, f, n.b);
         if error != blot_direct_types::Error.none { return grown, error; }
         value = grown;
         has_grown = ok_grown;
     }
     var had_noop = false;
-    if !has_grown {
+    if !has_grown && !has_direct {
         // A generalized local value is computed once: its uses decide the one
         // type it is computed at.
         let bnd = m.binding(n.a);
@@ -1193,6 +1426,19 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         }
     }
     bindPut(g, f, n.a, value);
+    if !has_direct && n.c < 2 && value.ty != blot_direct_types::never {
+        var src_da: i64 = -1;
+        if rhs_tag == blot_check_core::Tag.reference {
+            src_da = findDirectArray(f, localRef(m, n.b));
+        } else if rhs_tag == blot_check_core::Tag.update {
+            let uinfo = m.updateInfo(n.b);
+            src_da = findDirectArray(f, localRef(m, uinfo.root));
+        }
+        if src_da >= 0 {
+            let da = f.direct_arrays[src_da];
+            recordDirectArray(f, n.a, da.slot_local, da.base, da.len_local, da.length, da.elem_ty, da.step);
+        }
+    }
     if f.indirect_bound_binding != 0 && n.a == f.indirect_bound_binding && tagOf(g, value.ty) == blot_direct_types::Tag.u32_ {
         recordCheckedBound(f, w(g, value, 0), f.indirect_bound_len);
     }
@@ -1505,8 +1751,8 @@ recursive fn isFreshOwnedArrayRhs(g: Generator&, f: Fn&, m: const Module&, id: u
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
             if ok != blot_error::Error.none { return false; }
-            if op_kind == blot_check_storage_ops::Op.copy { return true; }
-            if op_kind == blot_check_storage_ops::Op.push {
+            if op_kind == blot_check_storage_ops::Op.copy || op_kind == blot_check_storage_ops::Op.with_capacity { return true; }
+            if op_kind == blot_check_storage_ops::Op.push || op_kind == blot_check_storage_ops::Op.reserve || op_kind == blot_check_storage_ops::Op.extend {
                 let ch = m.children(id);
                 return ch.len == 2 && isFreshOwnedArrayRhs(g, f, m, ch[0], ty);
             }
@@ -1902,6 +2148,10 @@ fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false, high:
         if literal { recordConstU32(f, w(g, value, 0), bits, m.unit, id); }
         // Staging records its dependencies while evaluating the value.
         else { recordConstU32(f, w(g, value, 0), bits); }
+    } else if err == blot_direct_types::Error.none && ty == blot_direct_types::u64_ {
+        let v64 = (bits as u64) | ((high as u64) << 32);
+        if literal { recordConstU64(f, w(g, value, 0), v64, m.unit, id); }
+        else { recordConstU64(f, w(g, value, 0), v64); }
     }
     return value, err;
 }
@@ -2026,6 +2276,8 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
                     let value, error = pop(g, f, ty, id);
                     if error == blot_direct_types::Error.none && ctag == blot_direct_types::Tag.u32_ {
                         recordConstU32(f, w(g, value, 0), rn.a, target.unit, root);
+                    } else if error == blot_direct_types::Error.none && ctag == blot_direct_types::Tag.u64_ {
+                        recordConstU64(f, w(g, value, 0), (rn.a as u64) | ((rn.b as u64) << 32), target.unit, root);
                     }
                     return value, error;
                 }

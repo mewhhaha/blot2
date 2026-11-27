@@ -972,6 +972,334 @@ fn sameCountExpr(m: const Module&, a: u32, b: u32) -> bool {
     let nb = m.node(b);
     return na.tag == blot_check_core::Tag.constant && nb.tag == blot_check_core::Tag.constant && na.a == nb.a;
 }
+recursive fn collectDirectArrayAliases(
+    g: const Generator&,
+    m: const Module&,
+    id: u32,
+    b_set: u32[16]&,
+    b_len: i64&,
+    changed: bool&,
+    ok: bool&,
+    budget: i64&,
+) {
+    if id == 0 || !ok { return; }
+    if budget <= 0 { ok = false; return; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_, product, record, array, array_op, storage, break_ => {
+            for ch in m.children(id) { collectDirectArrayAliases(g, m, ch, b_set, b_len, changed, ok, budget); }
+        },
+        bind => {
+            collectDirectArrayAliases(g, m, n.b, b_set, b_len, changed, ok, budget);
+            if !ok { return; }
+            if n.c < 2 && n.b != 0 {
+                let rn = m.node(n.b);
+                var from_b: u32 = 0;
+                if rn.tag == blot_check_core::Tag.reference {
+                    from_b = localRef(m, n.b);
+                } else if rn.tag == blot_check_core::Tag.update {
+                    let uinfo = m.updateInfo(n.b);
+                    let sels = m.updateSelectors(n.b);
+                    if sels.len == 1 && sels[0].kind == blot_check_core::UpdateKind.index {
+                        from_b = localRef(m, uinfo.root);
+                    }
+                }
+                if from_b != 0 {
+                    var in_set = false;
+                    for i in 0..b_len { if b_set[i] == from_b { in_set = true; break; } }
+                    if in_set {
+                        var already = false;
+                        for i in 0..b_len { if b_set[i] == n.a { already = true; break; } }
+                        if !already {
+                            if b_len >= 16 { ok = false; return; }
+                            b_set[b_len] = n.a;
+                            b_len += 1;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            collectDirectArrayAliases(g, m, linfo.first, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, linfo.end, b_set, b_len, changed, ok, budget);
+            for carry, ci in m.loopCarries(id) {
+                var in_set = false;
+                for i in 0..b_len { if b_set[i] == carry.incoming { in_set = true; break; } }
+                if in_set {
+                    var cb: i64 = 512;
+                    if !carryStaysInPlace(g, m, id, ci, carry.iteration, carry.backedge, cb) {
+                        ok = false;
+                        return;
+                    }
+                    for target_b in [carry.iteration, carry.outgoing] {
+                        if target_b == 0 { continue; }
+                        var already = false;
+                        for i in 0..b_len { if b_set[i] == target_b { already = true; break; } }
+                        if !already {
+                            if b_len >= 16 { ok = false; return; }
+                            b_set[b_len] = target_b;
+                            b_len += 1;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            collectDirectArrayAliases(g, m, linfo.body, b_set, b_len, changed, ok, budget);
+        },
+        if_stmt, if_value => {
+            collectDirectArrayAliases(g, m, n.a, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, n.b, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, n.c, b_set, b_len, changed, ok, budget);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { collectDirectArrayAliases(g, m, inp, b_set, b_len, changed, ok, budget); }
+            for arm in m.matchArms(id) {
+                collectDirectArrayAliases(g, m, arm.guard_, b_set, b_len, changed, ok, budget);
+                collectDirectArrayAliases(g, m, arm.body, b_set, b_len, changed, ok, budget);
+            }
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            collectDirectArrayAliases(g, m, uinfo.root, b_set, b_len, changed, ok, budget);
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index {
+                    collectDirectArrayAliases(g, m, sel.index, b_set, b_len, changed, ok, budget);
+                }
+            }
+            collectDirectArrayAliases(g, m, uinfo.value, b_set, b_len, changed, ok, budget);
+        },
+        scalar, logical, apply, associated => {
+            collectDirectArrayAliases(g, m, n.a, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, n.b, b_set, b_len, changed, ok, budget);
+        },
+        call => {
+            for arg in m.call(id).arguments { collectDirectArrayAliases(g, m, arg, b_set, b_len, changed, ok, budget); }
+        },
+        return_, project, result_associated, fork_ => {
+            collectDirectArrayAliases(g, m, n.a, b_set, b_len, changed, ok, budget);
+        },
+        construct => {
+            collectDirectArrayAliases(g, m, n.b, b_set, b_len, changed, ok, budget);
+        },
+        pattern_bind => {
+            collectDirectArrayAliases(g, m, n.b, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, n.c, b_set, b_len, changed, ok, budget);
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            collectDirectArrayAliases(g, m, sinfo.source, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, sinfo.end, b_set, b_len, changed, ok, budget);
+            collectDirectArrayAliases(g, m, sinfo.body, b_set, b_len, changed, ok, budget);
+        },
+        _ => {},
+    }
+}
+
+fn inDirectSet(b_set: const u32[16]&, b_len: i64, b: u32) -> bool {
+    if b == 0 { return false; }
+    for i in 0..b_len { if b_set[i] == b { return true; } }
+    return false;
+}
+
+recursive fn checkDirectArrayUses(
+    m: const Module&,
+    id: u32,
+    b_set: const u32[16]&,
+    b_len: i64,
+    budget: i64&,
+) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        constant, panic, primitive_function, constructor_function, operation_value, comptime_meta => { return true; },
+        reference => { return !inDirectSet(b_set, b_len, localRef(m, id)); },
+        array_op => {
+            let op = m.arrayOperation(id);
+            let ch = m.children(id);
+            if (op == blot_backend_collection_ops::Op.length || op == blot_backend_collection_ops::Op.get) &&
+                ch.len >= 1 && inDirectSet(b_set, b_len, localRef(m, ch[0])) {
+                for ci in 1..ch.len {
+                    if !checkDirectArrayUses(m, ch[ci], b_set, b_len, budget) { return false; }
+                }
+                return true;
+            }
+            for ch_id in ch {
+                if !checkDirectArrayUses(m, ch_id, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        storage => {
+            let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
+            let ch = m.children(id);
+            if ok == blot_error::Error.none &&
+                (op_k == blot_check_storage_ops::Op.length || op_k == blot_check_storage_ops::Op.read) &&
+                ch.len >= 1 && inDirectSet(b_set, b_len, localRef(m, ch[0])) {
+                for ci in 1..ch.len {
+                    if !checkDirectArrayUses(m, ch[ci], b_set, b_len, budget) { return false; }
+                }
+                return true;
+            }
+            for ch_id in ch {
+                if !checkDirectArrayUses(m, ch_id, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if n.c >= 2 {
+                if inDirectSet(b_set, b_len, n.a) || inDirectSet(b_set, b_len, n.c - 2) { return false; }
+                return checkDirectArrayUses(m, n.b, b_set, b_len, budget);
+            }
+            if n.b != 0 && inDirectSet(b_set, b_len, n.a) {
+                let rn = m.node(n.b);
+                if rn.tag == blot_check_core::Tag.reference && inDirectSet(b_set, b_len, localRef(m, n.b)) {
+                    return true;
+                }
+                if rn.tag == blot_check_core::Tag.update {
+                    let uinfo = m.updateInfo(n.b);
+                    let sels = m.updateSelectors(n.b);
+                    if sels.len == 1 && sels[0].kind == blot_check_core::UpdateKind.index &&
+                        inDirectSet(b_set, b_len, localRef(m, uinfo.root)) {
+                        return checkDirectArrayUses(m, sels[0].index, b_set, b_len, budget) &&
+                            checkDirectArrayUses(m, uinfo.value, b_set, b_len, budget);
+                    }
+                }
+            }
+            return checkDirectArrayUses(m, n.b, b_set, b_len, budget);
+        },
+        suite, block_, product, record, array => {
+            for ch in m.children(id) {
+                if !checkDirectArrayUses(m, ch, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        if_stmt, if_value => {
+            for merge in m.branchMerges(id) {
+                if inDirectSet(b_set, b_len, merge.then_binding) ||
+                    inDirectSet(b_set, b_len, merge.else_binding) ||
+                    inDirectSet(b_set, b_len, merge.result) { return false; }
+            }
+            return checkDirectArrayUses(m, n.a, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, n.b, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, n.c, b_set, b_len, budget);
+        },
+        match_ => {
+            for merge in m.branchMerges(id) {
+                if inDirectSet(b_set, b_len, merge.then_binding) ||
+                    inDirectSet(b_set, b_len, merge.else_binding) ||
+                    inDirectSet(b_set, b_len, merge.result) { return false; }
+            }
+            for inp in m.matchInputs(id) {
+                if !checkDirectArrayUses(m, inp, b_set, b_len, budget) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !checkDirectArrayUses(m, arm.guard_, b_set, b_len, budget) ||
+                    !checkDirectArrayUses(m, arm.body, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        loop_ => {
+            let linfo = m.loopInfo(id);
+            if !checkDirectArrayUses(m, linfo.first, b_set, b_len, budget) ||
+                !checkDirectArrayUses(m, linfo.end, b_set, b_len, budget) { return false; }
+            for carry in m.loopCarries(id) {
+                let inc_in = inDirectSet(b_set, b_len, carry.incoming);
+                let back_in = inDirectSet(b_set, b_len, carry.backedge);
+                if inc_in || back_in {
+                    if !inc_in || !inDirectSet(b_set, b_len, carry.iteration) { return false; }
+                    if carry.backedge != 0 && !back_in { return false; }
+                }
+            }
+            return checkDirectArrayUses(m, linfo.body, b_set, b_len, budget);
+        },
+        break_ => {
+            let vals = m.breakValues(id);
+            if n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.loop_ {
+                let carries = m.loopCarries(n.a);
+                for ch, ci in vals {
+                    let vb = localRef(m, ch);
+                    if vb != 0 && inDirectSet(b_set, b_len, vb) {
+                        if ci >= carries.len || !inDirectSet(b_set, b_len, carries[ci].iteration) { return false; }
+                    } else if !checkDirectArrayUses(m, ch, b_set, b_len, budget) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            for ch in vals {
+                if !checkDirectArrayUses(m, ch, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            if !checkDirectArrayUses(m, uinfo.root, b_set, b_len, budget) { return false; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && !checkDirectArrayUses(m, sel.index, b_set, b_len, budget) { return false; }
+            }
+            return checkDirectArrayUses(m, uinfo.value, b_set, b_len, budget);
+        },
+        scalar, logical, apply, associated => {
+            return checkDirectArrayUses(m, n.a, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, n.b, b_set, b_len, budget);
+        },
+        call => {
+            for arg in m.call(id).arguments {
+                if !checkDirectArrayUses(m, arg, b_set, b_len, budget) { return false; }
+            }
+            return true;
+        },
+        return_, project, result_associated, fork_ => {
+            return checkDirectArrayUses(m, n.a, b_set, b_len, budget);
+        },
+        construct => {
+            return checkDirectArrayUses(m, n.b, b_set, b_len, budget);
+        },
+        pattern_bind => {
+            return checkDirectArrayUses(m, n.b, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, n.c, b_set, b_len, budget);
+        },
+        closure => {
+            for cap in m.closureCaptures(id) {
+                if inDirectSet(b_set, b_len, cap) { return false; }
+            }
+            return true;
+        },
+        spark => {
+            let sinfo = m.sparkInfo(id);
+            return checkDirectArrayUses(m, sinfo.source, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, sinfo.end, b_set, b_len, budget) &&
+                checkDirectArrayUses(m, sinfo.body, b_set, b_len, budget);
+        },
+        _ => { return false; },
+    }
+}
+
+fn isDirectLocalArrayBinding(g: Generator&, f: const Fn&, m: const Module&, body_root: u32, binding: u32) -> bool {
+    var b_set: u32[16] = [0; 16];
+    b_set[0] = binding;
+    var b_len: i64 = 1;
+    var ok = true;
+    var changed = true;
+    var iter: i64 = 0;
+    while changed && ok && iter < 8 {
+        changed = false;
+        var abudget: i64 = 1024;
+        collectDirectArrayAliases(g, m, body_root, b_set, b_len, changed, ok, abudget);
+        iter += 1;
+    }
+    if !ok { return false; }
+    for i in 0..b_len {
+        if bindingCaptured(g, f, b_set[i]) { return false; }
+    }
+    var cbudget: i64 = 1024;
+    return checkDirectArrayUses(m, body_root, b_set, b_len, cbudget);
+}
+
 fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]) {
     if g.runtime_().has_fork || f.tco_inhibit != 0 || children.len < 2 || f.skip_fill_len >= 8 { return; }
     for k in 0..(children.len - 1) {
@@ -991,8 +1319,7 @@ fn scanDeadFills(g: Generator&, f: Fn&, m: const Module&, children: const u32[:]
         let fill_ty = m.types.node(m.binding(fill_b).ty);
         if fill_ty.tag != blot_check_types::Tag.array { continue; }
         let etag = m.types.node(fill_ty.a).tag;
-        if etag != blot_check_types::Tag.unsigned32 &&
-            etag != blot_check_types::Tag.floating32 && etag != blot_check_types::Tag.boolean {
+        if !blot_check_types::isNumeric(etag) && etag != blot_check_types::Tag.boolean {
             continue;
         }
         for j in (k + 1)..children.len {
@@ -2655,6 +2982,23 @@ fn tryEmitVec3MaybeLoop4x(
     return blot_direct_types::Error.none;
 }
 
+recursive fn isIrrefutableSubpat(m: const Module&, pat_id: u32, depth: i64 = 0) -> bool {
+    if pat_id == 0 { return true; }
+    if depth >= 16 { return false; }
+    let pat = m.pattern(pat_id);
+    match pat.tag {
+        wildcard, bind => { return true; },
+        product => {
+            for ch in m.patternChildren(pat_id) {
+                if !isIrrefutableSubpat(m, ch, depth + 1) { return false; }
+            }
+            return true;
+        },
+        record_payload => { return isIrrefutableSubpat(m, pat.b, depth + 1); },
+        _ => { return false; },
+    }
+}
+
 recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     // Lazy variant payload fast path: when matching an unboxed multi-constructor
     // nominal directly from a `Tag.array` element read (`pos[i]`, `pool.at id`),
@@ -2733,6 +3077,118 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let arms_len = g.units[f.unit - 1].matchArms(id).len;
         let cases, verr = g.types.variants(lazy_input_ty);
         if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        // Dense constructor tag jump table (`br_table`) when >= 3 unguarded arms have irrefutable subpatterns.
+        var use_br_table = arms_len >= 3 && arms_len <= 64 && merges_len == 0;
+        var tbl_arm: i64[64] = [-1; 64];
+        var tbl_max: u32 = 0;
+        var tbl_wild: i64 = -1;
+        if use_br_table {
+            let pm .= g.units[f.unit - 1];
+            for ai in 0..arms_len {
+                let arm = pm.matchArms(id)[ai];
+                if arm.guard_ != 0 { use_br_table = false; break; }
+                let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
+                if pat.tag == blot_check_core::PatternTag.wildcard {
+                    if tbl_wild < 0 && ai == arms_len - 1 { tbl_wild = ai; }
+                    else { use_br_table = false; break; }
+                } else if pat.tag == blot_check_core::PatternTag.constructor {
+                    if !isIrrefutableSubpat(pm, pat.b) { use_br_table = false; break; }
+                    let ctag = pm.constructor(pat.a).tag;
+                    if ctag >= 64 { use_br_table = false; break; }
+                    if tbl_arm[ctag] < 0 { tbl_arm[ctag] = ai; }
+                    if ctag > tbl_max { tbl_max = ctag; }
+                } else {
+                    use_br_table = false;
+                    break;
+                }
+            }
+        }
+        if use_br_table {
+            let span = (tbl_max + 1) as i64;
+            var trap_blk: u32 = 0;
+            if tbl_wild < 0 { trap_blk = open(g, f, OP_block); }
+            var arm_blks: u32[64] = [0; 64];
+            var bi = arms_len;
+            while bi > 0 {
+                bi -= 1;
+                arm_blks[bi] = open(g, f, OP_block);
+            }
+            lget(g, tag_local);
+            op(g, OP_br_table);
+            uleb(g, span as u32);
+            let default_depth = if tbl_wild >= 0 { f.depth - arm_blks[tbl_wild] } else { f.depth - trap_blk };
+            for ti in 0..span {
+                let target_arm = tbl_arm[ti];
+                if target_arm >= 0 { uleb(g, f.depth - arm_blks[target_arm]); }
+                else { uleb(g, default_depth); }
+            }
+            uleb(g, default_depth);
+            for arm_index in 0..arms_len {
+                close(g, f);
+                var pat_tag = blot_check_core::PatternTag.wildcard;
+                var ctor_tag: u32 = 0;
+                var subpat: u32 = 0;
+                var subpat_is_wild = true;
+                var body_id: u32 = 0;
+                {
+                    let pm .= g.units[f.unit - 1];
+                    let arm = pm.matchArms(id)[arm_index];
+                    body_id = arm.body;
+                    let pat = pm.pattern(pm.rowPatterns(pm.armRows(arm)[0])[0]);
+                    pat_tag = pat.tag;
+                    if pat_tag == blot_check_core::PatternTag.constructor {
+                        ctor_tag = pm.constructor(pat.a).tag;
+                        subpat = pat.b;
+                        if subpat != 0 && pm.pattern(subpat).tag != blot_check_core::PatternTag.wildcard {
+                            subpat_is_wild = false;
+                        }
+                    }
+                }
+                var saved_tag_idx: i64 = -1;
+                var saved_tag_prev: u32 = 0xffffffff;
+                if pat_tag == blot_check_core::PatternTag.constructor {
+                    if tagOf(g, arr_val.ty) == blot_direct_types::Tag.array {
+                        let elem_step, sterr = stride(g, f, lazy_input_ty, id);
+                        if sterr == blot_direct_types::Error.none {
+                            let tidx, tprev = recordCheckedElemTag(f, w(g, arr_val, 0), w(g, arr_val, 1), idx_local, elem_step, ctor_tag);
+                            saved_tag_idx = tidx;
+                            saved_tag_prev = tprev;
+                        }
+                    }
+                    if !subpat_is_wild {
+                        let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
+                        if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
+                        let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
+                        let payload_val, lerr = loadAt(g, f, elem_addr, 4, payload_ty, id);
+                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        let tested = test_(g, f, subpat, payload_val, false, 0, id);
+                        if tested != blot_direct_types::Error.none { return neverVal(), tested; }
+                    }
+                }
+                let body, berr = stmt(g, f, body_id);
+                if saved_tag_idx >= 0 && saved_tag_idx < f.checked_elems_len {
+                    f.checked_elems[saved_tag_idx].known_tag = saved_tag_prev;
+                }
+                if berr != blot_direct_types::Error.none { return body, berr; }
+                if body.ty != blot_direct_types::never {
+                    falls = true;
+                    if !info.statement {
+                        let delivered = deliver(g, f, body, result, id);
+                        if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                    }
+                }
+                br(g, f, OP_br, done);
+            }
+            if tbl_wild < 0 {
+                close(g, f);
+                op(g, OP_unreachable_);
+            }
+            close(g, f);
+            if !falls { return neverVal(), blot_direct_types::Error.none; }
+            if info.statement { return unitVal(), blot_direct_types::Error.none; }
+            if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
+            return neverVal(), blot_direct_types::Error.none;
+        }
         for arm_index in 0..arms_len {
             let next = open(g, f, OP_block);
             var pat_tag = blot_check_core::PatternTag.wildcard;
@@ -2909,6 +3365,136 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if berr == blot_direct_types::Error.none && boxed && input_val.len == 1 {
                 fbip_block = w(g, input_val, 0);
                 fbip_ty = input_val.ty;
+            }
+        }
+    }
+    // Dense jump table (`br_table`) for general single-input matches over
+    // dense integer literals (U32/U8/I32) or dense constructor tags (>= 3 arms, span <= 64).
+    if inputs.len == 1 && merges.len == 0 && arms.len >= 3 && arms.len <= 64 && fbip_block == 0 {
+        let in_val = g.s.vals[values.start];
+        let in_tag = tagOf(g, in_val.ty);
+        let is_int_switch = in_tag == blot_direct_types::Tag.u32_ || in_tag == blot_direct_types::Tag.u8_ || in_tag == blot_direct_types::Tag.i32_;
+        var is_nom_switch = false;
+        var nom_boxed = false;
+        if in_tag == blot_direct_types::Tag.nominal {
+            let nb, nberr = isBoxed(g, f, in_val.ty, id);
+            let nc, ncerr = g.types.variants(in_val.ty);
+            if nberr == blot_direct_types::Error.none && ncerr == blot_direct_types::Error.none && nc.len > 1 {
+                is_nom_switch = true;
+                nom_boxed = nb;
+            }
+        }
+        if is_int_switch || is_nom_switch {
+            var sw_ok = true;
+            var sw_min: u32 = 0xffffffff;
+            var sw_max: u32 = 0;
+            var sw_wild: i64 = -1;
+            var sw_wild_bind: u32 = 0;
+            for arm, ai in arms {
+                if arm.guard_ != 0 { sw_ok = false; break; }
+                let rows = m.armRows(arm);
+                for row in rows {
+                    let pats = m.rowPatterns(row);
+                    if pats.len != 1 { sw_ok = false; break; }
+                    let pat = m.pattern(pats[0]);
+                    if pat.tag == blot_check_core::PatternTag.wildcard || pat.tag == blot_check_core::PatternTag.bind {
+                        if rows.len != 1 || sw_wild >= 0 || ai != arms.len - 1 { sw_ok = false; break; }
+                        sw_wild = ai;
+                        if pat.tag == blot_check_core::PatternTag.bind { sw_wild_bind = pat.a; }
+                    } else if is_int_switch && pat.tag == blot_check_core::PatternTag.constant {
+                        if pat.a < sw_min { sw_min = pat.a; }
+                        if pat.a > sw_max { sw_max = pat.a; }
+                    } else if is_nom_switch && pat.tag == blot_check_core::PatternTag.constructor {
+                        if rows.len != 1 || !isIrrefutableSubpat(m, pat.b) { sw_ok = false; break; }
+                        let ctag = m.constructor(pat.a).tag;
+                        if ctag < sw_min { sw_min = ctag; }
+                        if ctag > sw_max { sw_max = ctag; }
+                    } else {
+                        sw_ok = false;
+                        break;
+                    }
+                }
+                if !sw_ok { break; }
+            }
+            if sw_ok && sw_min <= sw_max && (sw_max - sw_min) < 64 {
+                let span = (sw_max - sw_min + 1) as i64;
+                var tbl_arm: i64[64] = [-1; 64];
+                for arm, ai in arms {
+                    for row in m.armRows(arm) {
+                        let pat = m.pattern(m.rowPatterns(row)[0]);
+                        if is_int_switch && pat.tag == blot_check_core::PatternTag.constant {
+                            let idx = (pat.a - sw_min) as i64;
+                            if tbl_arm[idx] < 0 { tbl_arm[idx] = ai; }
+                        } else if is_nom_switch && pat.tag == blot_check_core::PatternTag.constructor {
+                            let idx = (m.constructor(pat.a).tag - sw_min) as i64;
+                            if tbl_arm[idx] < 0 { tbl_arm[idx] = ai; }
+                        }
+                    }
+                }
+                var trap_blk: u32 = 0;
+                if sw_wild < 0 { trap_blk = open(g, f, OP_block); }
+                var arm_blks: u32[64] = [0; 64];
+                var bi = arms.len;
+                while bi > 0 {
+                    bi -= 1;
+                    arm_blks[bi] = open(g, f, OP_block);
+                }
+                lget(g, w(g, in_val, 0));
+                if is_nom_switch && nom_boxed {
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+                }
+                if sw_min != 0 {
+                    i32Const(g, sw_min);
+                    op(g, OP_i32_sub);
+                }
+                op(g, OP_br_table);
+                uleb(g, span as u32);
+                let default_depth = if sw_wild >= 0 { f.depth - arm_blks[sw_wild] } else { f.depth - trap_blk };
+                for ti in 0..span {
+                    let ta = tbl_arm[ti];
+                    if ta >= 0 { uleb(g, f.depth - arm_blks[ta]); }
+                    else { uleb(g, default_depth); }
+                }
+                uleb(g, default_depth);
+                for arm, ai in arms {
+                    close(g, f);
+                    let saved_b = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
+                    if ai == sw_wild {
+                        if sw_wild_bind != 0 {
+                            refine(g, f, m.binding(sw_wild_bind).ty, in_val.ty);
+                            bindPut(g, f, sw_wild_bind, in_val);
+                        }
+                    } else if is_nom_switch {
+                        let pat = m.pattern(m.rowPatterns(m.armRows(arm)[0])[0]);
+                        if pat.b != 0 && m.pattern(pat.b).tag != blot_check_core::PatternTag.wildcard {
+                            let ctag = m.constructor(pat.a).tag;
+                            let payload, uerr = unwrapVariant(g, f, in_val, ctag, id);
+                            if uerr != blot_direct_types::Error.none { f.bindings = saved_b; return neverVal(), uerr; }
+                            let tested = test_(g, f, pat.b, payload, false, 0, id);
+                            if tested != blot_direct_types::Error.none { f.bindings = saved_b; return neverVal(), tested; }
+                        }
+                    }
+                    let body, berr = stmt(g, f, arm.body);
+                    f.bindings = saved_b;
+                    if berr != blot_direct_types::Error.none { return body, berr; }
+                    if body.ty != blot_direct_types::never {
+                        falls = true;
+                        if !info.statement {
+                            let delivered = deliver(g, f, body, result, id);
+                            if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
+                        }
+                    }
+                    br(g, f, OP_br, done);
+                }
+                if sw_wild < 0 {
+                    close(g, f);
+                    op(g, OP_unreachable_);
+                }
+                close(g, f);
+                if !falls { return neverVal(), blot_direct_types::Error.none; }
+                if info.statement { return unitVal(), blot_direct_types::Error.none; }
+                if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }
+                return neverVal(), blot_direct_types::Error.none;
             }
         }
     }
@@ -4142,7 +4728,7 @@ recursive fn exprPreservesHandle(
         },
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
-            if ok != blot_error::Error.none || op_kind != blot_check_storage_ops::Op.push { return false; }
+            if ok != blot_error::Error.none || (op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend) { return false; }
             let ch = m.children(id);
             return ch.len > 0 && exprPreservesHandle(g, m, ch[0], same, same_len, depth + 1, allow_calls, call_depth);
         },
@@ -6593,6 +7179,179 @@ recursive fn extractOrExitUpperBounds(
         out_len += 1;
     }
 }
+recursive fn matchAffineIndexExpr(g: const Generator&, f: const Fn&, m: const Module&, idx_node: u32, idx_b: u32) -> bool, u32, u32 {
+    if idx_node == 0 { return false, 0xffffffff, 0; }
+    let n = m.node(idx_node);
+    if n.tag != blot_check_core::Tag.scalar || n.op != blot_check_core::Op.add ||
+        m.types.node(m.typeOf(idx_node)).tag != blot_check_types::Tag.unsigned32 {
+        return false, 0xffffffff, 0;
+    }
+    // Check `idx + c` or `c + idx` (1 <= c <= 4)
+    let an = m.node(n.a);
+    let bn = m.node(n.b);
+    if bn.tag == blot_check_core::Tag.constant && bn.a >= 1 && bn.a <= 4 {
+        if localRef(m, n.a) == idx_b { return true, 0xffffffff, bn.a; }
+        // `(base + idx) + c`
+        let ok2, base2, c2 = matchAffineIndexExpr(g, f, m, n.a, idx_b);
+        if ok2 && c2 + bn.a <= 4 { return true, base2, c2 + bn.a; }
+    }
+    if an.tag == blot_check_core::Tag.constant && an.a >= 1 && an.a <= 4 {
+        if localRef(m, n.b) == idx_b { return true, 0xffffffff, an.a; }
+        let ok2, base2, c2 = matchAffineIndexExpr(g, f, m, n.b, idx_b);
+        if ok2 && c2 + an.a <= 4 { return true, base2, c2 + an.a; }
+    }
+    // Check `base + idx` or `idx + base` where `base` is an already-bound U32 local
+    var base_b: u32 = 0;
+    if localRef(m, n.b) == idx_b { base_b = localRef(m, n.a); }
+    else if localRef(m, n.a) == idx_b { base_b = localRef(m, n.b); }
+    if base_b != 0 && base_b != idx_b {
+        let _, ic = withCellType(g, f, base_b);
+        let bv, bok = bindGet(g, f, base_b);
+        if !ic && bok && bv.ty == blot_direct_types::u32_ {
+            return true, w(g, bv, 0), 0;
+        }
+    }
+    return false, 0xffffffff, 0;
+}
+
+fn matchMaskLocal(g: const Generator&, f: const Fn&, m: const Module&, idx_node: u32) -> u32 {
+    if idx_node == 0 { return 0xffffffff; }
+    let n = m.node(idx_node);
+    if n.tag == blot_check_core::Tag.scalar && n.op == blot_check_core::Op.bit_and &&
+        m.types.node(m.typeOf(idx_node)).tag == blot_check_types::Tag.unsigned32 {
+        let rb = localRef(m, n.b);
+        if rb != 0 {
+            let _, ic = withCellType(g, f, rb);
+            let rv, rok = bindGet(g, f, rb);
+            if !ic && rok && rv.ty == blot_direct_types::u32_ { return w(g, rv, 0); }
+        }
+    }
+    return 0xffffffff;
+}
+
+fn addAffineTriplet(
+    aff_base: u32[4]&,
+    aff_c: u32[4]&,
+    aff_len: u32[4]&,
+    aff_count: i64&,
+    base: u32,
+    c: u32,
+    clen: u32,
+) {
+    for i in 0..aff_count {
+        if aff_base[i] == base && aff_len[i] == clen {
+            if c > aff_c[i] { aff_c[i] = c; }
+            return;
+        }
+    }
+    if aff_count >= 4 { return; }
+    aff_base[aff_count] = base;
+    aff_c[aff_count] = c;
+    aff_len[aff_count] = clen;
+    aff_count += 1;
+}
+
+recursive fn collectAffineAndMaskBounds(
+    g: const Generator&,
+    f: const Fn&,
+    m: const Module&,
+    id: u32,
+    idx_b: u32,
+    end_local: u32,
+    lt_a: u32[4]&,
+    lt_b: u32[4]&,
+    lt_count: i64&,
+    aff_base: u32[4]&,
+    aff_c: u32[4]&,
+    aff_len: u32[4]&,
+    aff_count: i64&,
+    left: i64&,
+) {
+    if id == 0 || left <= 0 { return; }
+    left -= 1;
+    let n = m.node(id);
+    var arr_b: u32 = 0;
+    var idx_n: u32 = 0;
+    if n.tag == blot_check_core::Tag.array_op && m.arrayOperation(id) == blot_backend_collection_ops::Op.get {
+        let ch = m.children(id);
+        if ch.len == 2 { arr_b = localRef(m, ch[0]); idx_n = ch[1]; }
+    } else if n.tag == blot_check_core::Tag.storage {
+        let op_k, ok = blot_check_storage_ops::opFromCode(n.c);
+        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read {
+            let ch = m.children(id);
+            if ch.len == 2 { arr_b = localRef(m, ch[0]); idx_n = ch[1]; }
+        }
+    } else if n.tag == blot_check_core::Tag.update {
+        let uinfo = m.updateInfo(id);
+        let sels = m.updateSelectors(id);
+        if sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index {
+            arr_b = localRef(m, uinfo.root);
+            idx_n = sels[0].index;
+        }
+    }
+    if arr_b != 0 && idx_n != 0 {
+        let av, aok = bindGet(g, f, arr_b);
+        if aok && tagOf(g, av.ty) == blot_direct_types::Tag.array {
+            let ca = findCheckedArray(f, w(g, av, 0), w(g, av, 1));
+            if ca >= 0 {
+                let clen = f.checked_arrays[ca].length;
+                if idx_b != 0 && end_local != 0xffffffff {
+                    let is_aff, base_loc, c_val = matchAffineIndexExpr(g, f, m, idx_n, idx_b);
+                    if is_aff {
+                        if base_loc == 0xffffffff && c_val == 1 {
+                            if findCheckedBound(f, end_local, clen) < 0 {
+                                addLePair(lt_a, lt_b, lt_count, end_local, clen);
+                            }
+                        } else if findCheckedAffine(f, base_loc, end_local, c_val, clen) < 0 {
+                            addAffineTriplet(aff_base, aff_c, aff_len, aff_count, base_loc, c_val, clen);
+                        }
+                    }
+                }
+                let mask_loc = matchMaskLocal(g, f, m, idx_n);
+                if mask_loc != 0xffffffff && findCheckedBound(f, mask_loc, clen) < 0 {
+                    addLePair(lt_a, lt_b, lt_count, mask_loc, clen);
+                }
+            }
+        }
+    }
+    match n.tag {
+        suite, block_, product, record, array, array_op, storage => {
+            for ch in m.children(id) { collectAffineAndMaskBounds(g, f, m, ch, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); }
+        },
+        bind, construct => { collectAffineAndMaskBounds(g, f, m, n.b, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); },
+        return_, project, result_associated => { collectAffineAndMaskBounds(g, f, m, n.a, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); },
+        scalar, associated, logical, apply => {
+            collectAffineAndMaskBounds(g, f, m, n.a, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            collectAffineAndMaskBounds(g, f, m, n.b, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+        },
+        if_value, if_stmt => {
+            collectAffineAndMaskBounds(g, f, m, n.a, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            collectAffineAndMaskBounds(g, f, m, n.b, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            collectAffineAndMaskBounds(g, f, m, n.c, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+        },
+        update => {
+            let uinfo = m.updateInfo(id);
+            collectAffineAndMaskBounds(g, f, m, uinfo.value, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index {
+                    collectAffineAndMaskBounds(g, f, m, sel.index, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+                }
+            }
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { collectAffineAndMaskBounds(g, f, m, inp, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); }
+            for arm in m.matchArms(id) {
+                collectAffineAndMaskBounds(g, f, m, arm.guard_, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+                collectAffineAndMaskBounds(g, f, m, arm.body, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left);
+            }
+        },
+        call => {
+            for arg in m.call(id).arguments { collectAffineAndMaskBounds(g, f, m, arg, idx_b, end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, left); }
+        },
+        _ => {},
+    }
+}
+
 fn collectLoopPreBounds(
     g: const Generator&,
     f: const Fn&,
@@ -6603,9 +7362,16 @@ fn collectLoopPreBounds(
     le_a: u32[4]&,
     le_b: u32[4]&,
     le_count: i64&,
+    lt_a: u32[4]&,
+    lt_b: u32[4]&,
+    lt_count: i64&,
+    aff_base: u32[4]&,
+    aff_c: u32[4]&,
+    aff_len: u32[4]&,
+    aff_count: i64&,
 ) {
     var nodes: i64 = 0;
-    if !countLoopBodyNodes(m, info.body, nodes, 72) { return; }
+    if !countLoopBodyNodes(m, info.body, nodes, 96) { return; }
     if info.kind == blot_check_core::LoopKind.range && range.end_local != 0xffffffff && info.pattern != 0 {
         let pat = m.pattern(info.pattern);
         if pat.tag != blot_check_core::PatternTag.bind { return; }
@@ -6622,9 +7388,13 @@ fn collectLoopPreBounds(
             if clen == range.end_local || findCheckedLe(f, range.end_local, clen) >= 0 { continue; }
             addLePair(le_a, le_b, le_count, range.end_local, clen);
         }
+        var abud: i64 = 128;
+        collectAffineAndMaskBounds(g, f, m, info.body, pat.a, range.end_local, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, abud);
         return;
     }
     if info.kind == blot_check_core::LoopKind.forever {
+        var abud: i64 = 128;
+        collectAffineAndMaskBounds(g, f, m, info.body, 0, 0xffffffff, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count, abud);
         let bn = m.node(info.body);
         if bn.tag != blot_check_core::Tag.suite && bn.tag != blot_check_core::Tag.block_ { return; }
         let ch = m.children(info.body);
@@ -8715,10 +9485,208 @@ fn emitLoopReciprocal(g: Generator&, f: Fn&, divisor: u32, mandatory: bool, inde
     f.loop_reciprocals_len += 1;
 }
 
+fn emitLoopReciprocalU64(g: Generator&, f: Fn&, divisor: u32, from_u32: bool) {
+    for at in 0..f.loop_reciprocals_u64_len {
+        let e = f.loop_reciprocals_u64[at];
+        if e.divisor == divisor && e.from_u32 == from_u32 { return; }
+    }
+    if f.loop_reciprocals_u64_len >= 8 { return; }
+    let d = local(g, f, VT_i64);
+    let m_lo = local(g, f, VT_i64);
+    let m_hi = local(g, f, VT_i64);
+    let sh1 = local(g, f, VT_i64);
+    let sh2 = local(g, f, VT_i64);
+    let s_loc = local(g, f, VT_i64);
+    let rem = local(g, f, VT_i64);
+    let m_low = local(g, f, VT_i64);
+    let cnt = local32(g, f);
+    let carry = local(g, f, VT_i64);
+    let rem2 = local(g, f, VT_i64);
+    lget(g, divisor);
+    if from_u32 { op(g, OP_i64_extend_i32_u); }
+    ltee(g, d);
+    i64Const(g, 1);
+    op(g, OP_i64_gt_u);
+    let gt1 = open(g, f, OP_if_);
+    // s = 64 - clz(d - 1); sh1 = 1; sh2 = s - 1
+    i64Const(g, 64);
+    lget(g, d);
+    i64Const(g, 1);
+    op(g, OP_i64_sub);
+    op(g, OP_i64_clz);
+    op(g, OP_i64_sub);
+    ltee(g, s_loc);
+    i64Const(g, 1);
+    op(g, OP_i64_sub);
+    lset(g, sh2);
+    i64Const(g, 1);
+    lset(g, sh1);
+    // rem = ((1 << s) - d) mod 2^64 (for s == 64, 0 - d)
+    lget(g, s_loc);
+    i64Const(g, 64);
+    op(g, OP_i64_eq);
+    let s64 = open(g, f, OP_if_);
+    i64Const(g, 0);
+    lget(g, d);
+    op(g, OP_i64_sub);
+    lset(g, rem);
+    op(g, OP_else_);
+    i64Const(g, 1);
+    lget(g, s_loc);
+    op(g, OP_i64_shl);
+    lget(g, d);
+    op(g, OP_i64_sub);
+    lset(g, rem);
+    close(g, f);
+    lget(g, rem);
+    i64Const(g, 0);
+    op(g, OP_i64_ne);
+    let nonpow2 = open(g, f, OP_if_);
+    i64Const(g, 0);
+    lset(g, m_low);
+    i32Const(g, 64);
+    lset(g, cnt);
+    let lp_exit = open(g, f, OP_block);
+    let lp_top = open(g, f, OP_loop);
+    lget(g, cnt);
+    op(g, OP_i32_eqz);
+    br(g, f, OP_br_if, lp_exit);
+    lget(g, rem);
+    i64Const(g, 63);
+    op(g, OP_i64_shr_u);
+    lset(g, carry);
+    lget(g, rem);
+    i64Const(g, 1);
+    op(g, OP_i64_shl);
+    lset(g, rem2);
+    lget(g, m_low);
+    i64Const(g, 1);
+    op(g, OP_i64_shl);
+    lset(g, m_low);
+    lget(g, carry);
+    i64Const(g, 0);
+    op(g, OP_i64_ne);
+    lget(g, rem2);
+    lget(g, d);
+    op(g, OP_i64_ge_u);
+    op(g, OP_i32_or);
+    let sub_if = open(g, f, OP_if_);
+    lget(g, rem2);
+    lget(g, d);
+    op(g, OP_i64_sub);
+    lset(g, rem);
+    lget(g, m_low);
+    i64Const(g, 1);
+    op(g, OP_i64_or);
+    lset(g, m_low);
+    op(g, OP_else_);
+    lget(g, rem2);
+    lset(g, rem);
+    close(g, f);
+    lget(g, cnt);
+    i32Const(g, 1);
+    op(g, OP_i32_sub);
+    lset(g, cnt);
+    br(g, f, OP_br, lp_top);
+    close(g, f);
+    close(g, f);
+    lget(g, m_low);
+    i64Const(g, 1);
+    op(g, OP_i64_add);
+    ltee(g, m_low);
+    i64Const(g, 0xffffffff);
+    op(g, OP_i64_and);
+    lset(g, m_lo);
+    lget(g, m_low);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    lset(g, m_hi);
+    close(g, f);
+    close(g, f);
+    f.loop_reciprocals_u64[f.loop_reciprocals_u64_len] = LoopReciprocalU64 { divisor, from_u32, m_lo, m_hi, sh1, sh2, true };
+    f.loop_reciprocals_u64_len += 1;
+}
+
+fn invariantU64DivisorExpr(g: const Generator&, f: const Fn&, m: const Module&, node_id: u32, input_locals: u32) -> u32, bool {
+    if node_id == 0 { return 0xffffffff, false; }
+    let b = localRef(m, node_id);
+    if b != 0 {
+        let value, found = bindGet(g, f, b);
+        let _, is_cell = withCellType(g, f, b);
+        if found && !is_cell && value.ty == blot_direct_types::u64_ {
+            let loc = w(g, value, 0);
+            let _, is_c = constU64(f, loc);
+            if loc < input_locals && !is_c { return loc, false; }
+        }
+        return 0xffffffff, false;
+    }
+    let n = m.node(node_id);
+    // Match `u32_var.to_u64` (project/call/associated/scalar convert).
+    var src_u32: u32 = 0;
+    if n.tag == blot_check_core::Tag.scalar && n.op == blot_check_core::Op.numeric_convert {
+        src_u32 = n.a;
+    } else if n.tag == blot_check_core::Tag.project {
+        let sp = m.fieldSpelling(m.projection(n.b).field);
+        if sp.present && sp.value == "to_u64" { src_u32 = n.a; }
+    } else if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.numeric_convert {
+        src_u32 = n.a;
+    } else if n.tag == blot_check_core::Tag.call {
+        let ci = m.call(node_id);
+        if ci.arguments.len == 1 { src_u32 = ci.arguments[0]; }
+    }
+    if src_u32 != 0 {
+        let sb = localRef(m, src_u32);
+        if sb != 0 {
+            let value, found = bindGet(g, f, sb);
+            let _, is_cell = withCellType(g, f, sb);
+            if found && !is_cell && value.ty == blot_direct_types::u32_ {
+                let loc = w(g, value, 0);
+                let _, is_c = constU32(f, loc);
+                if loc < input_locals && !is_c { return loc, true; }
+            }
+        }
+    }
+    return 0xffffffff, false;
+}
+
+recursive fn calleeUsesParamAsU64Divisor(m: const Module&, id: u32, param_b: u32, depth: i64 = 0) -> bool {
+    if id == 0 || depth > 16 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        scalar => {
+            if (n.op == blot_check_core::Op.div || n.op == blot_check_core::Op.rem) &&
+                m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.unsigned64 {
+                if localRef(m, n.b) == param_b { return true; }
+                let bn = m.node(n.b);
+                if bn.tag == blot_check_core::Tag.project && localRef(m, bn.a) == param_b {
+                    let sp = m.fieldSpelling(m.projection(bn.b).field);
+                    if sp.present && sp.value == "to_u64" { return true; }
+                } else if (bn.tag == blot_check_core::Tag.scalar || bn.tag == blot_check_core::Tag.associated) &&
+                    bn.op == blot_check_core::Op.numeric_convert && localRef(m, bn.a) == param_b {
+                    return true;
+                }
+            }
+            return calleeUsesParamAsU64Divisor(m, n.a, param_b, depth + 1) || calleeUsesParamAsU64Divisor(m, n.b, param_b, depth + 1);
+        },
+        suite, block_, product, record => {
+            for ch in m.children(id) { if calleeUsesParamAsU64Divisor(m, ch, param_b, depth + 1) { return true; } }
+            return false;
+        },
+        bind, construct => { return calleeUsesParamAsU64Divisor(m, n.b, param_b, depth + 1); },
+        return_, project, associated => { return calleeUsesParamAsU64Divisor(m, n.a, param_b, depth + 1); },
+        if_stmt, if_value => {
+            return calleeUsesParamAsU64Divisor(m, n.a, param_b, depth + 1) ||
+                calleeUsesParamAsU64Divisor(m, n.b, param_b, depth + 1) ||
+                calleeUsesParamAsU64Divisor(m, n.c, param_b, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+
 // Bindings in the body, the iterator and changing carries have no stable
 // local at the preheader. Nested loops scan their own scope.
 recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals: u32, mandatory: u32, index: u32, end: u32, budget: i64&) {
-    if id == 0 || budget <= 0 || f.loop_reciprocals_len >= 8 { return; }
+    if id == 0 || budget <= 0 || (f.loop_reciprocals_len >= 8 && f.loop_reciprocals_u64_len >= 8) { return; }
     budget -= 1;
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -8726,6 +9694,11 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
         scalar, associated, logical => {
             let divisor = invariantDivisor(g, f, m, id, input_locals);
             if divisor != 0xffffffff { emitLoopReciprocal(g, f, divisor, divisor == mandatory, index, end); }
+            if n.tag == blot_check_core::Tag.scalar && (n.op == blot_check_core::Op.div || n.op == blot_check_core::Op.rem) &&
+                m.types.node(m.typeOf(n.b)).tag == blot_check_types::Tag.unsigned64 {
+                let d64, from_u32 = invariantU64DivisorExpr(g, f, m, n.b, input_locals);
+                if d64 != 0xffffffff { emitLoopReciprocalU64(g, f, d64, from_u32); }
+            }
             collectLoopReciprocals(g, f, n.a, input_locals, mandatory, index, end, budget);
             collectLoopReciprocals(g, f, n.b, input_locals, mandatory, index, end, budget);
         },
@@ -8740,7 +9713,38 @@ recursive fn collectLoopReciprocals(g: Generator&, f: Fn&, id: u32, input_locals
             collectLoopReciprocals(g, f, n.c, input_locals, mandatory, index, end, budget);
         },
         call => {
-            for arg in m.call(id).arguments { collectLoopReciprocals(g, f, arg, input_locals, mandatory, index, end, budget); }
+            let ci = m.call(id);
+            let target = g.resolve(m, ci.target);
+            if g.hasUnit(target.unit) && canInlineTarget(g, target, f.inline_depth) {
+                let tm .= g.units[target.unit - 1];
+                let tbody .= tm.body(target.binding);
+                if tbody && tbody.is_function {
+                    let tparams = tm.bodyParameters(tbody);
+                    if tparams.len == ci.arguments.len {
+                        for arg, ai in ci.arguments {
+                            let ab = localRef(m, arg);
+                            if ab == 0 { continue; }
+                            let av, aok = bindGet(g, f, ab);
+                            let _, is_cell = withCellType(g, f, ab);
+                            if !aok || is_cell { continue; }
+                            if av.ty == blot_direct_types::u32_ {
+                                let loc = w(g, av, 0);
+                                let _, is_c = constU32(f, loc);
+                                if loc < input_locals && !is_c && calleeUsesParamAsU64Divisor(tm, tbody.root, tparams[ai].binding) {
+                                    emitLoopReciprocalU64(g, f, loc, true);
+                                }
+                            } else if av.ty == blot_direct_types::u64_ {
+                                let loc = w(g, av, 0);
+                                let _, is_c = constU64(f, loc);
+                                if loc < input_locals && !is_c && calleeUsesParamAsU64Divisor(tm, tbody.root, tparams[ai].binding) {
+                                    emitLoopReciprocalU64(g, f, loc, false);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for arg in ci.arguments { collectLoopReciprocals(g, f, arg, input_locals, mandatory, index, end, budget); }
         },
         match_ => {
             for input in m.matchInputs(id) { collectLoopReciprocals(g, f, input, input_locals, mandatory, index, end, budget); }
@@ -8786,6 +9790,7 @@ recursive fn emitLoopCore(
     var range = range_in;
     if has_index { range.end_local = end_loc; }
     let reciprocal_mark = f.loop_reciprocals_len;
+    let reciprocal_u64_mark = f.loop_reciprocals_u64_len;
     if input_locals != 0 && !has_source {
         var prefix_budget: i64 = 32;
         var mandatory: u32 = 0xffffffff;
@@ -8808,7 +9813,7 @@ recursive fn emitLoopCore(
         op(g, OP_i32_ge_u);
         let opened = open(g, f, OP_if_);
         let assigned = assign(g, f, iteration, outgoing, id);
-        if assigned != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return assigned; }
+        if assigned != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
         br(g, f, OP_br, exit);
         close(g, f);
         let current = local32(g, f);
@@ -8823,9 +9828,9 @@ recursive fn emitLoopCore(
         if has_source {
             if source_view_base != 0xffffffff {
                 let element, elem_err = elementOf(g, f, source.ty, id);
-                if elem_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return elem_err; }
+                if elem_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return elem_err; }
                 let step, step_err = stride(g, f, element, id);
-                if step_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return step_err; }
+                if step_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return step_err; }
                 let addr = local32(g, f);
                 lget(g, source_view_base);
                 let fast = open(g, f, OP_if_);
@@ -8835,25 +9840,25 @@ recursive fn emitLoopCore(
                 popCheckedArraysAt(f, fast);
                 op(g, OP_else_);
                 let slow_addr, slow_err = elementAddress(g, f, source, current, id);
-                if slow_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return slow_err; }
+                if slow_err != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return slow_err; }
                 lget(g, slow_addr);
                 lset(g, addr);
                 close(g, f);
                 let loaded, lerr = loadElement(g, f, addr, 0, element, id);
-                if lerr != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return lerr; }
+                if lerr != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return lerr; }
                 item = loaded;
             } else {
                 let previous_range = f.checked_range;
                 f.checked_range = range;
                 let element, error = readElement(g, f, source, current, id);
                 f.checked_range = previous_range;
-                if error != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return error; }
+                if error != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
                 item = element;
             }
         } else { item = valOf1(g, blot_direct_types::u32_, current); }
         if info.pattern != 0 {
             let tested = test_(g, f, info.pattern, item, false, 0, id);
-            if tested != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; return tested; }
+            if tested != blot_direct_types::Error.none { f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return tested; }
         }
     }
     var release = true;
@@ -8864,7 +9869,7 @@ recursive fn emitLoopCore(
         if g.s.words[slots.start + at] != 0 { boxed_carries = true; continue; }
         let value = g.s.vals[iteration.start + at];
         let safe, error = ownerSlots(g, value.ty, value.start);
-        if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); f.loop_reciprocals_len = reciprocal_mark; return error; }
+        if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error; }
         if !safe { release = false; }
     }
     if release {
@@ -8895,34 +9900,34 @@ recursive fn emitLoopCore(
     if error != blot_direct_types::Error.none {
         f.loop_depth -= 1;
         s.labels.resize(labels_mark);
-        f.loop_reciprocals_len = reciprocal_mark; return error;
+        f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return error;
     }
     let do_unroll2 = unroll2 && !release && !has_index && body.ty != blot_direct_types::never;
     if body.ty != blot_direct_types::never {
         let backedge = g.reserveVals(carries.len);
         for carry, at in carries {
             let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return rerr; }
-            if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return g.fail(m, id, "loop carry without a backedge value"); }
+            if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
+            if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
         let assigned = assignCarries(g, f, backedge, iteration, slots, unchanged, owner_mark, stack_mark, id);
-        if assigned != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return assigned; }
+        if assigned != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned; }
         if do_unroll2 {
             f.checked_elems_len = 0;
             f.checked_bounds_len = 0;
             let body2, err2 = stmt(g, f, info.body);
-            if err2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return err2; }
+            if err2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return err2; }
             if body2.ty != blot_direct_types::never {
                 let backedge2 = g.reserveVals(carries.len);
                 for carry, at in carries {
                     let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
-                    if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return rerr; }
-                    if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return g.fail(m, id, "loop carry without a backedge value"); }
+                    if rerr != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return rerr; }
+                    if !present { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return g.fail(m, id, "loop carry without a backedge value"); }
                     g.s.vals[backedge2.start + at] = value;
                 }
                 let assigned2 = assignCarries(g, f, backedge2, iteration, slots, unchanged, owner_mark, stack_mark, id);
-                if assigned2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; return assigned2; }
+                if assigned2 != blot_direct_types::Error.none { f.loop_depth -= 1; s.labels.resize(labels_mark); f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark; return assigned2; }
                 br(g, f, OP_br, top);
             }
         } else {
@@ -8940,7 +9945,7 @@ recursive fn emitLoopCore(
         }
     }
     f.loop_depth -= 1;
-    f.loop_reciprocals_len = reciprocal_mark;
+    f.loop_reciprocals_len = reciprocal_mark; f.loop_reciprocals_u64_len = reciprocal_u64_mark;
     let label_final = s.labels[labels_mark];
     s.labels.resize(labels_mark);
     if release && (f.allocations != allocations || label_final.used) {
@@ -9032,6 +10037,13 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
         for carry, at in carries {
             bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
+            if at < 64 && carry_in_place[at] {
+                let da_idx = findDirectArray(f, carry.incoming);
+                if da_idx >= 0 {
+                    let da = f.direct_arrays[da_idx];
+                    recordDirectArray(f, carry.iteration, da.slot_local, da.base, da.len_local, da.length, da.elem_ty, da.step);
+                }
+            }
             // A copiedBox carry lives in a fresh loop-reserved block copied on
             // entry and backedge, so carry.iteration is always exclusively owned
             // for in-place FBIP when its sole read is a match/update.
@@ -9494,18 +10506,63 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if fm_done { emitted_loop = true; }
     }
 
-    // 4B-2: Pre-loop `CheckedLe` bounds hoisting for small non-resizing range and `for ever` loops.
+    // 4B-2: Pre-loop `CheckedLe` / masked / affine bounds hoisting for small non-resizing loops.
     if !emitted_loop && body_no_resize && !g.runtime_().has_fork && !f.in_specialized_loop && !copy_tail_done {
         var le_a: u32[4] = [0; 4];
         var le_b: u32[4] = [0; 4];
         var le_count: i64 = 0;
-        collectLoopPreBounds(g, f, g.units[f.unit - 1], id, info, range, le_a, le_b, le_count);
-        if le_count > 0 {
+        var lt_a: u32[4] = [0; 4];
+        var lt_b: u32[4] = [0; 4];
+        var lt_count: i64 = 0;
+        var aff_base: u32[4] = [0; 4];
+        var aff_c: u32[4] = [0; 4];
+        var aff_len: u32[4] = [0; 4];
+        var aff_count: i64 = 0;
+        collectLoopPreBounds(g, f, g.units[f.unit - 1], id, info, range, le_a, le_b, le_count, lt_a, lt_b, lt_count, aff_base, aff_c, aff_len, aff_count);
+        if le_count > 0 || lt_count > 0 || aff_count > 0 {
+            var cond_emitted = false;
             for li in 0..le_count {
                 lget(g, le_a[li]);
                 lget(g, le_b[li]);
                 op(g, OP_i32_le_u);
-                if li > 0 { op(g, OP_i32_and); }
+                if cond_emitted { op(g, OP_i32_and); }
+                cond_emitted = true;
+            }
+            for li in 0..lt_count {
+                lget(g, lt_a[li]);
+                lget(g, lt_b[li]);
+                op(g, OP_i32_lt_u);
+                if cond_emitted { op(g, OP_i32_and); }
+                cond_emitted = true;
+            }
+            for ai in 0..aff_count {
+                // Overflow-free check: end <= clen && c <= (clen - end) && base <= (clen - end - c).
+                let clen = aff_len[ai];
+                let end_l = range.end_local;
+                let cv = aff_c[ai];
+                lget(g, end_l);
+                lget(g, clen);
+                op(g, OP_i32_le_u);
+                if cond_emitted { op(g, OP_i32_and); }
+                cond_emitted = true;
+                let rem1 = local32(g, f);
+                lget(g, clen);
+                lget(g, end_l);
+                op(g, OP_i32_sub);
+                ltee(g, rem1);
+                i32Const(g, cv);
+                op(g, OP_i32_ge_u);
+                op(g, OP_i32_and);
+                if aff_base[ai] != 0xffffffff {
+                    lget(g, aff_base[ai]);
+                    lget(g, rem1);
+                    if cv != 0 {
+                        i32Const(g, cv);
+                        op(g, OP_i32_sub);
+                    }
+                    op(g, OP_i32_le_u);
+                    op(g, OP_i32_and);
+                }
             }
             let prev_spec = f.in_specialized_loop;
             f.in_specialized_loop = true;
@@ -9513,6 +10570,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if has_index { end_loc = w(g, end, 0); }
             let spec_if = open(g, f, OP_if_);
             for li in 0..le_count { recordCheckedLe(f, le_a[li], le_b[li]); }
+            for li in 0..lt_count { recordCheckedBound(f, lt_a[li], lt_b[li]); }
+            for ai in 0..aff_count { recordCheckedAffine(f, aff_base[ai], range.end_local, aff_c[ai], aff_len[ai]); }
             let ferr = emitLoopCore(g, f, id, info, iteration, outgoing, slots, has_index, index, end_loc, has_source, source, source_view_base, range, false, reciprocal_inputs);
             if ferr != blot_direct_types::Error.none { f.in_specialized_loop = prev_spec; return neverVal(), ferr; }
             popCheckedArraysAt(f, spec_if);
@@ -9540,6 +10599,13 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     for carry, at in carries {
         bindPut(g, f, carry.outgoing, g.s.vals[outgoing.start + at]);
+        if at < 64 && carry_in_place[at] {
+            let da_idx = findDirectArray(f, carry.incoming);
+            if da_idx >= 0 {
+                let da = f.direct_arrays[da_idx];
+                recordDirectArray(f, carry.outgoing, da.slot_local, da.base, da.len_local, da.length, da.elem_ty, da.step);
+            }
+        }
         if isUniqueOwnedAt(g, f, carry.iteration, f.loop_depth + 1) {
             var others_in_place = true;
             for oi in 0..carries.len {

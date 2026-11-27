@@ -432,6 +432,61 @@ recursive fn scanScalarRecursion(g: const Generator&, m: const Module&, id: u32,
     }
 }
 
+// Collects top-level plain-element container owner slots from a function result
+// when the result contains no boxed pointers, closures, or memory-holding sums.
+// If every collected slot predates `owner_mark` (or is persistent) and no store
+// escaped past `owner_mark`, the function can safely reclaim its local scratch.
+recursive fn fnResultOwnerSlots(g: Generator&, ty: Ty, words: u32, out: u32[8]&, out_len: i64&) -> bool, Error {
+    let holds, error = g.holdsMemory(ty);
+    if error != blot_direct_types::Error.none { return false, error; }
+    if !holds { return true, blot_direct_types::Error.none; }
+    let boxed, berr = g.types.boxed(ty);
+    if berr != blot_direct_types::Error.none { return false, berr; }
+    if boxed { return false, blot_direct_types::Error.none; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, view, ref, link => {
+            let elem_holds, eherr = g.contentsHoldMemory(n.a);
+            if eherr != blot_direct_types::Error.none { return false, eherr; }
+            if elem_holds || out_len >= 8 { return false, blot_direct_types::Error.none; }
+            out[out_len] = g.s.words[words];
+            out_len += 1;
+            return true, blot_direct_types::Error.none;
+        },
+        tuple => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let item = g.types.tupleItems(ty)[index];
+                let layout, lerr = g.types.layout(item);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                let safe, serr = fnResultOwnerSlots(g, item, words + at, out, out_len);
+                if serr != blot_direct_types::Error.none || !safe { return false, serr; }
+                at += layout.len as u32;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        record => {
+            var at: u32 = 0;
+            for index in 0..(n.b as i64) {
+                let field = g.types.recordField(ty, index).ty;
+                let layout, lerr = g.types.layout(field);
+                if lerr != blot_direct_types::Error.none { return false, lerr; }
+                let safe, serr = fnResultOwnerSlots(g, field, words + at, out, out_len);
+                if serr != blot_direct_types::Error.none || !safe { return false, serr; }
+                at += layout.len as u32;
+            }
+            return true, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(ty);
+            if cerr != blot_direct_types::Error.none || cases.len != 1 { return false, cerr; }
+            let payload = g.types.variant_payloads[cases.payloads];
+            return fnResultOwnerSlots(g, payload, words, out, out_len);
+        },
+        _ => { return false, blot_direct_types::Error.none; },
+    }
+}
+
 recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     let key = g.s.instances[id].key;
     var unit = key.unit;
@@ -600,10 +655,20 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     if g.s.instances[id].inferring { g.s.instances[id].result = result.ty; }
     // Stored memory-holding values may now be reachable from older storage.
     var release = false;
-    if f.allocates && !f.emitted_return_call {
-        let holds, error = g.holdsMemory(g.s.instances[id].result);
+    var res_slots: u32[8] = [0; 8];
+    var res_slots_len: i64 = 0;
+    if f.allocates && !f.emitted_return_call && f.memory_stores == 0 {
+        let res_ty = g.s.instances[id].result;
+        let holds, error = g.holdsMemory(res_ty);
         if error != blot_direct_types::Error.none { return error; }
-        release = !holds && f.memory_stores == 0;
+        if !holds {
+            release = true;
+        } else if result.ty != blot_direct_types::never && result.ty == res_ty {
+            let safe, serr = fnResultOwnerSlots(g, res_ty, result.start, res_slots, res_slots_len);
+            if serr != blot_direct_types::Error.none { return serr; }
+            if safe { release = true; }
+            else { res_slots_len = 0; }
+        }
     }
     if release {
         let rt = g.runtime_();
@@ -612,6 +677,17 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
         ltee(g, fn_esc);
         lget(g, owner_mark);
         op(g, OP_i32_ge_u);
+        for si in 0..res_slots_len {
+            let rslot = res_slots[si];
+            lget(g, rslot);
+            lget(g, owner_mark);
+            op(g, OP_i32_lt_u);
+            lget(g, rslot);
+            i32Const(g, rt.layout.persistent_split);
+            op(g, OP_i32_ge_u);
+            op(g, OP_i32_or);
+            op(g, OP_i32_and);
+        }
         let opened = open(g, f, OP_if_);
         releaseTo(g, owner_mark, stack_mark);
         close(g, f);

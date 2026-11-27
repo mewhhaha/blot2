@@ -125,6 +125,22 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
             let expected = blot_check_storage_types::unwrapShared(m.types, input);
             same(result, expected, n.ty);
         },
+        with_capacity => {
+            if m.types.node(n.ty).tag != blot_check_types::Tag.array { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, input);
+        },
+        reserve => {
+            if m.types.node(input).tag != blot_check_types::Tag.array { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, blot_check_types::u32_type, m.typeOf(args[1]));
+            same(result, input, n.ty);
+        },
+        extend => {
+            if m.types.node(input).tag != blot_check_types::Tag.array { return Contract {..}, blot_error::Error.invalid_artifact; }
+            let src_elem = blot_check_storage_types::readableElement(m.types, m.typeOf(args[1]));
+            if !src_elem.present { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, m.types.node(input).a, src_elem.value);
+            same(result, input, n.ty);
+        },
     }
     return result, blot_error::Error.none;
 }

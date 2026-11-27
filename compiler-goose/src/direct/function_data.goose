@@ -30,6 +30,30 @@ recursive fn resultAssociated(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 recursive fn update(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let info = m.updateInfo(id);
+    let root_da_idx = findDirectArray(f, localRef(m, info.root));
+    if root_da_idx >= 0 {
+        let selectors = m.updateSelectors(id);
+        if selectors.len == 1 && selectors[0].kind == blot_check_core::UpdateKind.index {
+            let da = f.direct_arrays[root_da_idx];
+            let pos_val, perr = expr(g, f, selectors[0].index);
+            if perr != blot_direct_types::Error.none { return pos_val, perr; }
+            let idx_loc, ierr = scalarLocal(g, f, pos_val, id);
+            if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+            let addr = directArrayAddress(g, f, da, idx_loc, id);
+            if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
+                let old, lerr = loadElement(g, f, addr, 0, da.elem_ty, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                bindPut(g, f, info.self_binding, old);
+            }
+            let replacement, rerr = stmt(g, f, info.value);
+            if rerr != blot_direct_types::Error.none { return replacement, rerr; }
+            if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
+            let werr = writeElement(g, f, addr, 0, replacement, id);
+            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            let bound, _ = bindGet(g, f, da.binding);
+            return bound, blot_direct_types::Error.none;
+        }
+    }
     let root, error = expr(g, f, info.root);
     if error != blot_direct_types::Error.none { return root, error; }
     let prev_reuse_nodes = f.reuse_nodes;
@@ -124,11 +148,6 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
             return neverVal(), g.fail(m, id, "comptime update has the wrong field type");
         }
     }
-    if offset != 0 {
-        let boxed, error = isBoxed(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        if boxed { return neverVal(), g.fail(m, id, "update of a boxed field inside an element"); }
-    }
     let whole_element = selectors.len == at + 1;
     if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
         var old = neverVal();
@@ -137,9 +156,25 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             old = loaded;
         } else {
-            let loaded, error = loadAt(g, f, address, offset, ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            old = loaded;
+            let boxed_sub, berr = copiedBox(g, f, ty, id);
+            if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+            if boxed_sub {
+                var sub_addr = address;
+                if offset != 0 {
+                    sub_addr = local32(g, f);
+                    lget(g, address);
+                    i32Const(g, offset);
+                    op(g, OP_i32_add);
+                    lset(g, sub_addr);
+                }
+                let loaded, error = loadElement(g, f, sub_addr, 0, ty, id);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                old = loaded;
+            } else {
+                let loaded, error = loadAt(g, f, address, offset, ty, id);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                old = loaded;
+            }
         }
         bindPut(g, f, info.self_binding, old);
     }
@@ -165,7 +200,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     }
     if g.runtime_().has_fork {
         var bytes: u32 = 0;
-        if whole_element && tagOf(g, replacement.ty) == blot_direct_types::Tag.boolean {
+        if whole_element && byteElement(tagOf(g, replacement.ty)) {
             bytes = 1;
         } else {
             let fb, berr = flatBytes(g, f, replacement.ty, id);
@@ -1008,7 +1043,111 @@ recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) ->
     }
     return neverVal(), target, true, blot_direct_types::Error.none;
 }
+// Direct field projection from a boxed array element (`arr[i].f1.f2`) without
+// stack-allocating and `memory.copy`ing the entire outer element block.
+fn tryProjectBoxedArrayElement(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
+    let m .= g.units[f.unit - 1];
+    var proj_nodes: u32[8] = [0; 8];
+    var proj_len: i64 = 0;
+    var cursor = id;
+    while m.node(cursor).tag == blot_check_core::Tag.project && proj_len < 8 {
+        proj_nodes[proj_len] = cursor;
+        proj_len += 1;
+        cursor = m.node(cursor).a;
+    }
+    if proj_len == 0 { return neverVal(), false, blot_direct_types::Error.none; }
+    var arr_node: u32 = 0;
+    var idx_node: u32 = 0;
+    let cn = m.node(cursor);
+    if cn.tag == blot_check_core::Tag.array_op && m.arrayOperation(cursor) == blot_backend_collection_ops::Op.get {
+        let ch = m.children(cursor);
+        if ch.len == 2 { arr_node = ch[0]; idx_node = ch[1]; }
+    } else if cn.tag == blot_check_core::Tag.storage {
+        let op_k, ok = blot_check_storage_ops::opFromCode(cn.c);
+        if ok == blot_error::Error.none && op_k == blot_check_storage_ops::Op.read {
+            let ch = m.children(cursor);
+            if ch.len == 2 { arr_node = ch[0]; idx_node = ch[1]; }
+        }
+    }
+    if arr_node == 0 { return neverVal(), false, blot_direct_types::Error.none; }
+    let elem_ty, eerr = g.types.lower(m, m.typeOf(cursor), f.env);
+    if eerr != blot_direct_types::Error.none { g.dropFailure(); return neverVal(), false, blot_direct_types::Error.none; }
+    let is_cb, cberr = copiedBox(g, f, elem_ty, cursor);
+    if cberr != blot_direct_types::Error.none || !is_cb { return neverVal(), false, blot_direct_types::Error.none; }
+    // Verify the entire projection chain resolves purely to static record fields
+    // at fixed byte offsets before emitting any code.
+    var cur_ty = elem_ty;
+    var total_offset: u32 = 0;
+    var step = proj_len;
+    while step > 0 {
+        step -= 1;
+        let pid = proj_nodes[step];
+        let pn = m.node(pid);
+        let projection = m.projection(pn.b);
+        let variants = m.projectionVariants(pn.b);
+        if variants.len > 1 { return neverVal(), false, blot_direct_types::Error.none; }
+        if variants.len == 1 && projection.nominal.decl == 0 { return neverVal(), false, blot_direct_types::Error.none; }
+        var record_ty = cur_ty;
+        if tagOf(g, cur_ty) == blot_direct_types::Tag.nominal {
+            let cases, cerr = g.types.variants(cur_ty);
+            if cerr != blot_direct_types::Error.none || cases.len != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+            record_ty = g.types.variant_payloads[cases.payloads];
+        }
+        if tagOf(g, record_ty) != blot_direct_types::Tag.record { return neverVal(), false, blot_direct_types::Error.none; }
+        var name_sym = projection.field;
+        if variants.len == 1 && projection.nominal.decl != 0 {
+            var found = false;
+            for nom, ni in m.nominals {
+                if !sameNominal(nom.identity, projection.nominal) { continue; }
+                for ci in m.nominalConstructors(ni as u32) {
+                    let ctor = m.constructors[ci];
+                    if ctor.tag != variants[0].tag { continue; }
+                    let payload = m.types.node(ctor.payload);
+                    if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), false, blot_direct_types::Error.none; }
+                    name_sym = m.types.recordField(payload, variants[0].field).name;
+                    found = true;
+                    break;
+                }
+                break;
+            }
+            if !found { return neverVal(), false, blot_direct_types::Error.none; }
+        }
+        let field_name, has_name = g.types.fieldNameOf(m, name_sym, true);
+        if !has_name { return neverVal(), false, blot_direct_types::Error.none; }
+        let pos = g.types.findField(record_ty, field_name);
+        if pos < 0 { return neverVal(), false, blot_direct_types::Error.none; }
+        let foff, ferr = fieldOffset(g, f, record_ty, pos, pid);
+        if ferr != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+        total_offset += foff;
+        cur_ty = g.types.recordField(record_ty, pos).ty;
+    }
+    let container, aerr = expr(g, f, arr_node);
+    if aerr != blot_direct_types::Error.none { return container, true, aerr; }
+    let position, perr = expr(g, f, idx_node);
+    if perr != blot_direct_types::Error.none { return position, true, perr; }
+    let index, serr = scalarLocal(g, f, position, cursor);
+    if serr != blot_direct_types::Error.none { return neverVal(), true, serr; }
+    let addr, eaddr_err = elementAddress(g, f, container, index, cursor, m.typeOf(arr_node), true);
+    if eaddr_err != blot_direct_types::Error.none { return neverVal(), true, eaddr_err; }
+    var target_addr = addr;
+    var load_off = total_offset;
+    let res_cb, rberr = copiedBox(g, f, cur_ty, id);
+    if rberr != blot_direct_types::Error.none { return neverVal(), true, rberr; }
+    if res_cb && load_off != 0 {
+        target_addr = local32(g, f);
+        lget(g, addr);
+        i32Const(g, load_off);
+        op(g, OP_i32_add);
+        lset(g, target_addr);
+        load_off = 0;
+    }
+    let loaded, lerr = loadElement(g, f, target_addr, load_off, cur_ty, id);
+    return loaded, true, lerr;
+}
 recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let direct_val, did_direct, direct_err = tryProjectBoxedArrayElement(g, f, id);
+    if direct_err != blot_direct_types::Error.none { return direct_val, direct_err; }
+    if did_direct { return direct_val, blot_direct_types::Error.none; }
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     let value, error = expr(g, f, n.a);

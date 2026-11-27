@@ -4039,6 +4039,83 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if pushed_shared { sharedIntoPlace(self_, base); }
             return Value { origin: container.origin, exits: exits, .. };
         }
+        if operation == blot_check_storage_ops::Op.with_capacity {
+            let cap = visitEscaping(self_, m, children[0]);
+            return Value { fact: deep, exits: cap.exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.reserve {
+            let container = visit(self_, m, children[0]);
+            let fresh = container.origin == 0 && unique(container.fact);
+            let place_base = self_.argument_places.len;
+            if local(self_, container.origin) {
+                var locked = Place { binding: container.origin, .. };
+                let src, found = source(self_, m, children[0]);
+                if found && src.binding == container.origin { locked = src; }
+                self_.argument_places.push(locked);
+            }
+            let cap = visitEscaping(self_, m, children[1]);
+            self_.argument_places.resize(place_base);
+            let exits = container.exits || cap.exits;
+            if fresh { return Value { fact: container.fact, exits: exits, .. }; }
+            let _, ok = ownedInPlacePath(self_, m, children[0], container.origin);
+            if !ok {
+                rejectSubject(self_, m, id, blot_check_core::Code.aliased_update, container.origin);
+                escape(self_, container);
+                return Value { exits: exits, .. };
+            }
+            if container.origin != 0 && moves(self_, m, children[0], container.origin) {
+                let fact = self_.facts[container.origin];
+                kill(self_, container.origin);
+                return Value { fact: fact, exits: exits, .. };
+            }
+            return Value { origin: container.origin, exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.extend {
+            let container = visit(self_, m, children[0]);
+            let fresh = container.origin == 0 && unique(container.fact);
+            let place_base = self_.argument_places.len;
+            if local(self_, container.origin) {
+                var locked = Place { binding: container.origin, .. };
+                let src, found = source(self_, m, children[0]);
+                if found && src.binding == container.origin { locked = src; }
+                self_.argument_places.push(locked);
+            }
+            let more = visit(self_, m, children[1]);
+            self_.argument_places.resize(place_base);
+            let exits = container.exits || more.exits;
+            let dst_ty = m.typeOf(children[0]);
+            var elem_shared = false;
+            if elementHolds(self_, m, dst_ty) {
+                let elem_opt = blot_check_storage_types::arrayElement(m.types, dst_ty);
+                if elem_opt.present && copyHasUncopiedInner(self_, m, elem_opt.value, [], [], 0) {
+                    elem_shared = true;
+                    escape(self_, more);
+                }
+            }
+            if fresh {
+                var fact = container.fact;
+                if elem_shared && fact == deep { fact = shell; }
+                return Value { fact: fact, exits: exits, .. };
+            }
+            let base, ok = ownedInPlacePath(self_, m, children[0], container.origin);
+            if !ok {
+                rejectSubject(self_, m, id, blot_check_core::Code.aliased_update, container.origin);
+                escape(self_, container);
+                return Value { exits: exits, .. };
+            }
+            if self_.in_fork != 0 && local(self_, base.binding) && elementHolds(self_, m, dst_ty) {
+                let vt = nodeTaint(self_, m, children[1], 0);
+                if vt != 0 { setForkTaint(self_, base.binding, maxU32(getForkTaint(self_, base.binding), vt)); }
+            }
+            if container.origin != 0 && moves(self_, m, children[0], container.origin) {
+                var fact = self_.facts[container.origin];
+                if elem_shared && fact == deep { fact = shell; }
+                kill(self_, container.origin);
+                return Value { fact: fact, exits: exits, .. };
+            }
+            if elem_shared { sharedIntoPlace(self_, base); }
+            return Value { origin: container.origin, exits: exits, .. };
+        }
         if operation == blot_check_storage_ops::Op.copy {
             let input_ty = m.typeOf(children[0]);
             let container = visit(self_, m, children[0]);
@@ -4738,10 +4815,11 @@ recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) 
         let children = m.children(id);
         if children.len == 0 { return 0; }
         let op, unknown = blot_check_storage_ops::opFromCode(n.c);
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.with_capacity { return 0; }
         if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.copy {
             if !blot_check_storage_types::arrayElement(m.types, n.ty).present || !elementHolds(self_, m, n.ty) { return 0; }
         }
-        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.push && children.len >= 2 {
+        if unknown == blot_error::Error.none && (op == blot_check_storage_ops::Op.push || (op == blot_check_storage_ops::Op.extend && elementHolds(self_, m, n.ty))) && children.len >= 2 {
             return maxU32(nodeTaint(self_, m, children[0], depth + 1), nodeTaint(self_, m, children[1], depth + 1));
         }
         return nodeTaint(self_, m, children[0], depth + 1);

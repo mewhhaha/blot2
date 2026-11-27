@@ -271,6 +271,13 @@ func PoolCursor.iter (cursor: PoolCursor a) => cursor
 func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.length then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1}) else $Nothing
 
 // Mutation dispatch keeps the owner mode explicit in each selected signature.
+func Array.with_capacity (capacity: U32): #[a] => @storage.with_capacity capacity
+func Array.reserve (values: own #[a]) -> (additional: U32): #[a] =>
+  return @storage.reserve values additional
+func Array.extend (values: own #[a]) -> (more: #[a]): #[a] =>
+  return @storage.extend values more
+func Array.extend_view (values: own #[a]) -> (more: &[a]): #[a] =>
+  return @storage.extend values more
 func Array.push (values: own #[a]) -> (value: a): #[a] =>
   return @storage.push values value
 func Array.truncate (values: own #[a]) -> (count: U32): #[a] =>

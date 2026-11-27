@@ -257,6 +257,21 @@ diagnostics, emitted function counts, and Wasm bytes/SHA-256 (`exit_diffs=0`,
 `diag_diffs=0`, `wasm_diffs=0`, `fn_diffs=0`); only JSON prelude/frontend work
 counters updated for the expanded `std/prelude.blot`.
 
+Benchmark Backend & Storage Checkpoint 1 (27 November 2026) added U64 constant
+and loop-invariant runtime reciprocal strength reduction (64-bit `mulhi64`),
+`OP_br_table` dense jump tables for constructor-tag and integer-literal matches,
+function-exit local reclamation for returned caller-owned plain handles with
+best-fit `<= 4x` `stack_free_large` reuse, boxed-array direct field projection
+and lifted boxed-subfield `indexedUpdate` restriction, 16-field inline record
+budget, masked/affine loop BCE, `@storage.with_capacity`/`reserve`/`extend`
+(`Array.with_capacity`/`reserve`/`extend`/`extend_view` in `std/prelude.blot`),
+and backend-only stack-backed small local fixed arrays (`DirectArray`, `1..32`
+non-escaping scalar elements). Re-recorded `expected.json`: all 109 fixtures
+keep 100% identical exit codes and diagnostics (`exit_diffs=0`, `diag_diffs=0`);
+91 direct-backend fixtures updated Wasm bytes/SHA (`+33,733B` net across 91
+modules from the new `r.reserve` runtime helper and best-fit reuse) plus `+4`
+prelude body elaborations/lowerings.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

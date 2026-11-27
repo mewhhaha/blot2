@@ -1726,7 +1726,15 @@ fn applyPrimitive(g: Generator&, f: Fn&, primitive: blot_check_core::Primitive, 
     for at in 0..(arguments.len as i64) { push(g, g.s.vals[arguments.start + at]); }
     let emitted = scalarOp(g, f, primitive.op, g.s.vals[arguments.start].ty, id, !elide_nan, result);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
-    return pop(g, f, result, id);
+    let popped, perr = pop(g, f, result, id);
+    if perr == blot_direct_types::Error.none && primitive.op == blot_check_core::Op.numeric_convert &&
+        arguments.len == 1 && g.s.vals[arguments.start].ty == blot_direct_types::u32_ && result == blot_direct_types::u64_ {
+        let src = g.s.vals[arguments.start];
+        let cf, known = constU32(f, w(g, src, 0));
+        if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
+        else { recordExtU32U64(f, w(g, popped, 0), w(g, src, 0)); }
+    }
+    return popped, perr;
 }
 // The type left after applying `count` arguments to function type `ty`.
 fn restType(g: Generator&, f: const Fn&, ty: Ty, count: i64, id: u32) -> Ty, Error {
@@ -1777,7 +1785,7 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         return_ => { return canInlineBodyMargin(g, tm, n.a, target, budget, margin); },
         product, record => {
             let children = tm.children(id);
-            if children.len > 8 { return false; }
+            if children.len > 16 { return false; }
             for child in children {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -1806,7 +1814,7 @@ recursive fn canInlineBodyMargin(g: const Generator&, tm: const Module&, id: u32
         storage => {
             let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
             if ok != blot_error::Error.none { return false; }
-            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate { return false; }
+            if op_kind != blot_check_storage_ops::Op.length && op_kind != blot_check_storage_ops::Op.read && op_kind != blot_check_storage_ops::Op.push && op_kind != blot_check_storage_ops::Op.pop && op_kind != blot_check_storage_ops::Op.truncate && op_kind != blot_check_storage_ops::Op.with_capacity && op_kind != blot_check_storage_ops::Op.reserve && op_kind != blot_check_storage_ops::Op.extend { return false; }
             for child in tm.children(id) {
                 if !canInlineBodyMargin(g, tm, child, target, budget, margin) { return false; }
             }
@@ -2436,7 +2444,14 @@ recursive fn associated(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false)
         if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
         var popped_ty = scalarResult(machine, left.ty);
         if has_result { popped_ty = result; }
-        return pop(g, f, popped_ty, id);
+        let popped, perr = pop(g, f, popped_ty, id);
+        if perr == blot_direct_types::Error.none && machine == blot_check_core::Op.numeric_convert &&
+            left.ty == blot_direct_types::u32_ && popped_ty == blot_direct_types::u64_ {
+            let cf, known = constU32(f, w(g, left, 0));
+            if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
+            else { recordExtU32U64(f, w(g, popped, 0), w(g, left, 0)); }
+        }
+        return popped, perr;
     }
     let identity, has_identity = g.receiverIdentity(left.ty);
     if !has_identity {

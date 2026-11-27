@@ -378,60 +378,218 @@ fn floorLog2U64(value: u64) -> u64 {
     while bits > 1 { bits >>= 1; log += 1; }
     return log;
 }
-fn emitU64Pow2Reduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, left: Val, right_id: u32, right: Val) -> bool {
+fn u64OperandConstant(g: const Generator&, f: const Fn&, id: u32, value: Val) -> ConstU64, bool {
+    if value.len == 0 {
+        let m .= g.units[f.unit - 1];
+        let n = m.node(id);
+        return ConstU64 { value: (n.a as u64) | ((n.b as u64) << 32), unit: m.unit, node: id }, true;
+    }
+    return constU64(f, w(g, value, 0));
+}
+// Exact Granlund-Montgomery 64-bit unsigned division parameters for non-pow2 d >= 2.
+// Returns (multiplier, shift, add):
+//   if !add: q = mulhi64(x, m) >> shift
+//   if  add: t = mulhi64(x, m); q = (((x - t) >> 1) + t) >> shift
+fn u64DivParams(d: u64) -> u64, u64, bool {
+    let log = floorLog2U64(d);
+    var rem: u64 = (1 as u64) << log;
+    var q_log: u64 = 0;
+    for _ in 0..64 {
+        let carry = rem >> 63;
+        let rem2 = rem << 1;
+        q_log <<= 1;
+        if carry != 0 || rem2 >= d {
+            rem = rem2 - d;
+            q_log |= 1;
+        } else {
+            rem = rem2;
+        }
+    }
+    let rounding = d - rem;
+    if rounding <= ((1 as u64) << log) {
+        return q_log + 1, log, false;
+    }
+    var rem_a: u64 = 0;
+    if log == 63 { rem_a = (0 as u64) - d; } else { rem_a = ((1 as u64) << (log + 1)) - d; }
+    var m_low: u64 = 0;
+    for _ in 0..64 {
+        let carry = rem_a >> 63;
+        let rem2 = rem_a << 1;
+        m_low <<= 1;
+        if carry != 0 || rem2 >= d {
+            rem_a = rem2 - d;
+            m_low |= 1;
+        } else {
+            rem_a = rem2;
+        }
+    }
+    return m_low + 1, log, true;
+}
+// Pushes upper 64 bits of (xv * ((m_hi << 32) | m_lo)) onto the stack.
+// When `runtime` is true, `m_lo_arg`/`m_hi_arg` are VT_i64 local indices holding 32-bit halves;
+// otherwise they are 32-bit half constants.
+fn emitMulHi64(g: Generator&, f: const Fn&, xv: u32, m_lo_arg: u64, m_hi_arg: u64, runtime: bool) {
+    let x_lo = local(g, f, VT_i64);
+    let x_hi = local(g, f, VT_i64);
+    let p1 = local(g, f, VT_i64);
+    let p2 = local(g, f, VT_i64);
+    lget(g, xv);
+    i64Const(g, 0xffffffff);
+    op(g, OP_i64_and);
+    lset(g, x_lo);
+    lget(g, xv);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    lset(g, x_hi);
+    // p1 = x_lo * m_hi
+    lget(g, x_lo);
+    if runtime { lget(g, m_hi_arg as u32); } else { i64Const(g, m_hi_arg as! i64); }
+    op(g, OP_i64_mul);
+    lset(g, p1);
+    // p2 = x_hi * m_lo
+    lget(g, x_hi);
+    if runtime { lget(g, m_lo_arg as u32); } else { i64Const(g, m_lo_arg as! i64); }
+    op(g, OP_i64_mul);
+    lset(g, p2);
+    // mid = ((x_lo * m_lo) >> 32) + (p1 & 0xffffffff) + (p2 & 0xffffffff)
+    lget(g, x_lo);
+    if runtime { lget(g, m_lo_arg as u32); } else { i64Const(g, m_lo_arg as! i64); }
+    op(g, OP_i64_mul);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    lget(g, p1);
+    i64Const(g, 0xffffffff);
+    op(g, OP_i64_and);
+    op(g, OP_i64_add);
+    lget(g, p2);
+    i64Const(g, 0xffffffff);
+    op(g, OP_i64_and);
+    op(g, OP_i64_add);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    // + (p1 >> 32) + (p2 >> 32) + (x_hi * m_hi)
+    lget(g, p1);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    op(g, OP_i64_add);
+    lget(g, p2);
+    i64Const(g, 32);
+    op(g, OP_i64_shr_u);
+    op(g, OP_i64_add);
+    lget(g, x_hi);
+    if runtime { lget(g, m_hi_arg as u32); } else { i64Const(g, m_hi_arg as! i64); }
+    op(g, OP_i64_mul);
+    op(g, OP_i64_add);
+}
+fn emitU64StrengthReduction(g: Generator&, f: Fn&, machine: Op, left_id: u32, left: Val, right_id: u32, right: Val) -> bool {
     if machine != blot_check_core::Op.mul && machine != blot_check_core::Op.div && machine != blot_check_core::Op.rem { return false; }
-    let m .= g.units[f.unit - 1];
+    let rhs, rhs_known = u64OperandConstant(g, f, right_id, right);
     if machine == blot_check_core::Op.mul {
         var input = left;
         var input_id = left_id;
-        var cnode: u32 = 0;
-        var factor: u64 = 0;
-        if right.len == 0 {
-            let rn = m.node(right_id);
-            let rv = (rn.a as u64) | ((rn.b as u64) << 32);
-            if rv == 0 || (rv & (rv - 1)) == 0 { factor = rv; cnode = right_id; }
+        var factor = rhs;
+        if !rhs_known || (rhs.value != 0 && (rhs.value & (rhs.value - 1)) != 0) {
+            let lhs, lhs_known = u64OperandConstant(g, f, left_id, left);
+            if !lhs_known || (lhs.value != 0 && (lhs.value & (lhs.value - 1)) != 0) { return false; }
+            factor = lhs;
+            input = right;
+            input_id = right_id;
         }
-        if cnode == 0 && left.len == 0 {
-            let ln = m.node(left_id);
-            let lv = (ln.a as u64) | ((ln.b as u64) << 32);
-            if lv == 0 || (lv & (lv - 1)) == 0 {
-                factor = lv;
-                cnode = left_id;
-                input = right;
-                input_id = right_id;
-            }
-        }
-        if cnode == 0 { return false; }
-        blot_direct_relocations::unpatchableOperand(m.unit, cnode);
-        if factor == 0 { i64Const(g, 0); }
+        useConstU64(factor);
+        if factor.value == 0 { i64Const(g, 0); }
         else {
             pushScalarOperand(g, f, input_id, input);
-            if factor > 1 {
-                i64Const(g, floorLog2U64(factor) as i64);
+            if factor.value > 1 {
+                i64Const(g, floorLog2U64(factor.value) as! i64);
                 op(g, OP_i64_shl);
             }
         }
         return true;
     }
-    if right.len != 0 { return false; }
-    let rn = m.node(right_id);
-    let d = (rn.a as u64) | ((rn.b as u64) << 32);
-    if d == 0 || (d & (d - 1)) != 0 { return false; }
-    blot_direct_relocations::unpatchableOperand(m.unit, right_id);
-    if d == 1 {
-        if machine == blot_check_core::Op.rem { i64Const(g, 0); }
-        else { pushScalarOperand(g, f, left_id, left); }
+    let remainder = machine == blot_check_core::Op.rem;
+    if rhs_known {
+        let d = rhs.value;
+        if d == 0 { return false; }
+        useConstU64(rhs);
+        if d == 1 {
+            if remainder { i64Const(g, 0); } else { pushScalarOperand(g, f, left_id, left); }
+            return true;
+        }
+        if (d & (d - 1)) == 0 {
+            pushScalarOperand(g, f, left_id, left);
+            if remainder {
+                i64Const(g, (d - 1) as! i64);
+                op(g, OP_i64_and);
+            } else {
+                i64Const(g, floorLog2U64(d) as! i64);
+                op(g, OP_i64_shr_u);
+            }
+            return true;
+        }
+        let mult, shift, add = u64DivParams(d);
+        let xv = local(g, f, VT_i64);
+        pushScalarOperand(g, f, left_id, left);
+        lset(g, xv);
+        if remainder { lget(g, xv); }
+        emitMulHi64(g, f, xv, mult & 0xffffffff, mult >> 32, false);
+        if add {
+            let tv = local(g, f, VT_i64);
+            lset(g, tv);
+            lget(g, xv);
+            lget(g, tv);
+            op(g, OP_i64_sub);
+            i64Const(g, 1);
+            op(g, OP_i64_shr_u);
+            lget(g, tv);
+            op(g, OP_i64_add);
+        }
+        if shift != 0 {
+            i64Const(g, shift as! i64);
+            op(g, OP_i64_shr_u);
+        }
+        if remainder {
+            i64Const(g, d as! i64);
+            op(g, OP_i64_mul);
+            op(g, OP_i64_sub);
+        }
         return true;
     }
-    pushScalarOperand(g, f, left_id, left);
-    if machine == blot_check_core::Op.rem {
-        i64Const(g, (d - 1) as! i64);
-        op(g, OP_i64_and);
-    } else {
-        i64Const(g, floorLog2U64(d) as i64);
+    if right.len == 0 || f.loop_reciprocals_u64_len == 0 { return false; }
+    let divisor = w(g, right, 0);
+    let ext_u32, has_ext = findExtU32U64(f, divisor);
+    for at in 0..f.loop_reciprocals_u64_len {
+        let rec = f.loop_reciprocals_u64[at];
+        let matched = (!rec.from_u32 && rec.divisor == divisor) || (rec.from_u32 && has_ext && rec.divisor == ext_u32);
+        if !matched { continue; }
+        if rec.check_at_use {
+            lget(g, divisor);
+            op(g, OP_i64_eqz);
+            trap(g, f);
+        }
+        let xv = local(g, f, VT_i64);
+        pushScalarOperand(g, f, left_id, left);
+        lset(g, xv);
+        if remainder { lget(g, xv); }
+        emitMulHi64(g, f, xv, rec.m_lo as u64, rec.m_hi as u64, true);
+        let tv = local(g, f, VT_i64);
+        lset(g, tv);
+        lget(g, xv);
+        lget(g, tv);
+        op(g, OP_i64_sub);
+        lget(g, rec.sh1);
         op(g, OP_i64_shr_u);
+        lget(g, tv);
+        op(g, OP_i64_add);
+        lget(g, rec.sh2);
+        op(g, OP_i64_shr_u);
+        if remainder {
+            lget(g, divisor);
+            op(g, OP_i64_mul);
+            op(g, OP_i64_sub);
+        }
+        return true;
     }
-    return true;
+    return false;
 }
 
 recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, stack_result: bool = false) -> Val, Error {
@@ -597,7 +755,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
         return pop(g, f, result, id);
     }
     if has_right && left.ty == blot_direct_types::u64_ &&
-        emitU64Pow2Reduction(g, f, machine, n.a, left, n.b, right) {
+        emitU64StrengthReduction(g, f, machine, n.a, left, n.b, right) {
         return pop(g, f, result, id);
     }
     pushScalarOperand(g, f, n.a, left);
@@ -605,7 +763,55 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32, elide_nan: bool = false, sta
     let emitted = scalarOp(g, f, machine, left.ty, id, !skip_nan, result);
     if emitted != blot_direct_types::Error.none { return neverVal(), emitted; }
     if stack_result { return Val { ty: result }, blot_direct_types::Error.none; }
-    return pop(g, f, result, id);
+    let popped, perr = pop(g, f, result, id);
+    if perr != blot_direct_types::Error.none { return popped, perr; }
+    if machine == blot_check_core::Op.numeric_convert && left.ty == blot_direct_types::u32_ && result == blot_direct_types::u64_ {
+        let cf, known = u32OperandConstant(g, f, n.a, left);
+        if known { recordConstU64(f, w(g, popped, 0), cf.value as u64, cf.unit, cf.node); }
+        else if left.len == 1 { recordExtU32U64(f, w(g, popped, 0), w(g, left, 0)); }
+    } else if has_right && result == blot_direct_types::u32_ && left.ty == blot_direct_types::u32_ {
+        if machine == blot_check_core::Op.bit_and {
+            let rc, rk = u32OperandConstant(g, f, n.b, right);
+            if rk {
+                recordCheckedMask(f, w(g, popped, 0), if right.len == 1 { w(g, right, 0) } else { 0xffffffff }, rc.value, true);
+            } else if right.len == 1 {
+                recordCheckedMask(f, w(g, popped, 0), w(g, right, 0), 0, false);
+            } else {
+                let lc, lk = u32OperandConstant(g, f, n.a, left);
+                if lk { recordCheckedMask(f, w(g, popped, 0), if left.len == 1 { w(g, left, 0) } else { 0xffffffff }, lc.value, true); }
+                else if left.len == 1 { recordCheckedMask(f, w(g, popped, 0), w(g, left, 0), 0, false); }
+            }
+        } else if machine == blot_check_core::Op.add {
+            let rc, rk = u32OperandConstant(g, f, n.b, right);
+            let lc, lk = u32OperandConstant(g, f, n.a, left);
+            if rk && rc.value >= 1 && rc.value <= 4 && left.len == 1 {
+                let ll = w(g, left, 0);
+                let prev = findCheckedAdd(f, ll);
+                if prev >= 0 && f.checked_adds[prev].c + rc.value <= 4 {
+                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + rc.value);
+                } else {
+                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, ll, rc.value);
+                }
+            } else if lk && lc.value >= 1 && lc.value <= 4 && right.len == 1 {
+                let rl = w(g, right, 0);
+                let prev = findCheckedAdd(f, rl);
+                if prev >= 0 && f.checked_adds[prev].c + lc.value <= 4 {
+                    recordCheckedAdd(f, w(g, popped, 0), f.checked_adds[prev].base, f.checked_adds[prev].idx, f.checked_adds[prev].c + lc.value);
+                } else {
+                    recordCheckedAdd(f, w(g, popped, 0), 0xffffffff, rl, lc.value);
+                }
+            } else if !rk && !lk && left.len == 1 && right.len == 1 && !f.checked_range.is_view && f.checked_range.end_local != 0xffffffff {
+                let ll = w(g, left, 0);
+                let rl = w(g, right, 0);
+                if rl == f.checked_range.index {
+                    recordCheckedAdd(f, w(g, popped, 0), ll, rl, 0);
+                } else if ll == f.checked_range.index {
+                    recordCheckedAdd(f, w(g, popped, 0), rl, ll, 0);
+                }
+            }
+        }
+    }
+    return popped, blot_direct_types::Error.none;
 }
 // `calleeFromArguments` for values: the callee's type from argument types.
 fn calleeOf(g: Generator&, f: const Fn&, target: BindingRef, arguments: Vals, id: u32) -> Ty, Error {

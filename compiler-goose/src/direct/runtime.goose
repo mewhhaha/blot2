@@ -172,6 +172,7 @@ struct Runtime {
     push: u32 = 0,
     pop: u32 = 0,
     truncate: u32 = 0,
+    reserve: u32 = 0,
     create: u32 = 0,
     copy: u32 = 0,
     persist: u32 = 0,
@@ -537,6 +538,7 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
     r.push = helper(module, 3, 1);
     r.pop = helper(module, 3, 1);
     r.truncate = helper(module, 3, 0);
+    r.reserve = helper(module, 4, 0);
     r.create = helper(module, 3, 2);
     r.copy = helper(module, 4, 2);
     r.persist = helper(module, 4, 2);
@@ -987,8 +989,18 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         get(h, 0);
         set(h, want_cap);
         op(h, blot_direct_writer::OP_end);
+        let best = temp(h);
+        let best_prev = temp(h);
+        let best_cap = temp(h);
+        let cur_cap = temp(h);
         k(h, 0);
         set(h, prev_free);
+        k(h, 0);
+        set(h, best);
+        k(h, 0);
+        set(h, best_prev);
+        k(h, 0xffffffff);
+        set(h, best_cap);
         gget(h, r.stack_free_large);
         set(h, cur);
         open(h, blot_direct_writer::OP_block);
@@ -998,21 +1010,38 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         idx(h, blot_direct_writer::OP_br_if, 1);
         get(h, cur);
         load(h, 12);
+        tee(h, cur_cap);
         get(h, want_cap);
         op(h, blot_direct_writer::OP_i32_eq);
         open(h, blot_direct_writer::OP_if_);
-        get(h, prev_free);
-        open(h, blot_direct_writer::OP_if_);
-        get(h, prev_free);
         get(h, cur);
-        load(h, 4);
-        store(h, 4);
-        op(h, blot_direct_writer::OP_else_);
-        get(h, cur);
-        load(h, 4);
-        gset(h, r.stack_free_large);
-        op(h, blot_direct_writer::OP_end);
+        set(h, best);
+        get(h, prev_free);
+        set(h, best_prev);
         idx(h, blot_direct_writer::OP_br, 2);
+        op(h, blot_direct_writer::OP_end);
+        // Best-fit reuse of a slightly larger chunk (want_cap < cap <= want_cap * 4)
+        // prevents e.g. 40M -> 20M -> 10M allocations from growing separate Wasm pages.
+        get(h, cur_cap);
+        get(h, want_cap);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        get(h, cur_cap);
+        k(h, 2);
+        op(h, blot_direct_writer::OP_i32_shr_u);
+        get(h, want_cap);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        op(h, blot_direct_writer::OP_i32_and);
+        get(h, cur_cap);
+        get(h, best_cap);
+        op(h, blot_direct_writer::OP_i32_lt_u);
+        op(h, blot_direct_writer::OP_i32_and);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, cur);
+        set(h, best);
+        get(h, prev_free);
+        set(h, best_prev);
+        get(h, cur_cap);
+        set(h, best_cap);
         op(h, blot_direct_writer::OP_end);
         get(h, cur);
         set(h, prev_free);
@@ -1020,6 +1049,21 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         load(h, 4);
         set(h, cur);
         idx(h, blot_direct_writer::OP_br, 0);
+        op(h, blot_direct_writer::OP_end);
+        op(h, blot_direct_writer::OP_end);
+        get(h, best);
+        tee(h, cur);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, best_prev);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, best_prev);
+        get(h, cur);
+        load(h, 4);
+        store(h, 4);
+        op(h, blot_direct_writer::OP_else_);
+        get(h, cur);
+        load(h, 4);
+        gset(h, r.stack_free_large);
         op(h, blot_direct_writer::OP_end);
         op(h, blot_direct_writer::OP_end);
         op(h, blot_direct_writer::OP_end);
@@ -1655,6 +1699,150 @@ fn emitWithOptions(module: blot_direct_writer::Module&, budgets: Budgets, has_fo
         get(h, 2);
         store(h, entry_length);
         finish(h, module, r.truncate);
+    }
+
+    // reserve(slot, generation, min_elements, stride): ensures heap-backed capacity >= min_elements * stride.
+    {
+        var h = H { parameters: 4, locals: 4, .. };
+        let entry = temp(h);
+        let capacity = temp(h);
+        let length = temp(h);
+        let need = temp(h);
+        let fresh = temp(h);
+        let size = temp(h);
+        get(h, 0);
+        get(h, 1);
+        call(h, r.check);
+        tee(h, entry);
+        load(h, entry_capacity);
+        tee(h, capacity);
+        k(h, static_pool_flag);
+        op(h, blot_direct_writer::OP_i32_and);
+        trapIf(h);
+        get(h, 2);
+        k(h, 0x04000000);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        trapIf(h);
+        get(h, 3);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, 2);
+        k(h, capacity_mask);
+        get(h, 3);
+        op(h, blot_direct_writer::OP_i32_div_u);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        trapIf(h);
+        op(h, blot_direct_writer::OP_end);
+        get(h, 2);
+        get(h, 3);
+        op(h, blot_direct_writer::OP_i32_mul);
+        tee(h, need);
+        op(h, blot_direct_writer::OP_i32_eqz);
+        open(h, blot_direct_writer::OP_if_);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        get(h, capacity);
+        k(h, heap_flag);
+        op(h, blot_direct_writer::OP_i32_and);
+        k(h, 0);
+        op(h, blot_direct_writer::OP_i32_ne);
+        get(h, need);
+        get(h, capacity);
+        k(h, capacity_mask);
+        op(h, blot_direct_writer::OP_i32_and);
+        op(h, blot_direct_writer::OP_i32_le_u);
+        op(h, blot_direct_writer::OP_i32_and);
+        open(h, blot_direct_writer::OP_if_);
+        op(h, blot_direct_writer::OP_return_);
+        op(h, blot_direct_writer::OP_end);
+        if has_fork {
+            emitMustUndo(h, r, 0);
+            open(h, blot_direct_writer::OP_if_);
+            get(h, entry);
+            k(h, 12);
+            call(h, r.undo_record);
+            k(h, 32);
+            call(h, r.undo_reserve);
+            op(h, blot_direct_writer::OP_end);
+        }
+        get(h, need);
+        get(h, capacity);
+        k(h, capacity_mask);
+        op(h, blot_direct_writer::OP_i32_and);
+        k(h, 1);
+        op(h, blot_direct_writer::OP_i32_shl);
+        get(h, need);
+        get(h, capacity);
+        k(h, capacity_mask);
+        op(h, blot_direct_writer::OP_i32_and);
+        k(h, 1);
+        op(h, blot_direct_writer::OP_i32_shl);
+        op(h, blot_direct_writer::OP_i32_gt_u);
+        op(h, blot_direct_writer::OP_select);
+        call(h, r.heap_alloc);
+        set(h, size);
+        set(h, fresh);
+        if has_fork {
+            emitMustUndo(h, r, 0);
+            open(h, blot_direct_writer::OP_if_);
+            gget(h, r.undo_sp);
+            get(h, fresh);
+            store(h, 0);
+            gget(h, r.undo_sp);
+            get(h, size);
+            k(h, 0x80000000);
+            op(h, blot_direct_writer::OP_i32_or);
+            store(h, 4);
+            gget(h, r.undo_sp);
+            k(h, 8);
+            op(h, blot_direct_writer::OP_i32_add);
+            gset(h, r.undo_sp);
+            op(h, blot_direct_writer::OP_end);
+        }
+        get(h, entry);
+        load(h, entry_length);
+        tee(h, length);
+        open(h, blot_direct_writer::OP_if_);
+        get(h, fresh);
+        get(h, entry);
+        load(h, entry_base);
+        get(h, length);
+        get(h, 3);
+        op(h, blot_direct_writer::OP_i32_mul);
+        memoryCopy(h);
+        op(h, blot_direct_writer::OP_end);
+        get(h, capacity);
+        k(h, heap_flag);
+        op(h, blot_direct_writer::OP_i32_and);
+        k(h, 0);
+        op(h, blot_direct_writer::OP_i32_ne);
+        get(h, capacity);
+        k(h, capacity_mask);
+        op(h, blot_direct_writer::OP_i32_and);
+        k(h, 0);
+        op(h, blot_direct_writer::OP_i32_ne);
+        op(h, blot_direct_writer::OP_i32_and);
+        if has_fork {
+            emitMustUndo(h, r, 0);
+            op(h, blot_direct_writer::OP_i32_eqz);
+            op(h, blot_direct_writer::OP_i32_and);
+        }
+        open(h, blot_direct_writer::OP_if_);
+        get(h, entry);
+        load(h, entry_base);
+        get(h, capacity);
+        k(h, capacity_mask);
+        op(h, blot_direct_writer::OP_i32_and);
+        call(h, r.heap_free);
+        op(h, blot_direct_writer::OP_end);
+        get(h, entry);
+        get(h, fresh);
+        store(h, entry_base);
+        get(h, entry);
+        get(h, size);
+        k(h, heap_flag | live_flag);
+        op(h, blot_direct_writer::OP_i32_or);
+        store(h, entry_capacity);
+        finish(h, module, r.reserve);
     }
 
     // create(length, stride, growable) -> (slot, generation), zeroed, reserve-slot-first.

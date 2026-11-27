@@ -29,15 +29,30 @@ io const answer = func (overflow: Bool): Array U32 => return do:
   );
 });
 
-Deno.test("retired @storage.reserve is rejected as unknown_intrinsic", async () => {
-  await compileExpectedFailure(
+Deno.test("@storage.reserve preallocates owned arrays and rejects aliased ones", async () => {
+  await compileAndRun(
     `
-io const invalid = func (count: U32) => return do:
+io const answer = func (count: U32): U32 => return do:
   let rows: Array U32 = #[]
-  @storage.reserve rows count
+  rows := @storage.reserve self count
+  for i in 0 .. count:
+    rows := @storage.push self i
   return rows.length
 `,
-    "unknown_intrinsic",
+    (guest) => {
+      assert.equal(guest.call("answer", 0), 0);
+      assert.equal(guest.call("answer", 1024), 1024);
+    },
+  );
+  await compileExpectedFailure(
+    `
+io const invalid = func (count: U32): U32 => return do:
+  let rows: Array U32 = #[1, 2, 3]
+  let alias = rows
+  let next = @storage.reserve rows count
+  return alias.length + next.length
+`,
+    "aliased_update",
   );
 });
 
