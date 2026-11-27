@@ -128,7 +128,23 @@ root struct Types {
     boxed_vals: u8[>..] = [],
     // Cached flat byte width (0xffffffff = uncomputed).
     flat_bytes_vals: u32[>..] = [],
-    // Cached cumulative record field byte offsets and register word offsets (per Tag.record Ty).
+    // Cached memory alignment (0 = uncomputed, 1/2/4).
+    flat_align_vals: u8[>..] = [],
+    // Cached plain-memory flag (0 = uncomputed, 1 = packed/reordered/sub-word, 2 = plain sequential register words).
+    plain_mem_vals: u8[>..] = [],
+    // Cached block byte width (0xffffffff = uncomputed; differs from flat_bytes_vals for recursive nominals).
+    block_bytes_vals: u32[>..] = [],
+    // Cached memory-holding flag for layout decisions (0 = unknown, 1 = false, 2 = true).
+    holds_mem_vals: u8[>..] = [],
+    in_holds_mem: bool[>..] = [],
+    in_mem_layout: bool[>..] = [],
+    // Bitmask of outlined cold variants (< 64) for non-recursive multi-constructor nominals.
+    outlined_mask: u64[>..] = [],
+    // 0 = uncomputed, 1 = computed (tagged), 2 = computed (2-variant nullable-pointer niche).
+    outlined_computed: u8[>..] = [],
+    // For outlined_computed == 2: variant index (0 or 1) of the 0-byte null constructor.
+    niche_null_idx: u8[>..] = [],
+    // Cached record field / tuple item byte offsets and register word offsets.
     field_byte_offs_slot: Slot[>..] = [],
     field_byte_offs: u32[>..] = [],
     field_word_offs_slot: Slot[>..] = [],
@@ -452,15 +468,21 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var init_reg = Slot {};
     var init_boxed: u8 = 0;
     var init_fbytes: u32 = 0xffffffff;
+    var init_falign: u8 = 0;
+    var init_plain: u8 = 0;
+    var init_bbytes: u32 = 0xffffffff;
+    var init_hmem: u8 = 0;
     match tag {
-        unit, never => { init_flat = Slot { true, 0, 0 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 0; },
-        boolean, u32_, u8_, i32_, cell => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
-        u64_, i64_ => { init_flat = Slot { true, 6, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
-        f64_ => { init_flat = Slot { true, 7, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
-        f32_ => { init_flat = Slot { true, 1, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; },
-        function, provider, array => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; },
-        ref, link => { init_flat = Slot { true, 2, 3 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 12; },
-        view => { init_flat = Slot { true, 2, 4 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 16; },
+        unit, never => { init_flat = Slot { true, 0, 0 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 0; init_falign = 1; init_plain = 2; init_bbytes = 0; init_hmem = 1; },
+        boolean, u8_ => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 1; init_falign = 1; init_plain = 1; init_bbytes = 1; init_hmem = 1; },
+        u32_, i32_ => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; init_falign = 4; init_plain = 2; init_bbytes = 4; init_hmem = 1; },
+        cell => { init_flat = Slot { true, 0, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; init_falign = 4; init_plain = 2; init_bbytes = 4; init_hmem = 2; },
+        u64_, i64_ => { init_flat = Slot { true, 6, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 1; },
+        f64_ => { init_flat = Slot { true, 7, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 1; },
+        f32_ => { init_flat = Slot { true, 1, 1 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 4; init_falign = 4; init_plain = 2; init_bbytes = 4; init_hmem = 1; },
+        function, provider, array => { init_flat = Slot { true, 2, 2 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 8; init_falign = 4; init_plain = 2; init_bbytes = 8; init_hmem = 2; },
+        ref, link => { init_flat = Slot { true, 2, 3 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 12; init_falign = 4; init_plain = 2; init_bbytes = 12; init_hmem = 2; },
+        view => { init_flat = Slot { true, 2, 4 }; init_reg = init_flat; init_boxed = 1; init_fbytes = 16; init_falign = 4; init_plain = 2; init_bbytes = 16; init_hmem = 2; },
         _ => {},
     }
     let id = self_.nodes.len as Ty;
@@ -473,6 +495,15 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     self_.reg_layouts.push(init_reg);
     self_.boxed_vals.push(init_boxed);
     self_.flat_bytes_vals.push(init_fbytes);
+    self_.flat_align_vals.push(init_falign);
+    self_.plain_mem_vals.push(init_plain);
+    self_.block_bytes_vals.push(init_bbytes);
+    self_.holds_mem_vals.push(init_hmem);
+    self_.in_holds_mem.push(false);
+    self_.in_mem_layout.push(false);
+    self_.outlined_mask.push(0);
+    self_.outlined_computed.push(0);
+    self_.niche_null_idx.push(0);
     self_.field_byte_offs_slot.push(Slot {});
     self_.field_word_offs_slot.push(Slot {});
     self_.variant_cache.push(VariantSlot {});
@@ -1059,10 +1090,326 @@ fn wordBytes(words: const ValType[:]) -> u32 {
     for kind in words { bytes += blot_direct_writer::wordBytes(kind); }
     return bytes;
 }
+fn alignUp(v: u32, a: u32) -> u32 {
+    if a <= 1 { return v; }
+    return (v + a - 1) & ~(a - 1);
+}
+// Pure type-level check matching `contentsHoldMemory`: whether values of `ty`
+// already hold scope/heap references (arrays, views, refs, links, closures,
+// providers, cells, or recursive nominals). Used so cold-variant outlining only
+// triggers on sums that already hold memory (preserving zero-leak scope-arena
+// rewind for pure-data mutable arrays).
+recursive fn tyHoldsMemory(self_: Types&, ty: Ty) -> bool, Error {
+    let cached = self_.holds_mem_vals[ty];
+    if cached != 0 { return cached == 2, Error.none; }
+    if self_.recursive_[ty].present || self_.in_holds_mem[ty] {
+        return true, Error.none;
+    }
+    let n = self_.node(ty);
+    var res = false;
+    match n.tag {
+        unit, boolean, u32_, f32_, u8_, i32_, u64_, i64_, f64_, never => {},
+        function, provider, array, ref, view, link, cell => { res = true; },
+        state_provider => {
+            let h, err = tyHoldsMemory(self_, self_.words[n.a + 2]);
+            if err != Error.none { return false, err; }
+            res = h;
+        },
+        tuple => {
+            for at in 0..(n.b as i64) {
+                let h, err = tyHoldsMemory(self_, self_.words[n.a + at]);
+                if err != Error.none { return false, err; }
+                if h { res = true; break; }
+            }
+        },
+        record => {
+            for idx in 0..(n.b as i64) {
+                let h, err = tyHoldsMemory(self_, self_.recordField(ty, idx).ty);
+                if err != Error.none { return false, err; }
+                if h { res = true; break; }
+            }
+        },
+        nominal => {
+            self_.in_holds_mem[ty] = true;
+            let cases, cerr = variants(self_, ty);
+            if cerr != Error.none { self_.in_holds_mem[ty] = false; return false, cerr; }
+            for ci in 0..(cases.len as i64) {
+                let h, err = tyHoldsMemory(self_, self_.variant_payloads[cases.payloads + ci]);
+                if err != Error.none { self_.in_holds_mem[ty] = false; return false, err; }
+                if h { res = true; break; }
+            }
+            self_.in_holds_mem[ty] = false;
+        },
+    }
+    self_.holds_mem_vals[ty] = if res { 2 } else { 1 };
+    return res, Error.none;
+}
+fn variantOutlinedBit(self_: const Types&, ty: Ty, ci: i64) -> bool {
+    return ci >= 0 && ci < 64 && ((self_.outlined_mask[ty] >> (ci as u64)) & 1) != 0;
+}
+fn variantOutlined(self_: Types&, ty: Ty, ci: i64) -> bool, Error {
+    if self_.node(ty).tag != Tag.nominal || ci < 0 || ci >= 64 { return false, Error.none; }
+    let _, err = flatSlot(self_, ty);
+    if err != Error.none { return false, err; }
+    return variantOutlinedBit(self_, ty, ci), Error.none;
+}
+fn hasOutlinedVariants(self_: Types&, ty: Ty) -> bool, Error {
+    if self_.node(ty).tag != Tag.nominal { return false, Error.none; }
+    let _, err = flatSlot(self_, ty);
+    if err != Error.none { return false, err; }
+    return self_.outlined_mask[ty] != 0, Error.none;
+}
+fn nullableNiche(self_: Types&, ty: Ty) -> bool, u32, u32, Ty, Error {
+    if self_.node(ty).tag != Tag.nominal { return false, 0, 0, 0, Error.none; }
+    let _, err = flatSlot(self_, ty);
+    if err != Error.none { return false, 0, 0, 0, err; }
+    if self_.outlined_computed[ty] != 2 { return false, 0, 0, 0, Error.none; }
+    let cases = self_.variant_cache[ty].value;
+    let null_i = self_.niche_null_idx[ty] as i64;
+    let some_i = 1 - null_i;
+    return true, self_.variant_tags[cases.tags + null_i], self_.variant_tags[cases.tags + some_i], self_.variant_payloads[cases.payloads + some_i], Error.none;
+}
+// Computes cold-variant outlining and 2-variant nullable-pointer niche for
+// non-recursive multi-constructor nominal `ty` after all variant `flatSlot`s
+// have finished.
+fn computeSumOutlining(self_: Types&, ty: Ty, cases: Variants) -> Error {
+    if self_.outlined_computed[ty] != 0 { return Error.none; }
+    if self_.recursive_[ty].present || cases.len <= 1 || cases.len > 64 {
+        self_.outlined_mask[ty] = 0;
+        self_.outlined_computed[ty] = 1;
+        return Error.none;
+    }
+    let holds, herr = tyHoldsMemory(self_, ty);
+    if herr != Error.none { return herr; }
+    if !holds {
+        self_.outlined_mask[ty] = 0;
+        self_.outlined_computed[ty] = 1;
+        return Error.none;
+    }
+    var min_psize: u32 = 0xffffffff;
+    var max_psize: u32 = 0;
+    for ci in 0..(cases.len as i64) {
+        let pty = self_.variant_payloads[cases.payloads + ci];
+        let cerr = computeMemLayout(self_, pty);
+        if cerr != Error.none { return cerr; }
+        let psz = self_.flat_bytes_vals[pty];
+        if psz < min_psize { min_psize = psz; }
+        if psz > max_psize { max_psize = psz; }
+    }
+    if !(max_psize > 24 && (min_psize == 0 || max_psize >= 2 * min_psize + 16)) {
+        self_.outlined_mask[ty] = 0;
+        self_.outlined_computed[ty] = 1;
+        return Error.none;
+    }
+    let cap: u32 = if min_psize > 24 { min_psize } else { 24 };
+    var mask: u64 = 0;
+    for ci in 0..(cases.len as i64) {
+        let pty = self_.variant_payloads[cases.payloads + ci];
+        let psz = self_.flat_bytes_vals[pty];
+        if psz > cap && !self_.recursive_[pty].present {
+            mask |= (1 as u64) << (ci as u64);
+        }
+    }
+    self_.outlined_mask[ty] = mask;
+    if cases.len == 2 {
+        let p0 = self_.variant_payloads[cases.payloads];
+        let p1 = self_.variant_payloads[cases.payloads + 1];
+        if self_.flat_bytes_vals[p0] == 0 && ((mask & 2) != 0) {
+            self_.outlined_computed[ty] = 2;
+            self_.niche_null_idx[ty] = 0;
+            return Error.none;
+        }
+        if self_.flat_bytes_vals[p1] == 0 && ((mask & 1) != 0) {
+            self_.outlined_computed[ty] = 2;
+            self_.niche_null_idx[ty] = 1;
+            return Error.none;
+        }
+    }
+    self_.outlined_computed[ty] = 1;
+    return Error.none;
+}
+// Computes and caches byte size, alignment (1/2/4), plain-memory flag, block bytes,
+// and alignment-sorted field/item byte offsets for `ty`.
+recursive fn computeMemLayout(self_: Types&, ty: Ty) -> Error {
+    if self_.flat_bytes_vals[ty] != 0xffffffff && self_.block_bytes_vals[ty] != 0xffffffff {
+        return Error.none;
+    }
+    if self_.in_mem_layout[ty] {
+        return Error.none;
+    }
+    let _, ferr = flatSlot(self_, ty);
+    if ferr != Error.none { return ferr; }
+    if self_.flat_bytes_vals[ty] != 0xffffffff && self_.block_bytes_vals[ty] != 0xffffffff {
+        return Error.none;
+    }
+    let n = self_.node(ty);
+    let is_rec = n.tag == Tag.nominal && self_.recursive_[ty].present;
+    if is_rec {
+        self_.flat_bytes_vals[ty] = 4;
+        self_.flat_align_vals[ty] = 4;
+        self_.plain_mem_vals[ty] = 2;
+        if self_.in_layout[ty] { return Error.none; }
+    }
+    self_.in_mem_layout[ty] = true;
+    let err = computeMemLayoutBody(self_, ty, n, is_rec);
+    self_.in_mem_layout[ty] = false;
+    return err;
+}
+recursive fn computeMemLayoutBody(self_: Types&, ty: Ty, n: Node, is_rec: bool) -> Error {
+    match n.tag {
+        state_provider => {
+            let inner = self_.words[n.a + 2];
+            let err = computeMemLayout(self_, inner);
+            if err != Error.none { return err; }
+            self_.flat_bytes_vals[ty] = self_.flat_bytes_vals[inner];
+            self_.flat_align_vals[ty] = self_.flat_align_vals[inner];
+            self_.plain_mem_vals[ty] = self_.plain_mem_vals[inner];
+            self_.block_bytes_vals[ty] = self_.block_bytes_vals[inner];
+            return Error.none;
+        },
+        record, tuple => {
+            let count = n.b as i64;
+            for i in 0..count {
+                let fty = if n.tag == Tag.record {
+                    self_.words[(n.a as i64) + i * 2 + 1]
+                } else {
+                    self_.words[(n.a as i64) + i]
+                };
+                let err = computeMemLayout(self_, fty);
+                if err != Error.none { return err; }
+            }
+            let start = self_.field_byte_offs.len;
+            for i in 0..count { self_.field_byte_offs.push(0); }
+            var all_plain = true;
+            var off: u32 = 0;
+            var max_align: u32 = 1;
+            for tier in [4 as u8, 2 as u8, 1 as u8] {
+                for i in 0..count {
+                    let fty = if n.tag == Tag.record {
+                        self_.words[(n.a as i64) + i * 2 + 1]
+                    } else {
+                        self_.words[(n.a as i64) + i]
+                    };
+                    let falign = self_.flat_align_vals[fty];
+                    if falign != tier { continue; }
+                    if self_.plain_mem_vals[fty] != 2 { all_plain = false; }
+                    let fsize = self_.flat_bytes_vals[fty];
+                    if fsize == 0 {
+                        self_.field_byte_offs[start + i] = off;
+                        continue;
+                    }
+                    let a = tier as u32;
+                    if a > max_align { max_align = a; }
+                    off = alignUp(off, a);
+                    self_.field_byte_offs[start + i] = off;
+                    off += fsize;
+                }
+            }
+            let total = alignUp(off, max_align);
+            self_.field_byte_offs_slot[ty] = Slot { true, start as u32, count as u32 };
+            self_.flat_bytes_vals[ty] = total;
+            self_.flat_align_vals[ty] = max_align as u8;
+            self_.plain_mem_vals[ty] = if all_plain { 2 } else { 1 };
+            self_.block_bytes_vals[ty] = total;
+            return Error.none;
+        },
+        nominal => {
+            let cases, cerr = variants(self_, ty);
+            if cerr != Error.none { return cerr; }
+            if cases.len == 0 {
+                self_.block_bytes_vals[ty] = 0;
+                if !is_rec {
+                    self_.flat_bytes_vals[ty] = 0;
+                    self_.flat_align_vals[ty] = 1;
+                    self_.plain_mem_vals[ty] = 2;
+                }
+                return Error.none;
+            }
+            if cases.len == 1 {
+                let pty = self_.variant_payloads[cases.payloads];
+                let err = computeMemLayout(self_, pty);
+                if err != Error.none { return err; }
+                self_.block_bytes_vals[ty] = self_.flat_bytes_vals[pty];
+                if !is_rec {
+                    self_.flat_bytes_vals[ty] = self_.flat_bytes_vals[pty];
+                    self_.flat_align_vals[ty] = self_.flat_align_vals[pty];
+                    self_.plain_mem_vals[ty] = self_.plain_mem_vals[pty];
+                }
+                return Error.none;
+            }
+            if !is_rec && self_.outlined_computed[ty] == 2 {
+                self_.block_bytes_vals[ty] = 4;
+                self_.flat_bytes_vals[ty] = 4;
+                self_.flat_align_vals[ty] = 4;
+                self_.plain_mem_vals[ty] = 2;
+                return Error.none;
+            }
+            var max_tag: u32 = 0;
+            var max_psize: u32 = 0;
+            var max_palign: u32 = 1;
+            var all_pplain = true;
+            for ci in 0..(cases.len as i64) {
+                let ctag = self_.variant_tags[cases.tags + ci];
+                if ctag > max_tag { max_tag = ctag; }
+                let pty = self_.variant_payloads[cases.payloads + ci];
+                let err = computeMemLayout(self_, pty);
+                if err != Error.none { return err; }
+                let is_out = !is_rec && variantOutlinedBit(self_, ty, ci);
+                let psz = if is_out { 4 } else { self_.flat_bytes_vals[pty] };
+                let pal = if is_out { 4 } else { self_.flat_align_vals[pty] as u32 };
+                if psz > max_psize { max_psize = psz; }
+                if psz > 0 && pal > max_palign { max_palign = pal; }
+                if !is_out && self_.plain_mem_vals[pty] != 2 { all_pplain = false; }
+            }
+            var tag_bytes: u32 = 4;
+            var sum_align: u32 = 4;
+            var sum_size: u32 = 0;
+            if max_psize == 0 {
+                if max_tag <= 0xff { tag_bytes = 1; }
+                else if max_tag <= 0xffff { tag_bytes = 2; }
+                sum_align = tag_bytes;
+                sum_size = tag_bytes;
+            } else if max_palign == 1 {
+                if max_tag <= 0xff { tag_bytes = 1; }
+                else if max_tag <= 0xffff { tag_bytes = 2; }
+                sum_align = tag_bytes;
+                sum_size = alignUp(tag_bytes + max_psize, sum_align);
+            } else if max_palign == 2 {
+                if max_tag <= 0xffff { tag_bytes = 2; }
+                sum_align = tag_bytes;
+                sum_size = alignUp(tag_bytes + max_psize, sum_align);
+            } else {
+                tag_bytes = 4;
+                sum_align = 4;
+                sum_size = alignUp(4 + max_psize, 4);
+            }
+            let bwords, bwerr = blockFlat(self_, ty);
+            if bwerr != Error.none { return bwerr; }
+            let sum_plain: u8 = if tag_bytes == 4 && all_pplain && wordBytes(bwords) == sum_size { 2 } else { 1 };
+            self_.block_bytes_vals[ty] = sum_size;
+            if !is_rec {
+                self_.flat_bytes_vals[ty] = sum_size;
+                self_.flat_align_vals[ty] = sum_align as u8;
+                self_.plain_mem_vals[ty] = sum_plain;
+            }
+            return Error.none;
+        },
+        _ => {
+            let words, error = flat(self_, ty);
+            if error != Error.none { return error; }
+            let bytes = wordBytes(words);
+            self_.flat_bytes_vals[ty] = bytes;
+            self_.flat_align_vals[ty] = if bytes == 0 { 1 } else { 4 };
+            self_.plain_mem_vals[ty] = 2;
+            self_.block_bytes_vals[ty] = bytes;
+            return Error.none;
+        },
+    }
+}
 fn blockBytes(self_: Types&, ty: Ty) -> u32, Error {
-    let words, error = blockFlat(self_, ty);
-    if error != Error.none { return 0, error; }
-    return wordBytes(words), Error.none;
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 0, err; }
+    return self_.block_bytes_vals[ty], Error.none;
 }
 // A value's register words: its flat words, or one pointer if boxed.
 fn layout(self_: Types&, ty: Ty) -> const ValType[:], Error {
@@ -1080,30 +1427,70 @@ fn layout(self_: Types&, ty: Ty) -> const ValType[:], Error {
 fn flatBytes(self_: Types&, ty: Ty) -> u32, Error {
     let cached = self_.flat_bytes_vals[ty];
     if cached != 0xffffffff { return cached, Error.none; }
-    let words, error = flat(self_, ty);
-    if error != Error.none { return 0, error; }
-    let bytes = wordBytes(words);
-    self_.flat_bytes_vals[ty] = bytes;
-    return bytes, Error.none;
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 0, err; }
+    return self_.flat_bytes_vals[ty], Error.none;
+}
+fn flatAlign(self_: Types&, ty: Ty) -> u32, Error {
+    if self_.flat_align_vals[ty] != 0 { return self_.flat_align_vals[ty] as u32, Error.none; }
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 1, err; }
+    return self_.flat_align_vals[ty] as u32, Error.none;
+}
+fn isPlainMem(self_: Types&, ty: Ty) -> bool, Error {
+    if self_.plain_mem_vals[ty] != 0 { return self_.plain_mem_vals[ty] == 2, Error.none; }
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return false, err; }
+    return self_.plain_mem_vals[ty] == 2, Error.none;
+}
+// Tag byte width (1/2/4) and payload byte offset for a multi-constructor nominal.
+fn sumTagInfo(self_: Types&, ty: Ty) -> u32, u32, Error {
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 4, 4, err; }
+    let cases, cerr = variants(self_, ty);
+    if cerr != Error.none { return 4, 4, cerr; }
+    if cases.len <= 1 { return 0, 0, Error.none; }
+    if self_.outlined_computed[ty] == 2 { return 4, 0, Error.none; }
+    var max_tag: u32 = 0;
+    var max_psize: u32 = 0;
+    var max_palign: u32 = 1;
+    for ci in 0..(cases.len as i64) {
+        let ctag = self_.variant_tags[cases.tags + ci];
+        if ctag > max_tag { max_tag = ctag; }
+        let pty = self_.variant_payloads[cases.payloads + ci];
+        let is_out = !self_.recursive_[ty].present && variantOutlinedBit(self_, ty, ci);
+        let psz = if is_out { 4 } else { self_.flat_bytes_vals[pty] };
+        let pal = if is_out { 4 } else { self_.flat_align_vals[pty] as u32 };
+        if psz > max_psize { max_psize = psz; }
+        if psz > 0 && pal > max_palign { max_palign = pal; }
+    }
+    var tag_bytes: u32 = 4;
+    if max_psize == 0 || max_palign == 1 {
+        if max_tag <= 0xff { tag_bytes = 1; }
+        else if max_tag <= 0xffff { tag_bytes = 2; }
+    } else if max_palign == 2 {
+        if max_tag <= 0xffff { tag_bytes = 2; }
+    }
+    let payload_off = if max_psize == 0 { tag_bytes } else { alignUp(tag_bytes, max_palign) };
+    return tag_bytes, payload_off, Error.none;
 }
 // Cached byte offset of record field `index` in flat form.
 fn recordFieldByteOffset(self_: Types&, ty: Ty, index: i64) -> u32, Error {
     let cached = self_.field_byte_offs_slot[ty];
     if cached.present { return self_.field_byte_offs[(cached.start as i64) + index], Error.none; }
-    let n = self_.node(ty);
-    let count = n.b as i64;
-    var offs: u32[>..<] = [];
-    var off: u32 = 0;
-    for i in 0..count {
-        offs.push(off);
-        let fb, err = flatBytes(self_, self_.words[(n.a as i64) + i * 2 + 1]);
-        if err != Error.none { return 0, err; }
-        off += fb;
-    }
-    let start = self_.field_byte_offs.len as u32;
-    self_.field_byte_offs.append(offs[..]);
-    self_.field_byte_offs_slot[ty] = Slot { true, start, count as u32 };
-    return self_.field_byte_offs[(start as i64) + index], Error.none;
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 0, err; }
+    let slot = self_.field_byte_offs_slot[ty];
+    return self_.field_byte_offs[(slot.start as i64) + index], Error.none;
+}
+// Cached byte offset of tuple item `index` in flat form.
+fn tupleItemByteOffset(self_: Types&, ty: Ty, index: i64) -> u32, Error {
+    let cached = self_.field_byte_offs_slot[ty];
+    if cached.present { return self_.field_byte_offs[(cached.start as i64) + index], Error.none; }
+    let err = computeMemLayout(self_, ty);
+    if err != Error.none { return 0, err; }
+    let slot = self_.field_byte_offs_slot[ty];
+    return self_.field_byte_offs[(slot.start as i64) + index], Error.none;
 }
 // Cached register word offset and width of record field `index`.
 fn recordFieldWordSlice(self_: Types&, ty: Ty, index: i64) -> u32, u32, Error {
@@ -1202,16 +1589,31 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                 if error != Error.none { return error; }
                 pushSlot(self_, item);
             } else if cases.len > 1 {
-                self_.pushScratchLayout(i32w);
                 // Each payload's layout slot, kept on the word scratch.
                 let mark = self_.scratch_len;
-                var width: i64 = 0;
                 for at in 0..(cases.len as i64) {
                     let item, error = flatSlot(self_, self_.variant_payloads[cases.payloads + at]);
                     if error != Error.none { self_.scratch_len = mark; return error; }
                     self_.pushScratch(item.start);
                     self_.pushScratch(item.len);
-                    width = max(width, item.len as i64);
+                }
+                let oerr = computeSumOutlining(self_, ty, cases);
+                if oerr != Error.none { self_.scratch_len = mark; return oerr; }
+                if self_.outlined_computed[ty] == 2 {
+                    // 2-variant nullable-pointer niche: single VT_i32 (0 = null, non-null = outlined payload ptr).
+                    self_.scratch_len = mark;
+                    self_.pushScratchLayout(i32w);
+                    return Error.none;
+                }
+                self_.pushScratchLayout(i32w);
+                var width: i64 = 0;
+                for at in 0..(cases.len as i64) {
+                    if !self_.recursive_[ty].present && variantOutlinedBit(self_, ty, at) {
+                        self_.scratch[mark + at * 2] = 0;
+                        self_.scratch[mark + at * 2 + 1] = 1;
+                    }
+                    let len = self_.scratch[mark + at * 2 + 1] as i64;
+                    width = max(width, len);
                 }
                 for position in 0..width {
                     var all_f32 = true;

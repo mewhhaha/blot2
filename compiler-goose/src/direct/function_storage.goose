@@ -66,18 +66,81 @@ fn writeFlat(g: Generator&, f: const Fn&, base: u32, offset: u32, value: Val, id
     storeAt(g, f, base, offset, value);
     return blot_direct_types::Error.none;
 }
-// Writes an element `value` into a container at `base + offset`.
-// Bare `Bool` and `U8` container elements are byte-packed (1-byte stride).
-fn writeElement(g: Generator&, f: const Fn&, base: u32, offset: u32, value: Val, id: u32) -> Error {
-    if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
-    if byteElement(tagOf(g, value.ty)) {
-        lget(g, base);
+// Emits a tag load for multi-constructor nominal `ty` at `offset` (address already on stack).
+fn emitTagLoad(g: Generator&, ty: Ty, offset: u32) -> Error {
+    let tag_bytes, _, err = g.types.sumTagInfo(ty);
+    if err != blot_direct_types::Error.none { return err; }
+    if tag_bytes == 1 {
+        op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, offset);
+    } else if tag_bytes == 2 {
+        op(g, OP_i32_load16_u); uleb(g, 1); uleb(g, offset);
+    } else {
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+    }
+    return blot_direct_types::Error.none;
+}
+// Emits a tag store for multi-constructor nominal `ty` at `offset` (address and tag on stack).
+fn emitTagStore(g: Generator&, ty: Ty, offset: u32) -> Error {
+    let tag_bytes, _, err = g.types.sumTagInfo(ty);
+    if err != blot_direct_types::Error.none { return err; }
+    if tag_bytes == 1 {
+        op(g, OP_i32_store8); uleb(g, 0); uleb(g, offset);
+    } else if tag_bytes == 2 {
+        op(g, OP_i32_store16); uleb(g, 1); uleb(g, offset);
+    } else {
+        op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+    }
+    return blot_direct_types::Error.none;
+}
+// Pushes the constructor tag of multi-constructor nominal `value` onto the Wasm stack,
+// handling boxed sums, 2-variant nullable-pointer niches, and unboxed sums uniformly.
+fn emitValueTag(g: Generator&, f: const Fn&, value: Val, id: u32) -> Error {
+    let is_niche, null_tag, some_tag, _, nerr = g.types.nullableNiche(value.ty);
+    if nerr != blot_direct_types::Error.none { return g.typeFailure(g.units[f.unit - 1], id); }
+    if is_niche {
+        i32Const(g, null_tag);
+        i32Const(g, some_tag);
         lget(g, w(g, value, 0));
-        op(g, OP_i32_store8);
-        uleb(g, 0);
-        uleb(g, offset);
+        op(g, OP_i32_eqz);
+        op(g, OP_select);
         return blot_direct_types::Error.none;
     }
+    lget(g, w(g, value, 0));
+    let boxed, berr = isBoxed(g, f, value.ty, id);
+    if berr != blot_direct_types::Error.none { return berr; }
+    if boxed {
+        let tlerr = emitTagLoad(g, value.ty, 0);
+        if tlerr != blot_direct_types::Error.none { return g.typeFailure(g.units[f.unit - 1], id); }
+    }
+    return blot_direct_types::Error.none;
+}
+// Outlines a cold variant payload into a 4-byte pointer local. If `declared` is
+// already a copiedBox (immutable block pointer), reuses its pointer directly with
+// zero allocation and zero copy.
+fn emitOutlinePayload(g: Generator&, f: Fn&, payload: Val, declared: Ty, id: u32) -> u32, Error {
+    let is_cb, cberr = copiedBox(g, f, declared, id);
+    if cberr != blot_direct_types::Error.none { return 0, cberr; }
+    if is_cb {
+        return w(g, payload, 0), blot_direct_types::Error.none;
+    }
+    let bytes, berr = flatBytes(g, f, declared, id);
+    if berr != blot_direct_types::Error.none { return 0, berr; }
+    let ptr = allocate(g, f, bytes);
+    let werr = writeFlat(g, f, ptr, 0, payload, id);
+    if werr != blot_direct_types::Error.none { return 0, werr; }
+    return ptr, blot_direct_types::Error.none;
+}
+// Reads an outlined variant payload from its 4-byte pointer local `ptr_local`.
+fn readOutlinedPayload(g: Generator&, f: const Fn&, ptr_local: u32, payload_ty: Ty, id: u32) -> Val, Error {
+    let is_cb, cberr = copiedBox(g, f, payload_ty, id);
+    if cberr != blot_direct_types::Error.none { return neverVal(), cberr; }
+    if is_cb {
+        return valOf1(g, payload_ty, ptr_local), blot_direct_types::Error.none;
+    }
+    return loadAt(g, f, ptr_local, 0, payload_ty, id);
+}
+// Writes an element `value` into a container at `base + offset`.
+fn writeElement(g: Generator&, f: const Fn&, base: u32, offset: u32, value: Val, id: u32) -> Error {
     return writeFlat(g, f, base, offset, value, id);
 }
 // Reads a value of `ty` at `base + offset` of an immutable block: a boxed
@@ -97,16 +160,6 @@ fn readFlat(g: Generator&, f: const Fn&, base: u32, offset: u32, ty: Ty, id: u32
 }
 // Element reads copy: storage elements change through their owner.
 fn loadElement(g: Generator&, f: Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
-    if byteElement(tagOf(g, ty)) {
-        let value, error = fresh(g, f, ty, id);
-        if error != blot_direct_types::Error.none { return value, error; }
-        lget(g, address);
-        op(g, OP_i32_load8_u);
-        uleb(g, 0);
-        uleb(g, offset);
-        lset(g, w(g, value, 0));
-        return value, blot_direct_types::Error.none;
-    }
     let copied, error = copiedBox(g, f, ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if copied {
@@ -127,14 +180,9 @@ fn fieldOffset(g: Generator&, f: const Fn&, ty: Ty, index: i64, id: u32) -> u32,
     return off, blot_direct_types::Error.none;
 }
 fn itemOffset(g: Generator&, f: const Fn&, ty: Ty, index: i64, id: u32) -> u32, Error {
-    var offset: u32 = 0;
-    let n = g.types.node(ty);
-    for before in 0..index {
-        let bytes, error = flatBytes(g, f, g.types.words[n.a + before], id);
-        if error != blot_direct_types::Error.none { return 0, error; }
-        offset += bytes;
-    }
-    return offset, blot_direct_types::Error.none;
+    let off, error = g.types.tupleItemByteOffset(ty, index);
+    if error != blot_direct_types::Error.none { return 0, g.typeFailure(g.units[f.unit - 1], id); }
+    return off, blot_direct_types::Error.none;
 }
 // Field `position` of a record value, boxed or not.
 fn recordField(g: Generator&, f: const Fn&, record: Val, position: i64, id: u32) -> Val, Error {
@@ -175,14 +223,12 @@ fn byteElement(tag: blot_direct_types::Tag) -> bool {
 }
 // Bytes per element of a container holding `element`.
 fn stride(g: Generator&, f: const Fn&, element: Ty, id: u32) -> u32, Error {
-    if byteElement(tagOf(g, element)) {
-        return 1, blot_direct_types::Error.none;
-    }
     let bytes, error = flatBytes(g, f, element, id);
     if error != blot_direct_types::Error.none { return 0, error; }
-    return max(bytes, 4), blot_direct_types::Error.none;
+    if bytes == 0 { return 4, blot_direct_types::Error.none; }
+    return bytes, blot_direct_types::Error.none;
 }
-fn storeAt(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
+fn storePlainWords(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
     var at = offset;
     for index in 0..(value.len as i64) {
         let word = g.s.words[value.start + index];
@@ -199,10 +245,137 @@ fn storeAt(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
         at += blot_direct_writer::wordBytes(kind);
     }
 }
+recursive fn storeAt(g: Generator&, f: const Fn&, address: u32, offset: u32, value: Val) {
+    if value.len == 0 || value.ty == blot_direct_types::never || value.ty == blot_direct_types::unit { return; }
+    let boxed, berr = g.types.boxed(value.ty);
+    if berr == blot_direct_types::Error.none && boxed {
+        storePlainWords(g, f, address, offset, value);
+        return;
+    }
+    let plain, perr = g.types.isPlainMem(value.ty);
+    if perr == blot_direct_types::Error.none && plain {
+        storePlainWords(g, f, address, offset, value);
+        return;
+    }
+    let n = g.types.node(value.ty);
+    match n.tag {
+        boolean, u8_ => {
+            lget(g, address);
+            lget(g, w(g, value, 0));
+            op(g, OP_i32_store8); uleb(g, 0); uleb(g, offset);
+        },
+        record => {
+            for idx in 0..(n.b as i64) {
+                let fty = g.types.recordField(value.ty, idx).ty;
+                let foff, ferr = g.types.recordFieldByteOffset(value.ty, idx);
+                let wstart, wlen, werr = g.types.recordFieldWordSlice(value.ty, idx);
+                if ferr == blot_direct_types::Error.none && werr == blot_direct_types::Error.none && wlen != 0 {
+                    storeAt(g, f, address, offset + foff, Val { fty, value.start + wstart, wlen });
+                }
+            }
+        },
+        tuple => {
+            var wstart: u32 = 0;
+            for idx in 0..(n.b as i64) {
+                let ity = g.types.words[n.a + idx];
+                let ioff, ierr = g.types.tupleItemByteOffset(value.ty, idx);
+                let ilay, lerr = g.types.layout(ity);
+                if ierr == blot_direct_types::Error.none && lerr == blot_direct_types::Error.none {
+                    let wlen = ilay.len as u32;
+                    if wlen != 0 {
+                        storeAt(g, f, address, offset + ioff, Val { ity, value.start + wstart, wlen });
+                    }
+                    wstart += wlen;
+                }
+            }
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(value.ty);
+            if cerr != blot_direct_types::Error.none || cases.len == 0 { return; }
+            if cases.len == 1 {
+                let pty = g.types.variant_payloads[cases.payloads];
+                storeAt(g, f, address, offset, Val { pty, value.start, value.len });
+                return;
+            }
+            let _, payload_off, serr = g.types.sumTagInfo(value.ty);
+            if serr != blot_direct_types::Error.none { return; }
+            lget(g, address);
+            lget(g, w(g, value, 0));
+            let _ = emitTagStore(g, value.ty, offset);
+            var non_empty: i64 = 0;
+            var single_ci: i64 = 0;
+            var single_tag: u32 = 0;
+            for ci in 0..(cases.len as i64) {
+                let pty = g.types.variant_payloads[cases.payloads + ci];
+                let is_out, oerr = g.types.variantOutlined(value.ty, ci);
+                let pb, pberr = g.types.flatBytes(pty);
+                if (oerr == blot_direct_types::Error.none && is_out) || (pberr == blot_direct_types::Error.none && pb > 0) {
+                    non_empty += 1;
+                    single_ci = ci;
+                    single_tag = g.types.variant_tags[cases.tags + ci];
+                }
+            }
+            if non_empty == 0 { return; }
+            if non_empty == 1 {
+                let is_out, oerr = g.types.variantOutlined(value.ty, single_ci);
+                if oerr == blot_direct_types::Error.none && is_out {
+                    let slots, slerr = g.types.layout(value.ty);
+                    if slerr == blot_direct_types::Error.none {
+                        lget(g, address);
+                        lget(g, w(g, value, 1));
+                        if slots[1] == VT_i64 { op(g, OP_i32_wrap_i64); }
+                        op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + payload_off);
+                    }
+                    return;
+                }
+                let unwrapped, uerr = unwrapVariant(g, f, value, single_tag, 0);
+                if uerr == blot_direct_types::Error.none {
+                    storeAt(g, f, address, offset + payload_off, unwrapped);
+                }
+                return;
+            }
+            for ci in 0..(cases.len as i64) {
+                let pty = g.types.variant_payloads[cases.payloads + ci];
+                let is_out, oerr = g.types.variantOutlined(value.ty, ci);
+                let pb, pberr = g.types.flatBytes(pty);
+                if !(oerr == blot_direct_types::Error.none && is_out) && (pberr != blot_direct_types::Error.none || pb == 0) { continue; }
+                let ctag = g.types.variant_tags[cases.tags + ci];
+                lget(g, w(g, value, 0));
+                i32Const(g, ctag);
+                op(g, OP_i32_eq);
+                op(g, OP_if_); op(g, 0x40);
+                if oerr == blot_direct_types::Error.none && is_out {
+                    let slots, slerr = g.types.layout(value.ty);
+                    if slerr == blot_direct_types::Error.none {
+                        lget(g, address);
+                        lget(g, w(g, value, 1));
+                        if slots[1] == VT_i64 { op(g, OP_i32_wrap_i64); }
+                        op(g, OP_i32_store); uleb(g, 2); uleb(g, offset + payload_off);
+                    }
+                } else {
+                    let unwrapped, uerr = unwrapVariant(g, f, value, ctag, 0);
+                    if uerr == blot_direct_types::Error.none {
+                        storeAt(g, f, address, offset + payload_off, unwrapped);
+                    }
+                }
+                op(g, OP_end);
+            }
+        },
+        _ => {
+            storePlainWords(g, f, address, offset, value);
+        },
+    }
+}
 // Like `storeAt`, but packs contiguous 4x F32 runs in wide aggregates into
 // cached `v128` locals so both memory stores and subsequent wide-worker calls
 // share the exact same XMM registers.
 fn storeAtPack(g: Generator&, f: Fn&, address: u32, offset: u32, value: Val) {
+    let boxed, berr = g.types.boxed(value.ty);
+    let plain, perr = g.types.isPlainMem(value.ty);
+    if berr != blot_direct_types::Error.none || boxed || perr != blot_direct_types::Error.none || !plain {
+        storeAt(g, f, address, offset, value);
+        return;
+    }
     var at = offset;
     var index: i64 = 0;
     let total = value.len as i64;
@@ -254,7 +427,7 @@ fn writeFlatPack(g: Generator&, f: Fn&, base: u32, offset: u32, value: Val, id: 
     storeAtPack(g, f, base, offset, value);
     return blot_direct_types::Error.none;
 }
-fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
+fn loadPlainWords(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
     let value, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return value, error; }
     var at = offset;
@@ -273,6 +446,174 @@ fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u3
         at += blot_direct_writer::wordBytes(kind);
     }
     return value, blot_direct_types::Error.none;
+}
+fn packVariantPayloadInto(g: Generator&, f: const Fn&, sum_ty: Ty, payload_ty: Ty, loaded: Val, result: Val) -> Error {
+    let slots, serr = g.types.layout(sum_ty);
+    if serr != blot_direct_types::Error.none { return serr; }
+    let words, werr = g.types.layout(payload_ty);
+    if werr != blot_direct_types::Error.none { return werr; }
+    for index in 0..(loaded.len as i64) {
+        lget(g, w(g, loaded, index));
+        let src = words[index];
+        let dst = slots[index + 1];
+        if src != dst {
+            if dst == VT_i32 {
+                if src == VT_f32 { op(g, OP_i32_reinterpret_f32); }
+            } else if dst == VT_i64 {
+                if src == VT_f64 { op(g, OP_i64_reinterpret_f64); }
+                else if src == VT_i32 { op(g, OP_i64_extend_i32_u); }
+                else if src == VT_f32 { op(g, OP_i32_reinterpret_f32); op(g, OP_i64_extend_i32_u); }
+            }
+        }
+        lset(g, w(g, result, index + 1));
+    }
+    return blot_direct_types::Error.none;
+}
+recursive fn loadAt(g: Generator&, f: const Fn&, address: u32, offset: u32, ty: Ty, id: u32) -> Val, Error {
+    if ty == blot_direct_types::unit || ty == blot_direct_types::never {
+        return fresh(g, f, ty, id);
+    }
+    let boxed, berr = isBoxed(g, f, ty, id);
+    if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+    if boxed {
+        return loadPlainWords(g, f, address, offset, ty, id);
+    }
+    let plain, perr = g.types.isPlainMem(ty);
+    if perr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+    if plain {
+        return loadPlainWords(g, f, address, offset, ty, id);
+    }
+    let n = g.types.node(ty);
+    match n.tag {
+        boolean, u8_ => {
+            let value, error = fresh(g, f, ty, id);
+            if error != blot_direct_types::Error.none { return value, error; }
+            lget(g, address);
+            op(g, OP_i32_load8_u); uleb(g, 0); uleb(g, offset);
+            lset(g, w(g, value, 0));
+            return value, blot_direct_types::Error.none;
+        },
+        record => {
+            let s .= g.s;
+            let mark = s.scratch.len;
+            for idx in 0..(n.b as i64) {
+                let fty = g.types.recordField(ty, idx).ty;
+                let foff, ferr = fieldOffset(g, f, ty, idx, id);
+                if ferr != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), ferr; }
+                let fv, lerr = loadAt(g, f, address, offset + foff, fty, id);
+                if lerr != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), lerr; }
+                for wi in 0..(fv.len as i64) { s.scratch.push(g.s.words[fv.start + wi]); }
+            }
+            let start = g.s.words.len as u32;
+            let count = (s.scratch.len - mark) as u32;
+            for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
+            s.scratch.resize(mark);
+            return Val { ty, start, count }, blot_direct_types::Error.none;
+        },
+        tuple => {
+            let s .= g.s;
+            let mark = s.scratch.len;
+            for idx in 0..(n.b as i64) {
+                let ity = g.types.words[n.a + idx];
+                let ioff, ierr = itemOffset(g, f, ty, idx, id);
+                if ierr != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), ierr; }
+                let iv, lerr = loadAt(g, f, address, offset + ioff, ity, id);
+                if lerr != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), lerr; }
+                for wi in 0..(iv.len as i64) { s.scratch.push(g.s.words[iv.start + wi]); }
+            }
+            let start = g.s.words.len as u32;
+            let count = (s.scratch.len - mark) as u32;
+            for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
+            s.scratch.resize(mark);
+            return Val { ty, start, count }, blot_direct_types::Error.none;
+        },
+        nominal => {
+            let cases, cerr = g.types.variants(ty);
+            if cerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+            if cases.len == 0 { return fresh(g, f, ty, id); }
+            if cases.len == 1 {
+                let pty = g.types.variant_payloads[cases.payloads];
+                let loaded, lerr = loadAt(g, f, address, offset, pty, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                return Val { ty, loaded.start, loaded.len }, blot_direct_types::Error.none;
+            }
+            let _, payload_off, serr = g.types.sumTagInfo(ty);
+            if serr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+            let tag_loc = local32(g, f);
+            lget(g, address);
+            let tlerr = emitTagLoad(g, ty, offset);
+            if tlerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+            lset(g, tag_loc);
+            var non_empty: i64 = 0;
+            var single_ci: i64 = 0;
+            var single_pty: Ty = 0;
+            for ci in 0..(cases.len as i64) {
+                let pty = g.types.variant_payloads[cases.payloads + ci];
+                let is_out, oerr = g.types.variantOutlined(ty, ci);
+                let pb, pberr = flatBytes(g, f, pty, id);
+                if pberr != blot_direct_types::Error.none { return neverVal(), pberr; }
+                if (oerr == blot_direct_types::Error.none && is_out) || pb > 0 {
+                    non_empty += 1;
+                    single_ci = ci;
+                    single_pty = pty;
+                }
+            }
+            if non_empty == 0 {
+                return valOf1(g, ty, tag_loc), blot_direct_types::Error.none;
+            }
+            let result, ferr = fresh(g, f, ty, id);
+            if ferr != blot_direct_types::Error.none { return result, ferr; }
+            lget(g, tag_loc);
+            lset(g, w(g, result, 0));
+            if non_empty == 1 {
+                let is_out, oerr = g.types.variantOutlined(ty, single_ci);
+                if oerr == blot_direct_types::Error.none && is_out {
+                    let slots, slerr = g.types.layout(ty);
+                    if slerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                    lget(g, address);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + payload_off);
+                    if slots[1] == VT_i64 { op(g, OP_i64_extend_i32_u); }
+                    lset(g, w(g, result, 1));
+                    return result, blot_direct_types::Error.none;
+                }
+                let loaded, lerr = loadAt(g, f, address, offset + payload_off, single_pty, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                let perr2 = packVariantPayloadInto(g, f, ty, single_pty, loaded, result);
+                if perr2 != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                return result, blot_direct_types::Error.none;
+            }
+            for ci in 0..(cases.len as i64) {
+                let pty = g.types.variant_payloads[cases.payloads + ci];
+                let is_out, oerr = g.types.variantOutlined(ty, ci);
+                let pb, pberr = flatBytes(g, f, pty, id);
+                if pberr != blot_direct_types::Error.none { return neverVal(), pberr; }
+                if !(oerr == blot_direct_types::Error.none && is_out) && pb == 0 { continue; }
+                let ctag = g.types.variant_tags[cases.tags + ci];
+                lget(g, tag_loc);
+                i32Const(g, ctag);
+                op(g, OP_i32_eq);
+                op(g, OP_if_); op(g, 0x40);
+                if oerr == blot_direct_types::Error.none && is_out {
+                    let slots, slerr = g.types.layout(ty);
+                    if slerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                    lget(g, address);
+                    op(g, OP_i32_load); uleb(g, 2); uleb(g, offset + payload_off);
+                    if slots[1] == VT_i64 { op(g, OP_i64_extend_i32_u); }
+                    lset(g, w(g, result, 1));
+                } else {
+                    let loaded, lerr = loadAt(g, f, address, offset + payload_off, pty, id);
+                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    let perr2 = packVariantPayloadInto(g, f, ty, pty, loaded, result);
+                    if perr2 != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                }
+                op(g, OP_end);
+            }
+            return result, blot_direct_types::Error.none;
+        },
+        _ => {
+            return loadPlainWords(g, f, address, offset, ty, id);
+        },
+    }
 }
 fn elementOf(g: Generator&, f: const Fn&, ty: Ty, id: u32) -> Ty, Error {
     match tagOf(g, ty) {
@@ -295,7 +636,10 @@ fn emitOffsetAddress(g: Generator&, f: const Fn&, base: u32, index: u32, step: u
     let address = local32(g, f);
     lget(g, base);
     lget(g, index);
-    if step == 4 {
+    if step == 2 {
+        i32Const(g, 1);
+        op(g, OP_i32_shl);
+    } else if step == 4 {
         i32Const(g, 2);
         op(g, OP_i32_shl);
     } else if step == 8 {
@@ -315,7 +659,10 @@ fn emitOffsetAddress(g: Generator&, f: const Fn&, base: u32, index: u32, step: u
 fn emitScaledBytes(g: Generator&, f: const Fn&, count: u32, step: u32) -> u32 {
     let bytes = local32(g, f);
     lget(g, count);
-    if step == 4 {
+    if step == 2 {
+        i32Const(g, 1);
+        op(g, OP_i32_shl);
+    } else if step == 4 {
         i32Const(g, 2);
         op(g, OP_i32_shl);
     } else if step == 8 {
@@ -1836,7 +2183,7 @@ fn emitFillOrGenerate(g: Generator&, f: Fn&, is_fill: bool, count: u32, source: 
     if is_fill && skip_fill && source.len == 1 && (step == 1 || step == 4 || step == 8) && isScalarTag(elem_tag) {
         return handle, blot_direct_types::Error.none;
     }
-    if is_fill && step == 1 && source.len == 1 && byteElement(elem_tag) {
+    if is_fill && step == 1 && source.len == 1 {
         lget(g, base);
         lget(g, w(g, source, 0));
         lget(g, count);
@@ -2987,10 +3334,8 @@ recursive fn deepCopyNominalInline(g: Generator&, f: Fn&, value: Val, ty: Ty, id
     let result, error = fresh(g, f, ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
     let vtag_local = local32(g, f);
-    lget(g, w(g, value, 0));
-    let boxed, error = isBoxed(g, f, ty, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    if boxed { memoryOp(g, OP_i32_load, 0); }
+    let terr = emitValueTag(g, f, value, id);
+    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
     lset(g, vtag_local);
     let exit = open(g, f, OP_block);
     for pos in 0..(cases.len as i64) {

@@ -77,6 +77,7 @@ let OP_table_set: Op = 0x26;
 let OP_i32_load: Op = 0x28;
 let OP_f32_load: Op = 0x2a;
 let OP_i32_load8_u: Op = 0x2d;
+let OP_i32_load16_u: Op = 0x2f;
 let OP_i32_store: Op = 0x36;
 let OP_f32_store: Op = 0x38;
 let OP_i32_store8: Op = 0x3a;

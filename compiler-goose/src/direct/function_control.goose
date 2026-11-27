@@ -3165,8 +3165,9 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 let in_ty, ierr = g.types.lower(m, m.typeOf(inputs[0]), f.env);
                 if ierr == blot_direct_types::Error.none && tagOf(g, in_ty) == blot_direct_types::Tag.nominal {
                     let boxed, berr = isBoxed(g, f, in_ty, id);
+                    let is_niche, _, _, _, nerr = g.types.nullableNiche(in_ty);
                     let cases, cerr = g.types.variants(in_ty);
-                    if berr == blot_direct_types::Error.none && !boxed && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                    if berr == blot_direct_types::Error.none && !boxed && nerr == blot_direct_types::Error.none && !is_niche && cerr == blot_direct_types::Error.none && cases.len > 1 {
                         var arms_ok = true;
                         for arm in m.matchArms(id) {
                             let rows = m.armRows(arm);
@@ -3207,11 +3208,12 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if serr != blot_direct_types::Error.none { return neverVal(), serr; }
         let elem_addr, eerr = elementAddress(g, f, arr_val, idx_local, lazy_input_id, g.units[f.unit - 1].typeOf(lazy_arr_node), true);
         if eerr != blot_direct_types::Error.none { return neverVal(), eerr; }
+        let _, lazy_payload_off, lp_err = g.types.sumTagInfo(lazy_input_ty);
+        if lp_err != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
         let tag_local = local32(g, f);
         lget(g, elem_addr);
-        op(g, OP_i32_load);
-        uleb(g, 2);
-        uleb(g, 0);
+        let tlerr = emitTagLoad(g, lazy_input_ty, 0);
+        if tlerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
         lset(g, tag_local);
 
         let info = g.units[f.unit - 1].matchInfo(id);
@@ -3305,8 +3307,22 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
                         if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
                         let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
-                        let payload_val, lerr = loadAt(g, f, elem_addr, 4, payload_ty, id);
-                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        let is_out, voerr = g.types.variantOutlined(lazy_input_ty, vpos);
+                        if voerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                        var payload_val = neverVal();
+                        if is_out {
+                            let ptr = local32(g, f);
+                            lget(g, elem_addr);
+                            op(g, OP_i32_load); uleb(g, 2); uleb(g, lazy_payload_off);
+                            lset(g, ptr);
+                            let loaded, lerr = readOutlinedPayload(g, f, ptr, payload_ty, id);
+                            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                            payload_val = loaded;
+                        } else {
+                            let loaded, lerr = loadAt(g, f, elem_addr, lazy_payload_off, payload_ty, id);
+                            if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                            payload_val = loaded;
+                        }
                         let tested = test_(g, f, subpat, payload_val, false, 0, id);
                         if tested != blot_direct_types::Error.none { return neverVal(), tested; }
                     }
@@ -3377,8 +3393,22 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let vpos, vperr = variantPosition(g, f, cases, ctor_tag, id);
                     if vperr != blot_direct_types::Error.none { return neverVal(), vperr; }
                     let payload_ty = g.types.variant_payloads[cases.payloads + vpos];
-                    let payload_val, lerr = loadAt(g, f, elem_addr, 4, payload_ty, id);
-                    if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                    let is_out, voerr = g.types.variantOutlined(lazy_input_ty, vpos);
+                    if voerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+                    var payload_val = neverVal();
+                    if is_out {
+                        let ptr = local32(g, f);
+                        lget(g, elem_addr);
+                        op(g, OP_i32_load); uleb(g, 2); uleb(g, lazy_payload_off);
+                        lset(g, ptr);
+                        let loaded, lerr = readOutlinedPayload(g, f, ptr, payload_ty, id);
+                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        payload_val = loaded;
+                    } else {
+                        let loaded, lerr = loadAt(g, f, elem_addr, lazy_payload_off, payload_ty, id);
+                        if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                        payload_val = loaded;
+                    }
                     let tested = test_(g, f, subpat, payload_val, true, next, id);
                     if tested != blot_direct_types::Error.none { return neverVal(), tested; }
                 }
@@ -3453,8 +3483,9 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let known_tag, has_known = findConstTag(f, w(g, input_val, 0));
             if has_known {
                 let boxed, berr = isBoxed(g, f, input_val.ty, id);
+                let is_niche, _, _, _, nerr = g.types.nullableNiche(input_val.ty);
                 let cases, cerr = g.types.variants(input_val.ty);
-                if berr == blot_direct_types::Error.none && !boxed && cerr == blot_direct_types::Error.none && cases.len > 1 {
+                if berr == blot_direct_types::Error.none && !boxed && nerr == blot_direct_types::Error.none && !is_niche && cerr == blot_direct_types::Error.none && cases.len > 1 {
                     let arms = m.matchArms(id);
                     var matched_arm: i64 = -1;
                     var matched_bind: u32 = 0;
@@ -3585,9 +3616,11 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     bi -= 1;
                     arm_blks[bi] = open(g, f, OP_block);
                 }
-                lget(g, w(g, in_val, 0));
-                if is_nom_switch && nom_boxed {
-                    op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+                if is_nom_switch {
+                    let terr = emitValueTag(g, f, in_val, id);
+                    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+                } else {
+                    lget(g, w(g, in_val, 0));
                 }
                 if sw_min != 0 {
                     i32Const(g, sw_min);
@@ -3898,18 +3931,27 @@ recursive fn test_(g: Generator&, f: Fn&, pattern_id: u32, value: Val, has_fail:
             let cases, error = g.types.variants(value.ty);
             if error != blot_direct_types::Error.none { return g.typeFailure(m, id); }
             if cases.len > 1 {
-                lget(g, w(g, value, 0));
-                // A boxed value's tag is the first word of its block.
-                let boxed, error = isBoxed(g, f, value.ty, id);
-                if error != blot_direct_types::Error.none { return error; }
-                if boxed {
-                    op(g, OP_i32_load);
-                    uleb(g, 2);
-                    uleb(g, 0);
+                let is_niche, null_tag, some_tag, _, nerr = g.types.nullableNiche(value.ty);
+                if nerr != blot_direct_types::Error.none { return g.typeFailure(m, id); }
+                if is_niche {
+                    lget(g, w(g, value, 0));
+                    if constructor.tag == some_tag {
+                        op(g, OP_i32_eqz);
+                    }
+                    failIf(g, f, has_fail, fail);
+                } else {
+                    lget(g, w(g, value, 0));
+                    // A boxed value's tag is the first word of its block.
+                    let boxed, error = isBoxed(g, f, value.ty, id);
+                    if error != blot_direct_types::Error.none { return error; }
+                    if boxed {
+                        let tlerr = emitTagLoad(g, value.ty, 0);
+                        if tlerr != blot_direct_types::Error.none { return g.typeFailure(m, id); }
+                    }
+                    i32Const(g, constructor.tag);
+                    op(g, OP_i32_ne);
+                    failIf(g, f, has_fail, fail);
                 }
-                i32Const(g, constructor.tag);
-                op(g, OP_i32_ne);
-                failIf(g, f, has_fail, fail);
             }
             if pattern.b != 0 {
                 let payload, error = unwrapVariant(g, f, value, constructor.tag, id);
@@ -4069,10 +4111,11 @@ fn assignCarries(g: Generator&, f: Fn&, values: Vals, targets: Vals, slots: Word
         let cursor = local32(g, f);
         i32Const(g, 0);
         lset(g, cursor);
+        let scan_bytes = bytes & ~3;
         let done = open(g, f, OP_block);
         let again = open(g, f, OP_loop);
         lget(g, cursor);
-        i32Const(g, bytes);
+        i32Const(g, scan_bytes);
         op(g, OP_i32_ge_u);
         br(g, f, OP_br_if, done);
         lget(g, w(g, target, 0));
@@ -11695,28 +11738,24 @@ recursive fn collectFlatPlainOwnerOffsets(g: Generator&, ty: Ty, base_off: u32, 
             return true, blot_direct_types::Error.none;
         },
         tuple => {
-            var off = base_off;
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
-                let ok, oerr = collectFlatPlainOwnerOffsets(g, item, off, out, out_len);
+                let ioff, ierr = g.types.tupleItemByteOffset(ty, index);
+                if ierr != blot_direct_types::Error.none { return false, ierr; }
+                let ok, oerr = collectFlatPlainOwnerOffsets(g, item, base_off + ioff, out, out_len);
                 if oerr != blot_direct_types::Error.none { return false, oerr; }
                 if !ok { return false, blot_direct_types::Error.none; }
-                let bytes, berr = g.types.flatBytes(item);
-                if berr != blot_direct_types::Error.none { return false, berr; }
-                off += bytes;
             }
             return true, blot_direct_types::Error.none;
         },
         record => {
-            var off = base_off;
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
-                let ok, oerr = collectFlatPlainOwnerOffsets(g, field, off, out, out_len);
+                let foff, ferr = g.types.recordFieldByteOffset(ty, index);
+                if ferr != blot_direct_types::Error.none { return false, ferr; }
+                let ok, oerr = collectFlatPlainOwnerOffsets(g, field, base_off + foff, out, out_len);
                 if oerr != blot_direct_types::Error.none { return false, oerr; }
                 if !ok { return false, blot_direct_types::Error.none; }
-                let bytes, berr = g.types.flatBytes(field);
-                if berr != blot_direct_types::Error.none { return false, berr; }
-                off += bytes;
             }
             return true, blot_direct_types::Error.none;
         },

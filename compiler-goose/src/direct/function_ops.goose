@@ -28,6 +28,7 @@ let OP_table_set: u8 = blot_direct_writer::OP_table_set;
 let OP_i32_load: u8 = blot_direct_writer::OP_i32_load;
 let OP_f32_load: u8 = blot_direct_writer::OP_f32_load;
 let OP_i32_load8_u: u8 = blot_direct_writer::OP_i32_load8_u;
+let OP_i32_load16_u: u8 = blot_direct_writer::OP_i32_load16_u;
 let OP_i32_store: u8 = blot_direct_writer::OP_i32_store;
 let OP_f32_store: u8 = blot_direct_writer::OP_f32_store;
 let OP_i32_store8: u8 = blot_direct_writer::OP_i32_store8;

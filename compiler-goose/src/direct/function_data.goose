@@ -229,15 +229,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         target = recomputed;
     }
     if g.runtime_().has_fork {
-        var bytes: u32 = 0;
-        if whole_element && byteElement(tagOf(g, replacement.ty)) {
-            bytes = 1;
-        } else {
-            let fb, berr = flatBytes(g, f, replacement.ty, id);
-            if berr != blot_direct_types::Error.none { return neverVal(), berr; }
-            bytes = fb;
-        }
-        recordBeforeWrite(g, f, w(g, container, 0), target, offset, bytes);
+        let fb, berr = flatBytes(g, f, replacement.ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+        recordBeforeWrite(g, f, w(g, container, 0), target, offset, fb);
     }
     var written = blot_direct_types::Error.none;
     if whole_element {
@@ -245,8 +239,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         if !g.runtime_().has_fork && tagOf(g, container.ty) == blot_direct_types::Tag.array &&
             tagOf(g, replacement.ty) == blot_direct_types::Tag.nominal && replacement.len > 1 {
             let boxed_r, berr = isBoxed(g, f, replacement.ty, id);
+            let plain_r, plerr = g.types.isPlainMem(replacement.ty);
             let cases_r, cerr = g.types.variants(replacement.ty);
-            if berr == blot_direct_types::Error.none && !boxed_r && cerr == blot_direct_types::Error.none && cases_r.len > 1 {
+            if berr == blot_direct_types::Error.none && !boxed_r && plerr == blot_direct_types::Error.none && plain_r && cerr == blot_direct_types::Error.none && cases_r.len > 1 {
                 let elem_step, serr = stride(g, f, replacement.ty, id);
                 if serr == blot_direct_types::Error.none {
                     let ce = findCheckedElem(f, w(g, container, 0), w(g, container, 1), index, elem_step);
@@ -254,7 +249,7 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
                         let new_tag, has_nt = findConstTag(f, w(g, replacement, 0));
                         if has_nt && new_tag == f.checked_elems[ce].known_tag {
                             let payload_val = Val { replacement.ty, replacement.start + 1, replacement.len - 1 };
-                            storeAt(g, f, target, 4, payload_val);
+                            storePlainWords(g, f, target, 4, payload_val);
                             skipped_tag = true;
                         }
                     }
@@ -335,16 +330,23 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
 // block starts with the tag, and the field's offset follows from it.
 recursive fn updateBoxedShared(g: Generator&, f: Fn&, id: u32, value: Val, cases: blot_direct_types::Variants, name: u32, at: i64) -> Val, Error {
     let m .= g.units[f.unit - 1];
+    for case_at in 0..(cases.len as i64) {
+        let is_out, oerr = g.types.variantOutlined(value.ty, case_at);
+        if oerr == blot_direct_types::Error.none && is_out {
+            return sharedFieldUpdate(g, f, id, value, cases, name, at);
+        }
+    }
     var has_field = false;
     var field_ty: Ty = 0;
     let offset = local32(g, f);
     i32Const(g, 0);
     lset(g, offset);
+    let _, sum_payload_off, spoff_err = g.types.sumTagInfo(value.ty);
+    if spoff_err != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     let tag = local32(g, f);
     lget(g, w(g, value, 0));
-    op(g, OP_i32_load);
-    uleb(g, 2);
-    uleb(g, 0);
+    let tlerr = emitTagLoad(g, value.ty, 0);
+    if tlerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     lset(g, tag);
     for case_at in 0..(cases.len as i64) {
         let case_tag = g.types.variant_tags[cases.tags + case_at];
@@ -362,7 +364,7 @@ recursive fn updateBoxedShared(g: Generator&, f: Fn&, id: u32, value: Val, cases
         let opened = open(g, f, OP_if_);
         let field_offset, error = fieldOffset(g, f, payload, position, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
-        i32Const(g, 4 + field_offset);
+        i32Const(g, sum_payload_off + field_offset);
         lset(g, offset);
         close(g, f);
     }
@@ -481,20 +483,34 @@ recursive fn updateAt(g: Generator&, f: Fn&, id: u32, value: Val, at: i64) -> Va
 recursive fn sharedFieldUpdate(g: Generator&, f: Fn&, id: u32, value: Val, cases: blot_direct_types::Variants, name: u32, at: i64) -> Val, Error {
     let result, error = fresh(g, f, value.ty, id);
     if error != blot_direct_types::Error.none { return result, error; }
+    let vtag = local32(g, f);
+    let terr = emitValueTag(g, f, value, id);
+    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+    lset(g, vtag);
     let exit = open(g, f, OP_block);
     for case_at in 0..(cases.len as i64) {
         let tag = g.types.variant_tags[cases.tags + case_at];
         let payload_ty = g.types.variant_payloads[cases.payloads + case_at];
         if tagOf(g, payload_ty) != blot_direct_types::Tag.record || g.types.findField(payload_ty, name) < 0 { continue; }
         let next = open(g, f, OP_block);
-        lget(g, w(g, value, 0));
+        lget(g, vtag);
         i32Const(g, tag);
         op(g, OP_i32_ne);
         br(g, f, OP_br_if, next);
         let unwrapped, error = unwrapVariant(g, f, value, tag, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
-        let updated, error = updateField(g, f, id, unwrapped, name, at);
-        if error != blot_direct_types::Error.none { return updated, error; }
+        let pboxed, pberr = isBoxed(g, f, unwrapped.ty, id);
+        if pberr != blot_direct_types::Error.none { return neverVal(), pberr; }
+        var updated = neverVal();
+        if pboxed {
+            let u, uerr = updateBoxed(g, f, id, unwrapped, name, at);
+            if uerr != blot_direct_types::Error.none { return u, uerr; }
+            updated = u;
+        } else {
+            let u, uerr = updateField(g, f, id, unwrapped, name, at);
+            if uerr != blot_direct_types::Error.none { return u, uerr; }
+            updated = u;
+        }
         if updated.ty != blot_direct_types::never {
             let wrapped, error = wrapVariant(g, f, value.ty, tag, updated, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -839,6 +855,24 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     let cases, error = g.types.variants(ty);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     if payload.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+    let is_niche, null_tag, some_tag, _, nerr = g.types.nullableNiche(ty);
+    if nerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_niche {
+        let position, perr = variantPosition(g, f, cases, tag, id);
+        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        let declared = g.types.variant_payloads[cases.payloads + position];
+        let declared_words, dwerr = layoutLen(g, f, declared, id);
+        if dwerr != blot_direct_types::Error.none { return neverVal(), dwerr; }
+        if declared_words != payload.len {
+            return neverVal(), g.fail(m, id, "constructor payload does not match its declared type");
+        }
+        if tag == null_tag {
+            return valOf1(g, ty, constLocal(g, f, 0)), blot_direct_types::Error.none;
+        }
+        let ptr, oerr = emitOutlinePayload(g, f, payload, declared, id);
+        if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+        return valOf1(g, ty, ptr), blot_direct_types::Error.none;
+    }
     let boxed, error = isBoxed(g, f, ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if boxed {
@@ -851,16 +885,33 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
             memory_block = made;
         }
         var offset: u32 = 0;
+        var is_out = false;
+        var declared = payload.ty;
         if cases.len > 1 {
+            let position, perr = variantPosition(g, f, cases, tag, id);
+            if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+            declared = g.types.variant_payloads[cases.payloads + position];
+            let vout, voerr = g.types.variantOutlined(ty, position);
+            if voerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            is_out = vout;
+            let _, payload_off, serr = g.types.sumTagInfo(ty);
+            if serr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
             lget(g, memory_block);
             i32Const(g, tag);
-            op(g, OP_i32_store);
-            uleb(g, 2);
-            uleb(g, 0);
-            offset = 4;
+            let tserr = emitTagStore(g, ty, 0);
+            if tserr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            offset = payload_off;
         }
-        let written = writeFlat(g, f, memory_block, offset, payload, id);
-        if written != blot_direct_types::Error.none { return neverVal(), written; }
+        if is_out {
+            let ptr, oerr = emitOutlinePayload(g, f, payload, declared, id);
+            if oerr != blot_direct_types::Error.none { return neverVal(), oerr; }
+            lget(g, memory_block);
+            lget(g, ptr);
+            op(g, OP_i32_store); uleb(g, 2); uleb(g, offset);
+        } else {
+            let written = writeFlat(g, f, memory_block, offset, payload, id);
+            if written != blot_direct_types::Error.none { return neverVal(), written; }
+        }
         return valOf1(g, ty, memory_block), blot_direct_types::Error.none;
     }
     let position, error = variantPosition(g, f, cases, tag, id);
@@ -889,6 +940,16 @@ fn wrapVariant(g: Generator&, f: Fn&, ty: Ty, tag: u32, payload: Val, id: u32) -
     recordConstTag(f, w(g, result, 0), tag);
     let slots, error = g.types.layout(ty);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    let is_out, oerr = g.types.variantOutlined(ty, position);
+    if oerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_out {
+        let ptr, perr = emitOutlinePayload(g, f, payload, declared, id);
+        if perr != blot_direct_types::Error.none { return neverVal(), perr; }
+        lget(g, ptr);
+        if slots[1] == VT_i64 { op(g, OP_i64_extend_i32_u); }
+        lset(g, w(g, result, 1));
+        return result, blot_direct_types::Error.none;
+    }
     let words, error = g.types.layout(declared);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     for index in 0..(payload.len as i64) {
@@ -916,16 +977,45 @@ fn unwrapVariant(g: Generator&, f: const Fn&, value: Val, tag: u32, id: u32) -> 
     let position, error = variantPosition(g, f, cases, tag, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let payload_ty = g.types.variant_payloads[cases.payloads + position];
+    let is_niche, null_tag, _, _, nerr = g.types.nullableNiche(value.ty);
+    if nerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_niche {
+        if tag == null_tag { return Val { payload_ty, 0, 0 }, blot_direct_types::Error.none; }
+        return readOutlinedPayload(g, f, w(g, value, 0), payload_ty, id);
+    }
+    let is_out, oerr = g.types.variantOutlined(value.ty, position);
+    if oerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     let boxed, error = isBoxed(g, f, value.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     if boxed {
         var offset: u32 = 0;
-        if cases.len > 1 { offset = 4; }
+        if cases.len > 1 {
+            let _, payload_off, serr = g.types.sumTagInfo(value.ty);
+            if serr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            offset = payload_off;
+        }
+        if is_out {
+            let ptr = local32(g, f);
+            lget(g, w(g, value, 0));
+            op(g, OP_i32_load); uleb(g, 2); uleb(g, offset);
+            lset(g, ptr);
+            return readOutlinedPayload(g, f, ptr, payload_ty, id);
+        }
         return readFlat(g, f, w(g, value, 0), offset, payload_ty, id);
     }
     if cases.len == 1 { return Val { payload_ty, value.start, value.len }, blot_direct_types::Error.none; }
     let slots, error = g.types.layout(value.ty);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+    if is_out {
+        var ptr = w(g, value, 1);
+        if slots[1] == VT_i64 {
+            ptr = local32(g, f);
+            lget(g, w(g, value, 1));
+            op(g, OP_i32_wrap_i64);
+            lset(g, ptr);
+        }
+        return readOutlinedPayload(g, f, ptr, payload_ty, id);
+    }
     let words, error = g.types.layout(payload_ty);
     if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
     let start = g.s.words.len as u32;
@@ -1258,10 +1348,8 @@ fn sharedField(g: Generator&, f: Fn&, value: Val, projection: u32, field: u32, i
     if !spelling.present { return neverVal(), g.fail(m, id, "projected field without a spelling"); }
     let name = g.types.fieldName(spelling.value);
     let tag = local32(g, f);
-    lget(g, w(g, value, 0));
-    let boxed, error = isBoxed(g, f, value.ty, id);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
-    if boxed { memoryOp(g, OP_i32_load, 0); }
+    let terr = emitValueTag(g, f, value, id);
+    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
     lset(g, tag);
     var has_result = false;
     var result = neverVal();

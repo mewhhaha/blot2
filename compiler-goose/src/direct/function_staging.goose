@@ -1218,14 +1218,20 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
     if boxed {
         let base, error = newBlock(g, f, ty, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
-        var offset: u32 = 0;
         for at in 0..(values.len as i64) {
             let item = g.s.vals[values.start + at];
+            var offset: u32 = 0;
+            if shape.tag == blot_direct_types::Tag.record {
+                let foff, ferr = fieldOffset(g, f, ty, at, id);
+                if ferr != blot_direct_types::Error.none { return neverVal(), ferr; }
+                offset = foff;
+            } else {
+                let ioff, ierr = itemOffset(g, f, ty, at, id);
+                if ierr != blot_direct_types::Error.none { return neverVal(), ierr; }
+                offset = ioff;
+            }
             let written = writeFlat(g, f, base, offset, item, id);
             if written != blot_direct_types::Error.none { return neverVal(), written; }
-            let size, error = flatBytes(g, f, item.ty, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            offset += size;
         }
         return valOf1(g, ty, base), blot_direct_types::Error.none;
     }

@@ -201,30 +201,30 @@ fn findCollectedTy(tys: const Ty[:], ty: Ty) -> i64 {
     return -1;
 }
 
-recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64) -> Error {
+recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64, force: bool) -> Error {
     if depth > 64 { return blot_direct_types::Error.none; }
     let holds, herr = g.holdsMemory(ty);
     if herr != blot_direct_types::Error.none { return herr; }
     let cholds, cherr = g.contentsHoldMemory(ty);
     if cherr != blot_direct_types::Error.none { return cherr; }
-    if !holds && !cholds { return blot_direct_types::Error.none; }
+    if !force && !holds && !cholds { return blot_direct_types::Error.none; }
     if findCollectedTy(out[..], ty) >= 0 { return blot_direct_types::Error.none; }
     out.push(ty);
     let n = g.types.node(ty);
     match n.tag {
         array => {
-            return collectPersistTys(g, n.a, out, depth + 1);
+            return collectPersistTys(g, n.a, out, depth + 1, false);
         },
         tuple => {
             for at in 0..(n.b as i64) {
-                let err = collectPersistTys(g, g.types.words[n.a + at], out, depth + 1);
+                let err = collectPersistTys(g, g.types.words[n.a + at], out, depth + 1, false);
                 if err != blot_direct_types::Error.none { return err; }
             }
             return blot_direct_types::Error.none;
         },
         record => {
             for idx in 0..(n.b as i64) {
-                let err = collectPersistTys(g, g.types.recordField(ty, idx).ty, out, depth + 1);
+                let err = collectPersistTys(g, g.types.recordField(ty, idx).ty, out, depth + 1, false);
                 if err != blot_direct_types::Error.none { return err; }
             }
             return blot_direct_types::Error.none;
@@ -233,7 +233,9 @@ recursive fn collectPersistTys(g: Generator&, ty: Ty, out: Ty[>..]&, depth: i64)
             let cases, cerr = g.types.variants(ty);
             if cerr != blot_direct_types::Error.none { return cerr; }
             for ci in 0..(cases.len as i64) {
-                let err = collectPersistTys(g, g.types.variant_payloads[cases.payloads + ci], out, depth + 1);
+                let is_out, oerr = g.types.variantOutlined(ty, ci);
+                if oerr != blot_direct_types::Error.none { return oerr; }
+                let err = collectPersistTys(g, g.types.variant_payloads[cases.payloads + ci], out, depth + 1, is_out);
                 if err != blot_direct_types::Error.none { return err; }
             }
             return blot_direct_types::Error.none;
@@ -368,28 +370,24 @@ recursive fn collectPersistFlatArrayOffsets(g: Generator&, ty: Ty, base_off: u32
             return true, blot_direct_types::Error.none;
         },
         tuple => {
-            var off = base_off;
             for index in 0..(n.b as i64) {
                 let item = g.types.words[n.a + index];
-                let ok, oerr = collectPersistFlatArrayOffsets(g, item, off, out, out_len);
+                let ioff, ierr = g.types.tupleItemByteOffset(ty, index);
+                if ierr != blot_direct_types::Error.none { return false, ierr; }
+                let ok, oerr = collectPersistFlatArrayOffsets(g, item, base_off + ioff, out, out_len);
                 if oerr != blot_direct_types::Error.none { return false, oerr; }
                 if !ok { return false, blot_direct_types::Error.none; }
-                let bytes, berr = g.types.flatBytes(item);
-                if berr != blot_direct_types::Error.none { return false, berr; }
-                off += bytes;
             }
             return true, blot_direct_types::Error.none;
         },
         record => {
-            var off = base_off;
             for index in 0..(n.b as i64) {
                 let field = g.types.recordField(ty, index).ty;
-                let ok, oerr = collectPersistFlatArrayOffsets(g, field, off, out, out_len);
+                let foff, ferr = g.types.recordFieldByteOffset(ty, index);
+                if ferr != blot_direct_types::Error.none { return false, ferr; }
+                let ok, oerr = collectPersistFlatArrayOffsets(g, field, base_off + foff, out, out_len);
                 if oerr != blot_direct_types::Error.none { return false, oerr; }
                 if !ok { return false, blot_direct_types::Error.none; }
-                let bytes, berr = g.types.flatBytes(field);
-                if berr != blot_direct_types::Error.none { return false, berr; }
-                off += bytes;
             }
             return true, blot_direct_types::Error.none;
         },
@@ -591,9 +589,29 @@ fn emitStageRoot(
 
     // Collect every memory-holding Ty reachable from root.state_ty.
     var tys: Ty[>..] = [];
-    let cerr = collectPersistTys(g, root.state_ty, tys, 0);
+    let cerr = collectPersistTys(g, root.state_ty, tys, 0, false);
     if cerr != blot_direct_types::Error.none { return cerr; }
     assert(tys.len > 0 && tys[0] == root.state_ty);
+    var needs_box_ptr: bool[>..] = [];
+    for t in tys {
+        let tb, tberr = isBoxed(g, f, t, 0);
+        if tberr != blot_direct_types::Error.none { return tberr; }
+        needs_box_ptr.push(tb);
+    }
+    for t in tys {
+        if g.types.node(t).tag == blot_direct_types::Tag.nominal {
+            let cases, vcerr = g.types.variants(t);
+            if vcerr != blot_direct_types::Error.none { return vcerr; }
+            for ci in 0..(cases.len as i64) {
+                let is_out, oerr = g.types.variantOutlined(t, ci);
+                if oerr != blot_direct_types::Error.none { return oerr; }
+                if is_out {
+                    let pidx = findCollectedTy(tys[..], g.types.variant_payloads[cases.payloads + ci]);
+                    if pidx >= 0 { needs_box_ptr[pidx] = true; }
+                }
+            }
+        }
+    }
 
     // Compute root shadow buffer byte size.
     let layout, lerr = g.types.layout(root.state_ty);
@@ -885,25 +903,21 @@ fn emitStageRoot(
                     close(g, f); // p_if
                 },
                 tuple => {
-                    var off: u32 = 0;
                     for at in 0..(tn.b as i64) {
                         let item_ty = g.types.words[tn.a + at];
-                        let perr = emitPushFlatChild(g, f, work_slot, w_a, off, item_ty, tys[..], tmp_a, tmp_b, dst_tmp);
+                        let ioff, ierr = g.types.tupleItemByteOffset(t, at);
+                        if ierr != blot_direct_types::Error.none { return ierr; }
+                        let perr = emitPushFlatChild(g, f, work_slot, w_a, ioff, item_ty, tys[..], tmp_a, tmp_b, dst_tmp);
                         if perr != blot_direct_types::Error.none { return perr; }
-                        let fb, ferr = flatBytes(g, f, item_ty, 0);
-                        if ferr != blot_direct_types::Error.none { return ferr; }
-                        off += fb;
                     }
                 },
                 record => {
-                    var off: u32 = 0;
                     for idx in 0..(tn.b as i64) {
                         let field_ty = g.types.recordField(t, idx).ty;
-                        let perr = emitPushFlatChild(g, f, work_slot, w_a, off, field_ty, tys[..], tmp_a, tmp_b, dst_tmp);
-                        if perr != blot_direct_types::Error.none { return perr; }
-                        let fb, ferr = flatBytes(g, f, field_ty, 0);
+                        let foff, ferr = g.types.recordFieldByteOffset(t, idx);
                         if ferr != blot_direct_types::Error.none { return ferr; }
-                        off += fb;
+                        let perr = emitPushFlatChild(g, f, work_slot, w_a, foff, field_ty, tys[..], tmp_a, tmp_b, dst_tmp);
+                        if perr != blot_direct_types::Error.none { return perr; }
                     }
                 },
                 nominal => {
@@ -913,17 +927,51 @@ fn emitStageRoot(
                         let perr = emitPushFlatChild(g, f, work_slot, w_a, 0, g.types.variant_payloads[cases.payloads], tys[..], tmp_a, tmp_b, dst_tmp);
                         if perr != blot_direct_types::Error.none { return perr; }
                     } else if cases.len > 1 {
-                        lget(g, w_a); op(g, OP_i32_load); uleb(g, 2); uleb(g, 0); lset(g, vtag_loc);
-                        for ci in 0..(cases.len as i64) {
-                            let pty = g.types.variant_payloads[cases.payloads + ci];
-                            if findCollectedTy(tys[..], pty) < 0 { continue; }
-                            lget(g, vtag_loc);
-                            i32Const(g, g.types.variant_tags[cases.tags + ci]);
-                            op(g, OP_i32_eq);
-                            let cif = open(g, f, OP_if_);
-                            let perr = emitPushFlatChild(g, f, work_slot, w_a, 4, pty, tys[..], tmp_a, tmp_b, dst_tmp);
-                            if perr != blot_direct_types::Error.none { return perr; }
-                            close(g, f);
+                        let is_niche, _, _, some_pty, nerr = g.types.nullableNiche(t);
+                        if nerr != blot_direct_types::Error.none { return nerr; }
+                        if is_niche {
+                            let pidx = findCollectedTy(tys[..], some_pty);
+                            if pidx >= 0 {
+                                lget(g, w_a);
+                                op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+                                ltee(g, tmp_b);
+                                let nz_if = open(g, f, OP_if_);
+                                emitPushWork(g, work_slot, 1, w_a, tmp_b, pidx as u32, dst_tmp);
+                                close(g, f);
+                            }
+                        } else {
+                            let _, payload_off, serr = g.types.sumTagInfo(t);
+                            if serr != blot_direct_types::Error.none { return serr; }
+                            lget(g, w_a);
+                            let tlerr = emitTagLoad(g, t, 0);
+                            if tlerr != blot_direct_types::Error.none { return tlerr; }
+                            lset(g, vtag_loc);
+                            for ci in 0..(cases.len as i64) {
+                                let pty = g.types.variant_payloads[cases.payloads + ci];
+                                let pidx = findCollectedTy(tys[..], pty);
+                                if pidx < 0 { continue; }
+                                let is_out, oerr = g.types.variantOutlined(t, ci);
+                                if oerr != blot_direct_types::Error.none { return oerr; }
+                                lget(g, vtag_loc);
+                                i32Const(g, g.types.variant_tags[cases.tags + ci]);
+                                op(g, OP_i32_eq);
+                                let cif = open(g, f, OP_if_);
+                                if is_out {
+                                    lget(g, w_a);
+                                    if payload_off != 0 {
+                                        i32Const(g, payload_off);
+                                        op(g, OP_i32_add);
+                                    }
+                                    ltee(g, tmp_a);
+                                    op(g, OP_i32_load); uleb(g, 2); uleb(g, 0);
+                                    lset(g, tmp_b);
+                                    emitPushWork(g, work_slot, 1, tmp_a, tmp_b, pidx as u32, dst_tmp);
+                                } else {
+                                    let perr = emitPushFlatChild(g, f, work_slot, w_a, payload_off, pty, tys[..], tmp_a, tmp_b, dst_tmp);
+                                    if perr != blot_direct_types::Error.none { return perr; }
+                                }
+                                close(g, f);
+                            }
                         }
                     }
                 },
@@ -934,9 +982,7 @@ fn emitStageRoot(
         op(g, OP_else_);
         // --- kind == 1: BoxPtr { patch_addr = w_a, ptr = w_b, compact_ty = w_ty } ---
         for t, ti in tys {
-            let t_boxed, tberr = isBoxed(g, f, t, 0);
-            if tberr != blot_direct_types::Error.none { return tberr; }
-            if !t_boxed { continue; }
+            if !needs_box_ptr[ti] { continue; }
             let is_rec, rerr = g.types.isRecursive(t);
             if rerr != blot_direct_types::Error.none { return rerr; }
             let logical_bytes, berr = blockBytes(g, f, t, 0);

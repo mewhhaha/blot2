@@ -281,6 +281,11 @@ struct Fn {
     unique_boxed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     // Non-escaping, non-boxed field projection references already emitted on unique_boxed bindings.
     unique_boxed_safe_refs: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    // Outer curried parameters of an inlined multi-arg lambda proven not captured in its peeled body.
+    inlined_uncaptured: u32[8] = [0; 8],
+    inlined_uncaptured_len: i64 = 0,
+    // Transitive depth of cross-function KnownClosure specialization for this body.
+    closure_spec_depth: u8 = 0,
     // Uniquely-owned local/own-param array/container bindings eligible for in-place spark reuse.
     unique_owned: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     loop_depth: u32 = 0,
@@ -1714,6 +1719,9 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return unitVal(), blot_direct_types::Error.none;
 }
 fn bindingCaptured(g: Generator&, f: const Fn&, binding: u32) -> bool {
+    for ui in 0..f.inlined_uncaptured_len {
+        if f.inlined_uncaptured[ui] == binding { return false; }
+    }
     let m .= g.units[f.unit - 1];
     let uid = (m.unit - 1) as i64;
     while g.s.captured_base.len < g.units.len { g.s.captured_base.push(0xffffffff); }

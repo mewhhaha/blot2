@@ -2651,8 +2651,12 @@ fn resolveWorkerSpec(g: Generator&, id: u32) -> i64, i64 {
 
 recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     let key = g.s.instances[id].key;
+    if g.s.parallel_readonly && key.kind == blot_direct_emit::InstanceKind.named && key.parent != 0 {
+        g.s.parallel_aborted = true;
+        return blot_direct_types::Error.unsupported;
+    }
     // Check if this named instance belongs to a specialized recursive worker SCC.
-    if key.kind == blot_direct_emit::InstanceKind.named && !g.s.instances[id].closure && !g.s.instances[id].inferring {
+    if key.kind == blot_direct_emit::InstanceKind.named && key.parent == 0 && !g.s.instances[id].closure && !g.s.instances[id].inferring {
         let spec_idx, scc_idx = resolveWorkerSpec(g, id);
         if g.s.parallel_aborted { return blot_direct_types::Error.unsupported; }
         if spec_idx >= 0 && scc_idx >= 0 {
@@ -2756,6 +2760,48 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
             bindPut(g, f, parameter.binding, pval);
             if at < 32 && ((own_mask >> (at as u32)) & 1) != 0 {
                 blot_support_zigmap::put(g.s.map_pool, f.unique_owned, parameter.binding, 1);
+            }
+        }
+        if key.parent != 0 && ((key.parent - 1) as i64) < g.s.closure_specs.len {
+            let cspec = g.s.closure_specs[(key.parent - 1) as i64];
+            f.closure_spec_depth = cspec.depth;
+            for si in 0..(cspec.len as i64) {
+                let sl = cspec.slots[si];
+                if (sl.param_idx as i64) >= (inputs.len as i64) { continue; }
+                let pval = g.s.vals[inputs.start + (sl.param_idx as i64)];
+                if ((sl.word_off as u32) + 1) >= pval.len { continue; }
+                var kc = KnownClosure {
+                    fn_local: w(g, pval, sl.word_off as i64),
+                    env_local: w(g, pval, (sl.word_off as i64) + 1),
+                    kind: sl.kind,
+                    unit: sl.unit,
+                    id: sl.id,
+                    instance_id: 0,
+                    full_ty: sl.full_ty,
+                    cap_count: sl.cap_count,
+                    cap_bindings: sl.cap_bindings,
+                    lambda_env: sl.lambda_env,
+                    depth: 0,
+                };
+                if sl.cap_count > 0 {
+                    let env_loc = kc.env_local;
+                    var off: u32 = 0;
+                    for ci in 0..(sl.cap_count as i64) {
+                        let cap_val, cerr = fresh(g, f, sl.cap_tys[ci], 0);
+                        if cerr != blot_direct_types::Error.none { return cerr; }
+                        for wi in 0..(cap_val.len as i64) {
+                            let word = g.s.words[cap_val.start + wi];
+                            opIndex(g, OP_local_get, env_loc);
+                            op(g, loadOp(g, f, word));
+                            uleb(g, 2);
+                            uleb(g, off);
+                            opIndex(g, OP_local_set, word);
+                            off += blot_direct_writer::wordBytes(localType(g, f, word));
+                        }
+                        kc.caps[ci] = cap_val;
+                    }
+                }
+                recordKnownClosure(f, kc);
             }
         }
         root = body.root;

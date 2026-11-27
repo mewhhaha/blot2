@@ -203,6 +203,25 @@ struct WorkerSpec {
     drop_word_start: u32 = 0,
     no_scope_alloc: bool = false,
 }
+// One statically known closure argument (or flat record/tuple field holding a
+// closure) passed into a closure-specialized `named` instance.
+struct ClosureSpecSlot {
+    param_idx: u8 = 0,
+    word_off: u8 = 0,
+    kind: u8 = 0,
+    cap_count: u8 = 0,
+    unit: u32 = 0,
+    id: u32 = 0,
+    full_ty: Ty = 0,
+    cap_tys: Ty[4] = [0; 4],
+    cap_bindings: u32[4] = [0; 4],
+    lambda_env: Env = Env {},
+}
+struct ClosureSpec {
+    len: u8 = 0,
+    depth: u8 = 0,
+    slots: ClosureSpecSlot[4] = [ClosureSpecSlot {}; 4],
+}
 // Four consecutive scalar locals start at w0. A tagged word indexes this
 // entry and encodes its lane in the low two bits.
 struct V128Shadow {
@@ -329,6 +348,9 @@ root struct State {
     // Specialized recursive worker specs: instance_id -> 1-based index into worker_specs.
     worker_map: U64Map = U64Map {},
     worker_specs: WorkerSpec[>..] = [],
+    // Cross-function KnownClosure specialization specs (1-based index stored in InstanceKey.parent).
+    closure_specs: ClosureSpec[>..] = [],
+    closure_spec_counts: U64Map = U64Map {},
     // Whole-program proof: false iff no NaN payload or NaN sign bit is observable
     // (no F32/F64/v128 `.bits`, no `@flat.*`, no float-bearing export/host/kernel ABI).
     float_bits_observable: bool = true,
@@ -798,9 +820,11 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     } else {
         growZerosU8(g.s.contents_memory, g.types.nodes.len - g.s.contents_memory.len);
     }
-    // A recursive type's flat form is a pointer into scope memory.
+    // A recursive type's flat form (or an outlined sum's variant) holds a pointer into scope memory.
     let is_recursive, recursive_error = g.types.isRecursive(ty);
     if recursive_error == blot_direct_types::Error.none && is_recursive { return true, blot_direct_types::Error.none; }
+    let has_out, out_error = g.types.hasOutlinedVariants(ty);
+    if out_error == blot_direct_types::Error.none && has_out { return true, blot_direct_types::Error.none; }
     let n = g.types.node(ty);
     var result = false;
     match n.tag {
@@ -1104,7 +1128,41 @@ fn within(g: Generator&, m: const Module&, ty: TId, reach: i64) -> bool {
 recursive fn named(g: Generator&, target: BindingRef, ty: Ty, site: const Module&, site_id: u32) -> u32, Error { return namedWith(g, target, ty, false, site, site_id, 0); }
 // `named`, where `unused_holes` says every hole of `ty` is unused.
 recursive fn namedWith(g: Generator&, target: BindingRef, ty: Ty, unused_holes: bool, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
-    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, 0, evidence_context };
+    return namedWithSpec(g, target, ty, 0, unused_holes, site, site_id, evidence_context);
+}
+fn sameClosureSpec(a: ClosureSpec, b: ClosureSpec) -> bool {
+    if a.len != b.len { return false; }
+    for i in 0..(a.len as i64) {
+        let sa = a.slots[i];
+        let sb = b.slots[i];
+        if sa.param_idx != sb.param_idx || sa.word_off != sb.word_off ||
+            sa.kind != sb.kind || sa.cap_count != sb.cap_count ||
+            sa.unit != sb.unit || sa.id != sb.id ||
+            sa.full_ty != sb.full_ty || sa.lambda_env.head != sb.lambda_env.head {
+            return false;
+        }
+        for ci in 0..(sa.cap_count as i64) {
+            if sa.cap_tys[ci] != sb.cap_tys[ci] || sa.cap_bindings[ci] != sb.cap_bindings[ci] {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+fn findClosureSpec(g: const Generator&, spec: ClosureSpec) -> u32 {
+    for i in 0..g.s.closure_specs.len {
+        if sameClosureSpec(g.s.closure_specs[i], spec) { return (i as u32) + 1; }
+    }
+    return 0;
+}
+fn internClosureSpec(g: Generator&, spec: ClosureSpec) -> u32 {
+    let existing = findClosureSpec(g, spec);
+    if existing != 0 { return existing; }
+    g.s.closure_specs.push(spec);
+    return g.s.closure_specs.len as u32;
+}
+recursive fn namedWithSpec(g: Generator&, target: BindingRef, ty: Ty, spec_id: u32, unused_holes: bool, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
+    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, spec_id, evidence_context };
     let found, present = find(g, key);
     if present { return found, blot_direct_types::Error.none; }
     let m .= unitModule(g, target.unit);
@@ -2102,6 +2160,7 @@ struct SharedSnapshot {
     reloc_staged: bool = false,
     push_entry_helper: u32 = 0,
     worker_specs_len: i64 = 0,
+    closure_specs_len: i64 = 0,
 }
 
 fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
@@ -2129,6 +2188,7 @@ fn takeSnapshot(g: const Generator&) -> SharedSnapshot {
         reloc_staged: blot_direct_relocations::hasStagedFlag(),
         push_entry_helper: g.s.push_entry_helper,
         worker_specs_len: g.s.worker_specs.len,
+        closure_specs_len: g.s.closure_specs.len,
     };
 }
 
@@ -2155,7 +2215,8 @@ fn sameSnapshot(a: SharedSnapshot, b: SharedSnapshot) -> bool {
         a.trap_closures == b.trap_closures &&
         a.reloc_staged == b.reloc_staged &&
         a.push_entry_helper == b.push_entry_helper &&
-        a.worker_specs_len == b.worker_specs_len;
+        a.worker_specs_len == b.worker_specs_len &&
+        a.closure_specs_len == b.closure_specs_len;
 }
 
 fn allKindFromCode(code: u8) -> InstanceKind, bool {
