@@ -85,6 +85,7 @@ Squid puts memory layout directly in the type so you choose dense storage withou
 | `#[T]` | Dynamic contiguous array, mutated in place |
 | `#[n; T]` | Fixed-length array with compile-time bounds-check elimination |
 | `%[T]` | Packed sequential storage: SoA record columns and split-stream sums |
+| `~[T]` | Reversible sequence (`Seq T`) with constant-time reverse and copy. Use `~[]` for an empty sequence when the element type is known. |
 | `*T` | Frozen value, shared by handle with zero copying |
 
 ```squid
